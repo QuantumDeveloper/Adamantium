@@ -1,39 +1,58 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
           xmlns:x="http://adamantium/ui/xaml/extensions"
           xmlns:controls="http://adamantium/ui">
+
+    <!-- Standard FluentDark button: subtle translucent control fill + control stroke, primary text, accent focus ring.
+         Static palette comes via {ResourceReference}; the runtime-mutable focus colour via {ThemeResource}. -->
     <Style Selector="Button">
-        <Setter Property="Width" Value="Auto"/>
-        <Setter Property="Height" Value="Auto"/>
-        <Setter Property="Background" Value="DarkGray"/>
-        <Setter Property="BorderBrush" Value="Yellow" />
+        <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
         <Setter Property="BorderThickness" Value="2"/>
         <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
+        <Setter Property="Padding" Value="11 5 11 6"/>
+        <Setter Property="MinHeight" Value="32"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
-    
+
     <Style Selector="Button">
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <controls:Grid>
-                        <controls:Border x:Name="InnerBorder"
-                                Width="{TemplateBinding Width}"
-                                Height="{TemplateBinding Height}"
-                                CornerRadius="{TemplateBinding CornerRadius}" 
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{ThemeResource AccentFillColorDefault}"
-                                BorderThickness="{TemplateBinding BorderThickness}">
-                                     <controls:ContentPresenter
-                                             HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                             VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                             Content="{TemplateBinding Content}"
-                                             ContentTemplate="{TemplateBinding ContentTemplate}"
-                                             ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
-                        </controls:Border>
-                    </controls:Grid>
+                    <controls:Border x:Name="InnerBorder"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <controls:ContentPresenter
+                                x:Name="PART_ContentPresenter"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                    </controls:Border>
                     <ControlTemplate.Triggers>
                         <PropertyTrigger Property="IsMouseOver" Value="true">
-                            <Setter TargetName="InnerBorder" Property="Background" Value="Red"/>
+                            <Setter TargetName="InnerBorder" Property="Background" Value="{ResourceReference ControlFillColorSecondary}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsPressed" Value="true">
+                            <Setter TargetName="InnerBorder" Property="Background" Value="{ResourceReference ControlFillColorTertiary}"/>
+                            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ResourceReference TextFillColorSecondary}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsFocused" Value="true">
+                            <Setter TargetName="InnerBorder" Property="BorderBrush" Value="{ThemeResource FocusStrokeColorOuter}"/>
+                            <Setter TargetName="InnerBorder" Property="BorderThickness" Value="2"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="IsEnabled" Value="false">
+                            <Setter TargetName="InnerBorder" Property="Background" Value="{ResourceReference ControlFillColorDisabled}"/>
+                            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ResourceReference TextFillColorDisabled}"/>
                         </PropertyTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

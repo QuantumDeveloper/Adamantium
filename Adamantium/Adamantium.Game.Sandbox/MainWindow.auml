@@ -9,7 +9,8 @@
         ContentTransition="SlideLeft"
         Width="1280"
         Height="720"
-        AnalyticAntialiasing="true">
+        AnalyticAntialiasing="true"
+        Background="{ResourceReference SolidBackgroundFillColorBase}">
     <Grid>
         <Button Width="150"
                 Height="150"
@@ -19,7 +20,7 @@
         </Button>
     <RenderTargetPanel x:Name="TestGrid1"
                        Opacity="0.95"
-                       Background="{ResourceReference ApproveBrush}">
+                       Background="{ResourceReference CardBackgroundFillColorDefault}">
         <RenderTargetPanel.Behaviors>
             <local:GameHostBehavior/>
         </RenderTargetPanel.Behaviors>

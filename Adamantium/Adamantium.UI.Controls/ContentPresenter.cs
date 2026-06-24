@@ -36,6 +36,14 @@ public class ContentPresenter : InputUIComponent
     public static readonly AdamantiumProperty TransitionDurationProperty = AdamantiumProperty.Register(nameof(TransitionDuration),
         typeof(Double), typeof(ContentPresenter), new PropertyMetadata(0.25));
 
+    // Text styling for string content (the auto-generated TextBlock). Template-bound from the templated parent (e.g. a
+    // Button's Foreground/FontSize) so theme states - Pressed/Disabled text colour - drive it.
+    public static readonly AdamantiumProperty ForegroundProperty = AdamantiumProperty.Register(nameof(Foreground),
+        typeof(Brush), typeof(ContentPresenter), new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender, OnTextStyleChanged));
+
+    public static readonly AdamantiumProperty FontSizeProperty = AdamantiumProperty.Register(nameof(FontSize),
+        typeof(Double), typeof(ContentPresenter), new PropertyMetadata(14.0, PropertyMetadataOptions.AffectsMeasure, OnTextStyleChanged));
+
     private static void OnContentPropertyChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
         if (a is ContentPresenter presenter)
@@ -112,7 +120,9 @@ public class ContentPresenter : InputUIComponent
             }
             else
             {
-                _currentRoot = new TextBlock { Text = newContent.ToString(), FontSize = 28 };
+                var textBlock = new TextBlock { Text = newContent.ToString(), FontSize = FontSize };
+                if (Foreground != null) textBlock.Foreground = Foreground;
+                _currentRoot = textBlock;
             }
         }
 
@@ -189,6 +199,32 @@ public class ContentPresenter : InputUIComponent
     {
         get => GetValue<Double>(TransitionDurationProperty);
         set => SetValue(TransitionDurationProperty, value);
+    }
+
+    public Brush Foreground
+    {
+        get => GetValue<Brush>(ForegroundProperty);
+        set => SetValue(ForegroundProperty, value);
+    }
+
+    public Double FontSize
+    {
+        get => GetValue<Double>(FontSizeProperty);
+        set => SetValue(FontSizeProperty, value);
+    }
+
+    // Pushes the (template-bound) text style onto the already-generated TextBlock, so a trigger changing Foreground or
+    // FontSize (Pressed/Disabled states) updates the text live, not only on the next content rebuild.
+    private static void OnTextStyleChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is ContentPresenter presenter) presenter.ApplyTextStyle();
+    }
+
+    private void ApplyTextStyle()
+    {
+        if (_currentRoot is not TextBlock textBlock) return;
+        textBlock.FontSize = FontSize;
+        if (Foreground != null) textBlock.Foreground = Foreground;
     }
 
     protected override Size MeasureOverride(Size availableSize)

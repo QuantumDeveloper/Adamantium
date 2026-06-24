@@ -116,7 +116,9 @@ public class StrokeRenderComponent : UIRenderComponent
         UIBasicEffect.Opacity.SetValue(RenderData.Opacity);
         if (Pen.Brush is SolidColorBrush solidColor)
         {
-            UIBasicEffect.FillColor.SetValue(solidColor.Color.ToVector4());
+            var fill = solidColor.Color.ToVector4();
+            fill.W *= (float)solidColor.Opacity;   // fold the brush's own Opacity into the colour alpha
+            UIBasicEffect.FillColor.SetValue(fill);
             UIBasicEffect.BasicSolidColorPass.Apply();
         }
         base.Render();
@@ -139,7 +141,9 @@ public class GeometryRenderComponent : UIRenderComponent
         UIBasicEffect.Opacity.SetValue(RenderData.Opacity);
         if (Background is SolidColorBrush solidColor)
         {
-            UIBasicEffect.FillColor.SetValue(solidColor.Color.ToVector4());
+            var fill = solidColor.Color.ToVector4();
+            fill.W *= (float)solidColor.Opacity;   // fold the brush's own Opacity into the colour alpha
+            UIBasicEffect.FillColor.SetValue(fill);
             if (solidColor == Brushes.Transparent)
             {
                 UIBasicEffect.Opacity.SetValue(0f);
@@ -196,7 +200,9 @@ public class ImageRenderComponent : UIRenderComponent
         
         if (Background is SolidColorBrush solidColor)
         {
-            UIBasicEffect.FillColor.SetValue(solidColor.Color.ToVector4());
+            var fill = solidColor.Color.ToVector4();
+            fill.W *= (float)solidColor.Opacity;   // fold the brush's own Opacity into the colour alpha
+            UIBasicEffect.FillColor.SetValue(fill);
         }
         
         if (Texture == null)

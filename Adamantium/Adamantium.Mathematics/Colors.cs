@@ -162,8 +162,11 @@ namespace Adamantium.Mathematics
             if (name.StartsWith("#"))
             {
                 var colorText = name.Replace("#", "");
-                return Color.FromBgra(Convert.ToUInt32(colorText, 16));
-                //return Color.FromRgba(Convert.ToUInt32(colorText, 16));
+                var argb = Convert.ToUInt32(colorText, 16);
+                // #RRGGBB (and shorter) carry no alpha - treat them as fully opaque, like every other toolkit. Only
+                // #AARRGGBB specifies its own alpha. Without this, 6-digit hex parsed as alpha 0 (fully transparent).
+                if (colorText.Length <= 6) argb |= 0xFF000000;
+                return Color.FromBgra(argb);
             }
 
             return ColorsMap[name];

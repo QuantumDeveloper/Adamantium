@@ -7,6 +7,7 @@ using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.Extensions;
@@ -61,7 +62,6 @@ public class WindowRenderService : UiRenderService
     private void CreateResources()
     {
         GraphicsDevice = _injectedDevice ?? GraphicsDeviceService.CreateRenderDevice();
-        GraphicsDevice.ClearColor = Colors.CornflowerBlue;
 
         windowRenderer = Window.Renderer ?? CreateRenderer();
         windowRenderer.SetWindow(Window);
@@ -107,6 +107,8 @@ public class WindowRenderService : UiRenderService
         // Refresh the analytic-AA switch from this window before recording (PreRender reads it in the beforeRenderPass
         // hook). Windows render serially, so this app-global flag is correct per window.
         Rendering.RenderUnits.AnalyticAa.Enabled = Window?.AnalyticAntialiasing ?? true;
+        // Backdrop = the window's Background (theme-owned), read each frame so a theme swap / runtime change reflects it.
+        GraphicsDevice.ClearColor = (Window?.Background as SolidColorBrush)?.Color ?? Colors.Black;
         GraphicsDevice.SetRenderTargets(windowRenderer.Presenter.RenderTarget);
         GraphicsDevice.SetDepthBuffer(windowRenderer.Presenter.DepthBuffer);
         GraphicsDevice.MSAALevel = windowRenderer.Presenter.MSAALevel;
