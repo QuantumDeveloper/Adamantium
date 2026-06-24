@@ -177,7 +177,7 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
 
         _effect.Projection.SetValue(RenderData.TransformMatrix * RenderData.ProjectionMatrix);
         var color = solid.Color.ToVector4();
-        color.W *= RenderData.Opacity;
+        color.W *= (float)solid.Opacity * RenderData.Opacity;   // colour alpha x brush Opacity x element Opacity
         _effect.FillColor.SetValue(color);
 
         _device.VertexType = typeof(FringeVertex);

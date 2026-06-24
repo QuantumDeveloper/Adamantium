@@ -26,7 +26,7 @@ VERTEX_OUTPUT UIVertexShader(UI_VERTEX input)
 float4 SolidColor_PS(VERTEX_OUTPUT input) : SV_TARGET
 {
 	float4 result = fillColor;
-    result.a = opacity;
+    result.a *= opacity;   // combine the colour's own alpha with the element/brush opacity (don't drop fillColor.a)
     return result;
 }
 

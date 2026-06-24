@@ -1,23 +1,36 @@
-﻿<ResourceDictionary xmlns:x="http://adamantium/ui/xaml/extensions"
+<ResourceDictionary xmlns:x="http://adamantium/ui/xaml/extensions"
         xmlns="http://adamantium/ui">
 
-    <SolidColorBrush x:Key="GeneralIconBrush" Color="#9B9B9B"/>
+    <!-- FluentDark static palette (WinUI dark tokens). Accent/focus are NOT here - they live on the Theme as
+         runtime-mutable properties (see FluentDark.auml + {ThemeResource}). Colour syntax: #RRGGBB is opaque,
+         #AARRGGBB carries explicit alpha (the translucent "over the layer" fills Fluent is built on). -->
 
-    <SolidColorBrush x:Key="LightIconBrush" Color="GhostWhite"/>
-    <SolidColorBrush x:Key="DarkIconBrush" Color="Black"/>
-    <SolidColorBrush x:Key="GeneralImageIconsBrush" Color="GhostWhite"/>
+    <!-- Layer / background fills -->
+    <SolidColorBrush x:Key="SolidBackgroundFillColorBase" Color="#202020"/>
+    <SolidColorBrush x:Key="SolidBackgroundFillColorSecondary" Color="#1C1C1C"/>
+    <SolidColorBrush x:Key="SolidBackgroundFillColorTertiary" Color="#282828"/>
+    <SolidColorBrush x:Key="CardBackgroundFillColorDefault" Color="#2D2D2D"/>
+    <SolidColorBrush x:Key="LayerFillColorDefault" Color="#4C3A3A3A"/>
 
-    <SolidColorBrush x:Key="SemitransparentBlackBrush" Color="Black" Opacity="0.6"/>
+    <!-- Control fills (translucent whites layered over the background) -->
+    <SolidColorBrush x:Key="ControlFillColorDefault" Color="#0FFFFFFF"/>
+    <SolidColorBrush x:Key="ControlFillColorSecondary" Color="#15FFFFFF"/>
+    <SolidColorBrush x:Key="ControlFillColorTertiary" Color="#08FFFFFF"/>
+    <SolidColorBrush x:Key="ControlFillColorDisabled" Color="#0BFFFFFF"/>
 
-    <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#171717"/>
+    <!-- Control strokes -->
+    <SolidColorBrush x:Key="ControlStrokeColorDefault" Color="#12FFFFFF"/>
+    <SolidColorBrush x:Key="ControlStrokeColorSecondary" Color="#18FFFFFF"/>
 
-    <SolidColorBrush x:Key="AlternationRowBackgroundBrush" Color="#1F1F1F"/>
+    <!-- Text -->
+    <SolidColorBrush x:Key="TextFillColorPrimary" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="TextFillColorSecondary" Color="#C5FFFFFF"/>
+    <SolidColorBrush x:Key="TextFillColorTertiary" Color="#87FFFFFF"/>
+    <SolidColorBrush x:Key="TextFillColorDisabled" Color="#5DFFFFFF"/>
 
-    <SolidColorBrush x:Key="ApproveBrush" Color="#36B99C"/>
-    <SolidColorBrush x:Key="DeclineBrush" Color="#F25233"/>
-    <SolidColorBrush x:Key="BasicTextColor" Color="#ffffff"/>
-    <SolidColorBrush x:Key="AdditionalSignsBlueBrush" Color="#82AED4"/>
-    <SolidColorBrush x:Key="ExtraMfaSecretTextColor" Color="#808080" />
-    <SolidColorBrush x:Key="MainQrCodeBarTextColor" Color="#b3b3b3"/>
+    <!-- Semantic (success / caution / critical) -->
+    <SolidColorBrush x:Key="SystemFillColorSuccess" Color="#6CCB5F"/>
+    <SolidColorBrush x:Key="SystemFillColorCaution" Color="#FCE100"/>
+    <SolidColorBrush x:Key="SystemFillColorCritical" Color="#FF99A4"/>
 
 </ResourceDictionary>

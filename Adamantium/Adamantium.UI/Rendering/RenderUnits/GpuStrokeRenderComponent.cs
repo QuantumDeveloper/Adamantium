@@ -298,7 +298,7 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
         // and transform are shared by every contour, so set them once, then draw each contour's expanded ribbon.
         _effect.Projection.SetValue(RenderData.TransformMatrix * RenderData.ProjectionMatrix);
         var color = (_pen.Brush as SolidColorBrush)?.Color.ToVector4() ?? new Vector4F(0, 0, 0, 1);
-        color.W *= RenderData.Opacity;   // StrokeDraw has no separate opacity uniform - fold it into alpha
+        color.W *= (float)(_pen.Brush?.Opacity ?? 1.0) * RenderData.Opacity;   // colour alpha x pen-brush Opacity x element Opacity
         _effect.StrokeColor.SetValue(color);
         // StrokePS reads these for the analytic-AA coverage (distance vs HalfThickness +/- Fringe/2).
         _effect.HalfThickness.SetValue((float)(_pen.Thickness / 2.0));

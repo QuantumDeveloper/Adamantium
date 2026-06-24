@@ -31,6 +31,9 @@ public abstract class ButtonBase : ContentControl
         new PropertyMetadata(default(Thickness),
             PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
 
+    public static readonly AdamantiumProperty FontSizeProperty = AdamantiumProperty.Register(nameof(FontSize),
+        typeof(double), typeof(ButtonBase), new PropertyMetadata(14.0, PropertyMetadataOptions.AffectsMeasure));
+
     public static readonly AdamantiumProperty ClickModeProperty = AdamantiumProperty.Register(nameof(ClickMode),
         typeof(ClickMode), typeof(ButtonBase), new PropertyMetadata(ClickMode.Release));
 
@@ -85,6 +88,12 @@ public abstract class ButtonBase : ContentControl
     {
         get => GetValue<Thickness>(PaddingProperty);
         set => SetValue(PaddingProperty, value);
+    }
+
+    public double FontSize
+    {
+        get => GetValue<double>(FontSizeProperty);
+        set => SetValue(FontSizeProperty, value);
     }
 
     public ClickMode ClickMode

@@ -2,7 +2,6 @@
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
-using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.Core.Templates;
 
@@ -215,11 +214,12 @@ public class ContentControl : Control, IContentControl
       {
          var child = (IMeasurableComponent)visual;
             
-         var childRect = CalculateChildArrangeRect(
-            finalSize, 
-            child.DesiredSize, 
-            HorizontalContentAlignment,
-            VerticalContentAlignment);
+         // A templated control's root fills the whole control; HorizontalContentAlignment is NOT consumed here - it
+         // flows through the template (to the ContentPresenter) to position the actual content. Only the untemplated
+         // path (hosting content directly) positions that content by the content alignment.
+         var childRect = Template != null
+            ? new Rect(finalSize)
+            : CalculateChildArrangeRect(finalSize, child.DesiredSize, HorizontalContentAlignment, VerticalContentAlignment);
                 
          child.Arrange(childRect);
       }

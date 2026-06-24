@@ -3,11 +3,7 @@
         xmlns="http://adamantium/ui"
         xmlns:local="http://adamantium/ui">
     <Style Selector="Border">
-        <Setter Property="Thickness" Value="3"/>
-        <Setter Property="Grid.Column" Value="2"/>
-        <Setter Property="Width" Value="Auto"/>
-        <Setter Property="Height" Value="Auto"/>
-        <Setter Property="BorderBrush" Value="{local:ResourceReference PanelBackgroundBrush}"/>
-        <Setter Property="Background" Value="{ResourceReference LightIconBrush}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="Background" Value="Transparent"/>
     </Style>
 </StyleSet>
