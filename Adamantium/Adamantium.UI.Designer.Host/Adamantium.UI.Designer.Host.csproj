@@ -25,4 +25,13 @@
         <ProjectReference Include="..\Adamantium.UI.Themes\Adamantium.UI.Themes.csproj" />
     </ItemGroup>
 
+    <!-- After building, stop any running designer host so the plugin respawns this fresh build on the next preview
+         render ("build = redeploy", no manual kill). IgnoreExitCode: taskkill returns non-zero when nothing is running.
+         The lock-proof isolated deploy (build while Game.Sandbox runs) is still deploy-designer-host.ps1. -->
+    <Target Name="StopRunningDesignerHost" AfterTargets="Build" Condition="'$(OS)' == 'Windows_NT'">
+        <!-- Stop-Process -ErrorAction SilentlyContinue is a no-op (and logs nothing) when the host isn't running, so it
+             never fails the build - unlike taskkill, which errors "process not found". -->
+        <Exec Command="powershell -NoProfile -Command &quot;Stop-Process -Name Adamantium.UI.Designer.Host -Force -ErrorAction SilentlyContinue&quot;" IgnoreExitCode="true" />
+    </Target>
+
 </Project>

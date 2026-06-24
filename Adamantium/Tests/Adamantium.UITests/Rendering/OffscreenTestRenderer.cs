@@ -80,7 +80,7 @@ internal sealed class OffscreenTestRenderer : IDisposable
     {
         var projection = root.GetProjectionMatrix();
         _renderCache.BuildFromVisualTree(root);
-        _renderCache.ProcessCommands(projection);
+        _renderCache.ProcessCommands(projection, 1.0);   // offscreen test renderer is 1:1 (no designer zoom)
 
         // Tooling overlays (selection frames) are a SECOND stage built from a flat list, rendered after the content
         // in the same frame so they sit on top. They share the projection and target; only the draw order differs.
@@ -89,7 +89,7 @@ internal sealed class OffscreenTestRenderer : IDisposable
         if (hasAdorners)
         {
             _adornerCache.BuildFromComponents(adorners, projection);
-            _adornerCache.ProcessCommands(projection);
+            _adornerCache.ProcessCommands(projection, 1.0);
         }
 
         _device.ClearColor = ClearColor;

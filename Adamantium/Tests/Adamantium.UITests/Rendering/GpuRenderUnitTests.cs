@@ -91,6 +91,47 @@ public class GpuRenderUnitTests
     }
 
     [Test]
+    public void Stroke_UniformOnlyPenChange_Repoints_NoRebuild()
+    {
+        // Real StrokeEffect -> the GPU stroke path (GpuStrokeRenderComponent), where TryRepoint lives.
+        var strokeEffect = new StrokeEffect(_device);
+        var unit = new RectangleRenderUnit(Command(Rect(Brushes.Red, BoxB, new Pen(Brushes.Black, 2))),
+            _device, (UIBasicEffect)_effect.Clone(), strokeEffect, _resourceFactory);
+        var stroke = unit.StrokeRenderer;
+        Assert.That(stroke, Is.InstanceOf<GpuStrokeRenderComponent>(), "solid pen + StrokeEffect -> GPU stroke");
+
+        // Thickness is a GPU uniform; buffer sizes don't change -> the SAME component is repointed, no per-frame realloc
+        // (the stroke-animation optimisation: dash offset / thickness / colour / trim all take this path).
+        unit.UpdateWithDrawCommand(Command(Rect(Brushes.Red, BoxB, new Pen(Brushes.Black, 7))));
+        Assert.That(unit.StrokeRenderer, Is.SameAs(stroke), "thickness-only pen change must repoint, not rebuild");
+
+        // A join change resizes the corner fans -> the buffer sizes differ, so it must rebuild (new component).
+        unit.UpdateWithDrawCommand(Command(Rect(Brushes.Red, BoxB, new Pen(Brushes.Black, 7, penLineJoin: PenLineJoin.Round))));
+        Assert.That(unit.StrokeRenderer, Is.Not.SameAs(stroke), "join change resizes buffers -> must rebuild");
+    }
+
+    [Test]
+    public void Line_DashOffsetOnlyChange_Repoints_NoRebuild()
+    {
+        var strokeEffect = new StrokeEffect(_device);
+        IDrawCommand LineCmd(double dashOffset, double endX) =>
+            Command(new LinePayload(new Vector2(0, 0), new Vector2((float)endX, 50),
+                new Pen(Brushes.Black, 3, dashOffset, new double[] { 6, 4 })));
+
+        var unit = new LineRenderUnit(LineCmd(0, 100), _device, (UIBasicEffect)_effect.Clone(), strokeEffect, _resourceFactory);
+        var stroke = unit.StrokeRenderer;
+        Assert.That(stroke, Is.InstanceOf<GpuStrokeRenderComponent>(), "solid dashed line -> GPU stroke");
+
+        // Same endpoints, only the dash offset animates -> repoint, no per-frame buffer rebuild (the reported case).
+        unit.UpdateWithDrawCommand(LineCmd(20, 100));
+        Assert.That(unit.StrokeRenderer, Is.SameAs(stroke), "dash-offset-only change on a line must repoint, not rebuild");
+
+        // Endpoint move changes the ribbon -> must rebuild.
+        unit.UpdateWithDrawCommand(LineCmd(20, 130));
+        Assert.That(unit.StrokeRenderer, Is.Not.SameAs(stroke), "endpoint move must rebuild");
+    }
+
+    [Test]
     public void ColourOnlyChange_KeepsGeometryRenderer_NoRebuild()
     {
         var unit = NewRectUnit(Rect(Brushes.Red, BoxA, pen: null));
@@ -223,8 +264,8 @@ public class GpuRenderUnitTests
         right.GeometryRenderer.ColorBlendEquation = ColorBlendEquations.Premultiplied;
 
         var proj = Matrix4x4F.OrthoOffCenter(0, 64, 0, 64, 0, 100000);
-        left.Update(Matrix4x4F.Identity, proj);
-        right.Update(Matrix4x4F.Identity, proj);
+        left.Update(Matrix4x4F.Identity, proj, 1.0);
+        right.Update(Matrix4x4F.Identity, proj, 1.0);
 
         var vp = new Viewport { Width = 64, Height = 64, MinDepth = 0, MaxDepth = 1 };
         var sc = new Rect2D { Offset = new Offset2D(), Extent = new Extent2D { Width = 64, Height = 64 } };

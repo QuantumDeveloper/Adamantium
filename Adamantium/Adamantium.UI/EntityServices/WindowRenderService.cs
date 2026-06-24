@@ -26,6 +26,10 @@ public class WindowRenderService : UiRenderService
 
     public IWindow Window { get; private set; }
 
+    /// <summary>The viewport zoom the content is rendered at (designer zoom; 1 = on-screen 1:1). The adorner overlay
+    /// stage renders at the same scale so its analytic AA (fringe width) matches the content.</summary>
+    public double RenderScale => windowRenderer?.RenderScale ?? 1.0;
+
     // Runtime path: EntityWorld.CreateService resolves the service via Activator.CreateInstance, which matches a
     // constructor by EXACT argument count (it ignores optional/default parameters). The runtime constructs this with
     // (world, window), so that 2-arg form needs its OWN constructor - an optional 3rd param would not be found.
@@ -100,6 +104,9 @@ public class WindowRenderService : UiRenderService
     
     public override bool BeginDraw()
     {
+        // Refresh the analytic-AA switch from this window before recording (PreRender reads it in the beforeRenderPass
+        // hook). Windows render serially, so this app-global flag is correct per window.
+        Rendering.RenderUnits.AnalyticAa.Enabled = Window?.AnalyticAntialiasing ?? true;
         GraphicsDevice.SetRenderTargets(windowRenderer.Presenter.RenderTarget);
         GraphicsDevice.SetDepthBuffer(windowRenderer.Presenter.DepthBuffer);
         GraphicsDevice.MSAALevel = windowRenderer.Presenter.MSAALevel;

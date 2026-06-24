@@ -266,7 +266,8 @@ public sealed class DesignerSession : IDisposable
 
         // MSAA x4 for crisp edges. Set before the service binds its presenter (the sample count is fixed at presenter
         // creation, so every previewed window uses the same).
-        window.MSAALevel = MSAALevel.X4;
+        // MSAA off: fills + strokes are analytically antialiased (GPU coverage fringe), matching WindowBase's default.
+        window.MSAALevel = MSAALevel.None;
 
         var service = GetRenderService(window);
         // Only a full build needs to drop the previous tree's units (new instances/RenderIds). On a reconcile the

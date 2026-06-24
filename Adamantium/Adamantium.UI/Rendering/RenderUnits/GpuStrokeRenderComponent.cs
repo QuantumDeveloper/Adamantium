@@ -28,11 +28,17 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
 
     private readonly GraphicsDevice _device;
     private readonly StrokeEffect _effect;
-    private readonly Pen _pen;
+    private Pen _pen;                        // mutable: TryRepoint swaps it for a uniform-only pen change (animation)
     private readonly bool _useCut;          // dash and/or trim -> the single-thread DashCut kernel + DrawIndirect
     private readonly bool _hasDashes;
     private readonly uint _joinType;        // 0 miter, 1 bevel, 2 round
     private readonly List<Contour> _contours = [];
+
+    // Continuous strokes expand to geometry-LOCAL ribbons (only the fringe width depends on scale), so reuse the
+    // expanded buffer every frame until the scale (or, via TryRepoint, the pen's expand uniforms) change. The dash/cut
+    // path is NOT cached (DashOffset/trim animate per frame).
+    private bool _expanded;
+    private float _expandedFringe = float.NaN;
 
     // Per-contour GPU state. The expander runs once per contour (its own points + output buffers), so combined/group
     // geometry strokes every contour instead of falling back to the CPU path.
@@ -69,6 +75,33 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
             var contour = BuildContour(points, isClosed, capNeedsFan, dashCapNeedsFan);
             if (contour != null) _contours.Add(contour);
         }
+    }
+
+    // Cheap pen update for animation. The pen's params (thickness, dash offset, trim values, colour) are GPU UNIFORMS,
+    // so when the SIZE-affecting params are unchanged (cut mode, join, caps, dash pattern -> same buffer sizes + fan
+    // counts) we just swap the pen and let PreRender re-dispatch with the new uniforms - NO per-frame buffer
+    // realloc/re-upload (that churn is what tanks FPS during stroke animation). Returns false (caller rebuilds via
+    // ProcessStrokeData) when a size-affecting param changed.
+    public bool TryRepoint(Pen newPen)
+    {
+        if (newPen.Brush is not SolidColorBrush) return false;   // non-solid -> CPU stroke path, not this component
+        var newHasDashes = newPen.DashStrokeArray is { Count: > 0 };
+        var newUseCut = newHasDashes || newPen.TrimStart > 0.0 || newPen.TrimEnd < 1.0;
+        if (newUseCut != _useCut) return false;                       // continuous <-> cut changes the buffer set
+        if (MapJoin(newPen.PenLineJoin) != _joinType) return false;  // join changes the corner fan size
+        if (MapCap(newPen.StartLineCap) != MapCap(_pen.StartLineCap)) return false;
+        if (MapCap(newPen.EndLineCap) != MapCap(_pen.EndLineCap)) return false;
+        if (MapCap(newPen.DashCap) != MapCap(_pen.DashCap)) return false;
+
+        // Dash pattern (buffer size + content): each GetPen() makes a NEW collection, so compare by value, not ref.
+        var oldDash = _pen.DashStrokeArray; var newDash = newPen.DashStrokeArray;
+        var oldN = oldDash?.Count ?? 0; var newN = newDash?.Count ?? 0;
+        if (oldN != newN) return false;
+        for (var i = 0; i < oldN; i++) if (oldDash[i] != newDash[i]) return false;
+
+        _pen = newPen;        // thickness/offset/trim-values/colour are uniforms (PreRender/Render); buffers stay valid
+        _expanded = false;    // re-dispatch so an expand-uniform change (e.g. thickness) takes effect
+        return true;
     }
 
     // Builds the GPU buffers for one contour. Returns null for a degenerate contour (no thread/vertex work).
@@ -125,7 +158,8 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
 
         if (c.ThreadCount == 0 || c.VertexCount == 0) return null;
 
-        c.VertexBuffer = ToDispose(Buffer.New(_device, (ulong)(c.VertexCount * 2 * sizeof(float)),
+        // 3 floats/vertex now: (x, y, signed perpendicular distance) - the distance drives the analytic-AA coverage.
+        c.VertexBuffer = ToDispose(Buffer.New(_device, (ulong)(c.VertexCount * 3 * sizeof(float)),
             BufferUsageFlags.VertexBuffer | BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
             MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal));
         return c;
@@ -184,11 +218,29 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
         _ => 0u
     };
 
+    // AA feather width in geometry-LOCAL units (~1 device px). The ribbon is widened/feathered in local space and only
+    // the viewport applies the designer zoom, so divide 1 device px by the local->device scale (transform area scale *
+    // RenderScale) - keeps the AA ~1 device px at any zoom. Mirrors GpuFillRenderComponent.ComputeFringeWidth.
+    private float ComputeFringe()
+    {
+        if (!AnalyticAa.Enabled) return 0f;   // AA off: no feather - the ribbon stays a hard +/-HalfThickness band
+        var t = RenderData.TransformMatrix;
+        var worldScale = (float)System.Math.Sqrt(System.Math.Abs(t.M11 * t.M22 - t.M12 * t.M21));
+        var deviceScale = worldScale * (float)RenderData.RenderScale;
+        return deviceScale > 1e-4f ? 1.0f / deviceScale : 1.0f;
+    }
+
     // Compute runs OUT of the render pass: PreRender is recorded from BeginDraw's beforeRenderPass hook
     // (WindowRenderService.BeginDraw -> ForwardWindowRenderer.PreRender -> RenderUnit.PreRender -> here). Each contour
     // sets its own uniforms, dispatches the expander, and barriers its output for the draw.
     public override void PreRender()
     {
+        var fringe = ComputeFringe();
+        // Static continuous stroke already expanded at this scale -> reuse it (skip the per-frame compute+barrier). The
+        // dash/cut path always re-runs (its offset/trim animate).
+        if (!_useCut && _expanded && fringe == _expandedFringe) return;
+        _expanded = true;
+        _expandedFringe = fringe;
         foreach (var c in _contours)
         {
             _effect.PointsAddress.SetValue(c.PointsBuffer.GetDeviceAddress());
@@ -204,6 +256,7 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
             _effect.EndCap.SetValue(_useCut || !c.IsClosed ? MapCap(_pen.EndLineCap) : 0u);
             _effect.DashCap.SetValue(MapCap(_pen.DashCap));   // dash/dot piece caps (cut path only)
             _effect.HalfThickness.SetValue((float)(_pen.Thickness / 2.0));
+            _effect.Fringe.SetValue(fringe);   // AA feather: the expander widens the ribbon/discs by Fringe/2
 
             if (_useCut)
             {
@@ -247,6 +300,9 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
         var color = (_pen.Brush as SolidColorBrush)?.Color.ToVector4() ?? new Vector4F(0, 0, 0, 1);
         color.W *= RenderData.Opacity;   // StrokeDraw has no separate opacity uniform - fold it into alpha
         _effect.StrokeColor.SetValue(color);
+        // StrokePS reads these for the analytic-AA coverage (distance vs HalfThickness +/- Fringe/2).
+        _effect.HalfThickness.SetValue((float)(_pen.Thickness / 2.0));
+        _effect.Fringe.SetValue(ComputeFringe());
 
         _device.VertexType = typeof(StrokeVertex);
         _device.PolygonMode = PolygonMode.Fill;

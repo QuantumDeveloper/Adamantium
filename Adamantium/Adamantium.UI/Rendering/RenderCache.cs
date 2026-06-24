@@ -81,12 +81,12 @@ public class RenderCache
         _renderUnits.Clear();
     }
 
-    public void ProcessCommands(Matrix4x4F projectionMatrix)
+    public void ProcessCommands(Matrix4x4F projectionMatrix, double renderScale)
     {
         foreach (var unit in _renderUnits)
         {
             var transform = unit.Component.WorldTransform;
-            unit.Update(transform, projectionMatrix);
+            unit.Update(transform, projectionMatrix, renderScale);
         }
     }
     

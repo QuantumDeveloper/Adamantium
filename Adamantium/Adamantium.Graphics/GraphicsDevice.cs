@@ -482,7 +482,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     public ShaderEXT CreateShader(ShaderCreateInfoEXT shaderCreateInfo)
     {
-        //return LogicalDevice.CreateShader(shaderCreateInfo);
         LogicalDevice.CreateShadersEXT(1, shaderCreateInfo, null, out var shaderObject);
         return shaderObject[0];
     }

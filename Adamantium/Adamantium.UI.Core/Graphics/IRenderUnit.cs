@@ -6,7 +6,7 @@ public interface IRenderUnit : IDisposable
 {
     IUIComponent Component { get; }
     void DeferDispose();
-    void Update(Matrix4x4F transform, Matrix4x4F projection);
+    void Update(Matrix4x4F transform, Matrix4x4F projection, double renderScale);
     /// <summary>Out-of-render-pass work recorded before BeginRendering (e.g. shared-surface latch copies).</summary>
     void PreRender();
     void Render();

@@ -76,11 +76,17 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
             PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsMeasure |
             PropertyMetadataOptions.AffectsRender, ClientHeightChangedCallBack));
         
-    public static readonly AdamantiumProperty MSAALevelProperty = AdamantiumProperty.Register(nameof(MSAALevel), 
+    public static readonly AdamantiumProperty MSAALevelProperty = AdamantiumProperty.Register(nameof(MSAALevel),
         typeof(MSAALevel), typeof(WindowBase),
-        new PropertyMetadata(MSAALevel.X4, PropertyMetadataOptions.AffectsRender, MSAALevelChangedCallback));
+        new PropertyMetadata(MSAALevel.None, PropertyMetadataOptions.AffectsRender, MSAALevelChangedCallback));
 
-    public static readonly AdamantiumProperty StateProperty = AdamantiumProperty.Register(nameof(State), 
+    // Live toggle for the GPU analytic AA (fill coverage fringe + feathered strokes), independent of MSAALevel so both
+    // can be A/B-compared. AffectsRender re-renders on change; the render path reads it each frame (no rebuild needed).
+    public static readonly AdamantiumProperty AnalyticAntialiasingProperty = AdamantiumProperty.Register(nameof(AnalyticAntialiasing),
+        typeof(bool), typeof(WindowBase),
+        new PropertyMetadata(true, PropertyMetadataOptions.AffectsRender));
+
+    public static readonly AdamantiumProperty StateProperty = AdamantiumProperty.Register(nameof(State),
         typeof(WindowState), typeof(WindowBase),
         new PropertyMetadata(WindowState.Normal, PropertyMetadataOptions.AffectsRender, StateChangedCallback));
 
@@ -164,6 +170,12 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     {
         get => GetValue<MSAALevel>(MSAALevelProperty);
         set => SetValue(MSAALevelProperty, value);
+    }
+
+    public bool AnalyticAntialiasing
+    {
+        get => GetValue<bool>(AnalyticAntialiasingProperty);
+        set => SetValue(AnalyticAntialiasingProperty, value);
     }
 
     public WindowState State

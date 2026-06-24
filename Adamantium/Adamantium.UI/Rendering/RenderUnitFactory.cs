@@ -15,6 +15,7 @@ public class RenderUnitFactory : IRenderUnitFactory
     private readonly IResourceFactory _resourceFactory;
     private UIBasicEffect _uiBasicEffect;
     private StrokeEffect _strokeEffect;
+    private FillFringeEffect _fillFringeEffect;
 
     public RenderUnitFactory(IGraphicsDevice graphicsDevice, IResourceFactory resourceFactory)
     {
@@ -22,12 +23,13 @@ public class RenderUnitFactory : IRenderUnitFactory
         _resourceFactory = resourceFactory;
         _uiBasicEffect = new UIBasicEffect(_graphicsDevice);
         _strokeEffect = new StrokeEffect(_graphicsDevice);
+        _fillFringeEffect = new FillFringeEffect(_graphicsDevice);
         _registeredFactories = new Dictionary<Type, Func<IDrawCommand, IRenderUnit>>();
-        RegisterFactory<RectanglePayload>(command => new RectangleRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory));
-        RegisterFactory<EllipsePayload>(command => new EllipseRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory));
+        RegisterFactory<RectanglePayload>(command => new RectangleRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory, _fillFringeEffect));
+        RegisterFactory<EllipsePayload>(command => new EllipseRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory, _fillFringeEffect));
         RegisterFactory<LinePayload>(command => new LineRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory));
         RegisterFactory<ImagePayload>(command => new ImageRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory));
-        RegisterFactory<GeometryPayload>(command => new GeometryRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory));
+        RegisterFactory<GeometryPayload>(command => new GeometryRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory, _fillFringeEffect));
         RegisterFactory<TextPayload>(command => new TextRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory));
     }
 

@@ -58,6 +58,7 @@ public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost
     public double Top { get; set; }
     public string Title { get; set; }
     public MSAALevel MSAALevel { get; set; }
+    public bool AnalyticAntialiasing { get; set; } = true;
     public WindowState State { get; set; }
     public IWindowRenderer DefaultRenderer { get; set; }
     public IWindowRenderer Renderer { get; set; }
