@@ -87,6 +87,35 @@ public class CombinedGeometryTests
         Assert.IsFalse(Covered(m, new Vector2(50, 50)), "overlap excluded");
     }
 
+    // ---- nested inputs (one fully inside the other, no edge crossings) -> the non-crossing fast path ----
+    // This is the Border's geometry: outer [0,100]^2 with inner [30,70]^2 fully inside it.
+
+    [Test]
+    public void Nested_Exclude_FormsRing()
+    {
+        var m = Combine(GeometryCombineMode.Exclude, NestedOuter(), NestedInner());
+        Assert.IsTrue(Covered(m, new Vector2(10, 50)), "ring (in outer, outside inner) kept");
+        Assert.IsFalse(Covered(m, new Vector2(50, 50)), "centre (the hole) removed");
+        Assert.IsFalse(Covered(m, new Vector2(150, 150)), "exterior empty");
+    }
+
+    [Test]
+    public void Nested_Intersect_KeepsInner()
+    {
+        var m = Combine(GeometryCombineMode.Intersect, NestedOuter(), NestedInner());
+        Assert.IsTrue(Covered(m, new Vector2(50, 50)), "inner (in both) kept");
+        Assert.IsFalse(Covered(m, new Vector2(10, 50)), "ring (outer only) not in intersection");
+    }
+
+    [Test]
+    public void Nested_Union_KeepsOuter()
+    {
+        var m = Combine(GeometryCombineMode.Union, NestedOuter(), NestedInner());
+        Assert.IsTrue(Covered(m, new Vector2(50, 50)), "centre filled");
+        Assert.IsTrue(Covered(m, new Vector2(10, 50)), "ring filled");
+        Assert.IsFalse(Covered(m, new Vector2(150, 150)), "exterior empty");
+    }
+
     // Regression: nested ellipses (one fully inside the other) combined into a solid shape must fill cleanly.
     // Before coordinate snapping, floating-point-noise-equal points were treated as distinct and the triangulator
     // cut spurious strips/bands through the disc -> some interior samples were left uncovered.
@@ -107,6 +136,8 @@ public class CombinedGeometryTests
     static RectangleGeometry DisjointB() => new(new Rect(100, 0, 40, 40));
     static RectangleGeometry OverlapA() => new(new Rect(0, 0, 60, 60));
     static RectangleGeometry OverlapB() => new(new Rect(40, 40, 60, 60));
+    static RectangleGeometry NestedOuter() => new(new Rect(0, 0, 100, 100));
+    static RectangleGeometry NestedInner() => new(new Rect(30, 30, 40, 40));
 
     static Mesh Combine(GeometryCombineMode mode, Geometry g1, Geometry g2)
     {

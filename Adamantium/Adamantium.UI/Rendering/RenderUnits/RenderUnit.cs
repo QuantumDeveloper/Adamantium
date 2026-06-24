@@ -88,7 +88,20 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
         contours = list;
         return true;
     }
-    
+
+    // On a geometry change, try to rewrite the existing GPU stroke's points in place (same topology + size-compatible
+    // pen) instead of rebuilding it - the resize fast path. False (caller rebuilds via ProcessStrokeData) for the CPU
+    // stroke, the dash/cut path, or a topology/pen-size change.
+    protected bool TryUpdateStroke(Pen pen, Geometry geometry)
+    {
+        if (pen == null || StrokeRenderer is not GpuStrokeRenderComponent gpuStroke) return false;
+        if (!TryGetSolidContours(pen, geometry, out var contours)) return false;
+        if (!gpuStroke.TryUpdateGeometry(contours, pen)) return false;
+
+        gpuStroke.RenderData = DrawCommand.RenderData;
+        return true;
+    }
+
     // Analytic AA: build a GPU coverage fringe around a SOLID fill's CLOSED contours, drawn over the body for a soft
     // ~1px edge. Only a solid-colour fill with a real closed contour gets it; otherwise no fringe (no fill AA).
     protected void ProcessFillFringe(Geometry geometry, Brush brush)
@@ -244,7 +257,8 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
         // thickness / colour / trim animation) on the existing GPU stroke, rebuilding only if the buffer sizes change.
         if (rebuild)
         {
-            ProcessStrokeData(inputPayload.Pen, inputPayload.Geometry);
+            if (!TryUpdateStroke(inputPayload.Pen, inputPayload.Geometry))
+                ProcessStrokeData(inputPayload.Pen, inputPayload.Geometry);
         }
         else if (!Equals(oldPen, inputPayload.Pen) &&
                  !(StrokeRenderer is GpuStrokeRenderComponent gs && gs.TryRepoint(inputPayload.Pen)))
@@ -281,7 +295,8 @@ public class LineRenderUnit : RenderUnit<LinePayload>
         {
             var geometry = new LineGeometry(inputPayload.LineStart, inputPayload.LineEnd);
             geometry.ProcessGeometry(GeometryType.Both);
-            ProcessStrokeData(inputPayload.Pen, geometry);
+            if (!TryUpdateStroke(inputPayload.Pen, geometry))
+                ProcessStrokeData(inputPayload.Pen, geometry);
         }
         else if (!Equals(oldPayload.Pen, inputPayload.Pen) &&
                  !(StrokeRenderer is GpuStrokeRenderComponent gs && gs.TryRepoint(inputPayload.Pen)))
@@ -332,7 +347,8 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
         // rebuild (process the geometry first, since it wasn't processed in the non-rebuild branch).
         if (rebuild)
         {
-            ProcessStrokeData(inputPayload.Pen, rectangleGeometry);
+            if (!TryUpdateStroke(inputPayload.Pen, rectangleGeometry))
+                ProcessStrokeData(inputPayload.Pen, rectangleGeometry);
         }
         else if (!Equals(oldPen, inputPayload.Pen) &&
                  !(StrokeRenderer is GpuStrokeRenderComponent gs && gs.TryRepoint(inputPayload.Pen)))
@@ -387,7 +403,8 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
         // rebuild (process the geometry first, since it wasn't processed in the non-rebuild branch).
         if (rebuild)
         {
-            ProcessStrokeData(inputPayload.Pen, ellipseGeometry);
+            if (!TryUpdateStroke(inputPayload.Pen, ellipseGeometry))
+                ProcessStrokeData(inputPayload.Pen, ellipseGeometry);
         }
         else if (!Equals(oldPen, inputPayload.Pen) &&
                  !(StrokeRenderer is GpuStrokeRenderComponent gs && gs.TryRepoint(inputPayload.Pen)))

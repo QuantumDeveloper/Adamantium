@@ -58,6 +58,55 @@ namespace Adamantium.MathTests
                 sb.AppendLine($"  squares={k,4}  tris={tris,6}  median={ms,9:F3} ms  min={min,9:F3} ms");
             }
 
+            // The geometry an animated Button re-triangulates every frame: a rounded rectangle (4 arc corners +
+            // 4 straight edges), one convex contour -> the FanTriangulate fast path. This is the case the resize
+            // animation hammers, so it must be ~free. tess = arc segments per corner (engine default is 20).
+            sb.AppendLine();
+            sb.AppendLine("== Rounded rect (button border, single convex contour -> fan) ==");
+            foreach (var tess in new[] { 4, 8, 16, 20, 32 })
+            {
+                var pts = RoundedRect(150, 80, 8, tess);
+                var (ms, min, tris) = Measure(() => Single(pts), 5, 50);
+                sb.AppendLine($"  tess={tess,3}  pts={pts.Length,4}  tris={tris,4}  median={ms,9:F4} ms  min={min,9:F4} ms");
+            }
+
+            // One second of resize animation @ 60 fps: 60 distinct widths, each triangulated once. Reports the
+            // total per-frame-equivalent cost so we know whether triangulation alone could stall the animation.
+            sb.AppendLine();
+            sb.AppendLine("== Rounded rect resize sweep (60 frames @ tess=20) ==");
+            {
+                var frames = new Vector2[60][];
+                for (int i = 0; i < 60; i++) frames[i] = RoundedRect(120 + i, 80, 8, 20);
+                var (ms, min, _) = Measure(() =>
+                {
+                    foreach (var f in frames) Single(f).FillIndirect();
+                    return Single(frames[0]); // returned poly is re-filled by Measure; the sweep above is the work
+                }, 2, 20);
+                sb.AppendLine($"  60 triangulations  median={ms,9:F3} ms  min={min,9:F3} ms  (per frame ~{ms / 60:F4} ms)");
+            }
+
+            // THE actual per-frame cost of an animated Button's BORDER. The border is a ring drawn as
+            // CombinedGeometry.Exclude(outer rounded rect, inner rounded rect), which triangulates via the
+            // SCANLINE (Polygon.FillDirect), NOT the fast nesting path. Same shape as the Annulus case above, but
+            // routed through the slow path - so this is the apples-to-apples cost the Border pays every frame.
+            sb.AppendLine();
+            sb.AppendLine("== Border ring (CombinedGeometry.Exclude -> scanline / FillDirect) ==");
+            foreach (var tess in new[] { 4, 8, 16, 20 })
+            {
+                var (ms, min, tris) = MeasureDirect(() => BorderRing(tess), 3, 20);
+                sb.AppendLine($"  tess={tess,3}  median={ms,9:F3} ms  min={min,9:F3} ms  tris={tris,4}");
+            }
+
+            // For contrast: the SAME ring fed to the fast nesting path (FillIndirect -> earcut-with-holes). This is
+            // what the border WOULD cost if CombinedGeometry routed clean (non-crossing) nesting through it.
+            sb.AppendLine();
+            sb.AppendLine("== Border ring (same shape -> fast nesting / FillIndirect) ==");
+            foreach (var tess in new[] { 4, 8, 16, 20 })
+            {
+                var (ms, min, tris) = Measure(() => BorderRingFast(tess), 3, 20);
+                sb.AppendLine($"  tess={tess,3}  median={ms,9:F3} ms  min={min,9:F3} ms  tris={tris,4}");
+            }
+
             var text = sb.ToString();
             try { System.IO.File.WriteAllText(@"C:\Temp\tri_bench.txt", text); } catch { }
             TestContext.Progress.WriteLine(text);
@@ -76,6 +125,61 @@ namespace Adamantium.MathTests
             var p = new Polygon { FillRule = FillRule.EvenOdd };
             p.AddContour(new MeshContour(Circle(n, 100)));
             p.AddContour(new MeshContour(Circle(n, 50)));
+            return p;
+        }
+
+        // Faithful copy of Shapes.Rectangle.GenerateRoundCorner: tess+1 points per 90-degree corner, snapped to
+        // 3 decimals, in the engine's corner order (TL -180, TR 90, BR 0, BL -90). Produces the exact contour the
+        // RectangleRenderUnit feeds the triangulator for a rounded border.
+        static Vector2[] RoundedRect(double w, double h, double radius, int tess)
+        {
+            radius = Math.Min(radius, Math.Min(w, h) / 2);
+            double halfW = w / 2, halfH = h / 2;
+            var v = new List<Vector2>();
+
+            void Corner(double startDeg, Vector2 center)
+            {
+                double step = -MathHelper.DegreesToRadians(90.0 / tess);
+                double a = MathHelper.DegreesToRadians(startDeg);
+                for (int i = 0; i <= tess; i++)
+                {
+                    var x = center.X + radius * Math.Cos(a);
+                    var y = center.Y - radius * Math.Sin(a);
+                    a += step;
+                    v.Add(Vector2.Round(new Vector2(x, y), 3));
+                }
+            }
+
+            Corner(-180, new Vector2(-halfW + radius, -halfH + radius));
+            Corner(90, new Vector2(halfW - radius, -halfH + radius));
+            Corner(0, new Vector2(halfW - radius, halfH - radius));
+            Corner(-90, new Vector2(-halfW + radius, halfH - radius));
+            return v.ToArray();
+        }
+
+        // Outer + inner rounded rect (inner inset by a 2px border thickness, winding reversed so NonZero leaves the
+        // interior as a hole = a ring). Returns the merged points+segments exactly as CombinedGeometry hands them to
+        // Polygon.FillDirect for the Border's stroke.
+        static (List<GeometryIntersection> pts, List<GeometrySegment> segs) BorderRing(int tess)
+        {
+            var outer = new MeshContour(RoundedRect(150, 80, 8, tess), true, true);
+            var innerPts = RoundedRect(146, 76, 6, tess);
+            Array.Reverse(innerPts);   // opposite winding -> NonZero treats the interior as a hole
+            var inner = new MeshContour(innerPts, true, true);
+
+            var pts = new List<GeometryIntersection>(outer.GeometryPoints);
+            pts.AddRange(inner.GeometryPoints);
+            var segs = new List<GeometrySegment>(outer.Segments);
+            segs.AddRange(inner.Segments);
+            return (pts, segs);
+        }
+
+        // Same outer+inner ring, but as two plain contours on one Polygon -> FillIndirect picks the fast nesting path.
+        static Polygon BorderRingFast(int tess)
+        {
+            var p = new Polygon { FillRule = FillRule.EvenOdd };
+            p.AddContour(new MeshContour(RoundedRect(150, 80, 8, tess)));
+            p.AddContour(new MeshContour(RoundedRect(146, 76, 6, tess)));
             return p;
         }
 
@@ -104,6 +208,28 @@ namespace Adamantium.MathTests
                     new Vector2(x, y), new Vector2(x + 20, y), new Vector2(x + 20, y + 20), new Vector2(x, y + 20) }));
             }
             return p;
+        }
+
+        // Variant of Measure for the scanline path, which is driven by FillDirect(points, segments) rather than
+        // FillIndirect() on contours. The inputs are rebuilt each run (FillDirect mutates/rounds them in place).
+        static (double median, double min, int tris) MeasureDirect(
+            Func<(List<GeometryIntersection> pts, List<GeometrySegment> segs)> build, int warmup, int runs)
+        {
+            for (int i = 0; i < warmup; i++) { var (p, s) = build(); new Polygon(FillRule.NonZero).FillDirect(p, s); }
+            var times = new List<double>();
+            int tris = 0;
+            for (int i = 0; i < runs; i++)
+            {
+                var (p, s) = build();
+                GC.Collect(); GC.WaitForPendingFinalizers();
+                var sw = Stopwatch.StartNew();
+                var v = new Polygon(FillRule.NonZero).FillDirect(p, s);
+                sw.Stop();
+                times.Add(sw.Elapsed.TotalMilliseconds);
+                tris = v.Count / 3;
+            }
+            times.Sort();
+            return (times[times.Count / 2], times[0], tris);
         }
 
         static (double median, double min, int tris) Measure(Func<Polygon> build, int warmup, int runs)

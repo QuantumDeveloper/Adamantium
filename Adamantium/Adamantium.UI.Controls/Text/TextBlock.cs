@@ -68,10 +68,49 @@ public class TextBlock : InputUIComponent
 
     private TextLayout _textLayout;
 
+    // Text shaping (ProcessText) is expensive, and measure+arrange both ran it EVERY layout pass - so a control whose
+    // size animates (e.g. a Button growing, whose templated ContentPresenter re-measures this TextBlock each frame)
+    // re-shaped the same unchanged text twice per frame. Cache the result and only re-shape when an input that actually
+    // affects the layout changes.
+    private Size _cachedSize;
+    private bool _hasLayout;
+    private string _lastText;
+    private double _lastFontSize, _lastWidth, _lastHeight;
+    private TextWrapping _lastWrapping;
+    private TextTrimming _lastTrimming;
+    private HorizontalTextAlignment _lastHAlign;
+    private VerticalTextAlignment _lastVAlign;
+    private bool _lastJustify;
+
     public TextBlock()
     {
         Id = Guid.NewGuid().ToString();
         _textLayout = new TextLayout(FontFamily.Typeface, FontFamily.Fonts[0]);
+    }
+
+    // Shapes the text only when an input that affects the layout changed since the last call; otherwise returns the
+    // cached size (and leaves _textLayout as-is). Cheap to call every measure/arrange/render. Width/Height use
+    // double.Equals so NaN==NaN counts as "unchanged" (an auto-sized label stays a cache hit while its parent resizes).
+    private Size EnsureLayout()
+    {
+        if (_hasLayout
+            && _lastText == Text && _lastFontSize.Equals(FontSize)
+            && _lastWidth.Equals(Width) && _lastHeight.Equals(Height)
+            && _lastWrapping == TextWrapping && _lastTrimming == TextTrimming
+            && _lastHAlign == HorizontalTextAlignment && _lastVAlign == VerticalTextAlignment
+            && _lastJustify == JustifyLastLine)
+        {
+            return _cachedSize;
+        }
+
+        _cachedSize = _textLayout.ProcessText(Text, FontSize, new Size(Width, Height), TextWrapping, TextTrimming,
+            HorizontalTextAlignment, VerticalTextAlignment, JustifyLastLine);
+
+        _hasLayout = true;
+        _lastText = Text; _lastFontSize = FontSize; _lastWidth = Width; _lastHeight = Height;
+        _lastWrapping = TextWrapping; _lastTrimming = TextTrimming;
+        _lastHAlign = HorizontalTextAlignment; _lastVAlign = VerticalTextAlignment; _lastJustify = JustifyLastLine;
+        return _cachedSize;
     }
 
     public string Text
@@ -144,33 +183,9 @@ public class TextBlock : InputUIComponent
         set => SetValue(StrokeProperty, value);
     }
 
-    protected override Size MeasureOverride(Size availableSize)
-    {
-        var size = _textLayout.ProcessText(Text, 
-            FontSize, 
-            new Size(Width, Height), 
-            TextWrapping,
-            TextTrimming,
-            HorizontalTextAlignment,
-            VerticalTextAlignment,
-            JustifyLastLine);
-        
-        return size;
-    }
+    protected override Size MeasureOverride(Size availableSize) => EnsureLayout();
 
-    protected override Size ArrangeOverride(Size finalSize)
-    {
-        var size = _textLayout.ProcessText(Text, 
-            FontSize, 
-            new Size(Width, Height), 
-            TextWrapping,
-            TextTrimming,
-            HorizontalTextAlignment,
-            VerticalTextAlignment,
-            JustifyLastLine);
-
-        return size;
-    }
+    protected override Size ArrangeOverride(Size finalSize) => EnsureLayout();
 
     TextRenderingParameters GetTextRenderingParameters()
     {
@@ -190,6 +205,7 @@ public class TextBlock : InputUIComponent
 
     protected override void OnRender(IDrawingContext context)
     {
+        EnsureLayout();   // refresh shaping if a render-only property (alignment/wrapping) changed since the last measure
         context.ForControl(this).DrawText(GetTextRenderingParameters(), DesiredSize, _textLayout, Foreground, Background, Stroke);
     }
 }

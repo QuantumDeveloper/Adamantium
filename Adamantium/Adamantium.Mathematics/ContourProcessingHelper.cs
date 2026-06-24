@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Adamantium.Mathematics.Triangulation;
 
 namespace Adamantium.Mathematics;
@@ -10,27 +11,37 @@ public static class ContourProcessingHelper
         var intersectionsList = new Dictionary<Vector2, GeometryIntersection>();
         var mesh1Intersections = new Dictionary<GeometrySegment, SortedList<double, GeometryIntersection>>();
         var mesh2Intersections = new Dictionary<GeometrySegment, SortedList<double, GeometryIntersection>>();
-        
+
+        // Seed every segment with its own endpoints ONCE (the old double loop re-seeded segment2's endpoints n*m times).
         foreach (var segment1 in contoursSegments1)
         {
             mesh1Intersections[segment1] = new SortedList<double, GeometryIntersection>();
-            
-            // add start and end points of segment1
             ProcessIntersection(segment1.Start, intersectionsList, mesh1Intersections, segment1);
             ProcessIntersection(segment1.End, intersectionsList, mesh1Intersections, segment1);
-            
-            foreach (var segment2 in contoursSegments2)
+        }
+        foreach (var segment2 in contoursSegments2)
+        {
+            mesh2Intersections[segment2] = new SortedList<double, GeometryIntersection>();
+            ProcessIntersection(segment2.Start, intersectionsList, mesh2Intersections, segment2);
+            ProcessIntersection(segment2.End, intersectionsList, mesh2Intersections, segment2);
+        }
+
+        // Broad-phase: sort segments2 by min-X and, for each segment1, test only those whose X-range overlaps it
+        // (sorted, so stop at the first min-X past segment1's max-X). X-disjoint segments can't cross, so this finds
+        // exactly the same crossings as the old all-pairs scan but skips most pairs.
+        var sorted2 = new List<GeometrySegment>(contoursSegments2);
+        sorted2.Sort((a, b) => Math.Min(a.Start.X, a.End.X).CompareTo(Math.Min(b.Start.X, b.End.X)));
+
+        foreach (var segment1 in contoursSegments1)
+        {
+            var s1MinX = Math.Min(segment1.Start.X, segment1.End.X);
+            var s1MaxX = Math.Max(segment1.Start.X, segment1.End.X);
+
+            foreach (var segment2 in sorted2)
             {
-                if (!mesh2Intersections.ContainsKey(segment2))
-                {
-                    mesh2Intersections[segment2] = new SortedList<double, GeometryIntersection>();
-                }
-                
-                // add start and end points of segment2
-                ProcessIntersection(segment2.Start, intersectionsList, mesh2Intersections, segment2);
-                ProcessIntersection(segment2.End, intersectionsList, mesh2Intersections, segment2);
-                
-                // add intersection points/
+                if (Math.Min(segment2.Start.X, segment2.End.X) > s1MaxX) break;          // sorted -> no more overlaps
+                if (Math.Max(segment2.Start.X, segment2.End.X) < s1MinX) continue;       // X-disjoint -> can't cross
+
                 if (Collision2D.SegmentSegmentIntersection(segment1, segment2, out var point))
                 {
                     ProcessIntersection(point, intersectionsList, mesh1Intersections, segment1);
@@ -95,12 +106,17 @@ public static class ContourProcessingHelper
                 {
                     segment2.IsArguable = true;
                     arguableSegments.Add(segment2);
-                    
+
                     segment1.RemoveSelfFromConnectedSegments();
                     segment1.RemoveSelfFromParent();
-                    
+
                     break;
                 }
+
+                // The ray is horizontal (UnitX) at segmentCenter.Y, so a segment whose Y-range doesn't include that
+                // height can't be crossed - skip the ray math (exact: same crossing count, just fewer tests).
+                if (segmentCenter.Y < Math.Min(segment1.Start.Y, segment1.End.Y) ||
+                    segmentCenter.Y > Math.Max(segment1.Start.Y, segment1.End.Y)) continue;
 
                 var seg = new LineSegment2D(segment1);
                 if (Collision2D.RaySegmentIntersection(ref ray, ref seg, out var intPoint))

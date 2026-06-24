@@ -132,7 +132,7 @@ public class WindowRenderService : UiRenderService
         windowRenderer?.Render(gameTime);   // content first
         DrawProcessors(gameTime);           // then processors (adorner overlays) on top, same frame
     }
-    
+
     public override void EndDraw()
     {
         GraphicsDevice.EndDraw();
