@@ -33,12 +33,10 @@ public class MouseDevice
 
     public bool Capture(IInputComponent component)
     {
-        if (component != null)
-        {
-            Captured = component;
-            return true;
-        }
-        return false;
+        // A null component releases the current capture. Routing (MouseMove/MouseDown/MouseUp) honours Captured, so a
+        // control that captures on press keeps receiving move/up even when the pointer leaves it.
+        Captured = component;
+        return component != null;
     }
 
     public Vector2 GetPosition(IInputComponent relativeTo)
@@ -326,7 +324,7 @@ public class MouseDevice
 
     private void MouseDown(IInputComponent rootComponent, Vector2 p, uint timestamp, MouseButtons button, InputModifiers inputModifiers)
     {
-        var hit = rootComponent.HitTest(p);
+        var hit = Captured ?? rootComponent.HitTest(p);
 
         if (hit != null)
         {
@@ -352,7 +350,7 @@ public class MouseDevice
 
     private void MouseUp(IInputComponent rootComponent, Vector2 p, uint timestamp, MouseButtons button, InputModifiers inputModifiers)
     {
-        var hit = rootComponent.HitTest(p);
+        var hit = Captured ?? rootComponent.HitTest(p);
 
         if (hit != null)
         {

@@ -56,7 +56,7 @@ public class Border : Decorator
    protected override Size MeasureOverride(Size availableSize)
    {
       var child = Child;
-      var padding = Padding + (BorderThickness / 2);
+      var padding = Padding + BorderThickness;
       var size = availableSize.Deflate(padding);
       if (child != null)
       {
@@ -69,7 +69,7 @@ public class Border : Decorator
 
    protected override Size ArrangeOverride(Size finalSize)
    {
-      var padding = Padding + (BorderThickness / 2);
+      var padding = Padding + BorderThickness;
       Child?.Arrange(new Rect(finalSize).Deflate(padding));
 
       if (Child != null)
@@ -93,25 +93,37 @@ public class Border : Decorator
 
    protected override void OnRender(IDrawingContext context)
    {
-      var size = new Size(ActualWidth, ActualHeight);
       var borderThickness = BorderThickness;
       var cornerRadius = CornerRadius;
       base.OnRender(context);
 
-      var outerGeometry = new RectangleGeometry(new Rect(size), cornerRadius);
-      var innerSize = size.Deflate(BorderThickness / 2);
-      var innerRect = new Rect(new Vector2(borderThickness.Left / 2, borderThickness.Top / 2), innerSize);
-      var innerGeometry = new RectangleGeometry(innerRect, cornerRadius);
-      
+      var outerRect = new Rect(new Size(ActualWidth, ActualHeight));
+      // Inset by the FULL border thickness and shrink the corner radii concentrically, so the border ring keeps a
+      // uniform width all the way around (including the rounded corners) instead of pinching at them.
+      var innerRect = outerRect.Deflate(borderThickness);
+      var innerRadius = DeflateCornerRadius(cornerRadius, borderThickness);
+
       var combined = new CombinedGeometry
       {
          GeometryCombineMode = GeometryCombineMode.Exclude,
-         Geometry1 = outerGeometry,
-         Geometry2 = innerGeometry
+         Geometry1 = new RectangleGeometry(outerRect, cornerRadius),
+         Geometry2 = new RectangleGeometry(innerRect, innerRadius)
       };
 
       context.ForControl(this)
-         .DrawRectangle(Background, innerRect, CornerRadius)
+         .DrawRectangle(Background, innerRect, innerRadius)
          .DrawGeometry(BorderBrush, combined);
+   }
+
+   // Each corner shrinks by the thickness of the two edges meeting there (clamped at 0) so the inner curve stays
+   // parallel to the outer one. Scalar (circular) corners can't be perfectly concentric under non-uniform thickness;
+   // taking the larger adjacent edge keeps the inner arc from bulging past the border on the thicker side.
+   private static CornerRadius DeflateCornerRadius(CornerRadius radius, Thickness border)
+   {
+      return new CornerRadius(
+         Math.Max(0.0, radius.TopLeft - Math.Max(border.Left, border.Top)),
+         Math.Max(0.0, radius.TopRight - Math.Max(border.Top, border.Right)),
+         Math.Max(0.0, radius.BottomRight - Math.Max(border.Right, border.Bottom)),
+         Math.Max(0.0, radius.BottomLeft - Math.Max(border.Bottom, border.Left)));
    }
 }
