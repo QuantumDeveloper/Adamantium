@@ -11,4 +11,14 @@
 		<StyleInclude Source="{x:Type fluentDark:ButtonStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ContentControlStyleSet}"/>
 	</Theme.StyleIncludes>
+
+	<!-- Accent / focus: the theme's runtime-mutable identity. Referenced via {ThemeResource Key}; change any of these
+	     at runtime (theme.AccentFillColorDefault = ...) and every binding refreshes live. Static palette is in Brushes.auml. -->
+	<Theme.AccentFillColorDefault><SolidColorBrush Color="#60CDFF"/></Theme.AccentFillColorDefault>
+	<Theme.AccentFillColorSecondary><SolidColorBrush Color="#57B8E6"/></Theme.AccentFillColorSecondary>
+	<Theme.AccentFillColorTertiary><SolidColorBrush Color="#4FA6CF"/></Theme.AccentFillColorTertiary>
+	<Theme.AccentFillColorDisabled><SolidColorBrush Color="#3D3D3D"/></Theme.AccentFillColorDisabled>
+	<Theme.AccentForegroundColor><SolidColorBrush Color="#000000"/></Theme.AccentForegroundColor>
+	<Theme.FocusStrokeColorOuter><SolidColorBrush Color="#FFFFFF"/></Theme.FocusStrokeColorOuter>
+	<Theme.FocusStrokeColorInner><SolidColorBrush Color="#000000"/></Theme.FocusStrokeColorInner>
 </Theme>

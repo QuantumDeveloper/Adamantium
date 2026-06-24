@@ -26,6 +26,9 @@ public abstract class TriggerBase : ITrigger
                 
                 component.SetValue(setterProperty, resource, ValuePriority.Trigger);
                 break;
+            case ThemeResource themeResource:
+                themeResource.Apply(component, setterProperty, ValuePriority.Trigger);
+                break;
             default:
                 var prop = AdamantiumPropertyMap.FindRegistered(component.GetType(), setterProperty);
                 var value = TypeCastFactory.CastFromString(setterValue, prop.PropertyType);
@@ -41,6 +44,9 @@ public abstract class TriggerBase : ITrigger
         {
             case BindingBase binding:
                 component.RemoveBinding(setterProperty);
+                break;
+            case ThemeResource:
+                ThemeResource.Remove(component, setterProperty, ValuePriority.Trigger);
                 break;
             default:
                 component.ClearValue(setterProperty, ValuePriority.Trigger);

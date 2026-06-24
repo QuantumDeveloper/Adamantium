@@ -256,6 +256,27 @@ public class CodeGenerationContext
 
                             break;
                         }
+                        case "ThemeResource":
+                        {
+                            // {ThemeResource Key} -> a live binding to the active theme's property. As a Setter value
+                            // it's stored as the marker (Setter.Apply -> SetBinding); as a normal property it's bound now.
+                            var key = extension.Arguments[0].Value.GetTextValue();
+                            if (isResource && element.TypeReference.Namespace == "Adamantium.UI.Core.Resources")
+                            {
+                                TextGenerator.WriteLine(
+                                    $"{symbolName} = new {Metadata.DefaultTypeContainer.ThemeResource.FullName}(\"{key}\");");
+                            }
+                            else
+                            {
+                                var trVar = GenerateNextElementName("tr");
+                                TextGenerator.WriteLine(
+                                    $"var {trVar} = new {Metadata.DefaultTypeContainer.ThemeResource.FullName}(\"{key}\");");
+                                var trTarget = isRoot ? "this" : CurrentParent;
+                                TextGenerator.WriteLine($"{trVar}.Apply({trTarget}, \"{propRef.Name}\");");
+                            }
+
+                            break;
+                        }
                         case "TemplateBinding":
                         {
                             var tbVar = GenerateNextElementName("tb");

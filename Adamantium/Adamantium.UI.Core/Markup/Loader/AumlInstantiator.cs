@@ -113,6 +113,15 @@ internal sealed class AumlInstantiator
                 continue;
             }
 
+            // {ThemeResource Key}: a live link to the active theme's accent/focus property (not a data binding).
+            if (instance is IFundamentalUIComponent themed &&
+                value is AumlAstMarkupExtensionNode { TypeReference.Name: "ThemeResource" } trNode)
+            {
+                var key = (trNode.Arguments.FirstOrDefault()?.Value as AumlAstTextNode)?.Text?.Trim();
+                if (!string.IsNullOrEmpty(key)) new ThemeResource(key).Apply(themed, pref.Name);
+                continue;
+            }
+
             switch (value)
             {
                 case AumlAstMarkupExtensionNode markup:
