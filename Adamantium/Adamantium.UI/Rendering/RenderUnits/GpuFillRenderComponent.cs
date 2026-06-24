@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
@@ -16,20 +15,20 @@ namespace Adamantium.UI.Rendering.RenderUnits;
 // body with alpha *= coverage -> an analytic feathered edge, no MSAA. Mirrors GpuStrokeRenderComponent (the same
 // contour -> compute -> Draw pattern), but one-sided (outward) and carrying a coverage attribute. A geometry with holes
 // / combined contours gets one ring per contour.
+//
+// Buffers are RENTED from the buffer manager (ReusableBuffer), not allocated per frame: a same-topology geometry change
+// (a resize) rewrites the contour points in place and re-dispatches the expander into the existing ring slot, with no
+// Vulkan allocation. See GPU_BUFFER_REUSE_PLAN.
 public sealed class GpuFillRenderComponent : UIRenderComponent
 {
     // Target fringe width in DEVICE pixels. The fringe is built in geometry-LOCAL units, so PreRender converts this to
     // local via the local->device scale (ComputeFringeWidth) - keeping the AA ~1 device px at any designer zoom.
     private const float DeviceFringePx = 1.0f;
+    private const MemoryPropertyFlags FillMemory = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal;
 
     private readonly GraphicsDevice _device;
     private readonly FillFringeEffect _effect;
     private readonly List<Contour> _contours = [];
-
-    // The expander output is geometry-LOCAL (only the fringe width depends on scale), so once expanded it's reused every
-    // frame until the scale changes - a geometry/brush change recreates the whole component. Skipping the per-frame
-    // compute+barrier for static fills is a big win (the draw still runs each frame).
-    private bool _expanded;
     private float _expandedFringe = float.NaN;
 
     // The fill brush, read LIVE at Render (like the body's GeometryRenderComponent.Background) so an in-place colour
@@ -42,12 +41,15 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
         public uint PointCount;
         public uint VertexCount;   // PointCount segments * 6 verts (closed loop)
         public float Winding;      // +1 / -1 so the outward miter actually points outward
-        public Buffer PointsBuffer;
-        public Buffer VertexBuffer;
+        public float[] PointsData; // x,y interleaved - the CPU payload re-uploaded to the current ring slot when stale
+        public ReusableBuffer PointsBuffer;
+        public ReusableBuffer VertexBuffer;
+        public ulong PointsBytes => (ulong)(PointsData.Length * sizeof(float));
+        public ulong VertexBytes => (ulong)(VertexCount * 3 * sizeof(float));   // 3 floats/vertex: x, y, coverage
     }
 
     public GpuFillRenderComponent(IGraphicsDevice device, UIBasicEffect uiBasicEffect, FillFringeEffect effect,
-        IReadOnlyList<(Vector2[] Points, bool IsClosed)> contours, Brush brush) : base(device, uiBasicEffect, null)
+        IReadOnlyList<(Vector2[] Points, bool IsClosed)> contours, Brush brush, GpuBufferManager bufferManager) : base(device, uiBasicEffect, null, bufferManager)
     {
         _device = (GraphicsDevice)device;
         _effect = effect;
@@ -60,11 +62,16 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
             var c = BuildContour(points);
             if (c != null) built.Add((c, points));
         }
+        AssignNesting(built);
+        foreach (var (contour, _) in built) _contours.Add(contour);
+    }
 
-        // Even-odd nesting: a contour inside an ODD number of the others is a HOLE - the fill is OUTSIDE it, so its
-        // fringe must feather INWARD (toward the hole), opposite an outer contour. Winding alone can't tell them apart
-        // (the tessellator emits holes with the same winding as outers), so flip holes here. A probe VERTEX is used, not
-        // the centroid - a frame-shaped outer's centroid can fall inside its own hole and misclassify it.
+    // Even-odd nesting: a contour inside an ODD number of the others is a HOLE - the fill is OUTSIDE it, so its fringe
+    // must feather INWARD (toward the hole), opposite an outer contour. Winding alone can't tell them apart (the
+    // tessellator emits holes with the same winding as outers), so flip holes here. A probe VERTEX is used, not the
+    // centroid - a frame-shaped outer's centroid can fall inside its own hole and misclassify it.
+    private static void AssignNesting(List<(Contour Contour, Vector2[] Points)> built)
+    {
         foreach (var (contour, points) in built)
         {
             var nesting = 0;
@@ -72,7 +79,6 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
                 if (!ReferenceEquals(other, contour) && PointInPolygon(points[0], otherPoints))
                     nesting++;
             if ((nesting & 1) == 1) contour.Winding = -contour.Winding;
-            _contours.Add(contour);
         }
     }
 
@@ -99,27 +105,56 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
             VertexCount = (uint)points.Length * 6u,
             // Outward miter sign from the contour's signed area (screen space is y-down, so the sign is tuned by the
             // headless edge test: the fringe must land OUTSIDE the shape).
-            Winding = SignedArea(points) >= 0 ? -1f : 1f
+            Winding = SignedArea(points) >= 0 ? -1f : 1f,
+            PointsData = ToFloats(points)
         };
 
+        c.PointsBuffer = ToDispose(BufferManager.CreateBuffer(
+            BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, FillMemory));
+        c.PointsBuffer.Reserve(c.PointsBytes);
+        c.PointsBuffer.Invalidate();
+
+        c.VertexBuffer = ToDispose(BufferManager.CreateBuffer(
+            BufferUsageFlags.VertexBuffer | BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, FillMemory));
+        c.VertexBuffer.Reserve(c.VertexBytes);
+        c.VertexBuffer.Invalidate();
+        return c;
+    }
+
+    private static float[] ToFloats(Vector2[] points)
+    {
         var floats = new float[points.Length * 2];
         for (var i = 0; i < points.Length; i++)
         {
             floats[i * 2] = (float)points[i].X;
             floats[i * 2 + 1] = (float)points[i].Y;
         }
-        c.PointsBuffer = ToDispose(Buffer.New(_device, (ulong)(floats.Length * sizeof(float)),
-            BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
-            MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal));
-        var ptr = c.PointsBuffer.MapMemory();
-        Marshal.Copy(floats, 0, (IntPtr)(nint)ptr, floats.Length);
-        c.PointsBuffer.UnmapMemory();
+        return floats;
+    }
 
-        // 3 floats/vertex: (x, y, coverage) - matches FringeVertex + the shader's float3 output.
-        c.VertexBuffer = ToDispose(Buffer.New(_device, (ulong)(c.VertexCount * 3 * sizeof(float)),
-            BufferUsageFlags.VertexBuffer | BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
-            MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal));
-        return c;
+    // Same-topology update (a resize): if the new contour set matches the current one (count + per-contour point count),
+    // rewrite each contour's points in place and re-expand - no new component, no allocation. Returns false when the
+    // topology differs (contour added/removed, or a CornerRadius change altered an arc's segment count), so the caller
+    // rebuilds. Winding/nesting are preserved (a resize keeps both).
+    public bool TryUpdateContours(IReadOnlyList<(Vector2[] Points, bool IsClosed)> contours, Brush brush)
+    {
+        var valid = new List<Vector2[]>();
+        foreach (var (points, _) in contours)
+            if (points is { Length: >= 3 }) valid.Add(points);
+
+        if (valid.Count != _contours.Count) return false;
+        for (var i = 0; i < valid.Count; i++)
+            if (valid[i].Length != _contours[i].PointCount) return false;
+
+        for (var i = 0; i < valid.Count; i++)
+        {
+            var c = _contours[i];
+            c.PointsData = ToFloats(valid[i]);
+            c.PointsBuffer.Invalidate();    // re-upload the points to the current ring slot
+            c.VertexBuffer.Invalidate();    // re-expand into the current ring slot
+        }
+        Brush = brush;
+        return true;
     }
 
     private static double SignedArea(Vector2[] p)
@@ -145,19 +180,29 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
         return deviceScale > 1e-4f ? DeviceFringePx / deviceScale : DeviceFringePx;
     }
 
-    // Compute runs out of the render pass (beforeRenderPass hook), same as the stroke expander: each contour dispatches
-    // the fringe expander and barriers its output for the draw.
+    // Compute runs out of the render pass (beforeRenderPass hook), same as the stroke expander: each contour ensures its
+    // points are uploaded to this frame's slot, then re-dispatches the fringe expander into this frame's vertex slot only
+    // when that slot is stale (a static fill settles to zero work; an animated one re-expands the current slot).
     public override void PreRender()
     {
         if (!AnalyticAa.Enabled || Brush is not SolidColorBrush) return;   // AA off or non-solid: skip the expander
         var fringeWidth = ComputeFringeWidth();
-        if (_expanded && fringeWidth == _expandedFringe) return;   // already expanded at this scale - reuse the ring
-        _expanded = true;
-        _expandedFringe = fringeWidth;
+        if (fringeWidth != _expandedFringe)
+        {
+            foreach (var c in _contours) c.VertexBuffer.Invalidate();   // scale changed -> re-expand every contour
+            _expandedFringe = fringeWidth;
+        }
+
         foreach (var c in _contours)
         {
-            _effect.PointsAddress.SetValue(c.PointsBuffer.GetDeviceAddress());
-            _effect.OutputAddress.SetValue(c.VertexBuffer.GetDeviceAddress());
+            var points = c.PointsBuffer.Acquire(c.PointsBytes, out var writePoints);
+            if (writePoints) points.SetData(c.PointsData, 0, (uint)c.PointsData.Length);
+
+            var vertices = c.VertexBuffer.Acquire(c.VertexBytes, out var writeVertices);
+            if (!writeVertices) continue;   // this frame's slot already holds the expanded ring
+
+            _effect.PointsAddress.SetValue(points.GetDeviceAddress());
+            _effect.OutputAddress.SetValue(vertices.GetDeviceAddress());
             _effect.PointCount.SetValue(c.PointCount);
             _effect.FringeWidth.SetValue(fringeWidth);
             _effect.Winding.SetValue(c.Winding);
@@ -165,7 +210,7 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
 
             _device.Dispatch((c.PointCount + 63u) / 64u);
 
-            _device.BufferBarrier(c.VertexBuffer,
+            _device.BufferBarrier(vertices,
                 PipelineStageFlagBits2.ComputeShaderBit, AccessFlagBits2.ShaderWriteBit,
                 PipelineStageFlagBits2.VertexAttributeInputBit, AccessFlagBits2.VertexAttributeReadBit);
         }
@@ -191,7 +236,8 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
 
         foreach (var c in _contours)
         {
-            _device.SetVertexBuffer(c.VertexBuffer);
+            var vertices = c.VertexBuffer.Acquire(c.VertexBytes, out _);   // the slot PreRender expanded this frame
+            _device.SetVertexBuffer(vertices);
             _device.Draw(c.VertexCount, 1);
         }
     }

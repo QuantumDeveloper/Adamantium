@@ -14,36 +14,32 @@ namespace Adamantium.UI.Rendering.RenderUnits;
 
 public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUnit where TPayload : class
 {
-    protected RenderUnit(
-        IDrawCommand command,
-        IGraphicsDevice graphicsDevice,
-        UIBasicEffect uiBasicEffect,
-        StrokeEffect strokeEffect,
-        IResourceFactory resourceFactory,
-        FillFringeEffect fillFringeEffect = null) : base(graphicsDevice)
+    protected RenderUnit(IDrawCommand command, RenderUnitContext context) : base(context.GraphicsDevice)
     {
+        Context = context;
         DrawCommand = command;
         Payload = DrawCommand.Payload as TPayload;
-        GraphicsDevice = graphicsDevice;
-        ResourceFactory = resourceFactory;
-        UIBasicEffect = uiBasicEffect;
-        StrokeEffect = strokeEffect;
-        FillFringeEffect = fillFringeEffect;
     }
+
+    // All the shared services (device, effects, resource factory, buffer manager) live here, so adding a new one is a
+    // one-line change to RenderUnitContext instead of a new parameter on every unit constructor and the factory.
+    protected RenderUnitContext Context { get; }
 
     public TPayload Payload { get; protected set; }
 
-    public UIBasicEffect UIBasicEffect { get; }
+    public UIBasicEffect UIBasicEffect => Context.UIBasicEffect;
 
     // Global toggle: lets the stroke fall back to the CPU path on the fly if anything is wrong with the GPU path.
     public static bool UseGpuStroke { get; set; } = true;
 
-    protected StrokeEffect StrokeEffect { get; }
+    protected StrokeEffect StrokeEffect => Context.StrokeEffect;
 
     // Analytic-AA fill fringe (GPU coverage edge). On like UseGpuStroke; toggle off to A/B against MSAA.
     public static bool UseGpuFill { get; set; } = true;
 
-    protected FillFringeEffect FillFringeEffect { get; }
+    protected FillFringeEffect FillFringeEffect => Context.FillFringeEffect;
+
+    protected GpuBufferManager BufferManager => Context.BufferManager;
 
     public UIRenderComponent StrokeRenderer { get; set; }
 
@@ -63,12 +59,12 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
         // (e.g. a gradient stroke) still falls back to the CPU StrokeGeometry path.
         if (UseGpuStroke && StrokeEffect != null && TryGetSolidContours(pen, geometry, out var contours))
         {
-            StrokeRenderer = new GpuStrokeRenderComponent(GraphicsDevice, UIBasicEffect, StrokeEffect, contours, pen);
+            StrokeRenderer = new GpuStrokeRenderComponent(GraphicsDevice, UIBasicEffect, StrokeEffect, contours, pen, BufferManager);
         }
         else
         {
             var strokeGeometry = new StrokeGeometry(pen, geometry);
-            StrokeRenderer = new StrokeRenderComponent(GraphicsDevice, UIBasicEffect, strokeGeometry.Mesh, pen);
+            StrokeRenderer = new StrokeRenderComponent(GraphicsDevice, UIBasicEffect, strokeGeometry.Mesh, pen, BufferManager);
         }
         StrokeRenderer.RenderData = DrawCommand.RenderData;
     }
@@ -101,17 +97,24 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
         FillFringeRenderer = null;
         if (!UseGpuFill || FillFringeEffect == null || brush is not SolidColorBrush solid) return;
 
+        var contours = BuildFillContours(geometry);
+        if (contours == null) return;
+
+        FillFringeRenderer = new GpuFillRenderComponent(GraphicsDevice, UIBasicEffect, FillFringeEffect, contours, solid, BufferManager);
+        FillFringeRenderer.RenderData = DrawCommand.RenderData;
+    }
+
+    // The closed contours (>= 3 points) of a solid fill that get an analytic-AA fringe. Null when there are none.
+    private static List<(Adamantium.Mathematics.Vector2[] Points, bool IsClosed)> BuildFillContours(Geometry geometry)
+    {
         var mesh = geometry?.Mesh;
-        if (mesh == null || mesh.Contours.Count == 0) return;
+        if (mesh == null || mesh.Contours.Count == 0) return null;
 
         List<(Adamantium.Mathematics.Vector2[] Points, bool IsClosed)> contours = [];
         foreach (var contour in mesh.Contours)
             if (contour.IsGeometryClosed && contour.Points is { Length: >= 3 })
                 contours.Add((contour.Points, true));
-        if (contours.Count == 0) return;
-
-        FillFringeRenderer = new GpuFillRenderComponent(GraphicsDevice, UIBasicEffect, FillFringeEffect, contours, solid);
-        FillFringeRenderer.RenderData = DrawCommand.RenderData;
+        return contours.Count == 0 ? null : contours;
     }
 
     // Keep the analytic-AA fringe in sync on a hot update. A geometry change (rebuild) already re-tessellated `geometry`,
@@ -123,6 +126,17 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
     {
         if (rebuild)
         {
+            // Same-topology resize -> rewrite the fringe contours in place (no new component / allocation); otherwise
+            // (contour count or a contour's point count changed) rebuild it.
+            if (brush is SolidColorBrush solid && FillFringeRenderer is GpuFillRenderComponent existingFringe)
+            {
+                var contours = BuildFillContours(geometry);
+                if (contours != null && existingFringe.TryUpdateContours(contours, solid))
+                {
+                    FillFringeRenderer.RenderData = DrawCommand.RenderData;
+                    return;
+                }
+            }
             ProcessFillFringe(geometry, brush);
             return;
         }
@@ -138,9 +152,9 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
         }
     }
 
-    protected IResourceFactory ResourceFactory { get; set; }
+    protected IResourceFactory ResourceFactory => Context.ResourceFactory;
     protected IDrawCommand DrawCommand { get; set; }
-    protected IGraphicsDevice GraphicsDevice { get; }
+    protected IGraphicsDevice GraphicsDevice => Context.GraphicsDevice;
 
     public IUIComponent Component => DrawCommand.Component;
 
@@ -189,11 +203,10 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
 
 public class GeometryRenderUnit : RenderUnit<GeometryPayload>
 {
-    public GeometryRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, StrokeEffect strokeEffect, IResourceFactory resourceFactory, FillFringeEffect fillFringeEffect = null) :
-        base(command, graphicsDevice, uiBasicEffect, strokeEffect, resourceFactory, fillFringeEffect)
+    public GeometryRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
         Payload.Geometry.ProcessGeometry(GeometryType.Both);
-        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, Payload.Geometry.Mesh, Payload.Brush);
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, Payload.Geometry.Mesh, Payload.Brush, BufferManager);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
         ProcessFillFringe(Payload.Geometry, Payload.Brush);
         ProcessStrokeData(Payload.Pen, Payload.Geometry);
@@ -208,17 +221,14 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
         var oldBrush = Payload.Brush;
         var rebuild = Payload.RequiresBufferRebuild(inputPayload);
 
+        // Geometry change: rewrite the body's buffers in place (no new component / no Vulkan allocation - the resize/
+        // animation fast path). The brush is a cheap repoint, applied either way.
         if (rebuild)
         {
             inputPayload.Geometry.ProcessGeometry(GeometryType.Both);
-            GeometryRenderer?.DeferDispose();
-            GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, inputPayload.Geometry.Mesh, inputPayload.Brush);
+            ((GeometryRenderComponent)GeometryRenderer).UpdateGeometry(inputPayload.Geometry.Mesh);
         }
-        else
-        {
-            var geometryRenderer = (GeometryRenderComponent)GeometryRenderer;
-            geometryRenderer.Background = inputPayload.Brush;
-        }
+        ((GeometryRenderComponent)GeometryRenderer).Background = inputPayload.Brush;
 
         DrawCommand = drawCommand;
         Payload = inputPayload;
@@ -246,8 +256,7 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
 
 public class LineRenderUnit : RenderUnit<LinePayload>
 {
-    public LineRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, StrokeEffect strokeEffect, IResourceFactory resourceFactory) :
-        base(command, graphicsDevice, uiBasicEffect, strokeEffect, resourceFactory)
+    public LineRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
         var geometry = new LineGeometry(Payload.LineStart, Payload.LineEnd);
         geometry.ProcessGeometry(GeometryType.Both);
@@ -286,12 +295,11 @@ public class LineRenderUnit : RenderUnit<LinePayload>
 
 public class RectangleRenderUnit : RenderUnit<RectanglePayload>
 {
-    public RectangleRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, StrokeEffect strokeEffect, IResourceFactory resourceFactory, FillFringeEffect fillFringeEffect = null) :
-        base(command, graphicsDevice, uiBasicEffect, strokeEffect, resourceFactory, fillFringeEffect)
+    public RectangleRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
         var rectangleGeometry = new RectangleGeometry(Payload.DestinationRect, Payload.CornerRadius);
         rectangleGeometry.ProcessGeometry(GeometryType.Both);
-        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, rectangleGeometry.Mesh, Payload.Brush);
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, rectangleGeometry.Mesh, Payload.Brush, BufferManager);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
         ProcessFillFringe(rectangleGeometry, Payload.Brush);
         ProcessStrokeData(Payload.Pen, rectangleGeometry);
@@ -309,14 +317,9 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
         if (rebuild)
         {
             rectangleGeometry.ProcessGeometry(GeometryType.Both);
-            GeometryRenderer?.DeferDispose();
-            GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, rectangleGeometry.Mesh, inputPayload.Brush);
+            ((GeometryRenderComponent)GeometryRenderer).UpdateGeometry(rectangleGeometry.Mesh);
         }
-        else
-        {
-            var renderer = (GeometryRenderComponent)GeometryRenderer;
-            renderer.Background = inputPayload.Brush;
-        }
+        ((GeometryRenderComponent)GeometryRenderer).Background = inputPayload.Brush;
         DrawCommand = drawCommand;
         Payload = inputPayload;
 
@@ -342,12 +345,11 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
 
 public class EllipseRenderUnit : RenderUnit<EllipsePayload>
 {
-    public EllipseRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, StrokeEffect strokeEffect, IResourceFactory resourceFactory, FillFringeEffect fillFringeEffect = null) :
-        base(command, graphicsDevice, uiBasicEffect, strokeEffect, resourceFactory, fillFringeEffect)
+    public EllipseRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
         var ellipseGeometry = new EllipseGeometry(Payload.DestinationRect, Payload.StartAngle, Payload.SweepAngle, Payload.EllipseType);
         ellipseGeometry.ProcessGeometry(GeometryType.Both);
-        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, ellipseGeometry.Mesh, Payload.Brush);
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, ellipseGeometry.Mesh, Payload.Brush, BufferManager);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
         ProcessFillFringe(ellipseGeometry, Payload.Brush);
         ProcessStrokeData(Payload.Pen, ellipseGeometry);
@@ -366,15 +368,9 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
         if (rebuild)
         {
             ellipseGeometry.ProcessGeometry(GeometryType.Both);
-            GeometryRenderer?.DeferDispose();
-            GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, ellipseGeometry.Mesh,
-                inputPayload.Brush);
+            ((GeometryRenderComponent)GeometryRenderer).UpdateGeometry(ellipseGeometry.Mesh);
         }
-        else
-        {
-            var renderer = (GeometryRenderComponent)GeometryRenderer;
-            renderer.Background = inputPayload.Brush;
-        }
+        ((GeometryRenderComponent)GeometryRenderer).Background = inputPayload.Brush;
 
         DrawCommand = drawCommand;
         Payload = inputPayload;
@@ -404,8 +400,7 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
 
 public class ImageRenderUnit : RenderUnit<ImagePayload>
 {
-    public ImageRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, StrokeEffect strokeEffect, IResourceFactory resourceFactory) :
-        base(command, graphicsDevice, uiBasicEffect, strokeEffect, resourceFactory)
+    public ImageRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
         var rectangleGeometry = new RectangleGeometry(Payload.DestinationRect);
         // Generate the quad's vertices (every other render unit does this in its ctor too). Without it the mesh is
@@ -425,7 +420,7 @@ public class ImageRenderUnit : RenderUnit<ImagePayload>
     private ImageRenderComponent CreateImageRenderer(Adamantium.Graphics.Core.Models.Mesh mesh, BitmapSource image)
     {
         var texture = image.GetOrCreateTexture(ResourceFactory);
-        var component = new ImageRenderComponent(GraphicsDevice, UIBasicEffect, mesh, texture)
+        var component = new ImageRenderComponent(GraphicsDevice, UIBasicEffect, mesh, texture, BufferManager)
         {
             Sampler = GraphicsDevice.SamplerStates.LinearClampToEdge
         };
@@ -464,8 +459,7 @@ public class ImageRenderUnit : RenderUnit<ImagePayload>
 
 public class TextRenderUnit : RenderUnit<TextPayload>
 {
-    public TextRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, StrokeEffect strokeEffect, IResourceFactory resourceFactory) :
-        base(command, graphicsDevice, uiBasicEffect, strokeEffect, resourceFactory)
+    public TextRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
         Payload.TextLayout.Update(GraphicsDevice);
         // Pad the text quad/RT so glyph effects (outline/glow) that reach beyond the body aren't clipped at
@@ -483,7 +477,8 @@ public class TextRenderUnit : RenderUnit<TextPayload>
             Payload.TextRenderingParameters, 
             Payload.Background,
             Payload.Foreground,
-            Payload.Stroke);
+            Payload.Stroke,
+            BufferManager);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
     }
     
@@ -507,7 +502,8 @@ public class TextRenderUnit : RenderUnit<TextPayload>
                 inputPayload.TextRenderingParameters, 
                 inputPayload.Background,
                 inputPayload.Foreground,
-                inputPayload.Stroke);
+                inputPayload.Stroke,
+                BufferManager);
         }
         else if (!Equals(Payload.Background, inputPayload.Background) ||
                  !Equals(Payload.Foreground, inputPayload.Foreground) ||

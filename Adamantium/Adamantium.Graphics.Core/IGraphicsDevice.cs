@@ -30,7 +30,7 @@ public interface IDrawableDevice
 
     void Draw(ulong vertexCount, uint instanceCount, uint firstVertex = 0, uint firstInstance = 0);
     
-    void DrawIndexed(IBuffer vertexBuffer, IBuffer indexBuffer, uint instanceCount = 1);
+    void DrawIndexed(IBuffer vertexBuffer, IBuffer indexBuffer, uint instanceCount = 1, uint indexCount = 0);
 }
 
 public interface IDestroyableDevice

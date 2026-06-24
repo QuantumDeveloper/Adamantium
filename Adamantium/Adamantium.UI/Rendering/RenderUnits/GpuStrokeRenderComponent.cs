@@ -56,7 +56,7 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
     }
 
     public GpuStrokeRenderComponent(IGraphicsDevice device, UIBasicEffect uiBasicEffect, StrokeEffect effect,
-        IReadOnlyList<(Vector2[] Points, bool IsClosed)> contours, Pen pen) : base(device, uiBasicEffect, null)
+        IReadOnlyList<(Vector2[] Points, bool IsClosed)> contours, Pen pen, GpuBufferManager bufferManager) : base(device, uiBasicEffect, null, bufferManager)
     {
         _device = (GraphicsDevice)device;   // Dispatch/BufferBarrier/DrawIndirect live on the concrete device
         _effect = effect;

@@ -61,10 +61,15 @@ public class GpuRenderUnitTests
         return new Adamantium.UI.Rendering.DrawCommand(component, component.RenderId, payload, renderData);
     }
 
+    // Bundles the per-test render services into the RenderUnitContext every unit now takes. A fresh GpuBufferManager
+    // per unit is fine - it's a lightweight context and each component owns/disposes its own rented handles.
+    private RenderUnitContext Ctx(UIBasicEffect ui, StrokeEffect stroke = null) =>
+        new(_device, _resourceFactory, ui, stroke, null, new GpuBufferManager(_device));
+
     // StrokeEffect is null on purpose: these tests exercise the CPU stroke path (StrokeRenderComponent). With a null
     // GPU stroke effect ProcessStrokeData falls back to CPU, so the unit's update/dispose behaviour is what's asserted.
     private RectangleRenderUnit NewRectUnit(RectanglePayload payload) =>
-        new RectangleRenderUnit(Command(payload), _device, (UIBasicEffect)_effect.Clone(), null, _resourceFactory);
+        new RectangleRenderUnit(Command(payload), Ctx((UIBasicEffect)_effect.Clone()));
 
     [Test]
     public void Pen_Added_BuildsStroke()
@@ -96,7 +101,7 @@ public class GpuRenderUnitTests
         // Real StrokeEffect -> the GPU stroke path (GpuStrokeRenderComponent), where TryRepoint lives.
         var strokeEffect = new StrokeEffect(_device);
         var unit = new RectangleRenderUnit(Command(Rect(Brushes.Red, BoxB, new Pen(Brushes.Black, 2))),
-            _device, (UIBasicEffect)_effect.Clone(), strokeEffect, _resourceFactory);
+            Ctx((UIBasicEffect)_effect.Clone(), strokeEffect));
         var stroke = unit.StrokeRenderer;
         Assert.That(stroke, Is.InstanceOf<GpuStrokeRenderComponent>(), "solid pen + StrokeEffect -> GPU stroke");
 
@@ -118,7 +123,7 @@ public class GpuRenderUnitTests
             Command(new LinePayload(new Vector2(0, 0), new Vector2((float)endX, 50),
                 new Pen(Brushes.Black, 3, dashOffset, new double[] { 6, 4 })));
 
-        var unit = new LineRenderUnit(LineCmd(0, 100), _device, (UIBasicEffect)_effect.Clone(), strokeEffect, _resourceFactory);
+        var unit = new LineRenderUnit(LineCmd(0, 100), Ctx((UIBasicEffect)_effect.Clone(), strokeEffect));
         var stroke = unit.StrokeRenderer;
         Assert.That(stroke, Is.InstanceOf<GpuStrokeRenderComponent>(), "solid dashed line -> GPU stroke");
 
@@ -257,10 +262,10 @@ public class GpuRenderUnitTests
         using var presenter = GraphicsPresenter.Create(_device, prms, "blend_test");
 
         var left = new RectangleRenderUnit(Command(Rect(Brushes.White, new Rect(4, 20, 24, 24), null), 0.5f),
-            _device, _effect, null, _resourceFactory);
+            Ctx(_effect));
         left.GeometryRenderer.ColorBlendEquation = ColorBlendEquations.AlphaBlend;
         var right = new RectangleRenderUnit(Command(Rect(Brushes.White, new Rect(36, 20, 24, 24), null), 0.5f),
-            _device, _effect, null, _resourceFactory);
+            Ctx(_effect));
         right.GeometryRenderer.ColorBlendEquation = ColorBlendEquations.Premultiplied;
 
         var proj = Matrix4x4F.OrthoOffCenter(0, 64, 0, 64, 0, 100000);
@@ -338,7 +343,7 @@ public class GpuRenderUnitTests
 
         var unit = new RectangleRenderUnit(
             Command(Rect(Brushes.Red, new Rect(0, 0, 32, 32), new Pen(Brushes.Black, 2))),
-            _device, _effect, null, _resourceFactory);
+            Ctx(_effect));
         Assert.That(device.RegisteredResourceCount, Is.GreaterThan(before), "unit creates geometry + stroke buffers");
 
         unit.Dispose();
