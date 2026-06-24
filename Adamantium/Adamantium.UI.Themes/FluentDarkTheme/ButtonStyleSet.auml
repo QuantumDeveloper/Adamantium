@@ -21,7 +21,7 @@
                                 Height="{TemplateBinding Height}"
                                 CornerRadius="{TemplateBinding CornerRadius}" 
                                 Background="{TemplateBinding Background}"
-                                BorderBrush="{ResourceReference DeclineBrush}"
+                                BorderBrush="{ThemeResource AccentFillColorDefault}"
                                 BorderThickness="{TemplateBinding BorderThickness}">
                                      <controls:ContentPresenter
                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"

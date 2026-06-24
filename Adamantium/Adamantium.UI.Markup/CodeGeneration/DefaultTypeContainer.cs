@@ -8,6 +8,7 @@ public class DefaultTypeContainer
         // reference), which the generator would emit as an inaccessible call (CS0122).
         TypeParser = typeResolver.Resolve("Adamantium.Core.TypeParsing.TypeParser");
         ResourceReference = typeResolver.ResolveByShortName("ResourceReference");
+        ThemeResource = typeResolver.ResolveByShortName("ThemeResource");
         ResourceDictionary = typeResolver.ResolveByShortName("ResourceDictionary");
         ResourceResolver = typeResolver.ResolveByShortName("ResourceResolver");
         StyleSet =  typeResolver.ResolveByShortName("StyleSet");
@@ -20,7 +21,9 @@ public class DefaultTypeContainer
     public IResolvedType TypeParser { get; }
     
     public IResolvedType ResourceReference { get; }
-    
+
+    public IResolvedType ThemeResource { get; }
+
     public IResolvedType ResourceResolver { get; }
     
     public IResolvedType ResourceDictionary { get; }
