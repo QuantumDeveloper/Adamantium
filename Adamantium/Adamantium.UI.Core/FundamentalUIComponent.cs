@@ -445,6 +445,24 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         _triggerActivators = null;
     }
 
+    // Re-wire the trigger activators that may reach template parts after this control's template changed - both its own
+    // element triggers and any style triggers attached to it. Each undoes what it applied to the OLD parts (and its
+    // subscriptions) and re-evaluates against the new template, so a runtime template swap never leaks the old parts or
+    // leaves stale trigger values behind. No-op in the common case (no triggers, or nothing currently applied).
+    protected void ReevaluateTriggersForTemplateChange()
+    {
+        if (_triggerActivators != null)
+        {
+            foreach (var activator in _triggerActivators)
+            {
+                activator.Deactivate();
+                activator.Activate();
+            }
+        }
+
+        Style.ReevaluateActivators(this);
+    }
+
     /// <summary>
     /// Raised when the control is attached to a rooted logical tree.
     /// </summary>

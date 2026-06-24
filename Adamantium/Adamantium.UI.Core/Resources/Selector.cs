@@ -24,34 +24,27 @@ public class Selector
 
     public bool Match(IFundamentalUIComponent control)
     {
-        if (Types.Contains(control.GetType()))
-        {
-            return true;
-        }
-        else if (control.Id == Id)
-        {
-            return true;
-        }
-        else if (ContainsClass(control))
-        {
-            return true;
-        }
-        else if (ContainsClassGroup(control))
-        {
-            return true;
-        }
-        return false;
+        // An empty selector matches nothing.
+        if (Types.Count == 0 && Classes.Count == 0 && ClassGroups.Count == 0 && Id == null)
+            return false;
+
+        // AND of every SPECIFIED facet (CSS/WPF semantics): "Button.Accent" = type Button AND class Accent; a
+        // single-facet selector ("Button") still matches purely on that facet.
+        if (Types.Count > 0 && !Types.Contains(control.GetType())) return false;
+        if (Id != null && control.Id != Id) return false;
+        if (Classes.Count > 0 && !HasAllClasses(control)) return false;
+        if (ClassGroups.Count > 0 && !ContainsClassGroup(control)) return false;
+        return true;
     }
 
-    private bool ContainsClass(IFundamentalUIComponent control)
+    private bool HasAllClasses(IFundamentalUIComponent control)
     {
-        var classes = control.ClassNames;
-        foreach (var @class in classes)
+        foreach (var @class in Classes)
         {
-            if (Classes.Contains(@class)) return true;
+            if (!control.ClassNames.Contains(@class)) return false;
         }
 
-        return false;
+        return true;
     }
     
     private bool ContainsClassGroup(IFundamentalUIComponent control)

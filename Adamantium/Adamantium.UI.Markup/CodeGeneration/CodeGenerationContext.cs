@@ -295,7 +295,15 @@ public class CodeGenerationContext
                                 }
                             }
 
-                            if (CurrentTemplate == null)
+                            if (isResource && element.TypeReference.Namespace == "Adamantium.UI.Core.Resources")
+                            {
+                                // {TemplateBinding X} as a Setter value (a trigger overriding a part). Store it as the
+                                // marker; the trigger resolves it against the templated parent when it fires - see
+                                // PropertyTriggerActivator.ApplyTemplateBinding. (Distinct from a normal template
+                                // element binding below, which wires up immediately at template build.)
+                                TextGenerator.WriteLine($"{symbolName} = {tbVar};");
+                            }
+                            else if (CurrentTemplate == null)
                             {
                                 diagnostics.ReportError(Metadata.ClassName,
                                     "TemplateBinding can only be used inside ControlTemplate.");

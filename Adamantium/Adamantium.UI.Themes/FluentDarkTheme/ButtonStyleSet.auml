@@ -3,14 +3,26 @@
           xmlns:x="http://adamantium/ui/xaml/extensions"
           xmlns:controls="http://adamantium/ui">
 
-    <!-- Standard FluentDark button: subtle translucent control fill + control stroke, primary text, accent focus ring.
-         Static palette comes via {ResourceReference}; the runtime-mutable focus colour via {ThemeResource}. -->
+    <!-- ONE template serves every variant: the rest/hover/pressed/disabled brushes live as properties on the control
+         (Background + Background/Foreground PointerOver/Pressed/Disabled), and the triggers project them onto the chrome
+         via {TemplateBinding}. A variant (e.g. Accent below) only overrides those brushes - no second template. Per the
+         small-styles convention each concern is its own <Style Selector="Button">: simple properties, then the template,
+         then the triggers. -->
+
+    <!-- Simple properties: static palette via {ResourceReference}. -->
     <Style Selector="Button">
         <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
         <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
+
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference ControlFillColorSecondary}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference ControlFillColorTertiary}"/>
+        <Setter Property="BackgroundDisabled" Value="{ResourceReference ControlFillColorDisabled}"/>
+        <Setter Property="ForegroundPressed" Value="{ResourceReference TextFillColorSecondary}"/>
+        <Setter Property="ForegroundDisabled" Value="{ResourceReference TextFillColorDisabled}"/>
+
         <Setter Property="BorderThickness" Value="2"/>
         <Setter Property="CornerRadius" Value="4"/>
-        <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
         <Setter Property="Padding" Value="11 5 11 6"/>
         <Setter Property="MinHeight" Value="32"/>
         <Setter Property="FontSize" Value="14"/>
@@ -18,45 +30,70 @@
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
 
+    <!-- Template (its own style). -->
     <Style Selector="Button">
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <controls:Border x:Name="InnerBorder"
-                            CornerRadius="{TemplateBinding CornerRadius}"
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}"
-                            Padding="{TemplateBinding Padding}">
-                        <controls:ContentPresenter
-                                x:Name="PART_ContentPresenter"
-                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
-                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
-                                Foreground="{TemplateBinding Foreground}"
-                                FontSize="{TemplateBinding FontSize}"
-                                Content="{TemplateBinding Content}"
-                                ContentTemplate="{TemplateBinding ContentTemplate}"
-                                ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
-                    </controls:Border>
-                    <ControlTemplate.Triggers>
-                        <PropertyTrigger Property="IsMouseOver" Value="true">
-                            <Setter TargetName="InnerBorder" Property="Background" Value="{ResourceReference ControlFillColorSecondary}"/>
-                        </PropertyTrigger>
-                        <PropertyTrigger Property="IsPressed" Value="true">
-                            <Setter TargetName="InnerBorder" Property="Background" Value="{ResourceReference ControlFillColorTertiary}"/>
-                            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ResourceReference TextFillColorSecondary}"/>
-                        </PropertyTrigger>
-                        <PropertyTrigger Property="IsFocused" Value="true">
-                            <Setter TargetName="InnerBorder" Property="BorderBrush" Value="{ThemeResource FocusStrokeColorOuter}"/>
-                            <Setter TargetName="InnerBorder" Property="BorderThickness" Value="2"/>
-                        </PropertyTrigger>
-                        <PropertyTrigger Property="IsEnabled" Value="false">
-                            <Setter TargetName="InnerBorder" Property="Background" Value="{ResourceReference ControlFillColorDisabled}"/>
-                            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ResourceReference TextFillColorDisabled}"/>
-                        </PropertyTrigger>
-                    </ControlTemplate.Triggers>
+                    <controls:Grid>
+                        <controls:Border x:Name="InnerBorder"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <controls:ContentPresenter
+                                    x:Name="PART_ContentPresenter"
+                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                    Foreground="{TemplateBinding Foreground}"
+                                    FontSize="{TemplateBinding FontSize}"
+                                    Content="{TemplateBinding Content}"
+                                    ContentTemplate="{TemplateBinding ContentTemplate}"
+                                    ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                        </controls:Border>
+                        <!-- Two-tone focus ring as an overlay (no layout reflow): outer + inner 1px rings, lit on focus. -->
+                        <controls:Border x:Name="FocusOuter" CornerRadius="4" BorderThickness="1" BorderBrush="Transparent">
+                            <controls:Border x:Name="FocusInner" CornerRadius="3" BorderThickness="1" BorderBrush="Transparent"/>
+                        </controls:Border>
+                    </controls:Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!-- Triggers (its own style). State triggers project the control's state brushes onto the named parts via
+         {TemplateBinding}; the focus ring uses {ThemeResource} so a runtime focus-colour change flows live. The host of
+         a style trigger is the control itself, so {TemplateBinding} reads the button's properties and TargetName reaches
+         the template parts. -->
+    <Style Selector="Button">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsPressed" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundPressed}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsFocused" Value="true">
+            <Setter TargetName="FocusOuter" Property="BorderBrush" Value="{ThemeResource FocusStrokeColorOuter}"/>
+            <Setter TargetName="FocusInner" Property="BorderBrush" Value="{ThemeResource FocusStrokeColorInner}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundDisabled}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- Accent button (Button.Accent): same template + triggers, only the brushes change. Accent/text-on-accent come
+         from {ThemeResource} so a runtime accent swap flows live. ForegroundDisabled is inherited from the base style.
+         Applied via <Button Classes="Accent">. -->
+    <Style Selector="Button.Accent">
+        <Setter Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="Foreground" Value="{ThemeResource AccentForegroundColor}"/>
+        <Setter Property="BackgroundPointerOver" Value="{ThemeResource AccentFillColorSecondary}"/>
+        <Setter Property="BackgroundPressed" Value="{ThemeResource AccentFillColorTertiary}"/>
+        <Setter Property="BackgroundDisabled" Value="{ThemeResource AccentFillColorDisabled}"/>
+        <Setter Property="ForegroundPressed" Value="{ThemeResource AccentForegroundColor}"/>
     </Style>
 </StyleSet>

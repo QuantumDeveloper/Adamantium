@@ -34,6 +34,24 @@ public abstract class ButtonBase : ContentControl
     public static readonly AdamantiumProperty FontSizeProperty = AdamantiumProperty.Register(nameof(FontSize),
         typeof(double), typeof(ButtonBase), new PropertyMetadata(14.0, PropertyMetadataOptions.AffectsMeasure));
 
+    // State brushes the default template's triggers project onto the chrome for hover/press/disabled. Exposing them as
+    // properties is what lets ONE template serve every button variant: the Accent style just overrides these brushes
+    // (via {ThemeResource}), no second template. Set by the theme; null means "no change in that state".
+    public static readonly AdamantiumProperty BackgroundPointerOverProperty = AdamantiumProperty.Register(
+        nameof(BackgroundPointerOver), typeof(Brush), typeof(ButtonBase), new PropertyMetadata(default(Brush)));
+
+    public static readonly AdamantiumProperty BackgroundPressedProperty = AdamantiumProperty.Register(
+        nameof(BackgroundPressed), typeof(Brush), typeof(ButtonBase), new PropertyMetadata(default(Brush)));
+
+    public static readonly AdamantiumProperty BackgroundDisabledProperty = AdamantiumProperty.Register(
+        nameof(BackgroundDisabled), typeof(Brush), typeof(ButtonBase), new PropertyMetadata(default(Brush)));
+
+    public static readonly AdamantiumProperty ForegroundPressedProperty = AdamantiumProperty.Register(
+        nameof(ForegroundPressed), typeof(Brush), typeof(ButtonBase), new PropertyMetadata(default(Brush)));
+
+    public static readonly AdamantiumProperty ForegroundDisabledProperty = AdamantiumProperty.Register(
+        nameof(ForegroundDisabled), typeof(Brush), typeof(ButtonBase), new PropertyMetadata(default(Brush)));
+
     public static readonly AdamantiumProperty ClickModeProperty = AdamantiumProperty.Register(nameof(ClickMode),
         typeof(ClickMode), typeof(ButtonBase), new PropertyMetadata(ClickMode.Release));
 
@@ -96,6 +114,36 @@ public abstract class ButtonBase : ContentControl
         set => SetValue(FontSizeProperty, value);
     }
 
+    public Brush BackgroundPointerOver
+    {
+        get => GetValue<Brush>(BackgroundPointerOverProperty);
+        set => SetValue(BackgroundPointerOverProperty, value);
+    }
+
+    public Brush BackgroundPressed
+    {
+        get => GetValue<Brush>(BackgroundPressedProperty);
+        set => SetValue(BackgroundPressedProperty, value);
+    }
+
+    public Brush BackgroundDisabled
+    {
+        get => GetValue<Brush>(BackgroundDisabledProperty);
+        set => SetValue(BackgroundDisabledProperty, value);
+    }
+
+    public Brush ForegroundPressed
+    {
+        get => GetValue<Brush>(ForegroundPressedProperty);
+        set => SetValue(ForegroundPressedProperty, value);
+    }
+
+    public Brush ForegroundDisabled
+    {
+        get => GetValue<Brush>(ForegroundDisabledProperty);
+        set => SetValue(ForegroundDisabledProperty, value);
+    }
+
     public ClickMode ClickMode
     {
         get => GetValue<ClickMode>(ClickModeProperty);
@@ -147,6 +195,12 @@ public abstract class ButtonBase : ContentControl
     {
         var command = Command;
         IsEnabled = command == null || command.CanExecute(CommandParameter);
+    }
+
+    /// <summary>Programmatically clicks the button (e.g. a default/cancel button activated by Enter/Esc), if enabled.</summary>
+    public void PerformClick()
+    {
+        if (IsEnabled) OnClick();
     }
 
     protected virtual void OnClick()
