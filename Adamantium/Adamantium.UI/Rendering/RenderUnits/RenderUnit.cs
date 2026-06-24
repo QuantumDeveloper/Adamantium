@@ -19,7 +19,8 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
         IGraphicsDevice graphicsDevice,
         UIBasicEffect uiBasicEffect,
         StrokeEffect strokeEffect,
-        IResourceFactory resourceFactory) : base(graphicsDevice)
+        IResourceFactory resourceFactory,
+        FillFringeEffect fillFringeEffect = null) : base(graphicsDevice)
     {
         DrawCommand = command;
         Payload = DrawCommand.Payload as TPayload;
@@ -27,6 +28,7 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
         ResourceFactory = resourceFactory;
         UIBasicEffect = uiBasicEffect;
         StrokeEffect = strokeEffect;
+        FillFringeEffect = fillFringeEffect;
     }
 
     public TPayload Payload { get; protected set; }
@@ -38,7 +40,15 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
 
     protected StrokeEffect StrokeEffect { get; }
 
+    // Analytic-AA fill fringe (GPU coverage edge). On like UseGpuStroke; toggle off to A/B against MSAA.
+    public static bool UseGpuFill { get; set; } = true;
+
+    protected FillFringeEffect FillFringeEffect { get; }
+
     public UIRenderComponent StrokeRenderer { get; set; }
+
+    // The analytic-AA coverage fringe around a solid fill's contour (drawn on top of the body). Null = no fill AA.
+    public UIRenderComponent FillFringeRenderer { get; set; }
 
     public UIRenderComponent GeometryRenderer { get; set; }
 
@@ -83,27 +93,80 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
         return true;
     }
     
+    // Analytic AA: build a GPU coverage fringe around a SOLID fill's CLOSED contours, drawn over the body for a soft
+    // ~1px edge. Only a solid-colour fill with a real closed contour gets it; otherwise no fringe (no fill AA).
+    protected void ProcessFillFringe(Geometry geometry, Brush brush)
+    {
+        FillFringeRenderer?.DeferDispose();
+        FillFringeRenderer = null;
+        if (!UseGpuFill || FillFringeEffect == null || brush is not SolidColorBrush solid) return;
+
+        var mesh = geometry?.Mesh;
+        if (mesh == null || mesh.Contours.Count == 0) return;
+
+        List<(Adamantium.Mathematics.Vector2[] Points, bool IsClosed)> contours = [];
+        foreach (var contour in mesh.Contours)
+            if (contour.IsGeometryClosed && contour.Points is { Length: >= 3 })
+                contours.Add((contour.Points, true));
+        if (contours.Count == 0) return;
+
+        FillFringeRenderer = new GpuFillRenderComponent(GraphicsDevice, UIBasicEffect, FillFringeEffect, contours, solid);
+        FillFringeRenderer.RenderData = DrawCommand.RenderData;
+    }
+
+    // Keep the analytic-AA fringe in sync on a hot update. A geometry change (rebuild) already re-tessellated `geometry`,
+    // so rebuild the fringe from it. A brush/colour change is a CHEAP update (RequiresBufferRebuild excludes the brush):
+    // the existing fringe just repoints its brush (read live at Render - no contour re-upload, and a solid<->non-solid
+    // flip simply stops/starts it drawing); only a fill that never had a fringe yet became solid needs a build (it
+    // tessellates on demand). No-op when nothing relevant changed.
+    protected void UpdateFillFringe(Geometry geometry, Brush brush, bool rebuild, bool brushChanged)
+    {
+        if (rebuild)
+        {
+            ProcessFillFringe(geometry, brush);
+            return;
+        }
+        if (!brushChanged) return;
+        if (FillFringeRenderer is GpuFillRenderComponent fringe)
+        {
+            fringe.Brush = brush;
+        }
+        else if (UseGpuFill && FillFringeEffect != null && brush is SolidColorBrush)
+        {
+            geometry.ProcessGeometry(GeometryType.Both);
+            ProcessFillFringe(geometry, brush);
+        }
+    }
+
     protected IResourceFactory ResourceFactory { get; set; }
     protected IDrawCommand DrawCommand { get; set; }
     protected IGraphicsDevice GraphicsDevice { get; }
 
     public IUIComponent Component => DrawCommand.Component;
 
-    public void Update(Matrix4x4F transform, Matrix4x4F projection)
+    public void Update(Matrix4x4F transform, Matrix4x4F projection, double renderScale)
     {
+        // RenderData is shared by all of a unit's renderers (set in ProcessStrokeData/ProcessFillFringe), so setting the
+        // viewport zoom here reaches the fringe component, which reads RenderData.RenderScale in PreRender for the
+        // scale-aware (~1 device px) fringe width.
+        if (DrawCommand?.RenderData != null) DrawCommand.RenderData.RenderScale = renderScale;
         GeometryRenderer?.Update(transform, projection);
+        FillFringeRenderer?.Update(transform, projection);
         StrokeRenderer?.Update(transform, projection);
     }
 
     public virtual void PreRender()
     {
         GeometryRenderer?.PreRender();
+        FillFringeRenderer?.PreRender();
         StrokeRenderer?.PreRender();
     }
 
     public virtual void Render()
     {
+        // Body first, then its analytic-AA fringe on top of the edge, then the stroke over the fill.
         GeometryRenderer?.Render();
+        FillFringeRenderer?.Render();
         StrokeRenderer?.Render();
     }
 
@@ -118,6 +181,7 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
         // The unit owns its renderers (their vertex/index buffers and text render targets), so dispose them too.
         // The unit itself is disposed via the deferred queue (after the frame fence), so disposing them now is safe.
         GeometryRenderer?.Dispose();
+        FillFringeRenderer?.Dispose();
         StrokeRenderer?.Dispose();
         base.Dispose(disposeManagedResources);
     }
@@ -125,12 +189,13 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
 
 public class GeometryRenderUnit : RenderUnit<GeometryPayload>
 {
-    public GeometryRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, StrokeEffect strokeEffect, IResourceFactory resourceFactory) :
-        base(command, graphicsDevice, uiBasicEffect, strokeEffect, resourceFactory)
+    public GeometryRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, StrokeEffect strokeEffect, IResourceFactory resourceFactory, FillFringeEffect fillFringeEffect = null) :
+        base(command, graphicsDevice, uiBasicEffect, strokeEffect, resourceFactory, fillFringeEffect)
     {
         Payload.Geometry.ProcessGeometry(GeometryType.Both);
         GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, Payload.Geometry.Mesh, Payload.Brush);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
+        ProcessFillFringe(Payload.Geometry, Payload.Brush);
         ProcessStrokeData(Payload.Pen, Payload.Geometry);
     }
 
@@ -138,8 +203,9 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
     {
         if (drawCommand.Payload is not GeometryPayload inputPayload) return;
 
-        // Capture the old pen BEFORE reassigning Payload, otherwise the comparison below is always equal.
+        // Capture the old pen/brush BEFORE reassigning Payload, otherwise the comparisons below are always equal.
         var oldPen = Payload.Pen;
+        var oldBrush = Payload.Brush;
         var rebuild = Payload.RequiresBufferRebuild(inputPayload);
 
         if (rebuild)
@@ -161,8 +227,17 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
             GeometryRenderer.RenderData = DrawCommand.RenderData;
         }
 
-        // The stroke wraps the geometry, so rebuild it when the geometry changed OR the pen changed.
-        if (rebuild || !Equals(oldPen, inputPayload.Pen))
+        // Analytic-AA fringe follows the fill: cheap brush/colour change repoints it, a geometry change rebuilds it.
+        UpdateFillFringe(inputPayload.Geometry, inputPayload.Brush, rebuild, !Equals(oldBrush, inputPayload.Brush));
+
+        // Stroke: geometry change -> full rebuild; pen-only change -> try a cheap uniform repoint (dash offset /
+        // thickness / colour / trim animation) on the existing GPU stroke, rebuilding only if the buffer sizes change.
+        if (rebuild)
+        {
+            ProcessStrokeData(inputPayload.Pen, inputPayload.Geometry);
+        }
+        else if (!Equals(oldPen, inputPayload.Pen) &&
+                 !(StrokeRenderer is GpuStrokeRenderComponent gs && gs.TryRepoint(inputPayload.Pen)))
         {
             ProcessStrokeData(inputPayload.Pen, inputPayload.Geometry);
         }
@@ -183,14 +258,24 @@ public class LineRenderUnit : RenderUnit<LinePayload>
     {
         if (drawCommand.Payload is not LinePayload inputPayload) return;
 
-        // A line is pure stroke: its endpoints AND pen both feed RequiresBufferRebuild, so this single check
-        // covers a move/resize as well as a pen change.
-        var rebuild = Payload.RequiresBufferRebuild(inputPayload);
-
+        var oldPayload = Payload;
         DrawCommand = drawCommand;
         Payload = inputPayload;
 
-        if (rebuild)
+        // A line is pure stroke. RequiresBufferRebuild bundles endpoints AND pen, which would rebuild the buffers every
+        // frame of a dash-offset animation. Split them: only an ENDPOINT move changes the ribbon geometry (rebuild);
+        // a pen-only change (offset/thickness/colour/trim) tries a cheap uniform repoint, rebuilding only on a size change.
+        var geometryChanged = !oldPayload.LineStart.Equals(inputPayload.LineStart)
+                              || !oldPayload.LineEnd.Equals(inputPayload.LineEnd);
+
+        if (geometryChanged)
+        {
+            var geometry = new LineGeometry(inputPayload.LineStart, inputPayload.LineEnd);
+            geometry.ProcessGeometry(GeometryType.Both);
+            ProcessStrokeData(inputPayload.Pen, geometry);
+        }
+        else if (!Equals(oldPayload.Pen, inputPayload.Pen) &&
+                 !(StrokeRenderer is GpuStrokeRenderComponent gs && gs.TryRepoint(inputPayload.Pen)))
         {
             var geometry = new LineGeometry(inputPayload.LineStart, inputPayload.LineEnd);
             geometry.ProcessGeometry(GeometryType.Both);
@@ -201,13 +286,14 @@ public class LineRenderUnit : RenderUnit<LinePayload>
 
 public class RectangleRenderUnit : RenderUnit<RectanglePayload>
 {
-    public RectangleRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, StrokeEffect strokeEffect, IResourceFactory resourceFactory) :
-        base(command, graphicsDevice, uiBasicEffect, strokeEffect, resourceFactory)
+    public RectangleRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, StrokeEffect strokeEffect, IResourceFactory resourceFactory, FillFringeEffect fillFringeEffect = null) :
+        base(command, graphicsDevice, uiBasicEffect, strokeEffect, resourceFactory, fillFringeEffect)
     {
         var rectangleGeometry = new RectangleGeometry(Payload.DestinationRect, Payload.CornerRadius);
         rectangleGeometry.ProcessGeometry(GeometryType.Both);
         GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, rectangleGeometry.Mesh, Payload.Brush);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
+        ProcessFillFringe(rectangleGeometry, Payload.Brush);
         ProcessStrokeData(Payload.Pen, rectangleGeometry);
     }
     
@@ -216,6 +302,7 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
         if (drawCommand.Payload is not RectanglePayload inputPayload) return;
 
         var oldPen = Payload.Pen;
+        var oldBrush = Payload.Brush;
         var rebuild = Payload.RequiresBufferRebuild(inputPayload);
 
         var rectangleGeometry = new RectangleGeometry(inputPayload.DestinationRect, inputPayload.CornerRadius);
@@ -235,11 +322,19 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
 
         GeometryRenderer?.RenderData = DrawCommand.RenderData;
 
-        // Stroke wraps the geometry: rebuild on geometry change OR pen change. In the pen-only case the
-        // geometry wasn't processed above, so process it before building the stroke.
-        if (rebuild || !Equals(oldPen, inputPayload.Pen))
+        // Analytic-AA fringe follows the fill: cheap brush/colour change repoints it, a geometry change rebuilds it.
+        UpdateFillFringe(rectangleGeometry, inputPayload.Brush, rebuild, !Equals(oldBrush, inputPayload.Brush));
+
+        // Stroke: geometry change -> full rebuild; pen-only change -> try a cheap uniform repoint (animation), else
+        // rebuild (process the geometry first, since it wasn't processed in the non-rebuild branch).
+        if (rebuild)
         {
-            if (!rebuild) rectangleGeometry.ProcessGeometry(GeometryType.Both);
+            ProcessStrokeData(inputPayload.Pen, rectangleGeometry);
+        }
+        else if (!Equals(oldPen, inputPayload.Pen) &&
+                 !(StrokeRenderer is GpuStrokeRenderComponent gs && gs.TryRepoint(inputPayload.Pen)))
+        {
+            rectangleGeometry.ProcessGeometry(GeometryType.Both);
             ProcessStrokeData(inputPayload.Pen, rectangleGeometry);
         }
     }
@@ -247,13 +342,14 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
 
 public class EllipseRenderUnit : RenderUnit<EllipsePayload>
 {
-    public EllipseRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, StrokeEffect strokeEffect, IResourceFactory resourceFactory) :
-        base(command, graphicsDevice, uiBasicEffect, strokeEffect, resourceFactory)
+    public EllipseRenderUnit(IDrawCommand command, IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, StrokeEffect strokeEffect, IResourceFactory resourceFactory, FillFringeEffect fillFringeEffect = null) :
+        base(command, graphicsDevice, uiBasicEffect, strokeEffect, resourceFactory, fillFringeEffect)
     {
         var ellipseGeometry = new EllipseGeometry(Payload.DestinationRect, Payload.StartAngle, Payload.SweepAngle, Payload.EllipseType);
         ellipseGeometry.ProcessGeometry(GeometryType.Both);
         GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, ellipseGeometry.Mesh, Payload.Brush);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
+        ProcessFillFringe(ellipseGeometry, Payload.Brush);
         ProcessStrokeData(Payload.Pen, ellipseGeometry);
     }
 
@@ -262,6 +358,7 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
         if (drawCommand.Payload is not EllipsePayload inputPayload) return;
 
         var oldPen = Payload.Pen;
+        var oldBrush = Payload.Brush;
         var rebuild = Payload.RequiresBufferRebuild(inputPayload);
 
         var ellipseGeometry = new EllipseGeometry(inputPayload.DestinationRect, inputPayload.StartAngle, inputPayload.SweepAngle,
@@ -287,11 +384,19 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
             GeometryRenderer.RenderData = drawCommand.RenderData;
         }
 
-        // Stroke wraps the geometry: rebuild on geometry change OR pen change; process geometry first in
-        // the pen-only case.
-        if (rebuild || !Equals(oldPen, inputPayload.Pen))
+        // Analytic-AA fringe follows the fill: cheap brush/colour change repoints it, a geometry change rebuilds it.
+        UpdateFillFringe(ellipseGeometry, inputPayload.Brush, rebuild, !Equals(oldBrush, inputPayload.Brush));
+
+        // Stroke: geometry change -> full rebuild; pen-only change -> try a cheap uniform repoint (animation), else
+        // rebuild (process the geometry first, since it wasn't processed in the non-rebuild branch).
+        if (rebuild)
         {
-            if (!rebuild) ellipseGeometry.ProcessGeometry(GeometryType.Both);
+            ProcessStrokeData(inputPayload.Pen, ellipseGeometry);
+        }
+        else if (!Equals(oldPen, inputPayload.Pen) &&
+                 !(StrokeRenderer is GpuStrokeRenderComponent gs && gs.TryRepoint(inputPayload.Pen)))
+        {
+            ellipseGeometry.ProcessGeometry(GeometryType.Both);
             ProcessStrokeData(inputPayload.Pen, ellipseGeometry);
         }
     }

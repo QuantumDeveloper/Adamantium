@@ -86,7 +86,7 @@ public class ForwardWindowRenderer : WindowRendererBase
         if (Window == null) return;
 
         _renderCache.BuildFromVisualTree(Window);
-        _renderCache.ProcessCommands(Window.GetProjectionMatrix());
+        _renderCache.ProcessCommands(Window.GetProjectionMatrix(), RenderScale);
     }
 
     // Headless designer: each render is a fresh tree (new RenderIds), so drop the cached units between renders instead

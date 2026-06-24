@@ -20,7 +20,11 @@ public interface IWindow : IRootVisualComponent, IContentControl
     bool IsClosed { get; }
         
     MSAALevel MSAALevel { get; set; }
-        
+
+    /// <summary>Toggles the GPU analytic anti-aliasing (coverage fringe on fills + feathered strokes). True = on.
+    /// Independent of <see cref="MSAALevel"/>, so the two can be compared in any combination.</summary>
+    bool AnalyticAntialiasing { get; set; }
+
     WindowState State { get; set; }
     
     IWindowRenderer DefaultRenderer { get; set; }

@@ -12,7 +12,7 @@
 
 // --- StrokeExpand (compute) globals ---
 uint64_t PointsAddress;   // float2[] polyline points (PointCount of them)
-uint64_t OutputAddress;   // float2[] output vertices
+uint64_t OutputAddress;   // float3[] output vertices: (x, y, signed perpendicular distance from centerline) for AA
 uint PointCount;          // continuous mode: polyline points. dash mode: piece-points (2 per dash piece).
 uint IsClosed;            // 0 = open polyline (flat ends), 1 = closed loop (wrap-around miters + closing pair)
 uint StartCap;            // start cap: 0 = flat, 1 = square, 2 = round, 3 = convex-tri, 4 = concave-tri, 5 = concave-round
@@ -22,6 +22,7 @@ uint JoinType;            // 0 = miter (bisector ribbon, clamped), 1 = bevel (pe
 uint RoundSegments;       // disc-fan subdivision for round joins/caps; 0 = no round geometry (no disc slots)
 uint DashMode;            // 0 = continuous polyline (per-point), 1 = one-pass GPU cut (dash/trim, single-thread + DrawIndirect)
 float HalfThickness;
+float Fringe;             // AA feather width in geometry-LOCAL units (~1 device px / scale); ribbon/discs widen by Fringe/2
 
 // --- one-pass GPU cut (DashMode == 1): the GPU walks the contour by arc length and emits dash/trim pieces ---
 uint64_t IndirectAddress; // VkDrawIndirectCommand the cut writes (vertexCount = GPU-decided draw size)
@@ -52,6 +53,7 @@ void OffsetPair(uint i, out float2 plus, out float2 minus)
     float2* points = (float2*)PointsAddress;
     float2 p = points[i];
 
+    float hw = HalfThickness + Fringe * 0.5;   // widen the ribbon by the AA feather; v carries +/-hw (see EmitQuad)
     float2 miter;
     float miterLen;
 
@@ -60,14 +62,14 @@ void OffsetPair(uint i, out float2 plus, out float2 minus)
         float2 dir = normalize(points[1] - points[0]);   // inward; outward is -dir
         p -= dir * CapShift(StartCap);                    // square extends out, concave insets in (cap shape added in the fan)
         miter = float2(-dir.y, dir.x);
-        miterLen = HalfThickness;
+        miterLen = hw;
     }
     else if (IsClosed == 0 && i + 1 == PointCount)
     {
         float2 dir = normalize(points[i] - points[i - 1]);   // outward
         p += dir * CapShift(EndCap);
         miter = float2(-dir.y, dir.x);
-        miterLen = HalfThickness;
+        miterLen = hw;
     }
     else
     {
@@ -77,7 +79,7 @@ void OffsetPair(uint i, out float2 plus, out float2 minus)
         float2 n1 = SegmentNormal(p, points[next]);
         miter = normalize(n0 + n1);
         float denom = max(dot(miter, n0), 0.25);       // clamp -> miter length capped at 4*half on sharp corners
-        miterLen = HalfThickness / denom;
+        miterLen = hw / denom;
     }
 
     plus = p + miter * miterLen;
@@ -85,20 +87,22 @@ void OffsetPair(uint i, out float2 plus, out float2 minus)
 }
 
 // Writes a quad (two triangles, 6 verts) from four corners into outVerts at vertex offset o.
-void EmitQuad(float2* outVerts, uint o, float2 aP, float2 aM, float2 bP, float2 bM)
+// hw = widened half-extent (HalfThickness + Fringe/2): the P corners sit at +hw perpendicular, the M corners at -hw, and
+// the signed distance v=+/-hw is interpolated across the quad so StrokePS feathers both long edges.
+void EmitQuad(float3* outVerts, uint o, float2 aP, float2 aM, float2 bP, float2 bM, float hw)
 {
-    outVerts[o + 0] = aP;
-    outVerts[o + 1] = aM;
-    outVerts[o + 2] = bP;
-    outVerts[o + 3] = bP;
-    outVerts[o + 4] = aM;
-    outVerts[o + 5] = bM;
+    outVerts[o + 0] = float3(aP,  hw);
+    outVerts[o + 1] = float3(aM, -hw);
+    outVerts[o + 2] = float3(bP,  hw);
+    outVerts[o + 3] = float3(bP,  hw);
+    outVerts[o + 4] = float3(aM, -hw);
+    outVerts[o + 5] = float3(bM, -hw);
 }
 
 // Writes a degenerate (zero-area) quad at o - used for slots a thread doesn't fill, so the fixed layout stays uniform.
-void EmitDegenerateQuad(float2* outVerts, uint o, float2 p)
+void EmitDegenerateQuad(float3* outVerts, uint o, float2 p)
 {
-    for (uint q = 0u; q < 6u; ++q) outVerts[o + q] = p;
+    for (uint q = 0u; q < 6u; ++q) outVerts[o + q] = float3(p, 0.0);
 }
 
 // How far to move an end's quad cross-section ALONG THE OUTWARD direction, per cap code: square extends out by half;
@@ -116,11 +120,12 @@ float CapShift(uint cap)
 // most `maxTris`, returns how many it wrote. `p` = geometry endpoint, `o` = outward unit dir, `perp` = half-thickness
 // normal (p +/- perp are the stroke corners there). Convex caps add a bulge/tip beyond p; concave caps fill the two
 // lobes left between the inset quad (base centre p - o*half) and the corners, carving the notch/arc between them.
-uint EmitCapTris(float2* outVerts, uint base, uint maxTris, float2 p, float2 o, float2 perp, uint cap)
+uint EmitCapTris(float3* outVerts, uint base, uint maxTris, float2 p, float2 o, float2 perp, uint cap)
 {
     const float TWO_PI = 6.28318530717958647692;
     const float PI_ = 3.14159265358979323846;
     uint n = 0u;
+    float hw = HalfThickness + Fringe * 0.5;   // widened radius; v = radial distance so the disc rim feathers
 
     if (cap == 2u)   // convex round: full disc (opaque; the outer half is the visible cap)
     {
@@ -128,24 +133,24 @@ uint EmitCapTris(float2* outVerts, uint base, uint maxTris, float2 p, float2 o, 
         {
             float a0 = TWO_PI * float(k) / float(RoundSegments);
             float a1 = TWO_PI * float(k + 1u) / float(RoundSegments);
-            outVerts[base + n * 3u + 0] = p;
-            outVerts[base + n * 3u + 1] = p + HalfThickness * float2(cos(a0), sin(a0));
-            outVerts[base + n * 3u + 2] = p + HalfThickness * float2(cos(a1), sin(a1));
+            outVerts[base + n * 3u + 0] = float3(p, 0.0);
+            outVerts[base + n * 3u + 1] = float3(p + hw * float2(cos(a0), sin(a0)), hw);
+            outVerts[base + n * 3u + 2] = float3(p + hw * float2(cos(a1), sin(a1)), hw);
             ++n;
         }
     }
     else if (cap == 3u && maxTris >= 1u)   // convex triangle: a tip out at p + o*half
     {
-        outVerts[base + 0] = p + perp;
-        outVerts[base + 1] = p - perp;
-        outVerts[base + 2] = p + o * HalfThickness;
+        outVerts[base + 0] = float3(p + perp, 0.0);
+        outVerts[base + 1] = float3(p - perp, 0.0);
+        outVerts[base + 2] = float3(p + o * HalfThickness, 0.0);
         n = 1u;
     }
     else if (cap == 4u && maxTris >= 2u)   // concave triangle: two lobes back to the inset base centre (a V notch)
     {
         float2 bc = p - o * HalfThickness;
-        outVerts[base + 0] = bc + perp; outVerts[base + 1] = p + perp; outVerts[base + 2] = bc;
-        outVerts[base + 3] = bc - perp; outVerts[base + 4] = p - perp; outVerts[base + 5] = bc;
+        outVerts[base + 0] = float3(bc + perp, 0.0); outVerts[base + 1] = float3(p + perp, 0.0); outVerts[base + 2] = float3(bc, 0.0);
+        outVerts[base + 3] = float3(bc - perp, 0.0); outVerts[base + 4] = float3(p - perp, 0.0); outVerts[base + 5] = float3(bc, 0.0);
         n = 2u;
     }
     else if (cap == 5u)   // concave round: two lobe fans following the inward arc (radius half, centred on p)
@@ -160,9 +165,9 @@ uint EmitCapTris(float2* outVerts, uint base, uint maxTris, float2 p, float2 o, 
         {
             float th0 = aC + dTop * (float(k) / float(lobeSegs));
             float th1 = aC + dTop * (float(k + 1u) / float(lobeSegs));
-            outVerts[base + n * 3u + 0] = bc + perp;
-            outVerts[base + n * 3u + 1] = p + HalfThickness * float2(cos(th0), sin(th0));
-            outVerts[base + n * 3u + 2] = p + HalfThickness * float2(cos(th1), sin(th1));
+            outVerts[base + n * 3u + 0] = float3(bc + perp, 0.0);
+            outVerts[base + n * 3u + 1] = float3(p + HalfThickness * float2(cos(th0), sin(th0)), 0.0);
+            outVerts[base + n * 3u + 2] = float3(p + HalfThickness * float2(cos(th1), sin(th1)), 0.0);
             ++n;
         }
         float aCm = aC + PI_; if (aCm > PI_) aCm -= TWO_PI;
@@ -171,9 +176,9 @@ uint EmitCapTris(float2* outVerts, uint base, uint maxTris, float2 p, float2 o, 
         {
             float th0 = aB + dBot * (float(k) / float(lobeSegs));
             float th1 = aB + dBot * (float(k + 1u) / float(lobeSegs));
-            outVerts[base + n * 3u + 0] = bc - perp;
-            outVerts[base + n * 3u + 1] = p + HalfThickness * float2(cos(th0), sin(th0));
-            outVerts[base + n * 3u + 2] = p + HalfThickness * float2(cos(th1), sin(th1));
+            outVerts[base + n * 3u + 0] = float3(bc - perp, 0.0);
+            outVerts[base + n * 3u + 1] = float3(p + HalfThickness * float2(cos(th0), sin(th0)), 0.0);
+            outVerts[base + n * 3u + 2] = float3(p + HalfThickness * float2(cos(th1), sin(th1)), 0.0);
             ++n;
         }
     }
@@ -194,7 +199,7 @@ uint EmitCapTris(float2* outVerts, uint base, uint maxTris, float2 p, float2 o, 
 void StrokeExpandCS(uint3 tid : SV_DispatchThreadID)
 {
     float2* points = (float2*)PointsAddress;
-    float2* outVerts = (float2*)OutputAddress;
+    float3* outVerts = (float3*)OutputAddress;
 
     // Continuous polyline, one thread per point. Fixed per-point slot: a segment quad then a join fan.
     if (tid.x >= PointCount)
@@ -219,7 +224,7 @@ void StrokeExpandCS(uint3 tid : SV_DispatchThreadID)
             float2 aP, aM, bP, bM;
             OffsetPair(i, aP, aM);
             OffsetPair(ni, bP, bM);
-            EmitQuad(outVerts, baseV, aP, aM, bP, bM);
+            EmitQuad(outVerts, baseV, aP, aM, bP, bM, HalfThickness + Fringe * 0.5);
         }
         else
         {
@@ -229,13 +234,14 @@ void StrokeExpandCS(uint3 tid : SV_DispatchThreadID)
             float2 a = p;
             float2 b = points[ni];
             float2 dir = normalize(b - a);
-            float2 nrm = float2(-dir.y, dir.x) * HalfThickness;
+            float hw = HalfThickness + Fringe * 0.5;
+            float2 nrm = float2(-dir.y, dir.x) * hw;
             if (IsClosed == 0u)
             {
                 if (i == 0u) a -= dir * CapShift(StartCap);              // start cap: square extends, concave insets
                 if (ni + 1u == PointCount) b += dir * CapShift(EndCap);  // end cap
             }
-            EmitQuad(outVerts, baseV, a + nrm, a - nrm, b + nrm, b - nrm);
+            EmitQuad(outVerts, baseV, a + nrm, a - nrm, b + nrm, b - nrm, hw);
         }
     }
     else
@@ -270,10 +276,11 @@ void StrokeExpandCS(uint3 tid : SV_DispatchThreadID)
         // inner one lands inside the overlap, harmless for an opaque stroke.
         uint prev = (i + PointCount - 1u) % PointCount;
         uint next = (i + 1u) % PointCount;
-        float2 nIn = SegmentNormal(points[prev], p) * HalfThickness;
-        float2 nOut = SegmentNormal(p, points[next]) * HalfThickness;
-        outVerts[discBase + 0] = p + nIn; outVerts[discBase + 1] = p + nOut; outVerts[discBase + 2] = p;
-        outVerts[discBase + 3] = p - nIn; outVerts[discBase + 4] = p - nOut; outVerts[discBase + 5] = p;
+        float hw = HalfThickness + Fringe * 0.5;
+        float2 nIn = SegmentNormal(points[prev], p) * hw;
+        float2 nOut = SegmentNormal(p, points[next]) * hw;
+        outVerts[discBase + 0] = float3(p + nIn, hw); outVerts[discBase + 1] = float3(p + nOut, hw); outVerts[discBase + 2] = float3(p, 0.0);
+        outVerts[discBase + 3] = float3(p - nIn, -hw); outVerts[discBase + 4] = float3(p - nOut, -hw); outVerts[discBase + 5] = float3(p, 0.0);
         nTris = 2u;
     }
 
@@ -281,9 +288,9 @@ void StrokeExpandCS(uint3 tid : SV_DispatchThreadID)
     for (uint k = nTris; k < RoundSegments; ++k)
     {
         uint o = discBase + k * 3u;
-        outVerts[o + 0] = p;
-        outVerts[o + 1] = p;
-        outVerts[o + 2] = p;
+        outVerts[o + 0] = float3(p, 0.0);
+        outVerts[o + 1] = float3(p, 0.0);
+        outVerts[o + 2] = float3(p, 0.0);
     }
 }
 
@@ -291,26 +298,26 @@ void StrokeExpandCS(uint3 tid : SV_DispatchThreadID)
 // corner triangles, miter = those plus an outer wedge to the miter tip. nInU/nOutU are the UNIT normals of the incoming
 // / outgoing segments. Both corner triangles are emitted (one fills the convex gap, the other the concave gap; the
 // non-gap side is harmless overlap), so no per-corner left/right test is needed. Returns the advanced vertex count.
-uint EmitJoin(float2* outVerts, uint vCount, uint maxV, float2 V, float2 nInU, float2 nOutU)
+uint EmitJoin(float3* outVerts, uint vCount, uint maxV, float2 V, float2 nInU, float2 nOutU)
 {
-    float h = HalfThickness;
+    float h = HalfThickness + Fringe * 0.5;   // widened; outer corner verts carry v=+/-h, the centre V carries v=0
     if (JoinType == 2u)   // round join: a disc of radius half (same as a round cap; o/perp unused for a full disc)
     {
         uint tris = EmitCapTris(outVerts, vCount, (maxV - vCount) / 3u, V, float2(1.0, 0.0), float2(0.0, 0.0), 2u);
         return vCount + tris * 3u;
     }
-    if (vCount + 6u <= maxV)   // bevel/miter: fill both corner sides
+    if (vCount + 6u <= maxV)   // bevel/miter: fill both corner sides (feathered from centre V to the outer edge)
     {
-        outVerts[vCount + 0] = V + nInU * h; outVerts[vCount + 1] = V + nOutU * h; outVerts[vCount + 2] = V;
-        outVerts[vCount + 3] = V - nInU * h; outVerts[vCount + 4] = V - nOutU * h; outVerts[vCount + 5] = V;
+        outVerts[vCount + 0] = float3(V + nInU * h, h); outVerts[vCount + 1] = float3(V + nOutU * h, h); outVerts[vCount + 2] = float3(V, 0.0);
+        outVerts[vCount + 3] = float3(V - nInU * h, -h); outVerts[vCount + 4] = float3(V - nOutU * h, -h); outVerts[vCount + 5] = float3(V, 0.0);
         vCount += 6u;
     }
-    if (JoinType == 0u && vCount + 3u <= maxV)   // miter: extend the outer wedge to the (clamped) miter tip
+    if (JoinType == 0u && vCount + 3u <= maxV)   // miter: extend the outer wedge to the (clamped) miter tip (solid v=0)
     {
         float2 bis = normalize(nInU + nOutU);
         float dd = max(dot(bis, nInU), 0.25);
         float2 tip = V + bis * (h / dd);
-        outVerts[vCount + 0] = V + nInU * h; outVerts[vCount + 1] = tip; outVerts[vCount + 2] = V + nOutU * h;
+        outVerts[vCount + 0] = float3(V + nInU * h, 0.0); outVerts[vCount + 1] = float3(tip, 0.0); outVerts[vCount + 2] = float3(V + nOutU * h, 0.0);
         vCount += 3u;
     }
     return vCount;
@@ -331,7 +338,7 @@ void StrokeDashCutCS(uint3 tid : SV_DispatchThreadID)
         return;
 
     float2* points = (float2*)PointsAddress;
-    float2* outVerts = (float2*)OutputAddress;
+    float3* outVerts = (float3*)OutputAddress;
     float* pattern = (float*)PatternAddress;
     uint* indirect = (uint*)IndirectAddress;
     uint segCount = IsClosed != 0u ? PointCount : PointCount - 1u;
@@ -370,7 +377,8 @@ void StrokeDashCutCS(uint3 tid : SV_DispatchThreadID)
         float segLen = length(d);
         if (segLen < 1e-6) continue;
         float2 dir = d / segLen;
-        float2 nrm = float2(-dir.y, dir.x) * HalfThickness;
+        float hw = HalfThickness + Fringe * 0.5;
+        float2 nrm = float2(-dir.y, dir.x) * hw;
 
         float pos = 0.0;
         while (pos < segLen - 1e-6)
@@ -392,7 +400,7 @@ void StrokeDashCutCS(uint3 tid : SV_DispatchThreadID)
                 float2 e1 = p1 + dir * CapShift(capB);
                 if (vCount + 6u <= MaxVertices)
                 {
-                    EmitQuad(outVerts, vCount, e0 + nrm, e0 - nrm, e1 + nrm, e1 - nrm);
+                    EmitQuad(outVerts, vCount, e0 + nrm, e0 - nrm, e1 + nrm, e1 - nrm, hw);
                     vCount += 6u;
                 }
                 if (RoundSegments > 0u)
@@ -428,21 +436,28 @@ void StrokeDashCutCS(uint3 tid : SV_DispatchThreadID)
     indirect[3] = 0u;
 }
 
-struct VSInput { float2 Position : POSITION; };
-struct PSInput { float4 Position : SV_Position; };
+struct VSInput { float2 Position : POSITION; float Distance : TEXCOORD0; };
+struct PSInput { float4 Position : SV_Position; float Distance : TEXCOORD0; };
 
 [shader("vertex")]
 PSInput StrokeVS(VSInput input)
 {
     PSInput o;
     o.Position = mul(float4(input.Position, 0.0, 1.0), Projection);   // row-vector convention (matches engine effects)
+    o.Distance = input.Distance;
     return o;
 }
 
 [shader("fragment")]
 float4 StrokePS(PSInput input) : SV_Target
 {
-    return StrokeColor;
+    // Analytic AA: coverage from the interpolated signed perpendicular distance - 1 in the core, 0.5 at the nominal edge
+    // (|d| = HalfThickness), 0 at the widened edge (|d| = HalfThickness + Fringe/2). Feathers both ribbon edges + discs.
+    // Fringe == 0 (analytic AA off) => flat hard ribbon (no feather, no divide-by-zero).
+    float coverage = Fringe > 0.0 ? saturate((HalfThickness + Fringe * 0.5 - abs(input.Distance)) / Fringe) : 1.0;
+    float4 c = StrokeColor;
+    c.a *= coverage;
+    return c;
 }
 
 technique Stroke

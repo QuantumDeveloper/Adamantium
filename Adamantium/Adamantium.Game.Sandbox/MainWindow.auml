@@ -8,7 +8,8 @@
         Title="Adamantium Window"
         ContentTransition="SlideLeft"
         Width="1280"
-        Height="720">
+        Height="720"
+        AnalyticAntialiasing="true">
     <Grid>
         <Button Width="150"
                 Height="150"

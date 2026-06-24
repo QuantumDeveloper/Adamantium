@@ -22,6 +22,11 @@ public class RenderData
     public Rect ClipRect { get; }
     
     public Matrix4x4F ProjectionMatrix { get; set; }
-    
+
+    // Viewport zoom multiplier (designer renders ClientSize x RenderScale; the projection stays logical). 1 = on-screen
+    // 1:1. Analytic AA reads it so the fringe stays ~1 DEVICE px under zoom (TransformMatrix carries only the logical
+    // local->world scale; the zoom lives in the viewport, not the projection - see WindowRendererBase.RenderScale).
+    public double RenderScale { get; set; } = 1.0;
+
     public Effect CustomEffect { get; }
 }

@@ -36,7 +36,7 @@ public class AdornerRenderProcessor : EntityProcessor<WindowRenderService>
         // Built after the window's own layout update this frame: the overlay units come from the window's adorners and
         // are bound to the adorned elements' live WorldTransform.
         _cache.BuildFromComponents(window.Adorners, projection);
-        _cache.ProcessCommands(projection);
+        _cache.ProcessCommands(projection, AssociatedService.RenderScale);
     }
 
     public override void PreRender() => _cache?.PreRender();
