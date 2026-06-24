@@ -1,8 +1,10 @@
 using Adamantium.Graphics.Core;
 using Adamantium.UI.Controls.Adorners;
+using Adamantium.UI.Controls.Buttons;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Controls;
 using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.Win32;
 
@@ -42,7 +44,37 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
 
     public WindowBase()
     {
-        
+        // Default/cancel routing: the window is the root, so unhandled Enter/Esc bubble up here from the focused element.
+        AddHandler(Keyboard.KeyDownEvent, new KeyEventHandler(OnWindowKeyDown));
+    }
+
+    // Enter activates the IsDefault button, Escape the IsCancel button - unless the focused element already handled the
+    // key (handled keys don't reach this handler). WPF Window default/cancel behaviour.
+    private void OnWindowKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Handled) return;
+        var target = e.Key switch
+        {
+            Key.Enter => FindButton(this, b => b.IsDefault),
+            Key.Escape => FindButton(this, b => b.IsCancel),
+            _ => null
+        };
+        if (target != null)
+        {
+            target.PerformClick();
+            e.Handled = true;
+        }
+    }
+
+    private static Button FindButton(IUIComponent root, Func<Button, bool> match)
+    {
+        foreach (var child in root.VisualChildren)
+        {
+            if (child is Button button && match(button)) return button;
+            var found = FindButton(child, match);
+            if (found != null) return found;
+        }
+        return null;
     }
 
     public static readonly RoutedEvent ClientSizeChangedEvent = EventManager.RegisterRoutedEvent("ClientSizeChanged",

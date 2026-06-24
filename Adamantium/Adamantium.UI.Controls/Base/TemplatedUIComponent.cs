@@ -26,6 +26,10 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent
             {
                 component.ApplyTemplate();
             }
+
+            // Template parts just changed: re-point any style/element triggers that target named parts at the new tree
+            // (and tear down what they held on the old, now-discarded parts) so a runtime template swap stays leak-free.
+            component.ReevaluateTriggersForTemplateChange();
         }
     }
     

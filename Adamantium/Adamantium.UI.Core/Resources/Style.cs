@@ -114,6 +114,21 @@ public class Style : AdamantiumComponent
         }
     }
     
+    // Re-wire this component's style-trigger activators after its template changed: each tears down what it applied to
+    // the OLD parts (and its subscriptions) and re-evaluates against the NEW template. Lets a runtime template swap stay
+    // leak-free while a style's triggers target named parts of whatever template is currently applied.
+    internal static void ReevaluateActivators(IFundamentalUIComponent component)
+    {
+        var activators = GetActiveActivators(component);
+        if (activators == null) return;
+
+        foreach (var activator in activators)
+        {
+            activator.Deactivate();
+            activator.Activate();
+        }
+    }
+
     private static List<ITriggerActivator> GetActiveActivators(IFundamentalUIComponent component)
     {
         return component.GetValue<List<ITriggerActivator>>(ActiveActivatorsProperty);

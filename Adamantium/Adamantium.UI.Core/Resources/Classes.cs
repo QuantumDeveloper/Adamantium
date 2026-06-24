@@ -1,7 +1,10 @@
 ﻿using Adamantium.Core.Collections;
+using Adamantium.Core.TypeParsing;
+using Adamantium.UI.Core.TypeParsers;
 
 namespace Adamantium.UI.Core.Resources;
 
+[TypeParser(typeof(ClassesParser))]
 public class  Classes : TrackingCollection<string>
 {
     public Classes()

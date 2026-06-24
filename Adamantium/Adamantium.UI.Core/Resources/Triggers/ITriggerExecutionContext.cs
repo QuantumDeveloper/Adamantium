@@ -1,4 +1,5 @@
-﻿using Adamantium.UI.Core.Templates;
+﻿using Adamantium.UI.Core.Controls;
+using Adamantium.UI.Core.Templates;
 
 namespace Adamantium.UI.Core.Resources.Triggers;
 
@@ -20,12 +21,16 @@ internal class StyleTriggerExecutionContext : ITriggerExecutionContext
 
     public IFundamentalUIComponent HostComponent { get; set; }
     public ITheme Theme { get; set; }
-    
-    // In context style target could be only HostComponent
+
     public IAdamantiumComponent FindTarget(string targetName)
     {
-        return string.IsNullOrEmpty(targetName) ? HostComponent : null;
+        if (string.IsNullOrEmpty(targetName)) return HostComponent;
 
+        // A style-level trigger may target a NAMED PART of the host's template - this is what lets part triggers live in
+        // their own <Style> instead of only inside ControlTemplate.Triggers. Resolved lazily against the host's current
+        // template: a state trigger only needs the part when it fires, by which point the template (applied by another
+        // style's Template setter) exists, regardless of the order the styles were attached.
+        return (HostComponent as ITemplatedUIComponent)?.GetTemplateChild(targetName);
     }
 }
 

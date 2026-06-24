@@ -30,12 +30,17 @@ public class SelectorParser : ITypeParser<Selector>
                     selector.Classes.Add(splitItem.Substring(1));
                 }
             }
-            else // Control type
+            else // Control type, optionally with chained .classes: "Button" or "Button.Accent" or "Button.Accent.Big"
             {
-                var type = AppDomain.CurrentDomain.GetAssemblies().SelectMany(x => x.GetTypes()).FirstOrDefault(x => x.Name == splitItem);
+                var parts = splitItem.Split('.', StringSplitOptions.RemoveEmptyEntries);
+                var type = AppDomain.CurrentDomain.GetAssemblies().SelectMany(x => x.GetTypes()).FirstOrDefault(x => x.Name == parts[0]);
                 if (type != null)
                 {
                     selector.Types.Add(type);
+                }
+                for (var i = 1; i < parts.Length; i++)
+                {
+                    selector.Classes.Add(parts[i]);
                 }
             }
         }

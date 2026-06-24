@@ -18,12 +18,20 @@
                 HorizontalAlignment="Center"
                 VerticalAlignment="Center">
         </Button>
+        
     <RenderTargetPanel x:Name="TestGrid1"
                        Opacity="0.95"
                        Background="{ResourceReference CardBackgroundFillColorDefault}">
         <RenderTargetPanel.Behaviors>
             <local:GameHostBehavior/>
         </RenderTargetPanel.Behaviors>
+
+        <Button Classes="Accent"
+                Content="Accent"
+                Width="120"
+                Height="40"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top"/>
 		<!-- Closed-contour GPU stroke demo with ROUND joins: this star is one closed contour, its outline built by the
 		     compute expander (wrap-around miter ribbon + a round disc fan at each star tip = round joins). -->
 		<Path StrokeThickness="5"
