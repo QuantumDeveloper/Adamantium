@@ -259,7 +259,11 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             }
 
             DesiredSize = desiredSize;
-            _previousMeasure = DesiredSize;
+            // Cache the AVAILABLE size this measure ran with - the gate above compares the next availableSize against
+            // it to skip a redundant re-measure. (Storing DesiredSize here was the bug: desired != available for any
+            // control that doesn't fill its slot, so the gate always missed and EVERY such control - e.g. a Path with
+            // fixed bounds in a star cell - re-measured + re-tessellated on every parent measure, tanking animation.)
+            _previousMeasure = availableSize;
             if (LayoutTrace.Enabled) LayoutTrace.Log($"  MEASURE {LayoutName}: avail={availableSize} -> desired={DesiredSize}");
         }
         else if (LayoutTrace.Enabled)
@@ -547,7 +551,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     public void InvalidateMeasure()
     {
         if (!IsMeasureValid) return;
-        
+
         IsMeasureValid = false;
         IsArrangeValid = false;
         IsGeometryValid = false;

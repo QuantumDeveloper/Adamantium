@@ -116,6 +116,22 @@ public class GpuRenderUnitTests
     }
 
     [Test]
+    public void Resize_GpuStroke_SameTopology_UpdatesInPlace_NoRebuild()
+    {
+        // Real StrokeEffect -> the GPU stroke path. A rectangle keeps its corner topology across sizes, so a resize
+        // rewrites the stroke's points into the reused buffers (TryUpdateGeometry) instead of building a new component
+        // (and a new allocation) every frame - the resize/animation fast path the buffer-reuse work added.
+        var strokeEffect = new StrokeEffect(_device);
+        var unit = new RectangleRenderUnit(Command(Rect(Brushes.Red, BoxA, new Pen(Brushes.Black, 2))),
+            Ctx((UIBasicEffect)_effect.Clone(), strokeEffect));
+        var stroke = unit.StrokeRenderer;
+        Assert.That(stroke, Is.InstanceOf<GpuStrokeRenderComponent>(), "solid pen + StrokeEffect -> GPU stroke");
+
+        unit.UpdateWithDrawCommand(Command(Rect(Brushes.Red, BoxB, new Pen(Brushes.Black, 2))));
+        Assert.That(unit.StrokeRenderer, Is.SameAs(stroke), "same-topology resize updates the GPU stroke in place");
+    }
+
+    [Test]
     public void Line_DashOffsetOnlyChange_Repoints_NoRebuild()
     {
         var strokeEffect = new StrokeEffect(_device);

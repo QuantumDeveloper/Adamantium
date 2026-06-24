@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
@@ -20,11 +19,16 @@ namespace Adamantium.UI.Rendering.RenderUnits;
 //                 a VkDrawIndirectCommand; DrawIndirect reads that GPU-decided count (zero per-frame CPU for dashes).
 // A geometry can have SEVERAL contours (combined/group geometry, shapes with holes); each is expanded and drawn on its
 // own - the pen (colour, thickness, dashes, caps, join) is shared, only the points/closedness differ per contour.
+//
+// Points + the expanded vertex ribbon are RENTED from the buffer manager (ReusableBuffer), not allocated per frame: a
+// same-topology geometry change (a resize) rewrites the points in place and re-expands into the existing ring slot via
+// TryUpdateGeometry, with no Vulkan allocation. See GPU_BUFFER_REUSE_PLAN.
 public sealed class GpuStrokeRenderComponent : UIRenderComponent
 {
     // Disc-fan subdivision for round joins/caps (a smooth-enough circle); 0 when the contour has no round geometry.
     private const uint RoundSegmentsCount = 16;
     private const int MaxDashVertices = 8192 * 6;   // safety cap on the dash output buffer (per contour)
+    private const MemoryPropertyFlags StrokeMemory = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal;
 
     private readonly GraphicsDevice _device;
     private readonly StrokeEffect _effect;
@@ -34,10 +38,9 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
     private readonly uint _joinType;        // 0 miter, 1 bevel, 2 round
     private readonly List<Contour> _contours = [];
 
-    // Continuous strokes expand to geometry-LOCAL ribbons (only the fringe width depends on scale), so reuse the
-    // expanded buffer every frame until the scale (or, via TryRepoint, the pen's expand uniforms) change. The dash/cut
-    // path is NOT cached (DashOffset/trim animate per frame).
-    private bool _expanded;
+    // Continuous strokes expand to geometry-LOCAL ribbons (only the fringe width depends on scale), so the expanded ring
+    // slot is reused every frame until the scale (or, via TryRepoint, the pen's expand uniforms) change. The dash/cut
+    // path re-cuts every frame (DashOffset/trim animate).
     private float _expandedFringe = float.NaN;
 
     // Per-contour GPU state. The expander runs once per contour (its own points + output buffers), so combined/group
@@ -49,10 +52,13 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
         public uint PointCount;
         public uint ThreadCount;     // compute threads: points (continuous) or 1 (dash, single-thread cut)
         public uint VertexCount;     // continuous: exact draw count; dash: output capacity (actual count is on GPU)
-        public Buffer PointsBuffer;
-        public Buffer VertexBuffer;
+        public float[] PointsData;   // x,y interleaved - re-uploaded to the current ring slot when stale
+        public ReusableBuffer PointsBuffer;
+        public ReusableBuffer VertexBuffer;
         public Buffer PatternBuffer;     // dash only
         public Buffer IndirectBuffer;    // dash only (VkDrawIndirectCommand)
+        public ulong PointsBytes => (ulong)(PointsData.Length * sizeof(float));
+        public ulong VertexBytes => (ulong)(VertexCount * 3 * sizeof(float));   // 3 floats/vertex (x, y, signed dist)
     }
 
     public GpuStrokeRenderComponent(IGraphicsDevice device, UIBasicEffect uiBasicEffect, StrokeEffect effect,
@@ -77,12 +83,10 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
         }
     }
 
-    // Cheap pen update for animation. The pen's params (thickness, dash offset, trim values, colour) are GPU UNIFORMS,
-    // so when the SIZE-affecting params are unchanged (cut mode, join, caps, dash pattern -> same buffer sizes + fan
-    // counts) we just swap the pen and let PreRender re-dispatch with the new uniforms - NO per-frame buffer
-    // realloc/re-upload (that churn is what tanks FPS during stroke animation). Returns false (caller rebuilds via
-    // ProcessStrokeData) when a size-affecting param changed.
-    public bool TryRepoint(Pen newPen)
+    // True when newPen keeps every SIZE-affecting parameter (cut mode, join, caps, dash pattern -> same buffer sizes +
+    // fan counts). The rest (thickness, dash offset, trim values, colour) are GPU uniforms, so a compatible pen can be
+    // swapped without reallocating - TryRepoint / TryUpdateGeometry just re-dispatch with the new uniforms.
+    private bool IsPenSizeCompatible(Pen newPen)
     {
         if (newPen.Brush is not SolidColorBrush) return false;   // non-solid -> CPU stroke path, not this component
         var newHasDashes = newPen.DashStrokeArray is { Count: > 0 };
@@ -98,10 +102,59 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
         var oldN = oldDash?.Count ?? 0; var newN = newDash?.Count ?? 0;
         if (oldN != newN) return false;
         for (var i = 0; i < oldN; i++) if (oldDash[i] != newDash[i]) return false;
-
-        _pen = newPen;        // thickness/offset/trim-values/colour are uniforms (PreRender/Render); buffers stay valid
-        _expanded = false;    // re-dispatch so an expand-uniform change (e.g. thickness) takes effect
         return true;
+    }
+
+    // Cheap pen update for animation: a size-compatible pen change (thickness/offset/trim/colour) keeps the buffers, so
+    // just swap the pen and re-dispatch with the new uniforms - no per-frame realloc/re-upload (that churn is what tanks
+    // FPS during stroke animation). Returns false (caller rebuilds via ProcessStrokeData) when a size-affecting param
+    // changed.
+    public bool TryRepoint(Pen newPen)
+    {
+        if (!IsPenSizeCompatible(newPen)) return false;
+        _pen = newPen;
+        foreach (var c in _contours) c.VertexBuffer.Invalidate();   // re-expand with the new uniforms (e.g. thickness)
+        return true;
+    }
+
+    // Same-topology geometry update (a resize): if the new contours match the current ones (count + per-contour point
+    // count + closedness) and the pen stays size-compatible, rewrite the points in place and re-expand - no new
+    // component, no allocation. Returns false (caller rebuilds) for the dash/cut path (its output size depends on arc
+    // length) or any topology/pen-size change.
+    public bool TryUpdateGeometry(IReadOnlyList<(Vector2[] Points, bool IsClosed)> contours, Pen pen)
+    {
+        if (_useCut) return false;
+        if (!IsPenSizeCompatible(pen)) return false;
+
+        var valid = new List<(Vector2[] Points, bool IsClosed)>();
+        foreach (var (points, isClosed) in contours)
+            if (points is { Length: >= 2 }) valid.Add((points, isClosed));
+
+        if (valid.Count != _contours.Count) return false;
+        for (var i = 0; i < valid.Count; i++)
+            if (valid[i].Points.Length != _contours[i].PointCount || valid[i].IsClosed != _contours[i].IsClosed)
+                return false;
+
+        for (var i = 0; i < valid.Count; i++)
+        {
+            var c = _contours[i];
+            c.PointsData = ToFloats(valid[i].Points);
+            c.PointsBuffer.Invalidate();
+            c.VertexBuffer.Invalidate();
+        }
+        _pen = pen;
+        return true;
+    }
+
+    private static float[] ToFloats(Vector2[] points)
+    {
+        var floats = new float[points.Length * 2];
+        for (var i = 0; i < points.Length; i++)
+        {
+            floats[i * 2] = (float)points[i].X;
+            floats[i * 2 + 1] = (float)points[i].Y;
+        }
+        return floats;
     }
 
     // Builds the GPU buffers for one contour. Returns null for a degenerate contour (no thread/vertex work).
@@ -109,7 +162,7 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
     {
         if (points.Length < 2) return null;
 
-        var c = new Contour { IsClosed = isClosed, PointCount = (uint)points.Length };
+        var c = new Contour { IsClosed = isClosed, PointCount = (uint)points.Length, PointsData = ToFloats(points) };
 
         // Disc segments are needed when a join is round (disc) or bevel (wedge), OR a cap needs emitted geometry
         // (round / triangle / concave). On the cut path a ROUND JOIN also needs the disc (emitted at every corner the
@@ -118,18 +171,10 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
         c.RoundSegments = (needsFan || (_useCut && (capNeedsFan || dashCapNeedsFan || _joinType == 2u))) ? RoundSegmentsCount : 0u;
 
         // Raw contour -> BDA storage buffer (the GPU reads it; dashing/trim happen on the GPU, not here).
-        var floats = new float[points.Length * 2];
-        for (var i = 0; i < points.Length; i++)
-        {
-            floats[i * 2] = (float)points[i].X;
-            floats[i * 2 + 1] = (float)points[i].Y;
-        }
-        c.PointsBuffer = ToDispose(Buffer.New(_device, (ulong)(floats.Length * sizeof(float)),
-            BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
-            MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal));
-        var ptr = c.PointsBuffer.MapMemory();
-        Marshal.Copy(floats, 0, (IntPtr)(nint)ptr, floats.Length);
-        c.PointsBuffer.UnmapMemory();
+        c.PointsBuffer = ToDispose(BufferManager.CreateBuffer(
+            BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, StrokeMemory));
+        c.PointsBuffer.Reserve(c.PointsBytes);
+        c.PointsBuffer.Invalidate();
 
         if (_useCut)
         {
@@ -140,15 +185,13 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
             var patternArr = _hasDashes ? new float[_pen.DashStrokeArray.Count] : new float[1];
             for (var i = 0; i < _pen.DashStrokeArray.Count; i++) patternArr[i] = (float)_pen.DashStrokeArray[i];
             c.PatternBuffer = ToDispose(Buffer.New(_device, (ulong)(patternArr.Length * sizeof(float)),
-                BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
-                MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal));
+                BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, StrokeMemory));
             var pp = c.PatternBuffer.MapMemory();
-            Marshal.Copy(patternArr, 0, (IntPtr)(nint)pp, patternArr.Length);
+            System.Runtime.InteropServices.Marshal.Copy(patternArr, 0, (IntPtr)(nint)pp, patternArr.Length);
             c.PatternBuffer.UnmapMemory();
 
             c.IndirectBuffer = ToDispose(Buffer.New(_device, (ulong)(4 * sizeof(uint)),
-                BufferUsageFlags.IndirectBuffer | BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
-                MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal));
+                BufferUsageFlags.IndirectBuffer | BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, StrokeMemory));
         }
         else
         {
@@ -159,9 +202,10 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
         if (c.ThreadCount == 0 || c.VertexCount == 0) return null;
 
         // 3 floats/vertex now: (x, y, signed perpendicular distance) - the distance drives the analytic-AA coverage.
-        c.VertexBuffer = ToDispose(Buffer.New(_device, (ulong)(c.VertexCount * 3 * sizeof(float)),
-            BufferUsageFlags.VertexBuffer | BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
-            MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal));
+        c.VertexBuffer = ToDispose(BufferManager.CreateBuffer(
+            BufferUsageFlags.VertexBuffer | BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, StrokeMemory));
+        c.VertexBuffer.Reserve(c.VertexBytes);
+        c.VertexBuffer.Invalidate();
         return c;
     }
 
@@ -232,19 +276,28 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
 
     // Compute runs OUT of the render pass: PreRender is recorded from BeginDraw's beforeRenderPass hook
     // (WindowRenderService.BeginDraw -> ForwardWindowRenderer.PreRender -> RenderUnit.PreRender -> here). Each contour
-    // sets its own uniforms, dispatches the expander, and barriers its output for the draw.
+    // uploads its points to this frame's slot, then dispatches the expander into this frame's vertex slot when stale
+    // (continuous static -> zero work; scale change / dash -> re-expand the current slot).
     public override void PreRender()
     {
         var fringe = ComputeFringe();
-        // Static continuous stroke already expanded at this scale -> reuse it (skip the per-frame compute+barrier). The
-        // dash/cut path always re-runs (its offset/trim animate).
-        if (!_useCut && _expanded && fringe == _expandedFringe) return;
-        _expanded = true;
+        var fringeChanged = fringe != _expandedFringe;
         _expandedFringe = fringe;
+
         foreach (var c in _contours)
         {
-            _effect.PointsAddress.SetValue(c.PointsBuffer.GetDeviceAddress());
-            _effect.OutputAddress.SetValue(c.VertexBuffer.GetDeviceAddress());
+            var points = c.PointsBuffer.Acquire(c.PointsBytes, out var writePoints);
+            if (writePoints) points.SetData(c.PointsData, 0, (uint)c.PointsData.Length);
+
+            // The dash/cut path re-cuts every frame (offset/trim animate). Continuous re-expands only on a scale change.
+            if (_useCut) c.VertexBuffer.Invalidate();
+            else if (fringeChanged) c.VertexBuffer.Invalidate();
+
+            var vertices = c.VertexBuffer.Acquire(c.VertexBytes, out var writeVertices);
+            if (!writeVertices) continue;   // continuous static: this slot already holds the expanded ribbon
+
+            _effect.PointsAddress.SetValue(points.GetDeviceAddress());
+            _effect.OutputAddress.SetValue(vertices.GetDeviceAddress());
             _effect.PointCount.SetValue(c.PointCount);
             _effect.IsClosed.SetValue(c.IsClosed ? 1u : 0u);
             _effect.DashMode.SetValue(_useCut ? 1u : 0u);
@@ -278,7 +331,7 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
 
             // Make the compute output visible to the draw: vertex-attribute read (both modes) and, for the cut, the
             // indirect-command read.
-            _device.BufferBarrier(c.VertexBuffer,
+            _device.BufferBarrier(vertices,
                 PipelineStageFlagBits2.ComputeShaderBit, AccessFlagBits2.ShaderWriteBit,
                 PipelineStageFlagBits2.VertexAttributeInputBit, AccessFlagBits2.VertexAttributeReadBit);
             if (_useCut)
@@ -315,9 +368,10 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
 
         foreach (var c in _contours)
         {
-            _device.SetVertexBuffer(c.VertexBuffer);
+            var vertices = c.VertexBuffer.Acquire(c.VertexBytes, out _);   // the slot PreRender expanded this frame
+            _device.SetVertexBuffer(vertices);
             if (_useCut)
-                _device.DrawIndirect(c.VertexBuffer, c.IndirectBuffer);   // GPU-decided vertex count (dash/trim)
+                _device.DrawIndirect(vertices, c.IndirectBuffer);   // GPU-decided vertex count (dash/trim)
             else
                 _device.Draw(c.VertexCount, 1);
         }

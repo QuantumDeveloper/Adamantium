@@ -9,7 +9,7 @@ public class Program
     {
         var gameApp = new AdamantiumGameApplication();
         gameApp.IsFixedTimeStep = false;
-        //gameApp.EnableGraphicsDebug = false;
+        gameApp.EnableGraphicsDebug = false;
         gameApp.DesiredFPS = 300;
         gameApp.StartupType = typeof(MainWindow);
         gameApp.Run();
