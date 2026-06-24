@@ -17,51 +17,72 @@ namespace Adamantium.UI.Rendering.RenderUnits;
 
 public abstract class UIRenderComponent : DeferredDisposableObject
 {
-    protected UIRenderComponent(IGraphicsDevice device, UIBasicEffect uiBasicEffect, Mesh mesh) : base(device)
+    // UI body geometry lives in mappable (BAR) memory and is reused across frames through the buffer manager: a
+    // size/shape change rewrites the current frame's ring slot in place (UpdateGeometry) instead of allocating a fresh
+    // Vulkan buffer. See GPU_BUFFER_REUSE_PLAN.
+    private const MemoryPropertyFlags UiMemory = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal;
+    private static readonly int VertexStride = System.Runtime.InteropServices.Marshal.SizeOf<UIVertex>();
+
+    protected GpuBufferManager BufferManager { get; }
+    private ReusableBuffer _vertexBuffer;
+    private ReusableBuffer _indexBuffer;
+    private UIVertex[] _vertices;
+    private int[] _indices;
+    private uint _vertexCount;
+    private uint _indexCount;
+
+    protected UIRenderComponent(IGraphicsDevice device, UIBasicEffect uiBasicEffect, Mesh mesh, GpuBufferManager bufferManager) : base(device)
     {
         GraphicsDevice = device;
-        Mesh = mesh;
         UIBasicEffect = uiBasicEffect;
+        BufferManager = bufferManager;
         ColorBlendEquation = ColorBlendEquations.AlphaBlend;
-        
-        // UI quads are small and rebuilt often → CPU-to-GPU upload (BAR window), not device-local (which would
-        // stage+copy each quad). Large model geometry uses GpuOnly.
-        var uiMemoryFlags = BufferMemoryUsage.UploadFromCpuToGpu;
-        var vertices = mesh?.ToUIVertices();
-        if (vertices != null && vertices.Length != 0)
-        {
-            VertexBuffer = ToDispose(Buffer.Vertex.New(device, vertices, uiMemoryFlags));
-        }
-
-        if (mesh is { HasIndices: true } && VertexBuffer != null)
-        {
-            IndexBuffer = ToDispose(Buffer.Index.New(device, mesh.Indices, uiMemoryFlags));
-        }
-
         VertexType = typeof(UIVertex);
-        if (mesh != null) PrimitiveType = mesh.MeshTopology;
+        if (mesh != null) SetMesh(mesh);
     }
-    
-    public Mesh Mesh { get; }
-    
-    public Buffer VertexBuffer { get; private set; }
-    
-    public Buffer IndexBuffer { get; private set; }
-    
+
+    public Mesh Mesh { get; private set; }
+
     public Type VertexType { get; set; }
-    
+
     public PrimitiveType PrimitiveType { get; set; }
 
-    public bool HasIndexBuffer => IndexBuffer is { ElementCount: > 0 };
-    
     public RenderData RenderData { get; set; }
-    
+
     public UIBasicEffect UIBasicEffect { get; set; }
-    
+
     protected IGraphicsDevice GraphicsDevice { get; private set; }
-    
+
     public ColorBlendEquationEXT ColorBlendEquation { get; set; }
 
+    // Re-point this component at new geometry of the same kind WITHOUT recreating it (or its buffers): the manager
+    // rewrites the existing ring slot in place, growing only if the new geometry needs more room. This is the resize/
+    // animation fast path - the unit calls it instead of building a fresh component (and a fresh allocation) per frame.
+    public void UpdateGeometry(Mesh mesh) => SetMesh(mesh);
+
+    private void SetMesh(Mesh mesh)
+    {
+        Mesh = mesh;
+        if (mesh != null) PrimitiveType = mesh.MeshTopology;
+
+        _vertices = mesh?.ToUIVertices();
+        _vertexCount = _vertices is { Length: > 0 } ? (uint)_vertices.Length : 0u;
+        if (_vertexCount > 0)
+        {
+            _vertexBuffer ??= ToDispose(BufferManager.CreateBuffer(BufferUsageFlags.VertexBuffer, UiMemory));
+            _vertexBuffer.Reserve((ulong)(_vertexCount * (uint)VertexStride));   // size the allocation up front
+            _vertexBuffer.Invalidate();   // new payload -> every slot rewrites lazily on its next frame (promotes if drawn)
+        }
+
+        _indices = mesh is { HasIndices: true } && _vertexCount > 0 ? mesh.Indices : null;
+        _indexCount = _indices != null ? (uint)_indices.Length : 0u;
+        if (_indexCount > 0)
+        {
+            _indexBuffer ??= ToDispose(BufferManager.CreateBuffer(BufferUsageFlags.IndexBuffer, UiMemory));
+            _indexBuffer.Reserve((ulong)(_indexCount * sizeof(int)));
+            _indexBuffer.Invalidate();
+        }
+    }
 
     public void Update(Matrix4x4F transform, Matrix4x4F projectionMatrix)
     {
@@ -74,7 +95,12 @@ public abstract class UIRenderComponent : DeferredDisposableObject
 
     public virtual void Render()
     {
-        if (VertexBuffer == null) return;
+        if (_vertexCount == 0) return;
+
+        // Rent this frame's ring slot; upload the geometry only if the slot is stale (a static body settles to zero
+        // work after the first N frames, an animated one writes only the current slot - never a new allocation).
+        var vertexBuffer = _vertexBuffer.Acquire((ulong)(_vertexCount * (uint)VertexStride), out var writeVertices);
+        if (writeVertices) vertexBuffer.SetData(_vertices, 0, _vertexCount);
 
         GraphicsDevice.VertexType = VertexType;
         GraphicsDevice.PolygonMode = PolygonMode.Fill;
@@ -84,22 +110,25 @@ public abstract class UIRenderComponent : DeferredDisposableObject
         GraphicsDevice.DepthTestEnabled = true;
         GraphicsDevice.DepthWriteEnable = true;
 
-        if (HasIndexBuffer)
+        if (_indexCount > 0)
         {
-            // DrawIndexed binds both the vertex and index buffers itself - don't bind them again.
-            GraphicsDevice.DrawIndexed(VertexBuffer, IndexBuffer);
+            var indexBuffer = _indexBuffer.Acquire((ulong)(_indexCount * sizeof(int)), out var writeIndices);
+            if (writeIndices) indexBuffer.SetData(_indices, 0, _indexCount);
+            // DrawIndexed binds both the vertex and index buffers itself - don't bind them again. The over-allocated
+            // ring buffer may be larger than the geometry, so draw the actual index count, not the buffer's capacity.
+            GraphicsDevice.DrawIndexed(vertexBuffer, indexBuffer, indexCount: _indexCount);
         }
         else
         {
-            GraphicsDevice.SetVertexBuffer(VertexBuffer);
-            GraphicsDevice.Draw(VertexBuffer.ElementCount, 1);
+            GraphicsDevice.SetVertexBuffer(vertexBuffer);
+            GraphicsDevice.Draw(_vertexCount, 1);
         }
     }
 }
 
 public class StrokeRenderComponent : UIRenderComponent
 {
-    public StrokeRenderComponent(IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, Mesh mesh, Pen pen) : base(graphicsDevice, uiBasicEffect, mesh)
+    public StrokeRenderComponent(IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, Mesh mesh, Pen pen, GpuBufferManager bufferManager) : base(graphicsDevice, uiBasicEffect, mesh, bufferManager)
     {
         PrimitiveType = PrimitiveType.TriangleList;
         Pen = pen;
@@ -127,7 +156,7 @@ public class StrokeRenderComponent : UIRenderComponent
 
 public class GeometryRenderComponent : UIRenderComponent
 {
-    public GeometryRenderComponent(IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, Mesh mesh, Brush background) : base(graphicsDevice, uiBasicEffect, mesh)
+    public GeometryRenderComponent(IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, Mesh mesh, Brush background, GpuBufferManager bufferManager) : base(graphicsDevice, uiBasicEffect, mesh, bufferManager)
     {
         Background = background;
     }
@@ -157,12 +186,12 @@ public class GeometryRenderComponent : UIRenderComponent
 
 public class ImageRenderComponent : UIRenderComponent
 {
-    public ImageRenderComponent(IGraphicsDevice device, UIBasicEffect uiBasicEffect, Mesh mesh, ITexture texture) : base(device, uiBasicEffect, mesh)
+    public ImageRenderComponent(IGraphicsDevice device, UIBasicEffect uiBasicEffect, Mesh mesh, ITexture texture, GpuBufferManager bufferManager) : base(device, uiBasicEffect, mesh, bufferManager)
     {
         Texture = texture;
     }
-    
-    public ImageRenderComponent(IGraphicsDevice device, UIBasicEffect uiBasicEffect, Mesh mesh, Brush background) : base(device, uiBasicEffect, mesh)
+
+    public ImageRenderComponent(IGraphicsDevice device, UIBasicEffect uiBasicEffect, Mesh mesh, Brush background, GpuBufferManager bufferManager) : base(device, uiBasicEffect, mesh, bufferManager)
     {
         Background = background;
     }
@@ -237,9 +266,10 @@ public class TextRenderComponent : ImageRenderComponent
         FontRenderer fontRenderer,
         TextLayout textLayout,
         TextRenderingParameters renderingParameters, 
-        Brush background, 
+        Brush background,
         Brush foreground,
-        Brush stroke) : base(device, uiBasicEffect, mesh, background)
+        Brush stroke,
+        GpuBufferManager bufferManager) : base(device, uiBasicEffect, mesh, background, bufferManager)
     {
         FontRenderer = fontRenderer;
         TextLayout = textLayout;

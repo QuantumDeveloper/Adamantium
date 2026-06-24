@@ -11,26 +11,27 @@ namespace Adamantium.UI.Rendering;
 public class RenderUnitFactory : IRenderUnitFactory
 {
     private Dictionary<Type, Func<IDrawCommand, IRenderUnit>> _registeredFactories;
-    private readonly IGraphicsDevice _graphicsDevice;
-    private readonly IResourceFactory _resourceFactory;
-    private UIBasicEffect _uiBasicEffect;
-    private StrokeEffect _strokeEffect;
-    private FillFringeEffect _fillFringeEffect;
+    private readonly RenderUnitContext _context;
 
     public RenderUnitFactory(IGraphicsDevice graphicsDevice, IResourceFactory resourceFactory)
     {
-        _graphicsDevice = graphicsDevice;
-        _resourceFactory = resourceFactory;
-        _uiBasicEffect = new UIBasicEffect(_graphicsDevice);
-        _strokeEffect = new StrokeEffect(_graphicsDevice);
-        _fillFringeEffect = new FillFringeEffect(_graphicsDevice);
+        // The shared services every unit needs, in one object. One buffer manager shared by every unit this factory
+        // builds, so geometry buffers are reused across frames (and, later, across units) instead of being reallocated
+        // on each resize/animation frame. A new shared dependency goes into RenderUnitContext, not every constructor.
+        _context = new RenderUnitContext(
+            graphicsDevice,
+            resourceFactory,
+            new UIBasicEffect(graphicsDevice),
+            new StrokeEffect(graphicsDevice),
+            new FillFringeEffect(graphicsDevice),
+            new GpuBufferManager(graphicsDevice));
         _registeredFactories = new Dictionary<Type, Func<IDrawCommand, IRenderUnit>>();
-        RegisterFactory<RectanglePayload>(command => new RectangleRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory, _fillFringeEffect));
-        RegisterFactory<EllipsePayload>(command => new EllipseRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory, _fillFringeEffect));
-        RegisterFactory<LinePayload>(command => new LineRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory));
-        RegisterFactory<ImagePayload>(command => new ImageRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory));
-        RegisterFactory<GeometryPayload>(command => new GeometryRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory, _fillFringeEffect));
-        RegisterFactory<TextPayload>(command => new TextRenderUnit(command, _graphicsDevice, _uiBasicEffect, _strokeEffect, _resourceFactory));
+        RegisterFactory<RectanglePayload>(command => new RectangleRenderUnit(command, _context));
+        RegisterFactory<EllipsePayload>(command => new EllipseRenderUnit(command, _context));
+        RegisterFactory<LinePayload>(command => new LineRenderUnit(command, _context));
+        RegisterFactory<ImagePayload>(command => new ImageRenderUnit(command, _context));
+        RegisterFactory<GeometryPayload>(command => new GeometryRenderUnit(command, _context));
+        RegisterFactory<TextPayload>(command => new TextRenderUnit(command, _context));
     }
 
     public void RegisterFactory<T>(Func<IDrawCommand, IRenderUnit> factory)

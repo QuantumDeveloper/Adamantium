@@ -1310,18 +1310,20 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         commandBuffer.Draw((uint)vertexCount, instanceCount, firstVertex, firstInstance);
     }
 
-    public void DrawIndexed(IBuffer vertexBuffer, IBuffer indexBuffer, uint instanceCount = 1)
+    // indexCount lets the caller draw fewer indices than the buffer holds - needed for an over-allocated/reused index
+    // buffer (its capacity exceeds the live geometry). 0 means "the whole buffer" (its ElementCount), as before.
+    public void DrawIndexed(IBuffer vertexBuffer, IBuffer indexBuffer, uint instanceCount = 1, uint indexCount = 0)
     {
         ulong offset = 0;
         var commandBuffer = commandBuffers[CurrentFrame];
-            
+
         SetDrawingState(commandBuffer);
 
         commandBuffer.BindVertexBuffers(0, 1, vertexBuffer.GetBuffer(), offset);
 
         commandBuffer.BindIndexBuffer(indexBuffer.GetBuffer(), 0, IndexType.Uint32);
 
-        commandBuffer.DrawIndexed((uint)indexBuffer.ElementCount, instanceCount, 0, 0, 0);
+        commandBuffer.DrawIndexed(indexCount > 0 ? indexCount : (uint)indexBuffer.ElementCount, instanceCount, 0, 0, 0);
     }
 
     // --- GPU-driven geometry (compute amplification -> indirect draw) ---------------------------------------------
