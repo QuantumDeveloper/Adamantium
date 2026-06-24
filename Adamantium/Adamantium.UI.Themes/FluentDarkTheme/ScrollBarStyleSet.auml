@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions"
+          xmlns:controls="http://adamantium/ui">
+
+    <!-- A clean thumb+trough scrollbar (no arrow buttons), one template for BOTH orientations: the Track flips via its
+         Orientation, and it creates the thumb + the two (invisible, hit-testable) page repeat-buttons itself. Per the
+         small-styles convention each concern is its own <Style Selector="ScrollBar">. -->
+
+    <!-- Simple properties: a subtle trough. -->
+    <Style Selector="ScrollBar">
+        <Setter Property="Background" Value="{ResourceReference SolidBackgroundFillColorTertiary}"/>
+    </Style>
+
+    <!-- Template (its own style). -->
+    <Style Selector="ScrollBar">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollBar">
+                    <controls:Border Background="{TemplateBinding Background}" CornerRadius="6">
+                        <controls:Track x:Name="PART_Track"
+                                Orientation="{TemplateBinding Orientation}"
+                                Minimum="{TemplateBinding Minimum}"
+                                Maximum="{TemplateBinding Maximum}"
+                                Value="{TemplateBinding Value}"
+                                ViewportSize="{TemplateBinding ViewportSize}"/>
+                    </controls:Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

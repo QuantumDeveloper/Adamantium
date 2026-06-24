@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions"
+          xmlns:controls="http://adamantium/ui">
+
+    <!-- Default Thumb visual: a rounded fill that the Track sizes/positions. Used by the ScrollBar (and any future
+         Slider / GridSplitter). Split per the small-styles convention: one style for the template. -->
+    <Style Selector="Thumb">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <controls:Border CornerRadius="4" Background="{ResourceReference TextFillColorTertiary}"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>
