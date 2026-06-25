@@ -373,7 +373,25 @@ public class CodeGenerationContext
                 }
                 else if (value.IsTextNode())
                 {
-                    GenerateSimpleAssignment(symbolName, prop.GetTextValue(), resolvedType);
+                    // Inside a ControlTemplate, apply a PART's literal at TEMPLATE priority instead of the CLR setter's
+                    // LOCAL priority, so a theme trigger targeting that part can override it. WPF precedence is
+                    // Template < Trigger < Local; emitting "part.Prop = value" makes it Local, which outranks the
+                    // trigger and froze e.g. a scrollbar's IsHitTestVisible="False" so the hover trigger could never
+                    // arm it. The cast keeps the value the property's exact type before it is boxed for SetValue.
+                    // Guard on IAdamantiumComponent: a ControlTemplate also hosts plain CLR objects in its Triggers
+                    // (Setter/Animation/KeyFrame/PropertyTrigger) whose attributes are ordinary CLR setters - those have
+                    // no SetValue and must stay plain assignments.
+                    if (CurrentTemplate != null && typeInfo.ImplementsInterface("IAdamantiumComponent"))
+                    {
+                        var target = isRoot ? "this" : CurrentParent;
+                        var expr = BuildValueExpression(prop.GetTextValue(), resolvedType);
+                        TextGenerator.WriteLine(
+                            $"{target}.SetValue(\"{propRef.Name}\", ({resolvedType.FullName})({expr}), Adamantium.UI.Core.ValuePriority.Template);");
+                    }
+                    else
+                    {
+                        GenerateSimpleAssignment(symbolName, prop.GetTextValue(), resolvedType);
+                    }
                 }
                 else
                 {
@@ -457,17 +475,20 @@ public class CodeGenerationContext
     
     private void GenerateSimpleAssignment(string symbolName, string valueText, IResolvedType member)
     {
+        TextGenerator.WriteLine($"{symbolName} = {BuildValueExpression(valueText, member)};");
+    }
+
+    // The C# expression for a literal attribute value, typed as the property's type (so it can be assigned directly OR
+    // boxed for a priority-aware SetValue without losing its type, e.g. Opacity="0" must be (double)0, not a boxed int).
+    private string BuildValueExpression(string valueText, IResolvedType member)
+    {
         if (member.TypeKind == ResolvedTypeKind.Enum)
-        {
-            TextGenerator.WriteLine($"{symbolName} = {member.FullName}.{valueText};");
-            return;
-        }
-        
+            return $"{member.FullName}.{valueText}";
+
         switch (member.SpecialType)
         {
             case ResolvedSpecialType.System_String:
-                TextGenerator.WriteLine($"{symbolName} = \"{valueText}\";");
-                break;
+                return $"\"{valueText}\"";
             case ResolvedSpecialType.System_Double:
             case ResolvedSpecialType.System_Single:
             case ResolvedSpecialType.System_Decimal:
@@ -479,17 +500,13 @@ public class CodeGenerationContext
             case ResolvedSpecialType.System_UInt16:
             case ResolvedSpecialType.System_UInt32:
             case ResolvedSpecialType.System_UInt64:
-                TextGenerator.WriteLine($"{symbolName} = {valueText};");
-                break;
+                return valueText;
             case ResolvedSpecialType.System_Boolean:
-                TextGenerator.WriteLine($"{symbolName} = {valueText.ToLowerInvariant()};");
-                break;
+                return valueText.ToLowerInvariant();
             case ResolvedSpecialType.System_Object:
-                TextGenerator.WriteLine($"{symbolName} = \"{valueText}\";");
-                break;
+                return $"\"{valueText}\"";
             default:
-                TextGenerator.WriteLine($"{symbolName} = {Metadata.DefaultTypeContainer.TypeParser.FullName}.Parse<{member.FullName}>({Quote(valueText)});");
-                break;
+                return $"{Metadata.DefaultTypeContainer.TypeParser.FullName}.Parse<{member.FullName}>({Quote(valueText)})";
         }
     }
     
