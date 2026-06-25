@@ -47,7 +47,17 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
     public static readonly AdamantiumProperty OpacityProperty = AdamantiumProperty.Register(nameof(Opacity),
         typeof(Double), typeof(UIComponent),
-        new PropertyMetadata(1.0, PropertyMetadataOptions.BindsTwoWayByDefault));
+        new PropertyMetadata(1.0, PropertyMetadataOptions.BindsTwoWayByDefault, OnOpacityChanged));
+
+    // Opacity composites DOWN the visual tree (a descendant's effective opacity includes every ancestor's - see
+    // DrawingContext.GetEffectiveOpacity), so a change must re-render this element AND its whole subtree: the children's
+    // render units bake the effective opacity at record time and would otherwise keep the stale value (the plain
+    // AffectsRender flag only invalidates self, which is why fading a container left its grandchildren - e.g. a
+    // scrollbar's thumb - frozen at their old opacity).
+    private static void OnOpacityChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        (d as UIComponent)?.InvalidateRender(true);
+    }
 
     #endregion
 
@@ -124,8 +134,10 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     public void InvalidateRender(bool invalidateChildren)
     {
         IsGeometryValid = false;
-        if (!invalidateChildren) return;
-        
+        // The child collection is null until the UIComponent ctor runs; a property-changed callback (e.g. Opacity's)
+        // can fire earlier, while the base ctor applies defaults - guard so an early invalidate is a harmless no-op.
+        if (!invalidateChildren || VisualChildrenCollection == null) return;
+
         foreach (var uiComponent in VisualChildrenCollection)
         {
             uiComponent.InvalidateRender(true);
