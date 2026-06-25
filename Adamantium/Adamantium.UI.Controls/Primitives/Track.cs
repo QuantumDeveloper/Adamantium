@@ -87,9 +87,10 @@ public class Track : Panel
 
     private static RepeatButton CreatePageButton()
     {
-        // Invisible (no template -> renders nothing) but hit-testable by its arranged bounds, so a press on the trough
-        // pages and auto-repeats. Not focusable so paging never steals focus from the scrolled content.
-        return new RepeatButton { Background = null, Focusable = false };
+        // A ScrollBarPageButton (not a plain RepeatButton) so the default RepeatButton chrome doesn't apply: invisible
+        // (no template -> renders nothing) but hit-testable by its arranged bounds, so a press on the trough pages and
+        // auto-repeats. Not focusable so paging never steals focus from the scrolled content.
+        return new ScrollBarPageButton { Background = null, Focusable = false };
     }
 
     protected override Size MeasureOverride(Size availableSize)

@@ -9,7 +9,8 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Thumb">
-                    <controls:Border CornerRadius="4" Background="{ResourceReference TextFillColorTertiary}"/>
+                    <controls:Border CornerRadius="4"
+                                     Background="{ResourceReference TextFillColorTertiary}"/>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
