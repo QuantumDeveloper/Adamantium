@@ -95,59 +95,45 @@ public class Thumb : Control
 
    protected override void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
    {
-      if (!IsDragging)
-      {
-         IsDragging = true;
-         e.Handled = true;
-         dragStartPoint = e.GetPosition(this);
-         DragStartedEventArgs args = new DragStartedEventArgs(dragStartPoint);
-         args.RoutedEvent = DragStartedEvent;
-         RaiseEvent(args);
-      }
-   }
+      // Already dragging AND still holding capture -> ignore. If IsDragging is stale (capture was revoked externally,
+      // e.g. an alt-tab, without an up reaching us) a fresh press re-starts cleanly instead of being swallowed.
+      if (IsDragging && IsMouseCaptured) return;
 
-   protected override void OnRawMouseMove(object sender, UnboundMouseEventArgs e)
-   {
-         
-      if (e.MouseDevice.LeftButton == MouseButtonState.Relesed)
-      {
-         IsDragging = false;
-      }
-
+      IsDragging = true;
       e.Handled = true;
-      if (IsDragging && e.MouseDevice.LeftButton == MouseButtonState.Pressed)
-      {
-         var delta = e.GetPosition(this) - dragStartPoint;
-         DragEventArgs args = new DragEventArgs(delta);
-         args.RoutedEvent = DragDeltaEvent;
-         RaiseEvent(args);
-      }
+      dragStartPoint = DragPosition(e);
+      // Capture so the drag keeps tracking once the pointer leaves the thumb. WITHOUT this the move never reaches the
+      // thumb: the raw-move event is routed to the FOCUSED element, and the captured MouseMove below is the only path
+      // that honours capture - so the thumb (unfocused) would otherwise never see a drag and never move.
+      CaptureMouse();
+      RaiseEvent(new DragStartedEventArgs(dragStartPoint) { RoutedEvent = DragStartedEvent });
    }
 
    protected override void OnMouseMove(object sender, MouseEventArgs e)
    {
       e.Handled = true;
+      if (!IsDragging) return;
+
+      var delta = DragPosition(e) - dragStartPoint;
+      RaiseEvent(new DragEventArgs(delta) { RoutedEvent = DragDeltaEvent });
    }
 
    protected override void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
    {
       e.Handled = true;
+      if (!IsDragging) return;
+
+      IsDragging = false;
+      if (IsMouseCaptured) ReleaseMouseCapture();
+      var delta = DragPosition(e) - dragStartPoint;
+      RaiseEvent(new DragCompletedEventArgs(delta, false) { RoutedEvent = DragCompletedEvent });
    }
 
-   protected override void OnRawMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-   {
-      e.Handled = true;
-      if (IsDragging)
-      {
-         var delta = e.GetPosition(this) - dragStartPoint;
-         DragCompletedEventArgs args = new DragCompletedEventArgs(delta, false)
-         {
-            RoutedEvent = DragCompletedEvent
-         };
-         RaiseEvent(args);
-      }
-      IsDragging = false;
-   }
+   // Pointer position in the thumb's PARENT space, which does NOT move while the thumb is dragged. Measuring the delta
+   // there makes DragDelta the true CUMULATIVE pointer movement since the press; measuring it relative to the thumb
+   // itself was a residual that broke as soon as the thumb re-positioned (the value ran away to an extreme).
+   private Vector2 DragPosition(MouseEventArgs e)
+      => VisualParent is IInputComponent parent ? e.GetPosition(parent) : e.GetPosition(this);
 
    protected override Size MeasureOverride(Size availableSize)
    {

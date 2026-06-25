@@ -124,6 +124,19 @@ public class ScrollControlsTests
         });
     }
 
+    [Test]
+    public void Track_NothingToScroll_ThumbFillsAndIsInert()
+    {
+        // range == 0 (Maximum == Minimum): nothing to scroll -> the thumb fills the whole track and a drag does nothing.
+        var track = ArrangedTrack(Orientation.Vertical, 0, 0, 0, 0, 12, 200);
+        Assert.Multiple(() =>
+        {
+            Assert.That(track.Thumb.Bounds.Height, Is.EqualTo(200).Within(0.5), "full-length thumb");
+            Assert.That(track.Thumb.Bounds.Y, Is.EqualTo(0).Within(0.5));
+            Assert.That(track.ValueFromDistance(0, 100), Is.EqualTo(0), "inert: a drag maps to no value change");
+        });
+    }
+
     // ---- ScrollBar ----
 
     [Test]
@@ -146,5 +159,14 @@ public class ScrollControlsTests
     {
         var bar = new ScrollBar { Minimum = 0, Maximum = 50, Value = 999 };
         Assert.That(bar.Value, Is.EqualTo(50));
+    }
+
+    [Test]
+    public void ScrollBar_Default_HasNothingToScroll()
+    {
+        // A bare scrollbar isn't bound to content yet, so by default there is no scrollable range: the thumb fills
+        // the trough and is inert until a Maximum/ViewportSize (or a ScrollViewer) gives it something to scroll.
+        var bar = new ScrollBar();
+        Assert.That(bar.Maximum, Is.EqualTo(bar.Minimum));
     }
 }

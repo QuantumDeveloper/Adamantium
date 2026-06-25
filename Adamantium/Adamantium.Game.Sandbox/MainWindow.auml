@@ -259,15 +259,20 @@
             </Line.Triggers>
         </Line>
 
-        <!-- ScrollBar demo (vertical + horizontal). The thumb's size follows ViewportSize; drag it, or press the
-             trough either side to page (auto-repeating). Last Grid children so they sit on top and stay interactive. -->
+        <!-- ScrollBar demo. Vertical = HAS a scrollable range (Maximum + ViewportSize): a proportional thumb you can
+             drag, or page by pressing the trough (auto-repeating). Horizontal = nothing to scroll (no Maximum): the
+             thumb fills the trough and is inert. Last Grid children so they sit on top and stay interactive. -->
         <ScrollBar Orientation="Vertical"
-                   HorizontalAlignment="Right" VerticalAlignment="Stretch"
-                   Minimum="0" Maximum="100" ViewportSize="20" Value="30"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Stretch"
+                   Minimum="0"
+                   Maximum="100"
+                   ViewportSize="20"
+                   Value="30"
                    SmallChange="5" LargeChange="20"/>
+        <!-- No Maximum/ViewportSize -> nothing to scroll: full, inert thumb (can't be dragged or paged). -->
         <ScrollBar Orientation="Horizontal"
-                   HorizontalAlignment="Stretch" VerticalAlignment="Bottom"
-                   Minimum="0" Maximum="100" ViewportSize="25" Value="40"
-                   SmallChange="5" LargeChange="20"/>
+                   HorizontalAlignment="Stretch"
+                   VerticalAlignment="Bottom"/>
     </Grid>
 </Window>

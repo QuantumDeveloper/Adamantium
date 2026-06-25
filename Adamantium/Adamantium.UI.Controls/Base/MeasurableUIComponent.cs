@@ -448,7 +448,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             }
 
             size = this.ApplyLayoutConstraints(size);
-                
+
             if (this is IRootVisualComponent)
             {
                 size = DesiredSize;
@@ -557,10 +557,14 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         IsGeometryValid = false;
         _previousMeasure = null;
         _previousArrange = null;
-        
-        if (LogicalParent is IMeasurableComponent parent)
+
+        // Propagate up the VISUAL tree, not the logical one: layout follows the visual parent. A template part (e.g. a
+        // ScrollBar's Border-rooted template) has NO logical parent, so a logical walk stopped at it - the templated
+        // control never re-measured/arranged, and the orphaned part was re-laid-out alone against its 0 DesiredSize
+        // (the ScrollBar Track/thumb collapsed on a Value change).
+        if (VisualParent is IMeasurableComponent parent)
         {
-            parent?.InvalidateMeasure();
+            parent.InvalidateMeasure();
         }
     }
 
@@ -573,10 +577,11 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
 
         _previousArrange = null;
 
-        if (LogicalParent is IMeasurableComponent parent)
+        // Up the VISUAL tree (see InvalidateMeasure): a template part has no logical parent, so a logical walk left the
+        // templated control's arrange valid and the part was re-arranged alone against its 0 DesiredSize -> collapse.
+        if (VisualParent is IMeasurableComponent parent)
         {
-            parent?.InvalidateArrange();
+            parent.InvalidateArrange();
         }
-
     }
 }

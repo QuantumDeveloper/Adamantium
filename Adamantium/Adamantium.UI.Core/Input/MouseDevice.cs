@@ -39,6 +39,23 @@ public class MouseDevice
         return component != null;
     }
 
+    /// <summary>
+    /// Mirror the app's mouse capture (<see cref="Captured"/>) to the OS for the given window worker. A platform window
+    /// worker calls this AFTER processing a mouse event; the platform-specific acquire/release is the worker's
+    /// <see cref="IWindowWorkerService.SetMouseCapture"/>. Shared here so every platform gets the same behaviour -
+    /// without OS capture the window stops receiving move/up once the pointer leaves it, freezing a drag and dropping
+    /// the off-window release. <paramref name="osCaptured"/> is the worker's own "currently holds OS capture" flag,
+    /// updated here so the call only fires on a transition.
+    /// </summary>
+    public void SyncOsMouseCapture(IWindowWorkerService worker, ref bool osCaptured)
+    {
+        var want = Captured != null;
+        if (want == osCaptured) return;
+
+        osCaptured = want;
+        worker.SetMouseCapture(want);
+    }
+
     public Vector2 GetPosition(IInputComponent relativeTo)
     {
         var p = Position;
