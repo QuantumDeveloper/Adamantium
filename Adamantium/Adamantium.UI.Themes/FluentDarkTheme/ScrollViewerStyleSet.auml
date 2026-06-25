@@ -4,9 +4,15 @@
           xmlns:controls="http://adamantium/ui">
 
     <!-- ScrollViewer: a content host with two OVERLAY scrollbars (Fluent-style, no arrow buttons). The content
-         presenter fills the whole area and scrolls UNDER the bars; the bars float on the right / bottom edges and
-         show themselves only when that axis overflows (Auto). Pointer-leave auto-hide is layered on in a later pass.
-         One template, per the small-styles convention. -->
+         presenter fills the whole area and scrolls UNDER the bars; the bars float on the right / bottom edges and the
+         control shows/Collapses each one by overflow (Auto). The THEME owns the hide/reveal feel: here the bars start
+         invisible AND non-interactive (Opacity=0 + IsHitTestVisible=False), and fade in + become grabbable only while
+         the pointer is over the viewer - so a different theme could choose always-on bars instead. The control just
+         exposes IsMouseOver + the named parts. Split per the small-styles convention: template, then triggers. -->
+
+    <!-- Template (its own style). Bars start hidden: Opacity 0 so they're invisible, and IsHitTestVisible False so an
+         invisible bar can't be grabbed by accident at the edge (Opacity alone stays hit-testable). The trigger reveals
+         and arms them on hover. -->
     <Style Selector="ScrollViewer">
         <Setter Property="Template">
             <Setter.Value>
@@ -20,16 +26,64 @@
                             x:Name="PART_VerticalScrollBar"
                             Orientation="Vertical"
                             HorizontalAlignment="Right"
-                            VerticalAlignment="Stretch"/>
+                            VerticalAlignment="Stretch"
+                            Opacity="0"
+                            IsHitTestVisible="False"/>
                         <controls:ScrollBar
                             x:Name="PART_HorizontalScrollBar"
                             Orientation="Horizontal"
                             VerticalAlignment="Bottom"
-                            HorizontalAlignment="Stretch"/>
+                            HorizontalAlignment="Stretch"
+                            Opacity="0"
+                            IsHitTestVisible="False"/>
                     </controls:Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!-- Auto-hide (its own style). Pointer over the viewer -> fade both bars in and arm them (IsHitTestVisible); pointer
+         leaves -> disarm instantly and fade them out. The hide/reveal lives here in the theme, not in the control, so a
+         different theme is free to do something else. Setters + the animation reach the parts via TargetName (a style
+         trigger resolves named parts against the host's template). -->
+    <Style Selector="ScrollViewer">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="PART_VerticalScrollBar" Property="IsHitTestVisible" Value="True"/>
+            <Setter TargetName="PART_HorizontalScrollBar" Property="IsHitTestVisible" Value="True"/>
+            <PropertyTrigger.EnterActions>
+                <RunAnimationAction TargetName="PART_VerticalScrollBar">
+                    <Animation Duration="0:0:0.15" Easing="CubicOut">
+                        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0"/></KeyFrame>
+                        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="PART_HorizontalScrollBar">
+                    <Animation Duration="0:0:0.15" Easing="CubicOut">
+                        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="0"/></KeyFrame>
+                        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+            </PropertyTrigger.EnterActions>
+            <PropertyTrigger.ExitActions>
+                <!-- Fluent-style DELAYED hide: hold for ~0.7s after the pointer leaves, then fade out over ~0.3s (one
+                     1s animation: opacity 1 held to 70% of the timeline, then 1->0). The pointer is already off the
+                     viewer during the hold, so the bar lingering non-grabbable is harmless. Fade-IN stays immediate. -->
+                <RunAnimationAction TargetName="PART_VerticalScrollBar">
+                    <Animation Duration="0:0:1.0" Easing="CubicOut">
+                        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                        <KeyFrame Cue="70%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="PART_HorizontalScrollBar">
+                    <Animation Duration="0:0:1.0" Easing="CubicOut">
+                        <KeyFrame Cue="0%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                        <KeyFrame Cue="70%"><Setter Property="Opacity" Value="1"/></KeyFrame>
+                        <KeyFrame Cue="100%"><Setter Property="Opacity" Value="0"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+            </PropertyTrigger.ExitActions>
+        </PropertyTrigger>
     </Style>
 
 </StyleSet>

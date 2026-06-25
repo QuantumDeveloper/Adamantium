@@ -4,6 +4,7 @@ using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Controls.Primitives;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
+using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Controls;
 
@@ -33,9 +34,26 @@ public class ScrollViewer : ContentControl
         nameof(VerticalScrollBarVisibility), typeof(ScrollBarVisibility), typeof(ScrollViewer),
         new PropertyMetadata(ScrollBarVisibility.Auto, PropertyMetadataOptions.AffectsMeasure));
 
+    public static readonly AdamantiumProperty PanningModeProperty = AdamantiumProperty.Register(
+        nameof(PanningMode), typeof(PanningMode), typeof(ScrollViewer),
+        new PropertyMetadata(PanningMode.None, OnPanningModeChanged));
+
     public ScrollViewer()
     {
         MouseWheel += OnMouseWheel;
+    }
+
+    /// <summary>Which axes a content drag pans (default <see cref="PanningMode.None"/> - scrollbars/wheel only). Opt in
+    /// to touch-style panning per axis without it being forced on every ScrollViewer.</summary>
+    public PanningMode PanningMode
+    {
+        get => GetValue<PanningMode>(PanningModeProperty);
+        set => SetValue(PanningModeProperty, value);
+    }
+
+    private static void OnPanningModeChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is ScrollViewer sv && sv._presenter != null) sv._presenter.PanningMode = sv.PanningMode;
     }
 
     /// <summary>When the horizontal bar appears (default <see cref="ScrollBarVisibility.Auto"/>).</summary>
@@ -65,6 +83,7 @@ public class ScrollViewer : ContentControl
         {
             _presenter.CanScrollHorizontally = HorizontalScrollBarVisibility != ScrollBarVisibility.Disabled;
             _presenter.CanScrollVertically = VerticalScrollBarVisibility != ScrollBarVisibility.Disabled;
+            _presenter.PanningMode = PanningMode;
             _presenter.ScrollMetricsChanged += OnScrollMetricsChanged;
         }
         if (_verticalBar != null)

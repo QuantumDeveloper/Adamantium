@@ -266,7 +266,8 @@
                       Height="320"
                       HorizontalAlignment="Left"
                       VerticalAlignment="Top"
-                      Margin="20">
+                      Margin="20"
+                      PanningMode="Both">
             <Image Width="1920"
                    Height="1080"
                    Source="Textures/texture.png"/>

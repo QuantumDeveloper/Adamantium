@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Input;
 
 namespace Adamantium.UI.Controls;
 
@@ -13,6 +14,13 @@ namespace Adamantium.UI.Controls;
 /// </summary>
 public class ScrollContentPresenter : ContentPresenter, IScrollableContent
 {
+    // Pan (touch-style content drag): grab anywhere on the content and drag to scroll, no scrollbars needed. A small
+    // threshold keeps a plain click on interactive content from being swallowed as a pan.
+    private const double PanThreshold = 4;
+    private bool _isPanning;
+    private Vector2 _panStartPoint;
+    private Vector2 _panStartOffset;
+
     private Size _extent;
     private Size _viewport;
     private Vector2 _offset;
@@ -34,6 +42,9 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
 
     public bool CanScrollVertically { get; set; } = true;
 
+    /// <summary>Which axes a content drag pans (set by the <see cref="ScrollViewer"/>). None = drag does nothing.</summary>
+    public PanningMode PanningMode { get; set; } = PanningMode.None;
+
     public event EventHandler ScrollMetricsChanged;
 
     public void SetOffset(Vector2 offset)
@@ -42,6 +53,49 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
         if (clamped == _offset) return;
         _offset = clamped;
         InvalidateArrange();   // reposition the child; the metrics event is raised from the arrange
+    }
+
+    // --- Pan: drag the content itself to scroll (the no-scrollbars / touch path) ---
+
+    protected override void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.Handled || PanningMode == PanningMode.None) return;   // pan off, or interactive content took the press
+        _isPanning = false;
+        _panStartPoint = e.GetPosition(this);   // the presenter is the fixed viewport, so this space is stable
+        _panStartOffset = _offset;
+        // Capture so the drag keeps tracking once the pointer leaves the content (raw moves only honour capture).
+        CaptureMouse();
+    }
+
+    protected override void OnMouseMove(object sender, MouseEventArgs e)
+    {
+        if (!IsMouseCaptured) return;
+
+        var raw = e.GetPosition(this) - _panStartPoint;
+        if (!_isPanning)
+        {
+            // Hold off until the drag clears the threshold, so a plain click isn't consumed as a (zero) pan.
+            if (Math.Abs(raw.X) < PanThreshold && Math.Abs(raw.Y) < PanThreshold) return;
+            _isPanning = true;
+        }
+
+        // Restrict to the allowed axis (the other stays put). Dragging the content one way reveals what's behind it,
+        // i.e. the offset moves opposite the pointer.
+        var delta = PanningMode switch
+        {
+            PanningMode.HorizontalOnly => new Vector2(raw.X, 0),
+            PanningMode.VerticalOnly => new Vector2(0, raw.Y),
+            _ => raw
+        };
+        SetOffset(_panStartOffset - delta);
+        e.Handled = true;
+    }
+
+    protected override void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (IsMouseCaptured) ReleaseMouseCapture();
+        if (_isPanning) e.Handled = true;   // it was a pan, not a click
+        _isPanning = false;
     }
 
     protected override Size MeasureOverride(Size availableSize)
