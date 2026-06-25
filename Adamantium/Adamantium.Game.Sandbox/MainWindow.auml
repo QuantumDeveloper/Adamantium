@@ -259,18 +259,18 @@
             </Line.Triggers>
         </Line>
 
-        <!-- ScrollViewer demo: a 1920x1080 image inside a 520x320 viewport. Both axes overflow, so both overlay bars
-             appear (Auto) - drag a thumb, page the trough, or spin the wheel; the image scrolls and is clipped to the
-             viewport by the renderer scissor (ScrollContentPresenter.ClipToBounds -> per-unit Vulkan scissor). -->
+        <!-- ScrollViewer demo: a large image at its NATURAL size inside a 520x320 viewport. Both axes overflow, so both
+             overlay bars appear (Auto) - drag a thumb, page the trough, or spin the wheel; the image scrolls and is
+             clipped to the viewport by the renderer scissor (ScrollContentPresenter.ClipToBounds -> per-unit Vulkan
+             scissor). NO explicit Image Width/Height: the scroll extent then equals the bitmap, so you can't scroll past
+             the content into empty space (a fixed box larger than the bitmap left exactly that dead margin). -->
         <ScrollViewer Width="520"
                       Height="320"
                       HorizontalAlignment="Left"
                       VerticalAlignment="Top"
                       Margin="20"
                       PanningMode="Both">
-            <Image Width="1920"
-                   Height="1080"
-                   Source="Textures/texture.png"/>
+            <Image Source="Textures/luxfon.tga"/>
         </ScrollViewer>
 
         <!-- Standalone RepeatButton: button-like chrome (its own default style), hover/press states, and Click that
