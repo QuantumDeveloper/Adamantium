@@ -431,38 +431,15 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     public void SetValue(string property, object value, ValuePriority priority = ValuePriority.Local)
     {
         if (string.IsNullOrEmpty(property)) return;
-        
-        var adamantiumProperty = AdamantiumPropertyMap.FindRegistered(GetType(), property);
-        if (adamantiumProperty != null)
-        {
-            SetValue(adamantiumProperty, value);
-        }
-    }
 
-    /// <summary>
-    /// Sets a <see cref="AdamantiumProperty"/> value.
-    /// </summary>
-    /// <param name="property">The property.</param>
-    /// <param name="value">New value.</param>
-    // public void SetEffectiveValue(AdamantiumProperty property, object value)
-    // {
-    //     ValidateProperty(property);
-    //
-    //     if (value == AdamantiumProperty.UnsetValue)
-    //     {
-    //         return;
-    //     }
-    //
-    //     lock (values)
-    //     {
-    //         if (!values.ContainsKey(property))
-    //         {
-    //             return;
-    //         }
-    //
-    //         RunSetValueSequence(property, value, ValuePriority.Effective, false);
-    //     }
-    // }
+        var adamantiumProperty = AdamantiumPropertyMap.FindRegistered(GetType(), property);
+        if (adamantiumProperty == null)
+            return;
+        
+        // Honour the caller's priority - this dropped it (always Local), which is why a ControlTemplate literal
+        // set via this overload at Template priority could not be overridden by a Trigger (Local outranks Trigger).
+        SetValue(adamantiumProperty, value, priority);
+    }
 
     private object GetOrCalculateEffectiveValue(AdamantiumProperty property)
     {

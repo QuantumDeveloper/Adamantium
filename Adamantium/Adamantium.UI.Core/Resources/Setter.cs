@@ -67,7 +67,10 @@ public class Setter : ISetter, IEquatable<Setter>
     {
         if (ReferenceEquals(null, other)) return false;
         if (ReferenceEquals(this, other)) return true;
-        return Equals(Property, other.Property) && Equals(Value, other.Value);
+        // TargetName is part of a setter's identity: two setters that write the SAME property/value onto DIFFERENT
+        // template parts (e.g. a trigger lighting up both scrollbars' IsHitTestVisible) are distinct. Omitting it
+        // collapsed them into one dictionary key in the trigger activator, so applying the second tore down the first.
+        return Equals(Property, other.Property) && Equals(Value, other.Value) && Equals(TargetName, other.TargetName);
     }
 
     public override bool Equals(object obj)
@@ -80,6 +83,6 @@ public class Setter : ISetter, IEquatable<Setter>
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(Property);
+        return HashCode.Combine(Property, TargetName);
     }
 }
