@@ -309,7 +309,12 @@ public class MouseDevice
         }
         else
         {
-            var element = Captured.HitTest(p);
+            // The captured element stays the mouse-over target even when the pointer wanders off it (dragging a thumb
+            // past its own bounds, a fast drag outrunning the thumb): hit-test within the capture, but fall back to the
+            // captured element itself. Without the fallback HitTest returns null once the pointer leaves the thumb, the
+            // over-chain collapses to the root, and every ancestor (a ScrollViewer's IsMouseOver, a Button's hover, ...)
+            // spuriously goes false mid-drag - which made an overlay scrollbar fade out from under the dragging cursor.
+            var element = Captured.HitTest(p) ?? Captured;
             SetMouseOver(rootComponent, element, inputModifiers, timestamp);
             source = Captured;
         }
