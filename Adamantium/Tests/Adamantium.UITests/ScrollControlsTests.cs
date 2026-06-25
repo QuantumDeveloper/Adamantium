@@ -1,4 +1,7 @@
+using System.Linq;
 using Adamantium.Mathematics;
+using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Controls.Primitives;
 using Adamantium.UI.Core;
@@ -168,5 +171,70 @@ public class ScrollControlsTests
         // the trough and is inert until a Maximum/ViewportSize (or a ScrollViewer) gives it something to scroll.
         var bar = new ScrollBar();
         Assert.That(bar.Maximum, Is.EqualTo(bar.Minimum));
+    }
+
+    // ---- ScrollContentPresenter: the physical IScrollableContent (extent capture, translate, clamp) ----
+
+    // Content with a fixed natural size, so the presenter measures a definite extent regardless of layout details.
+    private sealed class FixedContent : MeasurableUIComponent
+    {
+        private readonly Size _size;
+        public FixedContent(Size size) => _size = size;
+        protected override Size MeasureOverride(Size availableSize) => _size;
+    }
+
+    private static ScrollContentPresenter ArrangedPresenter(Size content, Size viewport)
+    {
+        var p = new ScrollContentPresenter { Content = new FixedContent(content) };
+        p.Measure(viewport);
+        p.Arrange(new Rect(viewport));
+        return p;
+    }
+
+    [Test]
+    public void ScrollContentPresenter_ReportsContentExtentAndViewport()
+    {
+        var p = ArrangedPresenter(new Size(800, 1200), new Size(300, 400));
+        Assert.Multiple(() =>
+        {
+            Assert.That(p.Extent, Is.EqualTo(new Size(800, 1200)), "extent = content's natural size (measured unbounded)");
+            Assert.That(p.Viewport, Is.EqualTo(new Size(300, 400)), "viewport = the presenter's arranged size");
+        });
+    }
+
+    [Test]
+    public void ScrollContentPresenter_SetOffset_TranslatesChild()
+    {
+        var p = ArrangedPresenter(new Size(800, 1200), new Size(300, 400));
+        p.SetOffset(new Vector2(100, 250));
+        p.Arrange(new Rect(new Size(300, 400)));   // SetOffset invalidated the arrange; re-run it
+
+        var child = p.VisualChildren.First();
+        Assert.Multiple(() =>
+        {
+            Assert.That(p.Offset.X, Is.EqualTo(100));
+            Assert.That(p.Offset.Y, Is.EqualTo(250));
+            Assert.That(child.Bounds.X, Is.EqualTo(-100).Within(0.5), "child shifts left by the horizontal offset");
+            Assert.That(child.Bounds.Y, Is.EqualTo(-250).Within(0.5), "child shifts up by the vertical offset");
+        });
+    }
+
+    [Test]
+    public void ScrollContentPresenter_ClampsOffsetToExtentMinusViewport()
+    {
+        var p = ArrangedPresenter(new Size(800, 1200), new Size(300, 400));
+        p.SetOffset(new Vector2(9999, 9999));   // way past the end
+        Assert.Multiple(() =>
+        {
+            Assert.That(p.Offset.X, Is.EqualTo(500), "max X offset = extent.W - viewport.W = 800-300");
+            Assert.That(p.Offset.Y, Is.EqualTo(800), "max Y offset = extent.H - viewport.H = 1200-400");
+        });
+    }
+
+    [Test]
+    public void ScrollContentPresenter_ClipsToBounds()
+    {
+        // The presenter must opt into clipping so the overflowing content is scissored to the viewport by the renderer.
+        Assert.That(new ScrollContentPresenter().ClipToBounds, Is.True);
     }
 }
