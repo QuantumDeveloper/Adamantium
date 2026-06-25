@@ -20,6 +20,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 
     private bool isOverSizeFrame;
     private bool trackMouse;
+    private bool osMouseCaptured;
     private InputModifiers lastRawMouseModifiers;
     private Win32NativeWindowWrapper source;
 
@@ -46,6 +47,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         messageTable[(uint)WindowMessages.Char] = HandleChar;
         messageTable[(uint)WindowMessages.Mousemove] = HandleMouseMove;
         messageTable[(uint)WindowMessages.Mouseleave] = HandleMouseLeave;
+        messageTable[(uint)WindowMessages.Capturechanged] = HandleCaptureChanged;
         messageTable[(uint)WindowMessages.LeftButtondown] = HandleMouseLeftButtonDown;
         messageTable[(uint)WindowMessages.RightButtondown] = HandleMouseLeftButtonDown;
         messageTable[(uint)WindowMessages.MiddleButtondown] = HandleMouseLeftButtonDown;
@@ -398,6 +400,27 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         var eventArgs = new RawMouseEventArgs(eventType, window, Messages.PointFromLParam(lParam),
             WindowsMouseDeviceExtension.GetKeyModifiers(windowMessage, wParam), MouseDevice.CurrentDevice, GetTimeStamp());
         MouseDevice.CurrentDevice.ProcessEvent(eventArgs);
+        // Mirror the app's mouse capture to the OS (shared, cross-platform logic): an element that captured on press
+        // (a dragging thumb, a pressed button) then keeps getting move/up even when the pointer leaves the window, and
+        // the off-window release is caught instead of leaving the control stuck.
+        MouseDevice.CurrentDevice.SyncOsMouseCapture(this, ref osMouseCaptured);
+        handled = true;
+        return IntPtr.Zero;
+    }
+
+    // Platform-specific OS capture (the shared "when" lives in MouseDevice.SyncOsMouseCapture).
+    public void SetMouseCapture(bool capture)
+    {
+        if (capture) Win32Interop.SetCapture(window.Handle);
+        else Win32Interop.ReleaseCapture();
+    }
+
+    private IntPtr HandleCaptureChanged(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
+    {
+        // The OS revoked our capture (another window/app grabbed it, alt-tab, etc.). Drop the internal capture too so a
+        // captured control doesn't stay stuck believing the drag is still live.
+        osMouseCaptured = false;
+        if (MouseDevice.CurrentDevice.Captured != null) MouseDevice.CurrentDevice.Capture(null);
         handled = true;
         return IntPtr.Zero;
     }

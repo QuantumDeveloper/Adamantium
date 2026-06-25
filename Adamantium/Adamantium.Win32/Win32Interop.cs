@@ -53,6 +53,14 @@ namespace Adamantium.Win32
         [DllImport("user32.dll")]
         public static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
 
+        // Mouse capture: while a window holds the capture the OS delivers ALL mouse messages (move + button-up) to it,
+        // even when the cursor is outside the client area - so a drag keeps tracking and the release is caught off-window.
+        [DllImport("user32.dll", EntryPoint = "SetCapture")]
+        public static extern IntPtr SetCapture(IntPtr hWnd);
+
+        [DllImport("user32.dll", EntryPoint = "ReleaseCapture")]
+        public static extern bool ReleaseCapture();
+
         [DllImport("user32.dll")]
         public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 

@@ -27,11 +27,14 @@ public class ScrollBar : RangeBase
     private Track _track;
     private RepeatButton _lineUpButton;
     private RepeatButton _lineDownButton;
+    private double _dragStartValue;
 
     public ScrollBar()
     {
-        // Sensible standalone range (a ScrollViewer overrides these); apply the default vertical thickness.
-        Maximum = 100;
+        // Nothing to scroll by default: Maximum == Minimum (range 0) makes the Track fill the whole trough with an
+        // inert thumb (density 0 -> drag/page are no-ops). A real Maximum + ViewportSize (set directly or by a
+        // ScrollViewer) turns it into a proportional, draggable thumb.
+        Maximum = 0;
         ApplyOrientation();
     }
 
@@ -78,6 +81,7 @@ public class ScrollBar : RangeBase
         _track = GetTemplateChild("PART_Track") as Track;
         if (_track != null)
         {
+            _track.Thumb.DragStarted += OnThumbDragStarted;
             _track.Thumb.DragDelta += OnThumbDragDelta;
             _track.Thumb.DragCompleted += OnThumbDragCompleted;
             _track.IncreaseRepeatButton.Click += OnPageIncrease;
@@ -96,6 +100,7 @@ public class ScrollBar : RangeBase
     {
         if (_track != null)
         {
+            _track.Thumb.DragStarted -= OnThumbDragStarted;
             _track.Thumb.DragDelta -= OnThumbDragDelta;
             _track.Thumb.DragCompleted -= OnThumbDragCompleted;
             _track.IncreaseRepeatButton.Click -= OnPageIncrease;
@@ -106,12 +111,14 @@ public class ScrollBar : RangeBase
         if (_lineDownButton != null) { _lineDownButton.Click -= OnLineIncrease; _lineDownButton = null; }
     }
 
-    // The Track reports a drag delta relative to the (moving) thumb, i.e. the residual to the pointer, so adding its
-    // value-equivalent each event chases the pointer (the layout pass between mouse moves re-seats the thumb).
+    // Thumb drag: e.Change is the CUMULATIVE pointer movement since the press (measured in the Track's stable space),
+    // so map it from the value captured at drag start - not by accumulating per-event deltas, which drifted.
+    private void OnThumbDragStarted(object sender, DragStartedEventArgs e) => _dragStartValue = Value;
+
     private void OnThumbDragDelta(object sender, DragEventArgs e)
     {
         if (_track == null) return;
-        var newValue = Value + _track.ValueFromDistance(e.Change.X, e.Change.Y);
+        var newValue = _dragStartValue + _track.ValueFromDistance(e.Change.X, e.Change.Y);
         SetValueAndNotify(newValue, ScrollEventType.ThumbTrack);
     }
 

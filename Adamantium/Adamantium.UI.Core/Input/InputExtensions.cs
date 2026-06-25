@@ -23,7 +23,7 @@ public static class InputExtensions
       return result;
    }
 
-   private static void Collect(IInputComponent element, Vector2 p, List<IInputComponent> result)
+   private static void Collect(IUIComponent element, Vector2 p, List<IInputComponent> result)
    {
       if (!element.ClipRectangle.Contains(p)
           || element.Visibility != Visibility.Visible
@@ -31,19 +31,23 @@ public static class InputExtensions
           || !element.IsHitTestVisible)
          return;
 
-      // Into the element's local space, then recurse into children front-to-back so the top-most hit is collected first.
+      // Into the element's local space, then recurse into ALL visual children front-to-back (not only input ones), so a
+      // NON-input container - a Border / any Decorator - is descended THROUGH and the interactive content it wraps stays
+      // reachable. Filtering to IInputComponent here made anything inside a Border dead to the mouse (e.g. a ScrollBar
+      // whose template root is a Border: its Track/Thumb were unhittable).
       var local = p - element.ClipRectangle.Location;
-      foreach (var child in ZSort(element.VisualChildren.OfType<IInputComponent>()))
+      foreach (var child in ZSort(element.VisualChildren))
          Collect(child, local, result);
 
-      // Narrow phase: the element is hit (behind its children) only if the point is on its actual geometry, not just
-      // inside its bounding box - so a click in a shape's empty bbox corner falls through to whatever is really there.
-      if (element.HitTestCore(local))
-         result.Add(element);
+      // Narrow phase: only an INPUT element is a hit target (non-input visuals are pure pass-through containers), and
+      // only if the point is on its actual geometry, not just inside its bounding box - so a click in a shape's empty
+      // bbox corner falls through to whatever is really there.
+      if (element is IInputComponent input && element.HitTestCore(local))
+         result.Add(input);
    }
 
    // Front-to-back paint order: higher ZIndex first, then later siblings (higher index) first.
-   private static IEnumerable<IInputComponent> ZSort(IEnumerable<IInputComponent> elements)
+   private static IEnumerable<IUIComponent> ZSort(IEnumerable<IUIComponent> elements)
    {
       return elements
          .Select((element, index) => (element, index))
