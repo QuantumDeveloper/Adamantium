@@ -17,7 +17,8 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ScrollBar">
-                    <controls:Border Background="{TemplateBinding Background}" CornerRadius="6">
+                    <controls:Border Background="{TemplateBinding Background}"
+                                     CornerRadius="6">
                         <controls:Track x:Name="PART_Track"
                                 Orientation="{TemplateBinding Orientation}"
                                 Minimum="{TemplateBinding Minimum}"

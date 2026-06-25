@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions"
+          xmlns:controls="http://adamantium/ui">
+
+    <!-- Default chrome for a STANDALONE RepeatButton (spinners, steppers): the same look as Button, minus the focus
+         ring. Matches by EXACT type, so a ScrollBar's page buttons (a ScrollBarPageButton subtype) stay untouched and
+         invisible. Per the small-styles convention each concern is its own <Style Selector="RepeatButton">. -->
+
+    <!-- Simple properties: static palette + rest/hover/press/disabled state brushes the triggers project. -->
+    <Style Selector="RepeatButton">
+        <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
+
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference ControlFillColorSecondary}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference ControlFillColorTertiary}"/>
+        <Setter Property="BackgroundDisabled" Value="{ResourceReference ControlFillColorDisabled}"/>
+        <Setter Property="ForegroundPressed" Value="{ResourceReference TextFillColorSecondary}"/>
+        <Setter Property="ForegroundDisabled" Value="{ResourceReference TextFillColorDisabled}"/>
+
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="8 4 8 5"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <!-- Template (its own style). -->
+    <Style Selector="RepeatButton">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RepeatButton">
+                    <controls:Border x:Name="InnerBorder"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <controls:ContentPresenter
+                                x:Name="PART_ContentPresenter"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                    </controls:Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Triggers (its own style): project the state brushes onto the chrome via {TemplateBinding}. -->
+    <Style Selector="RepeatButton">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsPressed" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundPressed}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundDisabled}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

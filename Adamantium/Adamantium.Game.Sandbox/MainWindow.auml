@@ -259,6 +259,17 @@
             </Line.Triggers>
         </Line>
 
+        <!-- Standalone RepeatButton: button-like chrome (its own default style), hover/press states, and Click that
+             auto-repeats while held (after Delay, every Interval). The ScrollBar's page buttons share the auto-repeat
+             behaviour but stay invisible (they are a ScrollBarPageButton subtype the chrome doesn't target). -->
+        <RepeatButton Content="Hold me"
+                      Width="120"
+                      Height="40"
+                      HorizontalAlignment="Right"
+                      VerticalAlignment="Top"
+                      Delay="400"
+                      Interval="80"/>
+
         <!-- ScrollBar demo. Vertical = HAS a scrollable range (Maximum + ViewportSize): a proportional thumb you can
              drag, or page by pressing the trough (auto-repeating). Horizontal = nothing to scroll (no Maximum): the
              thumb fills the trough and is inert. Last Grid children so they sit on top and stay interactive. -->
@@ -269,7 +280,8 @@
                    Maximum="100"
                    ViewportSize="20"
                    Value="30"
-                   SmallChange="5" LargeChange="20"/>
+                   SmallChange="5"
+                   LargeChange="20"/>
         <!-- No Maximum/ViewportSize -> nothing to scroll: full, inert thumb (can't be dragged or paged). -->
         <ScrollBar Orientation="Horizontal"
                    HorizontalAlignment="Stretch"
