@@ -33,9 +33,13 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         AdamantiumProperty.Register(nameof(IsHitTestVisible),
             typeof(Boolean), typeof(UIComponent), new PropertyMetadata(true));
 
+    // Opt-in, like WPF: a component clips its descendants to its bounds (a Vulkan scissor, honoured by the renderer)
+    // only when this is set. Default false so content that intentionally overflows its bounds - drop shadows, the
+    // analytic-AA fill fringe, glyph effect padding, render-transformed children - is never clipped unless asked. A
+    // ScrollViewer's content host, and a control mid content-transition, set it to true.
     public static readonly AdamantiumProperty ClipToBoundsProperty = AdamantiumProperty.Register(nameof(ClipToBounds),
         typeof(Boolean), typeof(UIComponent),
-        new PropertyMetadata(true, PropertyMetadataOptions.BindsTwoWayByDefault));
+        new PropertyMetadata(false, PropertyMetadataOptions.BindsTwoWayByDefault));
 
     public static readonly AdamantiumProperty IsEnabledProperty = AdamantiumProperty.Register(nameof(IsEnabled),
         typeof(Boolean), typeof(UIComponent),

@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.UI.Rendering;
 
@@ -16,6 +18,9 @@ public class RenderCache
     private readonly Dictionary<Guid, List<IRenderUnit>> _unitsByControl = new Dictionary<Guid, List<IRenderUnit>>();
 
     private readonly IRenderUnitFactory _renderUnitFactory;
+
+    // Last render scale seen in ProcessCommands; maps a unit's window-logical clip rect to framebuffer-pixel scissor.
+    private double _renderScale = 1.0;
 
     public RenderCache(IDrawingContext context, IRenderUnitFactory renderUnitFactory)
     {
@@ -83,6 +88,7 @@ public class RenderCache
 
     public void ProcessCommands(Matrix4x4F projectionMatrix, double renderScale)
     {
+        _renderScale = renderScale;
         foreach (var unit in _renderUnits)
         {
             var transform = unit.Component.WorldTransform;
@@ -99,12 +105,84 @@ public class RenderCache
         }
     }
 
-    public void Render()
+    /// <summary>Renders every cached unit with no scissor management. Used by GPU-free tests (no device).</summary>
+    public void Render() => Render(null, default);
+
+    /// <summary>
+    /// Renders every cached unit, narrowing the Vulkan scissor per unit so a unit whose owner sits inside one or more
+    /// <see cref="IUIComponent.ClipToBounds"/> ancestors (a scroll viewport, a clipped panel, a content transition) is
+    /// clipped to the intersection of those ancestors' bounds. <paramref name="fullScissor"/> is the window-wide
+    /// scissor restored for unclipped units.
+    /// </summary>
+    public void Render(IGraphicsDevice device, Rect2D fullScissor)
     {
+        var scissorNarrowed = false;   // whether the active scissor is currently narrower than fullScissor
         foreach (var unit in _renderUnits)
         {
+            if (device != null)
+            {
+                var scissor = ResolveScissor(unit.Component, fullScissor, out var clipped);
+                if (clipped)
+                {
+                    device.SetScissors(scissor);
+                    scissorNarrowed = true;
+                }
+                else if (scissorNarrowed)
+                {
+                    // First unclipped unit after a clipped one: restore the full window scissor.
+                    device.SetScissors(fullScissor);
+                    scissorNarrowed = false;
+                }
+            }
             unit.Render();
         }
+
+        // Leave the device on the full scissor for whatever renders next (e.g. the adorner pass).
+        if (scissorNarrowed) device.SetScissors(fullScissor);
+    }
+
+    // The scissor for a unit: the intersection of every ancestor viewport that ClipToBounds (in framebuffer pixels),
+    // or fullScissor if none clip. `clipped` is false in the latter case so the caller keeps the window scissor.
+    private Rect2D ResolveScissor(IUIComponent component, Rect2D fullScissor, out bool clipped)
+    {
+        Rect? clip = null;
+        for (var c = component; c != null; c = c.VisualParent)
+        {
+            if (!c.ClipToBounds) continue;
+            // The element's own viewport (local 0,0..RenderSize) mapped into window-logical space by its WorldTransform.
+            var rect = new Rect(0, 0, c.RenderSize.Width, c.RenderSize.Height).TransformToAABB(c.WorldTransform);
+            clip = clip is { } existing ? existing.Intersect(rect) : rect;
+        }
+
+        if (clip is not { } logical)
+        {
+            clipped = false;
+            return fullScissor;
+        }
+
+        clipped = true;
+        return ToFramebufferScissor(logical, fullScissor);
+    }
+
+    // Window-logical rect -> Vulkan scissor in framebuffer pixels (logical x RenderScale), clamped to the window
+    // scissor so it never exceeds the attachment and collapses to empty (nothing drawn) when fully scrolled out.
+    private Rect2D ToFramebufferScissor(Rect logical, Rect2D fullScissor)
+    {
+        var fbLeft = fullScissor.Offset.X;
+        var fbTop = fullScissor.Offset.Y;
+        var fbRight = fbLeft + (int)fullScissor.Extent.Width;
+        var fbBottom = fbTop + (int)fullScissor.Extent.Height;
+
+        var left = Math.Clamp((int)Math.Floor(logical.X * _renderScale), fbLeft, fbRight);
+        var top = Math.Clamp((int)Math.Floor(logical.Y * _renderScale), fbTop, fbBottom);
+        var right = Math.Clamp((int)Math.Ceiling(logical.Right * _renderScale), fbLeft, fbRight);
+        var bottom = Math.Clamp((int)Math.Ceiling(logical.Bottom * _renderScale), fbTop, fbBottom);
+
+        return new Rect2D
+        {
+            Offset = new Offset2D { X = left, Y = top },
+            Extent = new Extent2D { Width = (uint)Math.Max(0, right - left), Height = (uint)Math.Max(0, bottom - top) }
+        };
     }
     
     private void BuildRenderCommands(IRootVisualComponent visualRoot)

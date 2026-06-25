@@ -109,8 +109,9 @@ internal sealed class OffscreenTestRenderer : IDisposable
 
         _device.SetViewports(_viewport);
         _device.SetScissors(_scissor);
-        _renderCache.Render();                    // content
-        if (hasAdorners) _adornerCache.Render();  // tooling overlays, on top
+        _renderCache.Render(_device, _scissor);                    // content
+        if (hasAdorners) 
+            _adornerCache.Render(_device, _scissor);  // tooling overlays, on top
 
         _device.EndDraw();
         _device.Submit();

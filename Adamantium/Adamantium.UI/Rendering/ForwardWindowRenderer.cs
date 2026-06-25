@@ -72,7 +72,7 @@ public class ForwardWindowRenderer : WindowRendererBase
 
         GraphicsDevice.SetViewports(Viewport);
         GraphicsDevice.SetScissors(Scissor);
-        _renderCache.Render();
+        _renderCache.Render(GraphicsDevice, Scissor);
     }
 
     public override void PreRender()
