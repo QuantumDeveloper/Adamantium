@@ -228,6 +228,61 @@ public class GpuRenderUnitTests
         }
     }
 
+    // Renderer clipping: a child whose draw OVERFLOWS its ClipToBounds parent must be scissored to the parent's
+    // bounds. This is the foundation the ScrollViewer (and ContentControl/Presenter transitions) need - without the
+    // per-unit scissor the overflow bleeds across the whole window. Sample points are chosen to read the same way
+    // under a vertical read-back flip (centre row/column, and Y points that are background in either orientation).
+    [Test]
+    public void ClipToBounds_Parent_ScissorsOverflowingChild()
+    {
+        var factory = new RenderUnitFactory(_device, _resourceFactory);
+        using var renderer = new OffscreenTestRenderer(_device, factory, 64, 64) { ClearColor = Colors.CornflowerBlue };
+
+        // A 24x24 clipping window at (20,20); inside it a child whose 64x64 red draw overflows it on all sides.
+        // Geometry is set directly (Bounds/RenderSize, the inputs WorldTransform + the scissor read) so the test
+        // doesn't depend on a layout pass - the window spans x,y 20..44 and the child's red draw shares that origin.
+        var child = new TestControl
+        {
+            RenderAction = s => s.DrawRectangle(Brushes.Red, new Rect(0, 0, 64, 64)),
+            Bounds = new Rect(0, 0, 64, 64),
+            RenderSize = new Size(64, 64)
+        };
+        var clip = new TestControl
+        {
+            ClipToBounds = true,
+            Bounds = new Rect(20, 20, 24, 24),
+            RenderSize = new Size(24, 24)
+        };
+        clip.Add(child);
+
+        var root = new TestRoot(64, 64);
+        root.Add(clip);
+
+        Assert.That(renderer.RenderFrame(root), Is.True, "off-screen frame must render");
+
+        var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"clip_{System.Guid.NewGuid():N}.png");
+        renderer.Save(path, ImageFileType.Png);
+        try
+        {
+            var img = Adamantium.Imaging.Image.Load(path);
+            var px = img.GetPixelBuffer(0, 0);
+            var inside = px.GetPixel<uint>(32, 32);        // centre of the clip window -> red survives
+            var clippedRight = px.GetPixel<uint>(54, 32);  // within the red draw (x<64) but right of the window -> clipped
+            var clippedV = px.GetPixel<uint>(32, 54);      // outside the window in Y -> clipped (flip-safe: row 9 is above the draw, also bg)
+            var bg = px.GetPixel<uint>(2, 2);              // cleared background
+            TestContext.WriteLine($"inside=0x{inside:X8} clippedRight=0x{clippedRight:X8} clippedV=0x{clippedV:X8} bg=0x{bg:X8}");
+
+            Assert.That(bg, Is.Not.EqualTo(0u), "background must be a visible clear colour");
+            Assert.That(inside, Is.Not.EqualTo(bg), "inside the clip window the child must render");
+            Assert.That(clippedRight, Is.EqualTo(bg), "child overflow to the right of the window must be scissored away");
+            Assert.That(clippedV, Is.EqualTo(bg), "child overflow past the window in Y must be scissored away");
+        }
+        finally
+        {
+            System.IO.File.Delete(path);
+        }
+    }
+
     // The framework adorner stage: a SelectionAdorner drawn as a SECOND pass on top of the content. Proves the
     // overlay renders over the content (white corner handle sits outside the red box, on a cleared background) -
     // i.e. RenderBounds-driven tooling frames from the framework, not the host. Raw BGRA read-back avoids Image.Load.

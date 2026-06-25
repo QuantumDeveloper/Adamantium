@@ -396,7 +396,17 @@ public struct Rect : IEquatable<Rect>
 
       return new Rect(new Vector2(left, top), new Vector2(right, bottom));
    }
-      
+
+   /// <summary>
+   /// Returns the axis-aligned bounding box of a transformed rectangle, for the single-precision transform used by the
+   /// UI (a component's <c>WorldTransform</c>). Delegates to the <see cref="TransformToAABB(Matrix4x4)"/> overload via
+   /// the lossless float-&gt;double widening, so all four corners are transformed (correct under rotation, unlike a
+   /// two-corner shortcut).
+   /// </summary>
+   /// <param name="matrix">The transform.</param>
+   /// <returns>The bounding box.</returns>
+   public Rect TransformToAABB(Matrix4x4F matrix) => TransformToAABB((Matrix4x4)matrix);
+
    /// <summary>
    /// Translates the rectangle by an offset.
    /// </summary>
