@@ -173,10 +173,19 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
 
     public void Update(Matrix4x4F transform, Matrix4x4F projection, double renderScale)
     {
-        // RenderData is shared by all of a unit's renderers (set in ProcessStrokeData/ProcessFillFringe), so setting the
-        // viewport zoom here reaches the fringe component, which reads RenderData.RenderScale in PreRender for the
-        // scale-aware (~1 device px) fringe width.
-        if (DrawCommand?.RenderData != null) DrawCommand.RenderData.RenderScale = renderScale;
+        // Keep ALL of the unit's renderers pointed at the CURRENT RenderData. UpdateWithDrawCommand repoints the body
+        // unconditionally but the fringe/stroke only on a geometry/brush/pen change - so an OPACITY-only change (a
+        // fading container) left the analytic-AA fringe + stroke on their old RenderData, i.e. their old opacity: a
+        // bright ~1px rim lingered around a thumb whose body had already faded out. Re-share the RenderData every frame
+        // (it also carries the viewport zoom the fringe reads in PreRender for its ~1 device-px width).
+        var renderData = DrawCommand?.RenderData;
+        if (renderData != null)
+        {
+            renderData.RenderScale = renderScale;
+            if (GeometryRenderer != null) GeometryRenderer.RenderData = renderData;
+            if (FillFringeRenderer != null) FillFringeRenderer.RenderData = renderData;
+            if (StrokeRenderer != null) StrokeRenderer.RenderData = renderData;
+        }
         GeometryRenderer?.Update(transform, projection);
         FillFringeRenderer?.Update(transform, projection);
         StrokeRenderer?.Update(transform, projection);
