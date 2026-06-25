@@ -13,6 +13,7 @@
         <StyleInclude Source="{x:Type fluentDark:RepeatButtonStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ThumbStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ScrollBarStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ScrollViewerStyleSet}"/>
 	</Theme.StyleIncludes>
 
 	<!-- Accent / focus: the theme's runtime-mutable identity. Referenced via {ThemeResource Key}; change any of these

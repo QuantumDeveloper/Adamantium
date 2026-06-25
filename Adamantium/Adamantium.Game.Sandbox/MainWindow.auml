@@ -259,6 +259,19 @@
             </Line.Triggers>
         </Line>
 
+        <!-- ScrollViewer demo: a 1920x1080 image inside a 520x320 viewport. Both axes overflow, so both overlay bars
+             appear (Auto) - drag a thumb, page the trough, or spin the wheel; the image scrolls and is clipped to the
+             viewport by the renderer scissor (ScrollContentPresenter.ClipToBounds -> per-unit Vulkan scissor). -->
+        <ScrollViewer Width="520"
+                      Height="320"
+                      HorizontalAlignment="Left"
+                      VerticalAlignment="Top"
+                      Margin="20">
+            <Image Width="1920"
+                   Height="1080"
+                   Source="Textures/texture.png"/>
+        </ScrollViewer>
+
         <!-- Standalone RepeatButton: button-like chrome (its own default style), hover/press states, and Click that
              auto-repeats while held (after Delay, every Interval). The ScrollBar's page buttons share the auto-repeat
              behaviour but stay invisible (they are a ScrollBarPageButton subtype the chrome doesn't target). -->
