@@ -177,7 +177,11 @@ public class WindowRenderService : UiRenderService
         UpdateProcessors(time);          // adorner stage builds its overlay cache from the current layout
         windowRenderer.PrepareData();     // content cache built now, before drawing (GPU idle -> safe)
 
-        if (!BeginDraw()) return false;   // shared setup + beforeRenderPass (PreRender content + processors)
+        // shared setup + beforeRenderPass (PreRender content + processors). Throw (not a bare false) with the device's
+        // real reason so the designer reports it instead of an opaque "render failed".
+        if (!BeginDraw())
+            throw new System.InvalidOperationException(
+                $"GraphicsDevice.BeginDraw failed: {GraphicsDevice.LastFrameError ?? "unknown device error"}");
         windowRenderer.Render(time);      // content
         DrawProcessors(time);              // adorner overlays on top
 

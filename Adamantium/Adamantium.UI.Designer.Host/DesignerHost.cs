@@ -34,6 +34,31 @@ public static class DesignerHost
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
+    private static string _logPath;
+
+    // A render failure must tell the user WHAT broke, not a bare "render failed". Format the exception chain (type +
+    // message for the exception and every InnerException), the first stack frames (where it threw), and the path to the
+    // full per-PID host log - everything the IDE's error badge needs to be actionable.
+    private static string Describe(Exception e)
+    {
+        var sb = new StringBuilder();
+        for (var cur = e; cur != null; cur = cur.InnerException)
+        {
+            if (sb.Length > 0) sb.Append("\n caused by ");
+            sb.Append(cur.GetType().Name).Append(": ").Append(cur.Message);
+        }
+        if (!string.IsNullOrEmpty(e.StackTrace))
+        {
+            var frames = e.StackTrace.Split('\n');
+            sb.Append('\n');
+            for (var i = 0; i < frames.Length && i < 8; i++)
+                sb.Append('\n').Append(frames[i].TrimEnd());
+        }
+        if (_logPath != null)
+            sb.Append("\n\nFull host log: ").Append(_logPath);
+        return sb.ToString();
+    }
+
     public static int Run()
     {
         // Read/write the protocol as UTF-8 without a BOM so it round-trips cleanly with the plugin.
@@ -50,6 +75,7 @@ public static class DesignerHost
         {
             // Per-PID file so a crash + respawn doesn't clobber the failing session's log.
             var logPath = Path.Combine(Path.GetTempPath(), $"adamantium-designer-host-{Environment.ProcessId}.log");
+            _logPath = logPath;
             var fileLog = new StreamWriter(new FileStream(logPath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = true };
             var sink = TextWriter.Synchronized(fileLog);
             Console.SetError(sink);
@@ -64,7 +90,7 @@ public static class DesignerHost
         }
         catch (Exception e)
         {
-            WriteResponse(protocol, new Response { Error = $"init failed: {e.Message}" });
+            WriteResponse(protocol, new Response { Error = $"init failed: {Describe(e)}" });
             return 1;
         }
 
@@ -163,7 +189,7 @@ public static class DesignerHost
         }
         catch (Exception e)
         {
-            return new Response { Error = e.Message };
+            return new Response { Error = Describe(e) };
         }
     }
 
@@ -195,7 +221,7 @@ public static class DesignerHost
         }
         catch (Exception e)
         {
-            return new Response { Error = e.Message };
+            return new Response { Error = Describe(e) };
         }
     }
 
@@ -224,7 +250,7 @@ public static class DesignerHost
         }
         catch (Exception e)
         {
-            return new Response { Error = e.Message };
+            return new Response { Error = Describe(e) };
         }
     }
 
@@ -260,7 +286,7 @@ public static class DesignerHost
         }
         catch (Exception e)
         {
-            return new Response { Error = e.Message };
+            return new Response { Error = Describe(e) };
         }
     }
 
@@ -292,7 +318,7 @@ public static class DesignerHost
         }
         catch (Exception e)
         {
-            return new Response { Error = e.Message };
+            return new Response { Error = Describe(e) };
         }
     }
 
