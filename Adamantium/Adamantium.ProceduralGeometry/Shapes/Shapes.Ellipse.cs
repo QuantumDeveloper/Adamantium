@@ -25,6 +25,11 @@ namespace Adamantium.ProceduralGeometry.Shapes
                     sweepAngle %= 360;
                 }
 
+                // A full ellipse, or a pie sector (whose outline returns through the centre), is a closed loop; an
+                // edge-to-edge ARC is an open polyline. This flag drives MeshContour.IsGeometryClosed, which is what the
+                // GPU stroke reads to decide whether to wrap the ribbon back to the first point.
+                bool isClosed = Math.Abs(sweepAngle) >= 360.0 || ellipseType == EllipseType.Sector;
+
                 Mesh mesh = null;
 
                 switch (geometryType)
@@ -34,12 +39,14 @@ namespace Adamantium.ProceduralGeometry.Shapes
                         break;
                     case GeometryType.Both:
                     {
+                        // Fill comes from the dedicated solid generator (a clean triangulation - full disc / pie sector /
+                        // segment); the stroke reads the separate outline CONTOUR. Triangulating the outline as the fill
+                        // (the old path) garbled partial arcs and depended on a duplicated start vertex - which the clean
+                        // outline (needed by the GPU stroke) no longer has.
+                        mesh = GenerateSolidGeometry(ellipseType, diameter, startAngle, sweepAngle, isClockWise, tessellation, transform);
                         var contour = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, sweepAngle,
                             isClockWise, tessellation, transform);
-                        mesh = new Mesh();
-                        mesh.AddContour(contour, true);
-                        var vertices = Triangulate(contour);
-                        mesh.SetPoints(vertices).SetTopology(PrimitiveType.LineStrip).GenerateBasicIndices();
+                        mesh.AddContour(contour, isClosed);
                         break;
                     }
                     case GeometryType.Outlined:
@@ -47,7 +54,7 @@ namespace Adamantium.ProceduralGeometry.Shapes
                         var contour = GenerateOutlinedGeometry(ellipseType, diameter, startAngle, sweepAngle,
                             isClockWise, tessellation, transform);
                         mesh = new Mesh();
-                        mesh.AddContour(contour, true);
+                        mesh.AddContour(contour, isClosed);
                         break;
                     }
                 }
@@ -145,39 +152,33 @@ namespace Adamantium.ProceduralGeometry.Shapes
                 Matrix4x4? transform = null)
             {
                 var vertices = new List<Vector3>();
-                var center = Vector3.Zero;
                 var radiusX = diameter.X / 2;
                 var radiusY = diameter.Y / 2;
 
-                var range = sweepAngle;
-                var angle = range / tessellation;
+                // Full ellipse: emit exactly `tessellation` points around it WITHOUT repeating the start vertex - the
+                // closing edge is implicit (IsGeometryClosed), and a duplicated start/end vertex is a zero-length segment
+                // the GPU stroke can't normalize. Partial arc: emit `tessellation + 1` points so BOTH the start- and
+                // stop-angle endpoints land exactly on the arc.
+                bool isFull = Math.Abs(sweepAngle) >= 360.0;
+                int count = isFull ? tessellation : tessellation + 1;
 
-                float sign = 1;
-                if (isClockWise)
+                float sign = isClockWise ? -1f : 1f;
+                double startRad = MathHelper.DegreesToRadians(startAngle) * sign;
+                double stepRad = MathHelper.DegreesToRadians(sweepAngle / tessellation) * sign;
+
+                for (int i = 0; i < count; ++i)
                 {
-                    sign = -1;
+                    double a = startRad + stepRad * i;
+                    double x = Math.Round(radiusX * Math.Cos(a), 4, MidpointRounding.AwayFromZero);
+                    double y = Math.Round(radiusY * Math.Sin(a), 4, MidpointRounding.AwayFromZero);
+                    vertices.Add(new Vector3(x, y, 0));
                 }
 
-                float angleItem = MathHelper.DegreesToRadians(angle) * sign;
-                startAngle = MathHelper.DegreesToRadians(startAngle);
-                angle = startAngle * sign;
-
-                for (int i = 0; i <= tessellation; ++i)
+                // A pie sector's outline runs arc -> centre -> back to the first radius (closed loop); an edge-to-edge
+                // arc stops at the rim.
+                if (!isFull && ellipseType == EllipseType.Sector)
                 {
-                    double x = center.X + (radiusX * Math.Cos(angle));
-                    double y = center.Y + (radiusY * Math.Sin(angle));
-
-                    x = Math.Round(x, 4, MidpointRounding.AwayFromZero);
-                    y = Math.Round(y, 4, MidpointRounding.AwayFromZero);
-
-                    var vertex = new Vector3(x, y, 0);
-                    vertices.Add(vertex);
-                    angle += angleItem;
-                }
-                
-                if (range < 360 && ellipseType == EllipseType.Sector)
-                {
-                    vertices.Add(center);
+                    vertices.Add(Vector3.Zero);
                 }
 
                 if (transform is { IsIdentity: false })

@@ -19,8 +19,15 @@ internal class SVGCommandInterpreter
                 case 'M':
                 case 'm':
                     var startPoint = new Vector2(command.Arguments[0], command.Arguments[1]);
-                    figureSegments = context.BeginFigure(startPoint, true, true);
+                    // Figures start OPEN; a later 'Z' closes them (see below). The old hardcoded isClosed:true forced
+                    // EVERY path to a closed ring, so an open glyph like a check mark (M..L..L, no Z) drew the phantom
+                    // edge back to the start = a triangle. SVG/XAML semantics: closure is the explicit 'Z'.
+                    figureSegments = context.BeginFigure(startPoint, true, false);
                     currentPoint = startPoint;
+                    break;
+                case 'Z':
+                case 'z':
+                    figureSegments?.CloseFigure();
                     break;
                 case 'A':
                 case 'a':

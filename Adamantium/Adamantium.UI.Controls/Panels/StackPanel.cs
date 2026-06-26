@@ -73,51 +73,32 @@ public class StackPanel : Panel
 
    protected override Size ArrangeOverride(Size finalSize)
    {
-      double arrangedWidth = finalSize.Width;
-      double arrangedHeight = finalSize.Height;
+      var horizontal = Orientation == Orientation.Horizontal;
 
-      if (Orientation == Orientation.Vertical)
-      {
-         arrangedHeight = 0;
-      }
-      else
-      {
-         arrangedWidth = 0;
-      }
+      // Cross-axis = the CONTENT extent (DesiredSize: the tallest/widest child, or an explicit Width/Height), clamped to
+      // the slot - never the full slot on its own. A stack only occupies what it stacks, so it must not report (and
+      // therefore hit-test) cross space it doesn't use: a horizontal Stretch stack otherwise swallowed the whole window
+      // height for input, blocking everything beneath it. Children are still given the full cross extent so they can
+      // align within it. (Stacking axis = the running content sum - a stack never fills along its orientation either.)
+      double cross = horizontal
+         ? Math.Min(finalSize.Height, DesiredSize.Height)
+         : Math.Min(finalSize.Width, DesiredSize.Width);
 
+      double main = 0;
       foreach (var child in Children)
       {
-         double childWidth = child.DesiredSize.Width;
-         double childHeight = child.DesiredSize.Height;
-
-         if (Orientation == Orientation.Vertical)
+         if (horizontal)
          {
-            double width = Math.Max(childWidth, arrangedWidth);
-            Rect childFinal = new Rect(0, arrangedHeight, width, childHeight);
-            child.Arrange(childFinal);
-            arrangedWidth = Math.Max(arrangedWidth, childWidth);
-            arrangedHeight += childHeight;
+            child.Arrange(new Rect(main, 0, child.DesiredSize.Width, cross));
+            main += child.DesiredSize.Width;
          }
          else
          {
-            double height = Math.Max(childHeight, arrangedHeight);
-            Rect childFinal = new Rect(arrangedWidth, 0, childWidth, height);
-            child.Arrange(childFinal);
-
-            arrangedWidth += childWidth;
-            arrangedHeight = Math.Max(arrangedHeight, childHeight);
+            child.Arrange(new Rect(0, main, cross, child.DesiredSize.Height));
+            main += child.DesiredSize.Height;
          }
       }
 
-      if (Orientation == Orientation.Vertical)
-      {
-         arrangedHeight = Math.Max(arrangedHeight, finalSize.Height);
-      }
-      else
-      {
-         arrangedWidth = Math.Max(arrangedWidth, finalSize.Width);
-      }
-
-      return new Size(arrangedWidth, arrangedHeight);
+      return horizontal ? new Size(main, cross) : new Size(cross, main);
    }
 }

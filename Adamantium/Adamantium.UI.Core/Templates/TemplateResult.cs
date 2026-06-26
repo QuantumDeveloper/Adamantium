@@ -37,9 +37,9 @@ public class TemplateResult
         namesMap[name] = component;
     }
     
-    public void AddTemplateBinding(IUIComponent target, string sourceProperty, TemplateBinding binding)
+    public void AddTemplateBinding(IUIComponent target, string targetProperty, TemplateBinding binding)
     {
-        templateBindings.Add(new TemplateBindingExpression(null, target, sourceProperty, binding));
+        templateBindings.Add(new TemplateBindingExpression(null, target, targetProperty, binding));
     }
 
     public void AddBinding(IUIComponent target, string sourceProperty, BindingBase binding)

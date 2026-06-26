@@ -59,6 +59,18 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     public static readonly AdamantiumProperty VerticalAlignmentProperty = AdamantiumProperty.Register(nameof(VerticalAlignment),
         typeof(VerticalAlignment), typeof(MeasurableUIComponent), new PropertyMetadata(VerticalAlignment.Stretch, PropertyMetadataOptions.AffectsArrange));
 
+    // Attached layout intent settable on ANY measurable element: opt the control into 1:1 (square) sizing - it derives
+    // the missing dimension from the one the consumer set, so a circular/square control stays correct when only Width OR
+    // only Height is given. It is just a registered marker here (no base-layout logic - circularity is rare); the CONTROL
+    // decides how to honour it (e.g. ProgressBar reads it in MeasureOverride), every other control ignores it. Lives on
+    // the layout base, so it registers automatically when any control's owner chain is walked - no manual init/cleanup.
+    public static readonly AdamantiumProperty SquareSizingProperty = AdamantiumProperty.RegisterAttached("SquareSizing",
+        typeof(bool), typeof(MeasurableUIComponent), new PropertyMetadata(false, PropertyMetadataOptions.AffectsMeasure));
+
+    public static bool GetSquareSizing(IAdamantiumComponent element) => element.GetValue<bool>(SquareSizingProperty);
+
+    public static void SetSquareSizing(IAdamantiumComponent element, bool value) => element.SetValue(SquareSizingProperty, value);
+
     public static readonly AdamantiumProperty MarginProperty = AdamantiumProperty.Register(nameof(Margin),
         typeof(Thickness), typeof(MeasurableUIComponent), new PropertyMetadata(default(Thickness), PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
 
@@ -472,11 +484,15 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
 
             switch (HorizontalAlignment)
             {
+                // Stretch anchors at the START, like Left. When the element fills the slot the offset is 0 either way;
+                // when it returns LESS than the slot (a control that can't stretch - e.g. a CheckBox's content stack)
+                // it must stay at the slot origin, not drift to the middle. Grouping Stretch with Center slid such
+                // content to the centre of its parent the moment the element stopped filling.
                 case HorizontalAlignment.Left:
+                case HorizontalAlignment.Stretch:
                     size.Width = Math.Min(sizeMinusMargins.Width, ActualWidth);
                     break;
                 case HorizontalAlignment.Center:
-                case HorizontalAlignment.Stretch:
                     originX += (sizeMinusMargins.Width - size.Width) / 2;
                     clipOriginX = Math.Max(originX, finalRect.X + margin.Left);
                     size.Width = Math.Min(sizeMinusMargins.Width, ActualWidth);
@@ -491,10 +507,10 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             switch (VerticalAlignment)
             {
                 case VerticalAlignment.Top:
+                case VerticalAlignment.Stretch:
                     size.Height = Math.Min(sizeMinusMargins.Height, ActualHeight);
                     break;
                 case VerticalAlignment.Center:
-                case VerticalAlignment.Stretch:
                     originY += (sizeMinusMargins.Height - size.Height) / 2;
                     clipOriginY = Math.Max(originY, finalRect.Y + margin.Top);
                     size.Height = Math.Min(sizeMinusMargins.Height, ActualHeight);

@@ -90,8 +90,10 @@ public interface IAdamantiumComponent : IComponent
 
     public void RemoveStyleValue(string propertyName, Style style);
 
-    public void SetTriggerValue(string property, object value);
-    public void SetTriggerValue(AdamantiumProperty property, object value);
+    // Trigger setters push tagged with a token (the setter), so overlapping triggers stack instead of clobbering one slot.
+    public void SetTriggerValue(string property, object value, object token);
+    public void SetTriggerValue(AdamantiumProperty property, object value, object token);
+    public void ClearTriggerValue(AdamantiumProperty property, object token);
 
     /// <summary>
     /// Fires when value on <see cref="AdamantiumProperty"/> was changed

@@ -1,0 +1,10 @@
+﻿<View xmlns="http://adamantium/ui">
+    <StackPanel Orientation="Horizontal"
+                VerticalAlignment="Center">
+        <RadioButton Content="Value 1"/>
+        <RadioButton Content="Value 2" />
+        <ToggleSwitch Content="Test Switch"/>
+        <CheckBox Content="Checkbox" IsThreeState="true"/>
+        <Slider Width="250"/>
+    </StackPanel>
+</View>

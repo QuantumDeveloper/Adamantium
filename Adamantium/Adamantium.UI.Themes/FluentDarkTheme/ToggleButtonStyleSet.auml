@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions"
+          xmlns:controls="http://adamantium/ui">
+
+    <!-- A button that stays lit while checked. Same chrome as Button; the extra concern is one IsChecked trigger that
+         paints the accent. Per the small-styles convention each concern is its own <Style Selector="ToggleButton">. -->
+
+    <Style Selector="ToggleButton">
+        <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference ControlFillColorSecondary}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference ControlFillColorTertiary}"/>
+        <Setter Property="BackgroundDisabled" Value="{ResourceReference ControlFillColorDisabled}"/>
+        <Setter Property="ForegroundPressed" Value="{ResourceReference TextFillColorSecondary}"/>
+        <Setter Property="ForegroundDisabled" Value="{ResourceReference TextFillColorDisabled}"/>
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="11 5 11 6"/>
+        <Setter Property="MinHeight" Value="32"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="ToggleButton">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <controls:Grid>
+                        <controls:Border x:Name="InnerBorder"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <controls:ContentPresenter
+                                    x:Name="PART_ContentPresenter"
+                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                    Foreground="{TemplateBinding Foreground}"
+                                    FontSize="{TemplateBinding FontSize}"
+                                    Content="{TemplateBinding Content}"
+                                    ContentTemplate="{TemplateBinding ContentTemplate}"
+                                    ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                        </controls:Border>
+                        <controls:Border x:Name="FocusOuter" CornerRadius="4" BorderThickness="1" BorderBrush="Transparent">
+                            <controls:Border x:Name="FocusInner" CornerRadius="3" BorderThickness="1" BorderBrush="Transparent"/>
+                        </controls:Border>
+                    </controls:Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="ToggleButton">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsChecked" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="InnerBorder" Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ThemeResource AccentForegroundColor}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsPressed" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsFocused" Value="true">
+            <Setter TargetName="FocusOuter" Property="BorderBrush" Value="{ThemeResource FocusStrokeColorOuter}"/>
+            <Setter TargetName="FocusInner" Property="BorderBrush" Value="{ThemeResource FocusStrokeColorInner}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundDisabled}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

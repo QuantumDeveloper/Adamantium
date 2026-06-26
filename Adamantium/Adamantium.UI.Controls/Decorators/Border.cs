@@ -69,25 +69,12 @@ public class Border : Decorator
 
    protected override Size ArrangeOverride(Size finalSize)
    {
+      // Fill the arranged slot and lay the child out inside it (minus border+padding); the child positions itself within
+      // via its own alignment. Returning the CHILD's size instead collapsed a stretched border to a non-stretch child -
+      // e.g. a Button's chrome shrank to its centred ContentPresenter and the text spilled outside. Shrink-to-content is
+      // a MEASURE concern (MeasureOverride already returns child+padding, honouring Width/Height), not arrange.
       var padding = Padding + BorderThickness;
       Child?.Arrange(new Rect(finalSize).Deflate(padding));
-
-      if (Child != null)
-      {
-         var result = Child.Bounds.Size.Inflate(padding);
-         if (!Double.IsNaN(Width))
-         {
-            result.Width = Math.Max(result.Width, Width);
-         }
-            
-         if (!Double.IsNaN(Height))
-         {
-            result.Height = Math.Max(result.Height, Height);
-         }
-
-         return result;
-      }
-      
       return finalSize;
    }
 

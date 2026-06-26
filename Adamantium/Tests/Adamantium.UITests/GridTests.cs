@@ -463,7 +463,8 @@ namespace Adamantium.UITests
          Assert.AreEqual(150, grid.ColumnDefinitions[0].ActualWidth);
          Assert.AreEqual(4, grid.ColumnDefinitions[1].ActualWidth);
          Assert.AreEqual(50, grid.ColumnDefinitions[2].ActualWidth);
-         Assert.AreEqual(new Rect(52, 0, 100, 25), grid.Children[0].Bounds);
+         // Default Stretch anchors a fixed-size child at the START of its (spanned) slot, not centred.
+         Assert.AreEqual(new Rect(0, 0, 100, 25), grid.Children[0].Bounds);
          Assert.AreEqual(new Rect(0, 25, 150, 25), grid.Children[1].Bounds);
          Assert.AreEqual(new Rect(154, 25, 50, 25), grid.Children[2].Bounds);
 
@@ -1649,7 +1650,8 @@ namespace Adamantium.UITests
 
          g.Arrange(new Rect(0, 0, g.DesiredSize.Width, g.DesiredSize.Height));
 
-         Assert.AreEqual(new Rect(85, 0, 200, 200), child1.Bounds);
+         // Default Stretch anchors a fixed-size child at the START of its (spanned) slot, not centred.
+         Assert.AreEqual(new Rect(0, 0, 200, 200), child1.Bounds);
          Assert.AreEqual(new Rect(0, 210, 150, 200), child2.Bounds);
          Assert.AreEqual(new Rect(170, 210, 200, 200), child3.Bounds);
 
@@ -1718,7 +1720,8 @@ namespace Adamantium.UITests
 
          g.Arrange(new Rect(0, 0, g.DesiredSize.Width, g.DesiredSize.Height));
 
-         Assert.AreEqual(new Rect(95, 0, 200, 200), child1.Bounds);
+         // Default Stretch anchors a fixed-size child at the START of its (spanned) slot, not centred.
+         Assert.AreEqual(new Rect(0, 0, 200, 200), child1.Bounds);
          Assert.AreEqual(new Rect(0, 210, 150, 200), child2.Bounds);
          Assert.AreEqual(new Rect(190, 210, 200, 200), child3.Bounds);
 

@@ -14,6 +14,12 @@
         <StyleInclude Source="{x:Type fluentDark:ThumbStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ScrollBarStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ScrollViewerStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ToggleButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:CheckBoxStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:RadioButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ToggleSwitchStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:SliderStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ProgressBarStyleSet}"/>
 	</Theme.StyleIncludes>
 
 	<!-- Accent / focus: the theme's runtime-mutable identity. Referenced via {ThemeResource Key}; change any of these

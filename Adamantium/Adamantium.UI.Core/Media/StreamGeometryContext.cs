@@ -21,6 +21,12 @@ public class StreamGeometryContext : IFigureSegments
         return this;
     }
 
+    IFigureSegments IFigureSegments.CloseFigure()
+    {
+        if (figure != null) figure.IsClosed = true;
+        return this;
+    }
+
     IFigureSegments IFigureSegments.LineTo(Vector2 point, bool isStroked)
     {
         figure.Segments.Add(new LineSegment(point, isStroked));
@@ -106,7 +112,10 @@ public class StreamGeometryContext : IFigureSegments
         contours.Clear();
         foreach (var pathFigure in figures)
         {
-            var contour = new MeshContour(pathFigure.Points);
+            // Propagate the figure's open/closed state. MeshContour defaults isGeometryClosed=true, so omitting it
+            // forced EVERY figure closed - which is why an open glyph (a check mark / arc, figure.IsClosed=false from
+            // the missing 'Z') still got the phantom closing edge in its stroke and looked like a triangle.
+            var contour = new MeshContour(pathFigure.Points, pathFigure.IsClosed);
             contours.Add(contour);
         }
 

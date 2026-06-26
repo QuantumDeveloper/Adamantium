@@ -16,7 +16,7 @@ public class ThemeResource : MarkupExtension
     // Live expressions created by Apply, per target, keyed by "property@priority". Lets a setter/trigger dispose the
     // exact expression it established (Remove) without disturbing a same-property expression at another priority - e.g.
     // a template's base {ThemeResource} sitting under a hover trigger's override. Weak keys: never pins a control.
-    private static readonly ConditionalWeakTable<IFundamentalUIComponent, Dictionary<string, ThemeResourceExpression>> _applied = new();
+    private static readonly ConditionalWeakTable<IFundamentalUIComponent, Dictionary<(string Slot, object Token), ThemeResourceExpression>> _applied = new();
 
     public ThemeResource()
     {
@@ -34,13 +34,15 @@ public class ThemeResource : MarkupExtension
     /// <summary>Connects a live <see cref="ThemeResourceExpression"/> from the theme's <see cref="Key"/> property to
     /// <paramref name="propertyName"/> on <paramref name="target"/>. Used by codegen, setters and the runtime loader.</summary>
     public ThemeResourceExpression Apply(IFundamentalUIComponent target, string propertyName,
-        ValuePriority priority = ValuePriority.Template)
+        ValuePriority priority = ValuePriority.Template, object token = null)
     {
-        var expression = new ThemeResourceExpression(target, target.GetProperty(propertyName), Key, priority);
+        var expression = new ThemeResourceExpression(target, target.GetProperty(propertyName), Key, priority, token);
         expression.EstablishConnection();
 
-        var map = _applied.GetValue(target, static _ => new Dictionary<string, ThemeResourceExpression>());
-        var slot = propertyName + "@" + priority;
+        var map = _applied.GetValue(target, static _ => new Dictionary<(string, object), ThemeResourceExpression>());
+        // Keyed per token so two trigger {ThemeResource}s on the same part property (a checkbox's accent under its
+        // checked+hover accent-secondary) each keep their own live connection and stack, instead of one closing the other.
+        var slot = (propertyName + "@" + priority, token);
         if (map.TryGetValue(slot, out var previous)) previous.CloseConnection();   // defensive: re-apply on the same slot
         map[slot] = expression;
         return expression;
@@ -48,13 +50,16 @@ public class ThemeResource : MarkupExtension
 
     /// <summary>Disposes the expression a setter/trigger established (closing its theme subscription) and clears the
     /// value it pushed - so leaving a trigger or detaching a style fully undoes a <c>{ThemeResource}</c>.</summary>
-    public static void Remove(IFundamentalUIComponent target, string propertyName, ValuePriority priority)
+    public static void Remove(IFundamentalUIComponent target, string propertyName, ValuePriority priority, object token = null)
     {
         if (!_applied.TryGetValue(target, out var map)) return;
-        if (map.Remove(propertyName + "@" + priority, out var expression))
+        if (map.Remove((propertyName + "@" + priority, token), out var expression))
         {
             expression.CloseConnection();
-            target.ClearValue(propertyName, priority);
+            if (priority == ValuePriority.Trigger && token != null)
+                target.ClearTriggerValue(target.GetProperty(propertyName), token);
+            else
+                target.ClearValue(propertyName, priority);
         }
     }
 

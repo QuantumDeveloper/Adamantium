@@ -19,12 +19,24 @@
                 <ControlTemplate TargetType="ScrollBar">
                     <controls:Border Background="{TemplateBinding Background}"
                                      CornerRadius="6">
+                        <!-- The Track is pure layout now; the template supplies its parts (a grey thumb + two invisible,
+                             hit-testable page areas). -->
                         <controls:Track x:Name="PART_Track"
                                 Orientation="{TemplateBinding Orientation}"
                                 Minimum="{TemplateBinding Minimum}"
                                 Maximum="{TemplateBinding Maximum}"
                                 Value="{TemplateBinding Value}"
-                                ViewportSize="{TemplateBinding ViewportSize}"/>
+                                ViewportSize="{TemplateBinding ViewportSize}">
+                            <controls:Track.DecreaseRepeatButton>
+                                <controls:ScrollBarPageButton Focusable="false"/>
+                            </controls:Track.DecreaseRepeatButton>
+                            <controls:Track.Thumb>
+                                <controls:Thumb/>
+                            </controls:Track.Thumb>
+                            <controls:Track.IncreaseRepeatButton>
+                                <controls:ScrollBarPageButton Focusable="false"/>
+                            </controls:Track.IncreaseRepeatButton>
+                        </controls:Track>
                     </controls:Border>
                 </ControlTemplate>
             </Setter.Value>

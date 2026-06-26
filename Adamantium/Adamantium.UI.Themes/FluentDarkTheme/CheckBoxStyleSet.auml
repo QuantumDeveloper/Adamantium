@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions"
+          xmlns:controls="http://adamantium/ui">
+
+    <!-- A 20x20 box with a check glyph, then the content label. The box fills with the accent + the glyph fades in when
+         checked. Per the small-styles convention each concern is its own <Style Selector="CheckBox">. -->
+
+    <!-- Base brushes live on the control (via {ResourceReference}); the template parts bind them with {TemplateBinding}
+         (Template priority), so the IsChecked trigger (higher priority) can repaint them. Setting a part brush directly
+         with {ResourceReference} would bake it at Local priority and the trigger could never override it. -->
+    <Style Selector="CheckBox">
+        <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
+        <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="CheckBox">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <controls:StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <controls:Border x:Name="Box" 
+                                         Width="20" 
+                                         Height="20" 
+                                         CornerRadius="4"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="1"
+                                VerticalAlignment="Center">
+                            <!-- Two overlaid markers, only one ever shown: the check for IsChecked=true, a filled square
+                                 for the indeterminate IsChecked=null (three-state). A Border holds a single child, so a
+                                 Grid centres both over each other. -->
+                            <controls:Grid>
+                                <!-- Geometry normalised to start at (0,0): a Path's box is its geometry bounds, so leading
+                                     empty space (the old M4.5,10...) pushed the centred glyph down-right = the "crooked"
+                                     look. White stroke (TextFillColorPrimary) reads on the accent-filled box; the theme's
+                                     AccentForegroundColor is black, which is what made the check look wrong. -->
+                                <controls:Path x:Name="CheckGlyph"
+                                        Data="M0,4.5 L3.5,8 L10,0"
+                                        Stroke="{ResourceReference TextFillColorPrimary}"
+                                        StrokeThickness="2"
+                                        StrokeLineJoin="Round"
+                                        Opacity="0"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"/>
+                                <controls:Border x:Name="IndeterminateGlyph"
+                                        Width="10"
+                                        Height="10"
+                                        CornerRadius="2"
+                                        Background="{ResourceReference TextFillColorPrimary}"
+                                        Opacity="0"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"/>
+                            </controls:Grid>
+                        </controls:Border>
+                        <controls:ContentPresenter x:Name="PART_ContentPresenter"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                VerticalAlignment="Center"
+                                Margin="8 0 0 0"/>
+                    </controls:StackPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="CheckBox">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="Box" Property="Background" Value="{ResourceReference ControlFillColorSecondary}"/>
+            <!-- The fill tokens differ by ~2% alpha (invisible here), so the hover reads off the BORDER brightening. -->
+            <Setter TargetName="Box" Property="BorderBrush" Value="{ResourceReference TextFillColorTertiary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsChecked" Value="true">
+            <Setter TargetName="Box" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="Box" Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="CheckGlyph" Property="Opacity" Value="1"/>
+        </PropertyTrigger>
+        <!-- Indeterminate (three-state, IsChecked=null): same accent box, but the square marker instead of the check.
+             "null" parses to a null bool? (TypeCastFactory handles Nullable<T>), so the trigger matches the null state. -->
+        <PropertyTrigger Property="IsChecked" Value="null">
+            <Setter TargetName="Box" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="Box" Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="IndeterminateGlyph" Property="Opacity" Value="1"/>
+        </PropertyTrigger>
+        <!-- Checked + hover: dim the accent a notch (Fluent's checked PointerOver). Declared after IsChecked so it lands
+             ON TOP of the trigger value stack while active, overriding the gray hover and the flat accent; leaving hover
+             pops it and the accent underneath returns. Relies on the per-token trigger value stack. -->
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="IsChecked" Value="true"/>
+                <Condition Property="IsMouseOver" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="Box" Property="Background" Value="{ThemeResource AccentFillColorSecondary}"/>
+            <Setter TargetName="Box" Property="BorderBrush" Value="{ThemeResource AccentFillColorSecondary}"/>
+        </MultiTrigger>
+        <!-- Indeterminate + hover: same accent dim as checked+hover. -->
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="IsChecked" Value="null"/>
+                <Condition Property="IsMouseOver" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="Box" Property="Background" Value="{ThemeResource AccentFillColorSecondary}"/>
+            <Setter TargetName="Box" Property="BorderBrush" Value="{ThemeResource AccentFillColorSecondary}"/>
+        </MultiTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="Box" Property="Background" Value="{ResourceReference ControlFillColorDisabled}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ResourceReference TextFillColorDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

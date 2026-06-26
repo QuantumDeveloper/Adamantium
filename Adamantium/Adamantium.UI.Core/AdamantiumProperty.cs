@@ -180,6 +180,17 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
 
    private static void CheckType(Type valueType, PropertyMetadata metadata, String name)
    {
+      // Nullable<T> (e.g. ToggleButton.IsChecked is bool?): null is a legal default, and a non-null default is BOXED as
+      // its underlying T (a boxed Nullable<T> is indistinguishable from a boxed T), so validate against the underlying.
+      var underlyingType = Nullable.GetUnderlyingType(valueType);
+      if (underlyingType != null)
+      {
+         if (metadata.DefaultValue != null && !FindType(underlyingType, metadata.DefaultValue.GetType()))
+            throw new ArgumentException(
+               "Default value is not of the same type as property type for PropertyName " + name);
+         return;
+      }
+
       if (valueType.IsValueType && metadata.DefaultValue == null)
       {
          throw new ArgumentException(

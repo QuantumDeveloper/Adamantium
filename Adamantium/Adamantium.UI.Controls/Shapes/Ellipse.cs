@@ -17,7 +17,7 @@ public class Ellipse : Shape
          PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender,
          StartAngleValueCallback));
 
-   public static readonly AdamantiumProperty StopAngleProperty = AdamantiumProperty.Register(nameof(StopAngle),
+   public static readonly AdamantiumProperty SweepAngleProperty = AdamantiumProperty.Register(nameof(StopAngle),
       typeof(Double), typeof(Ellipse),
       new PropertyMetadata(360.0,
          PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender,
@@ -74,8 +74,8 @@ public class Ellipse : Shape
 
    public Double StopAngle
    {
-      get => GetValue<Double>(StopAngleProperty);
-      set => SetValue(StopAngleProperty, value);
+      get => GetValue<Double>(SweepAngleProperty);
+      set => SetValue(SweepAngleProperty, value);
    }
    
    public EllipseType EllipseType
