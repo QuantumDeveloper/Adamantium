@@ -137,6 +137,13 @@ public class DefaultAumlTransformer : IAumlTransformer
                 var typeInfo = typeContainer.Types.FirstOrDefault(x => x.Name == typeReference.Name);
                 if (typeInfo == null)
                 {
+                    // A same-assembly (generated) type used WITHOUT a clr-namespace prefix - e.g. an embedded AUML view
+                    // <ControlsView/> under the default xmlns. Such views live in the local assembly (pre-registered),
+                    // not in a framework xmlns, so fall back to a short-name lookup before failing.
+                    var local = typeResolver.ResolveByShortName(typeReference.Name);
+                    if (local != null)
+                        return CreateResolved(local, lineInfo);
+
                     diagnostics.ReportError(document.FileName, $"Type {typeReference.Name} could not be found in namespace {typeReference.Namespace}. {lineInfo}");
                     return typeReference;
                 }
@@ -196,10 +203,18 @@ public class DefaultAumlTransformer : IAumlTransformer
                 var typeInfo = typeContainer.Types.FirstOrDefault(x => x.Name == typeReference.Name);
                 if (typeInfo == null)
                 {
-                    diagnostics.ReportError(document.FileName, $"Type {typeReference.Name} could not be found in namespace {typeReference.Namespace}. {lineInfo}");
-                    return typeReference;
+                    // A same-assembly (generated) type used WITHOUT a clr-namespace prefix - e.g. a property set on an
+                    // embedded AUML view <ControlsView VerticalAlignment="Center"/> under the default xmlns. The view
+                    // lives in the local assembly (pre-registered), not in a framework xmlns, so fall back to a
+                    // short-name lookup before failing (mirrors ProcessTypeReference).
+                    typeInfo = typeResolver.ResolveByShortName(typeReference.Name);
+                    if (typeInfo == null)
+                    {
+                        diagnostics.ReportError(document.FileName, $"Type {typeReference.Name} could not be found in namespace {typeReference.Namespace}. {lineInfo}");
+                        return typeReference;
+                    }
                 }
-                
+
                 var propertyInfo = typeInfo.GetAllProperties().FirstOrDefault(x=>x.Name == propertyReference.Name);
 
                 if (propertyInfo == null)
@@ -464,5 +479,87 @@ public class DefaultAumlTransformer : IAumlTransformer
         container.HasSemanticErrors = diagnostics.HasErrors;
 
         return container;
+    }
+
+    /// <summary>
+    /// Pre-registers a control document (Window/View/Page/UIApplication) as a generated type, so a document that EMBEDS
+    /// another - e.g. <c>&lt;local:ControlsView/&gt;</c> - can resolve it during its own transform, regardless of file
+    /// processing order (and so a view-inside-a-view works too). Resolves only the ROOT type (a real framework type,
+    /// always present in the compilation), computes the generated class name + namespace exactly as the source generator
+    /// will, and registers a <see cref="MetadataResolvedType"/>. Non-control roots (resources/styles/themes are never
+    /// embedded) are a no-op. Must run for ALL documents before any body is transformed.
+    /// </summary>
+    public IResolvedType PreRegisterDocument(AumlDocument document, ITypeResolver typeResolver)
+    {
+        typeResolver.ScanXmlnsAttributes();
+        foreach (var mapping in document.NamespaceMappings)
+        {
+            if (!mapping.IsClrNamespace) continue;
+            if (string.IsNullOrEmpty(mapping.Assembly))
+                typeResolver.FindAssemblyByNamespace(mapping.Namespace);
+            else
+                typeResolver.ResolveAssembly(mapping.Assembly);
+        }
+
+        var rootRef = document.Root?.TypeReference;
+        if (rootRef == null) return null;
+
+        var resolvedRoot = ResolveRootReference(rootRef, typeResolver);
+        if (resolvedRoot == null) return null;
+
+        var rootType = typeResolver.Resolve(resolvedRoot.GetFullTypeName());
+        if (rootType is not { EntityType: EntityType.Window or EntityType.View or EntityType.Page or EntityType.UIApplication })
+            return null;
+
+        // Reuse the resolved root reference in the full Transform (which short-circuits on IsResolved) and as the
+        // registered type's BaseType chain (MetadataResolvedType.BaseType reads RootNode's type reference).
+        document.Root.TypeReference = resolvedRoot;
+
+        var className = Path.GetFileNameWithoutExtension(document.RelativeFilePath);
+        var container = new AumlMetadataContainer(typeResolver)
+        {
+            RelativeFilePath = document.RelativeFilePath,
+            AssemblyName = document.RootNamespace,
+            RootNode = document.Root,
+            RootEntityType = rootType.EntityType,
+            ClassName = className,
+            Namespace = AumlNaming.ComputeNamespace(document.RelativeFilePath, document.RootNamespace, document.Root, className),
+        };
+
+        var resolvedType = new MetadataResolvedType(container);
+        typeResolver.RegisterGeneratedType(resolvedType);
+        return resolvedType;
+    }
+
+    // Resolves the document ROOT element's type reference (Window/View/...) to a concrete type. The root is always a
+    // real framework type, so it resolves against the compilation even in the lightweight pre-registration pass.
+    private IAumlAstTypeReference ResolveRootReference(IAumlAstTypeReference rootRef, ITypeResolver typeResolver)
+    {
+        if (rootRef.IsResolved) return rootRef;
+
+        IResolvedType type;
+        if (rootRef.IsXmlNamespaceDeclaration && !string.IsNullOrEmpty(rootRef.Namespace))
+        {
+            type = typeResolver.GetResolvedAssemblyByXmlDefinition(rootRef.Namespace)
+                ?.Types.FirstOrDefault(x => x.Name == rootRef.Name);
+        }
+        else if (string.IsNullOrEmpty(rootRef.Namespace))
+        {
+            type = typeResolver.ResolveByShortName(rootRef.Name);
+        }
+        else
+        {
+            type = typeResolver.FindAssemblyByNamespace(rootRef.Namespace)
+                ?.Types.FirstOrDefault(x => x.FullName == rootRef.GetFullTypeName());
+        }
+
+        if (type == null) return null;
+
+        return new AumlAstResolvedTypeReference(
+            rootRef.GetLineInfo(),
+            type.Namespace,
+            type.Name,
+            type.AssemblyName,
+            type.InheritsFromMarkupExtension(AumlParser.MarupExtensionClassFullName));
     }
 }

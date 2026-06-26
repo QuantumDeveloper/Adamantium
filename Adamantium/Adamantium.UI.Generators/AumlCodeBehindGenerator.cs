@@ -73,6 +73,22 @@ namespace Adamantium.UI.Generators
                     metadata.Add(aumlDoc);
                 }
 
+                // Phase 1.5 - pre-register every control document (Window/View/Page) as a generated type BEFORE any body
+                // is transformed, so cross-document references (e.g. <local:ControlsView/>) resolve regardless of file
+                // processing order, including a view embedded inside another view.
+                foreach (var aumlDoc in metadata)
+                {
+                    try
+                    {
+                        transformer.PreRegisterDocument(aumlDoc, typeResolver);
+                    }
+                    catch
+                    {
+                        // A malformed document surfaces its real error during the Phase 2 transform below; pre-registration
+                        // is best-effort and must never abort the whole generation.
+                    }
+                }
+
                 // Phase 2 - metadata transform and code generation based on sorted metadata
                 var sortedMetadata = metadata.OrderBy(meta => GetGenerationPriority(meta.Root));
 
