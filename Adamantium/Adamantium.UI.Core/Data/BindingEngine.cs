@@ -27,6 +27,26 @@ public static class BindingEngine
         BindingBase bindingBase)
         => SetBinding(target, target.GetProperty(targetProperty), bindingBase);
 
+    /// <summary>Registers an already-constructed expression (built by a template) so it is refreshed when the target's
+    /// DataContext changes - a DataTemplate's {Binding}s are created before the container's DataContext exists, so they
+    /// must re-resolve once it arrives - then establishes it. Producer/target-less expressions are just established.
+    /// </summary>
+    public static void Register(BindingExpressionBase expression)
+    {
+        if (expression == null) return;
+        if (expression.Target == null || expression.TargetProperty == null)
+        {
+            expression.EstablishConnection();
+            return;
+        }
+
+        var map = _bindings.GetValue(expression.Target, static _ => new Dictionary<AdamantiumProperty, BindingExpressionBase>());
+        if (map.TryGetValue(expression.TargetProperty, out var existing) && !ReferenceEquals(existing, expression))
+            existing.CloseConnection();
+        map[expression.TargetProperty] = expression;
+        expression.EstablishConnection();
+    }
+
     /// <summary>The live binding on a target property, or null.</summary>
     public static BindingExpressionBase GetBindingExpression(IFundamentalUIComponent target, AdamantiumProperty targetProperty)
         => _bindings.TryGetValue(target, out var map) && map.TryGetValue(targetProperty, out var e) ? e : null;
