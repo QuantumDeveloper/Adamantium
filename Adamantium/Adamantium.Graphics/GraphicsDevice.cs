@@ -793,17 +793,61 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         queue.Clear();
     }
 
+    /// <summary>Why the last <see cref="BeginDraw"/> returned false (a Vulkan device/surface error). Surfaced so a
+    /// caller that only sees the bool (e.g. the designer's headless render) can report the real reason, not "render failed".</summary>
+    public string LastFrameError { get; private set; }
+
+    // The factual error code (e.g. ErrorDeviceLost) is only the SYMPTOM; the validation layers carry the real cause.
+    // Append whatever they reported so the report isn't a guess. Empty (with a hint) when validation is off.
+    private static string DescribeRecentValidation()
+    {
+        var messages = Adamantium.Graphics.Core.VulkanInstance.RecentValidationMessages;
+        if (messages.Count == 0)
+            return " (no validation messages captured — run with graphics debug enabled to get the real cause)";
+        return "\nValidation layer messages leading up to it:\n  - " + string.Join("\n  - ", messages);
+    }
+
+    // After a device-lost, VK_EXT_device_fault returns the driver's REAL fault description (and how many faulting
+    // address regions / vendor records there are) - the diagnostic that works without validation layers. Best-effort:
+    // only when the extension was enabled, and never throws back into the caller.
+    private string DescribeDeviceFault()
+    {
+        try
+        {
+            if (MainDevice is not { DeviceFaultSupported: true }) return string.Empty;
+            if (LogicalDevice.GetDeviceFaultInfoEXT(out var fault) != Result.Success || fault == null) return string.Empty;
+
+            var sb = new System.Text.StringBuilder($"\nGPU device fault (VK_EXT_device_fault): \"{fault.Description}\"");
+            var addresses = fault.PAddressInfos.Span;
+            for (var i = 0; i < addresses.Length; i++)
+            {
+                var a = addresses[i];
+                sb.Append($"\n  - {a.AddressType}: address 0x{(ulong)a.ReportedAddress:X} (precision 0x{(ulong)a.AddressPrecision:X})");
+            }
+            var vendors = fault.PVendorInfos.Span;
+            for (var i = 0; i < vendors.Length; i++)
+            {
+                var v = vendors[i];
+                sb.Append($"\n  - vendor \"{v.Description}\": code=0x{v.VendorFaultCode:X} data=0x{v.VendorFaultData:X}");
+            }
+            return sb.ToString();
+        }
+        catch { return string.Empty; }
+    }
+
     public bool BeginDraw(float depth = 1.0f, uint stencil = 0, Action<CommandBuffer> beforeRenderPass = null)
     {
         CanPresent = false;
+        LastFrameError = null;
         var renderFence = InFlightFences[CurrentFrame];
         var result = LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
-        
+
         DisposeDeferredObjects(CurrentFrame);
 
         if (result != Result.Success && result != Result.Timeout)
         {
             Log.Logger.Information($"Wait for fences result: {result}");
+            LastFrameError = $"WaitForFences returned {result}{DescribeDeviceFault()}{DescribeRecentValidation()}";
             return false;
         }
 
@@ -811,6 +855,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         {
             if (!Presenter.AcquireNextImage(null, ImageAvailableSemaphores[CurrentFrame]))
             {
+                LastFrameError = $"swapchain AcquireNextImage failed{DescribeRecentValidation()}";
                 return false;
             }
         }

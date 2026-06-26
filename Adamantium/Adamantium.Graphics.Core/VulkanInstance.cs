@@ -120,8 +120,15 @@ namespace Adamantium.Graphics.Core
 
             if (IsInDebugMode)
             {
-                createInfo.EnabledLayerCount = (uint)ValidationLayers.Count;
-                createInfo.PEnabledLayerNames = ValidationLayers.ToArray();
+                // Only enable validation layers that are actually installed - asking for a missing layer makes
+                // Instance.Create fail outright, which would take down the whole (e.g. designer) host instead of just
+                // running without validation.
+                var available = new HashSet<string>(layersAvailable.Select(x => x.LayerName));
+                var enabledLayers = ValidationLayers.Where(available.Contains).ToArray();
+                createInfo.EnabledLayerCount = (uint)enabledLayers.Length;
+                createInfo.PEnabledLayerNames = enabledLayers;
+                if (enabledLayers.Length == 0)
+                    Console.Error.WriteLine("[vk] graphics debug requested but no validation layers are installed (Vulkan SDK?) - running without them");
             }
 
             VkInstance = Instance.Create(createInfo);
@@ -234,11 +241,34 @@ namespace Adamantium.Graphics.Core
             func.Invoke(VkInstance, debugMessenger, null);
         }
 
+        // The most recent validation/error/warning messages from the layers, kept so a later failure (e.g. a
+        // device-lost surfacing only as ErrorDeviceLost at the next WaitForFences) can report the REAL Vulkan cause
+        // instead of a guess. Bounded ring buffer; thread-safe (the callback fires on arbitrary threads).
+        private static readonly System.Collections.Concurrent.ConcurrentQueue<string> _recentValidation = new();
+
+        /// <summary>A snapshot of the recent validation-layer error/warning messages (empty when validation is off).</summary>
+        public static IReadOnlyList<string> RecentValidationMessages => _recentValidation.ToArray();
+
         [UnmanagedCallersOnly]
         private static VkBool32 DebugCallback(DebugUtilsMessageSeverityFlagBitsEXT messageSeverity, DebugUtilsMessageTypeFlagBitsEXT messageTypes, VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData)
         {
-            var data = *pCallbackData;
-            Log.Logger.Debug(new string(data.pMessage));
+            try
+            {
+                var message = new string((*pCallbackData).pMessage);
+                Log.Logger.Debug(message);
+
+                // Errors/warnings are the actionable ones: echo them to the console (the designer host redirects it into
+                // its per-PID log) and remember them so a follow-up device error can quote the real validation message.
+                var isError = (messageSeverity & DebugUtilsMessageSeverityFlagBitsEXT.ErrorBitExt) != 0;
+                var isWarning = (messageSeverity & DebugUtilsMessageSeverityFlagBitsEXT.WarningBitExt) != 0;
+                if (isError || isWarning)
+                {
+                    Console.Error.WriteLine($"[vk-{(isError ? "error" : "warn")}] {message}");
+                    _recentValidation.Enqueue(message);
+                    while (_recentValidation.Count > 30) _recentValidation.TryDequeue(out _);
+                }
+            }
+            catch { /* a diagnostic callback must never throw back into the driver */ }
             return 0;
         }
 

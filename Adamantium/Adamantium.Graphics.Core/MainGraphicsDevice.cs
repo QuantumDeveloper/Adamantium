@@ -27,6 +27,9 @@ namespace Adamantium.Graphics.Core
         public uint BuffersCount { get; }
 
         public bool EnableDynamicRendering { get; }
+
+        /// <summary>True when VK_EXT_device_fault was enabled, so a device-lost can be queried for its real cause.</summary>
+        public bool DeviceFaultSupported { get; private set; }
         public VulkanInstance VulkanInstance { get; private set; }
 
         public GraphicsAdapter GraphicsAdapter { get; private set; }
@@ -86,6 +89,9 @@ namespace Adamantium.Graphics.Core
                 Constants.VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME,
                 Constants.VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
                 Constants.VK_KHR_EXTERNAL_SEMAPHORE_FD_EXTENSION_NAME,
+                // After a device-lost (VK_ERROR_DEVICE_LOST), lets us query the REAL GPU fault (description + faulting
+                // address regions) instead of guessing - the diagnostic for the designer's render-time device loss.
+                Constants.VK_EXT_DEVICE_FAULT_EXTENSION_NAME,
             });
         }
 
@@ -290,6 +296,15 @@ namespace Adamantium.Graphics.Core
             else
             {
                 descriptorBufferFeature.PNext = heapFeatures;
+            }
+
+            // VK_EXT_device_fault: turn on deviceFault so a later device-lost can be interrogated for its real cause.
+            // heapFeatures is the current tail of the feature chain; extend it.
+            if (finalDeviceExtensions.Contains(Constants.VK_EXT_DEVICE_FAULT_EXTENSION_NAME))
+            {
+                var faultFeatures = new PhysicalDeviceFaultFeaturesEXT { DeviceFault = true };
+                heapFeatures.PNext = faultFeatures;
+                DeviceFaultSupported = true;
             }
 
             deviceFeatures2.Features.SamplerAnisotropy = true;

@@ -17,6 +17,9 @@ public interface IDrawableDevice
 {
     bool BeginDraw(float depth = 1.0f, uint stencil = 0, Action<CommandBuffer> beforeRenderPass = null);
 
+    /// <summary>Why the last <see cref="BeginDraw"/> returned false (a device/surface error), else null.</summary>
+    string LastFrameError { get; }
+
     void BeginRendering(CommandBuffer commandBuffer, bool continueRendering = false, float depth = 1.0f, uint stencil = 0);
     
     void EndDraw();

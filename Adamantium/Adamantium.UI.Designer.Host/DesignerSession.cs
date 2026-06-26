@@ -88,8 +88,14 @@ public sealed class DesignerSession : IDisposable
         _gameService = new GameService();
         _app.Container.RegisterInstance<IGameService>(_gameService);
 
-        // Headless: nothing opens a window, so trigger device creation explicitly.
-        _app.Container.Resolve<IGraphicsDeviceService>().CreateMainDevice("Designer");
+        // Headless: nothing opens a window, so trigger device creation explicitly. Vulkan validation is OPT-IN via
+        // ADAMANTIUM_DESIGNER_GRAPHICS_DEBUG=1: when on, the layers report the REAL cause behind a device-lost (bad
+        // descriptor/resource/sync) into the host log + error badge. It is OFF by default because on the dev NVIDIA
+        // driver the validation layer's interception of vkCreateShadersEXT (shader objects) DETERMINISTICALLY
+        // access-violates, which would crash the host before any render - so forcing it on makes the designer useless.
+        var deviceService = _app.Container.Resolve<IGraphicsDeviceService>();
+        deviceService.IsInDebugMode = Environment.GetEnvironmentVariable("ADAMANTIUM_DESIGNER_GRAPHICS_DEBUG") == "1";
+        deviceService.CreateMainDevice("Designer");
 
         // Same as UIApplication.LoadThemes() (skipped because we never call Run()): without a theme the controls
         // have no templates/brushes and render nothing.
