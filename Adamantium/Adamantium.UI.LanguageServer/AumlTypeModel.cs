@@ -1,5 +1,6 @@
 using Adamantium.UI.Markup.CodeGeneration;
 using Adamantium.UI.Markup.CodeGeneration.Roslyn;
+using Adamantium.UI.Markup.Parsers;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -17,6 +18,9 @@ public sealed class AumlTypeModel
 {
     private readonly ITypeResolver _resolver;
     private readonly Dictionary<string, IReadOnlyList<IResolvedType>> _clrNamespaceCache = new(StringComparer.Ordinal);
+    // The project's own AUML views (<View>/<Window> roots), pre-registered from the .auml files so they're recognised
+    // and complete like framework controls even though the source generator hasn't emitted their classes.
+    private readonly List<IResolvedType> _localViews = new();
 
     private AumlTypeModel(ITypeResolver resolver, Compilation compilation)
     {
@@ -87,9 +91,45 @@ public sealed class AumlTypeModel
             return GetClrNamespaceTypes(xmlns, clrNamespace, assemblyName);
 
         var assembly = _resolver.GetResolvedAssemblyByXmlDefinition(xmlns);
-        return assembly is null
-            ? []
-            : assembly.Types.Where(IsMarkupType).ToList();
+        var framework = assembly is null
+            ? Enumerable.Empty<IResolvedType>()
+            : assembly.Types.Where(IsMarkupType);
+
+        // The project's own AUML views are usable unprefixed alongside the framework controls (the default xmlns), so
+        // surface them under an [XmlnsDefinition] namespace too - recognition + property completion for <ControlsView/>.
+        return _localViews.Count == 0
+            ? framework.ToList()
+            : framework.Concat(_localViews).ToList();
+    }
+
+    /// <summary>
+    /// Registers the project's own AUML views (<c>&lt;View&gt;</c>/<c>&lt;Window&gt;</c>/... roots) as types, so an
+    /// embedded view (<c>&lt;ControlsView/&gt;</c>) is recognised and its inherited properties complete - mirroring the
+    /// source generator's pre-registration. Parsed straight from the .auml files, so it works with no build.
+    /// </summary>
+    public void RegisterViews(IEnumerable<string> aumlFiles, string rootNamespace, string projectDir)
+    {
+        var transformer = new DefaultAumlTransformer();
+        foreach (var file in aumlFiles)
+        {
+            string content;
+            try { content = File.ReadAllText(file); } catch { continue; }
+
+            var document = AumlParser.Parse(content);
+            if (document.HasErrors) continue;
+
+            document.RelativeFilePath = file.Length > projectDir.Length
+                ? file.Substring(projectDir.Length).TrimStart('\\', '/').Replace('\\', '/')
+                : Path.GetFileName(file);
+            document.RootNamespace = rootNamespace;
+
+            try
+            {
+                if (transformer.PreRegisterDocument(document, _resolver) is { } view)
+                    _localViews.Add(view);
+            }
+            catch { /* a malformed view is simply not offered; its own diagnostics surface the real error */ }
+        }
     }
 
     // Compiler-generated types (<Module>, <>c, <PrivateImplementationDetails>, <>z__ReadOnlyArray, …) are never
@@ -193,6 +233,25 @@ public sealed class AumlTypeModel
 
     public IResolvedType? GetPropertyType(IResolvedType element, string propertyName) =>
         GetProperties(element).FirstOrDefault(p => p.Name == propertyName)?.Type;
+
+    private const string ThemeTypeFullName = "Adamantium.UI.Core.Resources.Theme";
+
+    /// <summary>
+    /// The keys completable in <c>{ThemeResource Key}</c>: the <c>Brush</c>-typed properties of the framework
+    /// <see cref="ThemeTypeFullName">Theme</see> class (the theme's runtime-mutable brushes - AccentFillColorDefault,
+    /// FocusStrokeColorOuter, ...). These are NOT the static <c>{ResourceReference}</c> brushes, which live in a
+    /// ResourceDictionary - hence offering the Theme's own brushes here instead of an arbitrary colour list.
+    /// </summary>
+    public IReadOnlyList<string> GetThemeBrushKeys()
+    {
+        var theme = _resolver.Resolve(ThemeTypeFullName);
+        if (theme is null) return [];
+        return GetProperties(theme)
+            .Where(p => p.Type?.Name is "Brush" or "IBrush")
+            .Select(p => p.Name)
+            .OrderBy(n => n, StringComparer.Ordinal)
+            .ToList();
+    }
 
     /// <summary>
     /// Readable properties for binding-path completion (<c>{Binding ...}</c> against an <c>x:ViewModel</c>): every

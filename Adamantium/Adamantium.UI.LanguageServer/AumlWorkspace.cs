@@ -55,6 +55,19 @@ public sealed class AumlWorkspace : IDisposable
             // types/properties anywhere in the engine show up on save without a build; the rest stay as dlls.
             var (compilation, repoRoot, xmlnsMappings) = SourceProjectGraph.Build(project, binDir, _syntaxCache, _metadataCache);
             var model = AumlTypeModel.FromCompilation(compilation, xmlnsMappings);
+
+            // Pre-register the project's own AUML views so an embedded <ControlsView/> is recognised and its inherited
+            // properties complete - the source generator does the same when it builds. Parsed from the .auml files
+            // directly (obj/bin copies excluded), so it needs no build.
+            var projectDir = Path.GetDirectoryName(project);
+            if (projectDir is not null)
+            {
+                var aumlFiles = Directory.EnumerateFiles(projectDir, "*.auml", SearchOption.AllDirectories)
+                    .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
+                             && !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}"));
+                model.RegisterViews(aumlFiles, compilation.AssemblyName, projectDir);
+            }
+
             _byProject[project] = model;
             WatchBin(project, binDir);
             WatchSources(project, repoRoot);
