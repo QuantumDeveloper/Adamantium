@@ -23,6 +23,7 @@
 
     <ItemGroup>
         <InternalsVisibleTo Include="Adamantium.UI" />
+        <InternalsVisibleTo Include="Adamantium.UITests" />
     </ItemGroup>
 
 </Project>
