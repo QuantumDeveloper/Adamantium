@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions"
+          xmlns:controls="http://adamantium/ui">
+
+    <!-- A pill track with a thumb that slides from the off (left) to the on (right) position. The IsChecked trigger
+         paints the accent and re-anchors the thumb (HorizontalAlignment Left->Right inside the track's Grid). Per the
+         small-styles convention each concern is its own <Style Selector="ToggleSwitch">. -->
+
+    <!-- Base brushes on the control, bound onto the track with {TemplateBinding} so the IsChecked trigger can repaint it
+         (a {ResourceReference} straight on the part would bake at Local priority and block the trigger). -->
+    <Style Selector="ToggleSwitch">
+        <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
+        <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="ToggleSwitch">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleSwitch">
+                    <controls:StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <controls:Border x:Name="SwitchTrack"
+                                         Width="40"
+                                         Height="20"
+                                         CornerRadius="10"
+                                         Background="{TemplateBinding Background}"
+                                         BorderBrush="{TemplateBinding BorderBrush}"
+                                         BorderThickness="1"
+                                         VerticalAlignment="Center">
+                            <controls:Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                                <controls:Ellipse x:Name="SwitchThumb"
+                                                  Width="12" Height="12"
+                                                  Fill="{ResourceReference TextFillColorPrimary}"
+                                                  HorizontalAlignment="Left"
+                                                  VerticalAlignment="Center"
+                                                  Margin="4 0 0 0"/>
+                            </controls:Grid>
+                        </controls:Border>
+                        <controls:ContentPresenter x:Name="PART_ContentPresenter"
+                                                   Content="{TemplateBinding Content}"
+                                                   ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                   Foreground="{TemplateBinding Foreground}"
+                                                   FontSize="{TemplateBinding FontSize}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="10 0 0 0"/>
+                    </controls:StackPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="ToggleSwitch">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="SwitchTrack" Property="Background"
+                    Value="{ResourceReference ControlFillColorSecondary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsChecked" Value="true">
+            <Setter TargetName="SwitchTrack" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="SwitchThumb" Property="Fill" Value="{ThemeResource AccentForegroundColor}"/>
+            <Setter TargetName="SwitchThumb" Property="HorizontalAlignment" Value="Right"/>
+            <Setter TargetName="SwitchThumb" Property="Margin" Value="0 0 4 0"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="SwitchTrack" Property="Background"
+                    Value="{ResourceReference ControlFillColorDisabled}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground"
+                    Value="{ResourceReference TextFillColorDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

@@ -23,4 +23,9 @@ public interface IFigureSegments
     IFigureSegments BSplineTo(IEnumerable<Vector2> points, bool isStroked = true);
       
     IFigureSegments NurbsTo(IEnumerable<Vector2> points, bool isUniform, bool useCustomDegree, int degree, bool isStroked = true);
+
+    /// <summary>Marks the current figure CLOSED (the SVG/XAML 'Z' command): its outline connects the last point back to
+    /// the start. Without it a figure stays OPEN - a stroke is a polyline with end caps, not a ring - so "M..L..L" with
+    /// no Z renders as a check mark / arc, not a filled-style triangle.</summary>
+    IFigureSegments CloseFigure();
 }

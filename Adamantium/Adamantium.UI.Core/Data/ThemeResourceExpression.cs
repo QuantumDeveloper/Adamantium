@@ -12,16 +12,18 @@ public class ThemeResourceExpression : BindingExpressionBase
 {
     private readonly string _key;
     private readonly ValuePriority _priority;
+    private readonly object _token;
     private AdamantiumComponent _theme;
     private AdamantiumProperty _sourceProperty;
 
     public ThemeResourceExpression(IFundamentalUIComponent target, AdamantiumProperty targetProperty, string key,
-        ValuePriority priority = ValuePriority.Template)
+        ValuePriority priority = ValuePriority.Template, object token = null)
     {
         Target = target;
         TargetProperty = targetProperty;
         _key = key;
         _priority = priority;
+        _token = token;
     }
 
     public override void EstablishConnection()
@@ -42,7 +44,13 @@ public class ThemeResourceExpression : BindingExpressionBase
     {
         if (_theme == null || _sourceProperty == null || TargetProperty == null) return;
         var value = _theme.GetValue(_sourceProperty);
-        if (value != null) Target.SetValue(TargetProperty, value, _priority);
+        if (value == null) return;
+        // A trigger {ThemeResource} pushes onto the per-token trigger stack (so it coexists with other triggers on the
+        // same property); a base/template one writes its priority slot directly.
+        if (_priority == ValuePriority.Trigger && _token != null)
+            Target.SetTriggerValue(TargetProperty, value, _token);
+        else
+            Target.SetValue(TargetProperty, value, _priority);
     }
 
     public override void CloseConnection()

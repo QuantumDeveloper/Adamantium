@@ -71,7 +71,12 @@ public class ScrollControlsTests
     private static Track ArrangedTrack(Orientation o, double min, double max, double value, double viewport,
         double width, double height)
     {
-        var track = new Track { Orientation = o, Minimum = min, Maximum = max, ViewportSize = viewport, Value = value };
+        // The Track is template-driven now: parts come from the consuming template, so provide a thumb the way a
+        // template would (a bare one - DesiredSize 0,0 - so slider-mode sizing clamps to MinThumbLength, as before).
+        var track = new Track
+        {
+            Orientation = o, Minimum = min, Maximum = max, ViewportSize = viewport, Value = value, Thumb = new Thumb()
+        };
         track.Measure(new Size(width, height));
         track.Arrange(new Rect(0, 0, width, height));
         return track;

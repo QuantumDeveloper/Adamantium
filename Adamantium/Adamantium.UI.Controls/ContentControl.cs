@@ -203,13 +203,6 @@ public class ContentControl : Control, IContentControl
 
    protected override Size ArrangeOverride(Size finalSize)
    {
-      // var visual = VisualChildrenCollection.FirstOrDefault();
-      // if (visual is IMeasurableComponent child)
-      // {
-      //    child.Arrange(new Rect(finalSize));
-      //    return child.Bounds.Size;
-      // }
-      
       foreach (var visual in VisualChildren)
       {
          var child = (IMeasurableComponent)visual;
@@ -235,7 +228,25 @@ public class ContentControl : Control, IContentControl
 
       return finalSize;
    }
-   
+
+   /// <summary>Arranges the template/content at its own desired (content) size instead of filling the slot, and reports
+   /// that size. For a control whose visual can't grow - a CheckBox's box+glyph+label, a RadioButton's ring+label - this
+   /// keeps ActualWidth/RenderSize/ClipRectangle equal to what is actually drawn, and the template's own centring then
+   /// anchors to that real box, not to the whole slot. The base ArrangeOverride fills the slot, which is correct only
+   /// for a control whose chrome stretches to match (a Button: its visible border == its size).</summary>
+   protected Size ArrangeContentSize(Size finalSize)
+   {
+      foreach (var visual in VisualChildren)
+      {
+         if (visual is not IMeasurableComponent child) continue;
+         var size = new Size(Math.Min(child.DesiredSize.Width, finalSize.Width),
+                             Math.Min(child.DesiredSize.Height, finalSize.Height));
+         child.Arrange(new Rect(size));
+         return size;
+      }
+      return finalSize;
+   }
+
    protected static Rect CalculateChildArrangeRect(
       Size parentFinalSize,
       Size childDesiredSize,
@@ -247,8 +258,6 @@ public class ContentControl : Control, IContentControl
       double width = childDesiredSize.Width;
       double height = childDesiredSize.Height;
         
-      // --- Горизонтальное позиционирование ---
-      // (здесь может быть более сложная логика с Margin из вашего ArrangeCore)
       if (horizontalAlignment == HorizontalAlignment.Center)
       {
          x = (parentFinalSize.Width - childDesiredSize.Width) / 2;
@@ -262,7 +271,6 @@ public class ContentControl : Control, IContentControl
          width = parentFinalSize.Width;
       }
 
-      // --- Вертикальное позиционирование ---
       if (verticalAlignment == VerticalAlignment.Center)
       {
          y = (parentFinalSize.Height - childDesiredSize.Height) / 2;
@@ -278,7 +286,6 @@ public class ContentControl : Control, IContentControl
 
       return new Rect(x, y, width, height);
    }
-
 
    void IContainer.AddOrSetChildComponent(object component)
    {

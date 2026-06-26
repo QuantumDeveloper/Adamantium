@@ -15,9 +15,10 @@ public class RunAnimationAction : ITriggerAction
 
     public void Invoke(ITriggerExecutionContext context)
     {
-        if (Animation == null)
-            return;
-        if (context.FindTarget(TargetName) is AnimatableUIComponent target)
-            Animation.Apply(target);
+        if (Animation == null) return;
+
+        var target = context.FindTarget(TargetName);
+        if (target is AnimatableUIComponent animTarget)
+            Animation.Apply(animTarget);
     }
 }

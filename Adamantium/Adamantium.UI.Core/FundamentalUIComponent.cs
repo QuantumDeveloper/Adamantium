@@ -53,17 +53,17 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         var o = adamantiumAdamantiumComponent as FundamentalUIComponent;
         if (o == null) return;
 
-        if (e.OldValue != null)
+        if (e.OldValue is Classes oldClasses)
         {
-            var classes = (Classes)e.NewValue;
-            classes.CollectionChanged -= o.ClassesCollectionChanged;
+            oldClasses.CollectionChanged -= o.ClassesCollectionChanged;
         }
 
-        if (e.NewValue != null)
+        if (e.NewValue is Classes newClasses)
         {
-            var classes = (Classes)e.NewValue;
-            classes.CollectionChanged += o.ClassesCollectionChanged;
+            newClasses.CollectionChanged += o.ClassesCollectionChanged;
         }
+
+        o.SyncClassNames();
     }
 
     public FundamentalUIComponent()
@@ -124,7 +124,23 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
 
     private void ClassesCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
     {
-        
+        SyncClassNames();
+    }
+
+    // The settable Classes property (markup/binding) carries the author's intent; ClassNames is the collection selectors
+    // read (Selector.Match). Mirror one into the other so a class set in markup - e.g. <ProgressBar Classes="Ring"/> -
+    // actually activates the ".Ring" styles. Without this the two collections drift and class selectors never match.
+    private void SyncClassNames()
+    {
+        // The default-value callback can fire from the base ctor before our ctor initialises ClassNames; the default
+        // Classes set is empty, so there is nothing to mirror yet.
+        if (ClassNames == null) return;
+
+        ClassNames.Clear();
+        foreach (var name in Classes)
+        {
+            ClassNames.Add(name);
+        }
     }
     
     public Boolean AllowDrop

@@ -20,12 +20,16 @@ public class TemplateBindingExpression : BindingExpressionBase
         Mode = templateBinding.Mode;
     }
 
-    public TemplateBindingExpression(IFundamentalUIComponent source, IFundamentalUIComponent target, string sourceProperty, TemplateBinding templateBinding) : this(templateBinding)
+    public TemplateBindingExpression(IFundamentalUIComponent source, IFundamentalUIComponent target, string targetProperty, TemplateBinding templateBinding) : this(templateBinding)
     {
-        SourceProperty = source?.GetProperty(sourceProperty);
-        SourcePropertyName = sourceProperty;
+        // {TemplateBinding Path} on a part's property: read Path from the templated parent (source) and write the part's
+        // declared property (targetProperty). The generator passes propRef.Name (the part attribute) as targetProperty
+        // and the markup arg as Path - so source resolves from Path, target from targetProperty. These differ for a
+        // cross-name binding (e.g. ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}").
+        SourceProperty = source?.GetProperty(TemplateBinding.Path);
+        SourcePropertyName = TemplateBinding.Path;
         Target = target;
-        TargetProperty = target.GetProperty(TemplateBinding.Path);
+        TargetProperty = target.GetProperty(targetProperty);
     }
 
     private void OnSourcePropertyChanged(object sender, AdamantiumPropertyChangedEventArgs e)

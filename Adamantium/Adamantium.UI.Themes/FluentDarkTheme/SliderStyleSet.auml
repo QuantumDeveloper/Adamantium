@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions"
+          xmlns:controls="http://adamantium/ui">
+
+    <!-- A thin rail with a draggable thumb. The Track (reused from the scrollbar) owns thumb sizing/positioning and
+         pixel-to-value mapping (ViewportSize=0 -> a fixed-size handle); this style is just the rail + the Track.
+         Per the small-styles convention each concern is its own <Style Selector="Slider">. -->
+
+    <Style Selector="Slider">
+        <Setter Property="MinHeight" Value="24"/>
+        <Setter Property="MinWidth" Value="120"/>
+    </Style>
+
+    <Style Selector="Slider">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Slider">
+                    <controls:Grid>
+                        <controls:Border x:Name="Rail" Height="4" CornerRadius="2"
+                                Background="{ResourceReference ControlFillColorTertiary}"
+                                VerticalAlignment="Center"/>
+                        <!-- The accent fill (start..thumb). The control sets its Width on every Value change (like the
+                             ProgressBar fill) so it recomputes live - a part sized only by the Track's arrange does not
+                             repaint on a width change. -->
+                        <controls:Border x:Name="PART_SelectionRange" Height="4" CornerRadius="2"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                HorizontalAlignment="Left" VerticalAlignment="Center" Width="0"/>
+                        <controls:Track x:Name="PART_Track"
+                                Orientation="{TemplateBinding Orientation}"
+                                Minimum="{TemplateBinding Minimum}"
+                                Maximum="{TemplateBinding Maximum}"
+                                Value="{TemplateBinding Value}"
+                                ViewportSize="0">
+                            <!-- Both page areas are invisible + hit-testable (click the trough to page); the visible
+                                 accent is PART_SelectionRange above. -->
+                            <controls:Track.DecreaseRepeatButton>
+                                <controls:ScrollBarPageButton Focusable="false"/>
+                            </controls:Track.DecreaseRepeatButton>
+                            <!-- The handle: a 20px accent circle. Its Width/Height drive the Track's slider-mode sizing
+                                 (centred across the rail); the inline template overrides the shared grey Thumb style at
+                                 Local priority. -->
+                            <controls:Track.Thumb>
+                                <controls:Thumb Width="20" Height="20">
+                                    <controls:Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <controls:Border CornerRadius="10"
+                                                    Background="{ThemeResource AccentFillColorDefault}"/>
+                                        </ControlTemplate>
+                                    </controls:Thumb.Template>
+                                </controls:Thumb>
+                            </controls:Track.Thumb>
+                            <!-- Increase side stays empty so the grey rail shows through past the thumb. -->
+                            <controls:Track.IncreaseRepeatButton>
+                                <controls:ScrollBarPageButton Focusable="false"/>
+                            </controls:Track.IncreaseRepeatButton>
+                        </controls:Track>
+                    </controls:Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

@@ -8,6 +8,18 @@ public static class TypeCastFactory
     {
         if (input == null || input.GetType() == finalType) return input;
 
+        // Nullable<T> (e.g. ToggleButton.IsChecked is bool?): an empty/"null" string is null, otherwise parse the
+        // underlying T - a boxed T is a valid boxed Nullable<T>. Done before the TypeParser fall-through, which has no
+        // parser for Nullable<…>.
+        var underlyingType = Nullable.GetUnderlyingType(finalType);
+        if (underlyingType != null)
+        {
+            var text = input as string ?? input.ToString();
+            if (string.IsNullOrEmpty(text) || string.Equals(text, "null", StringComparison.OrdinalIgnoreCase))
+                return null;
+            return CastFromString(input, underlyingType);
+        }
+
         if (finalType.IsPrimitive)
         {
             if (finalType == typeof(Double) && input.ToString() == "Auto")

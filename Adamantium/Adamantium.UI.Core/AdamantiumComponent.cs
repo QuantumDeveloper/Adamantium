@@ -11,6 +11,11 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
     private readonly Dictionary<string, StyleValueContainer> styleValues = new();
 
+    // Per-property stack of trigger contributions (token -> value), so several triggers can target one property without
+    // clobbering each other - leaving the top one restores the one beneath. The single Trigger slot in `values` holds
+    // only the stack's current top. See SetTriggerValue/ClearTriggerValue.
+    private readonly Dictionary<string, TriggerValueContainer> triggerValues = new();
+
     private AdamantiumComponent inheritanceParent;
 
     protected AdamantiumComponent()
@@ -344,15 +349,28 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         return AdamantiumPropertyMap.FindRegistered(GetType(), propertyName);
     }
     
-    public void SetTriggerValue(string propertyName, object value)
+    public void SetTriggerValue(string propertyName, object value, object token)
     {
         var property = AdamantiumPropertyMap.FindRegistered(GetType(), propertyName);
-        SetTriggerValue(property, value);
+        SetTriggerValue(property, value, token);
     }
 
-    public void SetTriggerValue(AdamantiumProperty property, object value)
+    // A trigger setter pushes its value tagged with a token (the setter itself), so overlapping triggers stack instead
+    // of overwriting one slot. The Trigger priority slot just mirrors the stack's current top.
+    public void SetTriggerValue(AdamantiumProperty property, object value, object token)
     {
-        SetValue(property, value, ValuePriority.Trigger);
+        if (!triggerValues.TryGetValue(property.Name, out var container))
+            triggerValues[property.Name] = container = new TriggerValueContainer();
+        container.Set(token, value);
+        SetValue(property, container.EffectiveValue, ValuePriority.Trigger);
+    }
+
+    // Drops one trigger's contribution; the slot falls back to the next trigger underneath (or UnsetValue -> Style/Local).
+    public void ClearTriggerValue(AdamantiumProperty property, object token)
+    {
+        if (!triggerValues.TryGetValue(property.Name, out var container)) return;
+        container.Remove(token);
+        SetValue(property, container.EffectiveValue, ValuePriority.Trigger);
     }
 
     public void SetStyleValue(string propertyName, object value, Style style)
