@@ -1,0 +1,6 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions">
+    <Grid>
+
+    </Grid>
+</View>
