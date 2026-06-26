@@ -32,12 +32,12 @@ public class DataTemplate : UiTemplate
                 fundamental.TemplatedParent = templatedParent;
             });
 
+            // Register through the engine (not a bare EstablishConnection): a DataTemplate's {Binding}s are built before
+            // the container's DataContext is assigned, so they must re-resolve when it arrives (DataContext change ->
+            // BindingEngine.RefreshBindings). This is what makes ItemTemplate/ContentTemplate bindings resolve per item.
             foreach (var binding in result.Bindings)
             {
-                if (binding is BindingExpression binding1)
-                {
-                    binding1.EstablishConnection();
-                }
+                BindingEngine.Register(binding);
             }
 
             if (result.Triggers.Count > 0)
