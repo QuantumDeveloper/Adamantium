@@ -35,7 +35,7 @@ public sealed class CompletionEngine
             AumlCompletionKind.ElementName => CompleteElements(ctx, namespaces),
             AumlCompletionKind.AttributeName => CompleteAttributes(ctx, namespaces, text, offset),
             AumlCompletionKind.AttributeValue => CompleteValues(ctx, namespaces, text, offset, documentPath),
-            AumlCompletionKind.MarkupExtensionName => CompleteMarkupExtensionName(ctx),
+            AumlCompletionKind.MarkupExtensionName => CompleteMarkupExtensionName(ctx, text, offset),
             AumlCompletionKind.MarkupExtensionArg => CompleteMarkupExtensionArg(ctx, namespaces, text, offset),
             _ => []
         };
@@ -44,11 +44,16 @@ public sealed class CompletionEngine
     // After '{': offer the available markup-extension names (TemplateBinding, ResourceReference, …). ReplaceBack only
     // covers the partial name typed after '{' (so the '{' is preserved, not eaten by the client's word guess), and the
     // snippet closes the brace + drops the caret where the argument goes: "{Binding |}".
-    private IReadOnlyList<AumlCompletionItem> CompleteMarkupExtensionName(AumlCompletionContext ctx) =>
-        _model.GetMarkupExtensions()
+    private IReadOnlyList<AumlCompletionItem> CompleteMarkupExtensionName(AumlCompletionContext ctx, string text, int offset)
+    {
+        // Don't append a closing brace when the editor already auto-paired one right after the caret ("{Th|}") - that
+        // extra '}' is exactly what produced the annoying "{ThemeResource }}".
+        var closeBrace = offset < text.Length && text[offset] == '}' ? "" : "}";
+        return _model.GetMarkupExtensions()
             .Where(n => Matches(n, ctx.Prefix))
-            .Select(n => new AumlCompletionItem(n, AumlCompletionItemKind.Element, InsertText: n + " $0}", ReplaceBack: ctx.Prefix.Length))
+            .Select(n => new AumlCompletionItem(n, AumlCompletionItemKind.Element, InsertText: n + " $0" + closeBrace, ReplaceBack: ctx.Prefix.Length))
             .ToList();
+    }
 
     // Inside "{Name arg}": complete the argument generically for ANY markup extension. The extension's own settable
     // properties drive the NAMED arguments (after the first comma); the value of the positional (default) argument and
@@ -99,7 +104,8 @@ public sealed class CompletionEngine
     // still complete a positional value, dispatched by name in CompleteExtensionValue.
     private static bool IsPositionalValueExtension(string extLocal) =>
         extLocal is "TemplateBinding" or "TemplateBindingExtension" or "Type" or "TypeExtension"
-            or "ResourceReference" or "ResourceReferenceExtension";
+            or "ResourceReference" or "ResourceReferenceExtension"
+            or "ThemeResource" or "ThemeResourceExtension";
 
     /// <summary>Completes the VALUE of a markup-extension argument from the appropriate external source. Special
     /// extensions are dispatched by name (TemplateBinding -> the ControlTemplate TargetType's properties; x:Type ->
@@ -126,6 +132,14 @@ public sealed class CompletionEngine
         // Resource keys (ResourceReference): no resource index in the type model yet -> nothing to offer.
         if (extLocal is "ResourceReference" or "ResourceReferenceExtension")
             return [];
+
+        // {ThemeResource Key} -> only the theme's OWN brush keys (the Theme class's Brush properties), not the generic
+        // colour list the Brush-typed default property would otherwise pull in (which was confusing).
+        if (extLocal is "ThemeResource" or "ThemeResourceExtension")
+            return _model.GetThemeBrushKeys()
+                .Where(k => Matches(k, partial))
+                .Select(k => new AumlCompletionItem(k, AumlCompletionItemKind.Value, "Brush", ReplaceBack: partial.Length))
+                .ToList();
 
         if (propType is null) return [];
 
