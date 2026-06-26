@@ -5,6 +5,8 @@ namespace Adamantium.UI.Markup.CodeGeneration;
 public class MetadataResolvedType : IResolvedType
 {
     private readonly AumlMetadataContainer _metadata;
+    private IResolvedType _baseType;
+    private bool _baseResolved;
 
     public MetadataResolvedType(AumlMetadataContainer metadata)
     {
@@ -25,31 +27,36 @@ public class MetadataResolvedType : IResolvedType
     {
         get
         {
+            if (_baseResolved) return _baseType;
+            _baseResolved = true;
             var baseTypeRef = _metadata.RootNode?.GetTypeReference();
             if (baseTypeRef is { IsResolved: true })
-            {
-                return _metadata.TypeResolver.Resolve(baseTypeRef.GetFullTypeName());
-            }
-
-            return null;
+                _baseType = _metadata.TypeResolver.Resolve(baseTypeRef.GetFullTypeName());
+            return _baseType;
         }
     }
 
     public EntityType EntityType => _metadata.RootEntityType;
     public ResolvedTypeKind TypeKind => ResolvedTypeKind.Class;
 
-    public IEnumerable<IResolvedMember> Members => [];
-    public IResolvedMember GetMemberByName(string memberName) => null;
-    public List<IResolvedProperty> GetAllProperties() => new List<IResolvedProperty>();
-    public bool HasAttribute(string attributeName) => false;
-    public IResolvedAttribute GetAttribute(string fullName) => null;
-    public IEnumerable<IResolvedAttribute> GetAttributes() => [];
-    public bool ImplementsInterface(string interfaceName) => false;
-    public IResolvedType GetInterface(string interfaceName) => null;
-    public bool IsCollection() => false;
+    // A generated view declares no members of its own (it's non-extensible, extended via Behaviors). For type
+    // resolution it IS its base (the <View>/<Window> root type), so delegate every member/interface query there: this
+    // is what lets an embedded view expose the base control's settable properties - to markup (<ControlsView Width=".."/>)
+    // and to the language server's property completion/hover.
+    public IEnumerable<IResolvedMember> Members => BaseType?.Members ?? [];
+    public IResolvedMember GetMemberByName(string memberName) => BaseType?.GetMemberByName(memberName);
+    public List<IResolvedProperty> GetAllProperties() => BaseType?.GetAllProperties() ?? new List<IResolvedProperty>();
+    public bool HasAttribute(string attributeName) => BaseType?.HasAttribute(attributeName) ?? false;
+    public IResolvedAttribute GetAttribute(string fullName) => BaseType?.GetAttribute(fullName);
+    public IEnumerable<IResolvedAttribute> GetAttributes() => BaseType?.GetAttributes() ?? [];
+    public bool ImplementsInterface(string interfaceName) => BaseType?.ImplementsInterface(interfaceName) ?? false;
+    public IResolvedType GetInterface(string interfaceName) => BaseType?.GetInterface(interfaceName);
+    public bool IsCollection() => BaseType?.IsCollection() ?? false;
 
     public bool FindPropertyWithAttribute(string attributeFullName, out IResolvedProperty property)
     {
+        if (BaseType != null)
+            return BaseType.FindPropertyWithAttribute(attributeFullName, out property);
         property = null;
         return false;
     }

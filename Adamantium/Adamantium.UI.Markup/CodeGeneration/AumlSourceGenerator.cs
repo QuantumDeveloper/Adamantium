@@ -183,31 +183,9 @@ public class AumlSourceGenerator : IAumlSourceGenerator
         var rootBaseType = typeContainer.GetTypeByFullName(rootNode.TypeReference.GetFullTypeName());
 
         // Namespace: an explicit x:Namespace directive (the WPF x:Class analog) takes priority; otherwise derive it
-        // from AssemblyName + relative path (as GenerateThemeFile/GenerateResourceFile do).
-        var namespaceDirective = rootNode.Children
-            .OfType<AumlAstDirective>()
-            .FirstOrDefault(d => d.Name == AumlDirectives.Namespace);
-
-        string @namespace;
-        if (namespaceDirective?.Value is AumlAstTextNode directiveValue && !string.IsNullOrEmpty(directiveValue.Text))
-        {
-            // The value is a full type name "Namespace.ClassName" (like x:Class), or already a bare namespace.
-            // Strip the class name (= file name) if it is present at the end.
-            var value = directiveValue.Text;
-            @namespace = value.EndsWith($".{className}")
-                ? value.Substring(0, value.Length - className.Length - 1)
-                : value;
-        }
-        else
-        {
-            var additionalPath = Path.GetDirectoryName(container.RelativeFilePath);
-            @namespace = container.AssemblyName;
-            if (!string.IsNullOrEmpty(additionalPath))
-            {
-                additionalPath = additionalPath.ToNamespace();
-                @namespace = $"{@namespace}.{additionalPath}";
-            }
-        }
+        // from AssemblyName + relative path. Shared with the pre-registration pass so a cross-referenced view resolves
+        // to the exact name it is generated under.
+        var @namespace = AumlNaming.ComputeNamespace(container.RelativeFilePath, container.AssemblyName, rootNode, className);
 
         container.Namespace = @namespace;
         container.ClassName = className;

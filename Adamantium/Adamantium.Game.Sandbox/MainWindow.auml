@@ -285,21 +285,6 @@
 <!--                      Delay="400"-->
 <!--                      Interval="90"/>-->
         
-        <StackPanel Orientation="Horizontal">
-            <RadioButton Content="Value 1" VerticalAlignment="Center"/>
-            <RadioButton Content="Value 2" />
-            <ToggleSwitch Content="Test Switch"/>
-            <ToggleButton Content="Toggle button"/>
-            <CheckBox Content="Checkbox" IsThreeState="true"/>
-            <Slider Width="250"/>
-        </StackPanel>
-        
-        <ProgressBar Minimum="0" 
-                     Maximum="360" 
-                     Value="360" 
-                     Width="100"
-                     Classes="Ring"
-                    VerticalAlignment="Bottom"/>
-        
+        <ControlsView VerticalAlignment="Center"/>        
     </Grid>
 </Window>
