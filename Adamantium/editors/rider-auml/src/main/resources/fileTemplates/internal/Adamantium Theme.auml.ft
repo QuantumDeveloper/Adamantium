@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Theme xmlns="http://adamantium/ui"
+       xmlns:x="http://adamantium/ui/xaml/extensions"
+       Name="${NAME}">
+
+    <Theme.StyleIncludes>
+
+    </Theme.StyleIncludes>
+</Theme>

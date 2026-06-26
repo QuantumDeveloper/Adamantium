@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <Style Selector="Button">
+        <Setter Property="MinHeight" Value="32"/>
+    </Style>
+</StyleSet>

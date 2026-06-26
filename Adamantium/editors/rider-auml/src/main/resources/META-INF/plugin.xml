@@ -30,7 +30,26 @@
 
         <!-- WPF-style split editor for .auml: XML text on the left, live engine-rendered preview on the right. -->
         <fileEditorProvider implementation="com.adamantium.auml.AumlPreviewFileEditorProvider"/>
+
+        <!-- Bundled "New AUML File" templates (resources/fileTemplates/internal/*.auml.ft). Each name maps to one
+             root entity type; the New/Add action below offers them as kinds. Also editable in
+             Settings | Editor | File and Code Templates. -->
+        <internalFileTemplate name="Adamantium Window"/>
+        <internalFileTemplate name="Adamantium View"/>
+        <internalFileTemplate name="Adamantium Theme"/>
+        <internalFileTemplate name="Adamantium StyleSet"/>
+        <internalFileTemplate name="Adamantium ResourceDictionary"/>
     </extensions>
+
+    <!-- "AUML File" entry in the project view's New/Add context menu (kind picker -> bundled template). -->
+    <actions>
+        <action id="Adamantium.CreateAumlFile"
+                class="com.adamantium.auml.CreateAumlFileAction"
+                text="AUML File"
+                description="Creates a new Adamantium UI markup file">
+            <add-to-group group-id="NewGroup" anchor="first"/>
+        </action>
+    </actions>
 
     <!-- Mark each .auml file's clr-namespace: URIs as ignored XML resources when it opens. -->
     <projectListeners>
