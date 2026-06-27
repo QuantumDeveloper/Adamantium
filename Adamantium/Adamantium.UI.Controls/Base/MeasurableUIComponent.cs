@@ -564,7 +564,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         }
     }
 
-    public void InvalidateMeasure()
+    public virtual void InvalidateMeasure()
     {
         if (!IsMeasureValid) return;
 
@@ -584,7 +584,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         }
     }
 
-    public void InvalidateArrange()
+    public virtual void InvalidateArrange()
     {
         if (!IsArrangeValid) return;
         

@@ -75,6 +75,8 @@ public class FontRenderer : GraphicsResource
     private Color _oldClearColor;
     private IRenderTarget _oldRenderTargets;
     private IDepthStencilBuffer _oldDepthStencilBuffer;
+    private Rect2D[] _savedScissors;
+    private Viewport[] _savedViewports;
 
     public FontRenderer(IGraphicsDevice device) : base(device)
     {
@@ -138,7 +140,12 @@ public class FontRenderer : GraphicsResource
         this.renderTarget = renderTarget;
         currentScreenSize = new Vector2F(renderTarget.Width, renderTarget.Height);
         transformMatrix = Matrix4x4F.Translation(translation);
-        
+
+        // Snapshot the viewport + scissor active in the pass we're about to interrupt, so RestoreState can put back the
+        // exact clip (e.g. a virtualized list item's narrowed scissor) instead of resetting to the full attachment.
+        _savedScissors = ((GraphicsDevice)GraphicsDevice).CurrentScissors;
+        _savedViewports = ((GraphicsDevice)GraphicsDevice).CurrentViewports;
+
         GraphicsDevice.EndDraw();
 
         _oldClearColor = GraphicsDevice.ClearColor;
@@ -261,7 +268,7 @@ public class FontRenderer : GraphicsResource
             fontEffect.StrokeColor.SetValue(stroke.ToVector4());
             fontEffect.FontBatchStrokedTextPass.Apply();
         }
-        
+
         GraphicsDevice.Draw(4, layout.ElementsCount);   // 4 strip verts x ElementsCount glyph instances
         //glyphEffectPass.UnApply(true);
     }
@@ -280,18 +287,21 @@ public class FontRenderer : GraphicsResource
 
         GraphicsDevice.ClearColor = _oldClearColor;
         GraphicsDevice.MSAALevel = _oldRenderTargets.MSAALevel;
-        var viewport = new Viewport() {Width = _oldRenderTargets.Width, Height = _oldRenderTargets.Height, MaxDepth = 1};
-        GraphicsDevice.SetViewports(viewport);
-        var scissor = new Rect2D();
-        scissor.Offset = new Offset2D();
-        // scissor.Offset.X = renderingParameters.TextArea.X;
-        // scissor.Offset.Y = renderingParameters.TextArea.Y;
-        scissor.Extent = new Extent2D();
-        // scissor.Extent.Width = (uint)renderingParameters.TextArea.Width;
-        // scissor.Extent.Height = (uint)renderingParameters.TextArea.Height;
-        scissor.Extent.Width = (uint)viewport.Width;
-        scissor.Extent.Height = (uint)viewport.Height;
-        GraphicsDevice.SetScissors(scissor);
+
+        // Restore the viewport + scissor that were active when SetState interrupted the pass - NOT the full attachment.
+        // Resetting to full left the resumed pass (and the text composite that immediately follows) drawing unclipped,
+        // so a clipped caller (a virtualized list item) had its text poke ~half an item past the viewport edge on a
+        // fast scroll. Fall back to the full attachment only if nothing was captured.
+        if (_savedViewports is { Length: > 0 })
+            GraphicsDevice.SetViewports(_savedViewports);
+        else
+            GraphicsDevice.SetViewports(new Viewport { Width = _oldRenderTargets.Width, Height = _oldRenderTargets.Height, MaxDepth = 1 });
+
+        if (_savedScissors is { Length: > 0 })
+            GraphicsDevice.SetScissors(_savedScissors);
+        else
+            GraphicsDevice.SetScissors(new Rect2D { Offset = new Offset2D(), Extent = new Extent2D { Width = (uint)_oldRenderTargets.Width, Height = (uint)_oldRenderTargets.Height } });
+
         GraphicsDevice.SetRenderTargets(_oldRenderTargets);
         GraphicsDevice.SetDepthBuffer(_oldDepthStencilBuffer);
         GraphicsDevice.DepthTestEnabled = true;

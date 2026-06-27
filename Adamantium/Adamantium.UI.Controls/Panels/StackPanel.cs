@@ -11,6 +11,7 @@ public class StackPanel : VirtualizingPanel
 
    private double _itemExtent = 1;   // measured (uniform) item size along the stacking axis
    private int _lastFirst;           // remembered window start -> the probe index next pass
+   private Size _childConstraint;    // constraint the window was measured with -> re-measure in arrange if needed
 
    public static readonly AdamantiumProperty OrientationProperty = AdamantiumProperty.Register(nameof(Orientation),
       typeof(Orientation), typeof(StackPanel),
@@ -119,7 +120,7 @@ public class StackPanel : VirtualizingPanel
       var count = Owner.Items.Count;
       if (count == 0)
       {
-         RecycleOutsideWindow(0, -1);
+         foreach (var c in Owner.ItemContainerGenerator.SetWindow(0, -1)) c.Visibility = Visibility.Collapsed;
          return new Size();
       }
 
@@ -128,6 +129,7 @@ public class StackPanel : VirtualizingPanel
       var childConstraint = vertical
          ? new Size(crossAvailable, double.PositiveInfinity)
          : new Size(double.PositiveInfinity, crossAvailable);
+      _childConstraint = childConstraint;
 
       // Probe a representative item for the (uniform) main-axis extent. Reuse the last window start as the probe so the
       // estimate tracks the items actually on screen.
@@ -150,7 +152,9 @@ public class StackPanel : VirtualizingPanel
       }
       _lastFirst = first;
 
-      RecycleOutsideWindow(first, last);
+      // Reconcile the realized set to exactly [first,last]: containers leaving the window are rebound in place to the
+      // ones entering (no collapse/null churn). Only true surplus (window shrank, e.g. resize/list edge) is hidden.
+      foreach (var c in Owner.ItemContainerGenerator.SetWindow(first, last)) c.Visibility = Visibility.Collapsed;
 
       double crossMax = 0;
       for (var i = first; i <= last; i++)
@@ -173,6 +177,11 @@ public class StackPanel : VirtualizingPanel
       foreach (var index in System.Linq.Enumerable.ToList(Owner.ItemContainerGenerator.RealizedIndices))
       {
          if (Owner.ItemContainerGenerator.ContainerFromIndex(index) is not IMeasurableComponent container) continue;
+         // A rebind during measure can leave a container's measure invalid (its propagation up to the panel is muted by
+         // the _inLayout guard, so the panel itself stays valid and may not re-run MeasureVirtualized). Arrange bails on
+         // an invalid measure, leaving the container unpositioned - and the layout driver then parks it at the parent
+         // origin (0,0), which is the pile/overlap at the top. Re-measure it here so Arrange actually positions it.
+         if (!container.IsMeasureValid) container.Measure(_childConstraint);
          var main = index * _itemExtent - mainOffset;
          container.Arrange(vertical
             ? new Rect(0, main, cross, _itemExtent)

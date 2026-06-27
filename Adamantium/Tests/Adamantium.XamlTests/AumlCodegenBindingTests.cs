@@ -272,6 +272,40 @@ public class AumlCodegenBindingTests
         Assert.That(code, Does.Contain("TextBlock"));
     }
 
+    private const string ItemsControlWithItemTemplate =
+        WindowHeader + ">" +
+        "<ItemsControl ItemsSource=\"{Binding People}\">" +
+        "<ItemsControl.ItemTemplate>" +
+        "<DataTemplate><TextBlock Text=\"{Binding Name}\"/></DataTemplate>" +
+        "</ItemsControl.ItemTemplate>" +
+        "</ItemsControl>" +
+        "</Window>";
+
+    [Test]
+    public void ItemTemplate_EmitsDataTemplateBuilder()
+    {
+        // Regression: an inline <DataTemplate> must be emitted with a Func<TemplateResult> builder (like ControlTemplate),
+        // NOT a bare `new DataTemplate()` (whose Build() NRE'd - no builder, no container).
+        var code = Generate(ItemsControlWithItemTemplate, out var errors);
+
+        Assert.That(errors, Is.Empty, Errors(errors));
+        Assert.Multiple(() =>
+        {
+            Assert.That(code, Does.Contain("DataTemplate(Build_"), "DataTemplate must take a builder method");
+            Assert.That(code, Does.Contain("result.RootComponent ="), "the builder sets the template root");
+            Assert.That(code, Does.Match(@"new [\w\.:]*DataTemplate\(Build_"), "builder ctor, not the parameterless one");
+            Assert.That(code, Does.Not.Match(@"new [\w\.:]*DataTemplate\(\s*\)"), "no empty `new DataTemplate()` (that was the NRE)");
+            Assert.That(code, Does.Contain("SetBinding(\"Text\""), "the item template's {Binding Name} is emitted");
+        });
+    }
+
+    [Test]
+    public void ItemTemplate_GeneratedCodeCompiles()
+    {
+        var errors = Compile(ItemsControlWithItemTemplate);
+        Assert.That(errors, Is.Empty, "generated code did not compile: " + string.Join(" | ", errors.Select(d => d.ToString())));
+    }
+
     [Test]
     public void NestedMultiBinding_GeneratedCodeCompiles()
     {

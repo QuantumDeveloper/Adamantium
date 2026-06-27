@@ -1222,13 +1222,19 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     public void SetScissors(params Rect2D[] scissors)
     {
         if (scissors == null || scissors.Length == 0) return;
-            
+
         this.scissors.Clear();
         this.scissors.AddRange(scissors);
         scissorsArray = scissors;
 
         CurrentCommandBuffer.SetScissor(0, (uint)scissors.Length, scissors);
     }
+
+    // The most recently set viewport/scissor, so code that interrupts the pass to render to another target (the font
+    // renderer's offscreen text target) can save and restore the exact clip that was active rather than resetting it
+    // to the full attachment (which left the resumed pass drawing unclipped).
+    public Rect2D[] CurrentScissors => scissorsArray;
+    public Viewport[] CurrentViewports => viewportsArray;
 
     public void SetRenderTargets(params IRenderTarget[] renderTargets)
     {

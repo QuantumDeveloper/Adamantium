@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.UI.Core;
@@ -16,6 +17,12 @@ public sealed class Dispatcher : IDispatcher
     private IApplicationPlatform appPlatform;
     private DispatcherOperationExecutor executor;
     private Thread uiThread;
+
+    // Work marshalled from other threads (window input on the OS message thread) to run on the UI loop thread. Drained
+    // at the start of each Update, before layout - so event handling and the tree mutations it triggers never race the
+    // measure/arrange/render that also runs on the loop thread.
+    private readonly Channel<Action> loopQueue =
+        Channel.CreateUnbounded<Action>(new UnboundedChannelOptions { SingleReader = true });
         
     private static object collectionLocker = new object();
     private static Dictionary<DispatcherContext, Dispatcher> dispatchers;
@@ -141,5 +148,33 @@ public sealed class Dispatcher : IDispatcher
     public static void Attach(Dispatcher dispatcher)
     {
         AddToDict(dispatcher);
+    }
+
+    /// <summary>
+    /// Queues <paramref name="action"/> to run on the UI loop thread (drained at the start of the next Update, before
+    /// layout). Window input arrives on the OS message thread; routing it through here keeps the event handling - and
+    /// the tree mutations it triggers - on the same thread as layout/render, instead of racing them. Called already on
+    /// the loop thread it runs inline.
+    /// </summary>
+    public void Post(Action action)
+    {
+        if (action == null) return;
+        var loop = uiThread;
+        if (loop == null || Thread.CurrentThread == loop)
+        {
+            action();
+            return;
+        }
+        loopQueue.Writer.TryWrite(action);
+    }
+
+    /// <summary>Runs every queued action in order. MUST be called only from the UI loop thread (start of Update).</summary>
+    public void DrainPending()
+    {
+        while (loopQueue.Reader.TryRead(out var action))
+        {
+            try { action(); }
+            catch (Exception ex) { Console.WriteLine(ex); }
+        }
     }
 }

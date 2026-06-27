@@ -313,7 +313,7 @@ public class TextRenderComponent : ImageRenderComponent
         // which cancels this inset, keeping the text body in its exact on-screen position.
         var pad = TextLayout.EffectPadding;
         var location = new Vector3F(RenderingParameters.TextArea.X + pad, RenderingParameters.TextArea.Y + pad, 5);
-        
+
         var resolveTexture = _renderTarget.ResolveTexture;
         if (!_textRendered)
         {

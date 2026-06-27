@@ -20,6 +20,7 @@
         <StyleInclude Source="{x:Type fluentDark:ToggleSwitchStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:SliderStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ProgressBarStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ItemsControlStyleSet}"/>
 	</Theme.StyleIncludes>
 
 	<!-- Accent / focus: the theme's runtime-mutable identity. Referenced via {ThemeResource Key}; change any of these

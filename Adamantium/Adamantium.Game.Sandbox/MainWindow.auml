@@ -12,12 +12,12 @@
         AnalyticAntialiasing="true"
         Background="{ResourceReference SolidBackgroundFillColorBase}">
     <Grid>
-        <Button Width="150"
-                Height="150"
-                Background="Yellow"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center">
-        </Button>
+<!--        <Button Width="150"-->
+<!--                Height="150"-->
+<!--                Background="Yellow"-->
+<!--                HorizontalAlignment="Center"-->
+<!--                VerticalAlignment="Center">-->
+<!--        </Button>-->
         
     <RenderTargetPanel x:Name="TestGrid1"
                        Opacity="0.95"
@@ -74,33 +74,33 @@
             </Path.Triggers>
         </Path>
 
-		<Path Name="Path3"
-              Fill="Red"
-              StrokeThickness="5"
-              Stroke="Blue"
-              HorizontalAlignment="Center"
-			  VerticalAlignment="Center">
-            <Path.Data>
-                <GeometryGroup>
-                    <CombinedGeometry GeometryCombineMode="Xor">
-                        <CombinedGeometry.Geometry1>
-                            <EllipseGeometry RadiusX="40" RadiusY="40" Center="75,75"/>
-                        </CombinedGeometry.Geometry1>
-                        <CombinedGeometry.Geometry2>
-                            <EllipseGeometry RadiusX="40" RadiusY="40" Center="125,75" />
-                        </CombinedGeometry.Geometry2>
-                    </CombinedGeometry>
-                    <CombinedGeometry GeometryCombineMode="Intersect">
-                        <CombinedGeometry.Geometry1>
-                            <EllipseGeometry RadiusX="40" RadiusY="40" Center="175,75"/>
-                        </CombinedGeometry.Geometry1>
-                        <CombinedGeometry.Geometry2>
-                            <EllipseGeometry RadiusX="40" RadiusY="40" Center="225,75" />
-                        </CombinedGeometry.Geometry2>
-                    </CombinedGeometry>
-                </GeometryGroup>
-            </Path.Data>
-        </Path>
+<!--		<Path Name="Path3"-->
+<!--              Fill="Red"-->
+<!--              StrokeThickness="5"-->
+<!--              Stroke="Blue"-->
+<!--              HorizontalAlignment="Center"-->
+<!--			  VerticalAlignment="Center">-->
+<!--            <Path.Data>-->
+<!--                <GeometryGroup>-->
+<!--                    <CombinedGeometry GeometryCombineMode="Xor">-->
+<!--                        <CombinedGeometry.Geometry1>-->
+<!--                            <EllipseGeometry RadiusX="40" RadiusY="40" Center="75,75"/>-->
+<!--                        </CombinedGeometry.Geometry1>-->
+<!--                        <CombinedGeometry.Geometry2>-->
+<!--                            <EllipseGeometry RadiusX="40" RadiusY="40" Center="125,75" />-->
+<!--                        </CombinedGeometry.Geometry2>-->
+<!--                    </CombinedGeometry>-->
+<!--                    <CombinedGeometry GeometryCombineMode="Intersect">-->
+<!--                        <CombinedGeometry.Geometry1>-->
+<!--                            <EllipseGeometry RadiusX="40" RadiusY="40" Center="175,75"/>-->
+<!--                        </CombinedGeometry.Geometry1>-->
+<!--                        <CombinedGeometry.Geometry2>-->
+<!--                            <EllipseGeometry RadiusX="40" RadiusY="40" Center="225,75" />-->
+<!--                        </CombinedGeometry.Geometry2>-->
+<!--                    </CombinedGeometry>-->
+<!--                </GeometryGroup>-->
+<!--            </Path.Data>-->
+<!--        </Path>-->
 		
 <!--		<Border Width="200"-->
 <!--                Height="50"-->
@@ -129,7 +129,8 @@
         <TextBlock Text="Крупный текст1! - Проверка!?!"
                    FontSize="24"
                    VerticalAlignment="Bottom"
-        Background="Transparent"/>
+                   HorizontalAlignment="Center"
+                   Background="Transparent"/>
 
         <Button Width="150"
                 Height="130"
@@ -285,6 +286,7 @@
 <!--                      Delay="400"-->
 <!--                      Interval="90"/>-->
         
-        <ControlsView VerticalAlignment="Center"/>        
+<!--        <ControlsView VerticalAlignment="Center"/>        -->
+        <ItemsDemoView VerticalAlignment="Center" HorizontalAlignment="Center"/>
     </Grid>
 </Window>

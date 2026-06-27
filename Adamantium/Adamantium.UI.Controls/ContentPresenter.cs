@@ -16,6 +16,7 @@ public class ContentPresenter : InputUIComponent
     // "outgoing" pair so it can slide out before being removed.
     private IUIComponent _currentRoot;
     private TemplateResult _currentTemplateResult;
+    private DataTemplate _currentTemplate;   // the template that built _currentRoot, so a recycled container can reuse it
     private IUIComponent _outgoingRoot;
     private TemplateResult _outgoingTemplateResult;
     private bool _isContentChanged;
@@ -64,6 +65,17 @@ public class ContentPresenter : InputUIComponent
 
         _isContentChanged = false;
 
+        // Recycling fast-path: the new content uses the SAME DataTemplate that built the current visual (a virtualized
+        // list rebinding a recycled container to another item). Keep the visual AND its render units/GPU buffers - the
+        // data updates by itself via the container's DataContext (the item template's {Binding}s re-resolve). Rebuilding
+        // here would dispose and recreate every buffer each scroll frame (the OutOfDeviceMemory under fast scroll).
+        if (newContent != null && newContent is not IUIComponent && _currentRoot != null && _currentTemplate != null)
+        {
+            var reuseTemplate = ContentTemplate ?? ContentTemplateSelector?.SelectTemplate(newContent, this);
+            if (ReferenceEquals(reuseTemplate, _currentTemplate))
+                return;   // reuse: no teardown, no rebuild
+        }
+
         // A new swap supersedes one still mid-flight: finish the previous transition instantly before starting over.
         if (_outgoingRoot != null)
             RemoveOutgoing();
@@ -91,6 +103,7 @@ public class ContentPresenter : InputUIComponent
 
         _currentRoot = null;
         _currentTemplateResult = null;
+        _currentTemplate = null;
 
         if (newContent != null)
             BuildCurrent(newContent);
@@ -117,6 +130,7 @@ public class ContentPresenter : InputUIComponent
             {
                 _currentTemplateResult = dataTemplate.Build(this);
                 _currentRoot = _currentTemplateResult?.RootComponent;
+                _currentTemplate = dataTemplate;   // remember it so a recycled rebind to the same template reuses this visual
             }
             else
             {

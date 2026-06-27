@@ -38,6 +38,10 @@ public class ScrollViewer : ContentControl
         nameof(PanningMode), typeof(PanningMode), typeof(ScrollViewer),
         new PropertyMetadata(PanningMode.None, OnPanningModeChanged));
 
+    public static readonly AdamantiumProperty CanContentScrollProperty = AdamantiumProperty.Register(
+        nameof(CanContentScroll), typeof(bool), typeof(ScrollViewer),
+        new PropertyMetadata(false, OnCanContentScrollChanged));
+
     public ScrollViewer()
     {
         MouseWheel += OnMouseWheel;
@@ -54,6 +58,19 @@ public class ScrollViewer : ContentControl
     private static void OnPanningModeChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
     {
         if (d is ScrollViewer sv && sv._presenter != null) sv._presenter.PanningMode = sv.PanningMode;
+    }
+
+    /// <summary>When true, scrolling is delegated to a virtualizing panel inside the content (item scrolling) rather
+    /// than pixel-translating the whole content. Set by item controls whose panel virtualizes.</summary>
+    public bool CanContentScroll
+    {
+        get => GetValue<bool>(CanContentScrollProperty);
+        set => SetValue(CanContentScrollProperty, value);
+    }
+
+    private static void OnCanContentScrollChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is ScrollViewer sv && sv._presenter != null) sv._presenter.CanContentScroll = sv.CanContentScroll;
     }
 
     /// <summary>When the horizontal bar appears (default <see cref="ScrollBarVisibility.Auto"/>).</summary>
@@ -84,6 +101,7 @@ public class ScrollViewer : ContentControl
             _presenter.CanScrollHorizontally = HorizontalScrollBarVisibility != ScrollBarVisibility.Disabled;
             _presenter.CanScrollVertically = VerticalScrollBarVisibility != ScrollBarVisibility.Disabled;
             _presenter.PanningMode = PanningMode;
+            _presenter.CanContentScroll = CanContentScroll;
             _presenter.ScrollMetricsChanged += OnScrollMetricsChanged;
         }
         if (_verticalBar != null)

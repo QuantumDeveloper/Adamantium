@@ -25,6 +25,16 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
     private Size _viewport;
     private Vector2 _offset;
 
+    // When CanContentScroll is on and the hosted content contains an IScrollableContent (a virtualizing panel), this
+    // presenter delegates the scroll mechanism to it instead of physically translating: the panel realizes only the
+    // visible window. WPF's CanContentScroll, on the clean IScrollableContent seam.
+    private IScrollableContent _inner;
+
+    /// <summary>Delegate scrolling to an inner virtualizing panel (item scrolling) instead of pixel-translating the content.</summary>
+    public bool CanContentScroll { get; set; }
+
+    private bool Delegating => CanContentScroll && _inner != null;
+
     public ScrollContentPresenter()
     {
         // The whole point of the presenter: the overflowing content is scissored to this viewport (see the renderer's
@@ -32,11 +42,11 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
         ClipToBounds = true;
     }
 
-    public Size Extent => _extent;
+    public Size Extent => Delegating ? _inner.Extent : _extent;
 
     public Size Viewport => _viewport;
 
-    public Vector2 Offset => _offset;
+    public Vector2 Offset => Delegating ? _inner.Offset : _offset;
 
     public bool CanScrollHorizontally { get; set; } = true;
 
@@ -49,6 +59,12 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
 
     public void SetOffset(Vector2 offset)
     {
+        if (Delegating)
+        {
+            _inner.SetOffset(offset);   // the panel clamps, re-windows, and raises its own metrics
+            return;
+        }
+
         var clamped = ClampOffset(offset, _extent, _viewport);
         if (clamped == _offset) return;
         _offset = clamped;
@@ -100,8 +116,24 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        // Measure the content unbounded on every axis the viewer allows scrolling, so it reports its natural extent;
-        // constrained on a disabled axis so it fits. base (ContentPresenter) builds the content and measures it.
+        if (CanContentScroll)
+        {
+            // Measure the content at the VIEWPORT (not unbounded) so an inner virtualizing panel realizes only what's
+            // visible; then delegate the scroll surface to it. base (ContentPresenter) builds + measures the content.
+            base.MeasureOverride(availableSize);
+            ResolveInner();
+            if (_inner != null)
+            {
+                _viewport = new Size(
+                    double.IsInfinity(availableSize.Width) ? _inner.Extent.Width : availableSize.Width,
+                    double.IsInfinity(availableSize.Height) ? _inner.Extent.Height : availableSize.Height);
+                RaiseMetricsChanged();
+                return _viewport;
+            }
+        }
+
+        // Physical path: measure the content unbounded on every axis the viewer allows scrolling, so it reports its
+        // natural extent; constrained on a disabled axis so it fits.
         var constraint = new Size(
             CanScrollHorizontally ? double.PositiveInfinity : availableSize.Width,
             CanScrollVertically ? double.PositiveInfinity : availableSize.Height);
@@ -122,6 +154,17 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
     protected override Size ArrangeOverride(Size finalSize)
     {
         _viewport = finalSize;
+
+        if (Delegating)
+        {
+            // The inner panel owns the offset (it positions its realized window itself), so just arrange the content
+            // across the viewport - no pixel translation.
+            if (VisualChildren.FirstOrDefault() is IMeasurableComponent inner)
+                inner.Arrange(new Rect(finalSize));
+            RaiseMetricsChanged();
+            return finalSize;
+        }
+
         _offset = ClampOffset(_offset, _extent, finalSize);
 
         if (VisualChildren.FirstOrDefault() is IMeasurableComponent content)
@@ -136,6 +179,29 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
         RaiseMetricsChanged();
         return finalSize;
     }
+
+    // Find the inner virtualizing panel (first IScrollableContent in the content subtree) and track its metrics.
+    private void ResolveInner()
+    {
+        var found = FindInner(this);
+        if (ReferenceEquals(found, _inner)) return;
+        if (_inner != null) _inner.ScrollMetricsChanged -= OnInnerMetricsChanged;
+        _inner = found;
+        if (_inner != null) _inner.ScrollMetricsChanged += OnInnerMetricsChanged;
+    }
+
+    private static IScrollableContent FindInner(IUIComponent root)
+    {
+        foreach (var child in root.VisualChildren)
+        {
+            if (child is IScrollableContent scrollable) return scrollable;
+            var deeper = FindInner(child);
+            if (deeper != null) return deeper;
+        }
+        return null;
+    }
+
+    private void OnInnerMetricsChanged(object sender, EventArgs e) => RaiseMetricsChanged();
 
     private void RaiseMetricsChanged() => ScrollMetricsChanged?.Invoke(this, EventArgs.Empty);
 
