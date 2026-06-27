@@ -14,6 +14,7 @@ using Adamantium.UI.Core;
 using Adamantium.UI.Core.Dispatcher;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Input;
+using Adamantium.UI.Core.Media.Animation;
 using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.EntityServices;
@@ -592,8 +593,11 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
 
     protected void Update(AppTime frameTime)
     {
+        // Apply input marshalled onto this (loop) thread BEFORE anything reads/writes the visual tree, so window input
+        // (and the layout invalidation it triggers) lands on the loop thread ahead of layout instead of racing it.
+        Threading.Dispatcher.CurrentDispatcher?.DrainPending();
         // Drive time-based animations once per frame (FrameTime is in seconds) before the services update/layout.
-        Adamantium.UI.Core.Media.Animation.AnimationManager.Tick(frameTime.FrameTime);
+        AnimationManager.Tick(frameTime.FrameTime);
         EntityWorld.ServiceManager.Update(frameTime);
     }
 

@@ -6,5 +6,6 @@
         <ToggleSwitch Content="Test Switch"/>
         <CheckBox Content="Checkbox" IsThreeState="true"/>
         <Slider Width="250"/>
+        <ItemsDemoView/>
     </StackPanel>
 </View>

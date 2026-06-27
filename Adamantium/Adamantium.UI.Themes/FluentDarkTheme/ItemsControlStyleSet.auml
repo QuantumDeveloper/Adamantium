@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions"
+          xmlns:controls="http://adamantium/ui">
+
+    <!-- ItemsControl: a Border around a ScrollViewer that hosts the items. CanContentScroll=true so the ScrollViewer
+         delegates scrolling to the virtualizing items panel (item scrolling, not pixel translation). PART_ItemsPresenter
+         is the items host; its panel comes from ItemsPanel (default = a vertical virtualizing StackPanel). Per the
+         small-styles convention this is just the template. -->
+    <Style Selector="ItemsControl">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ItemsControl">
+                    <controls:Border Background="{TemplateBinding Background}">
+                        <controls:ScrollViewer CanContentScroll="True"
+                                               HorizontalScrollBarVisibility="Disabled"
+                                               VerticalScrollBarVisibility="Auto">
+                            <controls:ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </controls:ScrollViewer>
+                    </controls:Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

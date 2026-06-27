@@ -180,6 +180,17 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         return IntPtr.Zero;
     }
 
+    // Window input arrives on the OS message thread. Raising the event below routes to controls and mutates/invalidates
+    // the visual tree, which must NOT happen concurrently with the measure/arrange/render running on the loop thread.
+    // The event args are built synchronously by the caller (capturing the message's transient state); only the raising
+    // is marshalled onto the loop thread (drained at the start of Update). Order is preserved (a single FIFO queue).
+    private static void DispatchInput(Action raise)
+    {
+        var dispatcher = Threading.Dispatcher.CurrentDispatcher;
+        if (dispatcher != null) dispatcher.Post(raise);
+        else raise();
+    }
+
 
     private IntPtr HandleActivate(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
@@ -336,16 +347,16 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 
     private IntPtr HandleKeyDown(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
-        KeyboardDevice.CurrentDevice.ProcessEvent(new RawKeyboardEventArgs((Key)Messages.GetKey(wParam),
-            RawKeyboardEventType.KeyDown, lParam, KeyboardDevice.CurrentDevice.Modifiers, GetTimeStamp()));
+        DispatchInput(() => KeyboardDevice.CurrentDevice.ProcessEvent(new RawKeyboardEventArgs((Key)Messages.GetKey(wParam),
+            RawKeyboardEventType.KeyDown, lParam, KeyboardDevice.CurrentDevice.Modifiers, GetTimeStamp())));
         handled = true;
         return IntPtr.Zero;
     }
 
     private IntPtr HandleKeyUp(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
-        KeyboardDevice.CurrentDevice.ProcessEvent(new RawKeyboardEventArgs((Key)Messages.GetKey(wParam),
-            RawKeyboardEventType.KeyUp, lParam, KeyboardDevice.CurrentDevice.Modifiers, GetTimeStamp()));
+        DispatchInput(() => KeyboardDevice.CurrentDevice.ProcessEvent(new RawKeyboardEventArgs((Key)Messages.GetKey(wParam),
+            RawKeyboardEventType.KeyUp, lParam, KeyboardDevice.CurrentDevice.Modifiers, GetTimeStamp())));
         handled = true;
         return IntPtr.Zero;
     }
@@ -356,8 +367,8 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         //Ignoring system keys
         if (text >= 32)
         {
-            KeyboardDevice.CurrentDevice.ProcessEvent(new RawTextInputEventArgs(text.ToString(),
-                KeyboardDevice.CurrentDevice.Modifiers, GetTimeStamp()));
+            DispatchInput(() => KeyboardDevice.CurrentDevice.ProcessEvent(new RawTextInputEventArgs(text.ToString(),
+                KeyboardDevice.CurrentDevice.Modifiers, GetTimeStamp())));
         }
         handled = true;
         return IntPtr.Zero;
@@ -379,7 +390,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         }
         var eventArgs = new RawMouseEventArgs(RawMouseEventType.MouseMove, window, Messages.PointFromLParam(lParam),
             WindowsMouseDeviceExtension.GetKeyModifiers(windowMessage, wParam), MouseDevice.CurrentDevice, GetTimeStamp());
-        MouseDevice.CurrentDevice.ProcessEvent(eventArgs);
+        DispatchInput(() => MouseDevice.CurrentDevice.ProcessEvent(eventArgs));
         handled = true;
         return IntPtr.Zero;
     }
@@ -389,7 +400,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         trackMouse = false;
         var eventArgs = new RawMouseEventArgs(RawMouseEventType.LeaveWindow, window, Vector2.Zero,
             KeyboardDevice.CurrentDevice.Modifiers, MouseDevice.CurrentDevice, GetTimeStamp());
-        MouseDevice.CurrentDevice.ProcessEvent(eventArgs);
+        DispatchInput(() => MouseDevice.CurrentDevice.ProcessEvent(eventArgs));
         handled = true;
         return IntPtr.Zero;
     }
@@ -399,7 +410,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         var eventType = WindowsMouseDeviceExtension.EventTypeFromMessage(windowMessage, wParam);
         var eventArgs = new RawMouseEventArgs(eventType, window, Messages.PointFromLParam(lParam),
             WindowsMouseDeviceExtension.GetKeyModifiers(windowMessage, wParam), MouseDevice.CurrentDevice, GetTimeStamp());
-        MouseDevice.CurrentDevice.ProcessEvent(eventArgs);
+        DispatchInput(() => MouseDevice.CurrentDevice.ProcessEvent(eventArgs));
         // Mirror the app's mouse capture to the OS (shared, cross-platform logic): an element that captured on press
         // (a dragging thumb, a pressed button) then keeps getting move/up even when the pointer leaves the window, and
         // the off-window release is caught instead of leaving the control stuck.
@@ -434,7 +445,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
             window.PointToClient(Messages.PointFromLParam(lParam)),
             WindowsMouseDeviceExtension.GetKeyModifiers(windowMessage, wParam),
             MouseDevice.CurrentDevice, GetTimeStamp());
-        MouseDevice.CurrentDevice.ProcessEvent(eventArgs);
+        DispatchInput(() => MouseDevice.CurrentDevice.ProcessEvent(eventArgs));
         handled = true;
         return IntPtr.Zero;
     }

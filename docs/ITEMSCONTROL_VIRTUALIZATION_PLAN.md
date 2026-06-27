@@ -1,5 +1,21 @@
 # ItemsControl + ItemContainerGenerator + встроенная виртуализация (Stack + Wrap)
 
+## Статус реализации (2026-06-27) — все фазы сделаны, локальные коммиты, НЕ запушено
+
+Headless-сьют Adamantium.UITests: **181 passed, 1 skipped, 0 failed** (13 новых тестов ItemsControl).
+
+- ✅ **Фаза 1** — ItemsControl/ItemCollection/ItemContainerGenerator/ItemsPresenter (commit 46382a2)
+- ✅ **Фаза 2** — динамические коллекции (INotifyCollectionChanged) (46382a2)
+- ✅ **Фаза 3** — VirtualizingPanel база + StackPanel 1D (46382a2)
+- ✅ **Контейнер** — шов GetContainerForItem/PrepareContainer/… + ItemTemplateSelector + ItemContainerStyle (06e8e2e)
+- ✅ **Фаза 4** — WrapPanel 2D, однородная ячейка (4ece083)
+- ✅ **Фаза 5** — рециклинг/ограниченная память (тест: прокрутка 10k → <100 контейнеров) (c6d49f4)
+- ✅ **VM-привязки** — сквозной тест + делегация ScrollViewer.CanContentScroll → виртуализирующая панель (226edfa)
+- ✅ **Фаза 6** — FluentDark ItemsControlStyleSet + AUML-авторинг + демо в Sandbox (e2794aa)
+- ⏸ **Designer/визуальный рендер** — на твою проверку (GPU-драйвер Quadro флакует на vkCreateShadersEXT, надёжно автономно не проверить). Запусти Sandbox или дизайнер на `ItemsDemoView`/`ControlsView`.
+
+Док — это исходный план; отметки выше = что реализовано. **Ничего не запушено** (по твоей просьбе).
+
 ## Зачем это
 
 В Adamantium.UI **нет** ни `ItemsControl`, ни генератора контейнеров, ни виртуализирующих
@@ -78,6 +94,32 @@ ItemsControl (: Control)
   реализованного элемента (предполагаем однородность). Тогда позиция элемента i и `Extent` по
   обеим осям — арифметика O(1) → точные скроллы по двум осям (это и есть приемлемая цена).
   Неоднородная обёртка не виртуализируется → realize-all + диагностика.
+
+## Контейнер: нужен ли отдельный тип, селектор шаблонов, стиль
+
+Контейнер концептуально обязателен (генератор без него не работает), но **не «новый тип на
+каждый контрол»**. Контейнер = «элемент, хостящий один item».
+- **Базовый `ItemsControl`**: контейнер = `ContentPresenter` — это и есть полноценный контейнер
+  (проецирует item через `ItemTemplate`/`Selector`). Отдельный тип не нужен (как в WPF).
+- **Отдельный тип нужен там, где у контейнера есть собственное интерактивное СОСТОЯНИЕ**:
+  `IsSelected`, визуал выделения, hover/press, разворачивание → `ListBox`/`ListBoxItem`,
+  `TreeView`/`TreeViewItem`, `ComboBox`/`ComboBoxItem`. Это следующий шаг (выбираемые контролы),
+  и именно там `ItemContainerStyle` раскрывается (стилизация состояний выделения).
+
+Чтобы подключать любой тип контейнера **без переписывания генератора**, контейнер —
+**подключаемый шов** на `ItemsControl` (как `GetContainerForItemOverride` в WPF, но чище),
+`protected internal virtual`:
+- `bool IsItemItsOwnContainer(object item)` — база: `item is IUIComponent`.
+- `IUIComponent GetContainerForItem()` — база: `new ContentPresenter()` (+ применяет `ItemContainerStyle`).
+- `void PrepareContainer(IUIComponent container, object item)` — база: DataContext=item,
+  Content=item, ContentTemplate=`ItemTemplate`, ContentTemplateSelector=`ItemTemplateSelector`.
+- `void ClearContainer(IUIComponent container)` — сброс для переиспользования.
+`ListBox` later переопределит → `ListBoxItem`. Генератор просто зовёт эти методы.
+
+**Новые свойства `ItemsControl`** (по запросу): `ItemTemplateSelector` (`DataTemplateSelector` —
+выбор шаблона на item, прокидывается в `ContentPresenter.ContentTemplateSelector`) и
+`ItemContainerStyle` (`Style` — применяется к каждому контейнеру в `GetContainerForItem`).
+Изменение любого из ItemTemplate/Selector/ContainerStyle → регенерация контейнеров.
 
 ## Связка ScrollViewer ↔ виртуализирующая панель
 

@@ -178,10 +178,19 @@ public class CodeGenerationContext
                 var value = prop.Values[0];
 
                 
-                if (value.TypeReference.GetFullTypeName() == Metadata.DefaultTypeContainer.ControlTemplate.FullName)
+                var valueTypeName = value.TypeReference.GetFullTypeName();
+                var valueResolvedType = Metadata.TypeResolver.Resolve(valueTypeName);
+
+                // ControlTemplate, DataTemplate (ItemTemplate/ContentTemplate) and ItemsPanelTemplate all derive UiTemplate
+                // and take a Func<TemplateResult> builder: emit a builder method that constructs the template's tree and
+                // returns a TemplateResult, then `new <Template>(builder)`. Without this a DataTemplate would be emitted as
+                // an empty `new DataTemplate()` whose Build() NREs (no builder, no container).
+                if (valueResolvedType != null
+                    && Metadata.DefaultTypeContainer.UiTemplate != null
+                    && valueResolvedType.InheritsFrom(Metadata.DefaultTypeContainer.UiTemplate.FullName))
                 {
-                    var templateName = GenerateNextElementName("controlTemplate");
-                    var templateTypeName = value.TypeReference.GetFullTypeName();
+                    var templateName = GenerateNextElementName("template");
+                    var templateTypeName = valueTypeName;
                     
                     var templateBuilderMethod = $"Build_{templateName}";
 

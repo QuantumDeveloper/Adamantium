@@ -17,6 +17,12 @@ public class TextPayload(
     public TextRenderingParameters TextRenderingParameters { get; } = renderingParameters;
     public Size DesiredSize { get; } = desiredSize;
     public TextLayout TextLayout { get; } = textLayout;
+    // A SNAPSHOT of the shaped text taken when this payload is built. The TextBlock reuses ONE TextLayout instance and
+    // re-shapes it in place, so the old and new payloads share the same TextLayout reference - a reference (or any
+    // TextLayout-property) comparison can't see the change. The immutable string snapshot can: it differs whenever a
+    // recycled container is rebound to another item, even one whose text is the same length (same DesiredSize). Without
+    // this, such a rebind never rebuilt the glyph buffer -> the GPU kept drawing the previous item's text (jumbled list).
+    public string Text { get; } = textLayout?.Text;
     public Brush Foreground { get; } = foreground;
     public Brush Background { get; } = background;
     public Brush Stroke { get; } = stroke;
@@ -30,7 +36,7 @@ public class TextPayload(
     {
         if (newState is not TextPayload payload) return true;
 
-        return DesiredSize != payload.DesiredSize || TextLayout != payload.TextLayout ||
+        return DesiredSize != payload.DesiredSize || Text != payload.Text || TextLayout != payload.TextLayout ||
                TextRenderingParameters != payload.TextRenderingParameters;
     }
 

@@ -37,7 +37,7 @@ public class TextLayout : DisposableObject
     public FontAtlas FontAtlas { get; private set; }
 
     public string Text { get; private set; }
-    
+
     public float FontSize { get; private set; }
 
     /// <summary>
@@ -569,7 +569,7 @@ public class TextLayout : DisposableObject
     public void Update(IGraphicsDevice graphicsDevice)
     {
         if (!_textUpdated) return;
-        
+
         FontAtlas ??= FontAtlasStore.GetOrCreateFrom(graphicsDevice, Typeface, FontParameters.Default(sortingVariant:GlyphSortingVariant.ByIndex));
         FontAtlas.Update(Text+".");
         ElementsCount = 0;

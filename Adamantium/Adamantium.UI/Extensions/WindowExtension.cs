@@ -62,8 +62,16 @@ public static class WindowExtension
             {
                 MeasureControl(control, wnd.ClientWidth, wnd.ClientHeight);
             }
-            else
+            else if (control.VisualParent is not IMeasurableComponent visualParent || visualParent.IsMeasureValid)
             {
+                // This is the TOP-most invalid node in its branch, so measure it directly. When an ANCESTOR is also
+                // invalid we must NOT measure here: that ancestor re-measures this node hierarchically with the real
+                // parent-given constraint. Measuring standalone uses control.Width/Height, which for an auto-sized
+                // control is NaN -> Size.Infinity - and that bogus unbounded measure is what corrupted a virtualizing
+                // panel re-invalidated mid-pass (its RaiseMetrics -> scrollbar -> InvalidateMeasure fires AFTER the
+                // window was already visited this DFS pass, re-invalidating the panel below it): the panel realized a
+                // huge window while being arranged to the small viewport -> the list jumped sideways / spilled past its
+                // clip. Deferring lets the next pass measure it correctly from the (still-invalid) window down.
                 MeasureControl(control, control.Width, control.Height);
             }
         }

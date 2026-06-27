@@ -37,7 +37,7 @@ public class GameHostBehavior : Behavior<RenderTargetPanel>
 
         // OnAttached fires while the AUML tree is being built, before the panel is in the visual tree. Defer the
         // wiring until it is attached, by which point its window and WindowRenderService exist.
-        panel.AttachedToVisualTreeEvent += OnPanelAttachedToVisualTree;
+        //panel.AttachedToVisualTreeEvent += OnPanelAttachedToVisualTree;
     }
 
     private void AttachDesignTimeGame(RenderTargetPanel panel)

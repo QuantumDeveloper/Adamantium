@@ -6,6 +6,7 @@ using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Generators;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.Core.Templates;
 
@@ -27,6 +28,12 @@ public class ItemsControl : Control, IContainer
 
     public static readonly AdamantiumProperty ItemTemplateProperty = AdamantiumProperty.Register(nameof(ItemTemplate),
         typeof(DataTemplate), typeof(ItemsControl), new PropertyMetadata(null, OnItemTemplateChanged));
+
+    public static readonly AdamantiumProperty ItemTemplateSelectorProperty = AdamantiumProperty.Register(nameof(ItemTemplateSelector),
+        typeof(DataTemplateSelector), typeof(ItemsControl), new PropertyMetadata(null, OnRegenerateContainers));
+
+    public static readonly AdamantiumProperty ItemContainerStyleProperty = AdamantiumProperty.Register(nameof(ItemContainerStyle),
+        typeof(Style), typeof(ItemsControl), new PropertyMetadata(null, OnRegenerateContainers));
 
     public static readonly AdamantiumProperty ItemsPanelProperty = AdamantiumProperty.Register(nameof(ItemsPanel),
         typeof(ItemsPanelTemplate), typeof(ItemsControl), new PropertyMetadata(null, OnItemsPanelChanged));
@@ -59,6 +66,21 @@ public class ItemsControl : Control, IContainer
         set => SetValue(ItemTemplateProperty, value);
     }
 
+    /// <summary>Picks the <see cref="DataTemplate"/> per item (when no <see cref="ItemTemplate"/> is set).</summary>
+    public DataTemplateSelector ItemTemplateSelector
+    {
+        get => GetValue<DataTemplateSelector>(ItemTemplateSelectorProperty);
+        set => SetValue(ItemTemplateSelectorProperty, value);
+    }
+
+    /// <summary>Style applied to every generated container (its real value is selection/state styling on the
+    /// dedicated container types - ListBoxItem etc.; on the base it styles the ContentPresenter).</summary>
+    public Style ItemContainerStyle
+    {
+        get => GetValue<Style>(ItemContainerStyleProperty);
+        set => SetValue(ItemContainerStyleProperty, value);
+    }
+
     public ItemsPanelTemplate ItemsPanel
     {
         get => GetValue<ItemsPanelTemplate>(ItemsPanelProperty);
@@ -78,9 +100,13 @@ public class ItemsControl : Control, IContainer
     }
 
     private static void OnItemTemplateChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+        => OnRegenerateContainers(a, e);
+
+    // ItemTemplate / ItemTemplateSelector / ItemContainerStyle changed: existing containers were projected through the
+    // old settings, so drop them and re-generate.
+    private static void OnRegenerateContainers(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
-        // Existing containers were projected through the old template: drop them and re-realize.
-        ((ItemsControl)a)._presenter?.Refresh();
+        ((ItemsControl)a)._presenter?.RegenerateContainers();
     }
 
     private static void OnItemsPanelChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
@@ -91,6 +117,40 @@ public class ItemsControl : Control, IContainer
     private void OnItemsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
     {
         _presenter?.OnItemsChanged(e);
+    }
+
+    // --- Container seam (override in selectable controls, e.g. ListBox -> ListBoxItem) -----------------------------
+
+    /// <summary>True if the item is already a ready-to-host UI element (used as its own container, no wrapping).</summary>
+    protected internal virtual bool IsItemItsOwnContainer(object item) => item is IUIComponent;
+
+    /// <summary>Creates the container for one item. Base = a <see cref="ContentPresenter"/> carrying the ItemContainerStyle.</summary>
+    protected internal virtual IUIComponent GetContainerForItem()
+    {
+        var presenter = new ContentPresenter();
+        if (ItemContainerStyle != null) presenter.AttachStyles(ItemContainerStyle);
+        return presenter;
+    }
+
+    /// <summary>Binds a (new or recycled) container to <paramref name="item"/>: DataContext + content + item template.</summary>
+    protected internal virtual void PrepareContainer(IUIComponent container, object item)
+    {
+        if (container is ContentPresenter presenter)
+        {
+            presenter.DataContext = item;
+            presenter.ContentTemplate = ItemTemplate;
+            presenter.ContentTemplateSelector = ItemTemplateSelector;
+            presenter.Content = item;
+        }
+    }
+
+    /// <summary>Releases a container's item so it can be recycled. Crucially does NOT clear Content - that would tear
+    /// down the item template's visual (and its GPU buffers); the container keeps its visual and is rebound to a new
+    /// item (its DataContext) on reuse, so the buffers are reused, not recreated every scroll frame.</summary>
+    protected internal virtual void ClearContainer(IUIComponent container)
+    {
+        if (container is ContentPresenter presenter)
+            presenter.DataContext = null;
     }
 
     // IContainer: markup children flow into Items.

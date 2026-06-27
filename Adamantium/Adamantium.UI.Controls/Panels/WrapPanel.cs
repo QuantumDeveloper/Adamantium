@@ -3,8 +3,16 @@ using Adamantium.UI.Core;
 
 namespace Adamantium.UI.Controls.Panels;
 
-public class WrapPanel : Panel
+public class WrapPanel : VirtualizingPanel
 {
+   // ---- Virtualized 2D state (items host) ----
+   private const int Buffer = 1;        // extra lines on each side of the viewport
+   private double _cellFlow = 1;        // cell size along the flow axis
+   private double _cellScroll = 1;      // cell size along the scroll (wrap) axis
+   private int _columns = 1;            // items per line
+   private int _lastFirstLine;          // remembered first visible line -> probe next pass
+   private Size _childConstraint;       // constraint the window was measured with -> re-measure in arrange if needed
+
    public static readonly AdamantiumProperty OrientationProperty = AdamantiumProperty.Register(nameof(Orientation),
       typeof(Orientation), typeof(WrapPanel), new PropertyMetadata(Orientation.Horizontal, PropertyMetadataOptions.AffectsMeasure|PropertyMetadataOptions.AffectsArrange));
 
@@ -36,8 +44,8 @@ public class WrapPanel : Panel
    public WrapPanel()
    { }
 
-   /// <inheritdoc/>
-   protected override Size MeasureOverride(Size availableSize)
+   // ---- Plain container layout (a WrapPanel used with explicit Children; behaviour unchanged) -----------------
+   protected override Size MeasurePlain(Size availableSize)
    {
       Size desiredSize = new Size();
       Size lineSize = new Size();
@@ -124,8 +132,7 @@ public class WrapPanel : Panel
       return desiredSize;
    }
 
-   /// <inheritdoc/>
-   protected override Size ArrangeOverride(Size finalSize)
+   protected override Size ArrangePlain(Size finalSize)
    {
       double accumulated = 0;
       var lineSize = new Size();
@@ -226,5 +233,90 @@ public class WrapPanel : Panel
             accumulatedY += childSize.Height;
          }
       }
+   }
+
+   // ---- Virtualized 2D layout (items host): uniform cell -> only the visible grid window is realized -----------
+
+   protected override Size MeasureVirtualized(Size availableSize, Vector2 offset)
+   {
+      var horizontal = Orientation == Orientation.Horizontal;
+      var count = Owner.Items.Count;
+      if (count == 0)
+      {
+         foreach (var c in Owner.ItemContainerGenerator.SetWindow(0, -1)) c.Visibility = Visibility.Collapsed;
+         return new Size();
+      }
+
+      var viewportFlow = horizontal ? availableSize.Width : availableSize.Height;
+      var viewportScroll = horizontal ? availableSize.Height : availableSize.Width;
+
+      ResolveCell(horizontal, count);
+
+      _columns = Math.Max(1, (int)Math.Floor(viewportFlow / _cellFlow));
+      var lines = (count + _columns - 1) / _columns;
+
+      int first, last;
+      if (double.IsInfinity(viewportScroll))
+      {
+         OnNoViewport();
+         first = 0;
+         last = count - 1;
+      }
+      else
+      {
+         var scrollOffset = horizontal ? offset.Y : offset.X;
+         var firstLine = Math.Max(0, (int)Math.Floor(scrollOffset / _cellScroll) - Buffer);
+         var lastLine = Math.Min(lines - 1, (int)Math.Ceiling((scrollOffset + viewportScroll) / _cellScroll) + Buffer);
+         _lastFirstLine = firstLine;
+         first = firstLine * _columns;
+         last = Math.Min(count - 1, (lastLine + 1) * _columns - 1);
+      }
+
+      // Reconcile the realized grid window to exactly [first,last] (rebind in place; hide only true surplus).
+      foreach (var c in Owner.ItemContainerGenerator.SetWindow(first, last)) c.Visibility = Visibility.Collapsed;
+      var childConstraint = horizontal ? new Size(_cellFlow, _cellScroll) : new Size(_cellScroll, _cellFlow);
+      _childConstraint = childConstraint;
+      for (var i = first; i <= last; i++)
+         ((IMeasurableComponent)RealizeInWindow(i)).Measure(childConstraint);
+
+      var flowExtent = _columns * _cellFlow;
+      var scrollExtent = lines * _cellScroll;
+      return horizontal ? new Size(flowExtent, scrollExtent) : new Size(scrollExtent, flowExtent);
+   }
+
+   protected override void ArrangeVirtualized(Size finalSize, Vector2 offset)
+   {
+      var horizontal = Orientation == Orientation.Horizontal;
+      var scrollOffset = horizontal ? offset.Y : offset.X;
+
+      foreach (var index in Owner.ItemContainerGenerator.RealizedIndices.ToList())
+      {
+         if (Owner.ItemContainerGenerator.ContainerFromIndex(index) is not IMeasurableComponent container) continue;
+         // See StackPanel: re-measure a container left invalid by a rebind so Arrange positions it instead of bailing
+         // (the layout driver would otherwise park the unpositioned container at the parent origin = the pile/overlap).
+         if (!container.IsMeasureValid) container.Measure(_childConstraint);
+         var line = index / _columns;
+         var col = index % _columns;
+         var flowPos = col * _cellFlow;
+         var scrollPos = line * _cellScroll - scrollOffset;
+         container.Arrange(horizontal
+            ? new Rect(flowPos, scrollPos, _cellFlow, _cellScroll)
+            : new Rect(scrollPos, flowPos, _cellScroll, _cellFlow));
+      }
+   }
+
+   // Resolve the uniform cell: explicit ItemWidth/ItemHeight, else measure the first item (assume uniform).
+   private void ResolveCell(bool horizontal, int count)
+   {
+      var probeIndex = Math.Clamp(_lastFirstLine * Math.Max(1, _columns), 0, count - 1);
+      var probe = (IMeasurableComponent)RealizeInWindow(probeIndex);
+      probe.Measure(new Size(
+         double.IsNaN(ItemWidth) ? double.PositiveInfinity : ItemWidth,
+         double.IsNaN(ItemHeight) ? double.PositiveInfinity : ItemHeight));
+
+      var cellW = double.IsNaN(ItemWidth) ? probe.DesiredSize.Width : ItemWidth;
+      var cellH = double.IsNaN(ItemHeight) ? probe.DesiredSize.Height : ItemHeight;
+      _cellFlow = Math.Max(1, horizontal ? cellW : cellH);
+      _cellScroll = Math.Max(1, horizontal ? cellH : cellW);
    }
 }

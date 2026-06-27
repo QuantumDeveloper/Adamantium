@@ -89,12 +89,15 @@ public class RenderCache
     public void ProcessCommands(Matrix4x4F projectionMatrix, double renderScale)
     {
         _renderScale = renderScale;
+        _projectionMatrix = projectionMatrix;
         foreach (var unit in _renderUnits)
         {
             var transform = unit.Component.WorldTransform;
             unit.Update(transform, projectionMatrix, renderScale);
         }
     }
+
+    private Matrix4x4F _projectionMatrix;
     
     /// <summary>Out-of-render-pass pass: recorded before BeginRendering (shared-surface latch copies).</summary>
     public void PreRender()
@@ -119,9 +122,14 @@ public class RenderCache
         var scissorNarrowed = false;   // whether the active scissor is currently narrower than fullScissor
         foreach (var unit in _renderUnits)
         {
+            // Read the world transform ONCE: the bounds-cull below evaluates it and the GPU is re-baked with the very
+            // same value before drawing. Using one read for both the cull decision and the re-bake keeps them from
+            // diverging (the cull approving "inside" while the GPU draws the element elsewhere = the off-viewport spill).
+            var wt = unit.Component.WorldTransform;
+
             if (device != null)
             {
-                var scissor = ResolveScissor(unit.Component, fullScissor, out var clipped);
+                var scissor = ResolveScissor(unit.Component, wt, fullScissor, out var clipped, out var cull);
                 if (clipped)
                 {
                     device.SetScissors(scissor);
@@ -133,7 +141,15 @@ public class RenderCache
                     device.SetScissors(fullScissor);
                     scissorNarrowed = false;
                 }
+
+                // The unit's owner is entirely outside its clip (a virtualized item just off the viewport, content sliding
+                // out, etc.): nothing of it is visible, so don't draw it. The GPU scissor would clip it to nothing anyway,
+                // but skipping the draw keeps it from painting for the frame(s) before the dynamic scissor settles - and
+                // is a plain "don't render the invisible" win. Partially-visible units still draw and rely on the scissor.
+                if (cull) continue;
             }
+
+            unit.Update(wt, _projectionMatrix, _renderScale);   // re-bake with the SAME transform the cull just approved
             unit.Render();
         }
 
@@ -143,7 +159,8 @@ public class RenderCache
 
     // The scissor for a unit: the intersection of every ancestor viewport that ClipToBounds (in framebuffer pixels),
     // or fullScissor if none clip. `clipped` is false in the latter case so the caller keeps the window scissor.
-    private Rect2D ResolveScissor(IUIComponent component, Rect2D fullScissor, out bool clipped)
+    // `cull` is true when the unit's own bounds fall ENTIRELY outside that clip (so the caller skips drawing it).
+    private Rect2D ResolveScissor(IUIComponent component, Matrix4x4F worldTransform, Rect2D fullScissor, out bool clipped, out bool cull)
     {
         Rect? clip = null;
         for (var c = component; c != null; c = c.VisualParent)
@@ -154,11 +171,19 @@ public class RenderCache
             clip = clip is { } existing ? existing.Intersect(rect) : rect;
         }
 
+        cull = false;
         if (clip is not { } logical)
         {
             clipped = false;
             return fullScissor;
         }
+
+        // Is the unit's own owner fully outside the clip on any axis? Then none of it shows -> let the caller cull it.
+        // Use the SAME world transform the caller will bake into the GPU draw, not a fresh component.WorldTransform read:
+        // layout runs on another thread, so a re-read here could differ from what is actually drawn (cull says "inside"
+        // while the GPU paints it outside -> the off-viewport spill).
+        var bounds = new Rect(0, 0, component.RenderSize.Width, component.RenderSize.Height).TransformToAABB(worldTransform);
+        cull = bounds.Right <= logical.X || bounds.X >= logical.Right || bounds.Bottom <= logical.Y || bounds.Y >= logical.Bottom;
 
         clipped = true;
         return ToFramebufferScissor(logical, fullScissor);
@@ -190,12 +215,19 @@ public class RenderCache
         _renderUnits.Clear();
         var projectionMatrix = visualRoot.GetProjectionMatrix();
         var stack = new Stack<IUIComponent>();
+        var visited = new HashSet<Guid>();
         stack.Push(visualRoot);
         while (stack.Count > 0)
         {
             var component = stack.Pop();
 
             if (component.Visibility != Visibility.Visible) continue;
+
+            // A component must render exactly once per frame. If the visual tree somehow makes one reachable twice in
+            // this walk (e.g. a templated content host whose child is referenced from two places), processing it again
+            // would add its units to _renderUnits a second time -> every such element is drawn TWICE (overdraw at the
+            // same spot). Guard against that here so each component (and its subtree) is built once.
+            if (!visited.Add(component.RenderId)) continue;
 
             // Capture dirtiness BEFORE Render: a clean control's Render() is a no-op (records nothing),
             // so an empty command list means "reuse the cached units". A dirty control re-records, so an

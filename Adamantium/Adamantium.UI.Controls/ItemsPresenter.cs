@@ -69,6 +69,16 @@ public class ItemsPresenter : InputUIComponent
         }
     }
 
+    /// <summary>Drops and re-generates all containers (ItemTemplate / ItemTemplateSelector / ItemContainerStyle changed).</summary>
+    internal void RegenerateContainers()
+    {
+        if (_owner == null || _panel == null) return;
+        if (_panel is VirtualizingPanel virtualizing)
+            virtualizing.Revirtualize();   // clears the realized window + generator; next measure rebuilds with new settings
+        else
+            Refresh();
+    }
+
     /// <summary>Applies a collection change incrementally so unaffected containers keep their state (non-virtualizing path).</summary>
     internal void OnItemsChanged(NotifyCollectionChangedEventArgs e)
     {

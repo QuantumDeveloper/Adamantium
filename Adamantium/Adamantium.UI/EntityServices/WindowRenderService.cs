@@ -117,6 +117,13 @@ public class WindowRenderService : UiRenderService
         // latched private textures (zero latency), and the copies aren't recorded inside the render pass.
         return GraphicsDevice.BeginDraw(beforeRenderPass: _ =>
         {
+            // Build the content render cache HERE - inside beforeRenderPass, which runs after BeginDraw's fence wait
+            // (the GPU is done with this slot, so buffer updates/frees can't race it) and after this frame's layout
+            // Update, but BEFORE PreRender and the render pass. So the cache the renderer draws this frame reflects
+            // THIS frame's visual tree. It used to be built in EndDraw - one frame AFTER it was drawn - so a container
+            // realized/collapsed this frame lagged the draw by a frame: an item entering the window had no unit yet (a
+            // one-frame hole) and one leaving still had a stale unit (a one-frame ghost overlapping with a foreign item).
+            windowRenderer.PrepareData();
             windowRenderer.PreRender();
             PreRenderProcessors();   // adorner stage compute (stroke expander) before the render pass
         });
@@ -136,7 +143,8 @@ public class WindowRenderService : UiRenderService
     public override void EndDraw()
     {
         GraphicsDevice.EndDraw();
-        windowRenderer.PrepareData();
+        // The content cache is built in BeginDraw (beforeRenderPass) now, not here: it must reflect the frame BEFORE
+        // that frame is drawn, not one frame late. EndDraw only finalizes and blits the rendered frame to the swapchain.
         GraphicsDevice.BlitImage(GraphicsDevice.CurrentCommandBuffer,
             GraphicsDevice.CurrentRenderTarget.ResolveTexture,
             windowRenderer.Presenter.GetCurrentImage());
@@ -159,11 +167,10 @@ public class WindowRenderService : UiRenderService
     }
 
     // --- Headless one-shot rendering (designer) -------------------------------------------------------------------
-    // The runtime loop above builds the render cache in EndDraw (a 1-frame pipeline whose deferred disposal is tuned
-    // to that timing). A headless one-shot instead builds BEFORE drawing (so the first frame isn't blank) and waits
-    // for GPU idle (the result texture is safe to read back and frees can't race the GPU). It uses the SAME renderer
-    // + processors as the loop and does NOT call the loop's EndDraw (no next-frame rebuild, no swapchain blit).
-    // Window.Update is the caller's responsibility (the designer runs layout itself).
+    // Same shape as the runtime loop: BeginDraw builds the content cache (in beforeRenderPass, after the fence wait)
+    // and PreRenders it, then Render draws it. The headless one-shot additionally waits for GPU idle afterwards (so the
+    // result texture is safe to read back and frees can't race the GPU). It uses the SAME renderer + processors as the
+    // loop and does NOT call the loop's EndDraw (no swapchain blit). Window.Update is the caller's responsibility.
     public bool RenderHeadlessFrame(IWindow window, double renderScale, AppTime time)
     {
         // Bind/resize to the requested window + scale, reusing device + presenter (resize, not recreate). Needed only
@@ -175,10 +182,10 @@ public class WindowRenderService : UiRenderService
         }
 
         UpdateProcessors(time);          // adorner stage builds its overlay cache from the current layout
-        windowRenderer.PrepareData();     // content cache built now, before drawing (GPU idle -> safe)
 
-        // shared setup + beforeRenderPass (PreRender content + processors). Throw (not a bare false) with the device's
-        // real reason so the designer reports it instead of an opaque "render failed".
+        // shared setup + beforeRenderPass: builds the content cache (PrepareData) and PreRenders it, then the
+        // processors - same as the runtime path. Throw (not a bare false) with the device's real reason so the
+        // designer reports it instead of an opaque "render failed".
         if (!BeginDraw())
             throw new System.InvalidOperationException(
                 $"GraphicsDevice.BeginDraw failed: {GraphicsDevice.LastFrameError ?? "unknown device error"}");
