@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Decorators;
@@ -176,6 +179,46 @@ public class LayoutManagerTests
             Assert.That(reentrant.IsArrangeValid, Is.True, "re-entrant control left arrange-invalid (pass exited before re-arranging it)");
             Assert.That(reentrant.RenderSize.Width, Is.EqualTo(60).Within(0.5), "re-entrant control mis-sized after the pass");
         });
+    }
+
+    // F1: a per-frame layout time budget defers work past the deadline to the next frame, and that deferred work
+    // completes over subsequent frames. A zero budget processes ~one node per phase per pass (with forward progress).
+    [Test]
+    public void FrameBudget_DefersWorkAndCompletesOverFrames()
+    {
+        var stack = new StackPanel { Orientation = Orientation.Vertical };
+        var children = new List<Border>();
+        for (var i = 0; i < 20; i++)
+        {
+            var b = new Border { Width = 40, Height = 10 };
+            children.Add(b);
+            stack.Children.Add(b);
+        }
+        var root = new Border { Width = 100, Height = 1000, Child = stack };
+        WindowExtension.UpdateTree(root);   // settle
+
+        foreach (var b in children) b.InvalidateArrange();   // 20 independent dirty arrange entries
+
+        try
+        {
+            LayoutManager.FrameBudget = TimeSpan.Zero;   // process ~one node per phase per pass
+            var arrangeBefore = MeasurableUIComponent.TotalArrangeCalls;
+            WindowExtension.UpdateTree(root);
+            var firstPass = MeasurableUIComponent.TotalArrangeCalls - arrangeBefore;
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(firstPass, Is.GreaterThan(0), "forward progress: at least one node processed under a zero budget");
+                Assert.That(firstPass, Is.LessThan(20), "a zero budget defers most work to later frames");
+            });
+
+            for (var f = 0; f < 40 && children.Any(b => !((IMeasurableComponent)b).IsArrangeValid); f++)
+                WindowExtension.UpdateTree(root);
+
+            Assert.That(children.All(b => ((IMeasurableComponent)b).IsArrangeValid), Is.True,
+                "budget-deferred work completes over subsequent frames");
+        }
+        finally { LayoutManager.FrameBudget = null; }
     }
 
     // Phase 4: LayoutUpdated marks "layout settled this frame" - it fires once per pass that did work, and not at all on

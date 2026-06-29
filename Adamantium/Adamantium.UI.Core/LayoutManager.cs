@@ -33,6 +33,11 @@ public sealed class LayoutManager
     // outer drain loop bails after this many iterations rather than spinning forever.
     private const int MaxPassIterations = 100;
 
+    // F1 layout time-budgeting: max wall-time one ExecuteLayoutPass may spend before deferring the rest to the next
+    // frame. Null = unlimited (drain everything - the default). Set it to keep a heavy frame (binding storm / view
+    // switch) responsive; deferred subtrees keep their last Bounds and render in place until they catch up.
+    public static TimeSpan? FrameBudget;
+
     private readonly IUIComponent _root;
     private readonly DirtyQueue _toStyle = new();
     private readonly DirtyQueue _toMeasure = new();
@@ -98,9 +103,16 @@ public sealed class LayoutManager
             else if (!rootMeasurable.IsArrangeValid) _toArrange.Enqueue(_root);
         }
 
+        // F1: optional per-frame time budget. Null = unlimited (drain everything - the default, behaviour-neutral). When
+        // set, the pass processes dirty nodes until the budget is spent, then defers the rest to the next frame - a
+        // deferred subtree keeps its last Bounds and renders in place (graceful lag, not a hole).
+        var budget = FrameBudget;
+        var stopwatch = budget.HasValue ? System.Diagnostics.Stopwatch.StartNew() : null;
+
         var didWork = false;
         var iterations = 0;
-        while (!_toStyle.IsEmpty || !_toMeasure.IsEmpty || !_toArrange.IsEmpty)
+        var withinBudget = true;
+        while (withinBudget && (!_toStyle.IsEmpty || !_toMeasure.IsEmpty || !_toArrange.IsEmpty))
         {
             if (++iterations > MaxPassIterations)
             {
@@ -109,21 +121,37 @@ public sealed class LayoutManager
             }
             didWork = true;
 
-            // Drain each queue as a SNAPSHOT (process only what's queued now). Work re-dirtied DURING a phase - e.g. an
-            // arrange that re-invalidates a measure - lands back in the queues and is handled on the NEXT iteration. That
-            // keeps the phases ordered (all measure before arrange) and lets a re-entrant invalidation converge, instead
-            // of consuming an arrange entry before its re-measure has run (which would leave the node unarranged).
-            _toStyle.DrainInto(_passBuffer);
-            foreach (var node in _passBuffer) ApplyTheme(node);
-
-            _toMeasure.DrainInto(_passBuffer);
-            foreach (var node in _passBuffer) MeasureDirty(node);
-
-            _toArrange.DrainInto(_passBuffer);
-            foreach (var node in _passBuffer) ArrangeDirty(node);
+            // Drain each queue as a SNAPSHOT (process only what's queued now), ordered style -> measure -> arrange. Work
+            // re-dirtied DURING a phase lands back in the queues and is handled on the NEXT iteration - keeping the
+            // phases ordered and letting re-entrant invalidation converge. Stop the whole pass the moment a phase runs
+            // out of budget (its tail is re-queued for the next frame).
+            withinBudget = DrainPhase(_toStyle, ApplyTheme, stopwatch, budget)
+                        && DrainPhase(_toMeasure, MeasureDirty, stopwatch, budget)
+                        && DrainPhase(_toArrange, ArrangeDirty, stopwatch, budget);
         }
 
-        if (didWork) LayoutUpdated?.Invoke(this, EventArgs.Empty);
+        // LayoutUpdated = "layout settled this frame" - only when everything drained, not when budget-deferred.
+        if (didWork && _toStyle.IsEmpty && _toMeasure.IsEmpty && _toArrange.IsEmpty)
+            LayoutUpdated?.Invoke(this, EventArgs.Empty);
+    }
+
+    // Drains one queue as a snapshot, ancestors-first. Returns true if it emptied the snapshot, false if it stopped on
+    // the frame budget (re-queuing the unprocessed tail for the next frame). Always processes at least one node, so a
+    // tiny/zero budget still makes forward progress.
+    private bool DrainPhase(DirtyQueue queue, Action<IUIComponent> process, System.Diagnostics.Stopwatch stopwatch, TimeSpan? budget)
+    {
+        queue.DrainInto(_passBuffer);
+        var count = _passBuffer.Count;
+        for (var i = 0; i < count; i++)
+        {
+            process(_passBuffer[i]);
+            if (budget.HasValue && i + 1 < count && stopwatch.Elapsed >= budget.Value)
+            {
+                for (var j = i + 1; j < count; j++) queue.Enqueue(_passBuffer[j]);
+                return false;
+            }
+        }
+        return true;
     }
 
     private static void ApplyTheme(IUIComponent node)
@@ -148,11 +176,12 @@ public sealed class LayoutManager
         var before = control.DesiredSize;
 
         // Re-measure with the element's OWN cached constraint (the available size the parent last gave it), NOT a guess.
-        // MeasureOverride cascades down, the validity gate skipping any clean subtree. The window uses its client size;
-        // a never-measured top-most node falls back to its Width/Height (-> Infinity if auto).
-        if (node is IWindow wnd)
+        // MeasureOverride cascades down, the validity gate skipping any clean subtree. A root visual (window or any
+        // IRootVisualComponent top-level) uses its client size; a never-measured top-most node falls back to its
+        // Width/Height (-> Infinity if auto).
+        if (node is IRootVisualComponent root)
         {
-            MeasureControl(control, wnd.ClientWidth, wnd.ClientHeight);
+            MeasureControl(control, root.ClientWidth, root.ClientHeight);
         }
         else if (control.PreviousMeasureConstraint is { } cached)
         {
