@@ -42,6 +42,19 @@ public class ScrollViewer : ContentControl
         nameof(CanContentScroll), typeof(bool), typeof(ScrollViewer),
         new PropertyMetadata(false, OnCanContentScrollChanged));
 
+    // Per-control inertia tuning - flows to this control's ScrollContentPresenter (the feel is not hardcoded).
+    public static readonly AdamantiumProperty IsInertiaEnabledProperty = AdamantiumProperty.Register(
+        nameof(IsInertiaEnabled), typeof(bool), typeof(ScrollViewer),
+        new PropertyMetadata(true, OnInertiaSettingChanged));
+
+    public static readonly AdamantiumProperty InertiaFrictionProperty = AdamantiumProperty.Register(
+        nameof(InertiaFriction), typeof(double), typeof(ScrollViewer),
+        new PropertyMetadata(6.0, OnInertiaSettingChanged));
+
+    public static readonly AdamantiumProperty InertiaSmoothRateProperty = AdamantiumProperty.Register(
+        nameof(InertiaSmoothRate), typeof(double), typeof(ScrollViewer),
+        new PropertyMetadata(14.0, OnInertiaSettingChanged));
+
     public ScrollViewer()
     {
         MouseWheel += OnMouseWheel;
@@ -73,6 +86,40 @@ public class ScrollViewer : ContentControl
         if (d is ScrollViewer sv && sv._presenter != null) sv._presenter.CanContentScroll = sv.CanContentScroll;
     }
 
+    /// <summary>Enables inertial scrolling (smooth wheel + flick momentum) for this control. Default true.</summary>
+    public bool IsInertiaEnabled
+    {
+        get => GetValue<bool>(IsInertiaEnabledProperty);
+        set => SetValue(IsInertiaEnabledProperty, value);
+    }
+
+    /// <summary>Flick velocity decay per second - higher stops a fling sooner (coasts less). Default 6.</summary>
+    public double InertiaFriction
+    {
+        get => GetValue<double>(InertiaFrictionProperty);
+        set => SetValue(InertiaFrictionProperty, value);
+    }
+
+    /// <summary>Wheel ease-to-target rate per second - higher is snappier, lower glides longer. Default 14.</summary>
+    public double InertiaSmoothRate
+    {
+        get => GetValue<double>(InertiaSmoothRateProperty);
+        set => SetValue(InertiaSmoothRateProperty, value);
+    }
+
+    private static void OnInertiaSettingChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is ScrollViewer sv) sv.PushInertiaSettings();
+    }
+
+    private void PushInertiaSettings()
+    {
+        if (_presenter == null) return;
+        _presenter.IsInertiaEnabled = IsInertiaEnabled;
+        _presenter.InertiaFriction = InertiaFriction;
+        _presenter.InertiaSmoothRate = InertiaSmoothRate;
+    }
+
     /// <summary>When the horizontal bar appears (default <see cref="ScrollBarVisibility.Auto"/>).</summary>
     public ScrollBarVisibility HorizontalScrollBarVisibility
     {
@@ -102,6 +149,7 @@ public class ScrollViewer : ContentControl
             _presenter.CanScrollVertically = VerticalScrollBarVisibility != ScrollBarVisibility.Disabled;
             _presenter.PanningMode = PanningMode;
             _presenter.CanContentScroll = CanContentScroll;
+            PushInertiaSettings();
             _presenter.ScrollMetricsChanged += OnScrollMetricsChanged;
         }
         if (_verticalBar != null)
@@ -168,9 +216,8 @@ public class ScrollViewer : ContentControl
     private void OnMouseWheel(object sender, MouseWheelEventArgs e)
     {
         if (_presenter == null) return;
-        var offset = _presenter.Offset;
         var delta = -(e.Delta / 120.0) * WheelLinesPerNotch * LineStep;   // wheel up -> scroll towards the top
-        _presenter.SetOffset(new Vector2(offset.X, offset.Y + delta));
+        _presenter.AnimateScrollBy(new Vector2(0, delta));   // smooth (eased) wheel; instant if inertia is off
         e.Handled = true;
     }
 
