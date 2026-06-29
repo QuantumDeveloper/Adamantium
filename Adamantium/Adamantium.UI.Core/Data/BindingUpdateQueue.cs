@@ -22,9 +22,10 @@ public static class BindingUpdateQueue
     private static readonly List<BindingExpressionBase> Batch = new();   // reused snapshot buffer
 
     /// <summary>F2 budget: the maximum number of binding updates applied per <see cref="Flush"/> (i.e. per frame).
-    /// 0 = unlimited (the default). Set it (e.g. 50000, 10000) to bound the cost of a binding storm: anything over the
-    /// cap stays dirty and drains over later frames instead of all applying in one frame.</summary>
-    public static int MaxAppliesPerFlush { get; set; }
+    /// Default 10000 - high enough that a normal frame's handful of updates never hit it, low enough to bound a binding
+    /// storm (anything over the cap stays dirty and drains over later frames). Set to 0 to disable (apply all each
+    /// frame), or raise/lower it (e.g. 50000) to taste.</summary>
+    public static int MaxAppliesPerFlush { get; set; } = 10000;
 
     /// <summary>Marks an expression for the next coalesced flush (deduped: enqueuing twice still applies once).</summary>
     public static void Enqueue(BindingExpressionBase expression)

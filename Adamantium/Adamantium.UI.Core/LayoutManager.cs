@@ -34,15 +34,17 @@ public sealed class LayoutManager
     private const int MaxPassIterations = 100;
 
     // F1 layout time-budgeting: max wall-time one ExecuteLayoutPass may spend before deferring the rest to the next
-    // frame. Null = unlimited (drain everything - the default). Set it to keep a heavy frame (binding storm / view
-    // switch) responsive; deferred subtrees keep their last Bounds and render in place until they catch up.
-    public static TimeSpan? FrameBudget;
+    // frame. Default 8 ms - high enough that a normal frame finishes well within it, low enough to keep a pathological
+    // frame (binding storm / view switch) responsive; deferred subtrees keep their last Bounds and render in place
+    // until they catch up. Set to null to disable (always finish the pass in one go).
+    public static TimeSpan? FrameBudget = TimeSpan.FromMilliseconds(8);
 
     private readonly IUIComponent _root;
     private readonly DirtyQueue _toStyle = new();
     private readonly DirtyQueue _toMeasure = new();
     private readonly DirtyQueue _toArrange = new();
     private readonly List<IUIComponent> _passBuffer = new();   // reused snapshot buffer for one phase's drain
+    private readonly System.Diagnostics.Stopwatch _passStopwatch = new();   // reused per pass (no per-frame allocation)
 
     public LayoutManager(IUIComponent root)
     {
@@ -107,7 +109,7 @@ public sealed class LayoutManager
         // set, the pass processes dirty nodes until the budget is spent, then defers the rest to the next frame - a
         // deferred subtree keeps its last Bounds and renders in place (graceful lag, not a hole).
         var budget = FrameBudget;
-        var stopwatch = budget.HasValue ? System.Diagnostics.Stopwatch.StartNew() : null;
+        if (budget.HasValue) _passStopwatch.Restart();
 
         var didWork = false;
         var iterations = 0;
@@ -125,9 +127,9 @@ public sealed class LayoutManager
             // re-dirtied DURING a phase lands back in the queues and is handled on the NEXT iteration - keeping the
             // phases ordered and letting re-entrant invalidation converge. Stop the whole pass the moment a phase runs
             // out of budget (its tail is re-queued for the next frame).
-            withinBudget = DrainPhase(_toStyle, ApplyTheme, stopwatch, budget)
-                        && DrainPhase(_toMeasure, MeasureDirty, stopwatch, budget)
-                        && DrainPhase(_toArrange, ArrangeDirty, stopwatch, budget);
+            withinBudget = DrainPhase(_toStyle, ApplyTheme, budget)
+                        && DrainPhase(_toMeasure, MeasureDirty, budget)
+                        && DrainPhase(_toArrange, ArrangeDirty, budget);
         }
 
         // LayoutUpdated = "layout settled this frame" - only when everything drained, not when budget-deferred.
@@ -138,14 +140,14 @@ public sealed class LayoutManager
     // Drains one queue as a snapshot, ancestors-first. Returns true if it emptied the snapshot, false if it stopped on
     // the frame budget (re-queuing the unprocessed tail for the next frame). Always processes at least one node, so a
     // tiny/zero budget still makes forward progress.
-    private bool DrainPhase(DirtyQueue queue, Action<IUIComponent> process, System.Diagnostics.Stopwatch stopwatch, TimeSpan? budget)
+    private bool DrainPhase(DirtyQueue queue, Action<IUIComponent> process, TimeSpan? budget)
     {
         queue.DrainInto(_passBuffer);
         var count = _passBuffer.Count;
         for (var i = 0; i < count; i++)
         {
             process(_passBuffer[i]);
-            if (budget.HasValue && i + 1 < count && stopwatch.Elapsed >= budget.Value)
+            if (budget.HasValue && i + 1 < count && _passStopwatch.Elapsed >= budget.Value)
             {
                 for (var j = i + 1; j < count; j++) queue.Enqueue(_passBuffer[j]);
                 return false;
