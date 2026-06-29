@@ -140,14 +140,17 @@ public sealed class LayoutManager
         // Base.Arrange aborts when measure is invalid; mirror that so a node still pending measure isn't parked early.
         if (control.IsArrangeValid || !control.IsMeasureValid) return;
 
-        var parent = node.LogicalParent as IMeasurableComponent;
-        var rect = parent != null ? new Rect(parent.DesiredSize) : new Rect(control.DesiredSize);
+        // Arrange the node into its OWN last correct slot (preserved across invalidation), NOT parent.DesiredSize - that
+        // old fallback parked a dirty child at its parent's origin (the "pile at (0,0)" bug, plan problem #3). The node's
+        // ArrangeOverride then re-distributes correct rects to its children. Only a node that was never arranged (the
+        // root, on first layout) has no saved slot -> it fills its own measured area.
+        var slot = control.PreviousArrangeSlot ?? new Rect(control.DesiredSize);
         if (LayoutTrace.Enabled)
         {
             var name = string.IsNullOrEmpty(node.Name) ? node.GetType().Name : node.Name;
-            LayoutTrace.Log($"ARRANGE-DIRTY {name}: -> Arrange({rect})");
+            LayoutTrace.Log($"ARRANGE-DIRTY {name}: -> Arrange({slot})");
         }
-        control.Arrange(rect);
+        control.Arrange(slot);
     }
 
     private static void MeasureControl(IMeasurableComponent control, Double width, Double height)

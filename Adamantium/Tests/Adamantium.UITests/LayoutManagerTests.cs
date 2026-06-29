@@ -68,4 +68,36 @@ public class LayoutManagerTests
             Assert.That(leaf.RenderSize.Width, Is.EqualTo(80).Within(0.5), "the invalidated node was re-laid-out to its new size");
         });
     }
+
+    // Phase 2: arrange is top-down by saved slot. Invalidating ONLY a child's arrange must re-arrange that child into
+    // its own last correct slot (not park it at the parent origin), and touch only its subtree - not re-arrange the
+    // whole tree from the root.
+    [Test]
+    public void ChildOnlyArrangeInvalidation_ReArrangesIntoCorrectSlotNotOrigin()
+    {
+        var a = new Border { Width = 60, Height = 50 };
+        var b = new Border { Width = 60, Height = 50 };
+        var stack = new StackPanel { Orientation = Orientation.Vertical };
+        stack.Children.Add(a);
+        stack.Children.Add(b);
+        var root = new Border { Width = 200, Height = 200, Child = stack };
+
+        WindowExtension.UpdateTree(root);
+        var bSlotY = b.Bounds.Y;
+        Assert.That(bSlotY, Is.GreaterThan(40), "sanity: the second vertically-stacked child should sit below the first (~y=50)");
+
+        // Invalidate ONLY b's arrange (b's measure stays valid, its slot is unchanged).
+        var arrangeBefore = MeasurableUIComponent.TotalArrangeCalls;
+        b.InvalidateArrange();
+        WindowExtension.UpdateTree(root);
+        var arrangeDelta = MeasurableUIComponent.TotalArrangeCalls - arrangeBefore;
+
+        Assert.Multiple(() =>
+        {
+            // Re-arranged into its OWN saved slot (correct position), NOT parked at the parent origin (y=0).
+            Assert.That(b.Bounds.Y, Is.EqualTo(bSlotY).Within(0.5), "child re-arranged to the wrong slot (origin?) instead of its saved slot");
+            // Minimal: only b (a leaf Border) re-arranged - not the whole root->stack->a->b chain.
+            Assert.That(arrangeDelta, Is.EqualTo(1), "a child-only arrange invalidation should re-arrange only that child's subtree");
+        });
+    }
 }

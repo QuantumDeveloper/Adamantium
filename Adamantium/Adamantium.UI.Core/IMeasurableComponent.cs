@@ -20,8 +20,13 @@ public interface IMeasurableComponent : IObservableComponent
     bool UseLayoutRounding { get; set; }
     bool IsMeasureValid { get; }
     bool IsArrangeValid { get; }
-    
+
     Size DesiredSize { get; }
+
+    /// <summary>The rect this element was last arranged with (its last correct slot), or null if never arranged. The
+    /// layout manager re-arranges an arrange-dirty element into this slot rather than guessing one - the element's own
+    /// ArrangeOverride then re-distributes correct rects to its children.</summary>
+    Rect? PreviousArrangeSlot { get; }
     
     void InvalidateMeasure();
     void InvalidateArrange();
