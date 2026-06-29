@@ -3,6 +3,7 @@ using System.Linq;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
+using Adamantium.UI.Core.Media.Animation;
 
 namespace Adamantium.UI.Controls;
 
@@ -24,6 +25,35 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
     private Size _extent;
     private Size _viewport;
     private Vector2 _offset;
+
+    // --- Inertia (kinetic) scrolling: smooth wheel + flick momentum, driven by the AnimationManager heartbeat. The feel
+    // is per-instance (tunable per control via the ScrollViewer that owns this presenter), not hardcoded. ---
+
+    /// <summary>Flick velocity decay per second - higher stops a fling sooner (coasts less), lower glides further.</summary>
+    public double InertiaFriction { get; set; } = 6.0;
+
+    /// <summary>Wheel ease-to-target rate per second - higher is snappier, lower glides longer to the target.</summary>
+    public double InertiaSmoothRate { get; set; } = 14.0;
+
+    /// <summary>Speed (px/s) below which a flick is treated as stopped.</summary>
+    public double MinFlickSpeed { get; set; } = 12.0;
+
+    /// <summary>Release speed (px/s) needed to start a flick.</summary>
+    public double FlickStartSpeed { get; set; } = 80.0;
+
+    private bool _inertiaActive;        // logically scrolling under inertia
+    private bool _inertiaRegistered;    // a ticker is registered with the AnimationManager
+    private Vector2? _inertiaTarget;    // set => smooth-to-target (wheel); null => flick (velocity) mode
+    private Vector2 _inertiaVelocity;   // px/s, flick mode
+
+    // Pan velocity tracking, to fling on release.
+    private long _lastMoveTimestamp;
+    private Vector2 _lastMoveOffset;
+    private Vector2 _panVelocity;
+
+    /// <summary>Enables inertial scrolling (smooth wheel + flick momentum). On by default; a ScrollViewer/theme can
+    /// turn it off to get instant scrolling back.</summary>
+    public bool IsInertiaEnabled { get; set; } = true;
 
     // When CanContentScroll is on and the hosted content contains an IScrollableContent (a virtualizing panel), this
     // presenter delegates the scroll mechanism to it instead of physically translating: the panel realizes only the
@@ -59,6 +89,13 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
 
     public void SetOffset(Vector2 offset)
     {
+        StopInertia();   // a direct (scrollbar / programmatic) offset set cancels any in-flight inertia
+        SetOffsetCore(offset);
+    }
+
+    // The actual offset set, WITHOUT cancelling inertia - used by the inertia ticker itself.
+    private void SetOffsetCore(Vector2 offset)
+    {
         if (Delegating)
         {
             _inner.SetOffset(offset);   // the panel clamps, re-windows, and raises its own metrics
@@ -71,14 +108,86 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
         InvalidateArrange();   // reposition the child; the metrics event is raised from the arrange
     }
 
+    /// <summary>Smoothly scrolls by <paramref name="delta"/> (the wheel path): eases toward an accumulating target, so
+    /// rapid notches add up instead of jumping. Instant set when inertia is off.</summary>
+    public void AnimateScrollBy(Vector2 delta)
+    {
+        if (!IsInertiaEnabled)
+        {
+            SetOffset(Offset + delta);
+            return;
+        }
+        // Accumulate into the smooth target so several quick notches build one longer glide.
+        var basis = _inertiaActive && _inertiaTarget.HasValue ? _inertiaTarget.Value : Offset;
+        _inertiaTarget = ClampOffset(basis + delta, Extent, Viewport);
+        _inertiaVelocity = default;
+        _inertiaActive = true;
+        EnsureInertiaTicker();
+    }
+
+    private void StartFlick(Vector2 velocity)
+    {
+        _inertiaVelocity = velocity;
+        _inertiaTarget = null;
+        _inertiaActive = true;
+        EnsureInertiaTicker();
+    }
+
+    private void StopInertia()
+    {
+        _inertiaActive = false;   // the registered ticker self-removes on its next advance
+        _inertiaTarget = null;
+        _inertiaVelocity = default;
+    }
+
+    private void EnsureInertiaTicker()
+    {
+        if (_inertiaRegistered) return;
+        _inertiaRegistered = true;
+        AnimationManager.AddTicker(AdvanceInertia);
+    }
+
+    // One inertia step. Smooth (wheel): exponential ease to the target. Flick: integrate velocity with friction decay.
+    // Either way it stops at the bounds (the offset stops changing) or once it has effectively settled.
+    private bool AdvanceInertia(double dt)
+    {
+        if (!_inertiaActive) { _inertiaRegistered = false; return true; }
+
+        var before = Offset;
+        Vector2 next;
+        if (_inertiaTarget.HasValue)
+        {
+            var t = 1.0 - Math.Exp(-InertiaSmoothRate * dt);
+            next = before + (_inertiaTarget.Value - before) * t;
+            if ((_inertiaTarget.Value - next).Length() < 0.5) next = _inertiaTarget.Value;
+        }
+        else
+        {
+            next = before + _inertiaVelocity * dt;
+            _inertiaVelocity *= Math.Exp(-InertiaFriction * dt);
+        }
+
+        SetOffsetCore(next);
+        var moved = (Offset - before).Length();   // 0 => clamped at a bound (or settled)
+
+        var done = _inertiaTarget.HasValue
+            ? (_inertiaTarget.Value - Offset).Length() < 0.5 || moved < 0.01
+            : _inertiaVelocity.Length() < MinFlickSpeed || moved < 0.01;
+        if (done) { _inertiaActive = false; _inertiaRegistered = false; }
+        return done;
+    }
+
     // --- Pan: drag the content itself to scroll (the no-scrollbars / touch path) ---
 
     protected override void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.Handled || PanningMode == PanningMode.None) return;   // pan off, or interactive content took the press
+        StopInertia();   // grabbing the content halts any in-flight inertia
         _isPanning = false;
         _panStartPoint = e.GetPosition(this);   // the presenter is the fixed viewport, so this space is stable
-        _panStartOffset = _offset;
+        _panStartOffset = Offset;
+        _lastMoveTimestamp = 0;
+        _panVelocity = default;
         // Capture so the drag keeps tracking once the pointer leaves the content (raw moves only honour capture).
         CaptureMouse();
     }
@@ -103,14 +212,32 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
             PanningMode.VerticalOnly => new Vector2(0, raw.Y),
             _ => raw
         };
-        SetOffset(_panStartOffset - delta);
+        SetOffsetCore(_panStartOffset - delta);   // pan drives the offset directly (Down already stopped inertia)
+
+        // Track the offset's velocity so a flick can continue it on release; blend a little so one jittery sample
+        // doesn't dominate the release velocity.
+        var now = System.Diagnostics.Stopwatch.GetTimestamp();
+        var current = Offset;
+        if (_lastMoveTimestamp != 0)
+        {
+            var moveDt = (now - _lastMoveTimestamp) / (double)System.Diagnostics.Stopwatch.Frequency;
+            if (moveDt > 0.0001)
+                _panVelocity = _panVelocity * 0.4 + (current - _lastMoveOffset) * (1.0 / moveDt) * 0.6;
+        }
+        _lastMoveTimestamp = now;
+        _lastMoveOffset = current;
         e.Handled = true;
     }
 
     protected override void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         if (IsMouseCaptured) ReleaseMouseCapture();
-        if (_isPanning) e.Handled = true;   // it was a pan, not a click
+        if (_isPanning)
+        {
+            e.Handled = true;   // it was a pan, not a click
+            if (IsInertiaEnabled && _panVelocity.Length() > FlickStartSpeed)
+                StartFlick(_panVelocity);   // fling: keep scrolling with decaying velocity
+        }
         _isPanning = false;
     }
 

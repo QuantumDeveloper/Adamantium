@@ -21,6 +21,11 @@ public static class AnimationManager
     /// static manager and get advanced against dead controls on the next tick.</summary>
     public static void Reset() => Active.Clear();
 
+    /// <summary>Registers a custom per-frame ticker driven by the same heartbeat as animations: <paramref name="advance"/>
+    /// is called each frame with the frame delta and returns true when it's done (then it's dropped). Used for
+    /// physics-style updates that aren't a property animation - e.g. scroll inertia.</summary>
+    public static void AddTicker(Func<double, bool> advance) => Active.Add(new DelegateTicker(advance));
+
     /// <summary>Advances every running animation by <paramref name="deltaSeconds"/>. Called once per frame.</summary>
     public static void Tick(double deltaSeconds)
     {
@@ -56,5 +61,14 @@ public static class AnimationManager
     internal static bool Cancel(AdamantiumComponent target, AdamantiumProperty property)
     {
         return Active.RemoveAll(a => a.Animates(target, property)) > 0;
+    }
+
+    // Wraps a delegate as a running "animation" so a non-property per-frame updater (scroll inertia) rides the heartbeat.
+    private sealed class DelegateTicker : IRunningAnimation
+    {
+        private readonly Func<double, bool> _advance;
+        public DelegateTicker(Func<double, bool> advance) => _advance = advance;
+        public bool Advance(double deltaSeconds) => _advance(deltaSeconds);
+        public bool Animates(AdamantiumComponent target, AdamantiumProperty property) => false;
     }
 }
