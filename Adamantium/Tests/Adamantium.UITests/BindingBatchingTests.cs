@@ -98,6 +98,7 @@ public class BindingBatchingTests
 
         foreach (var vm in vms) vm.Name = "changed";   // n batched, coalesced dirty bindings
 
+        var savedCap = BindingUpdateQueue.MaxAppliesPerFlush;
         try
         {
             BindingUpdateQueue.MaxAppliesPerFlush = 10;
@@ -113,6 +114,6 @@ public class BindingBatchingTests
             for (var f = 0; f < 10 && targets.Any(t => t.Text != "changed"); f++) BindingUpdateQueue.Flush();
             Assert.That(targets.All(t => t.Text == "changed"), Is.True, "the over-budget remainder drains over subsequent flushes");
         }
-        finally { BindingUpdateQueue.MaxAppliesPerFlush = 0; }
+        finally { BindingUpdateQueue.MaxAppliesPerFlush = savedCap; }
     }
 }

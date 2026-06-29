@@ -199,6 +199,7 @@ public class LayoutManagerTests
 
         foreach (var b in children) b.InvalidateArrange();   // 20 independent dirty arrange entries
 
+        var savedBudget = LayoutManager.FrameBudget;
         try
         {
             LayoutManager.FrameBudget = TimeSpan.Zero;   // process ~one node per phase per pass
@@ -218,7 +219,7 @@ public class LayoutManagerTests
             Assert.That(children.All(b => ((IMeasurableComponent)b).IsArrangeValid), Is.True,
                 "budget-deferred work completes over subsequent frames");
         }
-        finally { LayoutManager.FrameBudget = null; }
+        finally { LayoutManager.FrameBudget = savedBudget; }
     }
 
     // Phase 4: LayoutUpdated marks "layout settled this frame" - it fires once per pass that did work, and not at all on
