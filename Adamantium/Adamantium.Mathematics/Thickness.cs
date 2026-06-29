@@ -23,6 +23,12 @@ public struct Thickness
       Right = lst[2];
       Bottom = lst[3];
    }
+   
+   public Thickness(Double leftTop, Double rightBottom)
+   {
+      Left = Top = leftTop;
+      Right = Bottom = rightBottom;
+   }
 
    public Thickness(Double left, Double top, Double right, Double bottom)
    {

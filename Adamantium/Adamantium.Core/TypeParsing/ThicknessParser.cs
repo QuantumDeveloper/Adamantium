@@ -16,6 +16,11 @@ public class ThicknessParser : ITypeParser<Thickness>
             return new Thickness(double.Parse(values[0], CultureInfo.InvariantCulture));
         }
 
+        if (values.Length == 2)
+        {
+            return new Thickness(double.Parse(values[0], CultureInfo.InvariantCulture), double.Parse(values[1], CultureInfo.InvariantCulture));
+        }
+
         var list = new List<double>();
         foreach (var v in values)
         {
