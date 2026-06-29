@@ -279,9 +279,12 @@ public class TextRenderComponent : ImageRenderComponent
         // Supersampled target: TextSupersample x the logical text size. Must scale together with
         // FontRenderer.RenderScale (set in Render) — RT and rasterization scale have to match or the glyphs
         // and the target disagree (the earlier "crumpled" SSAA was exactly this mismatch).
+        // No MSAA: the glyphs are MSDF-textured quads, so their edge anti-aliasing comes from the font pixel shader
+        // (screenPxRange median) - NOT from coverage sampling. MSAA would only AA the quad's axis-aligned borders, i.e.
+        // nothing useful, while costing 4x sample memory + a resolve on every text (re)rasterization. Single-sample.
         _renderTarget = ToDispose(device.CreateRenderTarget((uint)(mesh.Bounds.Width * TextSupersample),
             (uint)(mesh.Bounds.Height * TextSupersample),
-            MSAALevel.X4,
+            MSAALevel.None,
             SurfaceFormat.R8G8B8A8.UNorm,
             name: "TextRenderer"));
         Sampler = GraphicsDevice.SamplerStates.LinearFont;
@@ -299,6 +302,18 @@ public class TextRenderComponent : ImageRenderComponent
     // Colour-only change: swap the brushes and force one re-rasterization, reusing the existing render
     // target and geometry (no buffer/RT rebuild).
     public void UpdateColors(Brush background, Brush foreground, Brush stroke)
+    {
+        Background = background;
+        Foreground = foreground;
+        Stroke = stroke;
+        _textRendered = false;
+    }
+
+    // Text-content change at the SAME size: the shared TextLayout was re-shaped in place and its glyph buffer
+    // re-uploaded, so just reuse this render target + geometry and force one re-rasterization - no new component and no
+    // Vulkan render-target allocation (the live-text / recycled-list-row fast path). Same body as UpdateColors; the name
+    // marks the intent at the call site.
+    public void UpdateText(Brush background, Brush foreground, Brush stroke)
     {
         Background = background;
         Foreground = foreground;

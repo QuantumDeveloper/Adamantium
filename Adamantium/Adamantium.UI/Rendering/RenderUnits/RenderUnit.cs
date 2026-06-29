@@ -514,22 +514,37 @@ public class TextRenderUnit : RenderUnit<TextPayload>
         
         if (Payload.RequiresBufferRebuild(inputPayload))
         {
-            inputPayload.TextLayout.Update(GraphicsDevice);
-            var pad = inputPayload.TextLayout.EffectPadding;
-            var ds = inputPayload.DesiredSize;
-            var rectangleGeometry = new RectangleGeometry(new Rect(-pad, -pad, ds.Width + 2 * pad, ds.Height + 2 * pad));
-            rectangleGeometry.ProcessGeometry(GeometryType.Both);
-            GeometryRenderer?.DeferDispose();
-            GeometryRenderer = new TextRenderComponent(GraphicsDevice, 
-                UIBasicEffect,
-                rectangleGeometry.Mesh,
-                ResourceFactory.GetFontRenderer(GraphicsDevice), 
-                inputPayload.TextLayout,
-                inputPayload.TextRenderingParameters, 
-                inputPayload.Background,
-                inputPayload.Foreground,
-                inputPayload.Stroke,
-                BufferManager);
+            inputPayload.TextLayout.Update(GraphicsDevice);   // re-upload the (re-shaped) glyph buffer either way
+
+            // Same size, same params, same (re-shaped-in-place) layout instance: only the text content changed, so the
+            // render target is the same size - reuse it and just re-rasterize, instead of disposing the component and
+            // allocating a fresh render target. The live-text (counters/clocks) + recycled-list-row fast path; the RT
+            // allocation it skips is the dominant per-change cost. Mirrors the colour-only UpdateColors path below.
+            if (GeometryRenderer is TextRenderComponent reuse
+                && Payload.DesiredSize == inputPayload.DesiredSize
+                && Payload.TextLayout == inputPayload.TextLayout
+                && Equals(Payload.TextRenderingParameters, inputPayload.TextRenderingParameters))
+            {
+                reuse.UpdateText(inputPayload.Background, inputPayload.Foreground, inputPayload.Stroke);
+            }
+            else
+            {
+                var pad = inputPayload.TextLayout.EffectPadding;
+                var ds = inputPayload.DesiredSize;
+                var rectangleGeometry = new RectangleGeometry(new Rect(-pad, -pad, ds.Width + 2 * pad, ds.Height + 2 * pad));
+                rectangleGeometry.ProcessGeometry(GeometryType.Both);
+                GeometryRenderer?.DeferDispose();
+                GeometryRenderer = new TextRenderComponent(GraphicsDevice,
+                    UIBasicEffect,
+                    rectangleGeometry.Mesh,
+                    ResourceFactory.GetFontRenderer(GraphicsDevice),
+                    inputPayload.TextLayout,
+                    inputPayload.TextRenderingParameters,
+                    inputPayload.Background,
+                    inputPayload.Foreground,
+                    inputPayload.Stroke,
+                    BufferManager);
+            }
         }
         else if (!Equals(Payload.Background, inputPayload.Background) ||
                  !Equals(Payload.Foreground, inputPayload.Foreground) ||
