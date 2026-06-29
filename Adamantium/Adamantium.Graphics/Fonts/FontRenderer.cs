@@ -2,7 +2,6 @@ using System;
 using Adamantium.FX.Effects.Generated;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.EffectsFramework;
-using Adamantium.Imaging;
 using Adamantium.Mathematics;
 using Adamantium.Vulkan.Core;
 
@@ -14,9 +13,7 @@ public class FontRenderer : GraphicsResource
     private bool beginCalled;
     private Matrix4x4F transformMatrix;
     private Type vertexType = typeof(FontItem);
-    private float currentFontSize;
-    private Size dotGlyphsSize;
-    
+
     private const float FontSizeThreshold = 14;
     // Glyph weight: a signed-distance contour bias (see FontEffect.fx). 0 = exact outline, > 0 = thicker
     // stems, < 0 = thinner. Normalized units (the field spans PixelRange texels), useful range ~[-0.15, 0.15].
@@ -60,17 +57,12 @@ public class FontRenderer : GraphicsResource
     private EffectParameter effectOutlineWidth;
     private EffectParameter effectSdfBlendLo;
     private EffectParameter effectSdfBlendHi;
-    private IEffectPass glyphEffectPass;
 
     private Vector2F currentScreenSize;
     private static readonly Vector2F[] UVCornerCoords = [Vector2F.Zero, Vector2F.UnitX, Vector2F.UnitY, Vector2F.One];
     private Matrix4x4F finalMatrix;
     private SamplerState assignedSamplerState;
-    private SamplerState _oldSamplerState;
-    private TextRenderingParameters renderingParameters;
     private IRenderTarget renderTarget;
-
-    private TextLayout _textLayout;
 
     private Color _oldClearColor;
     private IRenderTarget _oldRenderTargets;
@@ -96,7 +88,6 @@ public class FontRenderer : GraphicsResource
         effectOutlineWidth = fontEffect.OutlineWidth;
         effectSdfBlendLo = fontEffect.SdfBlendLo;
         effectSdfBlendHi = fontEffect.SdfBlendHi;
-        glyphEffectPass = fontEffect.FontBatchRenderPass;
     }
 
     public void DrawLayout(TextLayout textLayout, Color foreground, Color stroke)
@@ -104,32 +95,11 @@ public class FontRenderer : GraphicsResource
         DrawInternal(textLayout, foreground, stroke);
     }
 
-    public void DrawString(string text, string fontName, double fontSize, Rectangle textArea, TextWrapping textWrapping,
-        TextTrimming textTrimming, Color color)
-    {
-        DrawString(text, fontName, fontSize,
-            new TextRenderingParameters()
-                { TextArea = textArea, Color = color, TextWrapping = textWrapping, TextTrimming = textTrimming });
-    }
-
-    public void DrawString(string text, string fontName, double fontSize, Vector2F textOrigin, Color color)
-    {
-        DrawString(text, fontName, fontSize,
-            new TextRenderingParameters() { TextArea = new Rectangle(textOrigin, 0, 0), Color = color });
-    }
-
-    public void DrawString(string text, string fontName, double fontSize, TextRenderingParameters parameters,
-        RenderTarget renderTarget = null)
-    {
-        renderingParameters = parameters;
-        transformMatrix = Matrix4x4F.Translation(parameters.TextArea.X, parameters.TextArea.Y, 2);
-        effectMatrixTransform.SetValue(transformMatrix);
-    }
-
     public void SetState(
         SamplerState samplerState,
-        Vector3F translation, 
-        IRenderTarget renderTarget)
+        Vector3F translation,
+        IRenderTarget renderTarget,
+        bool outerPassActive = true)
     {
         if (beginCalled)
         {
@@ -146,7 +116,9 @@ public class FontRenderer : GraphicsResource
         _savedScissors = ((GraphicsDevice)GraphicsDevice).CurrentScissors;
         _savedViewports = ((GraphicsDevice)GraphicsDevice).CurrentViewports;
 
-        GraphicsDevice.EndDraw();
+        // Inline (called mid main pass): end it so we can render into the text target. Pre-pass (called from PreRender,
+        // before the main pass begins): there's no outer pass to end - skip it.
+        if (outerPassActive) GraphicsDevice.EndDraw();
 
         _oldClearColor = GraphicsDevice.ClearColor;
         _oldRenderTargets = GraphicsDevice.CurrentRenderTarget;
@@ -159,48 +131,13 @@ public class FontRenderer : GraphicsResource
         device.TransitionImagesForRendering(device.CurrentCommandBuffer, device.CurrentRenderTarget, device.CurrentRenderTarget.ResolveTexture);
         GraphicsDevice.BeginRendering(GraphicsDevice.CurrentCommandBuffer);
 
-        // assignedSamplerState = samplerState ?? GraphicsDevice.SamplerStates.LinearFont;
-        // assignedBlendState = blendState ?? GraphicsDevice.BlendStates.Fonts;
-        // assignedDepthStencilState = depthStencilState ?? GraphicsDevice.DepthStencilStates.DepthEnableGreaterEqual;
-        // assignedRasterizerState = rasterizerState ?? GraphicsDevice.RasterizerStates.CullNoneClipDisabled;
-        //
-        // oldSamplerState = GraphicsDevice.Sampler;
-        // oldBlendState = GraphicsDevice.BlendState;
-        // oldRasterizerState = GraphicsDevice.RasterizerState;
-        // oldDepthStencilState = GraphicsDevice.DepthStencilState;
-
         beginCalled = true;
     }
-
-    // private void PrepareForFlushing()
-    // {
-    //     var orthoProjection = Matrix4x4F.OrthoOffCenter(0, currentScreenSize.X, 0, currentScreenSize.Y, 0, 10000f);
-    //     Matrix4x4F.Multiply(ref transformMatrix, ref orthoProjection, out finalMatrix);
-    //
-    //     if (assignedBlendState != null)
-    //     {
-    //         oldBlendState = GraphicsDevice.BlendState;
-    //         GraphicsDevice.BlendState = assignedBlendState;
-    //     }
-    //
-    //     if (assignedDepthStencilState != null)
-    //     {
-    //         oldDepthStencilState = GraphicsDevice.DepthStencilState;
-    //         GraphicsDevice.DepthStencilState = assignedDepthStencilState;
-    //     }
-    //
-    //     if (assignedRasterizerState == null) return;
-    //
-    //     oldRasterizerState = GraphicsDevice.RasterizerState;
-    //     GraphicsDevice.RasterizerState = assignedRasterizerState;
-    // }
 
     private void DrawInternal(TextLayout layout, Color foreground, Color stroke)
     {
         if (layout.ElementsCount == 0) return;
-        
-        //layout.FontAtlas.Atlas.Save("Atlas.png", ImageFileType.Png);
-        
+
         var vp = new Viewport();
         vp.Width = currentScreenSize.X;
         vp.Height = currentScreenSize.Y;
@@ -209,14 +146,10 @@ public class FontRenderer : GraphicsResource
 
         var scissor = new Rect2D();
         scissor.Offset = new Offset2D();
-        // scissor.Offset.X = renderingParameters.TextArea.X;
-        // scissor.Offset.Y = renderingParameters.TextArea.Y;
         scissor.Extent = new Extent2D();
-        // scissor.Extent.Width = (uint)renderingParameters.TextArea.Width;
-        // scissor.Extent.Height = (uint)renderingParameters.TextArea.Height;
         scissor.Extent.Width = (uint)currentScreenSize.X;
         scissor.Extent.Height = (uint)currentScreenSize.Y;
-        
+
         // Divide the ortho extent by RenderScale while the viewport stays the full (supersampled) target:
         // the logical-size layout then maps across the whole target and rasterizes RenderScale x larger.
         // Without this division RenderScale did nothing - the text drew at 1x in a corner of the 2x target.
@@ -234,7 +167,6 @@ public class FontRenderer : GraphicsResource
         GraphicsDevice.DepthTestEnabled = false;
         GraphicsDevice.DepthWriteEnable = false;
 
-        //effectSampler.SetResource(GraphicsDevice.SamplerStates.LinearFont);
         effectSampler.SetResource(assignedSamplerState);
         effectTexture.SetResource(layout.FontAtlas.Atlas);
         effectMatrixTransform.SetValue(finalMatrix);
@@ -253,7 +185,6 @@ public class FontRenderer : GraphicsResource
         GraphicsDevice.SetVertexBuffer(layout.VertexBuffer);
         // Instanced quad: 4-vertex triangle strip per glyph (corners from SV_VertexID), one instance per glyph.
         GraphicsDevice.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
-        //GraphicsDevice.DepthTestEnabled = true;
         if (stroke == Colors.Transparent)
         {
             IEffectPass pass;
@@ -270,16 +201,15 @@ public class FontRenderer : GraphicsResource
         }
 
         GraphicsDevice.Draw(4, layout.ElementsCount);   // 4 strip verts x ElementsCount glyph instances
-        //glyphEffectPass.UnApply(true);
     }
 
-    public void RestoreState()
+    public void RestoreState(bool outerPassActive = true)
     {
         if (!beginCalled)
         {
             throw new Exception("SetState must be called before end");
         }
-        
+
         GraphicsDevice.EndDraw();
         var device = (GraphicsDevice)GraphicsDevice;
 
@@ -309,31 +239,10 @@ public class FontRenderer : GraphicsResource
         GraphicsDevice.DepthCompareFunction = CompareOp.Always;
         GraphicsDevice.ColorBlendEnabled = true;
         GraphicsDevice.ColorBlendEquation = ColorBlendEquations.AlphaBlend;
-        GraphicsDevice.BeginRendering(GraphicsDevice.CurrentCommandBuffer, true);
+        // Inline: resume the main pass we interrupted. Pre-pass (standalone): don't - the main pass hasn't begun yet
+        // (BeginDraw begins it right after PreRender), and the outer render target is already restored above.
+        if (outerPassActive) GraphicsDevice.BeginRendering(GraphicsDevice.CurrentCommandBuffer, true);
 
-        // if (oldSamplerState != null)
-        // {
-        //     GraphicsDevice.Sampler = oldSamplerState;
-        // }
-        //
-        // if (oldRasterizerState != null)
-        // {
-        //     GraphicsDevice.RasterizerState = oldRasterizerState;
-        // }
-        //
-        // if (oldBlendState != null)
-        // {
-        //     GraphicsDevice.BlendState = oldBlendState;
-        // }
-        //
-        // if (oldDepthStencilState != null)
-        // {
-        //     GraphicsDevice.DepthStencilState = oldDepthStencilState;
-        // }
-        
-        // GraphicsDevice.SetRenderTarget(null);
-        // GraphicsDevice.SetDepthBuffer(null);
-    
         beginCalled = false;
     }
 }

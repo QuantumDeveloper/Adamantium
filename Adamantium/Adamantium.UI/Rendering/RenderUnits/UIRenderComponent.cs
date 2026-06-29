@@ -321,38 +321,37 @@ public class TextRenderComponent : ImageRenderComponent
         _textRendered = false;
     }
 
-    public override void Render()
+    // Rasterize the glyphs into the private text target BEFORE the main render pass begins (this runs in the
+    // beforeRenderPass PreRender phase). So the main pass is never interrupted per text block - it only composites the
+    // pre-rastered target. SetState/RestoreState use outerPassActive:false: there is no main pass to end/resume yet
+    // (BeginDraw begins it right after PreRender), we just render this one target as a standalone pass.
+    public override void PreRender()
     {
-        // Inset the text by the effect padding inside the (padded) target so edge glyphs' outline/glow have
-        // room. The composite quad was grown by the same pad with its origin shifted -pad (see RenderUnit),
-        // which cancels this inset, keeping the text body in its exact on-screen position.
+        if (_textRendered) return;
+
+        // Inset the text by the effect padding inside the (padded) target so edge glyphs' outline/glow have room. The
+        // composite quad was grown by the same pad with its origin shifted -pad (see RenderUnit), cancelling this inset.
         var pad = TextLayout.EffectPadding;
         var location = new Vector3F(RenderingParameters.TextArea.X + pad, RenderingParameters.TextArea.Y + pad, 5);
+        var foreground = ((SolidColorBrush)Foreground).Color;
+        var stroke = Colors.Transparent;
+        var previousColor = GraphicsDevice.ClearColor;
+        // Rasterize the (logical-size) layout RenderScale x larger into the target; the composite minifies it = SSAA.
+        FontRenderer.RenderScale = TextSupersample;
+        FontRenderer.SetState(GraphicsDevice.SamplerStates.LinearFont, location, _renderTarget, outerPassActive: false);
+        FontRenderer.DrawLayout(TextLayout, foreground, stroke);
+        FontRenderer.RestoreState(outerPassActive: false);
+        GraphicsDevice.ClearColor = previousColor;
+        _textRendered = true;
+    }
 
-        var resolveTexture = _renderTarget.ResolveTexture;
-        if (!_textRendered)
-        {
-            var foreground = ((SolidColorBrush)Foreground).Color;
-            var stroke = ((SolidColorBrush)Stroke).Color;
-            var previousColor = GraphicsDevice.ClearColor;
-            stroke = Colors.Transparent;
-            //Background = new SolidColorBrush(Colors.Transparent);
-            // Rasterize the (unchanged, logical-size) layout RenderScale x larger into the supersampled
-            // target; the composite below minifies it back = SSAA. Must equal the RT's TextSupersample.
-            FontRenderer.RenderScale = TextSupersample;
-            FontRenderer.SetState(GraphicsDevice.SamplerStates.LinearFont, location, _renderTarget);
-            FontRenderer.DrawLayout(TextLayout, foreground, stroke);
-            FontRenderer.RestoreState();
-            GraphicsDevice.ClearColor = previousColor;
-            _textRendered = true;
-        }
-
-        Texture = resolveTexture;
+    public override void Render()
+    {
+        // The glyphs were rasterized into _renderTarget in PreRender (before the main pass); here we only composite it.
+        Texture = _renderTarget.ResolveTexture;
         Sampler = GraphicsDevice.SamplerStates.LinearClampToEdge;
-        //Background = new SolidColorBrush(Colors.Red);
-        // The text target holds premultiplied color (the font shaders output rgb*alpha and it was rendered
-        // with a premultiplied blend), so it must be composited with a premultiplied blend too. A straight
-        // AlphaBlend here would multiply by alpha again -> the dark rim around the text.
+        // The text target holds premultiplied color (the font shaders output rgb*alpha, rendered with a premultiplied
+        // blend), so composite it with a premultiplied blend too - a straight AlphaBlend would darken the edges (rim).
         ColorBlendEquation = ColorBlendEquations.Premultiplied;
         base.Render();
     }
