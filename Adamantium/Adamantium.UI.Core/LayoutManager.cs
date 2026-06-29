@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using Adamantium.Mathematics;
+using Adamantium.UI.Core.Data;
 using Adamantium.UI.Core.Diagnostics;
 
 namespace Adamantium.UI.Core;
@@ -83,6 +84,11 @@ public sealed class LayoutManager
     /// </summary>
     public void ExecuteLayoutPass()
     {
+        // F2: apply this frame's batched binding updates (coalesced) BEFORE laying out, so the target writes and the
+        // measure/arrange invalidations they trigger are drained by this same pass. The global queue flushes once per
+        // frame: the first root's pass empties it, later roots find it empty.
+        BindingUpdateQueue.Flush();
+
         // Forward-progress safety net: if the root itself is dirty but was never enqueued (e.g. it was invalidated
         // during construction, before this manager existed / before the subtree was assembled under it), seed it now.
         // This is O(1) - two flag reads on the root - not a tree walk, so a clean frame still costs nothing.
