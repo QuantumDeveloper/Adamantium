@@ -1,6 +1,8 @@
+using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Decorators;
 using Adamantium.UI.Controls.Panels;
+using Adamantium.UI.Core;
 using Adamantium.UI.Extensions;
 using NUnit.Framework;
 
@@ -11,6 +13,24 @@ namespace Adamantium.UITests;
 // invalidating a node DOES schedule work on the next pass, then settles back to zero.
 public class LayoutManagerTests
 {
+    // A control that re-invalidates its own measure DURING arrange, exactly once - the re-entrancy the manager must
+    // survive (the old VirtualizingPanel._inLayout crutch muted this; now the manager's drain loop must converge).
+    private sealed class ReentrantArrangeBorder : Border
+    {
+        private bool _done;
+
+        protected override Size ArrangeOverride(Size finalSize)
+        {
+            var size = base.ArrangeOverride(finalSize);
+            if (!_done)
+            {
+                _done = true;
+                InvalidateMeasure();   // re-enter the layout system mid-arrange
+            }
+            return size;
+        }
+    }
+
     private static (Border root, Border leaf) BuildTree()
     {
         var leaf = new Border { Width = 50, Height = 50 };
@@ -98,6 +118,80 @@ public class LayoutManagerTests
             Assert.That(b.Bounds.Y, Is.EqualTo(bSlotY).Within(0.5), "child re-arranged to the wrong slot (origin?) instead of its saved slot");
             // Minimal: only b (a leaf Border) re-arranged - not the whole root->stack->a->b chain.
             Assert.That(arrangeDelta, Is.EqualTo(1), "a child-only arrange invalidation should re-arrange only that child's subtree");
+        });
+    }
+
+    // Phase 3: the pass must survive invalidation that happens DURING the pass. A control that invalidates its measure
+    // inside ArrangeOverride must not corrupt the pass - it must converge and leave the tree fully valid + correctly
+    // laid out (not exit with an unarranged node because the arrange entry was consumed before its re-measure).
+    [Test]
+    public void InvalidateMeasureInsideArrangeOverride_DoesNotCorruptPass()
+    {
+        var reentrant = new ReentrantArrangeBorder { Width = 60, Height = 40 };
+        var root = new Border { Width = 200, Height = 200, Child = reentrant };
+
+        Assert.DoesNotThrow(() => WindowExtension.UpdateTree(root), "re-entrant invalidation should not throw or spin");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(reentrant.IsMeasureValid, Is.True, "re-entrant control left measure-invalid");
+            Assert.That(reentrant.IsArrangeValid, Is.True, "re-entrant control left arrange-invalid (pass exited before re-arranging it)");
+            Assert.That(reentrant.RenderSize.Width, Is.EqualTo(60).Within(0.5), "re-entrant control mis-sized after the pass");
+        });
+    }
+
+    // Phase 4: LayoutUpdated marks "layout settled this frame" - it fires once per pass that did work, and not at all on
+    // a clean frame (so a consumer can rebuild on it instead of every frame).
+    [Test]
+    public void LayoutUpdated_FiresOncePerSettledPass_NotOnCleanFrame()
+    {
+        var (root, leaf) = BuildTree();
+        var manager = LayoutManager.GetOrCreate(root);
+        var fired = 0;
+        manager.LayoutUpdated += (_, _) => fired++;
+
+        WindowExtension.UpdateTree(root);   // first pass does work
+        Assert.That(fired, Is.EqualTo(1), "LayoutUpdated should fire once when the first pass settles");
+
+        WindowExtension.UpdateTree(root);   // clean frame: nothing to do
+        Assert.That(fired, Is.EqualTo(1), "LayoutUpdated must NOT fire on a clean frame");
+
+        leaf.Width = 90;                    // dirty again
+        WindowExtension.UpdateTree(root);
+        Assert.That(fired, Is.EqualTo(2), "LayoutUpdated should fire again after a new invalidation settles");
+    }
+
+    // Phase 5: the dirty-queue model must scale - a clean frame and a single-leaf arrange cost the same regardless of
+    // tree size (the old full walk visited every node every frame).
+    [Test]
+    public void LargeTree_CleanFrameAndSingleLeafArrangeDoNotScaleWithSize()
+    {
+        var stack = new StackPanel { Orientation = Orientation.Vertical };
+        Border target = null;
+        for (var i = 0; i < 500; i++)
+        {
+            var child = new Border { Width = 40, Height = 10 };
+            if (i == 250) target = child;
+            stack.Children.Add(child);
+        }
+        var root = new Border { Width = 100, Height = 5000, Child = stack };
+
+        WindowExtension.UpdateTree(root);   // settle the 500-node tree
+
+        var measure0 = MeasurableUIComponent.TotalMeasureCalls;
+        var arrange0 = MeasurableUIComponent.TotalArrangeCalls;
+        WindowExtension.UpdateTree(root);   // clean frame
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(MeasurableUIComponent.TotalMeasureCalls - measure0, Is.EqualTo(0), "clean frame measured in a large tree");
+            Assert.That(MeasurableUIComponent.TotalArrangeCalls - arrange0, Is.EqualTo(0), "clean frame arranged in a large tree");
+
+            // Arrange-only invalidation of one leaf re-arranges exactly that leaf - not the 499 siblings.
+            var arrange1 = MeasurableUIComponent.TotalArrangeCalls;
+            target.InvalidateArrange();
+            WindowExtension.UpdateTree(root);
+            Assert.That(MeasurableUIComponent.TotalArrangeCalls - arrange1, Is.EqualTo(1), "a single leaf arrange must not scale with tree size");
         });
     }
 }

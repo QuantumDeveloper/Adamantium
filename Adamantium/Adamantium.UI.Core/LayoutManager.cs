@@ -36,6 +36,7 @@ public sealed class LayoutManager
     private readonly DirtyQueue _toStyle = new();
     private readonly DirtyQueue _toMeasure = new();
     private readonly DirtyQueue _toArrange = new();
+    private readonly List<IUIComponent> _passBuffer = new();   // reused snapshot buffer for one phase's drain
 
     public LayoutManager(IUIComponent root)
     {
@@ -70,6 +71,11 @@ public sealed class LayoutManager
 
     public void InvalidateArrange(IUIComponent node) => _toArrange.Enqueue(node);
 
+    /// <summary>Raised once at the end of a layout pass that actually did work (queues drained), i.e. when layout has
+    /// settled for this frame. Not raised on a clean frame - so a consumer (e.g. the render cache) can rebuild on this
+    /// signal instead of every frame.</summary>
+    public event EventHandler LayoutUpdated;
+
     /// <summary>
     /// Runs one layout pass: drain the style queue (apply themes - this can change templates, so it must precede
     /// measure), then the measure queue, then the arrange queue, ancestors-first within each. Re-dirtying during the
@@ -86,6 +92,7 @@ public sealed class LayoutManager
             else if (!rootMeasurable.IsArrangeValid) _toArrange.Enqueue(_root);
         }
 
+        var didWork = false;
         var iterations = 0;
         while (!_toStyle.IsEmpty || !_toMeasure.IsEmpty || !_toArrange.IsEmpty)
         {
@@ -94,11 +101,23 @@ public sealed class LayoutManager
                 if (LayoutTrace.Enabled) LayoutTrace.Log($"LAYOUT PASS aborted after {MaxPassIterations} iterations (re-dirty loop)");
                 break;
             }
+            didWork = true;
 
-            while (_toStyle.Dequeue() is { } styleNode) ApplyTheme(styleNode);
-            while (_toMeasure.Dequeue() is { } measureNode) MeasureDirty(measureNode);
-            while (_toArrange.Dequeue() is { } arrangeNode) ArrangeDirty(arrangeNode);
+            // Drain each queue as a SNAPSHOT (process only what's queued now). Work re-dirtied DURING a phase - e.g. an
+            // arrange that re-invalidates a measure - lands back in the queues and is handled on the NEXT iteration. That
+            // keeps the phases ordered (all measure before arrange) and lets a re-entrant invalidation converge, instead
+            // of consuming an arrange entry before its re-measure has run (which would leave the node unarranged).
+            _toStyle.DrainInto(_passBuffer);
+            foreach (var node in _passBuffer) ApplyTheme(node);
+
+            _toMeasure.DrainInto(_passBuffer);
+            foreach (var node in _passBuffer) MeasureDirty(node);
+
+            _toArrange.DrainInto(_passBuffer);
+            foreach (var node in _passBuffer) ArrangeDirty(node);
         }
+
+        if (didWork) LayoutUpdated?.Invoke(this, EventArgs.Empty);
     }
 
     private static void ApplyTheme(IUIComponent node)
@@ -134,11 +153,17 @@ public sealed class LayoutManager
         }
     }
 
-    private static void ArrangeDirty(IUIComponent node)
+    private void ArrangeDirty(IUIComponent node)
     {
         var control = (IMeasurableComponent)node;
-        // Base.Arrange aborts when measure is invalid; mirror that so a node still pending measure isn't parked early.
-        if (control.IsArrangeValid || !control.IsMeasureValid) return;
+        if (control.IsArrangeValid) return;
+        if (!control.IsMeasureValid)
+        {
+            // Its measure was re-dirtied (re-entrancy) after this arrange entry was queued; defer the arrange to a later
+            // iteration, after the measure queue re-drains. (Re-enqueue rather than drop, or the node stays unarranged.)
+            _toArrange.Enqueue(node);
+            return;
+        }
 
         // Arrange the node into its OWN last correct slot (preserved across invalidation), NOT parent.DesiredSize - that
         // old fallback parked a dirty child at its parent's origin (the "pile at (0,0)" bug, plan problem #3). The node's
@@ -193,14 +218,16 @@ public sealed class LayoutManager
             _heap.Enqueue(node, Depth(node));
         }
 
-        public IUIComponent Dequeue()
+        /// <summary>Removes all currently-queued nodes into <paramref name="buffer"/> in ancestors-first (depth) order.
+        /// Nodes enqueued AFTER this returns (re-dirtied during processing) stay queued for the next drain.</summary>
+        public void DrainInto(List<IUIComponent> buffer)
         {
+            buffer.Clear();
             while (_heap.Count > 0)
             {
                 var node = _heap.Dequeue();
-                if (_members.Remove(node)) return node;
+                if (_members.Remove(node)) buffer.Add(node);
             }
-            return null;
         }
 
         private static int Depth(IUIComponent node)

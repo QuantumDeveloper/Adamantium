@@ -25,12 +25,13 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
     // realized window and the arranged positions consistent.
     private Vector2 _passOffset;
 
-    // True while the panel is inside its own measure/arrange. Realizing the window rebinds each container's DataContext
-    // (PrepareContainer), which re-resolves the item template's bindings; those targets are AffectsMeasure, so the
-    // container's InvalidateMeasure would propagate UP and mark THIS panel invalid again mid-pass - then its arrange
-    // aborts (Arrange bails on an invalid measure) and freshly realized items never get positioned (they pile at the
-    // panel origin / render at stale spots). The panel's own desired size is count*itemExtent regardless of its
-    // children, so this internal churn must NOT re-invalidate the panel.
+    // The virtualizing panel's own desired size is count*itemExtent - INDEPENDENT of its children. So while it realizes
+    // /rebinds its window inside its own measure/arrange, a container's InvalidateMeasure (the rebind re-resolves the
+    // item template's AffectsMeasure bindings) must NOT propagate up and re-invalidate the panel: that would make the
+    // layout manager run a SECOND full MeasureVirtualized (re-realizing the whole window) on every pass - a ~2x layout
+    // cost on every scroll/relayout frame. Muting child-originated invalidation during the pass reflects that the
+    // panel's measure does not depend on its children (the plan's "propagate up only where the parent depends on the
+    // child" principle); the panel re-measures each realized container itself inside MeasureVirtualized.
     private bool _inLayout;
 
     public override void InvalidateMeasure()
