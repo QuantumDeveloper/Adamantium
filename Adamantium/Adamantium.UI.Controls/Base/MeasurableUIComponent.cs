@@ -207,6 +207,10 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
 
     public Size DesiredSize { get; private set; }
 
+    /// <summary>The rect this element was last arranged with (its last correct slot), preserved across invalidation so
+    /// the layout manager can re-arrange the element into it. Null until the first arrange.</summary>
+    public Rect? PreviousArrangeSlot => _previousArrange;
+
     // Test/diagnostics hook: process-wide count of Measure()/Arrange() invocations across all instances. A perf test
     // asserts a clean frame (nothing invalidated) triggers zero of these - i.e. the dirty-queue layout manager touches
     // nothing when nothing is dirty (vs. the old full-tree walk, which called Measure/Arrange on every node each frame).
@@ -581,7 +585,8 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         IsArrangeValid = false;
         IsGeometryValid = false;
         _previousMeasure = null;
-        _previousArrange = null;
+        // NOTE: _previousArrange is deliberately KEPT - it is the element's last correct slot, which the layout manager
+        // re-arranges this element into (the IsArrangeValid=false flag, not a null slot, forces the re-arrange).
 
         // Propagate up the VISUAL tree, not the logical one: layout follows the visual parent. A template part (e.g. a
         // ScrollBar's Border-rooted template) has NO logical parent, so a logical walk stopped at it - the templated
@@ -606,18 +611,25 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
 
         IsArrangeValid = false;
         IsGeometryValid = false;
+        // _previousArrange is KEPT (the last correct slot) - see InvalidateMeasure. IsArrangeValid=false forces re-arrange.
 
-        _previousArrange = null;
-
-        // Up the VISUAL tree (see InvalidateMeasure): a template part has no logical parent, so a logical walk left the
-        // templated control's arrange valid and the part was re-arranged alone against its 0 DesiredSize -> collapse.
-        if (VisualParent is IMeasurableComponent parent)
+        if (_previousArrange != null)
         {
+            // Arrange is top-down: re-running THIS element's arrange into its own last correct slot re-distributes
+            // correct rects to its children via ArrangeOverride - so an arrange-only change re-lays-out just this
+            // subtree, not the whole tree, and never parks anything at the origin. (E.g. a ScrollBar's Value is
+            // AffectsArrange on the Track, so the Track re-arranges itself into its slot and repositions the thumb -
+            // no walk up to the window. The saved slot is also what stops a 0-desired template part collapsing.)
+            LayoutManager.For(this).InvalidateArrange(this);
+        }
+        else if (VisualParent is IMeasurableComponent parent)
+        {
+            // Never arranged yet, so we own no slot: the nearest ancestor that does must arrange us. Propagate up the
+            // VISUAL tree (a template part has no logical parent, so a logical walk would stop at it).
             parent.InvalidateArrange();
         }
         else
         {
-            // Top-most arrange-dirty node: register it with the layout manager for the next pass.
             LayoutManager.For(this).InvalidateArrange(this);
         }
     }

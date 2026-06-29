@@ -11,7 +11,6 @@ public class WrapPanel : VirtualizingPanel
    private double _cellScroll = 1;      // cell size along the scroll (wrap) axis
    private int _columns = 1;            // items per line
    private int _lastFirstLine;          // remembered first visible line -> probe next pass
-   private Size _childConstraint;       // constraint the window was measured with -> re-measure in arrange if needed
 
    public static readonly AdamantiumProperty OrientationProperty = AdamantiumProperty.Register(nameof(Orientation),
       typeof(Orientation), typeof(WrapPanel), new PropertyMetadata(Orientation.Horizontal, PropertyMetadataOptions.AffectsMeasure|PropertyMetadataOptions.AffectsArrange));
@@ -275,7 +274,6 @@ public class WrapPanel : VirtualizingPanel
       // Reconcile the realized grid window to exactly [first,last] (rebind in place; hide only true surplus).
       foreach (var c in Owner.ItemContainerGenerator.SetWindow(first, last)) c.Visibility = Visibility.Collapsed;
       var childConstraint = horizontal ? new Size(_cellFlow, _cellScroll) : new Size(_cellScroll, _cellFlow);
-      _childConstraint = childConstraint;
       for (var i = first; i <= last; i++)
          ((IMeasurableComponent)RealizeInWindow(i)).Measure(childConstraint);
 
@@ -292,9 +290,6 @@ public class WrapPanel : VirtualizingPanel
       foreach (var index in Owner.ItemContainerGenerator.RealizedIndices.ToList())
       {
          if (Owner.ItemContainerGenerator.ContainerFromIndex(index) is not IMeasurableComponent container) continue;
-         // See StackPanel: re-measure a container left invalid by a rebind so Arrange positions it instead of bailing
-         // (the layout driver would otherwise park the unpositioned container at the parent origin = the pile/overlap).
-         if (!container.IsMeasureValid) container.Measure(_childConstraint);
          var line = index / _columns;
          var col = index % _columns;
          var flowPos = col * _cellFlow;
