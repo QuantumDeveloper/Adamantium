@@ -211,6 +211,10 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     /// the layout manager can re-arrange the element into it. Null until the first arrange.</summary>
     public Rect? PreviousArrangeSlot => _previousArrange;
 
+    /// <summary>The available size this element was last measured with (its cached constraint), preserved across
+    /// invalidation so the layout manager can re-measure the element with it. Null until the first measure.</summary>
+    public Size? PreviousMeasureConstraint => _previousMeasure;
+
     // Test/diagnostics hook: process-wide count of Measure()/Arrange() invocations across all instances. A perf test
     // asserts a clean frame (nothing invalidated) triggers zero of these - i.e. the dirty-queue layout manager touches
     // nothing when nothing is dirty (vs. the old full-tree walk, which called Measure/Arrange on every node each frame).
@@ -584,23 +588,26 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         IsMeasureValid = false;
         IsArrangeValid = false;
         IsGeometryValid = false;
-        _previousMeasure = null;
-        // NOTE: _previousArrange is deliberately KEPT - it is the element's last correct slot, which the layout manager
-        // re-arranges this element into (the IsArrangeValid=false flag, not a null slot, forces the re-arrange).
+        // KEEP _previousMeasure (cached constraint) and _previousArrange (slot): the manager re-measures/re-arranges this
+        // node into them. The IsMeasureValid/IsArrangeValid=false flags, not nulled caches, are what force the re-run.
 
-        // Propagate up the VISUAL tree, not the logical one: layout follows the visual parent. A template part (e.g. a
-        // ScrollBar's Border-rooted template) has NO logical parent, so a logical walk stopped at it - the templated
-        // control never re-measured/arranged, and the orphaned part was re-laid-out alone against its 0 DesiredSize
-        // (the ScrollBar Track/thumb collapsed on a Value change). A parent's measured size depends on its children, so
-        // it must re-measure too; the chain coalesces at the first already-invalid ancestor.
-        if (VisualParent is IMeasurableComponent parent)
+        if (_previousMeasure != null)
         {
+            // Already measured: re-measure THIS node with its cached constraint. The manager propagates up to the parent
+            // ONLY if this re-measure actually CHANGES our DesiredSize (i.e. the parent's measure genuinely depends on
+            // us) - so an internal change that doesn't alter our outward size re-measures only this subtree, not the
+            // whole chain up to the window.
+            LayoutManager.For(this).InvalidateMeasure(this);
+        }
+        else if (VisualParent is IMeasurableComponent parent)
+        {
+            // Never measured yet (no cached constraint of our own): the nearest ancestor that owns one must measure us.
+            // Propagate up the VISUAL tree (a template part has no logical parent, so a logical walk would stop at it -
+            // the ScrollBar Track/thumb collapse).
             parent.InvalidateMeasure();
         }
         else
         {
-            // Top-most node of this freshly-dirtied chain: register it with the layout manager so the next pass
-            // re-measures (and re-arranges - a re-measure forces a re-arrange) this subtree, instead of a full walk.
             LayoutManager.For(this).InvalidateMeasure(this);
         }
     }

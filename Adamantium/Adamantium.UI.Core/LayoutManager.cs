@@ -139,23 +139,36 @@ public sealed class LayoutManager
         var control = (IMeasurableComponent)node;
         if (control.IsMeasureValid) return;   // already measured this pass via an ancestor's cascade
 
-        // Queued measure nodes are always the TOP-most measure-invalid node of their branch (see
-        // MeasurableUIComponent.InvalidateMeasure), so measuring them with their own Width/Height (window: client size)
-        // is correct - exactly as the old driver did. MeasureOverride then cascades down, the validity gate skipping
-        // any clean subtree.
         if (LayoutTrace.Enabled)
         {
             var name = string.IsNullOrEmpty(node.Name) ? node.GetType().Name : node.Name;
             LayoutTrace.Log($"MEASURE-DIRTY {name}");
         }
 
+        var before = control.DesiredSize;
+
+        // Re-measure with the element's OWN cached constraint (the available size the parent last gave it), NOT a guess.
+        // MeasureOverride cascades down, the validity gate skipping any clean subtree. The window uses its client size;
+        // a never-measured top-most node falls back to its Width/Height (-> Infinity if auto).
         if (node is IWindow wnd)
         {
             MeasureControl(control, wnd.ClientWidth, wnd.ClientHeight);
         }
+        else if (control.PreviousMeasureConstraint is { } cached)
+        {
+            control.Measure(cached);
+        }
         else
         {
             MeasureControl(control, control.Width, control.Height);
+        }
+
+        // Finer propagation: a parent's measure depends on this child only if the child's OUTWARD size changed. If it
+        // did, invalidate the parent (re-measured next iteration, gate-skipping this now-clean child); if it did not,
+        // the re-measure stayed contained in this subtree - no walk up to the window.
+        if (control.DesiredSize != before && node.VisualParent is IMeasurableComponent { IsMeasureValid: true } parent)
+        {
+            parent.InvalidateMeasure();
         }
     }
 

@@ -542,12 +542,15 @@ public class ItemsControlTests
         var ic = ArrangedItemsControl(data);
         var gen = ic.ItemContainerGenerator;
 
-        // Containers are (re)realized on layout - the live framework triggers this from the collection change's
-        // InvalidateMeasure; the headless test drives the layout pass explicitly.
+        // Containers are (re)realized on layout. A collection change invalidates the PANEL (Revirtualize); the live
+        // framework re-measures it via the layout manager's dirty queue (MeasureDirty), so the headless test drives the
+        // panel's layout directly - re-measuring ic alone would skip it, since ic's still-valid ancestors of the panel
+        // don't re-cascade into it (finer measure propagation: a parent isn't re-measured unless its own size changed).
         void Relayout()
         {
-            ic.Measure(new Size(500, 500), true);
-            ic.Arrange(new Rect(0, 0, 500, 500), true);
+            var panel = ic.ItemsHostPanel;
+            panel.Measure(new Size(500, 500), true);
+            panel.Arrange(new Rect(0, 0, 500, 500), true);
         }
 
         string ContentAt(int i) => (gen.ContainerFromIndex(i) as ContentPresenter)?.Content as string;
@@ -697,10 +700,13 @@ public class ItemsControlTests
             Assert.That(NameAt(1), Is.EqualTo("Bob"));
         });
 
-        // Mutating the VM's collection flows through to a new container after layout.
+        // Mutating the VM's collection flows through to a new container after layout. The collection change invalidates
+        // the PANEL (Revirtualize); re-measure it directly (the manager does this via MeasureDirty at runtime) - finer
+        // measure propagation means re-measuring ic alone wouldn't re-cascade into the still-valid panel ancestors.
         vm.People.Add(new ItemVm { Name = "Carol" });
-        ic.Measure(new Size(200, 500), true);
-        ic.Arrange(new Rect(0, 0, 200, 500), true);
+        var panel = ic.ItemsHostPanel;
+        panel.Measure(new Size(200, 500), true);
+        panel.Arrange(new Rect(0, 0, 200, 500), true);
         Assert.That(NameAt(2), Is.EqualTo("Carol"), "VM collection add -> new container");
     }
 

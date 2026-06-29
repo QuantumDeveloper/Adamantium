@@ -27,6 +27,11 @@ public interface IMeasurableComponent : IObservableComponent
     /// layout manager re-arranges an arrange-dirty element into this slot rather than guessing one - the element's own
     /// ArrangeOverride then re-distributes correct rects to its children.</summary>
     Rect? PreviousArrangeSlot { get; }
+
+    /// <summary>The available size this element was last measured with (its cached constraint), or null if never
+    /// measured. The layout manager re-measures a measure-dirty element with this rather than guessing one; only if the
+    /// re-measure changes <see cref="DesiredSize"/> does it then invalidate the parent (whose measure depends on it).</summary>
+    Size? PreviousMeasureConstraint { get; }
     
     void InvalidateMeasure();
     void InvalidateArrange();

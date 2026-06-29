@@ -31,6 +31,19 @@ public class LayoutManagerTests
         }
     }
 
+    // A Border that counts how many times its MeasureOverride runs - to prove finer measure propagation (a child
+    // re-measure that doesn't change the child's size must not re-run the parent's measure).
+    private sealed class MeasureCountingBorder : Border
+    {
+        public int MeasureOverrideCount;
+
+        protected override Size MeasureOverride(Size availableSize)
+        {
+            MeasureOverrideCount++;
+            return base.MeasureOverride(availableSize);
+        }
+    }
+
     private static (Border root, Border leaf) BuildTree()
     {
         var leaf = new Border { Width = 50, Height = 50 };
@@ -119,6 +132,31 @@ public class LayoutManagerTests
             // Minimal: only b (a leaf Border) re-arranged - not the whole root->stack->a->b chain.
             Assert.That(arrangeDelta, Is.EqualTo(1), "a child-only arrange invalidation should re-arrange only that child's subtree");
         });
+    }
+
+    // Finer measure propagation: invalidating a child re-measures ONLY that subtree if the child's outward size is
+    // unchanged (the parent's measure doesn't depend on an internal change); a size change DOES propagate up.
+    [Test]
+    public void ChildRemeasure_PropagatesToParentOnlyWhenItsSizeChanges()
+    {
+        var child = new Border { Width = 50, Height = 50 };
+        var parent = new MeasureCountingBorder { Child = child };
+        var root = new Border { Width = 200, Height = 200, Child = parent };
+        WindowExtension.UpdateTree(root);   // settle
+
+        var parentMeasuresBefore = parent.MeasureOverrideCount;
+
+        // Re-measure the child WITHOUT changing its size -> the parent must not re-measure.
+        child.InvalidateMeasure();
+        WindowExtension.UpdateTree(root);
+        Assert.That(parent.MeasureOverrideCount, Is.EqualTo(parentMeasuresBefore),
+            "a child re-measure that doesn't change its size must NOT re-measure the parent");
+
+        // Change the child's size -> the change must propagate up and re-measure the parent.
+        child.Width = 80;
+        WindowExtension.UpdateTree(root);
+        Assert.That(parent.MeasureOverrideCount, Is.GreaterThan(parentMeasuresBefore),
+            "a child size change must propagate up and re-measure the parent");
     }
 
     // Phase 3: the pass must survive invalidation that happens DURING the pass. A control that invalidates its measure
