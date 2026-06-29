@@ -1,6 +1,8 @@
+using System;
+using System.Collections.Generic;
 using Adamantium.Fonts;
 
-namespace Adamantium.UI.Controls.Text;
+namespace Adamantium.UI.Core.Media;
 
 public class FontFamily
 {
@@ -13,7 +15,7 @@ public class FontFamily
     {
         Typeface = TypefaceStore.GetTypeface(fontPath.OriginalString);
     }
-    
+
     public Typeface Typeface { get; }
 
     public IReadOnlyList<IFont> Fonts => Typeface.Fonts;

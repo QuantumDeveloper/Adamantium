@@ -34,12 +34,20 @@ public class TextBlock : InputUIComponent
         typeof(bool), typeof(TextBlock),
         new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender, TextParametersChangedCallback));
     
-    public static readonly AdamantiumProperty FontFamilyProperty = AdamantiumProperty.Register(nameof(FontFamily),
-        typeof(FontFamily), typeof(TextBlock),
-        //new PropertyMetadata(new FontFamily(new Uri("J:\\AdamantiumProject\\Adamantium\\Adamantium.Game.Playground\\Fonts\\TTFFonts\\SourceSans3-Regular.ttf")), PropertyMetadataOptions.AffectsRender));
-        //new PropertyMetadata(new FontFamily(new Uri("J:\\AdamantiumProject\\Adamantium\\Adamantium.Game.Playground\\Fonts\\OTFFonts\\Crimson-Italic.otf")), PropertyMetadataOptions.AffectsRender));
-        new PropertyMetadata(new FontFamily("Cambria"), PropertyMetadataOptions.AffectsRender));
-    
+    // FontFamily is declared (inherited) on UIComponent. On a TextBlock a font change must re-shape the text, so override
+    // the metadata with a callback that re-measures - this fires on BOTH a direct set and an inherited change cascaded
+    // from an ancestor (RaiseInheritedChange invokes the callback; the AffectsMeasure flag would not fire on the cascade).
+    static TextBlock()
+    {
+        FontFamilyProperty.OverrideMetadata(typeof(TextBlock),
+            new PropertyMetadata(null, PropertyMetadataOptions.Inherits, OnFontFamilyChanged));
+    }
+
+    private static void OnFontFamilyChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        (a as TextBlock)?.InvalidateMeasure();
+    }
+
     public static readonly AdamantiumProperty FontSizeProperty = AdamantiumProperty.Register(nameof(FontSize),
         typeof(double), typeof(TextBlock),
         new PropertyMetadata(12.0d, PropertyMetadataOptions.AffectsMeasure|PropertyMetadataOptions.AffectsRender));
@@ -74,6 +82,7 @@ public class TextBlock : InputUIComponent
     // affects the layout changes.
     private Size _cachedSize;
     private bool _hasLayout;
+    private FontFamily _layoutFont;   // the font _textLayout was built for (typeface is fixed per TextLayout)
     private string _lastText;
     private double _lastFontSize, _lastWidth, _lastHeight;
     private TextWrapping _lastWrapping;
@@ -85,7 +94,8 @@ public class TextBlock : InputUIComponent
     public TextBlock()
     {
         Id = Guid.NewGuid().ToString();
-        _textLayout = new TextLayout(FontFamily.Typeface, FontFamily.Fonts[0]);
+        // _textLayout is built lazily in EnsureLayout: FontFamily is inherited and may be null here (it resolves against
+        // an ancestor / DefaultFontFamily), and the typeface is fixed per TextLayout, so it's rebuilt when the font changes.
     }
 
     // Shapes the text only when an input that affects the layout changed since the last call; otherwise returns the
@@ -93,6 +103,16 @@ public class TextBlock : InputUIComponent
     // double.Equals so NaN==NaN counts as "unchanged" (an auto-sized label stays a cache hit while its parent resizes).
     private Size EnsureLayout()
     {
+        // Resolve the inherited font (falling back to the single shared default), and (re)build the layout when it
+        // changes - the typeface is fixed per TextLayout, so a font change means a new TextLayout for that face.
+        var font = FontFamily ?? DefaultFontFamily;
+        if (_textLayout == null || !ReferenceEquals(_layoutFont, font))
+        {
+            _textLayout = new TextLayout(font.Typeface, font.Fonts[0]);
+            _layoutFont = font;
+            _hasLayout = false;
+        }
+
         if (_hasLayout
             && _lastText == Text && _lastFontSize.Equals(FontSize)
             && _lastWidth.Equals(Width) && _lastHeight.Equals(Height)
@@ -151,12 +171,6 @@ public class TextBlock : InputUIComponent
     {
         get => GetValue<bool>(JustifyLastLineProperty);
         set => SetValue(JustifyLastLineProperty, value);
-    }
-
-    public FontFamily FontFamily
-    {
-        get => GetValue<FontFamily>(FontFamilyProperty);
-        set => SetValue(FontFamilyProperty, value);
     }
 
     public double FontSize

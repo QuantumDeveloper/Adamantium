@@ -11,6 +11,9 @@ public class Theme : AdamantiumComponent, ITheme
         StyleIncludes = new StyleIncludeCollection();
         ResourceManager = UIAppContext.Current.ResourceManager;
         MergedStyles = new StyleSet();
+        // Seed the theme's font so it's a real (non-null) property value from the start: a {ThemeResource FontFamily}
+        // binding reads the raw GetValue, and a theme can override it (live) to restyle all text.
+        FontFamily = SystemDefaultFontFamily;
     }
 
     public Theme(string name) : this()
@@ -21,6 +24,28 @@ public class Theme : AdamantiumComponent, ITheme
     public string Name { get; protected set; }
 
     public Brush AccentColor { get; set; }
+
+    private static FontFamily _systemDefaultFontFamily;
+
+    /// <summary>The per-platform system UI font - the single place the platform font choice lives, used as the default
+    /// for any theme that doesn't pick its own.</summary>
+    public static FontFamily SystemDefaultFontFamily => _systemDefaultFontFamily ??= new FontFamily(
+        OperatingSystem.IsWindows() ? "Segoe UI" : OperatingSystem.IsMacOS() ? "Helvetica" : "DejaVu Sans");
+
+    // The font is the theme's runtime-mutable identity, like the accent brushes above: it's an AdamantiumProperty so a
+    // change raises PropertyChanged and every consumer (a {ThemeResource FontFamily} binding in a style) refreshes live -
+    // no theme reload.
+    public static readonly AdamantiumProperty FontFamilyProperty = AdamantiumProperty.Register(
+        nameof(FontFamily), typeof(FontFamily), typeof(Theme), new PropertyMetadata(null));
+
+    /// <summary>The theme's font for text - consume it in styles via <c>{ThemeResource FontFamily}</c> (descendants also
+    /// inherit it through UIComponent.FontFamily). Unset falls back to <see cref="SystemDefaultFontFamily"/>; changing it
+    /// at runtime refreshes every consumer live (it's an observable AdamantiumProperty).</summary>
+    public FontFamily FontFamily
+    {
+        get => GetValue<FontFamily>(FontFamilyProperty) ?? SystemDefaultFontFamily;
+        set => SetValue(FontFamilyProperty, value);
+    }
 
     // Accent/focus brushes are the theme's runtime-mutable identity: change one (theme.AccentFillColorDefault = ...)
     // and every {ThemeResource} binding refreshes live - no theme reload. The static palette stays in the brush

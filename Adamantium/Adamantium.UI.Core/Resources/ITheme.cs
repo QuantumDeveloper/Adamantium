@@ -6,8 +6,12 @@ namespace Adamantium.UI.Core.Resources;
 public interface ITheme: IInitializable, IAdamantiumComponent
 {
     string Name { get; }
-    
+
     Brush AccentColor { get; set; }
+
+    /// <summary>The theme's font for text - consumed in styles via {ThemeResource FontFamily} and inherited via
+    /// UIComponent.FontFamily.</summary>
+    FontFamily FontFamily { get; }
     
     StyleSetCollection StyleSets { get; }
     
