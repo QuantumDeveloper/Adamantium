@@ -204,8 +204,15 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     public bool IsMeasureValid { get; private set; }
 
     public bool IsArrangeValid { get; private set; }
-    
+
     public Size DesiredSize { get; private set; }
+
+    // Test/diagnostics hook: process-wide count of Measure()/Arrange() invocations across all instances. A perf test
+    // asserts a clean frame (nothing invalidated) triggers zero of these - i.e. the dirty-queue layout manager touches
+    // nothing when nothing is dirty (vs. the old full-tree walk, which called Measure/Arrange on every node each frame).
+    public static long TotalMeasureCalls { get; private set; }
+
+    public static long TotalArrangeCalls { get; private set; }
 
     /// <summary>
     /// Measures the control and its child elements as part of a layout pass.
@@ -252,6 +259,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     /// </param>
     public void Measure(Size availableSize, bool force = false)
     {
+        TotalMeasureCalls++;
         if (Double.IsNaN(availableSize.Width) || Double.IsNaN(availableSize.Height))
         {
             throw new InvalidOperationException("Cannot call Measure using a size with NaN values.");
@@ -319,6 +327,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     /// </param>
     public void Arrange(Rect rect, bool force = false)
     {
+        TotalArrangeCalls++;
         if (IsInvalidRect(rect))
         {
             throw new InvalidOperationException("Invalid Arrange rectangle.");
@@ -577,17 +586,24 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         // Propagate up the VISUAL tree, not the logical one: layout follows the visual parent. A template part (e.g. a
         // ScrollBar's Border-rooted template) has NO logical parent, so a logical walk stopped at it - the templated
         // control never re-measured/arranged, and the orphaned part was re-laid-out alone against its 0 DesiredSize
-        // (the ScrollBar Track/thumb collapsed on a Value change).
+        // (the ScrollBar Track/thumb collapsed on a Value change). A parent's measured size depends on its children, so
+        // it must re-measure too; the chain coalesces at the first already-invalid ancestor.
         if (VisualParent is IMeasurableComponent parent)
         {
             parent.InvalidateMeasure();
+        }
+        else
+        {
+            // Top-most node of this freshly-dirtied chain: register it with the layout manager so the next pass
+            // re-measures (and re-arranges - a re-measure forces a re-arrange) this subtree, instead of a full walk.
+            LayoutManager.For(this).InvalidateMeasure(this);
         }
     }
 
     public virtual void InvalidateArrange()
     {
         if (!IsArrangeValid) return;
-        
+
         IsArrangeValid = false;
         IsGeometryValid = false;
 
@@ -598,6 +614,11 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         if (VisualParent is IMeasurableComponent parent)
         {
             parent.InvalidateArrange();
+        }
+        else
+        {
+            // Top-most arrange-dirty node: register it with the layout manager for the next pass.
+            LayoutManager.For(this).InvalidateArrange(this);
         }
     }
 }

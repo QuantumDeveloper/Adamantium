@@ -409,17 +409,23 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
     
     public void InvalidateStyles()
     {
-        if (UIAppContext.Current == null) 
+        if (UIAppContext.Current == null)
             return;
 
         IsStyleApplied = false;
-        
-        // UIAppContext.Current.UIContext.ThemeContext.ApplyCurrentTheme(this);
-        // UIAppContext.Current.UIContext.ThemeContext.ApplyExternalStyles(this, Styles.ToArray());
-        
-        foreach (var component in LogicalChildrenCollection)
+
+        // Register for re-theming on the next layout pass instead of relying on a per-frame full-tree walk to notice
+        // the cleared flag. The style queue is drained at the START of the pass, BEFORE measure, because applying a
+        // theme can swap a control's Template - changing the very subtree that then gets measured. (Attaching a node to
+        // the tree still applies its theme synchronously; this queue path covers a bulk re-theme, e.g. a theme swap.)
+        if (this is IUIComponent component)
         {
-            component.InvalidateStyles();
+            LayoutManager.For(component).InvalidateStyle(component);
+        }
+
+        foreach (var child in LogicalChildrenCollection)
+        {
+            child.InvalidateStyles();
         }
     }
 
