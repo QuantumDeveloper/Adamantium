@@ -21,6 +21,11 @@ public static class BindingUpdateQueue
     private static readonly HashSet<BindingExpressionBase> Dirty = new();
     private static readonly List<BindingExpressionBase> Batch = new();   // reused snapshot buffer
 
+    /// <summary>F2 budget: the maximum number of binding updates applied per <see cref="Flush"/> (i.e. per frame).
+    /// 0 = unlimited (the default). Set it (e.g. 50000, 10000) to bound the cost of a binding storm: anything over the
+    /// cap stays dirty and drains over later frames instead of all applying in one frame.</summary>
+    public static int MaxAppliesPerFlush { get; set; }
+
     /// <summary>Marks an expression for the next coalesced flush (deduped: enqueuing twice still applies once).</summary>
     public static void Enqueue(BindingExpressionBase expression)
     {
@@ -40,8 +45,22 @@ public static class BindingUpdateQueue
         {
             if (Dirty.Count == 0) return;
             Batch.Clear();
-            Batch.AddRange(Dirty);
-            Dirty.Clear();
+            if (MaxAppliesPerFlush > 0 && Dirty.Count > MaxAppliesPerFlush)
+            {
+                // Over budget: apply only the first N this flush; the rest stay dirty and drain over later frames.
+                foreach (var expression in Dirty)
+                {
+                    Batch.Add(expression);
+                    if (Batch.Count >= MaxAppliesPerFlush) break;
+                }
+                foreach (var expression in Batch) 
+                    Dirty.Remove(expression);
+            }
+            else
+            {
+                Batch.AddRange(Dirty);
+                Dirty.Clear();
+            }
         }
         // Apply OUTSIDE the lock: ApplyPending runs converters + SetValue and can re-enter Enqueue (dependent bindings),
         // which would deadlock under the lock; those re-enqueues land in Dirty for the next flush.
