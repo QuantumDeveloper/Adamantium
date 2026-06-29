@@ -3,8 +3,10 @@
           xmlns:x="http://adamantium/ui/xaml/extensions"
           xmlns:controls="http://adamantium/ui">
 
-    <!-- Default Thumb visual: a rounded fill that the Track sizes/positions. Used by the ScrollBar (and any future
-         Slider / GridSplitter). Split per the small-styles convention: one style for the template. -->
+    <!-- Default Thumb visual: a rounded fill that the Track sizes/positions. Used by the ScrollBar (the Slider supplies
+         its own round accent thumb inline, so this only affects the scrollbar). Rounded is fine here: the thumb sits
+         INSIDE the (square) trough, so its corners are over the trough fill, not over the scrolled content - no corner
+         show-through. Split per the small-styles convention: one style for the template. -->
     <Style Selector="Thumb">
         <Setter Property="Template">
             <Setter.Value>

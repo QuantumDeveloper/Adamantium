@@ -17,8 +17,12 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ScrollBar">
+                    <!-- Square trough: it sits over the scrolled CONTENT, and a rounded corner leaves the bounding-box
+                         corner triangle (outside the arc) transparent, so bright content shows through there as a stray
+                         "dead pixel". Square fills its box -> no corner show-through. The thumb (inside, over the trough)
+                         stays rounded. -->
                     <controls:Border Background="{TemplateBinding Background}"
-                                     CornerRadius="6">
+                                     CornerRadius="0">
                         <!-- The Track is pure layout now; the template supplies its parts (a grey thumb + two invisible,
                              hit-testable page areas). -->
                         <controls:Track x:Name="PART_Track"
