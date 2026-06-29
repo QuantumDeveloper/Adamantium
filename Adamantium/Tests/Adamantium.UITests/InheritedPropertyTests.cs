@@ -109,6 +109,7 @@ public class InheritedPropertyTests
         Assert.That(child.Text, Is.EqualTo("Alice"));
 
         vm.Name = "Bob";
+        BindingUpdateQueue.Flush();   // F2: a runtime source change is applied once per frame (batched); flush to apply now
         Assert.That(child.Text, Is.EqualTo("Bob"));
     }
 }

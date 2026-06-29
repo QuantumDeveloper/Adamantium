@@ -35,6 +35,22 @@ public abstract class BindingExpressionBase
    public virtual void UpdateTarget()
    { }
 
+   // F2: queue this expression for the once-per-frame coalesced flush instead of pushing synchronously - unless the
+   // binding opted into immediate application (a side-effect binding). Used for RUNTIME source changes; the initial
+   // connect push stays synchronous.
+   protected void ScheduleUpdate()
+   {
+      // Only a TOP-LEVEL binding (one that writes to a UI target) is batched. A producer (TargetProperty == null, a
+      // MultiBinding child) feeds its parent synchronously - it's combinator plumbing, not a target write, and is also
+      // exercised in isolation with no frame to flush it. IsImmediate opts a side-effect binding back to synchronous.
+      if (TargetProperty == null || BindingBase?.IsImmediate == true) ApplyPending();
+      else BindingUpdateQueue.Enqueue(this);
+   }
+
+   // F2: apply the pending (coalesced) update - reads the CURRENT source value and pushes it to the target. Called by
+   // the per-frame BindingUpdateQueue flush; reading the latest value is what makes N source changes collapse to one.
+   internal virtual void ApplyPending() => UpdateTarget();
+
    public abstract void EstablishConnection();
    public abstract void CloseConnection();
 

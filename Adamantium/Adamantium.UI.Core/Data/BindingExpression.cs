@@ -77,6 +77,7 @@ public class BindingExpression : BindingExpressionBase
 
    public override void CloseConnection()
    {
+      BindingUpdateQueue.Remove(this);   // F2: a closed binding must not be applied by a later flush
       if (_observed != null)
       {
          _observed.PropertyChanged -= OnSourcePropertyChanged;
@@ -113,9 +114,14 @@ public class BindingExpression : BindingExpressionBase
 
    private void OnSourcePropertyChanged(object sender, PropertyChangedEventArgs e)
    {
+      // F2: a runtime source change is batched + coalesced (applied once per frame), not pushed synchronously.
       if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == SourcePropertyName)
-         Refresh();
+         ScheduleUpdate();
    }
+
+   // F2: the coalesced apply reads the current source value (producer mode publishes ProducedValue, top-level pushes
+   // to the target) - same path as a source change, just deferred to the per-frame flush.
+   internal override void ApplyPending() => Refresh();
 
    private void OnTargetPropertyChanged(object sender, AdamantiumPropertyChangedEventArgs e)
    {
