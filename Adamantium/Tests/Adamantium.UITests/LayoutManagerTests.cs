@@ -47,6 +47,20 @@ public class LayoutManagerTests
         }
     }
 
+    // A visual root with a client viewport (for the visible-first test), mirroring a window's role.
+    private sealed class TestWindowRoot : Grid, Adamantium.UI.Core.IRootVisualComponent
+    {
+        public Vector2 PointToClient(Vector2 point) => point;
+        public Vector2 PointToScreen(Vector2 point) => point;
+        public void AttachContextAndInitialize(Adamantium.UI.Core.IUIContext context) { }
+        public double Left { get; set; }
+        public double Top { get; set; }
+        public string Title { get; set; }
+        public double ClientWidth { get; set; }
+        public double ClientHeight { get; set; }
+        public Adamantium.UI.Core.IUIContext UIContext => null;
+    }
+
     private static (Border root, Border leaf) BuildTree()
     {
         var leaf = new Border { Width = 50, Height = 50 };
@@ -220,6 +234,82 @@ public class LayoutManagerTests
                 "budget-deferred work completes over subsequent frames");
         }
         finally { LayoutManager.FrameBudget = savedBudget; }
+    }
+
+    // F1 refinement: under a budget, on-screen dirty nodes are processed before off-screen ones (the off-screen work
+    // is what gets deferred).
+    [Test]
+    public void FrameBudget_ProcessesVisibleNodesBeforeOffScreen()
+    {
+        var root = new TestWindowRoot { Width = 200, Height = 200, ClientWidth = 200, ClientHeight = 200 };
+        var stack = new StackPanel { Orientation = Orientation.Vertical };
+        root.Children.Add(stack);
+        var kids = new List<Border>();
+        for (var i = 0; i < 8; i++) { var b = new Border { Width = 50, Height = 50 }; kids.Add(b); stack.Children.Add(b); }
+        WindowExtension.UpdateTree(root);   // settle: kids 0-3 sit in the 200px viewport, 4-7 below it
+
+        foreach (var b in kids) b.InvalidateArrange();
+
+        var savedBudget = LayoutManager.FrameBudget;
+        try
+        {
+            LayoutManager.FrameBudget = TimeSpan.Zero;   // ~one node/pass
+            for (var p = 0; p < 3; p++) WindowExtension.UpdateTree(root);   // 3 passes (< the anti-starvation threshold)
+
+            Assert.Multiple(() =>
+            {
+                for (var i = 4; i < 8; i++)
+                    Assert.That(((IMeasurableComponent)kids[i]).IsArrangeValid, Is.False, $"off-screen kid {i} must be deferred behind the visible ones");
+                Assert.That(Enumerable.Range(0, 4).Count(i => ((IMeasurableComponent)kids[i]).IsArrangeValid), Is.GreaterThan(0),
+                    "on-screen kids are processed first");
+            });
+        }
+        finally { LayoutManager.FrameBudget = savedBudget; }
+    }
+
+    // F1 refinement (anti-starvation): a sustained backlog must not crawl one node per frame forever - after a few
+    // budget-capped passes the manager drops the budget for one pass and clears it.
+    [Test]
+    public void FrameBudget_AntiStarvation_DrainsBacklogInBoundedPasses()
+    {
+        var stack = new StackPanel { Orientation = Orientation.Vertical };
+        var kids = new List<Border>();
+        for (var i = 0; i < 30; i++) { var b = new Border { Width = 40, Height = 10 }; kids.Add(b); stack.Children.Add(b); }
+        var root = new Border { Width = 100, Height = 2000, Child = stack };
+        WindowExtension.UpdateTree(root);
+
+        foreach (var b in kids) b.InvalidateArrange();
+
+        var savedBudget = LayoutManager.FrameBudget;
+        try
+        {
+            LayoutManager.FrameBudget = TimeSpan.Zero;   // 1 node/pass without anti-starvation -> would need ~30 passes
+            var passes = 0;
+            while (kids.Any(b => !((IMeasurableComponent)b).IsArrangeValid) && passes < 50)
+            {
+                WindowExtension.UpdateTree(root);
+                passes++;
+            }
+            Assert.Multiple(() =>
+            {
+                Assert.That(kids.All(b => ((IMeasurableComponent)b).IsArrangeValid), Is.True, "the whole backlog drains");
+                Assert.That(passes, Is.LessThanOrEqualTo(6), "anti-starvation clears the backlog in a bounded number of passes, not one-per-frame");
+            });
+        }
+        finally { LayoutManager.FrameBudget = savedBudget; }
+    }
+
+    // F1 deferred-render guarantee (emergent): a never-arranged node has empty Bounds, so the renderer draws nothing for
+    // it until it's laid out - a budget-deferred brand-new subtree shows nothing rather than garbage.
+    [Test]
+    public void NeverArrangedNode_HasEmptyBounds()
+    {
+        var fresh = new Border { Width = 50, Height = 50 };
+        Assert.Multiple(() =>
+        {
+            Assert.That(fresh.Bounds.Width, Is.EqualTo(0).Within(0.001), "a never-arranged node has empty bounds (drawn as nothing until laid out)");
+            Assert.That(((IMeasurableComponent)fresh).PreviousArrangeSlot, Is.Null, "and no saved arrange slot yet");
+        });
     }
 
     // Phase 4: LayoutUpdated marks "layout settled this frame" - it fires once per pass that did work, and not at all on

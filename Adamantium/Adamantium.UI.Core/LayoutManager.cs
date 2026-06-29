@@ -44,7 +44,10 @@ public sealed class LayoutManager
     private readonly DirtyQueue _toMeasure = new();
     private readonly DirtyQueue _toArrange = new();
     private readonly List<IUIComponent> _passBuffer = new();   // reused snapshot buffer for one phase's drain
+    private readonly List<IUIComponent> _offscreenBuffer = new();   // scratch for the visible-first partition
     private readonly System.Diagnostics.Stopwatch _passStopwatch = new();   // reused per pass (no per-frame allocation)
+    private int _deferredStreak;   // consecutive budget-capped passes that didn't fully drain (anti-starvation)
+    private const int MaxDeferredPasses = 4;   // after this many, drop the budget for one pass to clear the backlog
 
     public LayoutManager(IUIComponent root)
     {
@@ -108,8 +111,13 @@ public sealed class LayoutManager
         // F1: optional per-frame time budget. Null = unlimited (drain everything - the default, behaviour-neutral). When
         // set, the pass processes dirty nodes until the budget is spent, then defers the rest to the next frame - a
         // deferred subtree keeps its last Bounds and renders in place (graceful lag, not a hole).
+        // Anti-starvation: if the queues have stayed un-drained for too many budget-capped passes, drop the budget for
+        // THIS pass and drain fully - one slower frame clears the backlog instead of it growing forever.
         var budget = FrameBudget;
+        if (budget.HasValue && _deferredStreak >= MaxDeferredPasses) budget = null;
         if (budget.HasValue) _passStopwatch.Restart();
+        // Visible-first prioritisation only matters when the budget can actually defer work; skip its cost otherwise.
+        var viewport = budget.HasValue ? Viewport : null;
 
         var didWork = false;
         var iterations = 0;
@@ -127,22 +135,27 @@ public sealed class LayoutManager
             // re-dirtied DURING a phase lands back in the queues and is handled on the NEXT iteration - keeping the
             // phases ordered and letting re-entrant invalidation converge. Stop the whole pass the moment a phase runs
             // out of budget (its tail is re-queued for the next frame).
-            withinBudget = DrainPhase(_toStyle, ApplyTheme, budget)
-                        && DrainPhase(_toMeasure, MeasureDirty, budget)
-                        && DrainPhase(_toArrange, ArrangeDirty, budget);
+            withinBudget = DrainPhase(_toStyle, ApplyTheme, budget, viewport)
+                        && DrainPhase(_toMeasure, MeasureDirty, budget, viewport)
+                        && DrainPhase(_toArrange, ArrangeDirty, budget, viewport);
         }
 
+        var settled = _toStyle.IsEmpty && _toMeasure.IsEmpty && _toArrange.IsEmpty;
+        _deferredStreak = settled ? 0 : _deferredStreak + 1;
+
         // LayoutUpdated = "layout settled this frame" - only when everything drained, not when budget-deferred.
-        if (didWork && _toStyle.IsEmpty && _toMeasure.IsEmpty && _toArrange.IsEmpty)
+        if (didWork && settled)
             LayoutUpdated?.Invoke(this, EventArgs.Empty);
     }
 
     // Drains one queue as a snapshot, ancestors-first. Returns true if it emptied the snapshot, false if it stopped on
     // the frame budget (re-queuing the unprocessed tail for the next frame). Always processes at least one node, so a
-    // tiny/zero budget still makes forward progress.
-    private bool DrainPhase(DirtyQueue queue, Action<IUIComponent> process, TimeSpan? budget)
+    // tiny/zero budget still makes forward progress. Under a budget, on-screen nodes are processed first so it's the
+    // off-screen work that gets deferred.
+    private bool DrainPhase(DirtyQueue queue, Action<IUIComponent> process, TimeSpan? budget, Rect? viewport)
     {
         queue.DrainInto(_passBuffer);
+        if (viewport.HasValue && _passBuffer.Count > 1) PrioritizeVisibleFirst(_passBuffer, viewport.Value);
         var count = _passBuffer.Count;
         for (var i = 0; i < count; i++)
         {
@@ -154,6 +167,34 @@ public sealed class LayoutManager
             }
         }
         return true;
+    }
+
+    // The root's on-screen area (world coords), or null if the root has no client size (e.g. an unsized test root).
+    private Rect? Viewport => _root is IRootVisualComponent r && r.ClientWidth > 0 && r.ClientHeight > 0
+        ? new Rect(0, 0, r.ClientWidth, r.ClientHeight)
+        : null;
+
+    // Stable-partition the buffer so on-screen nodes come first (each group keeps its ancestors-first depth order), so
+    // under the budget the visible work is done first and the off-screen work is what gets deferred.
+    private void PrioritizeVisibleFirst(List<IUIComponent> buffer, Rect viewport)
+    {
+        _offscreenBuffer.Clear();
+        var write = 0;
+        for (var read = 0; read < buffer.Count; read++)
+        {
+            if (IsOnScreen(buffer[read], viewport)) buffer[write++] = buffer[read];
+            else _offscreenBuffer.Add(buffer[read]);
+        }
+        for (var k = 0; k < _offscreenBuffer.Count; k++) buffer[write++] = _offscreenBuffer[k];
+    }
+
+    private static bool IsOnScreen(IUIComponent node, Rect viewport)
+    {
+        var b = node.Bounds;
+        if (b.Width <= 0 || b.Height <= 0) return true;   // unsized / brand-new -> don't deprioritise it
+        var w = b.TransformToAABB(node.WorldTransform);
+        return w.X < viewport.X + viewport.Width && w.X + w.Width > viewport.X
+            && w.Y < viewport.Y + viewport.Height && w.Y + w.Height > viewport.Y;
     }
 
     private static void ApplyTheme(IUIComponent node)
