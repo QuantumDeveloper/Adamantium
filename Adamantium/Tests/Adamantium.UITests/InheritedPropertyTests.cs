@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core.Data;
 using NUnit.Framework;
@@ -93,6 +94,16 @@ public class InheritedPropertyTests
 
         parent.DataContext = second;
         Assert.That(child.DataContext, Is.SameAs(second));
+    }
+
+    [Test]
+    public void FontFamily_IsInheritedProperty()
+    {
+        // FontFamily is declared on UIComponent and inherited; TextBlock OverrideMetadata must preserve Inherits so a
+        // font set on an ancestor (window/panel) still cascades to descendant text. The end-to-end cascade + the
+        // re-shape on change are verified visually in the running app; this guards the registration from regressing.
+        var metadata = UIComponent.FontFamilyProperty.GetDefaultMetadata(typeof(TextBlock));
+        Assert.That(metadata.Inherits, Is.True);
     }
 
     [Test]

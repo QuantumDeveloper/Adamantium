@@ -3,6 +3,7 @@ using Adamantium.Core.Collections;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Media;
+using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Controls.Base;
@@ -59,6 +60,14 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         (d as UIComponent)?.InvalidateRender(true);
     }
 
+    // Font family is INHERITED (like DataContext): set it on any element (a window, a panel) and every descendant's text
+    // picks it up unless it sets its own. Default null = "inherit"; at the root a null resolves to DefaultFontFamily.
+    // No layout flags here (they don't fire on inherited propagation anyway - see AdamantiumComponent.RaiseInheritedChange);
+    // TextBlock OverrideMetadata's it with a callback that re-measures, which fires on both a direct set AND the cascade.
+    public static readonly AdamantiumProperty FontFamilyProperty = AdamantiumProperty.Register(nameof(FontFamily),
+        typeof(FontFamily), typeof(UIComponent),
+        new PropertyMetadata(null, PropertyMetadataOptions.Inherits));
+
     #endregion
 
     #region Events
@@ -103,7 +112,28 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         set => SetValue(IsHitTestVisibleProperty, value);
     }
 
+    /// <summary>The inherited font family for text in this element and its descendants. Unset (null) means "inherit from
+    /// the parent"; at the root a null resolves to <see cref="DefaultFontFamily"/>.</summary>
+    public FontFamily FontFamily
+    {
+        get => GetValue<FontFamily>(FontFamilyProperty);
+        set => SetValue(FontFamilyProperty, value);
+    }
+
     #endregion
+
+    private static FontFamily _defaultFontFamilyOverride;
+
+    /// <summary>The fallback font used when no <see cref="FontFamily"/> is set anywhere up the tree. By default it is the
+    /// CURRENT THEME's <see cref="Theme.FontFamily"/> - the theme owns the look; assign this to override globally
+    /// regardless of theme. The per-platform default itself lives in the theme (<see cref="Theme.SystemDefaultFontFamily"/>).</summary>
+    public static FontFamily DefaultFontFamily
+    {
+        get => _defaultFontFamilyOverride
+            ?? UIAppContext.Current?.ThemeManager?.CurrentTheme?.FontFamily
+            ?? Theme.SystemDefaultFontFamily;   // no theme yet (e.g. headless tests)
+        set => _defaultFontFamilyOverride = value;
+    }
 
     public UIComponent()
     {
