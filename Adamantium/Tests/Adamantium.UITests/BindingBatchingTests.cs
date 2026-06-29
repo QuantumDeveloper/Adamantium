@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
+using System.Linq;
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core.Data;
 using NUnit.Framework;
@@ -75,5 +77,42 @@ public class BindingBatchingTests
 
         vm.Name = "B";
         Assert.That(target.Text, Is.EqualTo("B"), "an IsImmediate binding applies synchronously, without a flush");
+    }
+
+    [Test]
+    public void FlushBudget_CapsAppliesPerFlush_DrainsOverFlushes()
+    {
+        const int n = 50;
+        var converter = new CountingConverter();
+        var targets = new List<TextBlock>();
+        var vms = new List<Vm>();
+        for (var i = 0; i < n; i++)
+        {
+            var vm = new Vm { Name = "init" };
+            var t = new TextBlock { DataContext = vm };
+            t.SetBinding("Text", new Binding("Name") { Converter = converter });
+            vms.Add(vm);
+            targets.Add(t);
+        }
+        BindingUpdateQueue.Flush();   // clear any leftover from other tests; setup connects are synchronous anyway
+
+        foreach (var vm in vms) vm.Name = "changed";   // n batched, coalesced dirty bindings
+
+        try
+        {
+            BindingUpdateQueue.MaxAppliesPerFlush = 10;
+            var convertsBefore = converter.Count;
+            BindingUpdateQueue.Flush();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(converter.Count - convertsBefore, Is.EqualTo(10), "a flush applies at most the budget");
+                Assert.That(targets.Count(t => t.Text == "changed"), Is.EqualTo(10), "only the budgeted bindings updated this flush");
+            });
+
+            for (var f = 0; f < 10 && targets.Any(t => t.Text != "changed"); f++) BindingUpdateQueue.Flush();
+            Assert.That(targets.All(t => t.Text == "changed"), Is.True, "the over-budget remainder drains over subsequent flushes");
+        }
+        finally { BindingUpdateQueue.MaxAppliesPerFlush = 0; }
     }
 }
