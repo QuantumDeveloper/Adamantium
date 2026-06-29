@@ -16,6 +16,9 @@ public static class AnimationManager
     /// <summary>True while any animation is in flight - the live designer polls this to decide whether to keep ticking.</summary>
     public static bool HasActiveAnimations => Active.Count > 0;
 
+    /// <summary>How many animations/tickers are running right now (incl. scroll-inertia tickers) - for diagnostics.</summary>
+    public static int ActiveCount => Active.Count;
+
     /// <summary>Drops every running animation without firing completion callbacks. The live designer calls this when it
     /// builds a fresh preview tree, so animations bound to the previous (discarded) tree don't linger in this shared
     /// static manager and get advanced against dead controls on the next tick.</summary>

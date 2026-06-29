@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Globalization;
 using System.Reflection;
+using Adamantium.UI.Core.Diagnostics;
 using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Core.Data;
@@ -167,6 +168,7 @@ public class BindingExpression : BindingExpressionBase
       // at its default instead of pushing an incompatible value, which would throw in SetValue and abort the whole load.
       if (!TryCoerce(value, TargetProperty.PropertyType, out var coerced)) return;
       Target.SetValue(TargetProperty, coerced, ValuePriority.Binding);
+      RuntimeStats.BindingUpdatesApplied++;   // diagnostics: a binding wrote its target (initial/establish, DataContext re-resolve, or a batched source change)
    }
 
    public override void UpdateSource()
