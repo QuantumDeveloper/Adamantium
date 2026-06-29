@@ -436,7 +436,6 @@ public class Game : PropertyChangedBase, IGame
         fpsTime += appTime.FrameTime;
         if (fpsTime >= 1.0d)
         {
-            Console.WriteLine($"Game FPS = {fpsCounter}");
             appTime.Fps = (fpsCounter) / (Single)fpsTime;
             fpsCounter = 0;
             fpsTime = 0;

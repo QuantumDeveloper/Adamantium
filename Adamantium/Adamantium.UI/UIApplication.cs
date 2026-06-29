@@ -547,7 +547,6 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         fpsTime += appTime.FrameTime;
         if (fpsTime >= 1.0d)
         {
-            Console.WriteLine($"App FPS = {fpsCounter}");
             appTime.Fps = (fpsCounter) / (Single)fpsTime;
             fpsCounter = 0;
             fpsTime = 0;

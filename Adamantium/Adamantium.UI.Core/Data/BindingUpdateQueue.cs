@@ -66,7 +66,7 @@ public static class BindingUpdateQueue
         // Apply OUTSIDE the lock: ApplyPending runs converters + SetValue and can re-enter Enqueue (dependent bindings),
         // which would deadlock under the lock; those re-enqueues land in Dirty for the next flush.
         foreach (var expression in Batch)
-            expression.ApplyPending();
+            expression.ApplyPending();   // diagnostics counted in UpdateTarget (the actual target write), not here
         Batch.Clear();
     }
 }

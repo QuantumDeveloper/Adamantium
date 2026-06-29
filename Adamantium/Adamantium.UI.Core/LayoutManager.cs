@@ -115,7 +115,7 @@ public sealed class LayoutManager
         // THIS pass and drain fully - one slower frame clears the backlog instead of it growing forever.
         var budget = FrameBudget;
         if (budget.HasValue && _deferredStreak >= MaxDeferredPasses) budget = null;
-        if (budget.HasValue) _passStopwatch.Restart();
+        _passStopwatch.Restart();   // always time the pass (used for the budget when set, and for RuntimeStats either way)
         // Visible-first prioritisation only matters when the budget can actually defer work; skip its cost otherwise.
         var viewport = budget.HasValue ? Viewport : null;
 
@@ -142,6 +142,9 @@ public sealed class LayoutManager
 
         var settled = _toStyle.IsEmpty && _toMeasure.IsEmpty && _toArrange.IsEmpty;
         _deferredStreak = settled ? 0 : _deferredStreak + 1;
+
+        RuntimeStats.LastLayoutPassMs = _passStopwatch.Elapsed.TotalMilliseconds;
+        RuntimeStats.LastPassBudgetDeferred = !settled;
 
         // LayoutUpdated = "layout settled this frame" - only when everything drained, not when budget-deferred.
         if (didWork && settled)
