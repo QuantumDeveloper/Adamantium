@@ -71,6 +71,8 @@ public class WindowRenderService : UiRenderService
         // Tooling overlays (AdornerLayer: selection frames etc.) are a second stage in the processor collection,
         // drawn on top of the content in the same frame. Same for runtime and the headless designer.
         AttachProcessor(new AdornerRenderProcessor());
+        // The popup stage (tooltips, in-window popups) draws on top of the content AND the adorners (higher Order).
+        AttachProcessor(new PopupRenderProcessor());
     }
 
     // The renderer this service drives. The headless (designer) service overrides this to render into a texture

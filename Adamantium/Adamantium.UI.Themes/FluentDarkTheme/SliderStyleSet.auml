@@ -61,4 +61,25 @@
         </Setter>
     </Style>
 
+    <!-- Vertical orientation: the base template lays the rail + fill out horizontally; flip them to vertical (the Track
+         already gets Orientation via TemplateBinding, so the thumb moves correctly - only the rail chrome needs swapping).
+         Height="Auto" (the parser maps it to NaN) clears the horizontal 4px height so VerticalAlignment=Stretch spans full height. -->
+    <Style Selector="Slider">
+        <PropertyTrigger Property="Orientation" Value="Vertical">
+            <Setter TargetName="Rail" Property="Width" Value="4"/>
+            <Setter TargetName="Rail" Property="Height" Value="Auto"/>
+            <Setter TargetName="Rail" Property="HorizontalAlignment" Value="Center"/>
+            <Setter TargetName="Rail" Property="VerticalAlignment" Value="Stretch"/>
+            <Setter TargetName="PART_SelectionRange" Property="Width" Value="4"/>
+            <Setter TargetName="PART_SelectionRange" Property="Height" Value="0"/>
+            <Setter TargetName="PART_SelectionRange" Property="HorizontalAlignment" Value="Center"/>
+            <!-- Bottom-anchored: with the Track reversed (Minimum at the bottom) the accent fills UPWARD from the bottom to
+                 meet the thumb (its top edge tracks the thumb). -->
+            <Setter TargetName="PART_SelectionRange" Property="VerticalAlignment" Value="Bottom"/>
+            <!-- Standard slider direction: Minimum at the BOTTOM, value grows UP (Up-arrow/drag-up increase). The Track
+                 itself defaults to top=min for scrollbars, so a vertical slider must opt into the reversal. -->
+            <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="true"/>
+        </PropertyTrigger>
+    </Style>
+
 </StyleSet>

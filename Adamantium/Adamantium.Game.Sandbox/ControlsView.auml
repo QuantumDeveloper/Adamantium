@@ -5,7 +5,7 @@
         <RadioButton Content="Value 2" />
         <ToggleSwitch Content="Test Switch"/>
         <CheckBox Content="Checkbox" IsThreeState="true"/>
-        <Slider Width="250"/>
+        <Slider Width="250" IsValueToolTipEnabled="true" IsMoveToPointEnabled="True"/>
         <ItemsDemoView/>
     </StackPanel>
 </View>

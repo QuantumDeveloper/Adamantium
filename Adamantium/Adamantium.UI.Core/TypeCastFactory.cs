@@ -20,19 +20,31 @@ public static class TypeCastFactory
             return CastFromString(input, underlyingType);
         }
 
-        if (finalType.IsPrimitive)
+        // A malformed value in markup / a style setter (e.g. Height="NaN", a typo'd number/enum) must NOT crash the whole
+        // app: catch the conversion failure, log it, and return UnsetValue so the caller skips it (SetValue treats
+        // UnsetValue as "clear", and value resolution skips it - so the property keeps its default / lower-priority value).
+        try
         {
-            if (finalType == typeof(Double) && input.ToString() == "Auto")
+            if (finalType.IsPrimitive)
             {
-                return Double.NaN;
+                if (finalType == typeof(Double) && input.ToString() == "Auto")
+                {
+                    return Double.NaN;
+                }
+                return Convert.ChangeType(input, finalType);
             }
-            return Convert.ChangeType(input, finalType);
+
+            if (finalType.IsEnum) return Enum.Parse(finalType, input.ToString(), ignoreCase: true);
+
+            // Everything else (Brush, Thickness, CornerRadius, Color, Vector2, Geometry, …) converts through the engine's
+            // TypeParser - honouring [TypeParser] + the ParserRegistry - i.e. the same conversion a compiled build uses.
+            return TypeParser.Parse(input.ToString(), finalType);
         }
-
-        if (finalType.IsEnum) return Enum.Parse(finalType, input.ToString(), ignoreCase: true);
-
-        // Everything else (Brush, Thickness, CornerRadius, Color, Vector2, Geometry, …) converts through the engine's
-        // TypeParser - honouring [TypeParser] + the ParserRegistry - i.e. the same conversion a compiled build uses.
-        return TypeParser.Parse(input.ToString(), finalType);
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"[TypeCastFactory] could not convert '{input}' to {finalType.Name} - value ignored: {ex.Message}");
+            return AdamantiumProperty.UnsetValue;
+        }
     }
 }

@@ -132,6 +132,42 @@ public class ScrollControlsTests
         });
     }
 
+    // ---- Track.ValueFromPoint: click position -> value (move-to-point slider) ----
+
+    [Test]
+    public void Track_ValueFromPoint_MapsClickToValue()
+    {
+        // Horizontal, 200px track, 12px thumb -> 188px travel; the thumb is CENTRED on the click. Click at x=100 (track
+        // middle) -> along = 100 - 6 = 94 -> 94/188 * 100 = 50. Ends clamp to Minimum/Maximum.
+        var track = ArrangedTrack(Orientation.Horizontal, 0, 100, 0, 0, 200, 12);
+        Assert.Multiple(() =>
+        {
+            Assert.That(track.ValueFromPoint(new Vector2(100, 6)), Is.EqualTo(50).Within(0.5));
+            Assert.That(track.ValueFromPoint(new Vector2(6, 6)), Is.EqualTo(0).Within(0.5), "click at the start -> Minimum");
+            Assert.That(track.ValueFromPoint(new Vector2(194, 6)), Is.EqualTo(100).Within(0.5), "click at the end -> Maximum");
+            Assert.That(track.ValueFromPoint(new Vector2(-50, 6)), Is.EqualTo(0).Within(0.5), "clamped below the track");
+        });
+    }
+
+    [Test]
+    public void Track_ValueFromPoint_ReversedVertical_TopIsMaximum()
+    {
+        // A vertical slider sets IsDirectionReversed so the TOP is the maximum: a click near the top yields a high value.
+        var track = new Track
+        {
+            Orientation = Orientation.Vertical, Minimum = 0, Maximum = 100, ViewportSize = 0,
+            IsDirectionReversed = true, Thumb = new Thumb()
+        };
+        track.Measure(new Size(12, 200));
+        track.Arrange(new Rect(0, 0, 12, 200));
+        Assert.Multiple(() =>
+        {
+            Assert.That(track.ValueFromPoint(new Vector2(6, 6)), Is.EqualTo(100).Within(0.5), "top -> Maximum");
+            Assert.That(track.ValueFromPoint(new Vector2(6, 194)), Is.EqualTo(0).Within(0.5), "bottom -> Minimum");
+            Assert.That(track.ValueFromPoint(new Vector2(6, 100)), Is.EqualTo(50).Within(0.5), "middle -> midpoint");
+        });
+    }
+
     [Test]
     public void Track_NothingToScroll_ThumbFillsAndIsInert()
     {

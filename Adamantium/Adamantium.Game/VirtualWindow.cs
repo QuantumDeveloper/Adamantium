@@ -15,7 +15,7 @@ using Adamantium.UI.Rendering;
 
 namespace Adamantium.Game;
 
-public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost
+public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopupHost
 {
     public Vector2 PointToClient(Vector2 point)
     {
@@ -67,6 +67,11 @@ public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost
     // render service's adorner processor draws Adorners on top of the content. Mirrors WindowBase.
     public AdornerLayer AdornerLayer { get; } = new AdornerLayer();
     public IReadOnlyList<IUIComponent> Adorners => AdornerLayer.Adorners;
+
+    // In-window popup overlay (tooltips, popups). Mirrors WindowBase; the render service's popup processor draws these.
+    public PopupLayer PopupLayer { get; } = new PopupLayer();
+    public IReadOnlyList<IUIComponent> PopupRoots => PopupLayer.Roots;
+    public void LayoutPopups() => PopupLayer.UpdateLayout(new Size(ClientWidth, ClientHeight));
 
     public GameOutput RootWindow { get; set; }
 

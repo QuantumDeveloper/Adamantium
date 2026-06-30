@@ -286,9 +286,35 @@
 <!--                      Delay="400"-->
 <!--                      Interval="90"/>-->
         
-<!--        <ControlsView VerticalAlignment="Center"/>        -->
+        <ControlsView VerticalAlignment="Center"/>        
 <!--        <ItemsDemoView VerticalAlignment="Center" HorizontalAlignment="Center"/>-->
-        <ListBoxDemoView VerticalAlignment="Center" HorizontalAlignment="Center"/>
+<!--        <ListBoxDemoView VerticalAlignment="Center" HorizontalAlignment="Center"/>-->
+
+        <!-- Popup / value-tooltip + orientation demo: keep it here to watch progress. -->
+        <StackPanel Orientation="Horizontal"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Top"
+                    Margin="0,70,0,0">
+            <Slider Width="240" 
+                    Value="40" 
+                    Maximum="100" 
+                    IsValueToolTipEnabled="true" 
+                    IsSnapToTickEnabled="true" 
+                    TickFrequency="1" 
+                    IsMoveToPointEnabled="true" 
+                    Margin="12"/>
+            <Slider Orientation="Vertical" 
+                    Height="180" 
+                    Value="60" 
+                    Maximum="100" 
+                    IsValueToolTipEnabled="true" 
+                    IsSnapToTickEnabled="true" 
+                    TickFrequency="1" 
+                    IsMoveToPointEnabled="true" 
+                    Margin="12"/>
+        </StackPanel>
+
+
 
         <!-- Live diagnostics overlay: a TextBlock whose text the DiagnosticsOverlayBehavior rewrites each frame from
              RuntimeStats (layout pass ms, measure/arrange this frame, budget deferral, bindings/frame, active anims).

@@ -36,6 +36,22 @@
         </Setter>
     </Style>
 
+    <!-- Vertical orientation (linear bar): flip the horizontal track + fill to vertical. Height="Auto" (parser -> NaN)
+         clears the 6px height so VerticalAlignment=Stretch spans the full height; the fill grows from the bottom (the
+         control drives its Height like it drives Width for horizontal). The Ring (circular) is orientation-agnostic. -->
+    <Style Selector="ProgressBar">
+        <PropertyTrigger Property="Orientation" Value="Vertical">
+            <Setter TargetName="PART_Track" Property="Width" Value="6"/>
+            <Setter TargetName="PART_Track" Property="Height" Value="Auto"/>
+            <Setter TargetName="PART_Track" Property="HorizontalAlignment" Value="Center"/>
+            <Setter TargetName="PART_Track" Property="VerticalAlignment" Value="Stretch"/>
+            <Setter TargetName="PART_Indicator" Property="Width" Value="6"/>
+            <Setter TargetName="PART_Indicator" Property="Height" Value="0"/>
+            <Setter TargetName="PART_Indicator" Property="HorizontalAlignment" Value="Center"/>
+            <Setter TargetName="PART_Indicator" Property="VerticalAlignment" Value="Bottom"/>
+        </PropertyTrigger>
+    </Style>
+
     <!-- Circular template (ProgressBar.Ring): a dim full ring under an accent arc the control sweeps.
          SquareSizing opts the control into 1:1 sizing (the marker lives here, with the template - not on the instance and
          not a part-name/type guess), so setting only Width OR only Height still gives a round ring. Center (non-stretch)

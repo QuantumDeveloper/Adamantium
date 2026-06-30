@@ -19,7 +19,9 @@ public class Track : Panel
     // The thumb never shrinks below this along the track, so it stays grabbable even with a huge scroll range.
     private const double MinThumbLength = 12.0;
 
-    private double _density;   // value units per pixel of thumb travel (for ValueFromDistance)
+    private double _density;     // value units per pixel of thumb travel (for ValueFromDistance)
+    private double _remaining;   // travel length (trackLength - thumbAlong); for ValueFromPoint
+    private double _thumbAlong;  // thumb size along the track; for ValueFromPoint (centre the thumb on the click)
 
     public static readonly AdamantiumProperty OrientationProperty = AdamantiumProperty.Register(nameof(Orientation),
         typeof(Orientation), typeof(Track),
@@ -36,6 +38,10 @@ public class Track : Panel
 
     public static readonly AdamantiumProperty ViewportSizeProperty = AdamantiumProperty.Register(nameof(ViewportSize),
         typeof(double), typeof(Track), new PropertyMetadata(0.0, PropertyMetadataOptions.AffectsArrange));
+
+    public static readonly AdamantiumProperty IsDirectionReversedProperty = AdamantiumProperty.Register(
+        nameof(IsDirectionReversed), typeof(bool), typeof(Track),
+        new PropertyMetadata(false, PropertyMetadataOptions.AffectsArrange));
 
     // The three parts come from the template (<Track.Thumb>, <Track.DecreaseRepeatButton>, <Track.IncreaseRepeatButton>).
     // Assigning one swaps it into Children so it lives in the visual tree and gets measured/arranged here.
@@ -77,6 +83,14 @@ public class Track : Panel
     {
         get => GetValue<double>(ViewportSizeProperty);
         set => SetValue(ViewportSizeProperty, value);
+    }
+
+    /// <summary>Flips the value→position mapping along the track. Default false = Minimum at the start (top/left) - the
+    /// scrollbar convention. A vertical slider sets this true so Minimum sits at the BOTTOM and the value grows upward.</summary>
+    public bool IsDirectionReversed
+    {
+        get => GetValue<bool>(IsDirectionReversedProperty);
+        set => SetValue(IsDirectionReversedProperty, value);
     }
 
     public Thumb Thumb
@@ -156,22 +170,31 @@ public class Track : Panel
 
         // Thumb travel in value-units-per-pixel, used by the thumb-drag mapping (ValueFromDistance).
         _density = remaining > 0 && range > 0 ? range / remaining : 0;
+        _remaining = remaining;
+        _thumbAlong = thumbAlong;
 
-        var increaseStart = offset + thumbAlong;
-        var increaseLength = Math.Max(0, trackLength - increaseStart);
         var crossOffset = Math.Max(0, (thickness - thumbCross) / 2);
+
+        // IsDirectionReversed (a vertical slider): put Minimum at the BOTTOM, so a higher value sits HIGHER. Flip the
+        // thumb's distance-along-the-track AND which page button is decrease/increase (toward min vs max swap sides).
+        var reversed = vertical && IsDirectionReversed;
+        var along = reversed ? remaining - offset : offset;
+        var trailingStart = along + thumbAlong;
+        var trailingLength = Math.Max(0, trackLength - trailingStart);
+        var leadingButton = reversed ? IncreaseRepeatButton : DecreaseRepeatButton;
+        var trailingButton = reversed ? DecreaseRepeatButton : IncreaseRepeatButton;
 
         if (vertical)
         {
-            DecreaseRepeatButton?.Arrange(new Rect(0, 0, thickness, offset));
-            Thumb?.Arrange(new Rect(crossOffset, offset, thumbCross, thumbAlong));
-            IncreaseRepeatButton?.Arrange(new Rect(0, increaseStart, thickness, increaseLength));
+            leadingButton?.Arrange(new Rect(0, 0, thickness, along));
+            Thumb?.Arrange(new Rect(crossOffset, along, thumbCross, thumbAlong));
+            trailingButton?.Arrange(new Rect(0, trailingStart, thickness, trailingLength));
         }
         else
         {
-            DecreaseRepeatButton?.Arrange(new Rect(0, 0, offset, thickness));
-            Thumb?.Arrange(new Rect(offset, crossOffset, thumbAlong, thumbCross));
-            IncreaseRepeatButton?.Arrange(new Rect(increaseStart, 0, increaseLength, thickness));
+            leadingButton?.Arrange(new Rect(0, 0, along, thickness));
+            Thumb?.Arrange(new Rect(along, crossOffset, thumbAlong, thumbCross));
+            trailingButton?.Arrange(new Rect(trailingStart, 0, trailingLength, thickness));
         }
 
         return finalSize;
@@ -180,7 +203,20 @@ public class Track : Panel
     /// <summary>Converts a thumb-drag delta (in device pixels) into the corresponding change in <see cref="Value"/>.</summary>
     public double ValueFromDistance(double horizontal, double vertical)
     {
-        var delta = Orientation == Orientation.Vertical ? vertical : horizontal;
-        return delta * _density;
+        if (Orientation == Orientation.Vertical)
+            // Reversed (slider): dragging the thumb DOWN moves toward the minimum, so a downward delta DECREASES the value.
+            return (IsDirectionReversed ? -vertical : vertical) * _density;
+        return horizontal * _density;
+    }
+
+    /// <summary>Maps a point in the track's local space to the Value whose thumb would be CENTRED on it - used by a
+    /// move-to-point slider click. Honours orientation and <see cref="IsDirectionReversed"/>.</summary>
+    public double ValueFromPoint(Vector2 point)
+    {
+        if (_remaining <= 0) return Minimum;   // thumb fills the track - nowhere to move
+        var pos = Orientation == Orientation.Vertical ? point.Y : point.X;
+        var along = Math.Clamp(pos - _thumbAlong / 2, 0, _remaining);
+        var offset = IsDirectionReversed ? _remaining - along : along;
+        return Minimum + offset * _density;
     }
 }

@@ -34,6 +34,14 @@ public interface IWindow : IRootVisualComponent, IContentControl
     /// <summary>Framework tooling overlays (selection frames etc.) drawn ON TOP of the window's content in the same
     /// frame by the renderer's adorner stage. Empty by default; the WPF-equivalent of an AdornerLayer's adorners.</summary>
     IReadOnlyList<IUIComponent> Adorners { get; }
+
+    /// <summary>The laid-out children of the open popups, drawn ON TOP of the content (and adorners) within the window by
+    /// the renderer's popup stage. Empty by default. <see cref="LayoutPopups"/> refreshes their positions each frame.</summary>
+    IReadOnlyList<IUIComponent> PopupRoots { get; }
+
+    /// <summary>Re-evaluates every open popup's position from its target's current location and lays its child out,
+    /// clamped inside the window. Called by the popup render stage each frame so a popup follows a moving target.</summary>
+    void LayoutPopups();
     
     bool ShouldDisplayWindow { get; }
     

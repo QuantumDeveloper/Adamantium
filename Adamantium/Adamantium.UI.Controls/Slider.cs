@@ -1,9 +1,14 @@
 using System;
+using Adamantium.Graphics.Fonts;
+using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Controls.Base;
+using Adamantium.UI.Controls.Decorators;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Controls.Primitives;
+using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
+using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Controls;
@@ -19,6 +24,11 @@ public class Slider : RangeBase
     private Track _track;
     private MeasurableUIComponent _selectionRange;   // PART_SelectionRange - the accent fill (start..thumb)
     private double _dragStartValue;
+    private Popup _valueToolTip;                      // value badge shown over the thumb while dragging (opt-in)
+    private TextBlock _valueToolTipText;
+
+    public static readonly AdamantiumProperty IsValueToolTipEnabledProperty = AdamantiumProperty.Register(
+        nameof(IsValueToolTipEnabled), typeof(bool), typeof(Slider), new PropertyMetadata(false));
 
     public static readonly AdamantiumProperty OrientationProperty = AdamantiumProperty.Register(nameof(Orientation),
         typeof(Orientation), typeof(Slider),
@@ -29,6 +39,9 @@ public class Slider : RangeBase
 
     public static readonly AdamantiumProperty IsSnapToTickEnabledProperty = AdamantiumProperty.Register(
         nameof(IsSnapToTickEnabled), typeof(bool), typeof(Slider), new PropertyMetadata(false));
+
+    public static readonly AdamantiumProperty IsMoveToPointEnabledProperty = AdamantiumProperty.Register(
+        nameof(IsMoveToPointEnabled), typeof(bool), typeof(Slider), new PropertyMetadata(false));
 
     static Slider()
     {
@@ -64,6 +77,22 @@ public class Slider : RangeBase
         set => SetValue(IsSnapToTickEnabledProperty, value);
     }
 
+    /// <summary>When true, clicking anywhere on the track jumps the thumb straight to that point (and stays there),
+    /// instead of paging by <see cref="RangeBase.LargeChange"/>. Mirrors WPF's Slider.IsMoveToPointEnabled.</summary>
+    public bool IsMoveToPointEnabled
+    {
+        get => GetValue<bool>(IsMoveToPointEnabledProperty);
+        set => SetValue(IsMoveToPointEnabledProperty, value);
+    }
+
+    /// <summary>When true, a small badge with the current value rides over the thumb while dragging - above the thumb for
+    /// a horizontal slider, to its right for a vertical one. It follows the thumb (the popup re-anchors every frame).</summary>
+    public bool IsValueToolTipEnabled
+    {
+        get => GetValue<bool>(IsValueToolTipEnabledProperty);
+        set => SetValue(IsValueToolTipEnabledProperty, value);
+    }
+
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
@@ -73,11 +102,13 @@ public class Slider : RangeBase
         _selectionRange = GetTemplateChild("PART_SelectionRange") as MeasurableUIComponent;
         if (_track != null)
         {
+            _track.SizeChanged += OnTrackSizeChanged;
             // The parts now come from the template, so a malformed one may omit them - guard each.
             if (_track.Thumb != null)
             {
                 _track.Thumb.DragStarted += OnThumbDragStarted;
                 _track.Thumb.DragDelta += OnThumbDragDelta;
+                _track.Thumb.DragCompleted += OnThumbDragCompleted;
             }
             if (_track.IncreaseRepeatButton != null) _track.IncreaseRepeatButton.Click += OnIncrease;
             if (_track.DecreaseRepeatButton != null) _track.DecreaseRepeatButton.Click += OnDecrease;
@@ -88,10 +119,12 @@ public class Slider : RangeBase
     private void DetachParts()
     {
         if (_track == null) return;
+        _track.SizeChanged -= OnTrackSizeChanged;
         if (_track.Thumb != null)
         {
             _track.Thumb.DragStarted -= OnThumbDragStarted;
             _track.Thumb.DragDelta -= OnThumbDragDelta;
+            _track.Thumb.DragCompleted -= OnThumbDragCompleted;
         }
         if (_track.IncreaseRepeatButton != null) _track.IncreaseRepeatButton.Click -= OnIncrease;
         if (_track.DecreaseRepeatButton != null) _track.DecreaseRepeatButton.Click -= OnDecrease;
@@ -100,21 +133,52 @@ public class Slider : RangeBase
 
     // Thumb drag: e.Change is the CUMULATIVE pointer movement since the press (in the Track's stable space), so map it
     // from the value captured at drag start rather than accumulating per-event deltas (which drift).
-    private void OnThumbDragStarted(object sender, DragStartedEventArgs e) => _dragStartValue = Value;
+    private void OnThumbDragStarted(object sender, DragStartedEventArgs e)
+    {
+        _dragStartValue = Value;
+        ShowValueToolTip();
+    }
 
     private void OnThumbDragDelta(object sender, DragEventArgs e)
     {
         if (_track == null) return;
         Value = SnapToTick(_dragStartValue + _track.ValueFromDistance(e.Change.X, e.Change.Y));
+        UpdateValueToolTipText();
     }
 
-    private void OnIncrease(object sender, RoutedEventArgs e) => Value = SnapToTick(Value + LargeChange);
-    private void OnDecrease(object sender, RoutedEventArgs e) => Value = SnapToTick(Value - LargeChange);
+    private void OnThumbDragCompleted(object sender, DragCompletedEventArgs e) => HideValueToolTip();
+
+    // Click on the track: page towards/away from the thumb by LargeChange - OR, when IsMoveToPointEnabled, jump straight
+    // to the clicked point. Each page area (DecreaseRepeatButton/IncreaseRepeatButton) fires its own Click; either side
+    // jumps to the same place because the value comes from the actual click position, not the side.
+    private void OnIncrease(object sender, RoutedEventArgs e)
+    {
+        if (IsMoveToPointEnabled) MoveToMousePoint();
+        else Value = SnapToTick(Value + LargeChange);
+    }
+
+    private void OnDecrease(object sender, RoutedEventArgs e)
+    {
+        if (IsMoveToPointEnabled) MoveToMousePoint();
+        else Value = SnapToTick(Value - LargeChange);
+    }
+
+    // The page button that fired the Click captured the press, so the mouse is still at the click point: read it relative
+    // to the track and map it to a value (snapping still applies). Holding repeats this, so a held + dragged press follows.
+    private void MoveToMousePoint()
+    {
+        if (_track == null) return;
+        Value = SnapToTick(_track.ValueFromPoint(MouseDevice.CurrentDevice.GetPosition(_track)));
+    }
 
     // The accent fill (PART_SelectionRange) is driven exactly like ProgressBar's PART_Indicator: project the value
     // fraction onto its WIDTH on every Value change (and once more after layout, when the track's pixel length is known).
     // Setting Width carries AffectsRender, so it repaints live - a part sized only by the Track's arrange would not.
-    protected override void OnValueChanged(double oldValue, double newValue) => UpdateFill();
+    protected override void OnValueChanged(double oldValue, double newValue)
+    {
+        UpdateFill();
+        ForceArrangeFill();
+    }
 
     protected override Size ArrangeOverride(Size finalSize)
     {
@@ -126,35 +190,110 @@ public class Slider : RangeBase
             : new Size(Math.Min(finalSize.Width, DesiredSize.Width), finalSize.Height);
 
         var size = base.ArrangeOverride(finalSize);
-        UpdateFill();   // PART_Track is laid out now, so the fill's 100% length is finally known
+        // The track fills the slider, so the arranged main-axis length is the fill's 100%.
+        UpdateFill(Orientation == Orientation.Horizontal ? size.Width : size.Height);
+        ForceArrangeFill();
         return size;
     }
 
-    private void UpdateFill()
+    private void OnTrackSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        UpdateFill();
+        ForceArrangeFill();
+    }
+
+    private void UpdateFill(double? trackLength = null)
     {
         if (_selectionRange == null || _track == null) return;
 
         var range = Maximum - Minimum;
         var fraction = range > 0 ? Math.Clamp((Value - Minimum) / range, 0.0, 1.0) : 0.0;
 
+        var full = Orientation == Orientation.Horizontal
+            ? trackLength ?? _track.ActualWidth
+            : trackLength ?? _track.ActualHeight;
+        if (full <= 0) return;
+
         if (Orientation == Orientation.Horizontal)
-        {
-            var full = _track.ActualWidth;
-            if (full > 0) SetIfChanged(WidthProperty, fraction * full, _selectionRange.Width);
-        }
+            SetIfChanged(WidthProperty, fraction * full, _selectionRange.Width);
         else
-        {
-            var full = _track.ActualHeight;
-            if (full > 0) SetIfChanged(HeightProperty, fraction * full, _selectionRange.Height);
-        }
+            SetIfChanged(HeightProperty, fraction * full, _selectionRange.Height);
     }
 
-    // Set during arrange, which re-invalidates measure; only re-set on a real change so layout settles instead of looping
-    // (NaN = never set yet -> always set the first time).
+    // The fill's length comes from the arrange-time track size, but a part is arranged by its parent at its DESIRED size,
+    // which was measured before that length was known - so base.ArrangeOverride parks the fill at its stale desired size,
+    // and the manager's deferred re-layout doesn't reliably re-arrange a small child whose growth doesn't change its
+    // parent's size (the fill stayed empty until the first drag). So re-measure the fill (force, so the new Width/Height
+    // takes) and re-arrange it into the cell it already occupies - synchronous and guaranteed, this frame.
+    private void ForceArrangeFill()
+    {
+        if (_selectionRange is not IMeasurableComponent m || m.PreviousArrangeSlot is not { } slot) return;
+        _selectionRange.Measure(new Size(slot.Width, slot.Height), force: true);
+        _selectionRange.Arrange(slot);
+    }
+
+    // Only re-set on a real change so layout settles instead of looping (NaN = never set yet -> always set the first time).
     private void SetIfChanged(AdamantiumProperty property, double target, double current)
     {
         if (double.IsNaN(current) || Math.Abs(current - target) > 0.5)
             _selectionRange.SetValue(property, target);
+    }
+
+    // --- Value tooltip (opt-in): a value badge over the thumb on the window-wide popup layer, following the thumb -----
+
+    private void ShowValueToolTip()
+    {
+        if (!IsValueToolTipEnabled) return;
+        EnsureValueToolTip();
+        UpdateValueToolTipText();
+        _valueToolTip.IsOpen = true;
+    }
+
+    private void HideValueToolTip()
+    {
+        if (_valueToolTip != null) _valueToolTip.IsOpen = false;
+    }
+
+    private void UpdateValueToolTipText()
+    {
+        if (_valueToolTipText != null) _valueToolTipText.Text = Value.ToString("0.##");
+    }
+
+    // Build the badge lazily (only for sliders that use it) and add it to this slider's tree so it finds the window's
+    // popup layer; re-point it at the current thumb + side (horizontal -> above the thumb, vertical -> to its right).
+    private void EnsureValueToolTip()
+    {
+        var horizontal = Orientation == Orientation.Horizontal;
+        if (_valueToolTip == null)
+        {
+            _valueToolTipText = new TextBlock
+            {
+                Foreground = new SolidColorBrush(Colors.White),
+                FontSize = 12,
+                // A TextBlock shrink-wraps to the text (ArrangeOverride returns the text size) and its OWN text-alignment
+                // only bites within an explicit Width/Height (NaN here). So centre the BLOCK in the badge via layout
+                // alignment - that's what actually centres the value in the padded, MinWidth badge (both axes).
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var badge = new Border
+            {
+                Background = new SolidColorBrush(Colors.DimGray),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(8, 4),
+                // A stable baseline width so 1-2 digit values don't resize + re-center the badge on every step (the badge
+                // still grows to fit longer values). Pair with IsSnapToTickEnabled to drop the per-frame decimal jitter.
+                MinWidth = 32,
+                Child = _valueToolTipText
+            };
+            _valueToolTip = new Popup { Child = badge };
+            LogicalChildrenCollection.Add(_valueToolTip);
+            VisualChildrenCollection.Add(_valueToolTip);
+        }
+        _valueToolTip.PlacementTarget = _track?.Thumb;
+        _valueToolTip.Placement = horizontal ? PlacementMode.Top : PlacementMode.Right;
+        _valueToolTip.VerticalOffset = horizontal ? -6 : 0;
+        _valueToolTip.HorizontalOffset = horizontal ? 0 : 6;
     }
 
     // Lands a value on the nearest tick when snapping is on; otherwise returns it unchanged (RangeBase clamps to range).
