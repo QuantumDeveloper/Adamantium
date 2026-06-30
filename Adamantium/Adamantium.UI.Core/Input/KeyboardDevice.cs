@@ -7,7 +7,7 @@ namespace Adamantium.UI.Core.Input;
 
 public class KeyboardDevice
 {
-   private const int KEY_PRESSED = 0x8;
+   private const int KEY_PRESSED = 0x8000;   // GetKeyState: the key is down when the HIGH-ORDER bit (0x8000) is set
    private const int KEY_TOGGLED = 0x1;
 
    private byte[] keyCodes = new byte[256];
