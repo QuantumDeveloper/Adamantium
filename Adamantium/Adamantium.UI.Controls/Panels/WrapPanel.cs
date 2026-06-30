@@ -7,10 +7,12 @@ public class WrapPanel : VirtualizingPanel
 {
    // ---- Virtualized 2D state (items host) ----
    private const int Buffer = 1;        // extra lines on each side of the viewport
+   private const int MaxCellPasses = 4; // bound the in-pass convergence of the auto-sized cell
    private double _cellFlow = 1;        // cell size along the flow axis
    private double _cellScroll = 1;      // cell size along the scroll (wrap) axis
    private int _columns = 1;            // items per line
    private int _lastFirstLine;          // remembered first visible line -> probe next pass
+   private int _lastItemCount = -1;     // detect data changes -> re-establish the cached cell
 
    public static readonly AdamantiumProperty OrientationProperty = AdamantiumProperty.Register(nameof(Orientation),
       typeof(Orientation), typeof(WrapPanel), new PropertyMetadata(Orientation.Horizontal, PropertyMetadataOptions.AffectsMeasure|PropertyMetadataOptions.AffectsArrange));
@@ -243,42 +245,64 @@ public class WrapPanel : VirtualizingPanel
       if (count == 0)
       {
          foreach (var c in Owner.ItemContainerGenerator.SetWindow(0, -1)) c.Visibility = Visibility.Collapsed;
+         _lastItemCount = 0;
          return new Size();
       }
 
       var viewportFlow = horizontal ? availableSize.Width : availableSize.Height;
       var viewportScroll = horizontal ? availableSize.Height : availableSize.Width;
 
-      ResolveCell(horizontal, count);
-
-      _columns = Math.Max(1, (int)Math.Floor(viewportFlow / _cellFlow));
-      var lines = (count + _columns - 1) / _columns;
-
-      int first, last;
-      if (double.IsInfinity(viewportScroll))
+      // The data set changed -> the cached uniform cell may no longer represent the items; re-establish it.
+      if (count != _lastItemCount)
       {
-         OnNoViewport();
-         first = 0;
-         last = count - 1;
-      }
-      else
-      {
-         var scrollOffset = horizontal ? offset.Y : offset.X;
-         var firstLine = Math.Max(0, (int)Math.Floor(scrollOffset / _cellScroll) - Buffer);
-         var lastLine = Math.Min(lines - 1, (int)Math.Ceiling((scrollOffset + viewportScroll) / _cellScroll) + Buffer);
-         _lastFirstLine = firstLine;
-         first = firstLine * _columns;
-         last = Math.Min(count - 1, (lastLine + 1) * _columns - 1);
+         _cellFlow = _cellScroll = 1;
+         _lastItemCount = count;
       }
 
-      // Reconcile the realized grid window to exactly [first,last] (rebind in place; hide only true surplus).
-      foreach (var c in Owner.ItemContainerGenerator.SetWindow(first, last)) c.Visibility = Visibility.Collapsed;
-      var childConstraint = horizontal ? new Size(_cellFlow, _cellScroll) : new Size(_cellScroll, _cellFlow);
-      for (var i = first; i <= last; i++)
-         ((IMeasurableComponent)RealizeInWindow(i)).Measure(childConstraint);
+      // Seed the assumed cell so we have a sane column count before windowing (explicit ItemWidth/Height win).
+      SeedCell(horizontal, count);
 
+      // Resolve columns + the realized window and measure it; if a realized item is bigger than the assumed uniform
+      // cell, grow the cell (only along axes the user didn't pin) and resolve again. This converges in a couple of passes
+      // and then stays put across scrolls. The old code re-probed ONE variable-width item every pass, so the cell and
+      // column count flickered -> the whole grid reflowed (overlapping/garbled rows) and every frame re-bound the window.
+      int first = 0, last = -1;
+      for (var pass = 0; pass < MaxCellPasses; pass++)
+      {
+         _columns = Math.Max(1, (int)Math.Floor(viewportFlow / _cellFlow));
+         var lines = (count + _columns - 1) / _columns;
+
+         if (double.IsInfinity(viewportScroll))
+         {
+            OnNoViewport();
+            first = 0;
+            last = count - 1;
+         }
+         else
+         {
+            var scrollOffset = horizontal ? offset.Y : offset.X;
+            var firstLine = Math.Max(0, (int)Math.Floor(scrollOffset / _cellScroll) - Buffer);
+            var lastLine = Math.Min(lines - 1, (int)Math.Ceiling((scrollOffset + viewportScroll) / _cellScroll) + Buffer);
+            _lastFirstLine = firstLine;
+            first = firstLine * _columns;
+            last = Math.Min(count - 1, (lastLine + 1) * _columns - 1);
+         }
+
+         // Reconcile the realized grid window to exactly [first,last] (rebind in place; hide only true surplus).
+         foreach (var c in Owner.ItemContainerGenerator.SetWindow(first, last)) c.Visibility = Visibility.Collapsed;
+         var grew = false;
+         for (var i = first; i <= last; i++)
+         {
+            var child = (IMeasurableComponent)RealizeInWindow(i);
+            child.Measure(CellConstraint(horizontal));
+            grew |= GrowCell(horizontal, child.DesiredSize);
+         }
+         if (!grew) break;
+      }
+
+      var totalLines = (count + _columns - 1) / _columns;
       var flowExtent = _columns * _cellFlow;
-      var scrollExtent = lines * _cellScroll;
+      var scrollExtent = totalLines * _cellScroll;
       return horizontal ? new Size(flowExtent, scrollExtent) : new Size(scrollExtent, flowExtent);
    }
 
@@ -300,18 +324,42 @@ public class WrapPanel : VirtualizingPanel
       }
    }
 
-   // Resolve the uniform cell: explicit ItemWidth/ItemHeight, else measure the first item (assume uniform).
-   private void ResolveCell(bool horizontal, int count)
+   // Seed the assumed uniform cell. Explicit ItemWidth/ItemHeight are taken as-is; an unspecified axis is probed from a
+   // representative item (the first one in view) - the window measure then grows it to fit. We keep whatever the cell
+   // already holds (it only grows), so the column count stays stable across scrolls instead of flickering per pass.
+   private void SeedCell(bool horizontal, int count)
    {
+      var widthExplicit = !double.IsNaN(ItemWidth);
+      var heightExplicit = !double.IsNaN(ItemHeight);
+      if (widthExplicit) { if (horizontal) _cellFlow = Math.Max(1, ItemWidth); else _cellScroll = Math.Max(1, ItemWidth); }
+      if (heightExplicit) { if (horizontal) _cellScroll = Math.Max(1, ItemHeight); else _cellFlow = Math.Max(1, ItemHeight); }
+      if (widthExplicit && heightExplicit) return;
+
       var probeIndex = Math.Clamp(_lastFirstLine * Math.Max(1, _columns), 0, count - 1);
       var probe = (IMeasurableComponent)RealizeInWindow(probeIndex);
-      probe.Measure(new Size(
-         double.IsNaN(ItemWidth) ? double.PositiveInfinity : ItemWidth,
-         double.IsNaN(ItemHeight) ? double.PositiveInfinity : ItemHeight));
+      probe.Measure(CellConstraint(horizontal));
+      GrowCell(horizontal, probe.DesiredSize);
+   }
 
-      var cellW = double.IsNaN(ItemWidth) ? probe.DesiredSize.Width : ItemWidth;
-      var cellH = double.IsNaN(ItemHeight) ? probe.DesiredSize.Height : ItemHeight;
-      _cellFlow = Math.Max(1, horizontal ? cellW : cellH);
-      _cellScroll = Math.Max(1, horizontal ? cellH : cellW);
+   // Measure constraint for one item: an axis pinned by ItemWidth/ItemHeight is constrained to the cell; an unspecified
+   // axis is left free so the item reports its natural size and we can grow the cell to fit it (text stays on one line).
+   private Size CellConstraint(bool horizontal)
+   {
+      var flow = (horizontal ? !double.IsNaN(ItemWidth) : !double.IsNaN(ItemHeight)) ? _cellFlow : double.PositiveInfinity;
+      var scroll = (horizontal ? !double.IsNaN(ItemHeight) : !double.IsNaN(ItemWidth)) ? _cellScroll : double.PositiveInfinity;
+      return horizontal ? new Size(flow, scroll) : new Size(scroll, flow);
+   }
+
+   // Grow the uniform cell to fit a measured item, but never along an axis the user pinned via ItemWidth/ItemHeight.
+   private bool GrowCell(bool horizontal, Size desired)
+   {
+      var grew = false;
+      var flowExplicit = horizontal ? !double.IsNaN(ItemWidth) : !double.IsNaN(ItemHeight);
+      var scrollExplicit = horizontal ? !double.IsNaN(ItemHeight) : !double.IsNaN(ItemWidth);
+      var flow = horizontal ? desired.Width : desired.Height;
+      var scroll = horizontal ? desired.Height : desired.Width;
+      if (!flowExplicit && flow > _cellFlow) { _cellFlow = flow; grew = true; }
+      if (!scrollExplicit && scroll > _cellScroll) { _cellScroll = scroll; grew = true; }
+      return grew;
    }
 }
