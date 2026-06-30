@@ -287,7 +287,8 @@
 <!--                      Interval="90"/>-->
         
 <!--        <ControlsView VerticalAlignment="Center"/>        -->
-        <ItemsDemoView VerticalAlignment="Center" HorizontalAlignment="Center"/>
+<!--        <ItemsDemoView VerticalAlignment="Center" HorizontalAlignment="Center"/>-->
+        <ListBoxDemoView VerticalAlignment="Center" HorizontalAlignment="Center"/>
 
         <!-- Live diagnostics overlay: a TextBlock whose text the DiagnosticsOverlayBehavior rewrites each frame from
              RuntimeStats (layout pass ms, measure/arrange this frame, budget deferral, bindings/frame, active anims).
