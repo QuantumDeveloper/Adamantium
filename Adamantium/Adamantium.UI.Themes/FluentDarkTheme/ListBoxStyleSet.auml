@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions"
+          xmlns:controls="http://adamantium/ui">
+
+    <!-- ListBox: a themed Border around a ScrollViewer hosting the items. CanContentScroll=true so the ScrollViewer
+         delegates to the virtualizing items panel (item scrolling). PART_ItemsPresenter is the items host; its panel
+         comes from ItemsPanel (default = a vertical virtualizing StackPanel; set it to a WrapPanel for a tiled list).
+         Items are ListBoxItem containers (see ListBoxItemStyleSet). Only Background is per-instance (Control.Background);
+         the border/corner are theme chrome. -->
+    <Style Selector="ListBox">
+        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+    </Style>
+
+    <Style Selector="ListBox">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBox">
+                    <controls:Border Background="{TemplateBinding Background}"
+                                     BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                     BorderThickness="1"
+                                     CornerRadius="4">
+                        <controls:ScrollViewer CanContentScroll="True"
+                                               HorizontalScrollBarVisibility="Disabled"
+                                               VerticalScrollBarVisibility="Auto">
+                            <controls:ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </controls:ScrollViewer>
+                    </controls:Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>
