@@ -1,4 +1,5 @@
 using System;
+using Adamantium.Graphics.Fonts;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
@@ -76,6 +77,19 @@ public class ContentPresenter : InputUIComponent
                 return;   // reuse: no teardown, no rebuild
         }
 
+        // Recycling fast-path 2: plain (no-template) content already hosted in the auto-generated TextBlock - just update
+        // its text instead of tearing it down and building a new one. Without this, a virtualized list of STRING items
+        // (no ItemTemplate) recreates a TextBlock - and its render units / GPU buffers - on every recycle/rebind during
+        // scroll, which exhausts device memory (the OutOfDeviceMemory the template fast-path above already guards against,
+        // but only for DataTemplate content).
+        if (newContent != null && newContent is not IUIComponent && _currentTemplate == null
+            && _currentRoot is TextBlock reusableText
+            && ContentTemplate == null && ContentTemplateSelector == null)
+        {
+            reusableText.Text = newContent.ToString();
+            return;
+        }
+
         // A new swap supersedes one still mid-flight: finish the previous transition instantly before starting over.
         if (_outgoingRoot != null)
             RemoveOutgoing();
@@ -134,7 +148,17 @@ public class ContentPresenter : InputUIComponent
             }
             else
             {
-                var textBlock = new TextBlock { Text = newContent.ToString(), FontSize = FontSize };
+                // The auto-generated content text aligns to the PRESENTER's own alignment - which a control template binds
+                // from the control's Horizontal/VerticalContentAlignment (e.g. <ContentPresenter VerticalAlignment=
+                // "{TemplateBinding VerticalContentAlignment}"/>). So content lands where the template asked, instead of
+                // the TextBlock's default (VerticalTextAlignment.Bottom, which looked low). Authored TextBlocks are unaffected.
+                var textBlock = new TextBlock
+                {
+                    Text = newContent.ToString(),
+                    FontSize = FontSize,
+                    HorizontalTextAlignment = ToTextAlignment(HorizontalAlignment),
+                    VerticalTextAlignment = ToTextAlignment(VerticalAlignment)
+                };
                 if (Foreground != null) textBlock.Foreground = Foreground;
                 _currentRoot = textBlock;
             }
@@ -259,4 +283,20 @@ public class ContentPresenter : InputUIComponent
 
         return size;
     }
+
+    // Map the presenter's own content alignment onto the auto-generated text's alignment, so string content honours the
+    // template's Horizontal/VerticalContentAlignment. Stretch has no text equivalent -> left / centre (sensible defaults).
+    private static HorizontalTextAlignment ToTextAlignment(HorizontalAlignment alignment) => alignment switch
+    {
+        HorizontalAlignment.Center => HorizontalTextAlignment.Center,
+        HorizontalAlignment.Right => HorizontalTextAlignment.Right,
+        _ => HorizontalTextAlignment.Left,
+    };
+
+    private static VerticalTextAlignment ToTextAlignment(VerticalAlignment alignment) => alignment switch
+    {
+        VerticalAlignment.Top => VerticalTextAlignment.Top,
+        VerticalAlignment.Bottom => VerticalTextAlignment.Bottom,
+        _ => VerticalTextAlignment.Center,
+    };
 }
