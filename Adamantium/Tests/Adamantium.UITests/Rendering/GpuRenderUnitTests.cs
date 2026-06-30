@@ -317,7 +317,48 @@ public class GpuRenderUnitTests
             {
                 Assert.That(Red(30, 30), Is.True, "content (red box) must render");
                 Assert.That(Black(2, 2), Is.True, "background outside the adorned area stays cleared");
-                Assert.That(White(8, 8), Is.True, "selection handle must render ON TOP, outside the box corner");
+                Assert.That(White(15, 15), Is.True, "selection handle must render ON TOP, tucked inside the box corner");
+            });
+        }
+        finally { System.IO.File.Delete(path); }
+    }
+
+    // An element that FILLS the surface (touches every edge): the selection chrome must be drawn INSIDE its bounds so it
+    // stays within the window framebuffer. Regression: it used to inflate the frame + handles OUTSIDE the bounds, so for
+    // an edge element they fell off-window and were clipped to a few corner specks (the designer's "no frame" bug).
+    [Test]
+    public void Adorner_OnEdgeTouchingElement_StaysInsideBounds_NotClipped()
+    {
+        var factory = new RenderUnitFactory(_device, _resourceFactory);
+        using var renderer = new OffscreenTestRenderer(_device, factory, 64, 64) { ClearColor = Colors.Black };
+
+        var box = new Adamantium.UI.Controls.Shapes.Rectangle { Width = 64, Height = 64, Fill = Brushes.Red };
+        box.Measure(new Size(64, 64));
+        box.Arrange(new Rect(0, 0, 64, 64));   // fills the surface -> touches every edge
+
+        var root = new TestRoot(64, 64);
+        root.Add(box);
+        renderer.Adorners = [new Adamantium.UI.Controls.Adorners.SelectionAdorner(box)];
+        Assert.That(renderer.RenderFrame(root), Is.True);
+
+        var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"adorner_edge_{System.Guid.NewGuid():N}.bgra");
+        renderer.SaveRaw(path);
+        try
+        {
+            var bytes = System.IO.File.ReadAllBytes(path);   // B8G8R8A8, top-left origin
+            // CornflowerBlue ~ (R100,G149,B237): high B, LOW R - distinct from white (high R) and red (low B).
+            bool Frame(int x, int y) { var o = (y * 64 + x) * 4; return bytes[o] > 150 && bytes[o + 2] < 160 && bytes[o + 1] > 90; }
+            bool White(int x, int y) { var o = (y * 64 + x) * 4; return bytes[o] > 180 && bytes[o + 1] > 180 && bytes[o + 2] > 180; }
+            bool Red(int x, int y)   { var o = (y * 64 + x) * 4; return bytes[o] < 100 && bytes[o + 1] < 100 && bytes[o + 2] > 140; }
+
+            bool AnyFrameInLeftStrip() { for (var x = 0; x < 6; x++) for (var y = 26; y < 38; y++) if (Frame(x, y)) return true; return false; }
+            bool AnyWhiteInTopLeft()   { for (var x = 0; x < 10; x++) for (var y = 0; y < 10; y++) if (White(x, y)) return true; return false; }
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(AnyFrameInLeftStrip(), Is.True, "frame is drawn INSIDE the left edge, not clipped off-window");
+                Assert.That(AnyWhiteInTopLeft(), Is.True, "a corner handle sits inside the top-left corner");
+                Assert.That(Red(32, 32), Is.True, "the element still shows through the centre");
             });
         }
         finally { System.IO.File.Delete(path); }

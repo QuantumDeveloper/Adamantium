@@ -10,7 +10,7 @@ using Adamantium.Win32;
 
 namespace Adamantium.UI.Controls;
 
-public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IAdornerHost
+public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IAdornerHost, IPopupHost
 {
     private IWindowRenderer _renderer;
     protected IWindowWorkerService WindowWorkerService { get; private set; }
@@ -41,6 +41,14 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     public AdornerLayer AdornerLayer { get; } = new AdornerLayer();
 
     public IReadOnlyList<IUIComponent> Adorners => AdornerLayer.Adorners;
+
+    /// <summary>The window's popup layer: open <see cref="Popup"/>s' children the renderer draws on top of the content,
+    /// within the window. A popup registers itself here (via <see cref="IPopupHost"/>) while open.</summary>
+    public PopupLayer PopupLayer { get; } = new PopupLayer();
+
+    public IReadOnlyList<IUIComponent> PopupRoots => PopupLayer.Roots;
+
+    public void LayoutPopups() => PopupLayer.UpdateLayout(new Size(ClientWidth, ClientHeight));
 
     public WindowBase()
     {

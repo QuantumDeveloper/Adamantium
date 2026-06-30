@@ -23,6 +23,36 @@ public static class InputExtensions
       return result;
    }
 
+   /// <summary>
+   /// ALL visual elements under <paramref name="p"/>, front-to-back - INCLUDING non-input visuals (a Border, a Shape, a
+   /// TextBlock). Mouse routing must NOT target those (a Border should let clicks fall through to interactive content),
+   /// so it uses <see cref="GetInputElementsAt"/>; the DESIGNER, however, must be able to select ANY authored element,
+   /// not only interactive ones - that is what this is for.
+   /// </summary>
+   public static IEnumerable<IUIComponent> GetVisualsAt(this IUIComponent root, Vector2 p)
+   {
+      var result = new List<IUIComponent>();
+      CollectVisuals(root, p, result);
+      return result;
+   }
+
+   private static void CollectVisuals(IUIComponent element, Vector2 p, List<IUIComponent> result)
+   {
+      if (!element.ClipRectangle.Contains(p)
+          || element.Visibility != Visibility.Visible
+          || !element.IsHitTestVisible)
+         return;
+
+      var local = p - element.ClipRectangle.Location;
+      foreach (var child in ZSort(element.VisualChildren))
+         CollectVisuals(child, local, result);
+
+      // Any visual on its actual geometry is a candidate (not only IInputComponent) - the only difference from the input
+      // collector above, so non-interactive authored elements are reachable by the designer's selection.
+      if (element.HitTestCore(local))
+         result.Add(element);
+   }
+
    private static void Collect(IUIComponent element, Vector2 p, List<IInputComponent> result)
    {
       if (!element.ClipRectangle.Contains(p)

@@ -601,10 +601,14 @@ public sealed class DesignerSession : IDisposable
     // AUML (template-internal parts have no source position). Shared by HitTest (hover/go-to-source) and SelectAt.
     private (IUIComponent Component, AumlSourceSpan Span)? FindAuthoredAt(double x, double y)
     {
-        if (_lastWindow is not IInputComponent root || _lastSourceMap is null) return null;
+        if (_lastWindow is not IUIComponent root || _lastSourceMap is null) return null;
 
-        var hit = root.HitTest(new Vector2(x, y));
-        for (var current = hit as IUIComponent; current is not null; current = current.VisualParent)
+        // GetVisualsAt (not HitTest): the designer must select ANY authored element under the cursor, including a
+        // non-input visual like a Border or a Shape. HitTest returns only IInputComponent targets, so clicking a bare
+        // Border fell through to the nearest interactive element behind it (e.g. the containing panel) - the "selects the
+        // background panel, not the control in front" bug.
+        var hit = root.GetVisualsAt(new Vector2(x, y)).FirstOrDefault();
+        for (var current = hit; current is not null; current = current.VisualParent)
             if (_lastSourceMap.TryGetValue(current, out var span))
                 return (current, span);
         return null;

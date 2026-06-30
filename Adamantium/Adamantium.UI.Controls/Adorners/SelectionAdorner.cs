@@ -1,4 +1,4 @@
-using Adamantium.Mathematics;
+using System;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
@@ -7,13 +7,14 @@ using Adamantium.UI.Core.Media;
 namespace Adamantium.UI.Controls.Adorners;
 
 /// <summary>
-/// A decorated selection frame: an outlined rectangle a few pixels OUTSIDE the adorned element's painted bounds (so a
-/// stroke's edge/AA never touches the line) plus small square handles at the four corners. Drawn by the adorner stage
-/// on top of everything - this replaces the designer's own host-side frame.
+/// A decorated selection frame: an outlined rectangle just INSIDE the adorned element's painted bounds plus small square
+/// handles tucked into the four corners. Drawn by the adorner stage on top of everything - this replaces the designer's
+/// own host-side frame. The chrome is kept INSIDE the bounds on purpose: the adorner shares the window's framebuffer, so
+/// a frame drawn OUTSIDE an edge-touching element's bounds would fall off-window and be clipped away (only stray corner
+/// bits survive) - exactly the "no frame, 4 short corner marks" the designer showed for stretched/edge elements.
 /// </summary>
 public class SelectionAdorner : Adorner
 {
-    private const double Margin = 2.0;       // gap between the element's painted bounds and the frame
     private const double FrameThickness = 4;
     private const double HandleSize = 6.0;    // corner handle square (side length)
 
@@ -29,24 +30,28 @@ public class SelectionAdorner : Adorner
 
     protected override void OnRender(IDrawingContext context)
     {
-        var frame = AdornedBounds.Inflate(Margin);
+        // Inset the frame by half the stroke so the whole 4px line sits within the bounds (never clipped at a window edge).
+        var b = AdornedBounds;
+        var half = FrameThickness / 2.0;
+        var frame = new Rect(b.X + half, b.Y + half,
+            Math.Max(0, b.Width - FrameThickness), Math.Max(0, b.Height - FrameThickness));
         var session = context.ForControl(this);
         var pen = new Pen(Stroke, FrameThickness);
 
         // Outlined frame (transparent fill = outline only).
         session.DrawRectangle(Brushes.Transparent, frame, pen);
 
-        // Corner handles: small filled squares centred on each frame corner.
-        var half = HandleSize / 2.0;
+        // Corner handles: small filled squares tucked INTO each inner corner of the frame (so they also stay in bounds).
+        var hs = HandleSize;
         var handlePen = new Pen(Stroke, 1.0);
-        Vector2[] corners =
+        Rect[] handles =
         [
-            new Vector2(frame.X, frame.Y),
-            new Vector2(frame.X + frame.Width, frame.Y),
-            new Vector2(frame.X, frame.Y + frame.Height),
-            new Vector2(frame.X + frame.Width, frame.Y + frame.Height)
+            new Rect(frame.X, frame.Y, hs, hs),
+            new Rect(frame.X + frame.Width - hs, frame.Y, hs, hs),
+            new Rect(frame.X, frame.Y + frame.Height - hs, hs, hs),
+            new Rect(frame.X + frame.Width - hs, frame.Y + frame.Height - hs, hs, hs)
         ];
-        foreach (var c in corners)
-            session.DrawRectangle(HandleFill, new Rect(c.X - half, c.Y - half, HandleSize, HandleSize), handlePen);
+        foreach (var h in handles)
+            session.DrawRectangle(HandleFill, h, handlePen);
     }
 }

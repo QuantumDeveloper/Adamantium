@@ -1,0 +1,129 @@
+using System.Linq;
+using Adamantium.UI.Controls.Base;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.RoutedEvents;
+
+namespace Adamantium.UI.Controls;
+
+/// <summary>
+/// Shows its <see cref="Child"/> on a window-wide overlay layer (NOT a separate OS window): it never leaves the parent
+/// window's bounds. The child is positioned relative to <see cref="PlacementTarget"/> via <see cref="Placement"/> +
+/// offsets, re-evaluated every frame, so it FOLLOWS a moving target (e.g. a value tooltip riding a slider thumb). The
+/// popup occupies no space where it is declared - it is a portal into the window's <see cref="PopupLayer"/>.
+/// </summary>
+public class Popup : MeasurableUIComponent, IContainer
+{
+    public static readonly AdamantiumProperty IsOpenProperty = AdamantiumProperty.Register(nameof(IsOpen),
+        typeof(bool), typeof(Popup), new PropertyMetadata(false, OnIsOpenChanged));
+
+    public static readonly AdamantiumProperty ChildProperty = AdamantiumProperty.Register(nameof(Child),
+        typeof(IMeasurableComponent), typeof(Popup), new PropertyMetadata(null, OnChildChanged));
+
+    public static readonly AdamantiumProperty PlacementTargetProperty = AdamantiumProperty.Register(nameof(PlacementTarget),
+        typeof(UIComponent), typeof(Popup), new PropertyMetadata(null));
+
+    public static readonly AdamantiumProperty PlacementProperty = AdamantiumProperty.Register(nameof(Placement),
+        typeof(PlacementMode), typeof(Popup), new PropertyMetadata(PlacementMode.Bottom));
+
+    public static readonly AdamantiumProperty HorizontalOffsetProperty = AdamantiumProperty.Register(nameof(HorizontalOffset),
+        typeof(double), typeof(Popup), new PropertyMetadata(0.0));
+
+    public static readonly AdamantiumProperty VerticalOffsetProperty = AdamantiumProperty.Register(nameof(VerticalOffset),
+        typeof(double), typeof(Popup), new PropertyMetadata(0.0));
+
+    private IPopupHost _host;   // the window layer this popup is registered with while open
+
+    public bool IsOpen
+    {
+        get => GetValue<bool>(IsOpenProperty);
+        set => SetValue(IsOpenProperty, value);
+    }
+
+    [Content]
+    public IMeasurableComponent Child
+    {
+        get => GetValue<IMeasurableComponent>(ChildProperty);
+        set => SetValue(ChildProperty, value);
+    }
+
+    /// <summary>The element the popup positions against. Defaults to the element the popup is declared under.</summary>
+    public UIComponent PlacementTarget
+    {
+        get => GetValue<UIComponent>(PlacementTargetProperty);
+        set => SetValue(PlacementTargetProperty, value);
+    }
+
+    public PlacementMode Placement
+    {
+        get => GetValue<PlacementMode>(PlacementProperty);
+        set => SetValue(PlacementProperty, value);
+    }
+
+    public double HorizontalOffset
+    {
+        get => GetValue<double>(HorizontalOffsetProperty);
+        set => SetValue(HorizontalOffsetProperty, value);
+    }
+
+    public double VerticalOffset
+    {
+        get => GetValue<double>(VerticalOffsetProperty);
+        set => SetValue(VerticalOffsetProperty, value);
+    }
+
+    /// <summary>Explicit target, else the element this popup is declared under.</summary>
+    internal UIComponent EffectiveTarget => PlacementTarget ?? VisualParent as UIComponent;
+
+    // A popup occupies NO space in its own parent - its child lives in the window's popup layer.
+    protected override Size MeasureOverride(Size availableSize) => Size.Zero;
+    protected override Size ArrangeOverride(Size finalSize) => Size.Zero;
+
+    private static void OnIsOpenChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        var popup = (Popup)a;
+        if ((bool)e.NewValue) popup.Open(); else popup.Close();
+    }
+
+    private static void OnChildChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        var popup = (Popup)a;
+        // Logical child only (for DataContext inheritance) - NOT a visual child, so the main layout/render never draws
+        // it in place; the popup layer measures/arranges/renders it in the overlay.
+        if (e.OldValue is IMeasurableComponent oldChild) popup.LogicalChildrenCollection.Remove(oldChild);
+        if (e.NewValue is IMeasurableComponent newChild) popup.LogicalChildrenCollection.Add(newChild);
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        if (IsOpen) Open();   // IsOpen may have been set before the popup entered the tree
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        Close();
+        base.OnDetachedFromVisualTree(e);
+    }
+
+    private void Open()
+    {
+        if (_host != null || Child == null) return;
+        _host = this.GetVisualAncestors().OfType<IPopupHost>().FirstOrDefault();
+        if (_host == null) return;   // not in a window yet; OnAttachedToVisualTree retries
+        if (Child is UIComponent child) child.DataContext = DataContext;
+        _host.PopupLayer.Add(this);
+    }
+
+    private void Close()
+    {
+        _host?.PopupLayer.Remove(this);
+        _host = null;
+    }
+
+    // IContainer: the AUML loader sets Child via the [Content] property.
+    public void AddOrSetChildComponent(object component) { if (component is IMeasurableComponent c) Child = c; }
+    public void RemoveAllChildComponents() => Child = null;
+    public IReadOnlyList<object> GetChildComponents() => Child != null ? [Child] : [];
+    public void InsertChildComponent(int index, object component) { if (component is IMeasurableComponent c) Child = c; }
+    public void RemoveChildComponentAt(int index) => Child = null;
+}
