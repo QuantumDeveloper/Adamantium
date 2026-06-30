@@ -63,13 +63,18 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
 
    IDrawingSession IDrawingSession.DrawRectangle(Brush brush, Rect destinationRect, CornerRadius corners, Pen pen)
    {
+      // Nothing to fill and no border to stroke -> draw nothing, and don't create a render unit (with its GPU buffers)
+      // for it. This is what lets a ListBoxItem's null rest background cost zero GPU resources per item, so a long
+      // virtualized list (especially a wrap panel, which shows many rows at once) doesn't pile up fill units + AA fringes.
+      if (brush == null && pen == null) return this;
+
       var payload = new RectanglePayload(
       brush,
       destinationRect,
       corners,
       pen);
       CreateCommand(payload);
-      
+
       return this;
    }
 
