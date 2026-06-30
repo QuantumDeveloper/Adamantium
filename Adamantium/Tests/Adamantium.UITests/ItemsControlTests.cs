@@ -139,6 +139,67 @@ public class ItemsControlTests
     }
 
     [Test]
+    public void VirtualizingWrapPanel_AutoCell_VariableWidthItems_StableGridAndContent()
+    {
+        // Variable-width string items with NO ItemWidth/ItemHeight -> the panel resolves a UNIFORM cell itself and must
+        // keep it stable across scrolls. Regression: the old code re-probed ONE item's width every pass, so the cell and
+        // column count flickered (extent oscillated) and the grid reflowed into overlapping/garbled rows + scroll churn.
+        var items = Enumerable.Range(0, 3000).Select(i => $"Item {i}").Cast<object>().ToList();
+        var ic = new ItemsControl
+        {
+            ItemsSource = items,
+            ItemsPanel = new ItemsPanelTemplate(() => new TemplateResult
+            {
+                RootComponent = new WrapPanel { Orientation = Orientation.Horizontal }   // auto cell (no ItemWidth/Height)
+            })
+        };
+        ic.Template = ItemsPresenterTemplate();
+        ic.Measure(new Size(320, 240));
+        ic.Arrange(new Rect(0, 0, 320, 240));
+
+        var gen = ic.ItemContainerGenerator;
+        var panel = ic.ItemsHostPanel;
+        var scroll = (IScrollableContent)panel;
+
+        void LayoutAt(double y)
+        {
+            scroll.SetOffset(new Vector2(0, y));
+            panel.Measure(new Size(320, 240), true);
+            panel.Arrange(new Rect(0, 0, 320, 240), true);
+        }
+
+        void AssertContentBound(string where)
+        {
+            foreach (var i in gen.RealizedIndices)
+                Assert.That(((ContentPresenter)gen.ContainerFromIndex(i)).Content, Is.EqualTo(items[i]),
+                    $"index {i} shows its own item ({where}) - recycling rebinds in place, no stale/duplicate text");
+        }
+
+        // Scroll forward: the cell may grow to fit wider items (more digits); track the peak row extent.
+        var peakHeight = scroll.Extent.Height;
+        var maxRealized = 0;
+        for (double y = 0; y <= 4000; y += 173)
+        {
+            LayoutAt(y);
+            peakHeight = Math.Max(peakHeight, scroll.Extent.Height);
+            maxRealized = Math.Max(maxRealized, gen.RealizedCount);
+            AssertContentBound($"forward y={y}");
+        }
+
+        // Scroll back over the SAME items: a grow-only cached cell must not shrink, so the extent stays at its peak. The
+        // old per-pass re-probe shrank the cell here (narrow items at the top) -> column count jumped -> grid reflowed.
+        for (double y = 4000; y >= 0; y -= 173)
+        {
+            LayoutAt(y);
+            Assert.That(scroll.Extent.Height, Is.EqualTo(peakHeight).Within(0.5),
+                $"row extent stays stable scrolling back (y={y}) - the cell does not flicker");
+            AssertContentBound($"back y={y}");
+        }
+
+        Assert.That(maxRealized, Is.LessThan(150), "the realized grid window stays bounded at every scroll position");
+    }
+
+    [Test]
     public void RecyclingBoundsContainerAllocation()
     {
         var items = Enumerable.Range(0, 10000).Cast<object>().ToList();
