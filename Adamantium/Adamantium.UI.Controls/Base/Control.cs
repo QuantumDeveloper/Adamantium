@@ -9,7 +9,7 @@ public class Control : TemplatedUIComponent, IControl
    {
 
    }
-   
+
    public static readonly AdamantiumProperty BackgroundProperty = AdamantiumProperty.Register(nameof(Background),
       typeof(Brush), typeof(Control),
       new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));

@@ -196,7 +196,16 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         get => GetValue<Cursor>(CursorProperty);
         set => SetValue(CursorProperty, value);
     }
-    
+
+    /// <summary>Content shown as a hover tooltip - a string, or any UI content. WPF-style shorthand for the attached
+    /// <see cref="Adamantium.UI.Controls.ToolTipService.ToolTipProperty"/> (registered on every component), so a plain
+    /// <c>&lt;Button ToolTip="…"/&gt;</c> works on any input element and drives the same hover/show/hide service.</summary>
+    public object ToolTip
+    {
+        get => ToolTipService.GetToolTip(this);
+        set => ToolTipService.SetToolTip(this, value);
+    }
+
     public Boolean IsFocused
     {
         get => GetValue<Boolean>(IsFocusedProperty);
