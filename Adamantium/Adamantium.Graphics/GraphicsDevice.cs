@@ -1354,7 +1354,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         {
             throw new ArgumentNullException("Effect pass should be applied before executing draw");
         }
-            
+
         var commandBuffer = commandBuffers[CurrentFrame];
         SetDrawingState(commandBuffer);
 

@@ -63,10 +63,13 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
 
    IDrawingSession IDrawingSession.DrawRectangle(Brush brush, Rect destinationRect, CornerRadius corners, Pen pen)
    {
-      // Nothing to fill and no border to stroke -> draw nothing, and don't create a render unit (with its GPU buffers)
-      // for it. This is what lets a ListBoxItem's null rest background cost zero GPU resources per item, so a long
-      // virtualized list (especially a wrap panel, which shows many rows at once) doesn't pile up fill units + AA fringes.
-      if (brush == null && pen == null) return this;
+      // Nothing VISIBLE to fill and no border to stroke -> draw nothing, and don't create a render unit (with its GPU
+      // buffers + AA fringe) for it. A null OR a fully-transparent brush both paint nothing: Border/Panel/TextBlock all
+      // DEFAULT their Background to Brushes.Transparent, so without folding transparent in here every rest-state
+      // ListBoxItem (and each item's text background) still piled up an invisible fill unit + fringe - the ListBox FPS
+      // drop. Hit-testing is bounds-based, so nothing depends on the invisible draw.
+      if (!brush.IsVisible() && pen == null)
+         return this;
 
       var payload = new RectanglePayload(
       brush,
@@ -99,6 +102,8 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
 
    IDrawingSession IDrawingSession.DrawGeometry(Brush brush, Geometry geometry, Pen pen)
    {
+      // Same invisible-draw skip as DrawRectangle: a transparent/null fill with no stroke records nothing.
+      if (!brush.IsVisible() && pen == null) return this;
       var payload = new GeometryPayload(brush, geometry, pen);
       CreateCommand(payload);
       return this;
@@ -118,8 +123,11 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
    
    IDrawingSession IDrawingSession.DrawText(TextRenderingParameters renderingParameters, Size desiredSize, TextLayout textLayout, Brush foreground, Brush background, Brush stroke)
    {
-      var rectPayload = new RectanglePayload(background, new Rect(desiredSize), CornerRadius.Empty, null);
-      CreateCommand(rectPayload);
+      // Only emit the text's background rect when it's actually visible. Every TextBlock passed its Background here
+      // (default Brushes.Transparent), so each list item's text was creating an invisible fill unit + fringe on top of
+      // the (now batched) glyphs - a big slice of a long list's cost. The glyph draw itself is always recorded below.
+      if (background.IsVisible())
+         CreateCommand(new RectanglePayload(background, new Rect(desiredSize), CornerRadius.Empty, null));
       var payload = new TextPayload(renderingParameters, desiredSize, textLayout, foreground, background, stroke);
       CreateCommand(payload);
       return this;

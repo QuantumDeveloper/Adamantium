@@ -1,5 +1,5 @@
-const static float EPSILON = 1.401298E-45;
-const static int VERTICES_PER_SPRITE = 4;
+static const float EPSILON = 1.401298E-45;
+static const int VERTICES_PER_SPRITE = 4;
 
 struct FontItem
 {
@@ -22,7 +22,7 @@ struct PSInput
 Texture2D Texture : register(t1);
 SamplerState TextureSampler : register(s1);
 
-matrix MatrixTransform;
+float4x4 MatrixTransform;
 float2 TextureCornerCoords[4];
 float4 ForegroundColor;
 float FontSize;
@@ -83,16 +83,14 @@ PSInput ExpandGlyphCorner(FontItem item, int corner)
 
 float Median(float r, float g, float b)
 {
-    return max(min(r,g), min(max(r,g), b));
+    return max(min(r, g), min(max(r, g), b));
 }
 
-float screenPxRange(float2 uv) 
+float ScreenPxRange(float2 uv)
 {
-//    uint2 textureSize;
-//    Texture.GetDimensions(textureSize.x, textureSize.y);
     float2 unitRange = float2(PxRange, PxRange) / MSDFAtlasSize;
-    float2 screenTexSize = float2(1.0, 1.0)/fwidth(uv);
-    return max(0.5*dot(unitRange, screenTexSize), 1.0);
+    float2 screenTexSize = float2(1.0, 1.0) / fwidth(uv);
+    return max(0.5 * dot(unitRange, screenTexSize), 1.0);
 }
 
 // Coverage source for the glyph body: MSDF median when magnified (sharp corners), true-SDF alpha when
@@ -107,79 +105,78 @@ float SampleGlyphCoverage(float4 samp, float2 uv)
     return lerp(msdf, samp.a, t);
 }
 
+float2 SafeNormalize(float2 v)
+{
+    float len = length(v);
+    len = (len > 0.0) ? 1.0 / len : 0.0;
+    return v * len;
+}
+
+[shader("vertex")]
 PSInput FontVertexShader(FontItem item, uint vertexId : SV_VertexID)
 {
     return ExpandGlyphCorner(item, (int)vertexId);   // vertexId 0..3 = strip corner
 }
 
-
-float2 SafeNormalize(in float2 v)
+[shader("fragment")]
+float4 FontPixelShader(PSInput input) : SV_Target
 {
-	float len = length(v);
-	len = (len > 0.0) ? 1.0 / len : 0.0;
-	return v * len;
+    float2 uv = input.UV * MSDFAtlasSize;
+    float2 Jdx = ddx(uv);
+    float2 Jdy = ddy(uv);
+    float4 samp = Texture.Sample(TextureSampler, input.UV);
+
+    // Signed distance (normalized, contour at 0.5). FontWeight shifts the contour for thinner/thicker
+    // stems. Coverage source switches MSDF -> true-SDF with minification (see SampleGlyphCoverage).
+    float sigDist = SampleGlyphCoverage(samp, input.UV) - 0.5 + FontWeight;
+
+    // Anti-alias over ~1 screen pixel. The MAGNITUDE comes from the geometry derivatives (Jdx/Jdy = how
+    // many atlas texels map to one screen pixel) - smooth and robust, so thin stems don't drop out; the
+    // field derivatives give only the edge DIRECTION (their magnitude aliases on sub-pixel stems). The
+    // 0.5/PxRange factor is half a screen pixel and scales with PxRange - the old code hardcoded it to
+    // ~0.5/6, so at PxRange=16 the edge was ~2.8x too soft and clamped to the max -> permanent blur.
+    float2 gradDir = SafeNormalize(float2(ddx(sigDist), ddy(sigDist)));
+    float2 grad = float2(gradDir.x * Jdx.x + gradDir.y * Jdy.x, gradDir.x * Jdx.y + gradDir.y * Jdy.y);
+    float afWidth = min(0.5 / PxRange * length(grad), 0.5);
+    float opacity = smoothstep(-afWidth, afWidth, sigDist);
+
+    // Pre-multiplied alpha with gamma correction.
+    float4 color;
+    color.a = pow(abs(ForegroundColor.a * opacity), 1.0 / 2.2);
+    color.rgb = ForegroundColor.rgb * color.a;
+    return color;
 }
 
-float4 FontPixelShader(PSInput input) : SV_TARGET
-{
-    /*
-    // Large text
-    if (FontSize > FontSizeThreshold)
-    {
-        float2 msdfUnit = PxRange / MSDFAtlasSize;
-        float3 samp = Texture.Sample(TextureSampler, input.UV).rgb;
-    
-        float sigDist = Median(samp.r, samp.g, samp.b) - 0.5f;
-        sigDist = sigDist * dot(msdfUnit, 0.5f / fwidth(input.UV));
-    
-        float opacity = clamp(sigDist + 0.5f, 0.0f, 1.0f);
-        return input.Color * opacity;
-    }
-    else // Small text
-    */
-    {
-        float2 uv = input.UV * MSDFAtlasSize;
-        float2 Jdx = ddx(uv);
-        float2 Jdy = ddy(uv);
-        float4 samp = Texture.Sample(TextureSampler, input.UV);
-
-        // Signed distance (normalized, contour at 0.5). FontWeight shifts the contour for thinner/thicker
-        // stems. Coverage source switches MSDF -> true-SDF with minification (see SampleGlyphCoverage).
-        float sigDist = SampleGlyphCoverage(samp, input.UV) - 0.5f + FontWeight;
-
-        // Anti-alias over ~1 screen pixel. The MAGNITUDE comes from the geometry derivatives (Jdx/Jdy = how
-        // many atlas texels map to one screen pixel) - smooth and robust, so thin stems don't drop out; the
-        // field derivatives give only the edge DIRECTION (their magnitude aliases on sub-pixel stems). The
-        // 0.5/PxRange factor is half a screen pixel and scales with PxRange - the old code hardcoded it to
-        // ~0.5/6, so at PxRange=16 the edge was ~2.8x too soft and clamped to the max -> permanent blur.
-        float2 gradDir = SafeNormalize(float2(ddx(sigDist), ddy(sigDist)));
-        float2 grad = float2(gradDir.x * Jdx.x + gradDir.y * Jdy.x, gradDir.x * Jdx.y + gradDir.y * Jdy.y);
-        float afWidth = min(0.5f / PxRange * length(grad), 0.5f);
-        float opacity = smoothstep(-afWidth, afWidth, sigDist);
-        
-        // Apply pre-multiplied alpha with gamma correction
-        
-        float4 color;
-        color.a = pow(abs(ForegroundColor.a * opacity), 1.0f / 2.2f);
-        color.rgb = ForegroundColor.rgb * color.a;
-        return color;
-    }
-}
-
-// Canonical MSDF reconstruction (Chlumsky). screenPxRange() gives the field slope in screen pixels.
-// FontWeight shifts the 0.5 contour INSIDE the screenPxRange term (a true distance bias, not an opacity
+// Canonical MSDF reconstruction (Chlumsky). ScreenPxRange() gives the field slope in screen pixels.
+// FontWeight shifts the 0.5 contour INSIDE the ScreenPxRange term (a true distance bias, not an opacity
 // add), so it makes stems thinner/thicker without hazing the background. Selected via the RenderMsdf pass,
 // toggled from FontRenderer.UseCanonicalMsdf.
-float4 FontPixelShaderMsdf(PSInput input) : SV_TARGET
+[shader("fragment")]
+float4 FontPixelShaderMsdf(PSInput input) : SV_Target
 {
     float4 samp = Texture.Sample(TextureSampler, input.UV);
     float sd = SampleGlyphCoverage(samp, input.UV);
-    float opacity = clamp(screenPxRange(input.UV) * (sd - 0.5f + FontWeight) + 0.5f, 0.0f, 1.0f);
+    float opacity = clamp(ScreenPxRange(input.UV) * (sd - 0.5 + FontWeight) + 0.5, 0.0, 1.0);
     // Gamma-boost the coverage (same as the gradient pass): raises partial opacities so thin stems keep
     // their colour instead of washing out toward the background. The engine blends in sRGB, so this also
     // compensates the perceptual lightening of un-gamma-corrected coverage AA.
-    float alpha = pow(ForegroundColor.a * opacity, 1.0f / 2.2f);
+    float alpha = pow(ForegroundColor.a * opacity, 1.0 / 2.2);
     return float4(ForegroundColor.rgb * alpha, alpha);
+}
+
+// Batch variant of FontPixelShaderMsdf: the foreground comes from the per-instance vertex colour (input.Color,
+// baked per glyph on the CPU) instead of the ForegroundColor uniform, so ONE instanced draw can render glyphs
+// of many text blocks - each its own colour - from the shared atlas. Identical MSDF reconstruction otherwise.
+// Used by the CPU pre-transform text batch (docs/TEXT_GLYPH_BATCH_PLAN.md §9 Stage 2). input.Color is a plain
+// interpolated attribute (no matrix), so it is driver-safe on this Turing.
+[shader("fragment")]
+float4 FontPixelShaderMsdfBatch(PSInput input) : SV_Target
+{
+    float4 samp = Texture.Sample(TextureSampler, input.UV);
+    float sd = SampleGlyphCoverage(samp, input.UV);
+    float opacity = clamp(ScreenPxRange(input.UV) * (sd - 0.5 + FontWeight) + 0.5, 0.0, 1.0);
+    float alpha = pow(input.Color.a * opacity, 1.0 / 2.2);
+    return float4(input.Color.rgb * alpha, alpha);
 }
 
 // MSDF + outline. Reconstructs two coverages from the SAME field: the glyph body (contour at 0.5) and an
@@ -187,38 +184,40 @@ float4 FontPixelShaderMsdf(PSInput input) : SV_TARGET
 // OutlineColor. This is the verification effect: a visible outline at a real offset proves the distance
 // field is valid beyond the contour (only possible with the widened PxRange - a thin field saturates to
 // black a couple texels out and the ring collapses).
-float4 FontPixelShaderMsdfOutline(PSInput input) : SV_TARGET
+[shader("fragment")]
+float4 FontPixelShaderMsdfOutline(PSInput input) : SV_Target
 {
     float3 samp = Texture.Sample(TextureSampler, input.UV).rgb;
     float sd = Median(samp.r, samp.g, samp.b);
-    float screenPx = screenPxRange(input.UV);
+    float screenPx = ScreenPxRange(input.UV);
 
     // Body coverage (same as the plain MSDF pass) and the outer (body + outline) coverage.
-    float fill = clamp(screenPx * (sd - 0.5f + FontWeight) + 0.5f, 0.0f, 1.0f);
-    float outer = clamp(screenPx * (sd - 0.5f + OutlineWidth + FontWeight) + 0.5f, 0.0f, 1.0f);
+    float fill = clamp(screenPx * (sd - 0.5 + FontWeight) + 0.5, 0.0, 1.0);
+    float outer = clamp(screenPx * (sd - 0.5 + OutlineWidth + FontWeight) + 0.5, 0.0, 1.0);
 
     // Inside -> foreground, the ring (outer but not fill) -> outline colour.
     float3 rgb = lerp(OutlineColor.rgb, ForegroundColor.rgb, fill);
-    float alpha = pow(ForegroundColor.a * outer, 1.0f / 2.2f);
+    float alpha = pow(ForegroundColor.a * outer, 1.0 / 2.2);
     return float4(rgb * alpha, alpha);
 }
 
-float4 StrokedTextPS(PSInput input) : SV_TARGET
+[shader("fragment")]
+float4 StrokedTextPS(PSInput input) : SV_Target
 {
     if (FontSize > FontSizeThreshold) // large stroke
     {
         float2 msdfUnit = PxRange / MSDFAtlasSize;
         float3 samp = Texture.Sample(TextureSampler, input.UV).rgb;
 
-        float sigDist = Median(samp.r, samp.g, samp.b) - 0.5f;
-        sigDist = sigDist * dot(msdfUnit, 0.5f / fwidth(input.UV));
-        const float strokeThickness = 0.250f * 0.75f;
-        float strokeDist = Median(samp.r, samp.g, samp.b) - 0.25f - strokeThickness;
+        float sigDist = Median(samp.r, samp.g, samp.b) - 0.5;
+        sigDist = sigDist * dot(msdfUnit, 0.5 / fwidth(input.UV));
+        const float strokeThickness = 0.250 * 0.75;
+        float strokeDist = Median(samp.r, samp.g, samp.b) - 0.25 - strokeThickness;
         strokeDist = -(abs(strokeDist) - strokeThickness);
-        strokeDist = strokeDist * dot(msdfUnit, 0.5f / fwidth(input.UV));
+        strokeDist = strokeDist * dot(msdfUnit, 0.5 / fwidth(input.UV));
 
-        float opacity = clamp(sigDist + 0.5f, 0.0f, 1.0f);
-        float strokeOpacity = clamp(strokeDist + 0.5f, 0.0f, 1.0f);
+        float opacity = clamp(sigDist + 0.5, 0.0, 1.0);
+        float strokeOpacity = clamp(strokeDist + 0.5, 0.0, 1.0);
         return lerp(StrokeColor, ForegroundColor, opacity) * max(opacity, strokeOpacity);
     }
     else // small stroked text
@@ -230,16 +229,16 @@ float4 StrokedTextPS(PSInput input) : SV_TARGET
 
         // Same coverage source as the plain text pass: MSDF when magnified, true-SDF when minified.
         float coverage = SampleGlyphCoverage(samp, input.UV);
-        float sigDist = coverage - 0.5f;
-        const float strokeThickness = 0.250f * 0.75f;
-        float strokeDist = -(abs(coverage - 0.25f - strokeThickness) - strokeThickness);
+        float sigDist = coverage - 0.5;
+        const float strokeThickness = 0.250 * 0.75;
+        float strokeDist = -(abs(coverage - 0.25 - strokeThickness) - strokeThickness);
 
         // Same screen-pixel AA as the plain text pass: magnitude from the geometry derivatives (Jdx/Jdy) so
         // thin stems survive, scaled by 0.5/PxRange (half a screen pixel, scales with PxRange - no hardcoded
         // constant). The field derivatives give only the edge direction.
         float2 gradDir = SafeNormalize(float2(ddx(sigDist), ddy(sigDist)));
         float2 grad = float2(gradDir.x * Jdx.x + gradDir.y * Jdy.x, gradDir.x * Jdx.y + gradDir.y * Jdy.y);
-        float afWidth = min(0.5f / PxRange * length(grad), 0.5f);
+        float afWidth = min(0.5 / PxRange * length(grad), 0.5);
         float opacity = smoothstep(-afWidth, afWidth, sigDist);
         float strokeOpacity = smoothstep(-afWidth, afWidth, strokeDist);
 
@@ -263,6 +262,14 @@ technique FontBatch
         Profile = 5.1;
         VertexShader = FontVertexShader;
         PixelShader = FontPixelShaderMsdf;
+    }
+
+    pass RenderMsdfBatch
+    {
+        EffectName = "FontEffectMsdfBatch";
+        Profile = 5.1;
+        VertexShader = FontVertexShader;
+        PixelShader = FontPixelShaderMsdfBatch;
     }
 
     pass RenderMsdfOutline

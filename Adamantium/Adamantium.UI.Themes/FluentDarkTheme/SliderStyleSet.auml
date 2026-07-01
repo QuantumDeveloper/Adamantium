@@ -66,6 +66,11 @@
          Height="Auto" (the parser maps it to NaN) clears the horizontal 4px height so VerticalAlignment=Stretch spans full height. -->
     <Style Selector="Slider">
         <PropertyTrigger Property="Orientation" Value="Vertical">
+            <!-- MinWidth=120 (the base) is a horizontal min-LENGTH. On a vertical slider it would instead force the
+                 control 120px WIDE - a huge dead hit area beside the ~4-20px rail (it swallowed clicks left/right of,
+                 and above, the thin vertical track). Clear it and move the min length onto the vertical axis. -->
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="120"/>
             <Setter TargetName="Rail" Property="Width" Value="4"/>
             <Setter TargetName="Rail" Property="Height" Value="Auto"/>
             <Setter TargetName="Rail" Property="HorizontalAlignment" Value="Center"/>

@@ -1,3 +1,4 @@
+using System;
 using Adamantium.Core;
 using Adamantium.Graphics.Core;
 using Adamantium.Vulkan.Core;
@@ -72,6 +73,17 @@ namespace Adamantium.Graphics
         public void SetData(T[] fromData, uint startIndex = 0, uint elementCount = 0, uint offsetInBytes = 0)
         {
             base.SetData(fromData, startIndex, elementCount, offsetInBytes);
+        }
+
+        /// <summary>
+        /// Copies a span of elements from CPU memory to this buffer into GPU memory, pinning the span in place
+        /// (no intermediate array/copy). Handy for uploading an exact sub-range, e.g. <c>array.AsSpan(0, count)</c>.
+        /// </summary>
+        /// <param name="fromData">The data to copy from.</param>
+        /// <param name="offsetInBytes">The offset in bytes to write to.</param>
+        public void SetData(ReadOnlySpan<T> fromData, uint offsetInBytes = 0)
+        {
+            base.SetData(fromData, offsetInBytes);
         }
     }
 }

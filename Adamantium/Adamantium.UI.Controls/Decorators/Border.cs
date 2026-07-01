@@ -90,16 +90,28 @@ public class Border : Decorator
       var innerRect = outerRect.Deflate(borderThickness);
       var innerRadius = DeflateCornerRadius(cornerRadius, borderThickness);
 
-      var combined = new CombinedGeometry
-      {
-         GeometryCombineMode = GeometryCombineMode.Exclude,
-         Geometry1 = new RectangleGeometry(outerRect, cornerRadius),
-         Geometry2 = new RectangleGeometry(innerRect, innerRadius)
-      };
+      var ctx = context.ForControl(this);
 
-      context.ForControl(this)
-         .DrawRectangle(Background, innerRect, innerRadius)
-         .DrawGeometry(BorderBrush, combined);
+      // Only record draws that produce visible pixels. A null or fully-transparent brush (Border's DEFAULT Background
+      // is Brushes.Transparent) would otherwise still build a fill unit + its analytic-AA fringe every frame - an
+      // invisible per-element cost that multiplies across a long list, where every rest-state ListBoxItem is a Border
+      // (this was the ListBox FPS drop). Hit-testing is bounds-based, so nothing depends on the invisible draw.
+      if (Background.IsVisible())
+         ctx.DrawRectangle(Background, innerRect, innerRadius);
+
+      // Same for the border ring: skip when there's no visible brush or zero thickness (its geometry would be an
+      // empty/invisible ring anyway, but building + drawing it still costs a unit + fringe).
+      var hasThickness = borderThickness.Left != 0 || borderThickness.Top != 0 || borderThickness.Right != 0 || borderThickness.Bottom != 0;
+      if (hasThickness && BorderBrush.IsVisible())
+      {
+         var combined = new CombinedGeometry
+         {
+            GeometryCombineMode = GeometryCombineMode.Exclude,
+            Geometry1 = new RectangleGeometry(outerRect, cornerRadius),
+            Geometry2 = new RectangleGeometry(innerRect, innerRadius)
+         };
+         ctx.DrawGeometry(BorderBrush, combined);
+      }
    }
 
    // Each corner shrinks by the thickness of the two edges meeting there (clamped at 0) so the inner curve stays

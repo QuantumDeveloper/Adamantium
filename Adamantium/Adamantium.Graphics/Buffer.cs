@@ -343,6 +343,24 @@ namespace Adamantium.Graphics
         }
 
         /// <summary>
+        /// Copies a span of data from CPU memory to this buffer into GPU memory. Pins the span in place (no
+        /// intermediate array/copy), so callers can upload an exact sub-range (<c>array.AsSpan(0, count)</c>),
+        /// a slice, or a <c>stackalloc</c> block without allocating. Empty spans are a no-op.
+        /// </summary>
+        /// <typeparam name="TData">The element type.</typeparam>
+        /// <param name="fromData">The data to copy from.</param>
+        /// <param name="offsetInBytes">The offset in bytes to write to.</param>
+        public unsafe void SetData<TData>(ReadOnlySpan<TData> fromData, uint offsetInBytes = 0) where TData : struct
+        {
+            if (fromData.IsEmpty) return;
+            var bytes = MemoryMarshal.AsBytes(fromData);
+            fixed (byte* ptr = bytes)
+            {
+                SetData(new DataPointer((IntPtr)ptr, (ulong)bytes.Length), offsetInBytes);
+            }
+        }
+
+        /// <summary>
         /// Copies the content an array of data on CPU memory to this buffer into GPU memory.
         /// </summary>
         /// <param name="device">The <see cref="GraphicsDevice"/>.</param>

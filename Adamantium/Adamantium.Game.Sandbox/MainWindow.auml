@@ -286,9 +286,9 @@
 <!--                      Delay="400"-->
 <!--                      Interval="90"/>-->
         
-        <ControlsView VerticalAlignment="Center"/>        
+<!--        <ControlsView VerticalAlignment="Center"/>        -->
 <!--        <ItemsDemoView VerticalAlignment="Center" HorizontalAlignment="Center"/>-->
-<!--        <ListBoxDemoView VerticalAlignment="Center" HorizontalAlignment="Center"/>-->
+        <ListBoxDemoView VerticalAlignment="Center" HorizontalAlignment="Center"/>
 
         <!-- Popup / value-tooltip + orientation demo: keep it here to watch progress. -->
         <StackPanel Orientation="Horizontal"
