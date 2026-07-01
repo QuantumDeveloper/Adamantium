@@ -350,9 +350,12 @@ public class CodeGenerationContext
                 }
                 else if (propRef.IsAttachedProperty)
                 {
-                    var textVale = prop.GetTextValue();
+                    // Convert the literal to the attached property's value type (quote strings, resolve enums, parse the
+                    // rest) exactly like a regular property. Emitting the raw text only ever compiled for the int-typed
+                    // ones (Grid.Column="0"); a string like ToolTip="hint" broke as bare C# identifiers.
+                    var expr = BuildValueExpression(prop.GetTextValue(), resolvedType);
                     TextGenerator.WriteLine(
-                        $"{propRef.OwnerType.GetFullTypeName()}.Set{propRef.Name}({CurrentParent}, {textVale});");
+                        $"{propRef.OwnerType.GetFullTypeName()}.Set{propRef.Name}({CurrentParent}, {expr});");
                 }
                 // A collection populated by CHILD ELEMENTS (<Foo.Items><Item/>...</Foo.Items>) -> new + Add per child.
                 // A collection set by a STRING ATTRIBUTE (StrokeDashArray="10,6") is NOT handled here: it falls through

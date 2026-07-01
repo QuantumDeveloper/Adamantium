@@ -108,7 +108,11 @@ public class Popup : MeasurableUIComponent, IContainer
     private void Open()
     {
         if (_host != null || Child == null) return;
-        _host = this.GetVisualAncestors().OfType<IPopupHost>().FirstOrDefault();
+        // Find the window (popup host) via the TARGET's tree, falling back to the popup's own. A declared popup finds it
+        // either way; an externally-created one (a ToolTip's popup, which is NOT in the visual tree) still hosts as long
+        // as its target is in a window - the target is always the anchor we position against anyway.
+        IUIComponent anchor = EffectiveTarget ?? this;
+        _host = anchor.GetVisualAncestors().OfType<IPopupHost>().FirstOrDefault();
         if (_host == null) return;   // not in a window yet; OnAttachedToVisualTree retries
         if (Child is UIComponent child) child.DataContext = DataContext;
         _host.PopupLayer.Add(this);
