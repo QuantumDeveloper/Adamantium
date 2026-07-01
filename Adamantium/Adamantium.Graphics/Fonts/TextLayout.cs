@@ -51,7 +51,7 @@ public class TextLayout : DisposableObject
         : (int)Math.Ceiling(FontAtlas.GlyphMargin * FontSize / FontAtlas.MSDFTextureSize);
 
     public Size RealTextDimensions { get; private set; }
-    
+
     private bool _textUpdated;
 
     public TextLayout(Typeface typeface, IFont font)
@@ -222,9 +222,9 @@ public class TextLayout : DisposableObject
         }
         
         ArrangeText();
-        
+
         CalculatedLayoutSize = finalRect;
-        
+
         return CalculatedLayoutSize;
 
         bool ProcessWord(string word)
@@ -625,6 +625,41 @@ public class TextLayout : DisposableObject
         VertexBuffer.SetData(fontItems, 0, ElementsCount, 0);
 
         _textUpdated = true;
+    }
+
+    // CPU pre-transform text batch (docs/TEXT_GLYPH_BATCH_PLAN.md §9 Stage 2): copy this block's glyphs into a shared
+    // aggregate buffer with their positions baked to WORLD space and the block's foreground written per glyph, so many
+    // blocks render in ONE instanced draw (the batch VS then applies only a static Projection). A glyph's local quad
+    // g -> (g + textAreaOffset) * world. Only translation + axis-aligned scale can be folded into the axis-aligned
+    // FontItem rect; a rotated/sheared world (non-zero off-diagonal) would need 4 baked corners - returns false so the
+    // caller renders that block via the per-block direct draw instead (Stage 1). Also false (no state change) if it
+    // would overflow dest, so the caller can flush the current batch and retry. Row-vector convention (see FontEffect.fx).
+    public bool TryBakeWorldGlyphs(FontItem[] dest, ref int count, Matrix4x4F world, Vector2F textAreaOffset, Vector4F color)
+    {
+        if (ElementsCount == 0) return true;   // nothing to contribute
+
+        const float eps = 1e-4f;
+        if (Math.Abs(world.M12) > eps || Math.Abs(world.M21) > eps) return false;   // rotation/shear -> direct path
+        if (count + (int)ElementsCount > dest.Length) return false;                 // caller flushes + retries
+
+        var sx = world.M11;
+        var sy = world.M22;
+        var tx = world.M41;
+        var ty = world.M42;
+
+        for (int i = 0; i < ElementsCount; i++)
+        {
+            var item = fontItems[i];
+            var d = item.ArrangeRect;   // local x, y, w, h
+            item.ArrangeRect = new Vector4F(
+                (d.X + textAreaOffset.X) * sx + tx,
+                (d.Y + textAreaOffset.Y) * sy + ty,
+                d.Z * sx,
+                d.W * sy);
+            item.Color = color;
+            dest[count++] = item;
+        }
+        return true;
     }
 
     private bool IsLastGlyph(int position, int count)

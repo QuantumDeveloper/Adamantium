@@ -5,6 +5,7 @@ using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Rendering.RenderUnits;
 using Adamantium.Vulkan.Core;
 
 namespace Adamantium.UI.Rendering;
@@ -98,7 +99,18 @@ public class RenderCache
     }
 
     private Matrix4x4F _projectionMatrix;
-    
+
+    // CPU pre-transform text batch aggregator (docs/TEXT_GLYPH_BATCH_PLAN.md §9 Stage 2). Created lazily on the first
+    // Render that has a device (GPU-free test renders never batch). Frame-scoped state lives inside it.
+    private TextBatchCollector _textBatch;
+
+    // Item-background batch (the "подложки" instancing). Sibling of the text batch: solid rounded-rect fills batched
+    // into one SDF-AA'd instanced draw. Rects are the LOWER layer - FlushBatches draws rects THEN text. Both batches
+    // share one clip GROUP (_batchScissor): a scissor (or text-atlas) change flushes both together, preserving order.
+    private RectBatchCollector _rectBatch;
+    private Rect2D _batchScissor;
+    private bool _batchOpen;
+
     /// <summary>Out-of-render-pass pass: recorded before BeginRendering (shared-surface latch copies).</summary>
     public void PreRender()
     {
@@ -120,6 +132,17 @@ public class RenderCache
     public void Render(IGraphicsDevice device, Rect2D fullScissor)
     {
         var scissorNarrowed = false;   // whether the active scissor is currently narrower than fullScissor
+
+        // Text + item-background batches: reset per frame. Device renders only - GPU-free tests skip batching.
+        if (device != null)
+        {
+            _textBatch ??= new TextBatchCollector();
+            _rectBatch ??= new RectBatchCollector();
+            _textBatch.BeginFrame(device);
+            _rectBatch.BeginFrame(device);
+            _batchOpen = false;
+        }
+
         foreach (var unit in _renderUnits)
         {
             // Read the world transform ONCE: the bounds-cull below evaluates it and the GPU is re-baked with the very
@@ -127,9 +150,61 @@ public class RenderCache
             // diverging (the cull approving "inside" while the GPU draws the element elsewhere = the off-viewport spill).
             var wt = unit.Component.WorldTransform;
 
+            var scissor = fullScissor;
+            var clipped = false;
             if (device != null)
             {
-                var scissor = ResolveScissor(unit.Component, wt, fullScissor, out var clipped, out var cull);
+                scissor = ResolveScissor(unit.Component, wt, fullScissor, out clipped, out var cull);
+                // The unit's owner is entirely outside its clip (a virtualized item just off the viewport, content
+                // sliding out, etc.): nothing of it is visible, so don't draw it and don't feed it to a batch. The
+                // per-surviving-unit scissor is set below.
+                if (cull) continue;
+            }
+
+            // Bake AND draw with the same transform the cull just approved: refresh RenderData ONCE here (the batches
+            // read its opacity while baking; the per-unit path reuses it). Culled units returned above, so this runs
+            // only for units that will actually draw.
+            unit.Update(wt, _projectionMatrix, _renderScale);
+
+            // Batches: item-background rects (lower layer) + text (upper layer), each collapsed to one instanced draw.
+            // A clip-group change (scissor, or the text atlas) flushes BOTH together, keeping the rect-under-text order;
+            // a non-batchable unit that overlaps either batch flushes both first so it paints on top. (A batchable rect
+            // drawn explicitly OVER batched text in the SAME clip would layer under it - rare; lists put bg under text.)
+            if (device != null && unit is RectangleRenderUnit rru && _rectBatch.CanBatch(rru.RectPayload))
+            {
+                if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                if (_rectBatch.TryAdd(rru.RectPayload, wt, rru.GeometryRenderer.RenderData.Opacity, scissor, LogicalBounds(unit.Component, wt)))
+                {
+                    _batchScissor = scissor;
+                    _batchOpen = true;
+                    continue;
+                }
+                // else: rotated/overflow -> fall through to the per-unit draw below
+            }
+            else if (device != null && unit is TextRenderUnit tru && tru.TextComponent is { } tc && _textBatch.CanBatch(tc, out var atlas))
+            {
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_textBatch.SameAtlas(atlas))
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                if (_textBatch.TryAdd(tc, wt, scissor, atlas, LogicalBounds(unit.Component, wt)))
+                {
+                    _batchScissor = scissor;
+                    _batchOpen = true;
+                    continue;   // baked into the batch - drawn at the next flush
+                }
+                // else: rotated/sheared or overflow -> fall through to the per-block direct draw below
+            }
+            else if (device != null && (_rectBatch.Active || _textBatch.Active))
+            {
+                // A non-batchable unit that overlaps either pending batch: flush both first so this unit paints OVER
+                // them, as its later source order requires. Spatially disjoint units (a list's items) don't flush.
+                var lb = LogicalBounds(unit.Component, wt);
+                if (_rectBatch.OverlapsPending(lb) || _textBatch.OverlapsPending(lb))
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+            }
+
+            if (device != null)
+            {
                 if (clipped)
                 {
                     device.SetScissors(scissor);
@@ -137,25 +212,38 @@ public class RenderCache
                 }
                 else if (scissorNarrowed)
                 {
-                    // First unclipped unit after a clipped one: restore the full window scissor.
+                    // First unclipped unit after a clipped one (or after a flush): restore the full window scissor.
                     device.SetScissors(fullScissor);
                     scissorNarrowed = false;
                 }
-
-                // The unit's owner is entirely outside its clip (a virtualized item just off the viewport, content sliding
-                // out, etc.): nothing of it is visible, so don't draw it. The GPU scissor would clip it to nothing anyway,
-                // but skipping the draw keeps it from painting for the frame(s) before the dynamic scissor settles - and
-                // is a plain "don't render the invisible" win. Partially-visible units still draw and rely on the scissor.
-                if (cull) continue;
             }
 
-            unit.Update(wt, _projectionMatrix, _renderScale);   // re-bake with the SAME transform the cull just approved
             unit.Render();
         }
 
-        // Leave the device on the full scissor for whatever renders next (e.g. the adorner pass).
+        // Drain the tail batches (rects under text), then leave the device on the full scissor for the next pass.
+        if (device != null) FlushBatches(device, fullScissor, ref scissorNarrowed);
         if (scissorNarrowed) device.SetScissors(fullScissor);
     }
+
+    // A unit's own viewport (local 0,0..RenderSize) mapped into window-logical space - the same box ResolveScissor
+    // clips against, reused here for the batches' paint-order overlap test.
+    private static Rect LogicalBounds(IUIComponent component, Matrix4x4F worldTransform)
+        => new Rect(0, 0, component.RenderSize.Width, component.RenderSize.Height).TransformToAABB(worldTransform);
+
+    // Flush both batches in LAYER order - item-background rects first, then text on top - and mark the group closed.
+    // Both Flush calls leave the device on fullScissor, so the per-unit scissor state resets to "not narrowed".
+    private void FlushBatches(IGraphicsDevice device, Rect2D fullScissor, ref bool scissorNarrowed)
+    {
+        _rectBatch.Flush(device, fullScissor, _projectionMatrix);
+        _textBatch.Flush(device, fullScissor, _projectionMatrix);
+        scissorNarrowed = false;
+        _batchOpen = false;
+    }
+
+    private static bool ScissorEquals(Rect2D a, Rect2D b)
+        => a.Offset.X == b.Offset.X && a.Offset.Y == b.Offset.Y
+           && a.Extent.Width == b.Extent.Width && a.Extent.Height == b.Extent.Height;
 
     // The scissor for a unit: the intersection of every ancestor viewport that ClipToBounds (in framebuffer pixels),
     // or fullScissor if none clip. `clipped` is false in the latter case so the caller keeps the window scissor.

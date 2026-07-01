@@ -319,6 +319,10 @@ public class LineRenderUnit : RenderUnit<LinePayload>
 
 public class RectangleRenderUnit : RenderUnit<RectanglePayload>
 {
+    // The item-background batch (RectBatchCollector) reads the rect's brush/rect/corners/pen through this to bake it
+    // into the instanced draw. See RectBatchEffect.fx.
+    public RectanglePayload RectPayload => Payload;
+
     public RectangleRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
         var rectangleGeometry = new RectangleGeometry(Payload.DestinationRect, Payload.CornerRadius);
@@ -485,6 +489,10 @@ public class ImageRenderUnit : RenderUnit<ImagePayload>
 
 public class TextRenderUnit : RenderUnit<TextPayload>
 {
+    // The text batch aggregator (RenderCache) reaches the block's TextLayout / params / foreground / FontRenderer
+    // through this. Null only transiently before the component is built. See docs/TEXT_GLYPH_BATCH_PLAN.md §9.
+    public TextRenderComponent TextComponent => GeometryRenderer as TextRenderComponent;
+
     public TextRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
         Payload.TextLayout.Update(GraphicsDevice);

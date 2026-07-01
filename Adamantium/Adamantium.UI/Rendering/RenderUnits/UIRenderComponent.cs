@@ -138,10 +138,8 @@ public class StrokeRenderComponent : UIRenderComponent
 
     public override void Render()
     {
-        //var world = Matrix4x4F.Translation((float)RenderData.Location.X, (float)RenderData.Location.Y, 5);
         var world = RenderData.TransformMatrix;
         UIBasicEffect.Wvp.SetValue(world * RenderData.ProjectionMatrix);
-        //UIBasicEffect.World.SetValue(world);
         UIBasicEffect.Opacity.SetValue(RenderData.Opacity);
         if (Pen.Brush is SolidColorBrush solidColor)
         {
@@ -327,7 +325,13 @@ public class TextRenderComponent : ImageRenderComponent
     // (BeginDraw begins it right after PreRender), we just render this one target as a standalone pass.
     public override void PreRender()
     {
-        if (_textRendered) return;
+        // Direct main-pass draw: glyphs are drawn straight into the main pass in Render() - no private-RT
+        // rasterization pre-pass at all. See FontRenderer.UseDirectTextDraw + docs/TEXT_GLYPH_BATCH_PLAN.md §9.
+        if (FontRenderer.UseDirectTextDraw) 
+            return;
+        
+        if (_textRendered)
+            return;
 
         // Inset the text by the effect padding inside the (padded) target so edge glyphs' outline/glow have room. The
         // composite quad was grown by the same pad with its origin shifted -pad (see RenderUnit), cancelling this inset.
@@ -347,6 +351,12 @@ public class TextRenderComponent : ImageRenderComponent
 
     public override void Render()
     {
+        if (FontRenderer.UseDirectTextDraw)
+        {
+            RenderDirect();
+            return;
+        }
+
         // The glyphs were rasterized into _renderTarget in PreRender (before the main pass); here we only composite it.
         Texture = _renderTarget.ResolveTexture;
         Sampler = GraphicsDevice.SamplerStates.LinearClampToEdge;
@@ -354,5 +364,27 @@ public class TextRenderComponent : ImageRenderComponent
         // blend), so composite it with a premultiplied blend too - a straight AlphaBlend would darken the edges (rim).
         ColorBlendEquation = ColorBlendEquations.Premultiplied;
         base.Render();
+    }
+
+    // CPU pre-transform text batch, Stage 1 (docs/TEXT_GLYPH_BATCH_PLAN.md §9): draw the glyphs directly into the main
+    // pass instead of compositing a pre-rastered target. Glyph local pos g -> control-local (g + TextArea) -> world
+    // (RenderData.TransformMatrix) -> clip (RenderData.ProjectionMatrix). The RT path's +pad/-pad cancel (RT origin was
+    // at -pad, rasterization added +pad), so TextArea alone is the offset. Row-vector convention (FontEffect.fx does
+    // mul(pos, MatrixTransform), and EffectParameter transposes the matrix on upload). RenderScale = 1: no supersample
+    // target - the MSDF pixel shader self-anti-aliases from screen-space derivatives.
+    private void RenderDirect()
+    {
+        var textArea = RenderingParameters.TextArea;
+        var mvp = Matrix4x4F.Translation(textArea.X, textArea.Y, 5)
+                  * RenderData.TransformMatrix
+                  * RenderData.ProjectionMatrix;
+        var foreground = ((SolidColorBrush)Foreground).Color;
+        FontRenderer.RenderScale = 1f;
+        FontRenderer.DrawLayoutDirect(
+            GraphicsDevice.SamplerStates.LinearFont,
+            TextLayout,
+            foreground,
+            mvp,
+            RenderData.Opacity);
     }
 }

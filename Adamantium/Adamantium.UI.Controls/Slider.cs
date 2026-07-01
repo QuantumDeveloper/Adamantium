@@ -270,17 +270,21 @@ public class Slider : RangeBase
             {
                 Foreground = new SolidColorBrush(Colors.White),
                 FontSize = 12,
-                // A TextBlock shrink-wraps to the text (ArrangeOverride returns the text size) and its OWN text-alignment
-                // only bites within an explicit Width/Height (NaN here). So centre the BLOCK in the badge via layout
-                // alignment - that's what actually centres the value in the padded, MinWidth badge (both axes).
+                // Centre the BLOCK in the badge via layout alignment (both axes). VerticalTextAlignment DEFAULTS to
+                // Bottom, which sits the glyphs' ink on the block's baseline - so the value looked low/offset in the
+                // badge even though the block itself was centred. Center centres the INK inside the block's line box,
+                // so the digit lands on the badge's true vertical centre.
                 HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                VerticalTextAlignment = VerticalTextAlignment.Center
             };
             var badge = new Border
             {
                 Background = new SolidColorBrush(Colors.DimGray),
                 CornerRadius = new CornerRadius(4),
-                Padding = new Thickness(8, 4),
+                // Explicit 4-arg (L,T,R,B): the 2-arg Thickness(8,4) is (leftTop, rightBottom) = Top 8 / Bottom 4, an
+                // asymmetric vertical pad that pushed the value DOWN in the badge. Intent was horizontal 8, vertical 4.
+                Padding = new Thickness(8, 4, 8, 4),
                 // A stable baseline width so 1-2 digit values don't resize + re-center the badge on every step (the badge
                 // still grows to fit longer values). Pair with IsSnapToTickEnabled to drop the per-frame decimal jitter.
                 MinWidth = 32,

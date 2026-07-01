@@ -25,6 +25,16 @@ public class FontRenderer : GraphicsResource
     // larger and get downsampled when the texture is composited onto the control = SSAA. 1 = off.
     public float RenderScale { get; set; } = 1f;
 
+    // The LIVE text path (docs/TEXT_GLYPH_BATCH_PLAN.md §9): text draws straight into the main pass via a single
+    // CPU-built MVP (Translation(TextArea) x World x Projection - the only driver-safe form on this Turing: no
+    // indirect/indexed matrix in a graphics shader). Off = the old private-RT rasterize + composite fallback (A/B).
+    public static bool UseDirectTextDraw = true;
+
+    // Stage 2 of the text batch (docs/TEXT_GLYPH_BATCH_PLAN.md §9): aggregate MANY visible text blocks into ONE
+    // DrawBatch - the actual FPS win (collapse ~N per-block draws to ~1). When off, batchable text falls back to the
+    // per-block DrawLayoutDirect (Stage 1). Requires UseDirectTextDraw too; the aggregator/fallback live in RenderCache.
+    public static bool UseTextBatch = true;
+
     // Selects the glyph pixel shader: true = canonical MSDF (Chlumsky screenPxRange, RenderMsdf pass),
     // false = the gradient-derivative AA (Render pass). See FontEffect.fx.
     public bool UseCanonicalMsdf { get; set; } = true;
@@ -201,6 +211,90 @@ public class FontRenderer : GraphicsResource
         }
 
         GraphicsDevice.Draw(4, layout.ElementsCount);   // 4 strip verts x ElementsCount glyph instances
+    }
+
+    // Direct main-pass glyph draw (CPU pre-transform batch, Stage 1, docs/TEXT_GLYPH_BATCH_PLAN.md §9): renders the
+    // layout's glyphs straight into the CURRENT (main) pass with a single caller-supplied MVP, instead of rasterizing
+    // into a private RT and compositing a quad. No SetState/RestoreState, no render-target switch, no viewport/scissor
+    // override (the main pass's clip stands), MSAA left as the main pass set it. Depth matches the other main-pass UI
+    // units (CompareOp.Always, test+write on) - NOT the RT path's depth-off (that target had no depth buffer).
+    // Behind FontRenderer.UseDirectTextDraw. The MVP is built on the CPU (Translation(TextArea) x World x Projection)
+    // because an indirect/indexed matrix in a graphics shader AVs vkCreateShadersEXT on this Turing - see the plan.
+    public void DrawLayoutDirect(SamplerState samplerState, TextLayout layout, Color foreground, Matrix4x4F mvp, float opacity)
+    {
+        if (layout.ElementsCount == 0) return;
+
+        GraphicsDevice.ColorBlendEnabled = true;
+        // Font shaders output premultiplied color (rgb * alpha) -> premultiplied blend (same as the RT path + composite).
+        GraphicsDevice.ColorBlendEquation = ColorBlendEquations.Premultiplied;
+        GraphicsDevice.PrimitiveRestartEnable = true;
+        GraphicsDevice.DepthTestEnabled = true;
+        GraphicsDevice.DepthWriteEnable = true;
+        GraphicsDevice.DepthCompareFunction = CompareOp.Always;
+
+        var fg = foreground.ToVector4();
+        fg.W *= opacity;   // fold the element's Opacity (fade animation, dimmed container) into the glyph alpha
+
+        effectSampler.SetResource(samplerState);
+        effectTexture.SetResource(layout.FontAtlas.Atlas);
+        effectMatrixTransform.SetValue(mvp);
+        effectUVCornerCoords.SetValue(UVCornerCoords);
+        effectForegroundColor.SetValue(fg);
+        effectFontSize.SetValue(layout.FontSize);
+        effectFontSizeThreshold.SetValue(FontSizeThreshold);
+        effectFontWeight.SetValue(FontWeight);
+        effectPixelRange.SetValue(layout.FontAtlas.PixelRange);
+        effectAtlasSize.SetValue(new Vector2F(layout.FontAtlas.Atlas.Width, layout.FontAtlas.Atlas.Height));
+        effectOutlineColor.SetValue(OutlineColor.ToVector4());
+        effectOutlineWidth.SetValue(OutlineWidth);
+        effectSdfBlendLo.SetValue(SdfBlendLo);
+        effectSdfBlendHi.SetValue(SdfBlendHi);
+        GraphicsDevice.VertexType = vertexType;
+        GraphicsDevice.SetVertexBuffer(layout.VertexBuffer);
+        GraphicsDevice.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
+        // Direct text is never stroked (both text paths pass no stroke) - pick outline, else canonical / gradient MSDF.
+        var pass = UseOutline
+            ? fontEffect.FontBatchRenderMsdfOutlinePass
+            : (UseCanonicalMsdf ? fontEffect.FontBatchRenderMsdfPass : fontEffect.FontBatchRenderPass);
+        pass.Apply();
+
+        GraphicsDevice.Draw(4, layout.ElementsCount);   // 4 strip verts x ElementsCount glyph instances
+    }
+
+    // Aggregated text batch (docs/TEXT_GLYPH_BATCH_PLAN.md §9 Stage 2): draws MANY blocks' glyphs - already baked to
+    // world space, one shared atlas - in a SINGLE instanced draw straight into the main pass = the FPS win. The VS
+    // applies ONLY the static Projection (positions are pre-transformed on the CPU during aggregation, the one
+    // driver-safe form). The batch pixel shader takes the foreground from the per-instance vertex colour (baked per
+    // glyph), so blocks of different colours share one draw. State/depth/blend match DrawLayoutDirect (main pass).
+    public void DrawBatch(SamplerState samplerState, FontAtlas atlas, Buffer<FontItem> glyphs, uint glyphCount, Matrix4x4F projection, uint firstInstance = 0)
+    {
+        if (glyphCount == 0) return;
+
+        GraphicsDevice.ColorBlendEnabled = true;
+        GraphicsDevice.ColorBlendEquation = ColorBlendEquations.Premultiplied;
+        GraphicsDevice.PrimitiveRestartEnable = true;
+        GraphicsDevice.DepthTestEnabled = true;
+        GraphicsDevice.DepthWriteEnable = true;
+        GraphicsDevice.DepthCompareFunction = CompareOp.Always;
+
+        effectSampler.SetResource(samplerState);
+        effectTexture.SetResource(atlas.Atlas);
+        effectMatrixTransform.SetValue(projection);
+        effectUVCornerCoords.SetValue(UVCornerCoords);
+        effectFontWeight.SetValue(FontWeight);
+        effectPixelRange.SetValue(atlas.PixelRange);
+        effectAtlasSize.SetValue(new Vector2F(atlas.Atlas.Width, atlas.Atlas.Height));
+        effectSdfBlendLo.SetValue(SdfBlendLo);
+        effectSdfBlendHi.SetValue(SdfBlendHi);
+        GraphicsDevice.VertexType = vertexType;
+        GraphicsDevice.SetVertexBuffer(glyphs);
+        GraphicsDevice.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
+        // Batch pass: per-instance foreground (input.Color), so many colours in one draw. Canonical MSDF only for
+        // now; outline/stroked/gradient-AA text stays on the per-block direct path (RenderCache routes it there).
+        fontEffect.FontBatchRenderMsdfBatchPass.Apply();
+        // firstInstance offsets the per-instance FontItem fetch to THIS segment's slice of the shared buffer (its data
+        // was uploaded at the matching byte offset), so several segments share one buffer without overwriting.
+        GraphicsDevice.Draw(4, glyphCount, 0, firstInstance);   // 4 strip verts x glyphCount glyph instances
     }
 
     public void RestoreState(bool outerPassActive = true)
