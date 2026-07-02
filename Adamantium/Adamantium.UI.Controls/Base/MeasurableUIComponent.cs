@@ -499,9 +499,19 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
 
             size = ArrangeOverride(size).Constrain(size);
 
+            // A size change must re-run OnRender: a control that first rendered at a STALE size (e.g. 0x0 while still
+            // unarranged - which happens for content built during a measure pass, like a tab body added via a
+            // ContentPresenter/DataTemplate) cached that geometry and, being "geometry-valid", would never redraw at the
+            // new size - its fill rect stays 0x0 = invisible. Invalidate the render geometry so the render pass re-records
+            // it at the arranged size. Measure already does this (MeasureCore); arrange must too when the size changes.
+            var renderSizeChanged = !MathHelper.NearEqual(RenderSize.Width, size.Width)
+                                    || !MathHelper.NearEqual(RenderSize.Height, size.Height);
+
             ActualWidth = size.Width;
             ActualHeight = size.Height;
             RenderSize = size;
+
+            if (renderSizeChanged) IsGeometryValid = false;
 
             switch (HorizontalAlignment)
             {

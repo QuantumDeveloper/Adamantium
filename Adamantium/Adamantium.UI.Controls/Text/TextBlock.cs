@@ -85,6 +85,9 @@ public class TextBlock : InputUIComponent
     private FontFamily _layoutFont;   // the font _textLayout was built for (typeface is fixed per TextLayout)
     private string _lastText;
     private double _lastFontSize, _lastWidth, _lastHeight;
+    // The width/height the last measure was given (a wrapping block reflows to this when it has no explicit Width, so
+    // the wrap boundary comes from the container - like WPF - instead of a hardcoded Width). Infinity = unconstrained.
+    private Size _lastConstraint = new Size(double.PositiveInfinity, double.PositiveInfinity);
     private TextWrapping _lastWrapping;
     private TextTrimming _lastTrimming;
     private HorizontalTextAlignment _lastHAlign;
@@ -113,9 +116,18 @@ public class TextBlock : InputUIComponent
             _hasLayout = false;
         }
 
+        // Wrap boundary: an explicit Width wins; otherwise, for a WRAPPING block, fall back to the width the container
+        // gave this measure (WPF-style reflow to the parent) so wrapping needs no hardcoded Width. A NoWrap block keeps
+        // the old unbounded behaviour (explicit Width only) so ordinary labels never start trimming to their slot. An
+        // unconstrained parent (Infinity) stays unbounded. ProcessText maps NaN -> unbounded.
+        var width = Width;
+        if (double.IsNaN(width) && TextWrapping != TextWrapping.NoWrap && !double.IsInfinity(_lastConstraint.Width))
+            width = _lastConstraint.Width;
+        var height = Height;
+
         if (_hasLayout
             && _lastText == Text && _lastFontSize.Equals(FontSize)
-            && _lastWidth.Equals(Width) && _lastHeight.Equals(Height)
+            && _lastWidth.Equals(width) && _lastHeight.Equals(height)
             && _lastWrapping == TextWrapping && _lastTrimming == TextTrimming
             && _lastHAlign == HorizontalTextAlignment && _lastVAlign == VerticalTextAlignment
             && _lastJustify == JustifyLastLine)
@@ -123,11 +135,11 @@ public class TextBlock : InputUIComponent
             return _cachedSize;
         }
 
-        _cachedSize = _textLayout.ProcessText(Text, FontSize, new Size(Width, Height), TextWrapping, TextTrimming,
+        _cachedSize = _textLayout.ProcessText(Text, FontSize, new Size(width, height), TextWrapping, TextTrimming,
             HorizontalTextAlignment, VerticalTextAlignment, JustifyLastLine);
 
         _hasLayout = true;
-        _lastText = Text; _lastFontSize = FontSize; _lastWidth = Width; _lastHeight = Height;
+        _lastText = Text; _lastFontSize = FontSize; _lastWidth = width; _lastHeight = height;
         _lastWrapping = TextWrapping; _lastTrimming = TextTrimming;
         _lastHAlign = HorizontalTextAlignment; _lastVAlign = VerticalTextAlignment; _lastJustify = JustifyLastLine;
         return _cachedSize;
@@ -197,7 +209,11 @@ public class TextBlock : InputUIComponent
         set => SetValue(StrokeProperty, value);
     }
 
-    protected override Size MeasureOverride(Size availableSize) => EnsureLayout();
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        _lastConstraint = availableSize;   // a wrapping block reflows to this (its container's width) when it has no explicit Width
+        return EnsureLayout();
+    }
 
     protected override Size ArrangeOverride(Size finalSize) => EnsureLayout();
 

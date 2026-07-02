@@ -67,21 +67,17 @@ public abstract class UIRenderComponent : DeferredDisposableObject
 
         _vertices = mesh?.ToUIVertices();
         _vertexCount = _vertices is { Length: > 0 } ? (uint)_vertices.Length : 0u;
-        if (_vertexCount > 0)
-        {
-            _vertexBuffer ??= ToDispose(BufferManager.CreateBuffer(BufferUsageFlags.VertexBuffer, UiMemory));
-            _vertexBuffer.Reserve((ulong)(_vertexCount * (uint)VertexStride));   // size the allocation up front
-            _vertexBuffer.Invalidate();   // new payload -> every slot rewrites lazily on its next frame (promotes if drawn)
-        }
-
         _indices = mesh is { HasIndices: true } && _vertexCount > 0 ? mesh.Indices : null;
         _indexCount = _indices != null ? (uint)_indices.Length : 0u;
-        if (_indexCount > 0)
-        {
-            _indexBuffer ??= ToDispose(BufferManager.CreateBuffer(BufferUsageFlags.IndexBuffer, UiMemory));
-            _indexBuffer.Reserve((ulong)(_indexCount * sizeof(int)));
-            _indexBuffer.Invalidate();
-        }
+
+        // Do NOT allocate the GPU vertex/index buffer here. A BATCHED unit (e.g. a solid item-background rect) is drawn
+        // by the RectBatch's ONE shared instanced buffer and never calls its own Render(), so allocating a per-unit
+        // buffer per Border is pure waste - and hundreds of them (a big virtualized tile grid) exhaust device memory,
+        // which is the vkAllocateMemory=ErrorOutOfDeviceMemory. The buffer is allocated LAZILY on the first INDIVIDUAL
+        // Render (Acquire -> EnsureCapacity); a re-mesh of an already-drawn unit just invalidates so the next Acquire
+        // re-uploads the new geometry (the resize/animation fast path is preserved for units that DO draw themselves).
+        _vertexBuffer?.Invalidate();
+        _indexBuffer?.Invalidate();
     }
 
     public void Update(Matrix4x4F transform, Matrix4x4F projectionMatrix)
@@ -97,8 +93,10 @@ public abstract class UIRenderComponent : DeferredDisposableObject
     {
         if (_vertexCount == 0) return;
 
+        // First INDIVIDUAL draw: lazily create the per-unit buffer (batched units never get here, so never allocate).
         // Rent this frame's ring slot; upload the geometry only if the slot is stale (a static body settles to zero
         // work after the first N frames, an animated one writes only the current slot - never a new allocation).
+        _vertexBuffer ??= ToDispose(BufferManager.CreateBuffer(BufferUsageFlags.VertexBuffer, UiMemory));
         var vertexBuffer = _vertexBuffer.Acquire((ulong)(_vertexCount * (uint)VertexStride), out var writeVertices);
         if (writeVertices) vertexBuffer.SetData(_vertices, 0, _vertexCount);
 
@@ -112,6 +110,7 @@ public abstract class UIRenderComponent : DeferredDisposableObject
 
         if (_indexCount > 0)
         {
+            _indexBuffer ??= ToDispose(BufferManager.CreateBuffer(BufferUsageFlags.IndexBuffer, UiMemory));
             var indexBuffer = _indexBuffer.Acquire((ulong)(_indexCount * sizeof(int)), out var writeIndices);
             if (writeIndices) indexBuffer.SetData(_indices, 0, _indexCount);
             // DrawIndexed binds both the vertex and index buffers itself - don't bind them again. The over-allocated
@@ -224,7 +223,7 @@ public class ImageRenderComponent : UIRenderComponent
         var world = RenderData.TransformMatrix;;
         UIBasicEffect.Wvp.SetValue(world * RenderData.ProjectionMatrix);
         UIBasicEffect.Opacity.SetValue(RenderData.Opacity);
-        
+
         if (Background is SolidColorBrush solidColor)
         {
             var fill = solidColor.Color.ToVector4();

@@ -1,0 +1,26 @@
+<View xmlns="http://adamantium/ui">
+    <!-- DataContext is the TextViewModel. FontSize is slider-driven; Message is shown by several TextBlocks. -->
+    <StackPanel Orientation="Vertical" Margin="24">
+
+        <StackPanel Orientation="Horizontal">
+            <TextBlock Text="Font size:" VerticalAlignment="Center"/>
+            <Slider Width="240" Minimum="10" Maximum="48" Value="{Binding FontSize, Mode=TwoWay}" Margin="12,0,0,0"/>
+            <TextBlock Text="{Binding FontSize}" VerticalAlignment="Center" FontSize="16" Margin="12,0,0,0"/>
+        </StackPanel>
+
+        <TextBlock Text="{Binding Message}"
+                   FontSize="{Binding FontSize}"
+                   TextWrapping="WrapByWords"
+                   Width="520"
+                   HorizontalAlignment="Left"
+                   Margin="0,20,0,0"/>
+
+        <TextBlock Text="Trimmed to one line:" Margin="0,20,0,6"/>
+        <Border Width="280" HorizontalAlignment="Left">
+            <TextBlock Text="{Binding Message}" TextTrimming="CharEllipses"/>
+        </Border>
+
+        <TextBlock Text="(An editable TextBox is coming - it will two-way bind to this same Message.)"
+                   FontSize="12" Foreground="#94A3B8" Margin="0,20,0,0"/>
+    </StackPanel>
+</View>

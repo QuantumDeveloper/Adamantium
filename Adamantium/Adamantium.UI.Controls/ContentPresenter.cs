@@ -1,10 +1,8 @@
-using System;
 using Adamantium.Graphics.Fonts;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Media;
-using Adamantium.UI.Core.Media.Animation;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.Core.Templates;
 
@@ -57,6 +55,22 @@ public class ContentPresenter : InputUIComponent
     private void OnContentChangedInternal(object oldContent, object newContent)
     {
         _isContentChanged = true;
+
+        // WPF ContentPresenter semantics: when the content is a DATA object (not a UI element) rendered through a
+        // ContentTemplate/ContentTemplateSelector, the presenter's DataContext IS that object, so the template's
+        // {Binding}s resolve against it. This is what lets a data-templated body/header bind to its own item view-model
+        // even when the presenter sits in an outer template (e.g. a TabControl's PART_SelectedContentHost, whose ambient
+        // DataContext is the TabControl's, not the selected tab's). A UI-element (or null) content is left to inherit the
+        // ambient DataContext - the element brought its own bindings. Only SET (never clear), so an externally assigned
+        // DataContext (ItemsControl.PrepareContainer sets it before Content) is matched, never clobbered.
+        //
+        // NOTE: this handler is SHARED by the Content, ContentTemplate and ContentTemplateSelector changes, so it must key
+        // off the actual Content - never the incoming value, which for a template/selector change is the template/selector
+        // itself (that bug set DataContext to the DataTemplate, so a header/body template's {Binding}s resolved to nothing).
+        if (Content is not null and not IUIComponent)
+        {
+            DataContext = Content;
+        }
     }
 
     private void UpdateVisualContent(object newContent)

@@ -41,7 +41,10 @@
                                 CornerRadius="{TemplateBinding CornerRadius}"
                                 Padding="{TemplateBinding Padding}"
                                 ClipToBounds="True">
-                            <ContentPresenter x:Name="PART_SelectedContentHost" Content="{TemplateBinding SelectedContent}"/>
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              Content="{TemplateBinding SelectedContent}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
                         </Border>
                     </Grid>
                 </ControlTemplate>
@@ -62,7 +65,10 @@
                                 CornerRadius="{TemplateBinding CornerRadius}"
                                 Padding="{TemplateBinding Padding}"
                                 ClipToBounds="True">
-                            <ContentPresenter x:Name="PART_SelectedContentHost" Content="{TemplateBinding SelectedContent}"/>
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              Content="{TemplateBinding SelectedContent}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
                         </Border>
                         <TabStripScroller x:Name="PART_TabStrip" Grid.Row="1" Orientation="Horizontal">
                             <ItemsPresenter x:Name="PART_ItemsPresenter"/>
@@ -96,7 +102,10 @@
                                 CornerRadius="{TemplateBinding CornerRadius}"
                                 Padding="{TemplateBinding Padding}"
                                 ClipToBounds="True">
-                            <ContentPresenter x:Name="PART_SelectedContentHost" Content="{TemplateBinding SelectedContent}"/>
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              Content="{TemplateBinding SelectedContent}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
                         </Border>
                     </Grid>
                 </ControlTemplate>
@@ -124,7 +133,10 @@
                                 CornerRadius="{TemplateBinding CornerRadius}"
                                 Padding="{TemplateBinding Padding}"
                                 ClipToBounds="True">
-                            <ContentPresenter x:Name="PART_SelectedContentHost" Content="{TemplateBinding SelectedContent}"/>
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              Content="{TemplateBinding SelectedContent}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
                         </Border>
                         <TabStripScroller x:Name="PART_TabStrip" Grid.Column="1" Orientation="Vertical">
                             <ItemsPresenter x:Name="PART_ItemsPresenter"/>

@@ -1,0 +1,50 @@
+<View xmlns="http://adamantium/ui">
+    <!-- DataContext is the ShapesViewModel. Every static shape's StrokeThickness is bound to one value. -->
+    <StackPanel Orientation="Vertical" Margin="24">
+
+        <StackPanel Orientation="Horizontal">
+            <TextBlock Text="Stroke thickness:" VerticalAlignment="Center"/>
+            <Slider Width="220" Minimum="1" Maximum="12" Value="{Binding StrokeThickness, Mode=TwoWay}" Margin="12,0,0,0"/>
+            <TextBlock Text="{Binding StrokeThickness}" VerticalAlignment="Center" FontSize="16" Margin="12,0,0,0"/>
+        </StackPanel>
+
+        <WrapPanel Orientation="Horizontal" Margin="0,20,0,0">
+            <Ellipse Width="96" Height="96" Fill="#3B82F6" Stroke="Cyan" StrokeThickness="{Binding StrokeThickness}" Margin="10"/>
+            <Rectangle Width="120" Height="90" Fill="#22C55E" Stroke="White" StrokeThickness="{Binding StrokeThickness}" CornerRadius="12" Margin="10"/>
+            <Polygon Points="60,0 120,96 0,96" Fill="#F59E0B" Stroke="Black" StrokeThickness="{Binding StrokeThickness}" Margin="10"/>
+            <Path Fill="Magenta" Stroke="Cyan" StrokeLineJoin="Round"
+                  StrokeThickness="{Binding StrokeThickness}"
+                  Data="F0 M110,10 L168.78,190.9 L14.89,79.1 L205.11,79.1 L51.22,190.9 Z"
+                  Width="200" Height="200" Margin="10"/>
+        </WrapPanel>
+
+        <!-- Animated dashed outline (hover to trace it) - moved from the old MainWindow demo. -->
+        <TextBlock Text="Hover the line to animate its dash:" Margin="0,16,0,6"/>
+        <Line X1="0" Y1="0" X2="360" Y2="0"
+              Stroke="Lime" StrokeThickness="10"
+              StrokeDashArray="36 25"
+              StartLineCap="ConvexRound" EndLineCap="ConvexRound" StrokeDashCap="ConvexRound"
+              HorizontalAlignment="Left">
+            <Line.Triggers>
+                <PropertyTrigger Property="IsMouseOver" Value="true">
+                    <PropertyTrigger.EnterActions>
+                        <RunAnimationAction>
+                            <Animation Duration="0:0:2.2" Easing="CubicOut">
+                                <KeyFrame Cue="0%"><Setter Property="StrokeDashOffset" Value="0"/></KeyFrame>
+                                <KeyFrame Cue="100%"><Setter Property="StrokeDashOffset" Value="550"/></KeyFrame>
+                            </Animation>
+                        </RunAnimationAction>
+                    </PropertyTrigger.EnterActions>
+                    <PropertyTrigger.ExitActions>
+                        <RunAnimationAction>
+                            <Animation Duration="0:0:2.2" Easing="CubicOut">
+                                <KeyFrame Cue="0%"><Setter Property="StrokeDashOffset" Value="550"/></KeyFrame>
+                                <KeyFrame Cue="100%"><Setter Property="StrokeDashOffset" Value="0"/></KeyFrame>
+                            </Animation>
+                        </RunAnimationAction>
+                    </PropertyTrigger.ExitActions>
+                </PropertyTrigger>
+            </Line.Triggers>
+        </Line>
+    </StackPanel>
+</View>

@@ -35,6 +35,10 @@ public interface IUIComponent : IFundamentalUIComponent
 
     Matrix4x4F WorldTransform { get; }
 
+    /// <summary>This element's transform in its parent's space (the parent-relative part of <see cref="WorldTransform"/>),
+    /// so a frame-scoped consumer can compose world transforms top-down without re-walking to the root per node.</summary>
+    Matrix4x4F LocalTransform { get; }
+
     IReadOnlyCollection<IUIComponent> GetVisualDescendants();
         
     IReadOnlyCollection<IUIComponent> VisualChildren { get; }

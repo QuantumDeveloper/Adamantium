@@ -26,6 +26,13 @@ public class ItemsControlTests
         public double Size { get; init; }
     }
 
+    // A control-level view model (the ItemsControl DataContext), NOT an item. Mirrors LayoutViewModel.RectSize driving
+    // the tiled WrapPanel's uniform cell size.
+    private sealed class SizeHolder
+    {
+        public double RectSize { get; init; }
+    }
+
     // A minimal control template whose root is the ItemsPresenter the control looks up by PART name.
     private static ItemsControl ArrangedItemsControl(System.Collections.IEnumerable source, DataTemplate itemTemplate = null)
     {
@@ -331,6 +338,50 @@ public class ItemsControlTests
                 Assert.That(border.Width, Is.EqualTo(people[i].Size).Within(0.5),
                     $"item {i}: ItemTemplate {{Binding Size}} must resolve against the item");
             }
+        });
+    }
+
+    // Repro of the Layout tab hang: a tiled WrapPanel items host whose ItemWidth/ItemHeight bind to the CONTROL's
+    // DataContext (LayoutViewModel.RectSize), not to the item. The items-host panel only ever receives a DataContext by
+    // INHERITANCE from the ItemsControl (unlike an ItemTemplate, where the container sets DataContext=item explicitly).
+    // If that inheritance doesn't reach the panel, ItemWidth stays NaN -> SeedCell probes a size-less Border -> the cell
+    // collapses to ~0 -> the panel decides EVERY one of the 600 items is "visible" and realizes them all synchronously
+    // (the multi-second tab-switch freeze), while the ~0px tiles show nothing. Guard both: the binding resolves AND only
+    // a bounded window is realized.
+    [Test]
+    public void ItemsHostPanelBindingResolvesAgainstControlDataContext_AndVirtualizes()
+    {
+        var vm = new SizeHolder { RectSize = 64 };
+        var items = Enumerable.Range(0, 600).Cast<object>().ToList();
+
+        var ic = new ItemsControl
+        {
+            ItemsSource = items,
+            ItemTemplate = new DataTemplate(() => new TemplateResult { RootComponent = new Border() }),
+            ItemsPanel = new ItemsPanelTemplate(() =>
+            {
+                var wrap = new WrapPanel { Orientation = Orientation.Horizontal };
+                wrap.SetBinding("ItemWidth", new Binding("RectSize"));
+                wrap.SetBinding("ItemHeight", new Binding("RectSize"));
+                return new TemplateResult { RootComponent = wrap };
+            })
+        };
+        ic.Template = ItemsPresenterTemplate();
+        ic.DataContext = vm;
+
+        // Host in a fixed-size Border so the window pass measures the panel at a real 800x400 viewport (not Infinity).
+        var host = new Border { Width = 800, Height = 400, Child = ic };
+        Adamantium.UI.Extensions.WindowExtension.UpdateTree(host);
+
+        var panel = (WrapPanel)ic.ItemsHostPanel;
+        var gen = ic.ItemContainerGenerator;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(panel.ItemWidth, Is.EqualTo(64).Within(0.5),
+                "items-host {Binding RectSize} must resolve against the ItemsControl DataContext, not stay NaN");
+            Assert.That(gen.RealizedCount, Is.LessThan(120),
+                "a 64px cell realizes only the visible window; a collapsed cell would realize all 600 (the hang)");
         });
     }
 

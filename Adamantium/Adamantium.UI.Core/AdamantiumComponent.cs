@@ -292,6 +292,23 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         return false;
     }
 
+    // The priority slot currently supplying this property's base value (skipping the Animation mask and the Effective
+    // cache). A re-coercion (e.g. RangeBase re-clamping Value when Minimum/Maximum change) must rewrite the value IN
+    // PLACE at this priority rather than promoting it to Local: Local (1) outranks Binding (2), so a Local re-coerce
+    // would permanently mask a {Binding} on that property - which is what pinned a data-bound Slider.Value at its
+    // coerced Minimum and stopped the binding from ever applying.
+    protected ValuePriority GetBaseValuePriority(AdamantiumProperty property)
+    {
+        lock (values)
+        {
+            if (values.TryGetValue(property, out var container))
+                for (var p = ValuePriority.Local; p <= ValuePriority.Default; p++)
+                    if (container.GetValue(p) != AdamantiumProperty.UnsetValue)
+                        return p;
+        }
+        return ValuePriority.Default;
+    }
+
     // An inherited value changed (parent assigned/attached): fire the metadata callback (e.g. DataContext -> refresh
     // bindings) and re-raise so this element's own descendants inherit in turn.
     private void RaiseInheritedChange(AdamantiumProperty property, PropertyMetadata metadata, object oldValue, object newValue)

@@ -297,25 +297,32 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         set => SetValue(LayoutTransformProperty, value);
     }
     
-    // Virtual so an Adorner can return its adorned element's transform (it draws in that element's coordinate space).
-    public virtual Matrix4x4F WorldTransform
+    /// <summary>This element's transform in its PARENT's coordinate space: the render transform (local space, may be
+    /// animating) followed by the layout offset that positions it inside its parent. The parent-relative part of
+    /// <see cref="WorldTransform"/>, exposed so a frame-scoped consumer (the render pass) can compose world transforms
+    /// top-down without re-walking to the root per node.</summary>
+    public Matrix4x4F LocalTransform
     {
         get
         {
-            // Local transform: the render transform (applied in the element's local space, may be animating) followed
-            // by the layout offset that positions the element inside its parent.
             var localTransform = Matrix4x4F.Translation((float)Bounds.Location.X, (float)Bounds.Location.Y, 0);
-
             var renderTransform = RenderTransform;
             if (renderTransform != null)
             {
                 localTransform = (Matrix4x4F)renderTransform.Matrix * localTransform;
             }
-
-            // Compose up the visual tree. Computed live each call (not cached): RenderTransform animates per-frame, and
-            // an animated ancestor must carry its whole subtree - a dirty-flag cache would freeze descendants mid-flight.
-            return VisualParent != null ? localTransform * VisualParent.WorldTransform : localTransform;
+            return localTransform;
         }
+    }
+
+    // Virtual so an Adorner can return its adorned element's transform (it draws in that element's coordinate space).
+    public virtual Matrix4x4F WorldTransform
+    {
+        // Compose up the visual tree. Computed live each call (not cached): RenderTransform animates per-frame, and an
+        // animated ancestor must carry its whole subtree - a persistent dirty-flag cache would freeze descendants
+        // mid-flight. Hot callers that read it repeatedly within ONE frame (the render pass) memoize it frame-scoped
+        // instead (RenderCache), where the transforms are already stable (layout + animation applied before render).
+        get => VisualParent != null ? LocalTransform * VisualParent.WorldTransform : LocalTransform;
     }
 
 

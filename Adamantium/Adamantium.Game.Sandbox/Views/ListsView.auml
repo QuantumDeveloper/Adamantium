@@ -1,0 +1,26 @@
+<View xmlns="http://adamantium/ui">
+    <!-- DataContext is the ListsViewModel. Both ListBoxes share Items; single-select is bound two-way to SelectedItem. -->
+    <StackPanel Orientation="Horizontal" Margin="24">
+
+        <StackPanel Orientation="Vertical">
+            <TextBlock Text="Single select" Margin="0,0,0,6"/>
+            <ListBox Width="200" Height="240"
+                     ItemsSource="{Binding Items}"
+                     SelectedItem="{Binding SelectedItem, Mode=TwoWay}"/>
+            <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                <Button Content="Add" Command="{Binding AddCommand}" Width="80" Height="32" Margin="0,0,8,0"/>
+                <Button Content="Remove" Command="{Binding RemoveSelectedCommand}" Width="90" Height="32"/>
+            </StackPanel>
+        </StackPanel>
+
+        <StackPanel Orientation="Vertical" Margin="24,0,0,0">
+            <TextBlock Text="Multiple select" Margin="0,0,0,6"/>
+            <ListBox Width="200" Height="240" SelectionMode="Multiple" ItemsSource="{Binding Items}"/>
+        </StackPanel>
+
+        <StackPanel Orientation="Vertical" Margin="24,0,0,0">
+            <TextBlock Text="Selected (single):"/>
+            <TextBlock Text="{Binding SelectedItem}" FontSize="18" Margin="0,6,0,0"/>
+        </StackPanel>
+    </StackPanel>
+</View>

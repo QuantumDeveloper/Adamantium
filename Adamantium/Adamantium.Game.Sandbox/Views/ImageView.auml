@@ -1,0 +1,46 @@
+<View xmlns="http://adamantium/ui">
+    <!-- DataContext is the ImageViewModel. Opacity binds all images. Disabling the horizontal scrollbar gives the
+         WrapPanel the viewport WIDTH, so images wrap into rows and the ScrollViewer scrolls only vertically. -->
+    <Grid RowDefinitions="Auto,*" Margin="24">
+        <StackPanel Grid.Row="0" Orientation="Horizontal">
+            <TextBlock Text="Opacity:" VerticalAlignment="Center"/>
+            <Slider Width="240" 
+                    Minimum="0.1" 
+                    Maximum="1" 
+                    Value="{Binding Opacity, Mode=TwoWay}" 
+                    Margin="12,0,0,0"/>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1"
+                      Margin="0,14,0,0"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+            <WrapPanel Orientation="Horizontal" ItemWidth="212" ItemHeight="200">
+                <StackPanel Margin="8">
+                    <TextBlock Text="PNG (APNG animated)"/>
+                    <Image Width="188" Height="150" Source="Textures/APNG-cube.png" Opacity="{Binding Opacity}"/>
+                </StackPanel>
+                <StackPanel Margin="8">
+                    <TextBlock Text="GIF (infinity)"/>
+                    <Image Width="188" Height="150" Source="Textures/infinity.gif" Delay="25" Opacity="{Binding Opacity}"/>
+                </StackPanel>
+                <StackPanel Margin="8">
+                    <TextBlock Text="GIF (earth)"/>
+                    <Image Width="188" Height="150" Source="Textures/RotatingEarth2.gif" Delay="25" Opacity="{Binding Opacity}"/>
+                </StackPanel>
+                <StackPanel Margin="8">
+                    <TextBlock Text="TGA (luxfon)"/>
+                    <Image Width="188" Height="150" Source="Textures/luxfon.tga" Opacity="{Binding Opacity}"/>
+                </StackPanel>
+                <StackPanel Margin="8">
+                    <TextBlock Text="JPG + CornerRadius"/>
+                    <Image Width="188" Height="150" Source="Textures/ColoredImage.jpg" CornerRadius="14" Opacity="{Binding Opacity}"/>
+                </StackPanel>
+                <StackPanel Margin="8">
+                    <TextBlock Text="PNG (mip level 2)"/>
+                    <Image Width="188" Height="150" Source="Textures/elephant.png" MipLevel="2" Opacity="{Binding Opacity}"/>
+                </StackPanel>
+            </WrapPanel>
+        </ScrollViewer>
+    </Grid>
+</View>

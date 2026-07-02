@@ -190,15 +190,6 @@ public class ContentControl : Control, IContentControl
       UpdateVisualsForContent(Content);
       
       return base.MeasureOverride(availableSize);
-      
-      // var visual = VisualChildrenCollection.FirstOrDefault();
-      // if (visual is IMeasurableComponent child)
-      // {
-      //    child.Measure(availableSize);
-      //    return child.DesiredSize;
-      // }
-      //
-      // return new Size(0, 0);
    }
 
    protected override Size ArrangeOverride(Size finalSize)

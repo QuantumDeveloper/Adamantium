@@ -91,5 +91,10 @@ public class GameHostBehavior : Behavior<RenderTargetPanel>
         // rendering. Reuse the window's existing render device so we don't burn another slice of the BAR window.
         game.CreateOutputFromContext(panel, renderService.GraphicsDevice);
         _gameAttached = true;
+
+        // Bridge the live game to the tab's view-model so its menu can load models at runtime (the panel inherits the
+        // GameViewModel as its DataContext from the hosting tab).
+        if (panel.DataContext is ViewModels.GameViewModel gameViewModel)
+            gameViewModel.AttachGame(game);
     }
 }

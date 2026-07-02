@@ -109,14 +109,20 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         {
             case NotifyCollectionChangedAction.Add:
             {
-                var styles = (IEnumerable<Style>)e.NewItems;
-                Style.Apply(this, styles?.ToArray());
+                // Route through AttachStyles (not a bare Style.Apply) so a style added to the Styles collection is TRACKED
+                // in _attachedStyles. That makes it participate in the theme cycle: on (re)theming, ApplyCurrentTheme
+                // detaches it, applies the theme, then re-applies it via ApplyExternalStyles - so a user style always
+                // lands AFTER the theme, even if it was added before the control was themed (e.g. an ItemContainerStyle
+                // set at container creation). A bare Apply left it stacked BEFORE the theme, so the theme's value won.
+                var styles = e.NewItems?.Cast<Style>().ToArray();
+                if (styles is { Length: > 0 }) AttachStyles(styles);
                 break;
             }
             case NotifyCollectionChangedAction.Remove:
             {
-                var styles = (IEnumerable<Style>)e.NewItems;
-                Style.UnApply(this, styles?.ToArray());
+                // OldItems for a Remove (NewItems is null here); detach so the tracked style + its contribution are undone.
+                var styles = e.OldItems?.Cast<Style>().ToArray();
+                if (styles is { Length: > 0 }) DetachStyles(styles);
                 break;
             }
         }

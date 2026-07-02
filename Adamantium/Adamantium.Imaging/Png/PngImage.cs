@@ -9,6 +9,10 @@ namespace Adamantium.Imaging.Png
     internal class PngImage : IRawBitmap
     {
         private readonly PngCompressor compressor;
+        // Frames decode lazily and may be pulled from the async loader AND the render/animation thread at once. Serialize
+        // it: ProcessFrame mutates shared PngFrame state (it zeroes XOffset/YOffset after compositing), so two concurrent
+        // decodes of the same frame raced and the second composited the sub-region at (0,0) - the frame distortion.
+        private readonly object _frameDecodeLock = new object();
 
         public PngImage()
         {
@@ -99,7 +103,15 @@ namespace Adamantium.Imaging.Png
         private byte[] DecodeFrame(PngFrame frame, uint index)
         {
             if (frame.IsDecoded) return frame.RawPixelBuffer;
-            
+            lock (_frameDecodeLock)
+            {
+                if (frame.IsDecoded) return frame.RawPixelBuffer;   // another thread finished it while we waited
+                return DecodeFrameCore(frame, index);
+            }
+        }
+
+        private byte[] DecodeFrameCore(PngFrame frame, uint index)
+        {
             long predict = 0;
             int width = frame.EncodedWidth != 0 ? (int)frame.EncodedWidth : Header.Width;
             int height = frame.EncodedHeight != 0 ? (int)frame.EncodedHeight : Header.Height;
@@ -283,16 +295,37 @@ namespace Adamantium.Imaging.Png
             // APNG frames are sub-regions composited onto a full-size canvas. The buffer MUST be the full
             // canvas (PixelWidth*PixelHeight*bpp), not the sub-region: a sub-region-sized buffer overruns the
             // texture upload (vkCmdCopyBufferToImage reads past the staging buffer) and loses the device.
-            // The canvas starts from the previous frame's result, unless that frame disposed it.
+            // The canvas the current frame draws onto is what the PREVIOUS frame left after its DisposeOp (APNG spec):
+            //  * None       -> keep the previous frame's output as-is;
+            //  * Background  -> keep it, but clear the previous frame's own region to transparent black;
+            //  * Previous    -> discard the previous frame and restore the canvas from BEFORE it.
+            // The old code only handled None (all other ops fell through to a black canvas), so any Background/Previous
+            // frame showed just its sub-region on black - the "distortion" the user saw on certain frames.
             byte[] pixels = new byte[canvasSize];
             if (index > 0)
             {
                 var previous = Frames[(int)index - 1];
-                if (previous.DisposeOp == DisposeOp.None && previous.RawPixelBuffer != null)
+                if (previous.DisposeOp == DisposeOp.Previous)
+                {
+                    if (previous.CanvasBeforeFrame != null)
+                        Array.Copy(previous.CanvasBeforeFrame, pixels, Math.Min(previous.CanvasBeforeFrame.Length, canvasSize));
+                }
+                else if (previous.RawPixelBuffer != null)
                 {
                     Array.Copy(previous.RawPixelBuffer, pixels, Math.Min(previous.RawPixelBuffer.Length, canvasSize));
+                    if (previous.DisposeOp == DisposeOp.Background)
+                        ClearRegion(pixels, previous.RegionX, previous.RegionY, previous.RegionWidth, previous.RegionHeight, lineLength, bytesPerPixel);
                 }
             }
+
+            // Record this frame's region (XOffset/YOffset are zeroed right after compositing) and, for a Previous-dispose
+            // frame, snapshot the canvas as it is NOW - before this frame draws - so the next frame can revert to it.
+            frame.RegionX = frame.XOffset;
+            frame.RegionY = frame.YOffset;
+            frame.RegionWidth = frame.EncodedWidth != 0 ? frame.EncodedWidth : (uint)Header.Width;
+            frame.RegionHeight = frame.EncodedHeight != 0 ? frame.EncodedHeight : (uint)Header.Height;
+            if (frame.DisposeOp == DisposeOp.Previous)
+                frame.CanvasBeforeFrame = (byte[])pixels.Clone();
 
             var src = frame.RawPixelBuffer;
             int rowBytes = (int)frame.EncodedWidth * bytesPerPixel;
@@ -330,6 +363,20 @@ namespace Adamantium.Imaging.Png
             frame.YOffset = 0;
             frame.RawPixelBuffer = pixels;
             frame.IsDecoded = true;
+        }
+
+        // Clears a sub-region of the canvas to transparent black (APNG DisposeOp.Background), row by row so the region's
+        // stride is the sub-region width while the destination advances by the full canvas line.
+        private static void ClearRegion(byte[] pixels, uint x, uint y, uint width, uint height, int lineLength, int bytesPerPixel)
+        {
+            if (width == 0 || height == 0) return;
+            int rowBytes = (int)width * bytesPerPixel;
+            for (int k = 0; k < height; ++k)
+            {
+                int dstIndex = (((int)y + k) * lineLength) + ((int)x * bytesPerPixel);
+                if (dstIndex < 0 || dstIndex + rowBytes > pixels.Length) continue;
+                Array.Clear(pixels, dstIndex, rowBytes);
+            }
         }
 
         private void ConvertColorsIfNeeded(PngFrame frame, PngState state)

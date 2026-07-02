@@ -329,8 +329,17 @@ public class CodeGenerationContext
                         case "MultiBinding":
                         {
                             var bindingVar = EmitBinding(extension, diagnostics, isResource);
-                            var bindingTarget = isRoot ? "this" : CurrentParent;
-                            TextGenerator.WriteLine($"{bindingTarget}.SetBinding(\"{propRef.Name}\", {bindingVar});");
+                            if (IsBindingTypedProperty(resolvedType))
+                            {
+                                // The property itself HOLDS a binding object (e.g. DataTrigger.Binding) - assign it.
+                                TextGenerator.WriteLine($"{symbolName} = {bindingVar};");
+                            }
+                            else
+                            {
+                                // Ordinary property: establish a live binding on it.
+                                var bindingTarget = isRoot ? "this" : CurrentParent;
+                                TextGenerator.WriteLine($"{bindingTarget}.SetBinding(\"{propRef.Name}\", {bindingVar});");
+                            }
                             break;
                         }
                         default:
@@ -412,12 +421,20 @@ public class CodeGenerationContext
                 {
                     foreach (var propertyValue in prop.Values)
                     {
-                        // <X.Y><Binding/></X.Y> or <X.Y><MultiBinding>...</MultiBinding></X.Y> -> a live binding.
+                        // <X.Y><Binding/></X.Y> or <X.Y><MultiBinding>...</MultiBinding></X.Y> -> a live binding, unless the
+                        // property itself holds a binding object (e.g. DataTrigger.Binding), in which case assign it.
                         if (IsBindingNode(propertyValue))
                         {
                             var bindingVar = EmitBinding(propertyValue, diagnostics, isResource);
-                            var bindingTarget = isRoot ? "this" : CurrentParent;
-                            TextGenerator.WriteLine($"{bindingTarget}.SetBinding(\"{propRef.Name}\", {bindingVar});");
+                            if (IsBindingTypedProperty(resolvedType))
+                            {
+                                TextGenerator.WriteLine($"{symbolName} = {bindingVar};");
+                            }
+                            else
+                            {
+                                var bindingTarget = isRoot ? "this" : CurrentParent;
+                                TextGenerator.WriteLine($"{bindingTarget}.SetBinding(\"{propRef.Name}\", {bindingVar});");
+                            }
                             continue;
                         }
                         string nestedName = ProcessNestedValue(propertyValue, diagnostics, isResource);
@@ -596,6 +613,14 @@ public class CodeGenerationContext
         AumlAstObjectNode obj => obj.TypeReference?.Name is "Binding" or "MultiBinding",
         _ => false,
     };
+
+    // True when a property is typed to HOLD a binding object itself (Binding/MultiBinding/BindingBase) - e.g.
+    // DataTrigger.Binding. Such a property takes the {Binding} value by direct assignment; an ordinary property instead
+    // gets a live binding established on it via SetBinding.
+    private static bool IsBindingTypedProperty(IResolvedType type) =>
+        type?.FullName is "Adamantium.UI.Core.Data.Binding"
+                       or "Adamantium.UI.Core.Data.MultiBinding"
+                       or "Adamantium.UI.Core.Data.BindingBase";
 
     // Emits the code that constructs a Binding/MultiBinding and returns the variable holding it. Recurses for nested
     // multi-bindings, so multibinding-inside-multibinding generates correctly.

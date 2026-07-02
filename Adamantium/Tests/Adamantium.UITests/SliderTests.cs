@@ -5,6 +5,7 @@ using Adamantium.UI.Controls.Decorators;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Controls.Primitives;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Data;
 using Adamantium.UI.Core.Templates;
 using Adamantium.UI.Extensions;
 using NUnit.Framework;
@@ -47,9 +48,45 @@ public class SliderTests
         return result;
     });
 
+    // Mirrors the real theme: the Track's Minimum/Maximum/Value come from the Slider via {TemplateBinding}. This is the
+    // path the hand-built SliderTemplate above skips (it sets Track props directly), so it's the one that can silently
+    // fail and pin the thumb at the start.
+    private static ControlTemplate SliderTemplateWithTemplateBindings() => new(() =>
+    {
+        var grid = new Grid();
+        var track = new Track { Orientation = Orientation.Horizontal, ViewportSize = 0, Thumb = new Thumb { Width = 20, Height = 20 } };
+        grid.Children.Add(track);
+
+        var result = new TemplateResult { RootComponent = grid };
+        result.RegisterName("PART_Track", track);
+        result.AddTemplateBinding(track, "Minimum", new TemplateBinding { Path = "Minimum" });
+        result.AddTemplateBinding(track, "Maximum", new TemplateBinding { Path = "Maximum" });
+        result.AddTemplateBinding(track, "Value", new TemplateBinding { Path = "Value" });
+        return result;
+    });
+
     private static void Settle(Border root)
     {
         for (var i = 0; i < 5; i++) WindowExtension.UpdateTree(root);
+    }
+
+    // The live-app regression: the theme feeds Track.Value/Minimum/Maximum via {TemplateBinding}. If that binding doesn't
+    // carry the Slider's initial non-default Value into the Track, the Track positions the thumb for Value=Minimum -> at
+    // the very start, even though the Slider's Value (and the accent fill) are correct.
+    [Test]
+    public void Slider_ThumbAtInitialValue_ViaTemplateBinding()
+    {
+        var slider = new Slider { Minimum = 0, Maximum = 100, Value = 75, Orientation = Orientation.Horizontal };
+        slider.Template = SliderTemplateWithTemplateBindings();
+        var root = new Border { Width = 220, Height = 24, Child = slider };
+        Settle(root);
+
+        var track = (Track)slider.GetTemplateChild("PART_Track");
+        Assert.Multiple(() =>
+        {
+            Assert.That(track.Value, Is.EqualTo(75).Within(0.5), "Track.Value must receive the Slider's Value via {TemplateBinding Value}");
+            Assert.That(track.Thumb.Bounds.X, Is.GreaterThan(100), "thumb sits at the value fraction, not pinned at the start");
+        });
     }
 
     // Isolation: a left-aligned Border whose Width is set AFTER the first layout must reach RenderSize through a normal
@@ -97,6 +134,86 @@ public class SliderTests
         Assert.That(track.ActualHeight, Is.GreaterThan(0), "sanity: the track got a height");
         Assert.That(fill.RenderSize.Height, Is.EqualTo(0.40 * track.ActualHeight).Within(2.0),
             "accent fill must be ARRANGED to 40% of the track height once layout settles");
+    }
+
+    // The THUMB (not just the accent fill) must sit at the Value fraction. The theme binds Track.Value={TemplateBinding
+    // Value}; the Track positions the thumb in ArrangeOverride. Regression: a slider whose initial Value != Minimum showed
+    // the thumb pinned at the start. These drive the Track directly (Value set on it) to isolate the Track's arrange from
+    // the TemplateBinding that feeds it.
+    private sealed class ValueSource { public double V { get; init; } }
+
+    // The real slider bug: Value is data-bound AND coerced (RangeBase clamps to [Min,Max]). Minimum is applied first
+    // (during construction, coercing the default 0 up to Min) and the {Binding} resolves later (once DataContext is
+    // set). If the Minimum-coercion writes Value at LOCAL priority, it outranks the {Binding} (Local=1 beats Binding=2)
+    // and the slider stays pinned at Minimum forever - the thumb sat at the start. The coerced default must sit at its
+    // own (default) priority so the binding can still apply.
+    [Test]
+    public void BoundValue_WithMinimumMaximum_AppliesBindingOverCoercedMinimum()
+    {
+        var source = new ValueSource { V = 64 };
+        var slider = new Slider();
+        slider.Minimum = 24;    // coerces the default Value (0) up to 24 - must NOT be promoted above a binding
+        slider.Maximum = 180;
+        slider.SetBinding("Value", new Binding("V"));   // DataContext still null here: doesn't resolve yet
+        slider.DataContext = source;                    // now the binding re-resolves and must push 64
+
+        Assert.That(slider.Value, Is.EqualTo(64).Within(0.5),
+            "a {Binding} on Value must win over the Minimum-coercion; the coerced default must not outrank the binding");
+    }
+
+    [Test]
+    public void Track_ThumbSitsAtInitialValueFraction()
+    {
+        var thumb = new Thumb { Width = 20, Height = 20 };
+        var track = new Track { Orientation = Orientation.Horizontal, Minimum = 0, Maximum = 100, Value = 75, ViewportSize = 0, Thumb = thumb };
+        var root = new Border { Width = 220, Height = 24, Child = track };
+        Settle(root);
+
+        // trackLength 220, thumb 20 -> remaining 200; offset = 0.75 * 200 = 150.
+        Assert.That(thumb.Bounds.X, Is.EqualTo(150).Within(3),
+            "thumb must start at the initial Value fraction, not pinned at the track start");
+    }
+
+    [Test]
+    public void Track_ThumbRepositionsOnValueChange()
+    {
+        var thumb = new Thumb { Width = 20, Height = 20 };
+        var track = new Track { Orientation = Orientation.Horizontal, Minimum = 0, Maximum = 100, Value = 0, ViewportSize = 0, Thumb = thumb };
+        var root = new Border { Width = 220, Height = 24, Child = track };
+        Settle(root);
+        var xAtMin = thumb.Bounds.X;
+
+        track.Value = 100;
+        Settle(root);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(xAtMin, Is.EqualTo(0).Within(1), "at Value=Minimum the thumb sits at the start");
+            Assert.That(thumb.Bounds.X, Is.GreaterThan(xAtMin + 150), "raising Value moves the thumb toward the end");
+        });
+    }
+
+    // The exact live-app order: the Slider's Value arrives LATER, from a {Binding} that resolves once the DataContext
+    // flows - i.e. AFTER the template's {TemplateBinding Value} was established at Value=0. The Track must FOLLOW that
+    // change. If the template binding is not live, Track.Value stays 0 and the thumb never leaves the start (the bug).
+    [Test]
+    public void Slider_ThumbFollowsLaterValueChange_ViaTemplateBinding()
+    {
+        var slider = new Slider { Minimum = 0, Maximum = 100, Value = 0, Orientation = Orientation.Horizontal };
+        slider.Template = SliderTemplateWithTemplateBindings();
+        var root = new Border { Width = 220, Height = 24, Child = slider };
+        Settle(root);
+        var track = (Track)slider.GetTemplateChild("PART_Track");
+        var xAt0 = track.Thumb.Bounds.X;
+
+        slider.Value = 75;   // as a {Binding} would set it after the template already bound at 0
+        Settle(root);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(track.Value, Is.EqualTo(75).Within(0.5), "Track.Value must follow a later Slider.Value change via {TemplateBinding}");
+            Assert.That(track.Thumb.Bounds.X, Is.GreaterThan(xAt0 + 100), "thumb follows the later value change");
+        });
     }
 
     [Test]
