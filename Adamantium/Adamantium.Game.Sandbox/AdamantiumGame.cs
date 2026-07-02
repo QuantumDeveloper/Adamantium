@@ -81,5 +81,13 @@ namespace Adamantium.Game.Sandbox
             var entity = await ImportModel(SandboxAssets.Models.F15C.F_15C_Eagle_dae);
             EntityWorld.EntityManager.AddEntity(entity);
         }
+
+        /// <summary>Loads a model file and adds it to the scene - the runtime "load model" path the game menu uses.</summary>
+        public async Task<Entity> LoadAndAddModel(string pathToFile)
+        {
+            var entity = await ImportModel(pathToFile);
+            EntityWorld.EntityManager.AddEntity(entity);
+            return entity;
+        }
     }
 }

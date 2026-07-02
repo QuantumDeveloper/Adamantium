@@ -210,7 +210,10 @@ public class ListBox : Selector
     protected internal override IUIComponent GetContainerForItem()
     {
         var container = new ListBoxItem();
-        if (ItemContainerStyle != null) container.AttachStyles(ItemContainerStyle);
+        // Into the Styles collection (a USER style), not AttachStyles: the theme is applied to the container on attach,
+        // and ApplyCurrentTheme re-applies the Styles collection AFTER the theme - so the ItemContainerStyle overrides
+        // the theme's default container style instead of being overwritten by it.
+        if (ItemContainerStyle != null) container.Styles.Add(ItemContainerStyle);
         return container;
     }
 

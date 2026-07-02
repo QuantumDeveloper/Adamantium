@@ -190,17 +190,22 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
       if (Source is BitmapImage bitmap)
       {
          _bitmap = bitmap;
+
+         // Wait for the URI's background load (BitmapImage loads off the UI thread) so decoding never freezes the UI.
+         await bitmap.EnsureLoadedAsync();
+         if (!ReferenceEquals(_bitmap, bitmap)) return;   // Source changed mid-load -> this result is stale
+
          await DecodeBitmapFramesAsync(EndFrame);
          var endFrame = EndFrame > _bitmap.FrameCount ? _bitmap.FrameCount : EndFrame;
          if (StartFrame > endFrame)
          {
             StartFrame = endFrame;
          }
-         
+
          _bitmap.StartFrame = StartFrame;
          _bitmap.EndFrame = endFrame;
          _bitmap.ResetFrameIndex();
-         
+
          if (_bitmap.FrameCount > 1)
          {
             // At runtime a real timer advances frames. In the headless designer there is no real clock, so register
@@ -214,6 +219,11 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
          {
             _frame = _bitmap.HasMipLevels && MipLevel > 0 ? _bitmap.GetMipLevel(MipLevel) : _bitmap.GetFrame(0);
          }
+
+         // The async load can finish AFTER the Source-change layout/render already ran (measuring/painting nothing);
+         // re-measure (auto-sized images pick up the real size) and repaint now that the frame exists.
+         InvalidateMeasure();
+         InvalidateRender(false);
       }
    }
 
@@ -381,6 +391,12 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
       // per frame index), so advancing _frame makes animated images play. _frame is null for non-bitmap sources
       // (RenderTargetImage / SharedSurfaceImage) and before the first tick, where we draw the source directly.
       ImageSource image = _frame ?? Source;
+
+      // A URI-sourced bitmap now loads asynchronously (off the UI thread). Until it finishes it has no pixel data, so
+      // rendering it would build a texture from null and crash. Skip until it is ready - ProcessImageSource sets _frame
+      // and re-invalidates once loaded. A decoded _frame (BitmapFrame) or a non-BitmapImage source is always ready.
+      if (image is BitmapImage { IsLoaded: false }) return;
+
       context.ForControl(this).DrawImage(image, FilterBrush, new Rect(Bounds.Size), CornerRadius);
    }
 

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Reflection;
 
 namespace Adamantium.Core.TypeParsing;
@@ -6,6 +7,13 @@ namespace Adamantium.Core.TypeParsing;
 public static class TypeParser
 {
     public static TTarget Parse<TTarget>(string value) => (TTarget)Parse(value, typeof(TTarget));
+
+    // One resolved parser per target type, built once and cached. Parse USED to reflect on EVERY call -
+    // GetCustomAttribute + Activator.CreateInstance + GetMethod + MethodInfo.Invoke - which is fine for one-shot AUML
+    // parsing but murders a hot binding path: a value-converter on a virtualized list re-runs per realized item, so a
+    // resize/scroll that realizes hundreds of items did hundreds of full-reflection parses per frame = a visible freeze.
+    // With the cache a call is just a delegate invoke (the parser instance + Parse method are resolved a single time).
+    private static readonly ConcurrentDictionary<Type, Func<string, object>> _parsers = new();
 
     /// <summary>
     /// Non-generic counterpart of <see cref="Parse{TTarget}"/>: parses <paramref name="value"/> into
@@ -26,6 +34,13 @@ public static class TypeParser
             targetType = underlying;
         }
 
+        return _parsers.GetOrAdd(targetType, BuildParser)(value);
+    }
+
+    // Resolve the parser for a type ONCE (attribute reflection + Activator.CreateInstance + GetMethod happen here, cached
+    // by the caller); the returned delegate then just invokes on each parse.
+    private static Func<string, object> BuildParser(Type targetType)
+    {
         var parserType = ParserRegistry.GetParserFor(targetType)
                          ?? targetType.GetCustomAttribute<TypeParserAttribute>()?.ParserType;
 
@@ -35,22 +50,26 @@ public static class TypeParser
             // as the underlying T of a Nullable<T> (e.g. IsChecked="True" -> bool?, which has no parser of its own).
             // Fall back to the framework converter for those instead of failing.
             if (targetType.IsEnum)
-                return Enum.Parse(targetType, value, ignoreCase: true);
+                return v => Enum.Parse(targetType, v, ignoreCase: true);
             if (typeof(IConvertible).IsAssignableFrom(targetType))
-                return Convert.ChangeType(value, targetType, System.Globalization.CultureInfo.InvariantCulture);
-            throw new InvalidOperationException($"Type parser not found for {targetType.FullName}");
+                return v => Convert.ChangeType(v, targetType, System.Globalization.CultureInfo.InvariantCulture);
+            return _ => throw new InvalidOperationException($"Type parser not found for {targetType.FullName}");
         }
 
-        try
+        var parser = Activator.CreateInstance(parserType);
+        var parse = parserType.GetMethod(nameof(ITypeParser<object>.Parse), [typeof(string)])
+                    ?? throw new InvalidOperationException($"{parserType.FullName} has no Parse(string) method");
+        return value =>
         {
-            var parser = Activator.CreateInstance(parserType);
-            var parse = parserType.GetMethod(nameof(ITypeParser<object>.Parse), [typeof(string)]);
-            return parse!.Invoke(parser, [value]);
-        }
-        catch (Exception e)
-        {
-            throw new InvalidOperationException($"Cannot parse {value} as input for {targetType.FullName}",
-                e is TargetInvocationException tie ? tie.InnerException : e);
-        }
+            try
+            {
+                return parse.Invoke(parser, [value]);
+            }
+            catch (Exception e)
+            {
+                throw new InvalidOperationException($"Cannot parse {value} as input for {targetType.FullName}",
+                    e is TargetInvocationException tie ? tie.InnerException : e);
+            }
+        };
     }
 }

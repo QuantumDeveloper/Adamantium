@@ -323,20 +323,74 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
     // into the instanced draw. See RectBatchEffect.fx.
     public RectanglePayload RectPayload => Payload;
 
+    // A rect that the item-background SDF batch will draw (solid fill, no pen, uniform corners): the batch shader
+    // reconstructs the rounded rect from a signed-distance field and self-anti-aliases, so this unit needs NO analytic-AA
+    // FRINGE. Building one per rect is pure waste - and its per-tile GPU buffer, rebuilt on every resize, is exactly what
+    // exhausted device memory (vkAllocateMemory=ErrorOutOfDeviceMemory) while dragging the size slider. Mirrors
+    // RectBatchCollector.CanBatch so "no fringe built" == "the batch will draw it". Geometry-identity instancing phase 4.
+    private static bool IsSdfBatchable(RectanglePayload p)
+    {
+        if (!RectBatchCollector.Enabled) return false;
+        if (p.Brush is not SolidColorBrush s || s.Color.A == 0) return false;
+        if (p.Pen != null) return false;
+        var c = p.CornerRadius;
+        return c.TopLeft == c.TopRight && c.TopRight == c.BottomRight && c.BottomRight == c.BottomLeft;
+    }
+
     public RectangleRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
-        var rectangleGeometry = new RectangleGeometry(Payload.DestinationRect, Payload.CornerRadius);
-        rectangleGeometry.ProcessGeometry(GeometryType.Both);
-        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, rectangleGeometry.Mesh, Payload.Brush, BufferManager);
-        GeometryRenderer.RenderData = DrawCommand.RenderData;
-        ProcessFillFringe(rectangleGeometry, Payload.Brush);
-        ProcessStrokeData(Payload.Pen, rectangleGeometry);
+        // A batchable rect (solid, no pen, uniform corners) is drawn ENTIRELY by the item-background SDF batch, which
+        // self-AAs - so build ZERO per-unit machinery: no tessellation, no geometry/fringe/stroke, no GPU buffers. This
+        // is what makes a big virtualized tile grid cheap: a slider shrink that realizes hundreds of tiles no longer
+        // tessellates + allocates per tile (that was the 1-fps freeze and the resize OOM). The rare rejected case
+        // (rotated/sheared world, or per-frame overflow) builds its body lazily in Render via EnsureMachinery.
+        if (IsSdfBatchable(Payload)) return;
+        BuildMachinery(Payload);
     }
-    
+
+    // The per-unit fill/fringe/stroke renderers for a NON-batched rect. Tessellates once here; the buffers themselves are
+    // still allocated lazily on first draw (see UIRenderComponent.SetMesh).
+    private void BuildMachinery(RectanglePayload payload)
+    {
+        var g = new RectangleGeometry(payload.DestinationRect, payload.CornerRadius);
+        g.ProcessGeometry(GeometryType.Both);
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, payload.Brush, BufferManager);
+        GeometryRenderer.RenderData = DrawCommand.RenderData;
+        ProcessFillFringe(g, payload.Brush);
+        ProcessStrokeData(payload.Pen, g);
+    }
+
+    // The item-background batch reads the fill opacity here: a batchable rect has no GeometryRenderer to carry RenderData.
+    public double FillOpacity => DrawCommand?.RenderData?.Opacity ?? 1.0;
+
+    // A batchable rect the batch REJECTED this frame (rotated/sheared world, or the instance buffer overflowed) must draw
+    // itself, so build its BODY on demand. No fringe: it would need a PreRender we've already passed this frame; the body
+    // self-fills its buffer in Render. Idempotent (a persistently-rejected rect keeps the body across frames).
+    public void EnsureMachinery()
+    {
+        if (GeometryRenderer != null) return;
+        var g = new RectangleGeometry(Payload.DestinationRect, Payload.CornerRadius);
+        g.ProcessGeometry(GeometryType.Both);
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, Payload.Brush, BufferManager);
+        GeometryRenderer.RenderData = DrawCommand.RenderData;
+    }
+
     public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
     {
         if (drawCommand.Payload is not RectanglePayload inputPayload) return;
 
+        // Fast path: no machinery (a batchable tile, the common case). Just repoint payload/command - NO tessellation, NO
+        // buffers - so resizing a virtualized grid stays cheap. Build machinery only if the rect is now non-batchable
+        // (e.g. it gained a pen or a gradient fill).
+        if (GeometryRenderer == null)
+        {
+            DrawCommand = drawCommand;
+            Payload = inputPayload;
+            if (!IsSdfBatchable(inputPayload)) BuildMachinery(inputPayload);
+            return;
+        }
+
+        // Machinery exists (a non-batchable rect, or a kept fallback body): update it incrementally.
         var oldPen = Payload.Pen;
         var oldBrush = Payload.Brush;
         var rebuild = Payload.RequiresBufferRebuild(inputPayload);
@@ -350,11 +404,19 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
         ((GeometryRenderComponent)GeometryRenderer).Background = inputPayload.Brush;
         DrawCommand = drawCommand;
         Payload = inputPayload;
+        GeometryRenderer.RenderData = DrawCommand.RenderData;
 
-        GeometryRenderer?.RenderData = DrawCommand.RenderData;
-
-        // Analytic-AA fringe follows the fill: cheap brush/colour change repoints it, a geometry change rebuilds it.
-        UpdateFillFringe(rectangleGeometry, inputPayload.Brush, rebuild, !Equals(oldBrush, inputPayload.Brush));
+        // Fringe: skip for a batchable rect (the batch self-AAs, and a per-tile fringe rebuilt on resize is the OOM);
+        // drop a stale one. Otherwise follow the fill.
+        if (IsSdfBatchable(inputPayload))
+        {
+            FillFringeRenderer?.DeferDispose();
+            FillFringeRenderer = null;
+        }
+        else
+        {
+            UpdateFillFringe(rectangleGeometry, inputPayload.Brush, rebuild, !Equals(oldBrush, inputPayload.Brush));
+        }
 
         // Stroke: geometry change -> full rebuild; pen-only change -> try a cheap uniform repoint (animation), else
         // rebuild (process the geometry first, since it wasn't processed in the non-rebuild branch).

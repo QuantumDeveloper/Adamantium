@@ -1,0 +1,37 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters">
+    <!-- DataContext is the LayoutViewModel. A big virtualized, wrapping, scrolling grid of rectangles whose cell size is
+         slider-driven (the WrapPanel's ItemWidth/ItemHeight bind to RectSize). The ListBox virtualizes: only the on-screen
+         tiles are realized, so it stays smooth at hundreds of items. The tile colour is a string on the item, converted
+         to a Brush in the binding by StringToBrushConverter (a {Binding} does no string->Brush conversion itself). -->
+    <Grid RowDefinitions="Auto,*" Margin="24">
+        <StackPanel Grid.Row="0" Orientation="Horizontal">
+            <TextBlock Text="Rectangle size:" VerticalAlignment="Center"/>
+            <Slider Width="260" Minimum="24" Maximum="180" Value="{Binding RectSize, Mode=TwoWay}" Margin="12,0,0,0"/>
+            <TextBlock Text="{Binding RectSize}" VerticalAlignment="Center" FontSize="16" Margin="12,0,0,0"/>
+            <TextBlock Text="600 rectangles, virtualized" VerticalAlignment="Center" Foreground="#94A3B8" Margin="24,0,0,0"/>
+        </StackPanel>
+
+        <ListBox Grid.Row="1" Margin="0,14,0,0" ItemsSource="{Binding Rectangles}">
+            <!-- The ListBoxItem chrome is tuned for TEXT lists (Left/Center content, padding), which collapses an empty
+                 tile to 0 inside its (correctly binding-sized) cell. Make the container fill its cell so the tile shows. -->
+            <ListBox.ItemContainerStyle>
+                <Style Selector="ListBoxItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Padding" Value="0"/>
+                </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal" ItemWidth="{Binding RectSize}" ItemHeight="{Binding RectSize}"/>
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Border Background="{Binding Color, Converter={conv:StringToBrushConverter}}" CornerRadius="4" Margin="3"/>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </Grid>
+</View>

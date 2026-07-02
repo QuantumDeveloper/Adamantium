@@ -1,0 +1,40 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:app="clr-namespace:Adamantium.Game.Sandbox">
+    <!-- DataContext is the GameViewModel. The RenderTargetPanel runs the 3D game as the backdrop; a game-style overlay
+         menu sits on top, shown/hidden via the view-model (a DataTrigger collapses it), and its buttons load models. -->
+    <Grid>
+        <RenderTargetPanel Background="#0B0E14">
+            <RenderTargetPanel.Behaviors>
+                <app:GameHostBehavior/>
+            </RenderTargetPanel.Behaviors>
+        </RenderTargetPanel>
+
+        <!-- Always-visible toggle in the corner. -->
+        <Button Content="{Binding MenuButtonText}"
+                Command="{Binding ToggleMenuCommand}"
+                HorizontalAlignment="Left" VerticalAlignment="Top"
+                Width="120" Height="34" Margin="16"/>
+
+        <!-- The overlay menu: collapsed when IsMenuVisible is false (declarative DataTrigger). -->
+        <Border HorizontalAlignment="Center" VerticalAlignment="Center"
+                Width="280"
+                Background="#DD0E1420"
+                BorderBrush="#3B82F6" BorderThickness="1"
+                CornerRadius="12" Padding="24">`t
+            <Border.Triggers>
+                <DataTrigger Binding="{Binding IsMenuVisible}" Value="false">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </Border.Triggers>
+            <StackPanel Orientation="Vertical"
+                    HorizontalAlignment="Center">
+                <TextBlock Text="MENU" FontSize="22" HorizontalAlignment="Center" Margin="0,0,0,16"/>
+                <Button Content="Continue" Command="{Binding ToggleMenuCommand}" Height="36" Margin="0,0,0,8"/>
+                <Button Content="Load F-15" Command="{Binding LoadF15Command}" Height="36" Margin="0,0,0,8"/>
+                <Button Content="Load Monkey" Command="{Binding LoadMonkeyCommand}" Height="36" Margin="0,0,0,8"/>
+                <Button Content="Load Swordman" Command="{Binding LoadSwordmanCommand}" Height="36"/>
+                <TextBlock Text="{Binding Status}" HorizontalAlignment="Center" Margin="0,16,0,0"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</View>

@@ -1,0 +1,22 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:vm="clr-namespace:Adamantium.Game.Sandbox.ViewModels"
+      xmlns:app="clr-namespace:Adamantium.Game.Sandbox"
+      x:ViewModel="{x:Type vm:GalleryViewModel}">
+
+    <!-- Data-driven tabs: the TabControl binds to the root view-model's Tabs collection. Each tab's header comes from
+         the ItemTemplate ({Binding Header}); its body is chosen by the TabViewSelector, which maps each tab view-model
+         to its View. No per-tab wiring in markup - add a tab by adding its view-model to GalleryViewModel.Tabs. -->
+    <TabControl ItemsSource="{Binding Tabs}"
+                SelectedItem="{Binding SelectedTab, Mode=TwoWay}"
+                Margin="16">
+        <TabControl.ItemTemplate>
+            <DataTemplate>
+                <TextBlock Text="{Binding Header}"/>
+            </DataTemplate>
+        </TabControl.ItemTemplate>
+        <TabControl.ContentTemplateSelector>
+            <app:TabViewSelector/>
+        </TabControl.ContentTemplateSelector>
+    </TabControl>
+</View>

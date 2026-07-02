@@ -33,6 +33,8 @@ public class RenderCache
     public void BuildFromVisualTree(IRootVisualComponent visualRoot)
     {
         _commands.Clear();
+        _worldCache.Clear();   // new frame: transforms may have changed (layout/animation) - drop last frame's memos
+        _clipCache.Clear();
         BuildRenderCommands(visualRoot);
     }
 
@@ -45,6 +47,8 @@ public class RenderCache
     {
         _commands.Clear();
         _renderUnits.Clear();
+        _worldCache.Clear();   // new frame: drop last frame's transform + clip memos
+        _clipCache.Clear();
 
         var present = new HashSet<Guid>();
         if (components != null)
@@ -93,12 +97,51 @@ public class RenderCache
         _projectionMatrix = projectionMatrix;
         foreach (var unit in _renderUnits)
         {
-            var transform = unit.Component.WorldTransform;
+            var transform = World(unit.Component);
             unit.Update(transform, projectionMatrix, renderScale);
         }
     }
 
     private Matrix4x4F _projectionMatrix;
+
+    // Frame-scoped world-transform memo. UIComponent.WorldTransform is computed LIVE O(depth) on every access, and the
+    // render pass reads it many times per unit - ResolveScissor walks every ClipToBounds ancestor and reads each one's
+    // WorldTransform - so the naive path is O(depth^2) per unit x N units (measured: 13 ms of a 19 ms render for 205
+    // units). Within ONE frame the transforms are already stable (layout + animation ran before render), so compose each
+    // component's world transform ONCE here: World(c) = c.LocalTransform * World(parent), memoized => O(nodes)/frame.
+    // Cleared at each frame's build. Only the render path uses this; WorldTransform stays live for hit-test / layout.
+    private readonly Dictionary<IUIComponent, Matrix4x4F> _worldCache = new();
+
+    private Matrix4x4F World(IUIComponent c)
+    {
+        if (_worldCache.TryGetValue(c, out var m)) return m;
+        var parent = c.VisualParent;
+        m = parent != null ? c.LocalTransform * World(parent) : c.LocalTransform;
+        _worldCache[c] = m;
+        return m;
+    }
+
+    // Frame-scoped clip memo. A unit's scissor is the intersection of every ClipToBounds ancestor's world-space viewport -
+    // a value that depends ONLY on the ancestor chain, not the unit, so all units under the same clipping ancestor (e.g.
+    // every item in one ScrollViewer) share the SAME clip. The old code recomputed that whole walk per unit (180 tiles ->
+    // 180 identical walks). Memoize it per component instead: CumulativeClip(c) = (c clips ? c.worldRect : none) ∩
+    // CumulativeClip(parent). Cleared each frame with the world memo.
+    private readonly Dictionary<IUIComponent, Rect?> _clipCache = new();
+
+    private Rect? CumulativeClip(IUIComponent c)
+    {
+        if (c == null) return null;
+        if (_clipCache.TryGetValue(c, out var cached)) return cached;
+        var parentClip = CumulativeClip(c.VisualParent);
+        var result = parentClip;
+        if (c.ClipToBounds)
+        {
+            var rect = new Rect(0, 0, c.RenderSize.Width, c.RenderSize.Height).TransformToAABB(World(c));
+            result = parentClip is { } p ? p.Intersect(rect) : rect;
+        }
+        _clipCache[c] = result;
+        return result;
+    }
 
     // CPU pre-transform text batch aggregator (docs/TEXT_GLYPH_BATCH_PLAN.md §9 Stage 2). Created lazily on the first
     // Render that has a device (GPU-free test renders never batch). Frame-scoped state lives inside it.
@@ -145,10 +188,10 @@ public class RenderCache
 
         foreach (var unit in _renderUnits)
         {
-            // Read the world transform ONCE: the bounds-cull below evaluates it and the GPU is re-baked with the very
-            // same value before drawing. Using one read for both the cull decision and the re-bake keeps them from
-            // diverging (the cull approving "inside" while the GPU draws the element elsewhere = the off-viewport spill).
-            var wt = unit.Component.WorldTransform;
+            // Read the world transform ONCE (frame-memoized): the bounds-cull below evaluates it and the GPU is re-baked
+            // with the very same value before drawing. Using one read for both the cull decision and the re-bake keeps
+            // them from diverging (the cull approving "inside" while the GPU draws the element elsewhere = the spill).
+            var wt = World(unit.Component);
 
             var scissor = fullScissor;
             var clipped = false;
@@ -174,13 +217,16 @@ public class RenderCache
             {
                 if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
-                if (_rectBatch.TryAdd(rru.RectPayload, wt, rru.GeometryRenderer.RenderData.Opacity, scissor, LogicalBounds(unit.Component, wt)))
+                if (_rectBatch.TryAdd(rru.RectPayload, wt, rru.FillOpacity, scissor, LogicalBounds(unit.Component, wt)))
                 {
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
                 }
-                // else: rotated/overflow -> fall through to the per-unit draw below
+                // Rejected (rotated/sheared world, or the instance buffer overflowed): a batchable rect built no per-unit
+                // machinery, so build its body now and re-bake this frame's transform into it, then it draws below.
+                rru.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
             }
             else if (device != null && unit is TextRenderUnit tru && tru.TextComponent is { } tc && _textBatch.CanBatch(tc, out var atlas))
             {
@@ -250,14 +296,9 @@ public class RenderCache
     // `cull` is true when the unit's own bounds fall ENTIRELY outside that clip (so the caller skips drawing it).
     private Rect2D ResolveScissor(IUIComponent component, Matrix4x4F worldTransform, Rect2D fullScissor, out bool clipped, out bool cull)
     {
-        Rect? clip = null;
-        for (var c = component; c != null; c = c.VisualParent)
-        {
-            if (!c.ClipToBounds) continue;
-            // The element's own viewport (local 0,0..RenderSize) mapped into window-logical space by its WorldTransform.
-            var rect = new Rect(0, 0, c.RenderSize.Width, c.RenderSize.Height).TransformToAABB(c.WorldTransform);
-            clip = clip is { } existing ? existing.Intersect(rect) : rect;
-        }
+        // Intersection of every ClipToBounds ancestor's viewport - memoized per component (all units under one clipping
+        // ancestor share it), so a 180-item list resolves the shared clip ONCE, not 180 times.
+        var clip = CumulativeClip(component);
 
         cull = false;
         if (clip is not { } logical)

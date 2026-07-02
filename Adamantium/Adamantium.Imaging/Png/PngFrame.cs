@@ -74,6 +74,16 @@ namespace Adamantium.Imaging.Png
 
         public byte[] RawPixelBuffer { get; set; }
 
+        // APNG dispose bookkeeping. Compositing zeroes XOffset/YOffset and grows the buffer to the full canvas, which
+        // loses the frame's sub-region - keep it here so the NEXT frame can honour this frame's DisposeOp:
+        //  * Background -> clear THIS region back to transparent black before drawing the next frame;
+        //  * Previous   -> restore the canvas as it was BEFORE this frame (snapshot below).
+        public uint RegionX { get; set; }
+        public uint RegionY { get; set; }
+        public uint RegionWidth { get; set; }
+        public uint RegionHeight { get; set; }
+        public byte[] CanvasBeforeFrame { get; set; }
+
         public byte[] FrameData
         {
             get => frameData.ToArray();

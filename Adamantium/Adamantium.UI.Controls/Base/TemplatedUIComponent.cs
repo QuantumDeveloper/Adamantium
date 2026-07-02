@@ -81,6 +81,10 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent
         // nothing to tear down then.
         if (templateResult == null) return;
         TraverseVisualTreeAndUnload(templateResult.RootComponent);
+        // Undo the inheritance link set in AddTemplateChild so the detached old template root stops tracking this
+        // control's inherited values (a stale parent would keep pushing DataContext/FontFamily changes into orphaned UI).
+        if (templateResult.RootComponent is AdamantiumComponent oldRoot)
+            oldRoot.InheritanceParent = null;
         RemoveVisualChildren();
         templateResult.Destroy();
         templateResult = null;
@@ -89,6 +93,14 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent
     
     protected void AddTemplateChild(IUIComponent child)
     {
+        // Template content inherits the templated control's inherited values (DataContext, FontFamily, ...) so a
+        // {Binding} inside a ControlTemplate resolves against the control's DataContext, as in WPF. A template root is
+        // attached as a VISUAL child only, and visual-child wiring does NOT set the inheritance parent (only the logical
+        // tree does, see FundamentalUIComponent.SetParent) - so without this an ItemsPanel's ItemWidth={Binding RectSize}
+        // (or any template-part {Binding}) silently binds to a null DataContext. A container that assigns DataContext
+        // explicitly (e.g. ContentPresenter -> item) still wins: an explicit local value overrides the inherited one.
+        if (child is AdamantiumComponent component)
+            component.InheritanceParent = this;
         AddVisualChild(child);
     }
 

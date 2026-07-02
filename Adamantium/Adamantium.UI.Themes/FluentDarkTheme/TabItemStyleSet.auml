@@ -36,7 +36,9 @@
                                 VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                 Foreground="{TemplateBinding Foreground}"
                                 FontSize="{TemplateBinding FontSize}"
-                                Content="{TemplateBinding Header}"/>
+                                Content="{TemplateBinding Header}"
+                                ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}"/>
                     </Border>
                 </ControlTemplate>
             </Setter.Value>

@@ -58,7 +58,10 @@ public sealed class BitmapImage : BitmapSource
          var uri = (Uri)e.NewValue;
          if (uri.IsFile)
          {
-            bitmap.Load(uri);
+            // Load OFF the UI thread: decoding (especially every frame of an animated APNG/GIF) is heavy and froze the UI
+            // while a view full of images was being built (a multi-second tab-switch hang). Consumers await LoadTask
+            // before reading frames (see Image.ProcessImageSource); FrameCount/GetFrame report empty until it completes.
+            bitmap.LoadTask = Task.Run(() => bitmap.Load(uri));
          }
       }
    }
@@ -110,9 +113,21 @@ public sealed class BitmapImage : BitmapSource
       set => SetValue(UriSourceProperty, value);
    }
    
-   public bool IsLoaded { get; set; }
+   // Volatile: written on the background load thread AFTER the pixels/raw bitmap are filled, read on the render thread.
+   // The release/acquire ordering guarantees that once a reader sees IsLoaded == true, those pixel writes are visible too
+   // (so the OnRender "skip unloaded" guard never lets a half-populated bitmap reach texture creation).
+   private volatile bool _isLoaded;
+   public bool IsLoaded { get => _isLoaded; set => _isLoaded = value; }
 
-   public uint FrameCount => _rawBitmap.FramesCount;
+   /// <summary>The background load kicked off when <see cref="UriSource"/> was set (null if the bitmap was built from raw
+   /// data). Await it before reading frames so decoding never runs on the UI thread.</summary>
+   public Task LoadTask { get; private set; }
+
+   /// <summary>Completes when a URI-sourced bitmap has finished loading; completes immediately if there is no pending load.</summary>
+   public Task EnsureLoadedAsync() => LoadTask ?? Task.CompletedTask;
+
+   // Report empty until the (possibly still-running) background load has populated _rawBitmap, so an early read never NREs.
+   public uint FrameCount => _rawBitmap?.FramesCount ?? 0;
    
    public uint StartFrame { get; set; }
    
@@ -120,6 +135,7 @@ public sealed class BitmapImage : BitmapSource
 
    public BitmapFrame GetFrame(uint frameIndex)
    {
+      if (_rawBitmap == null) return null;   // load still pending (async URI load) - nothing to hand back yet
       CurrentFrameIndex = frameIndex;
       var rawData = _rawBitmap.GetRawPixels(frameIndex);
       return new BitmapFrame(

@@ -5,6 +5,7 @@ using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.RoutedEvents;
+using Adamantium.UI.Core.Templates;
 
 namespace Adamantium.UI.Controls;
 
@@ -18,6 +19,15 @@ public class TabItem : ContentControl, ISelectable
 {
     public static readonly AdamantiumProperty HeaderProperty = AdamantiumProperty.Register(nameof(Header),
         typeof(object), typeof(TabItem), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure));
+
+    // How a data Header is projected into the strip. The template's header presenter binds these; the owning TabControl
+    // flows its ItemTemplate/ItemTemplateSelector here for generated (data-bound) tabs, so a header VM renders as a
+    // proper visual (e.g. a TextBlock bound to its Header) instead of ToString(). Null = the header hosts as-is.
+    public static readonly AdamantiumProperty HeaderTemplateProperty = AdamantiumProperty.Register(nameof(HeaderTemplate),
+        typeof(DataTemplate), typeof(TabItem), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure));
+
+    public static readonly AdamantiumProperty HeaderTemplateSelectorProperty = AdamantiumProperty.Register(nameof(HeaderTemplateSelector),
+        typeof(DataTemplateSelector), typeof(TabItem), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure));
 
     public static readonly AdamantiumProperty IsSelectedProperty = AdamantiumProperty.Register(nameof(IsSelected),
         typeof(bool), typeof(TabItem), new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
@@ -60,6 +70,21 @@ public class TabItem : ContentControl, ISelectable
     {
         get => GetValue(HeaderProperty);
         set => SetValue(HeaderProperty, value);
+    }
+
+    /// <summary>Template used to render a data <see cref="Header"/> in the strip. Set from the owning
+    /// <see cref="TabControl.ItemTemplate"/> for generated tabs.</summary>
+    public DataTemplate HeaderTemplate
+    {
+        get => GetValue<DataTemplate>(HeaderTemplateProperty);
+        set => SetValue(HeaderTemplateProperty, value);
+    }
+
+    /// <summary>Picks the header template per item (from the owning <see cref="TabControl.ItemTemplateSelector"/>).</summary>
+    public DataTemplateSelector HeaderTemplateSelector
+    {
+        get => GetValue<DataTemplateSelector>(HeaderTemplateSelectorProperty);
+        set => SetValue(HeaderTemplateSelectorProperty, value);
     }
 
     public bool IsSelected

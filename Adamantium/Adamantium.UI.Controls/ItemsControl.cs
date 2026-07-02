@@ -128,7 +128,9 @@ public class ItemsControl : Control, IContainer
     protected internal virtual IUIComponent GetContainerForItem()
     {
         var presenter = new ContentPresenter();
-        if (ItemContainerStyle != null) presenter.AttachStyles(ItemContainerStyle);
+        // Into the Styles collection (a user style applied AFTER the theme), not AttachStyles which runs before the
+        // container is themed and would be overwritten by it - see ListBox.GetContainerForItem.
+        if (ItemContainerStyle != null) presenter.Styles.Add(ItemContainerStyle);
         return presenter;
     }
 

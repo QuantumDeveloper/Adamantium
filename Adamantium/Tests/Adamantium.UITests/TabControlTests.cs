@@ -1,5 +1,10 @@
+using System.Linq;
+using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.Decorators;
+using Adamantium.UI.Controls.Text;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Data;
 using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.Resources.Triggers;
 using Adamantium.UI.Core.Templates;
@@ -158,6 +163,75 @@ public class TabControlTests
 
         tc.TabStripPlacement = TabStripPlacement.Top;
         Assert.That(tc.GetTemplateChild("PART_Top"), Is.Not.Null, "reverts to the base template once the condition no longer holds");
+    }
+
+    // Pluggable tabs from a collection of view-models: a TabControl's ItemTemplate is its HEADER template (WPF
+    // semantics). It must flow onto each generated tab's HeaderTemplate (and ItemTemplateSelector -> HeaderTemplateSelector)
+    // so a data header renders through the template instead of ToString(). The body uses ContentTemplate/Selector instead.
+    [Test]
+    public void DataBound_ItemTemplateFlowsToTabItemHeaderTemplate()
+    {
+        var headerTemplate = new DataTemplate(() => new TemplateResult { RootComponent = new Border() });
+        var selector = new DummySelector();
+        var items = new[] { new PageVm { Title = "One" }, new PageVm { Title = "Two" } };
+        var tc = new TabControl { ItemsSource = items, ItemTemplate = headerTemplate, ItemTemplateSelector = selector };
+
+        var t0 = (TabItem)tc.ItemContainerGenerator.Realize(0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(t0.Header, Is.SameAs(items[0]), "the data item is the header");
+            Assert.That(t0.HeaderTemplate, Is.SameAs(headerTemplate), "TabControl.ItemTemplate flows onto the tab's HeaderTemplate");
+            Assert.That(t0.HeaderTemplateSelector, Is.SameAs(selector), "and ItemTemplateSelector -> HeaderTemplateSelector");
+        });
+    }
+
+    private sealed class PageVm { public string Title { get; init; } }
+
+    private sealed class HeaderVm { public string Header { get; init; } }
+
+    private sealed class DummySelector : DataTemplateSelector { }
+
+    // Reproduces the REAL header path: a TabItem whose template mirrors the theme (a PART_ContentPresenter with
+    // Content={TemplateBinding Header} + ContentTemplate={TemplateBinding HeaderTemplate}), with DataContext/Header/
+    // HeaderTemplate set exactly as TabControl.PrepareContainer sets them for a data item. The header template's
+    // {Binding Header} must resolve against the tab's DataContext (the item view-model) - i.e. render its label, not empty.
+    [Test]
+    public void TabItem_HeaderTemplate_BindsHeaderTextAgainstItemDataContext()
+    {
+        var vm = new HeaderVm { Header = "Buttons" };
+        var headerTemplate = new DataTemplate(() =>
+        {
+            var tb = new TextBlock();
+            var r = new TemplateResult { RootComponent = tb };
+            tb.SetBinding("Text", new Binding("Header"));
+            return r;
+        });
+
+        var tab = new TabItem { DataContext = vm, Header = vm, HeaderTemplate = headerTemplate };
+        tab.Template = new ControlTemplate(() =>
+        {
+            var cp = new ContentPresenter();
+            var r = new TemplateResult { RootComponent = cp };
+            r.RegisterName("PART_ContentPresenter", cp);
+            r.AddTemplateBinding(cp, "Content", new TemplateBinding { Path = "Header" });
+            r.AddTemplateBinding(cp, "ContentTemplate", new TemplateBinding { Path = "HeaderTemplate" });
+            return r;
+        });
+        tab.Measure(new Size(200, 50));
+        tab.Arrange(new Rect(0, 0, 200, 50));
+
+        var presenter = (ContentPresenter)tab.GetTemplateChild("PART_ContentPresenter");
+        var tbNode = presenter.VisualChildren.OfType<TextBlock>().FirstOrDefault();
+        Assert.Multiple(() =>
+        {
+            // Regression: the presenter's ContentTemplate change routes through the same handler as its Content change, so
+            // the DataContext rule wrongly adopted the DataTemplate (not the item) - headers/bodies then bound to nothing.
+            Assert.That(presenter.DataContext, Is.SameAs(vm), "presenter adopts the item VM (not the header template) as DataContext");
+            Assert.That(tbNode, Is.Not.Null, "header template built its TextBlock");
+            Assert.That(tbNode?.DataContext, Is.SameAs(vm), "the built TextBlock inherits the item VM");
+            Assert.That(tbNode?.Text, Is.EqualTo("Buttons"), "the header template's {Binding Header} resolves against the item VM");
+        });
     }
 
     private static ControlTemplate PartTemplate(string partName) => new(() =>

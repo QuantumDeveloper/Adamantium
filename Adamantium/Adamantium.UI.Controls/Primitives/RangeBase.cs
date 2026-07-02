@@ -85,8 +85,11 @@ public abstract class RangeBase : Control
     }
 
     // A Minimum/Maximum change can pull Value out of range. Re-assign Value so the coercion clamps it again; if it was
-    // already in range the coercion returns the same value and no ValueChanged fires (guarded below).
-    private void ReCoerceValue() => SetValue(ValueProperty, Value);
+    // already in range the coercion returns the same value and no ValueChanged fires (guarded below). Re-set at Value's
+    // CURRENT priority, not the default Local: a Local re-coerce (Local=1) would outrank a {Binding} on Value (Binding=2)
+    // and pin a data-bound slider at its coerced Minimum, because Minimum is applied (coercing the default 0 up to Min)
+    // BEFORE the binding resolves - so the coerced default must not be promoted above the binding.
+    private void ReCoerceValue() => SetValue(ValueProperty, Value, GetBaseValuePriority(ValueProperty));
 
     private static void OnValueChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
     {

@@ -7,6 +7,7 @@ using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Media.Animation;
+using Adamantium.UI.Core.Templates;
 
 namespace Adamantium.UI.Controls;
 
@@ -22,6 +23,16 @@ public class TabControl : Selector
 {
     public static readonly AdamantiumProperty SelectedContentProperty = AdamantiumProperty.Register(nameof(SelectedContent),
         typeof(object), typeof(TabControl), new PropertyMetadata(null));
+
+    // Body templating for data-bound tabs. When ItemsSource is a collection of view-models, the selected one becomes
+    // SelectedContent; the template's PART_SelectedContentHost renders it through these, so each tab VM shows its own
+    // View. ContentTemplateSelector picks per VM type (a data-template selector), ContentTemplate is a single template
+    // for all. Headers use the inherited ItemTemplate/ItemTemplateSelector (flowed onto each TabItem's HeaderTemplate).
+    public static readonly AdamantiumProperty ContentTemplateProperty = AdamantiumProperty.Register(nameof(ContentTemplate),
+        typeof(DataTemplate), typeof(TabControl), new PropertyMetadata(null));
+
+    public static readonly AdamantiumProperty ContentTemplateSelectorProperty = AdamantiumProperty.Register(nameof(ContentTemplateSelector),
+        typeof(DataTemplateSelector), typeof(TabControl), new PropertyMetadata(null));
 
     /// <summary>Which edge the tab strip sits on (default <see cref="TabStripPlacement.Top"/>). Each value selects its
     /// own control template via a theme trigger, so a placement can fully restyle the strip.</summary>
@@ -89,6 +100,21 @@ public class TabControl : Selector
     {
         get => GetValue(SelectedContentProperty);
         private set => SetValue(SelectedContentProperty, value);
+    }
+
+    /// <summary>Template for the selected tab's body when items are data (view-models). Rendered by the template's
+    /// <c>PART_SelectedContentHost</c>. Use <see cref="ContentTemplateSelector"/> to vary it per item type.</summary>
+    public DataTemplate ContentTemplate
+    {
+        get => GetValue<DataTemplate>(ContentTemplateProperty);
+        set => SetValue(ContentTemplateProperty, value);
+    }
+
+    /// <summary>Picks the body template per selected item (its view-model type), e.g. one View per tab view-model.</summary>
+    public DataTemplateSelector ContentTemplateSelector
+    {
+        get => GetValue<DataTemplateSelector>(ContentTemplateSelectorProperty);
+        set => SetValue(ContentTemplateSelectorProperty, value);
     }
 
     public TabStripPlacement TabStripPlacement
@@ -345,6 +371,10 @@ public class TabControl : Selector
             tab.DataContext = item;
             tab.Header = item;
             tab.Content = item;
+            // A TabControl's ItemTemplate is the HEADER template (WPF semantics): flow it onto the tab so the strip label
+            // renders the item via a template, while the body uses ContentTemplate/ContentTemplateSelector.
+            tab.HeaderTemplate = ItemTemplate;
+            tab.HeaderTemplateSelector = ItemTemplateSelector;
             ApplyContainerSelection(tab, item);
         }
     }
