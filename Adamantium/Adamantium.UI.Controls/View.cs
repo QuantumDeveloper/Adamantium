@@ -23,9 +23,4 @@ public class View : ContentControl, IView
     protected virtual void InitializeComponent()
     {
     }
-
-    // Honest bounds: a View is exactly as big as its content, not the slot it's dropped into - so an embedded
-    // <ControlsView/> (whose content is e.g. a content-sized StackPanel toolbar) stays a strip instead of filling and
-    // hit-testing the whole window. Consistent with the other intrinsically-sized controls.
-    protected override Size ArrangeOverride(Size finalSize) => ArrangeContentSize(finalSize);
 }

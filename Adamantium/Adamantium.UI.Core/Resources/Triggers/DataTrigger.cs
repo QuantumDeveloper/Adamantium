@@ -7,8 +7,11 @@ public class DataTrigger : TriggerBase
     public Binding Binding { get; set; }
     
     public object Value { get; set; }
+
     public override ITriggerActivator Apply(ITriggerExecutionContext context)
     {
-        return null;
+        var activator = new DataTriggerActivator(context, this);
+        activator.Activate();
+        return activator;
     }
 }

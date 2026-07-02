@@ -91,9 +91,12 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     {
         if (adamantiumComponent is not MeasurableUIComponent o) return;
         Size old = default;
-        if (e.OldValue == AdamantiumProperty.UnsetValue)
+        // Skip the boundary transitions where a value is first seeded from - or cleared back to - UnsetValue (a trigger
+        // or style setter being removed): there is no concrete double to report, and the cast below would throw. Layout
+        // re-measures on its own (Width AffectsMeasure), so no SizeChanged event is owed for the clear.
+        if (e.OldValue == AdamantiumProperty.UnsetValue || e.NewValue == AdamantiumProperty.UnsetValue)
             return;
-            
+
         old.Width = (double) e.OldValue;
         old.Height = o.Height;
             
@@ -107,9 +110,10 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     private static void HeightChangedCallBack(AdamantiumComponent adamantiumComponent, AdamantiumPropertyChangedEventArgs e)
     {
         if (!(adamantiumComponent is MeasurableUIComponent o)) return;
-        if (e.OldValue == AdamantiumProperty.UnsetValue)
+        // See WidthChangedCallBack: ignore the UnsetValue boundary (a trigger/style value being seeded or cleared).
+        if (e.OldValue == AdamantiumProperty.UnsetValue || e.NewValue == AdamantiumProperty.UnsetValue)
             return;
-            
+
         var old = new Size(o.Width, (double)e.OldValue);
         var newSize = new Size(o.Width, (double)e.NewValue);
         var args = new SizeChangedEventArgs(old, newSize, false, true);

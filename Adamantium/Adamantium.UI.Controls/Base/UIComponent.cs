@@ -23,6 +23,12 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     public static readonly AdamantiumProperty LayoutTransformProperty =
         AdamantiumProperty.Register(nameof(LayoutTransform), typeof(Transform), typeof(UIComponent));
 
+    // Paint/hit-test order among siblings: higher ZIndex is drawn later (on top) and hit first. AffectsRender because a
+    // change re-orders how the parent composites its children (the render walk re-sorts siblings by ZIndex, mirroring the
+    // hit-test's ZSort). Default 0 keeps natural document order.
+    public static readonly AdamantiumProperty ZIndexProperty = AdamantiumProperty.Register(nameof(ZIndex),
+        typeof(Int32), typeof(UIComponent), new PropertyMetadata(0, PropertyMetadataOptions.AffectsRender));
+
     public static readonly AdamantiumProperty VisibilityProperty = AdamantiumProperty.Register(nameof(Visibility),
         typeof(Visibility), typeof(UIComponent),
         new PropertyMetadata(Visibility.Visible,
@@ -273,7 +279,11 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     /// </summary>
     public bool IsRootComponent => ReferenceEquals(RootVisual, this);
 
-    public Int32 ZIndex { get; set; }
+    public Int32 ZIndex
+    {
+        get => GetValue<Int32>(ZIndexProperty);
+        set => SetValue(ZIndexProperty, value);
+    }
 
     public Transform RenderTransform
     {
@@ -368,7 +378,13 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     private void AttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         RootVisual = e.Root;
-        
+
+        // While detached, a control's cached render units are freed (RenderCache.ReconcileDetachedControls). On re-attach
+        // it is still geometry-valid, so its Render() would record nothing and it would draw blank (e.g. a TabItem body
+        // shown, hidden by switching tabs, then shown again). Invalidate so the next render pass rebuilds its units; the
+        // recursion below carries this to the whole re-attached subtree.
+        InvalidateRender(false);
+
         OnAttachedToVisualTree(e);
         AttachedToVisualTreeEvent?.Invoke(this, e);
 

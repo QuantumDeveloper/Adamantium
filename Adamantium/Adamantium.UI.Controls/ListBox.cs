@@ -11,59 +11,34 @@ using Adamantium.UI.Core.RoutedEvents;
 namespace Adamantium.UI.Controls;
 
 /// <summary>
-/// An <see cref="ItemsControl"/> with selectable items. Each item is hosted in a <see cref="ListBoxItem"/> container
-/// (generated + recycled like any ItemsControl). The selection lives on the ListBox (as the set of selected items) and is
-/// reflected onto the containers' <see cref="ListBoxItem.IsSelected"/> - including when a recycled container is rebound on
-/// scroll. <see cref="SelectionMode"/> chooses single / multiple / extended selection; <see cref="SelectedItem"/> /
-/// <see cref="SelectedIndex"/> are the primary (anchor) selection, and <see cref="SelectedItems"/> is the full set.
+/// A <see cref="Selector"/> with selectable items. Each item is hosted in a <see cref="ListBoxItem"/> container
+/// (generated + recycled like any ItemsControl). The primary selection (<see cref="Selector.SelectedItem"/> /
+/// <see cref="Selector.SelectedIndex"/>) comes from the base; ListBox widens it to a full set via
+/// <see cref="SelectedItems"/> + <see cref="SelectionMode"/> (single / multiple / extended). The selection lives on the
+/// control (by item) and is reflected onto the containers' <see cref="ListBoxItem.IsSelected"/> - including when a recycled
+/// container is rebound on scroll.
 /// <para/>
 /// Unlike WPF, <see cref="SelectedItems"/> is a settable, two-way-bindable collection: a view-model can hand the ListBox
 /// its OWN <see cref="ObservableCollection{T}"/> and the two stay in sync (the control mutates that same instance as the
 /// user selects, and listens to it so the view-model can drive the selection) - no attached-behaviour workaround needed.
 /// </summary>
-public class ListBox : ItemsControl
+public class ListBox : Selector
 {
-    private bool _syncingSelection;             // guards our own writes (index/item/bound-list) from re-entering
     private HashSet<object> _selectedSet = [];  // O(1) membership truth - used to reflect selection onto (recycled) containers
     private int _anchorIndex = -1;              // Extended-mode Shift-range anchor
 
     public static readonly AdamantiumProperty SelectionModeProperty = AdamantiumProperty.Register(nameof(SelectionMode),
         typeof(SelectionMode), typeof(ListBox), new PropertyMetadata(SelectionMode.Single));
 
-    public static readonly AdamantiumProperty SelectedIndexProperty = AdamantiumProperty.Register(nameof(SelectedIndex),
-        typeof(int), typeof(ListBox),
-        new PropertyMetadata(-1, PropertyMetadataOptions.BindsTwoWayByDefault, OnSelectedIndexChanged));
-
-    public static readonly AdamantiumProperty SelectedItemProperty = AdamantiumProperty.Register(nameof(SelectedItem),
-        typeof(object), typeof(ListBox),
-        new PropertyMetadata(null, PropertyMetadataOptions.BindsTwoWayByDefault, OnSelectedItemChanged));
-
     public static readonly AdamantiumProperty SelectedItemsProperty = AdamantiumProperty.Register(nameof(SelectedItems),
         typeof(IList), typeof(ListBox),
         new PropertyMetadata(null, PropertyMetadataOptions.BindsTwoWayByDefault, OnSelectedItemsChanged));
-
-    /// <summary>Raised when the selection changes (in any mode). For granular changes, observe <see cref="SelectedItems"/>.</summary>
-    public event EventHandler SelectionChanged;
 
     /// <summary>How clicks change the selection. Default <see cref="SelectionMode.Single"/>.</summary>
     public SelectionMode SelectionMode
     {
         get => GetValue<SelectionMode>(SelectionModeProperty);
         set => SetValue(SelectionModeProperty, value);
-    }
-
-    /// <summary>Index of the primary selected item, or -1 when nothing is selected.</summary>
-    public int SelectedIndex
-    {
-        get => GetValue<int>(SelectedIndexProperty);
-        set => SetValue(SelectedIndexProperty, value);
-    }
-
-    /// <summary>The primary selected item, or null when nothing is selected.</summary>
-    public object SelectedItem
-    {
-        get => GetValue(SelectedItemProperty);
-        set => SetValue(SelectedItemProperty, value);
     }
 
     /// <summary>
@@ -80,20 +55,17 @@ public class ListBox : ItemsControl
 
     // --- Property callbacks ---------------------------------------------------------------------------------------
 
-    private static void OnSelectedIndexChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    // Selector raises these when SelectedIndex/SelectedItem is set from OUTSIDE (binding/code). ListBox routes them through
+    // its multi-select machinery so the bound SelectedItems collection and the set stay consistent with the primary.
+    protected override void OnSelectedIndexSet(int index)
     {
-        var listBox = (ListBox)a;
-        if (listBox._syncingSelection) return;
-        var index = (int)e.NewValue;
-        if (index >= 0 && index < listBox.Items.Count) listBox.SelectOnly(index); else listBox.ClearSelection();
+        if (index >= 0 && index < Items.Count) SelectOnly(index); else ClearSelection();
     }
 
-    private static void OnSelectedItemChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    protected override void OnSelectedItemSet(object item)
     {
-        var listBox = (ListBox)a;
-        if (listBox._syncingSelection) return;
-        var index = listBox.IndexOfItem(e.NewValue);
-        if (index >= 0) listBox.SelectOnly(index); else listBox.ClearSelection();
+        var index = IndexOfItem(item);
+        if (index >= 0) SelectOnly(index); else ClearSelection();
     }
 
     private static void OnSelectedItemsChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
@@ -103,14 +75,14 @@ public class ListBox : ItemsControl
             oldObservable.CollectionChanged -= listBox.OnSelectedItemsCollectionChanged;
         if (e.NewValue is INotifyCollectionChanged newObservable)
             newObservable.CollectionChanged += listBox.OnSelectedItemsCollectionChanged;
-        if (listBox._syncingSelection) return;   // our own create-on-demand, not an external (re)bind - don't re-read it
+        if (listBox.SyncingSelection) return;   // our own create-on-demand, not an external (re)bind - don't re-read it
         listBox.AdoptBoundSelection();
     }
 
-    // The view-model mutated the bound collection (the control->view-model direction is guarded out via _syncingSelection).
+    // The view-model mutated the bound collection (the control->view-model direction is guarded out via SyncingSelection).
     private void OnSelectedItemsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
     {
-        if (_syncingSelection) return;
+        if (SyncingSelection) return;
         AdoptBoundSelection();
     }
 
@@ -120,23 +92,27 @@ public class ListBox : ItemsControl
     // properties, the bound SelectedItems collection (unless it IS the source of this change), the containers, the event.
     private void ApplySelection(IReadOnlyList<object> items, int primaryIndex, bool writeBoundList)
     {
-        if (writeBoundList) EnsureSelectedItems();
+        // Only materialise the internal mirror collection when there is actually something to store. Creating an empty one
+        // eagerly (the ctor seeds SelectedIndex=-1 -> ClearSelection, and base-property seeding now runs that before the
+        // SelectedItems slot exists) would pin SelectedItems at Local priority and mask a later two-way {Binding}
+        // (Binding < Local), silently isolating the view-model's collection.
+        if (writeBoundList && items.Count > 0) EnsureSelectedItems();
         var newSet = new HashSet<object>(items);
         var changed = !newSet.SetEquals(_selectedSet);
         _selectedSet = newSet;
 
-        _syncingSelection = true;
+        SyncingSelection = true;
         SelectedIndex = primaryIndex;
         SelectedItem = primaryIndex >= 0 && primaryIndex < Items.Count ? Items[primaryIndex] : null;
         if (writeBoundList) SyncBoundList(items);
-        _syncingSelection = false;
+        SyncingSelection = false;
 
         UpdateContainersSelection();
-        if (changed) SelectionChanged?.Invoke(this, EventArgs.Empty);
+        if (changed) RaiseSelectionChanged();
     }
 
     // Reconcile the bound SelectedItems collection to exactly 'items' (minimal diff so observers see granular changes, not
-    // a Reset). Runs under _syncingSelection so the CollectionChanged handler ignores these (our own) edits.
+    // a Reset). Runs under SyncingSelection so the CollectionChanged handler ignores these (our own) edits.
     private void SyncBoundList(IReadOnlyList<object> items)
     {
         var list = SelectedItems;
@@ -163,9 +139,9 @@ public class ListBox : ItemsControl
     private void EnsureSelectedItems()
     {
         if (SelectedItems != null) return;
-        _syncingSelection = true;
+        SyncingSelection = true;
         SelectedItems = new ObservableCollection<object>();
-        _syncingSelection = false;
+        SyncingSelection = false;
     }
 
     private void SelectOnly(int index)
@@ -224,25 +200,8 @@ public class ListBox : ItemsControl
         }
     }
 
-    private void UpdateContainersSelection()
-    {
-        // The base ctor seeds each property with its default and fires its changed callback, so a selection callback can
-        // run during construction - before ItemsControl's ctor has created the generator. Nothing to reflect yet.
-        if (ItemContainerGenerator == null) return;
-        foreach (var index in ItemContainerGenerator.RealizedIndices.ToList())
-            if (ItemContainerGenerator.ContainerFromIndex(index) is ListBoxItem item)
-                item.IsSelected = _selectedSet.Contains(Items[index]);
-    }
-
-    private int IndexOfItem(object item)
-    {
-        if (item == null || Items == null) return -1;
-        for (var i = 0; i < Items.Count; i++)
-            if (Equals(Items[i], item)) return i;
-        return -1;
-    }
-
-    private bool IsItemSelected(object item) => _selectedSet.Contains(item);
+    // The full selection set (not just the primary item) drives which containers show selected.
+    protected override bool IsItemSelected(object item) => _selectedSet.Contains(item);
 
     // --- Container seam: ListBox hosts items in ListBoxItem containers --------------------------------------------
 

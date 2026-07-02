@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- TabControl: the strip (PART_TabStrip, which pans on the mouse wheel - no scrollbar) + the themed content area
+         (PART_SelectedContentHost). Each TabStripPlacement is its OWN small style whose selector matches that value
+         ("TabControl[TabStripPlacement=Left]"): its template applies while the placement holds and switches on change,
+         so a side can fully restyle its strip (e.g. a docking-style Left/Right). Colours via {ResourceReference}. -->
+
+    <!-- Shared chrome + the default (horizontal) header panel. The drag-reorder motion feel is declared here (the easing
+         defaults to a decelerate cubic in code). -->
+    <Style Selector="TabControl">
+        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="12"/>
+        <Setter Property="ReorderAnimationDuration" Value="0:0:0.18"/>
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <TabPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Top (default): strip in the Auto row, content fills below. -->
+    <Style Selector="TabControl[TabStripPlacement=Top]">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabControl">
+                    <Grid RowDefinitions="Auto,*">
+                        <TabStripScroller x:Name="PART_TabStrip" Grid.Row="0" Orientation="Horizontal">
+                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </TabStripScroller>
+                        <Border Grid.Row="1"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Padding="{TemplateBinding Padding}"
+                                ClipToBounds="True">
+                            <ContentPresenter x:Name="PART_SelectedContentHost" Content="{TemplateBinding SelectedContent}"/>
+                        </Border>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Bottom: content above, strip in the Auto row below. -->
+    <Style Selector="TabControl[TabStripPlacement=Bottom]">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabControl">
+                    <Grid RowDefinitions="*,Auto">
+                        <Border Grid.Row="0"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Padding="{TemplateBinding Padding}"
+                                ClipToBounds="True">
+                            <ContentPresenter x:Name="PART_SelectedContentHost" Content="{TemplateBinding SelectedContent}"/>
+                        </Border>
+                        <TabStripScroller x:Name="PART_TabStrip" Grid.Row="1" Orientation="Horizontal">
+                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </TabStripScroller>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Left: strip in the Auto column on the left, headers stacked vertically, content fills right. -->
+    <Style Selector="TabControl[TabStripPlacement=Left]">
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <TabPanel Orientation="Vertical"/>
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabControl">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <TabStripScroller x:Name="PART_TabStrip" Grid.Column="0" Orientation="Vertical">
+                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </TabStripScroller>
+                        <Border Grid.Column="1"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Padding="{TemplateBinding Padding}"
+                                ClipToBounds="True">
+                            <ContentPresenter x:Name="PART_SelectedContentHost" Content="{TemplateBinding SelectedContent}"/>
+                        </Border>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Right: content fills left, strip in the Auto column on the right, headers stacked vertically. -->
+    <Style Selector="TabControl[TabStripPlacement=Right]">
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <TabPanel Orientation="Vertical"/>
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabControl">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <Border Grid.Column="0"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Padding="{TemplateBinding Padding}"
+                                ClipToBounds="True">
+                            <ContentPresenter x:Name="PART_SelectedContentHost" Content="{TemplateBinding SelectedContent}"/>
+                        </Border>
+                        <TabStripScroller x:Name="PART_TabStrip" Grid.Column="1" Orientation="Vertical">
+                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </TabStripScroller>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

@@ -326,13 +326,37 @@ public class RenderCache
             component.Render(_drawingContext);
             ProcessRenderCommands(component, projectionMatrix, wasGeometryValid);
 
-            foreach (var uiComponent in component.VisualChildren.Reverse())
-            {
-                stack.Push(uiComponent);
-            }
+            PushChildrenInPaintOrder(stack, component.VisualChildren);
         }
 
         ReconcileDetachedControls();
+    }
+
+    // Push a component's children so the stack pops them in PAINT order (drawn first = underneath). Fast path (the norm):
+    // no explicit ZIndex -> natural document order (push reversed so child 0 pops first). Otherwise composite by ZIndex
+    // then document order - the same precedence the hit-test's ZSort uses - so a raised child (e.g. a tab mid-drag) draws
+    // over its siblings.
+    private static void PushChildrenInPaintOrder(Stack<IUIComponent> stack, IReadOnlyCollection<IUIComponent> children)
+    {
+        var anyZ = false;
+        foreach (var child in children)
+            if (child.ZIndex != 0) { anyZ = true; break; }
+
+        if (!anyZ)
+        {
+            foreach (var child in children.Reverse())
+                stack.Push(child);
+            return;
+        }
+
+        foreach (var child in children
+                     .Select((child, index) => (child, index))
+                     .OrderByDescending(x => x.child.ZIndex)
+                     .ThenByDescending(x => x.index)
+                     .Select(x => x.child))
+        {
+            stack.Push(child);
+        }
     }
 
     private void ProcessRenderCommands(IUIComponent component, Matrix4x4F projectionMatrix, bool wasGeometryValid)

@@ -8,29 +8,37 @@ namespace Adamantium.UI.Controls.Base;
 public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent
 {
     private TemplateResult templateResult;
-   
+    private ControlTemplate appliedTemplate;
+
     public static readonly AdamantiumProperty TemplateProperty =
         AdamantiumProperty.Register(nameof(Template), typeof(ControlTemplate), typeof(MeasurableUIComponent),
             new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender, TemplateChangedCallback));
-   
+
     private static void TemplateChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
         if (a is TemplatedUIComponent component)
         {
-            if (e.OldValue is ControlTemplate oldTemplate)
-            {
-                component.RemoveTemplate();
-            }
-
-            if (e.NewValue is ControlTemplate newTemplate)
-            {
-                component.ApplyTemplate();
-            }
-
-            // Template parts just changed: re-point any style/element triggers that target named parts at the new tree
-            // (and tear down what they held on the old, now-discarded parts) so a runtime template swap stays leak-free.
-            component.ReevaluateTriggersForTemplateChange();
+            component.OnTemplateChanged();
         }
+    }
+
+    // The metadata callback fires on EVERY write to the property (any priority slot), not only when the EFFECTIVE value
+    // changes. So a trigger that swaps Template at Trigger priority - over a Style-priority base - must (re)build off the
+    // effective template, not off the raw written value: otherwise a masked lower-priority write would wrongly rebuild,
+    // and swap-back would tear the template down without restoring the base. Rebuild only when the effective template
+    // actually differs from the one currently applied.
+    private void OnTemplateChanged()
+    {
+        var effective = Template;
+        if (ReferenceEquals(effective, appliedTemplate)) return;
+
+        if (appliedTemplate != null) RemoveTemplate();
+        appliedTemplate = effective;
+        if (effective != null) ApplyTemplate();
+
+        // Template parts just changed: re-point any style/element triggers that target named parts at the new tree
+        // (and tear down what they held on the old, now-discarded parts) so a runtime template swap stays leak-free.
+        ReevaluateTriggersForTemplateChange();
     }
     
     public ControlTemplate Template
@@ -69,6 +77,9 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent
 
     private void RemoveTemplate()
     {
+        // A prior ApplyTemplate whose Build returned null leaves templateResult null while appliedTemplate is set;
+        // nothing to tear down then.
+        if (templateResult == null) return;
         TraverseVisualTreeAndUnload(templateResult.RootComponent);
         RemoveVisualChildren();
         templateResult.Destroy();

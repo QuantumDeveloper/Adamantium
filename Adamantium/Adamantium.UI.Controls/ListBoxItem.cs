@@ -12,7 +12,7 @@ namespace Adamantium.UI.Controls;
 /// recycled, so its selected state is driven BY the ListBox (set in PrepareContainer / on selection change), never
 /// stored only here.
 /// </summary>
-public class ListBoxItem : ContentControl
+public class ListBoxItem : ContentControl, ISelectable
 {
     public static readonly AdamantiumProperty IsSelectedProperty = AdamantiumProperty.Register(nameof(IsSelected),
         typeof(bool), typeof(ListBoxItem), new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));

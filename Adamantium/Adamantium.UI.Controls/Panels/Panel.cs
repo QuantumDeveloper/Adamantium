@@ -36,7 +36,9 @@ public abstract class Panel: InputUIComponent, IContainer
          case NotifyCollectionChangedAction.Add:
             var controls = e.NewItems.OfType<MeasurableUIComponent>();
             LogicalChildrenCollection.InsertRange(e.NewStartingIndex, controls);
-            VisualChildrenCollection.AddRange(e.NewItems.OfType<IUIComponent>());
+            // Insert at the SAME index (not AddRange/append) so the visual order mirrors Children - an inserted child
+            // (e.g. a reordered tab) must keep its slot in the paint order, not jump to the end.
+            VisualChildrenCollection.InsertRange(e.NewStartingIndex, e.NewItems.OfType<IUIComponent>());
             break;
          case NotifyCollectionChangedAction.Remove:
             LogicalChildrenCollection.Remove(e.OldItems.OfType<MeasurableUIComponent>());

@@ -7,7 +7,7 @@ public class ThemeManager : IThemeManager
 {
     private IDependencyResolver dependencyResolver;
     private readonly Dictionary<string, ITheme> _themesMap;
-    private Dictionary<Selector, IUIComponent> components;
+    private Dictionary<StyleSelector, IUIComponent> components;
     private TrackingCollection<ITheme> _themes;
     private IResourceManager _resourceManager;
 
@@ -18,7 +18,7 @@ public class ThemeManager : IThemeManager
         this.dependencyResolver = dependencyResolver;
         _themes = new TrackingCollection<ITheme>();
         _themesMap = new Dictionary<string, ITheme>();
-        components = new Dictionary<Selector, IUIComponent>();
+        components = new Dictionary<StyleSelector, IUIComponent>();
         _resourceManager = UIAppContext.Current.ResourceManager;
     }
 

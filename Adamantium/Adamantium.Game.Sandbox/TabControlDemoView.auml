@@ -1,0 +1,41 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Enough tabs to overflow the width so the header's ScrollViewer shows a horizontal bar (tabs keep full size, they
+         don't shrink). Each TabItem's Header sits in the strip; its child is the body shown in the content area below when
+         selected. First tab is auto-selected; click a header to switch (switching away and back must keep the body). -->
+    <TabControl>
+        <TabItem Header="Overview">
+            <StackPanel Orientation="Vertical">
+                <TextBlock Text="Overview" FontSize="18"/>
+                <TextBlock Text="Each tab has its own body, surfaced as SelectedContent and shown here."
+                TextWrapping="WrapBySymbols"/>
+            </StackPanel>
+        </TabItem>
+        <TabItem Header="Details">
+            <StackPanel Orientation="Vertical">
+                <TextBlock Text="Details" FontSize="18"/>
+                <TextBlock Text="Switch away and back - this body must reappear (the re-attach render fix)." 
+                           TextWrapping="WrapByWords"/>
+            </StackPanel>
+        </TabItem>
+        <TabItem Header="Settings">
+            <TextBlock Text="Settings body" FontSize="16"/>
+        </TabItem>
+        <TabItem Header="Network">
+            <TextBlock Text="Network body" FontSize="16"/>
+        </TabItem>
+        <TabItem Header="Storage">
+            <TextBlock Text="Storage body" FontSize="16"/>
+        </TabItem>
+        <TabItem Header="Security">
+            <TextBlock Text="Security body" FontSize="16"/>
+        </TabItem>
+        <TabItem Header="Advanced">
+            <TextBlock Text="Advanced body" FontSize="16"/>
+        </TabItem>
+        <TabItem Header="About">
+            <TextBlock Text="About body" FontSize="16"/>
+        </TabItem>
+    </TabControl>
+</View>

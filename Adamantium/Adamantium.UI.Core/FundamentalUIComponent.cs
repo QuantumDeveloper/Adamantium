@@ -219,6 +219,9 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         foreach (var style in styles)
         {
             style.Attach(this);
+            // Track so DetachStyles can undo them (re-theming detaches the previously-applied set first - see
+            // ApplyCurrentTheme). Guard against duplicates so a re-attach doesn't record the same style twice.
+            if (!_attachedStyles.Contains(style)) _attachedStyles.Add(style);
         }
     }
 
@@ -398,13 +401,16 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
     {
         if (UIAppContext.Current == null)
             return;
-        
+
+        // Drop the previously-applied theme + external styles first, so re-theming (a theme swap re-applies via the
+        // style queue, without a preceding detach) tears the old activators/subscriptions down instead of stacking a
+        // second set on top. No-op on the first apply (nothing tracked yet).
+        DetachStyles();
+
         UIAppContext.Current.UIContext.ThemeContext.ApplyCurrentTheme(this);
         UIAppContext.Current.UIContext.ThemeContext.ApplyExternalStyles(this, Styles.ToArray());
-        
+
         IsStyleApplied = true;
-        
-        //((IMeasurableComponent)this).InvalidateMeasure();
     }
     
     public void InvalidateStyles()
@@ -477,6 +483,10 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         {
             foreach (var activator in _triggerActivators)
             {
+                // Only re-point triggers that reach the (now-swapped) template parts. One that touches only the host's
+                // own properties is template-independent; re-pointing it is needless and, for a setter on Template
+                // itself, would re-swap the template and recurse.
+                if (activator is not { TargetsTemplateParts: true }) continue;
                 activator.Deactivate();
                 activator.Activate();
             }

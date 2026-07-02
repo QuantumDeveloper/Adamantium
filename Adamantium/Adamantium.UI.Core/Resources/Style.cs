@@ -1,25 +1,31 @@
-﻿using Adamantium.UI.Core.Resources.Triggers;
+﻿using System.Runtime.CompilerServices;
+using Adamantium.UI.Core.Resources.Triggers;
 
 namespace Adamantium.UI.Core.Resources;
 
 public class Style : AdamantiumComponent
 {
     private Dictionary<AdamantiumProperty, ISetter> settersDict;
-    
+
     private static readonly AdamantiumProperty ActiveActivatorsProperty =
         AdamantiumProperty.RegisterAttached<List<ITriggerActivator>>("ActiveActivators", typeof(AdamantiumComponent));
+
+    // The activators THIS style created on each component (a subset of the component's shared ActiveActivators list).
+    // Kept so Attach/Detach are idempotent: re-applying a style (a theme swap re-themes WITHOUT a prior detach) must
+    // undo its previous activators instead of piling up more - each carries a live PropertyChanged subscription.
+    private readonly ConditionalWeakTable<IFundamentalUIComponent, List<ITriggerActivator>> _activatorsByComponent = new();
 
     public Style()
     {
         settersDict = new Dictionary<AdamantiumProperty, ISetter>();
         Setters = new SetterCollection();
         Triggers = new TriggerCollection();
-        Selector = new Selector();
+        Selector = new StyleSelector();
     }
 
     internal ITheme Theme { get; set; }
 
-    public Selector Selector { get; set; }
+    public StyleSelector Selector { get; set; }
     
     public SetterCollection Setters { get; }
 
@@ -71,25 +77,33 @@ public class Style : AdamantiumComponent
             return;
         }
 
-        foreach (var setter in Setters)
+        // Idempotent: undo a prior attach of THIS style to THIS component first (a theme swap re-applies without a
+        // preceding detach), so activators + their subscriptions never accumulate across re-applies.
+        ReleaseActivators(component);
+
+        if (Selector.HasConditions)
         {
-            setter.Apply(component, this, Theme);
+            // The selector carries property conditions ("TabControl[TabStripPlacement=Left]"): its setters apply only
+            // WHILE the conditions hold (and re-apply/undo as the properties change), so route them through the very
+            // activator a MultiTrigger uses - at Trigger priority, which outranks an unconditional base style's setters.
+            var gate = new MultiTrigger { Setters = Setters };
+            gate.Conditions.AddRange(Selector.Conditions);
+            RecordActivator(component, gate.Apply(new StyleTriggerExecutionContext(component, Theme)));
         }
-
-        if (Triggers.Count > 0)
+        else
         {
-            var activators = GetOrCreateActiveActivators(component);
-            foreach (var trigger in Triggers)
+            foreach (var setter in Setters)
             {
-                var context = new StyleTriggerExecutionContext(component, Theme);
-
-                var activator = trigger.Apply(context);
-                
-                activators.Add(activator);
+                setter.Apply(component, this, Theme);
             }
         }
+
+        foreach (var trigger in Triggers)
+        {
+            RecordActivator(component, trigger.Apply(new StyleTriggerExecutionContext(component, Theme)));
+        }
     }
-    
+
     public void Detach(IFundamentalUIComponent component)
     {
         ArgumentNullException.ThrowIfNull(component);
@@ -99,19 +113,38 @@ public class Style : AdamantiumComponent
             return;
         }
 
-        foreach (var setter in Setters)
+        // Conditioned styles applied their setters through the activator, never unconditionally - so only an
+        // unconditional style undoes setters here; ReleaseActivators tears the conditioned/trigger ones down.
+        if (!Selector.HasConditions)
         {
-            setter.Remove(component, this, Theme);
-        }
-
-        var activators = GetActiveActivators(component);
-        if (activators != null)
-        {
-            foreach (var activator in activators)
+            foreach (var setter in Setters)
             {
-                activator.Deactivate();
+                setter.Remove(component, this, Theme);
             }
         }
+
+        ReleaseActivators(component);
+    }
+
+    // Add an activator to both the component's shared list (so a template-change reevaluation sees it) and this style's
+    // own per-component record (so Detach/re-Attach can remove exactly the ones it added).
+    private void RecordActivator(IFundamentalUIComponent component, ITriggerActivator activator)
+    {
+        GetOrCreateActiveActivators(component).Add(activator);
+        _activatorsByComponent.GetValue(component, static _ => new List<ITriggerActivator>()).Add(activator);
+    }
+
+    // Deactivate + drop every activator this style put on the component (from both the shared list and its own record).
+    private void ReleaseActivators(IFundamentalUIComponent component)
+    {
+        if (!_activatorsByComponent.TryGetValue(component, out var mine)) return;
+        var all = GetActiveActivators(component);
+        foreach (var activator in mine)
+        {
+            activator?.Deactivate();
+            all?.Remove(activator);
+        }
+        _activatorsByComponent.Remove(component);
     }
     
     // Re-wire this component's style-trigger activators after its template changed: each tears down what it applied to
@@ -124,6 +157,9 @@ public class Style : AdamantiumComponent
 
         foreach (var activator in activators)
         {
+            // Skip template-independent activators (no setter targets a named part): re-pointing them is needless, and
+            // for a setter on Template itself it would re-swap the template from inside this very pass and recurse.
+            if (activator is not { TargetsTemplateParts: true }) continue;
             activator.Deactivate();
             activator.Activate();
         }
