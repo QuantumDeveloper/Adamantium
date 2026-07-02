@@ -249,7 +249,9 @@ namespace Adamantium.Core.Collections
         {
             lock (SyncRoot)
             {
-                int index = Array.IndexOf(items, item);
+                // Search only the LIVE range [0, currentIndex): the backing array's trailing slots are stale/default
+                // and must not be matched.
+                int index = Array.IndexOf(items, item, 0, currentIndex);
 
                 if (index != -1)
                 {
@@ -284,12 +286,15 @@ namespace Adamantium.Core.Collections
         {
             lock (SyncRoot)
             {
-                if (index <= currentIndex && count > 0)
+                if (index < 0 || index >= currentIndex || count <= 0) return;
+
+                // Remove at the SAME index `count` times: each RemoveInternal shifts the rest down, so `index` is always
+                // the next item to drop. (The old `RemoveInternal(i)` for i in [index, index+count) removed every other
+                // element and could run off the end as currentIndex shrank.)
+                count = Math.Min(count, currentIndex - index);
+                for (var i = 0; i < count; i++)
                 {
-                    for (int i = index; i < index + count; i++)
-                    {
-                        RemoveInternal(i);
-                    }
+                    RemoveInternal(index);
                 }
             }
         }
@@ -361,7 +366,8 @@ namespace Adamantium.Core.Collections
         {
             lock (SyncRoot)
             {
-                return Array.IndexOf(items, item);
+                // Only the live range [0, currentIndex); trailing slots are stale/default.
+                return Array.IndexOf(items, item, 0, currentIndex);
             }
         }
 
@@ -421,9 +427,12 @@ namespace Adamantium.Core.Collections
             CheckCapacity(currentIndex);
             if (index < currentIndex)
             {
+                // Shift [index, currentIndex) right by one to open a slot AT index, then store there. (Storing at
+                // currentIndex - the end - was the bug: an insert-in-the-middle put the item last and duplicated the
+                // element that was at index. Surfaced as a tab dragged to a middle slot "flying to the end".)
                 Array.Copy(items, index, items, index + 1, currentIndex - index);
             }
-            items[currentIndex] = item;
+            items[index] = item;
             currentIndex++;
         }
 
