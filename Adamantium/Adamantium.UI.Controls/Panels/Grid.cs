@@ -107,38 +107,76 @@ public class Grid: Panel
       set => SetValue(ColumnSpacingProperty, value);
    }
 
+   // Real dependency properties (not plain CLR): the AUML string form <Grid RowDefinitions="Auto,*"> is applied inside a
+   // ControlTemplate via a by-name SetValue, which only reaches AdamantiumProperties (a plain CLR property was silently
+   // dropped -> no rows). Default null (no shared mutable collection); the getter lazily creates one so
+   // grid.RowDefinitions.Add(...) works without an explicit assignment. The callback keeps the mirror field in sync and
+   // hooks CollectionChanged / each definition's PropertyChanged so row/column edits re-lay-out.
+   public static readonly AdamantiumProperty RowDefinitionsProperty = AdamantiumProperty.Register(nameof(RowDefinitions),
+      typeof(RowDefinitions), typeof(Grid), new PropertyMetadata(null, OnRowDefinitionsChanged));
 
-   private RowDefinitions rowDefinitions;
+   public static readonly AdamantiumProperty ColumnDefinitionsProperty = AdamantiumProperty.Register(nameof(ColumnDefinitions),
+      typeof(ColumnDefinitions), typeof(Grid), new PropertyMetadata(null, OnColumnDefinitionsChanged));
+
+   // Mirror of the DP value, for internal reads (measure/arrange) without triggering the getter's lazy creation.
+   private RowDefinitions _rowDefinitions;
+   private ColumnDefinitions _columnDefinitions;
 
    public RowDefinitions RowDefinitions
    {
       get
       {
-         if (rowDefinitions == null)
-         {
-            rowDefinitions = new RowDefinitions();
-            rowDefinitions.CollectionChanged += RowDefinitions_CollectionChanged;
-         }
-         return rowDefinitions;
+         if (_rowDefinitions == null) SetValue(RowDefinitionsProperty, new RowDefinitions());
+         return _rowDefinitions;
       }
-      set => rowDefinitions = value;
+      set => SetValue(RowDefinitionsProperty, value);
    }
-
-   private ColumnDefinitions columnDefinitions;
 
    public ColumnDefinitions ColumnDefinitions
    {
       get
       {
-         if (columnDefinitions == null)
-         {
-            columnDefinitions = new ColumnDefinitions();
-            columnDefinitions.CollectionChanged += ColumnDefinitions_CollectionChanged;
-         }
-         return columnDefinitions;
+         if (_columnDefinitions == null) SetValue(ColumnDefinitionsProperty, new ColumnDefinitions());
+         return _columnDefinitions;
       }
-      
-      set => columnDefinitions = value;
+      set => SetValue(ColumnDefinitionsProperty, value);
+   }
+
+   private static void OnRowDefinitionsChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+   {
+      var grid = (Grid)a;
+      if (grid._rowDefinitions != null)
+      {
+         grid._rowDefinitions.CollectionChanged -= grid.RowDefinitions_CollectionChanged;
+         foreach (RowDefinition def in grid._rowDefinitions) def.PropertyChanged -= grid.Definition_PropertyChanged;
+      }
+      grid._rowDefinitions = e.NewValue as RowDefinitions;
+      if (grid._rowDefinitions != null)
+      {
+         grid._rowDefinitions.CollectionChanged += grid.RowDefinitions_CollectionChanged;
+         foreach (RowDefinition def in grid._rowDefinitions) def.PropertyChanged += grid.Definition_PropertyChanged;
+      }
+      // The getter lazily creates an EMPTY collection during measure (reading RowDefinitions.Count); that must NOT dirty
+      // the in-flight layout pass. Only a real change to the row set - a populated assign (string form) or clearing
+      // populated rows - needs a relayout.
+      if ((e.OldValue as RowDefinitions)?.Count > 0 || grid._rowDefinitions?.Count > 0) grid.InvalidateMeasure();
+   }
+
+   private static void OnColumnDefinitionsChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+   {
+      var grid = (Grid)a;
+      if (grid._columnDefinitions != null)
+      {
+         grid._columnDefinitions.CollectionChanged -= grid.ColumnDefinitions_CollectionChanged;
+         foreach (ColumnDefinition def in grid._columnDefinitions) def.PropertyChanged -= grid.Definition_PropertyChanged;
+      }
+      grid._columnDefinitions = e.NewValue as ColumnDefinitions;
+      if (grid._columnDefinitions != null)
+      {
+         grid._columnDefinitions.CollectionChanged += grid.ColumnDefinitions_CollectionChanged;
+         foreach (ColumnDefinition def in grid._columnDefinitions) def.PropertyChanged += grid.Definition_PropertyChanged;
+      }
+      if ((e.OldValue as ColumnDefinitions)?.Count > 0 || grid._columnDefinitions?.Count > 0) grid.InvalidateMeasure();
    }
 
    private void RowDefinitions_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -191,7 +229,7 @@ public class Grid: Panel
    }
 
    private bool IsDefinitionsEmpty =>
-      (rowDefinitions == null || rowDefinitions.Count == 0) && (columnDefinitions == null || columnDefinitions.Count == 0);
+      (_rowDefinitions == null || _rowDefinitions.Count == 0) && (_columnDefinitions == null || _columnDefinitions.Count == 0);
 
    //Zero-based Group index
    private const int MaxGroupIndex = 2;
@@ -664,13 +702,13 @@ public class Grid: Panel
 
          if (isRow && RowDefinitions.Count > 0)
          {
-            rowDefinitions[i].ActualHeight = gridSegment.FullSize;
-            rowDefinitions[i].Offset = offset;
+            _rowDefinitions[i].ActualHeight = gridSegment.FullSize;
+            _rowDefinitions[i].Offset = offset;
          }
          else if (!isRow && ColumnDefinitions.Count > 0)
          {
-            columnDefinitions[i].ActualWidth = gridSegment.FullSize;
-            columnDefinitions[i].Offset = offset;
+            _columnDefinitions[i].ActualWidth = gridSegment.FullSize;
+            _columnDefinitions[i].Offset = offset;
          }
          
          offset += gridSegment.FullSizeWithMargin;

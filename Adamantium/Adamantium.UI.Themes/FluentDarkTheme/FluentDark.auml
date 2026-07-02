@@ -24,6 +24,8 @@
         <StyleInclude Source="{x:Type fluentDark:ListBoxStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ListBoxItemStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ToolTipStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:TabControlStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:TabItemStyleSet}"/>
 	</Theme.StyleIncludes>
 
 	<!-- Accent / focus: the theme's runtime-mutable identity. Referenced via {ThemeResource Key}; change any of these

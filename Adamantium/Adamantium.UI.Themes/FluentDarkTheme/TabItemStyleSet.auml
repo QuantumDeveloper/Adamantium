@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- TabItem: ONE template; rest/hover/selected brushes live as properties and the triggers project them onto the
+         chrome via {TemplateBinding}. Colors come from the palette/theme via {ResourceReference}/{ThemeResource} so a
+         theme or accent swap restyles them live. Per the small-styles convention: simple properties, template, triggers. -->
+
+    <Style Selector="TabItem">
+        <Setter Property="Foreground" Value="{ResourceReference TextFillColorSecondary}"/>
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference ControlFillColorSecondary}"/>
+        <Setter Property="BackgroundSelected" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+        <Setter Property="ForegroundSelected" Value="{ResourceReference TextFillColorPrimary}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="4 4 0 0"/>
+        <Setter Property="Padding" Value="12 6"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="TabItem">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabItem">
+                    <Border x:Name="TabBorder"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter
+                                x:Name="PART_ContentPresenter"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                Content="{TemplateBinding Header}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="TabItem">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="TabBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsSelected" Value="true">
+            <Setter TargetName="TabBorder" Property="Background" Value="{TemplateBinding BackgroundSelected}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundSelected}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

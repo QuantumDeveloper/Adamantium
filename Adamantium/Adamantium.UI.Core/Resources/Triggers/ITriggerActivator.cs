@@ -7,6 +7,14 @@ public interface ITriggerActivator
 {
     void Activate();
     void Deactivate();
+
+    /// <summary>
+    /// Whether this trigger reaches into the templated control's named parts (any setter has a TargetName).
+    /// Only such activators need re-pointing when the template is swapped; one that only touches the host's OWN
+    /// properties is template-independent - re-pointing it is needless and, for a setter on <c>Template</c> itself,
+    /// re-entrant (it would re-swap the template and recurse). See the template-change reevaluation.
+    /// </summary>
+    bool TargetsTemplateParts { get; }
 }
 
 /// <summary>Active while ONE host property equals a value (the WPF Trigger / PropertyTrigger).</summary>

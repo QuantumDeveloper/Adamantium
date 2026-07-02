@@ -357,10 +357,13 @@ public class CodeGenerationContext
                     TextGenerator.WriteLine(
                         $"{propRef.OwnerType.GetFullTypeName()}.Set{propRef.Name}({CurrentParent}, {expr});");
                 }
-                // A collection populated by CHILD ELEMENTS (<Foo.Items><Item/>...</Foo.Items>) -> new + Add per child.
-                // A collection set by a STRING ATTRIBUTE (StrokeDashArray="10,6") is NOT handled here: it falls through
-                // to the text-node branch below, which routes it through TypeParser (e.g. DoubleCollectionParser).
-                else if (resolvedType.IsCollection() && !resolvedType.HasAttribute("TypeParserAttribute") && !value.IsTextNode())
+                // A collection populated by CHILD ELEMENTS (<Grid.RowDefinitions><RowDefinition/>...) -> new + Add per
+                // child. The STRING form (StrokeDashArray="10,6", RowDefinitions="Auto,*") is a text node, so `!IsTextNode`
+                // excludes it here and it falls through to the text-node branch, which routes it through the TypeParser.
+                // Key off the value being elements, NOT off the presence of a parser: a collection can support BOTH forms
+                // (RowDefinitions has a TypeParser AND takes <RowDefinition> children) - excluding parser-typed collections
+                // sent the child form to the plain-assignment branch (RowDefinitions = a single RowDefinition -> CS0029).
+                else if (resolvedType.IsCollection() && !value.IsTextNode())
                 {
                     if (resolvedMember.MemberKind == ResolvedMemberKind.Property && resolvedMember.HasSetter())
                     {

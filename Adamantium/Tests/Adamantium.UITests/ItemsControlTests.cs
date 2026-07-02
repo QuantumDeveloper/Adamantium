@@ -702,7 +702,7 @@ public class ItemsControlTests
     [Test]
     public void ItemContainerStyleAppliesToEachContainer()
     {
-        var style = new Style { Selector = new Selector { Types = { typeof(ContentPresenter) } } };
+        var style = new Style { Selector = new StyleSelector { Types = { typeof(ContentPresenter) } } };
         style.Setters.Add(new Setter("Width", "42"));
 
         var ic = new ItemsControl { ItemContainerStyle = style, ItemsSource = new[] { "a", "b", "c" } };

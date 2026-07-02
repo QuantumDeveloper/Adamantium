@@ -26,7 +26,23 @@ internal abstract class TriggerActivatorBase : ITriggerActivator
     {
         Context = context;
         _trigger = trigger;
+
+        if (trigger.Setters != null)
+        {
+            foreach (var setter in trigger.Setters)
+            {
+                if (!string.IsNullOrEmpty(setter.TargetName))
+                {
+                    TargetsTemplateParts = true;
+                    break;
+                }
+            }
+        }
     }
+
+    // A setter with a TargetName reaches a template PART; one with none touches the host's own property. Fixed for the
+    // trigger's lifetime - the setters don't change - so it's computed once.
+    public bool TargetsTemplateParts { get; }
 
     public abstract void Activate();
 
