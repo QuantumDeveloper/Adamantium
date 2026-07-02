@@ -32,10 +32,21 @@ public static class AnimationManager
     /// <summary>Advances every running animation by <paramref name="deltaSeconds"/>. Called once per frame.</summary>
     public static void Tick(double deltaSeconds)
     {
-        for (var i = Active.Count - 1; i >= 0; i--)
+        if (Active.Count == 0) return;
+
+        // Advance a SNAPSHOT: a finishing animation's completion callback may start OR cancel animations (e.g. a tab
+        // drag settling then committing the reorder + clearing transforms), which mutates Active. Iterating Active
+        // directly would corrupt the loop (skip/re-advance/out-of-range). A finished animation is removed via Remove
+        // (a no-op if a callback already cancelled it); animations started during a callback are advanced next tick.
+        foreach (var animation in Active.ToArray())
         {
-            if (Active[i].Advance(deltaSeconds))
-                Active.RemoveAt(i);
+            // An earlier animation's completion callback may have CANCELLED this one (removed it from Active). Don't
+            // advance a cancelled animation: its Advance would re-write the Animation-priority value the cancel just
+            // cleared, and - being gone from Active - nothing would clear it again (a stuck offset). Active is small,
+            // so the linear Contains check is negligible.
+            if (!Active.Contains(animation)) continue;
+            if (animation.Advance(deltaSeconds))
+                Active.Remove(animation);
         }
     }
 
