@@ -16,7 +16,7 @@
 
     <ItemGroup>
       <PackageReference Include="Adamantium.DXC" Version="1.0.9" />
-      <PackageReference Include="Adamantium.Vulkan.Spirv" Version="1.0.5" />
+      <PackageReference Include="Adamantium.Vulkan.Spirv" Version="1.0.6" />
       <PackageReference Include="Adamantium.Vulkan.Slang" Version="1.0.3" />
       <PackageReference Include="MessagePack" Version="3.1.7" />
       <PackageReference Include="MessagePack.Annotations" Version="3.1.7" />

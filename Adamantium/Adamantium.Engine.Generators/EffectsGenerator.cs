@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
 using Adamantium.Core;
 using Adamantium.EffectsCompiler;
 using Microsoft.CodeAnalysis;
@@ -88,11 +87,11 @@ public class EffectsGenerator : IIncrementalGenerator
 
         var bytecodeStream = new MemoryStream();
         result.EffectData.Save(bytecodeStream);
-        string bytes = GetBytecodeAsText(bytecodeStream.GetBuffer());
-        bytecodeStream.Position = 0;
-        textGenerator.WriteLine(@$"private static readonly EffectData bytecode = EffectData.Load(new byte[] {{
-        {bytes}
-        }});");
+        // The EffectData is already MessagePack+LZ4-compressed. Emit it as a Base64 string literal, NOT a decimal byte[]
+        // literal: Base64 is ~1.33 source chars/byte vs ~4-5 for each "123, ", so the generated file shrinks ~3-4x (and
+        // ToArray() gives exactly the written Length - GetBuffer() returned the whole zero-padded capacity).
+        string base64 = System.Convert.ToBase64String(bytecodeStream.ToArray());
+        textGenerator.WriteLine(@$"private static readonly EffectData bytecode = EffectData.Load(System.Convert.FromBase64String(""{base64}""));");
 
         textGenerator.NewLine();
 
@@ -163,22 +162,6 @@ public class EffectsGenerator : IIncrementalGenerator
         return textGenerator.ToString();
     }
 
-
-    private string GetBytecodeAsText(byte[] bytecode)
-    {
-        var bufferAsText = new StringBuilder();
-        for (int i = 0; i < bytecode.Length; i++)
-        {
-            bufferAsText.Append(bytecode[i]).Append(", ");
-            if (i > 0 && (i % 28) == 0)
-            {
-                bufferAsText.AppendLine();
-            }
-        }
-
-        return bufferAsText.ToString();
-    }
-    
     private void CreateDiagnostic(ref SourceProductionContext spc, EffectCompilerResult result, string filePath)
     {
         foreach (var message in result.Logger.Messages)

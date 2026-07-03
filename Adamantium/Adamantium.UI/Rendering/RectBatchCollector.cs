@@ -19,11 +19,11 @@ internal sealed class RectBatchCollector : BatchCollector<RectItem>
     // A/B / safety-valve toggle: off routes every rect back to its per-unit fill + AA-fringe draw (the pre-batch path).
     public static bool Enabled = true;
 
-    private RectBatchEffect _effect;
+    private BatchEffect _effect;
 
     public RectBatchCollector() : base(4096) { }
 
-    protected override void OnBeginFrame(IGraphicsDevice device) => _effect ??= new RectBatchEffect(device);
+    protected override void OnBeginFrame(IGraphicsDevice device) => _effect ??= new BatchEffect(device);
 
     // Batchable = a visible solid fill, no visible pen (a border is a separate DrawGeometry), uniform corner radius.
     // Everything else (gradient/image fill, a pen, per-corner radii, Enabled=off) falls back to the per-unit draw.

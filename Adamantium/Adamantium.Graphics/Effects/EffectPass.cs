@@ -169,54 +169,19 @@ public sealed class EffectPass : DisposableObject, IEffectPass
                 *(ulong*)(pushDataBytes + pushOffset) = pageBuffer.GetDeviceAddress() + bufferOffset;
             }
 
-            // 2. TEXTURES (ShaderResourceView)
-            var localLinks = stageBlock.ShaderResourceViewSlotLinks;
-            for (int i = 0; i < localLinks.Count; ++i)
-            {
-                var links = localLinks[i];
-                var resources = resourceLinker.GetShaderResources(links.ResourceParamDescription);
-                var effectParam = Effect.Parameters[links.ResourceParamDescription.Name];
-                uint basePushOffset = parameterPushOffsets[effectParam];
-
-                for (int resIdx = 0; resIdx < resources.Length; resIdx++)
-                {
-                    // Take the ready GlobalHeapOffset from ResourceInfo, written there by the linker
-                    uint heapOffset = resources[resIdx]?.GlobalHeapOffset ?? uint.MaxValue;
-                    *(uint*)(pushDataBytes + basePushOffset + (uint)(resIdx * 4)) = heapOffset;
-                }
-            }
-
-            // 3. SAMPLERS (SamplerState)
-            localLinks = stageBlock.SamplerStateSlotLinks;
-            for (int i = 0; i < localLinks.Count; ++i)
-            {
-                var links = localLinks[i];
-                var resources = resourceLinker.GetSamplers(links.ResourceParamDescription);
-                var effectParam = Effect.Parameters[links.ResourceParamDescription.Name];
-                uint basePushOffset = parameterPushOffsets[effectParam];
-
-                for (int resIdx = 0; resIdx < resources.Length; resIdx++)
-                {
-                    uint heapOffset = resources[resIdx]?.GlobalHeapOffset ?? uint.MaxValue;
-                    *(uint*)(pushDataBytes + basePushOffset + (uint)(resIdx * 4)) = heapOffset;
-                }
-            }
-
-            // 4. UAV (UnorderedAccessView)
-            localLinks = stageBlock.UnorderedAccessViewSlotLinks;
-            for (int i = 0; i < localLinks.Count; ++i)
-            {
-                var links = localLinks[i];
-                var resources = resourceLinker.GetUAVs(links.ResourceParamDescription);
-                var effectParam = Effect.Parameters[links.ResourceParamDescription.Name];
-                uint basePushOffset = parameterPushOffsets[effectParam];
-
-                for (int resIdx = 0; resIdx < resources.Length; resIdx++)
-                {
-                    uint heapOffset = resources[resIdx]?.GlobalHeapOffset ?? uint.MaxValue;
-                    *(uint*)(pushDataBytes + basePushOffset + (uint)(resIdx * 4)) = heapOffset;
-                }
-            }
+            // 2-4. Write each bound resource's heap-slot index into push data. One loop for all resource kinds: textures
+            // AND read-only StructuredBuffers share the SRV list (the buffer ones tagged IsStorageBuffer -> a different
+            // linker collection), samplers and UAVs are their own lists. link.Parameter is ALREADY the resolved
+            // EffectParameter, so there is no per-draw string lookup (the old Effect.Parameters[name] was redundant - the
+            // constant-buffer loop above already keys parameterPushOffsets by link.Parameter directly).
+            WriteHeapOffsets(pushDataBytes, stageBlock.ShaderResourceViewSlotLinks,
+                l => l.IsStorageBuffer
+                    ? resourceLinker.GetShaderResourceBuffers(l.ResourceParamDescription)
+                    : resourceLinker.GetShaderResources(l.ResourceParamDescription));
+            WriteHeapOffsets(pushDataBytes, stageBlock.SamplerStateSlotLinks,
+                l => resourceLinker.GetSamplers(l.ResourceParamDescription));
+            WriteHeapOffsets(pushDataBytes, stageBlock.UnorderedAccessViewSlotLinks,
+                l => resourceLinker.GetUAVs(l.ResourceParamDescription));
 
             stages.Add(stageBlock);
 
@@ -253,6 +218,22 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         }
 
         appliesCounter++;
+
+        // Writes each bound resource's stable heap-slot index into push data for one resource list. The actual descriptor
+        // (SampledImage / Sampler / StorageBuffer) already sits in that heap slot (allocated by the linker); here we only
+        // publish the index. link.Parameter is the pre-resolved EffectParameter, so no per-draw name lookup.
+        void WriteHeapOffsets(byte* push, List<SlotLink> links, System.Func<SlotLink, IHeapResource[]> getResources)
+        {
+            for (int i = 0; i < links.Count; ++i)
+            {
+                var link = links[i];
+                var resources = getResources(link);
+                uint basePushOffset = parameterPushOffsets[link.Parameter];
+                for (int resIdx = 0; resIdx < resources.Length; resIdx++)
+                    *(uint*)(push + basePushOffset + (uint)(resIdx * 4)) =
+                        resources[resIdx]?.GlobalHeapOffset ?? uint.MaxValue;
+            }
+        }
     }
 
     // === VK_EXT_descriptor_buffer: CB/texture/sampler descriptors are written into descriptor buffers ===
@@ -290,11 +271,16 @@ public sealed class EffectPass : DisposableObject, IEffectPass
                 CreateSamplerDescriptor(resources, links.SlotIndex, links.DescriptorSet);
             }
 
-            // Textures (ShaderResourceView)
+            // ShaderResourceView: a texture -> an image-view descriptor; a read-only StructuredBuffer -> a storage-buffer
+            // descriptor (same as a UAV - read-only is a shader-side decoration, not a descriptor difference).
             foreach (var links in stageBlock.ShaderResourceViewSlotLinks)
             {
-                var resources = resourceLinker.GetShaderResources(links.ResourceParamDescription);
-                CreateImageViewDescriptor(resources, links.SlotIndex, links.DescriptorSet);
+                if (links.IsStorageBuffer)
+                    CreateUAVWriteDescriptor(resourceLinker.GetShaderResourceBuffers(links.ResourceParamDescription),
+                        links.SlotIndex, links.DescriptorSet);
+                else
+                    CreateImageViewDescriptor(resourceLinker.GetShaderResources(links.ResourceParamDescription),
+                        links.SlotIndex, links.DescriptorSet);
             }
 
             // UAV
@@ -925,8 +911,11 @@ public sealed class EffectPass : DisposableObject, IEffectPass
             switch (resourceType)
             {
                 case EffectResourceType.ShaderResourceView:
+                    // A read-only StructuredBuffer reflects as an SRV too, but its resource is a STORAGE BUFFER, not a
+                    // texture. Same list, tagged so the consumers branch (read-only storage-buffer descriptor + mask).
                     link = new SlotLink((uint)parameter.Parameter.SlotIndex, (uint)parameter.Parameter.DescriptorSet,
-                        parameter.Parameter.ParameterDescription, parameter.Parameter);
+                        parameter.Parameter.ParameterDescription, parameter.Parameter,
+                        isStorageBuffer: parameter.Parameter.ParameterDescription.Type == EffectParameterType.StorageBuffer);
                     stageBlock.ShaderResourceViewSlotLinks.Add(link);
                     break;
                 case EffectResourceType.SamplerState:
@@ -1043,21 +1032,27 @@ public sealed class EffectPass : DisposableObject, IEffectPass
     [StructLayout(LayoutKind.Sequential)]
     private struct SlotLink
     {
-        public SlotLink(uint slotIndex, uint descriptorSet, EffectData.Parameter paramDescription, EffectParameter parameter)
+        public SlotLink(uint slotIndex, uint descriptorSet, EffectData.Parameter paramDescription, EffectParameter parameter,
+            bool isStorageBuffer = false)
         {
             ResourceParamDescription = paramDescription;
             SlotIndex = slotIndex;
             DescriptorSet = descriptorSet;
             Parameter = parameter;
+            IsStorageBuffer = isStorageBuffer;
         }
 
         public readonly EffectData.Parameter ResourceParamDescription;
-        
+
         public readonly EffectParameter Parameter;
 
         public readonly uint SlotIndex;
 
         public readonly uint DescriptorSet;
+
+        // An SRV slot that is a read-only StructuredBuffer (a storage-buffer resource) rather than a texture. Only
+        // meaningful for links in ShaderResourceViewSlotLinks; lets the one SRV loop branch instead of a second list.
+        public readonly bool IsStorageBuffer;
     }
 
     #endregion
@@ -1068,7 +1063,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
     {
         public List<ParameterBinding> Parameters;
         public readonly List<SlotLink> SamplerStateSlotLinks;
-        public readonly List<SlotLink> ShaderResourceViewSlotLinks;
+        public readonly List<SlotLink> ShaderResourceViewSlotLinks;   // textures AND read-only StructuredBuffers (SlotLink.IsStorageBuffer)
         public readonly List<SlotLink> UnorderedAccessViewSlotLinks;
 
         public readonly ShaderStageFlagBits Stage;
@@ -1150,20 +1145,22 @@ public sealed class EffectPass : DisposableObject, IEffectPass
                     mapIdx++;
                 }
 
-                // 2. Map the classic texture register(t0) to an index in the resource heap
+                // 2. Map each SRV register(t#) to a resource-heap slot. A texture -> a sampled-image descriptor; a
+                //    read-only StructuredBuffer (IsStorageBuffer) -> a read-only storage-buffer descriptor (its own
+                //    resource mask + the buffer-descriptor stride, not the image one).
                 foreach (var link in ShaderResourceViewSlotLinks)
                 {
-                    var effectParam = link.Parameter;
-                    uint offsetInPushData = pushOffsets[effectParam];
-                    // var resourceParam = effectParam.
+                    uint offsetInPushData = pushOffsets[link.Parameter];
 
                     mappings[mapIdx] = new DescriptorSetAndBindingMappingEXT
                     {
                         DescriptorSet = link.DescriptorSet,
                         FirstBinding = link.SlotIndex,
                         BindingCount = 1,
-                        ResourceMask = SpirvResourceTypeFlagBitsEXT.SampledImageBitExt|SpirvResourceTypeFlagBitsEXT.ReadOnlyImageBitExt,
-                        Source = DescriptorMappingSourceEXT.HeapWithPushIndexExt 
+                        ResourceMask = link.IsStorageBuffer
+                            ? SpirvResourceTypeFlagBitsEXT.ReadOnlyStorageBufferBitExt
+                            : SpirvResourceTypeFlagBitsEXT.SampledImageBitExt | SpirvResourceTypeFlagBitsEXT.ReadOnlyImageBitExt,
+                        Source = DescriptorMappingSourceEXT.HeapWithPushIndexExt
                     };
                     mappings[mapIdx].SourceData = new DescriptorMappingSourceDataEXT();
                     mappings[mapIdx].SourceData.PushIndex = new DescriptorMappingSourcePushIndexEXT
@@ -1171,7 +1168,9 @@ public sealed class EffectPass : DisposableObject, IEffectPass
                         PushOffset = offsetInPushData,
                         HeapOffset = 0,
                         HeapIndexStride = 1,
-                        HeapArrayStride = (uint)GraphicsDevice.Adapter.DeviceHeapProperties.ImageDescriptorSize
+                        HeapArrayStride = (uint)(link.IsStorageBuffer
+                            ? GraphicsDevice.Adapter.DeviceHeapProperties.BufferDescriptorSize
+                            : GraphicsDevice.Adapter.DeviceHeapProperties.ImageDescriptorSize)
                     };
                     mapIdx++;
                 }

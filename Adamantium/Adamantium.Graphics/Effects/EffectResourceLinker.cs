@@ -8,7 +8,14 @@ using VulkanBuffer = Adamantium.Vulkan.Core.Buffer;
 
 namespace Adamantium.Graphics.Effects;
 
-internal class ResourceInfo<T> : PropertyChangedBase where T : class
+// Non-generic view of a bound resource's heap slot, so the per-type resource arrays (textures / buffers / samplers) can
+// be handled uniformly when only the heap offset matters (the ApplyHeap push-offset write).
+internal interface IHeapResource
+{
+    uint GlobalHeapOffset { get; }
+}
+
+internal class ResourceInfo<T> : PropertyChangedBase, IHeapResource where T : class
 {
     private T resource;
 
@@ -59,11 +66,17 @@ internal class EffectResourceLinker : IEffectResourceLinker
     // public Dictionary<EffectData.Parameter, Sampler[]> SamplerStates;
     public Dictionary<EffectData.Parameter, ResourceInfo<SamplerState>[]> SamplerStates;
     public Dictionary<EffectData.Parameter, ResourceInfo<Texture>[]> ShaderResourceViews;
+    // Read-only StructuredBuffers: they reflect as a ShaderResourceView (D3D_SVT_STRUCTURED_BUFFER), but their RESOURCE
+    // is a storage buffer, not a Texture - so they live here, separate from the texture SRVs. In Vulkan a read-only and a
+    // read-write structured buffer are the SAME DescriptorType.StorageBuffer (SRV vs UAV is a D3D-ism); the read-only-ness
+    // is a shader decoration, so binding is identical to a UAV buffer, just without shader writes.
+    public Dictionary<EffectData.Parameter, ResourceInfo<Buffer>[]> ShaderResourceBuffers;
     public Dictionary<EffectData.Parameter, ResourceInfo<Buffer>[]> UnorderedAccessViews;
     public Dictionary<EffectData.Parameter, object> BoundResources;
 
     private static ResourceInfo<SamplerState>[] EmptySamplers = [];
     private static ResourceInfo<Texture>[] EmptyResourceViews = [];
+    private static ResourceInfo<Buffer>[] EmptyShaderResourceBuffers = [];
     private static ResourceInfo<Buffer>[] EmptyUAVs = [];
 
     internal IDescriptorHeapManager DescriptorHeapManager { get; }
@@ -82,6 +95,7 @@ internal class EffectResourceLinker : IEffectResourceLinker
 
         SamplerStates = new Dictionary<EffectData.Parameter, ResourceInfo<SamplerState>[]>();
         ShaderResourceViews = new Dictionary<EffectData.Parameter, ResourceInfo<Texture>[]>();
+        ShaderResourceBuffers = new Dictionary<EffectData.Parameter, ResourceInfo<Buffer>[]>();
         UnorderedAccessViews = new Dictionary<EffectData.Parameter, ResourceInfo<Buffer>[]>();
         BoundResources = new Dictionary<EffectData.Parameter, object>();
     }
@@ -111,6 +125,11 @@ internal class EffectResourceLinker : IEffectResourceLinker
     public ResourceInfo<Buffer>[] GetUAVs(EffectData.Parameter resourceName)
     {
         return UnorderedAccessViews.GetValueOrDefault(resourceName, EmptyUAVs);
+    }
+
+    public ResourceInfo<Buffer>[] GetShaderResourceBuffers(EffectData.Parameter resourceName)
+    {
+        return ShaderResourceBuffers.GetValueOrDefault(resourceName, EmptyShaderResourceBuffers);
     }
 
     public void SetResource(EffectData.ResourceParameter resourceName, EffectResourceType type, VulkanBuffer view)
@@ -226,6 +245,28 @@ internal class EffectResourceLinker : IEffectResourceLinker
                 break;
             case EffectResourceType.ShaderResourceView:
             {
+                // A read-only StructuredBuffer also reflects as a ShaderResourceView, but its resource is a storage
+                // BUFFER, not a texture. Route it to its own collection + bind it like a UAV buffer (its OWN heap slot,
+                // a StorageBuffer descriptor) - in Vulkan a read-only structured buffer IS a StorageBuffer descriptor.
+                if (value is Buffer srvBuffer)
+                {
+                    if (!ShaderResourceBuffers.TryGetValue(parameter, out var srvBufs))
+                    {
+                        srvBufs = new ResourceInfo<Buffer>[parameter.Count];
+                        ShaderResourceBuffers.Add(parameter, srvBufs);
+                        BoundResources[parameter] = srvBufs;
+                    }
+
+                    srvBufs[index] ??= new ResourceInfo<Buffer>();
+                    srvBufs[index].Resource = srvBuffer;
+                    if (EffectPass.UseDescriptorHeap)
+                    {
+                        srvBufs[index].GlobalHeapOffset =
+                            DescriptorHeapManager.GetOrAllocateBufferOffset(srvBuffer, DescriptorType.StorageBuffer);
+                    }
+                    break;
+                }
+
                 if (!ShaderResourceViews.TryGetValue(parameter, out var views))
                 {
                     views = new ResourceInfo<Texture>[parameter.Count];
