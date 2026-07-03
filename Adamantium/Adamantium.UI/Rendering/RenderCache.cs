@@ -20,6 +20,11 @@ public class RenderCache
 
     private readonly IRenderUnitFactory _renderUnitFactory;
 
+    // Reusable snapshot of the geometry-dirty set for the partial pass: ReRenderInPlace re-renders components, and a
+    // component's Render can mark MORE geometry dirty mid-pass - enumerating the live set then throws. Reused each build
+    // (no per-frame allocation), same pattern as LayoutManager's promote buffer.
+    private readonly List<IUIComponent> _geometryDirtyBuffer = new();
+
     // Last render scale seen in ProcessCommands; maps a unit's window-logical clip rect to framebuffer-pixel scissor.
     private double _renderScale = 1.0;
 
@@ -64,19 +69,27 @@ public class RenderCache
             _worldCache.Clear();
             _clipCache.Clear();
 
+            // Snapshot the dirty set: ReRenderInPlace re-renders each component, and a component's Render can mark MORE
+            // geometry dirty (e.g. an image finishing decode), ADDING to the live RenderDirty.Geometry set mid-loop and
+            // throwing "collection was modified". Copy into a reusable buffer and iterate that.
+            _geometryDirtyBuffer.Clear();
+            _geometryDirtyBuffer.AddRange(RenderDirty.Geometry);
+
             var fellBack = false;
-            foreach (var component in RenderDirty.Geometry)
+            foreach (var component in _geometryDirtyBuffer)
             {
                 if (!ReRenderInPlace(component)) { fellBack = true; break; }   // count/type/visibility change -> full walk
             }
 
-            if (!fellBack)
+            // Partial completes ONLY if nothing structural surfaced and NO new geometry was marked during the pass (the
+            // set didn't grow). If a render re-marked geometry, fall through to a full walk so that change isn't dropped.
+            if (!fellBack && !RenderDirty.IsStructural && RenderDirty.Geometry.Count == _geometryDirtyBuffer.Count)
             {
                 LastBuildKind = RenderBuildKind.Partial;   // no full walk (only the dirty components' unit contents)
                 RenderDirty.Clear();
                 return;
             }
-            // a structural change surfaced during the partial pass -> fall through to a full walk
+            // a structural change or a new invalidation surfaced during the partial pass -> fall through to a full walk
         }
 
         // Full walk: first build, a structural change, or a partial that surfaced one.
