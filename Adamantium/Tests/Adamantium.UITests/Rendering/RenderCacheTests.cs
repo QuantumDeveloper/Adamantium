@@ -251,4 +251,85 @@ public class RenderCacheTests
         Assert.That(unit.UpdateWithCommandCount, Is.GreaterThan(0));
         Assert.That(unit.DeferDisposeCount, Is.EqualTo(0));
     }
+
+    // -------- dirty-driven build: clean skip / partial in-place re-render / full walk on structural change (§4a/§4i) --------
+
+    [Test]
+    public void CleanFrame_IsSkipped()
+    {
+        var c = AddControl(); DrawsRectangle(c);
+
+        RenderFrame();
+        Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Full), "the first build is a full walk");
+
+        RenderFrame();
+        Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Clean), "a frame with no scene change does no work");
+    }
+
+    // The point of dirty regions: a same-shape change re-renders ONLY the dirty control, not its unchanged siblings, and
+    // does NOT do a full tree walk.
+    [Test]
+    public void ColourChange_IsPartial_ReRendersOnlyTheDirtyControl()
+    {
+        var a = AddControl(); DrawsRectangle(a);
+        var b = AddControl(); DrawsRectangle(b);
+        RenderFrame();
+        var aBefore = a.OnRenderCount;
+        var bBefore = b.OnRenderCount;
+
+        a.RenderAction = s => s.DrawRectangle(Brushes.Blue, Box);   // same shape, new colour
+        a.Invalidate();
+        RenderFrame();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Partial), "a same-shape change is a partial rebuild, not a full walk");
+            Assert.That(a.OnRenderCount, Is.GreaterThan(aBefore), "the dirty control re-rendered");
+            Assert.That(b.OnRenderCount, Is.EqualTo(bBefore), "an UNCHANGED control must NOT re-render");
+        });
+    }
+
+    [Test]
+    public void Move_IsPartial()
+    {
+        var c = AddControl(); DrawsRectangle(c);
+        RenderFrame();
+        RenderFrame();
+        Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Clean));
+
+        c.Bounds = new Rect(5, 5, 10, 10);   // a move: re-bake transforms, no re-record, no full walk
+        RenderFrame();
+        Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Partial), "a move is handled without a full tree walk");
+    }
+
+    [Test]
+    public void StructuralChange_IsFullWalk()
+    {
+        var a = AddControl(); DrawsRectangle(a);
+        RenderFrame();
+        RenderFrame();
+        Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Clean));
+
+        var b = AddControl(); DrawsRectangle(b);   // adding content changes the paint-order list
+        RenderFrame();
+        Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Full), "adding content forces a full walk");
+    }
+
+    // A change that alters a control's draw-command COUNT can't be patched in place (units would be added) - the partial
+    // pass must detect it and fall back to a full walk, re-rendering the control correctly (not losing its new content).
+    [Test]
+    public void CommandCountChange_FallsBackToFullWalk()
+    {
+        var c = AddControl();
+        c.RenderAction = s => s.DrawRectangle(Brushes.Red, Box);
+        RenderFrame();
+        Assert.That(_factory.Created.Count, Is.EqualTo(1));
+
+        c.RenderAction = s => s.DrawRectangle(Brushes.Red, Box).DrawRectangle(Brushes.Blue, Box);   // 1 -> 2 commands
+        c.Invalidate();
+        RenderFrame();
+
+        Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Full), "a command-count change falls back to a full walk");
+        Assert.That(_factory.Created.Count, Is.EqualTo(2), "the new second unit was created by the fallback walk");
+    }
 }

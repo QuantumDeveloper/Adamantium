@@ -16,6 +16,18 @@ public static class RuntimeStats
     /// <summary>True if the most recent layout pass hit the frame budget and deferred work to a later frame.</summary>
     public static bool LastPassBudgetDeferred;
 
+    // Per-frame render-pipeline phase timings (ms), snapshots of the most recent frame. Phase 0 of the render-cache
+    // redesign (docs/RENDER_CACHE_REDESIGN.md): make the otherwise-invisible per-frame render cost measurable, so the
+    // retained rewrite can be aimed at the phase that actually dominates (today the per-frame cache REBUILD, not layout).
+    /// <summary>RenderCache.BuildFromVisualTree - the per-frame walk that re-records every component's draw commands.</summary>
+    public static double LastRenderBuildMs;
+    /// <summary>RenderCache.ProcessCommands - re-bake every cached unit's world transform.</summary>
+    public static double LastRenderProcMs;
+    /// <summary>RenderCache.Render - the content draw pass (batch + command recording).</summary>
+    public static double LastRenderDrawMs;
+    /// <summary>Overlay stages (adorner + popup) draw.</summary>
+    public static double LastProcessorsMs;
+
     /// <summary>Cumulative count of binding target writes - every time a <c>{Binding}</c> pushes a value to its target:
     /// the initial connect, a DataContext re-resolve (e.g. a recycled list container rebinding on scroll), AND a batched
     /// source-property change. Sample by delta to see how many landed this frame (idle ~0; spikes on scroll rebinds and

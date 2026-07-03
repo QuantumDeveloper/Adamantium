@@ -18,7 +18,12 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     #region Adamantium properties
     
     public static readonly AdamantiumProperty RenderTransformProperty =
-        AdamantiumProperty.Register(nameof(RenderTransform), typeof(Transform), typeof(UIComponent));
+        // AffectsRender so ASSIGNING a new RenderTransform re-renders + bumps the render revision (a non-animated
+        // transform change must not be skipped by the clean-frame fast path). An ANIMATED transform mutates the same
+        // Transform object's inner values without re-assigning this property, so it is covered separately by the render
+        // cache's "no active animation" guard instead.
+        AdamantiumProperty.Register(nameof(RenderTransform), typeof(Transform), typeof(UIComponent),
+            new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
     
     public static readonly AdamantiumProperty LayoutTransformProperty =
         AdamantiumProperty.Register(nameof(LayoutTransform), typeof(Transform), typeof(UIComponent));
@@ -32,9 +37,19 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     public static readonly AdamantiumProperty VisibilityProperty = AdamantiumProperty.Register(nameof(Visibility),
         typeof(Visibility), typeof(UIComponent),
         new PropertyMetadata(Visibility.Visible,
-            PropertyMetadataOptions.BindsTwoWayByDefault | 
+            PropertyMetadataOptions.BindsTwoWayByDefault |
             PropertyMetadataOptions.AffectsMeasure |
-            PropertyMetadataOptions.AffectsRender));
+            PropertyMetadataOptions.AffectsRender,
+            OnVisibilityChanged));
+
+    // A show/hide changes the DRAWN set (a unit enters/leaves the paint-order list), so it is a STRUCTURAL change for
+    // the render cache - a partial in-place re-render can't add/remove a unit. Force a full walk. Skip the constructor's
+    // default-value SEED (UnsetValue -> Visible, fired for every control ever created) and any no-op set.
+    private static void OnVisibilityChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (e.OldValue != AdamantiumProperty.UnsetValue && !Equals(e.OldValue, e.NewValue))
+            RenderDirty.MarkStructural();
+    }
       
     public static readonly AdamantiumProperty IsHitTestVisibleProperty =
         AdamantiumProperty.Register(nameof(IsHitTestVisible),
@@ -151,7 +166,20 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         if (this is IRootVisualComponent root) RootVisual = root;
     }
 
-    public bool IsGeometryValid { get; protected set; }
+    private bool _isGeometryValid;
+
+    public bool IsGeometryValid
+    {
+        get => _isGeometryValid;
+        // Going INVALID = this element's rendered geometry is now stale (InvalidateRender / measure / arrange-resize /
+        // opacity / visibility all route here). That is the single choke point the clean-frame fast path keys off, so
+        // bump the global render revision. Going valid again (after Render re-records) is not a scene change - no bump.
+        protected set
+        {
+            _isGeometryValid = value;
+            if (!value) RenderDirty.MarkGeometry(this);   // stale geometry -> this component re-renders (partial rebuild)
+        }
+    }
 
     public Size RenderSize
     {
@@ -162,6 +190,7 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
             {
                 previousRenderSize = renderSize;
                 sizeChanged = true;
+                RenderDirty.MarkGeometry(this);   // a resize changes the recorded geometry -> re-render
             }
             renderSize = value;
         }
@@ -258,7 +287,21 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         }
     }
 
-    public Rect Bounds { get; set; }
+    private Rect _bounds;
+
+    // Position + size of this element in its parent's space. A MOVE (position change, same size) does NOT touch
+    // IsGeometryValid, but it DOES change where the element draws (its world transform), so it must bump the render
+    // revision too - otherwise the clean-frame fast path would skip a frame in which a tile just moved.
+    public Rect Bounds
+    {
+        get => _bounds;
+        set
+        {
+            if (_bounds == value) return;
+            _bounds = value;
+            RenderDirty.MarkTransform();   // a move: same recorded geometry, only the world transform changes -> re-bake
+        }
+    }
 
     public Rect ClipRectangle { get; internal set; }
 
@@ -338,16 +381,19 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     protected void AddVisualChild(IUIComponent child)
     {
         VisualChildrenCollection.Add(child);
+        RenderDirty.MarkStructural();   // new content -> paint-order list must be rebuilt
     }
     
     protected void RemoveVisualChild(IUIComponent child)
     {
         VisualChildrenCollection.Remove(child);
+        RenderDirty.MarkStructural();   // removed content -> paint-order list must be rebuilt
     }
 
     protected void RemoveVisualChildren()
     {
         VisualChildrenCollection.Clear();
+        RenderDirty.MarkStructural();
     }
 
     /// <summary>

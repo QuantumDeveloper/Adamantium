@@ -1,7 +1,9 @@
 using System;
+using System.Diagnostics;
 using Adamantium.Core;
 using Adamantium.Graphics.Core;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Diagnostics;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.Vulkan.Core;
@@ -72,7 +74,9 @@ public class ForwardWindowRenderer : WindowRendererBase
 
         GraphicsDevice.SetViewports(Viewport);
         GraphicsDevice.SetScissors(Scissor);
+        var t0 = Stopwatch.GetTimestamp();
         _renderCache.Render(GraphicsDevice, Scissor);
+        RuntimeStats.LastRenderDrawMs = Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
     }
 
     public override void PreRender()
@@ -85,8 +89,22 @@ public class ForwardWindowRenderer : WindowRendererBase
     {
         if (Window == null) return;
 
+        var t0 = Stopwatch.GetTimestamp();
         _renderCache.BuildFromVisualTree(Window);
+        var buildMs = Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
+        if (_renderCache.LastBuildKind == RenderBuildKind.Clean)
+        {
+            // Nothing changed: no rebuild AND nothing moved, so last frame's baked transforms are still valid - skip
+            // the per-unit re-bake too. The render pass re-draws the retained units as-is. (A PARTIAL frame still runs
+            // proc: a move re-bakes transforms, and PreRender reads them before the draw.)
+            RuntimeStats.LastRenderBuildMs = buildMs;
+            RuntimeStats.LastRenderProcMs = 0;
+            return;
+        }
+        var t1 = Stopwatch.GetTimestamp();
         _renderCache.ProcessCommands(Window.GetProjectionMatrix(), RenderScale);
+        RuntimeStats.LastRenderBuildMs = buildMs;
+        RuntimeStats.LastRenderProcMs = Stopwatch.GetElapsedTime(t1).TotalMilliseconds;
     }
 
     // Headless designer: each render is a fresh tree (new RenderIds), so drop the cached units between renders instead

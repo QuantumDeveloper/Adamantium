@@ -30,12 +30,96 @@ public class RenderCache
         _renderUnitFactory = renderUnitFactory;
     }
     
+    /// <summary>How much the most recent <see cref="BuildFromVisualTree"/> did - diagnostics + the "skip proc" decision
+    /// (only a <see cref="RenderBuildKind.Clean"/> frame skips the transform re-bake).</summary>
+    public RenderBuildKind LastBuildKind { get; private set; }
+
+    private bool _built;
+
+    /// <summary>
+    /// Brings the retained render scene up to date for this frame, doing only as much work as changed
+    /// (docs/RENDER_CACHE_REDESIGN.md §4a/§4i):
+    /// <list type="bullet">
+    /// <item>fully clean -> re-draw last frame's units (~0 CPU);</item>
+    /// <item>only moves/geometry changed (non-structural) -> re-render just the dirty components IN PLACE, keeping the
+    /// retained <c>_renderUnits</c> paint-order list;</item>
+    /// <item>structural change (or first build, or a partial that turned out structural) -> a full tree walk.</item>
+    /// </list>
+    /// </summary>
     public void BuildFromVisualTree(IRootVisualComponent visualRoot)
     {
+        // Fully clean: nothing changed since last build -> re-draw the retained units as-is. Keep the transform memo:
+        // nothing moved, so last frame's world transforms are still correct.
+        if (_built && !RenderDirty.HasWork)
+        {
+            LastBuildKind = RenderBuildKind.Clean;
+            return;
+        }
+
+        // Non-structural change on an existing scene -> PARTIAL update: re-render only the geometry-dirty components in
+        // place. A move (transform-dirty) needs no re-record - just drop the frame-scoped memos so the render pass
+        // re-bakes the world transforms live. Either way _renderUnits + _unitsByControl stay retained.
+        if (_built && !RenderDirty.IsStructural)
+        {
+            _worldCache.Clear();
+            _clipCache.Clear();
+
+            var fellBack = false;
+            foreach (var component in RenderDirty.Geometry)
+            {
+                if (!ReRenderInPlace(component)) { fellBack = true; break; }   // count/type/visibility change -> full walk
+            }
+
+            if (!fellBack)
+            {
+                LastBuildKind = RenderBuildKind.Partial;   // no full walk (only the dirty components' unit contents)
+                RenderDirty.Clear();
+                return;
+            }
+            // a structural change surfaced during the partial pass -> fall through to a full walk
+        }
+
+        // Full walk: first build, a structural change, or a partial that surfaced one.
+        LastBuildKind = RenderBuildKind.Full;
         _commands.Clear();
-        _worldCache.Clear();   // new frame: transforms may have changed (layout/animation) - drop last frame's memos
+        _worldCache.Clear();
         _clipCache.Clear();
         BuildRenderCommands(visualRoot);
+        _built = true;
+        RenderDirty.Clear();
+    }
+
+    // Re-render ONE already-cached component IN PLACE (its geometry went dirty). Returns false - "structural" - when the
+    // update would change the retained paint-order list (the component is new / now hidden / draws a different NUMBER of
+    // commands / a command's payload type changed, all of which add, remove or replace unit OBJECTS): the caller then
+    // does a full walk. On a true same-shape update the unit objects are reused via UpdateWithDrawCommand, so
+    // _renderUnits - which already references them - needs no change.
+    private bool ReRenderInPlace(IUIComponent component)
+    {
+        if (component.Visibility != Visibility.Visible) return false;   // (no Render() run yet - nothing to undo)
+        if (!_unitsByControl.TryGetValue(component.RenderId, out var units) || units.Count == 0) return false;
+
+        _drawingContextInternal.Clear();
+        component.Render(_drawingContext);   // NB: consumes the dirty flag (Render sets IsGeometryValid back to true)
+        var drawCommands = _drawingContextInternal.GetDrawCommands();
+
+        var structural = drawCommands.Count != units.Count;
+        for (var i = 0; !structural && i < drawCommands.Count; i++)
+        {
+            var command = drawCommands[i];
+            command.RenderData.ProjectionMatrix = _projectionMatrix;
+            if (!units[i].Match(command)) { structural = true; break; }   // payload type changed -> unit would be replaced
+            units[i].UpdateWithDrawCommand(command);
+        }
+
+        if (structural)
+        {
+            // We already rendered (and consumed the dirty flag), but the paint-order list needs rebuilding. Re-invalidate
+            // so the caller's full walk re-renders + re-caches this component instead of skipping it as "still valid".
+            component.InvalidateRender(false);
+            return false;
+        }
+        return true;
     }
 
     /// <summary>

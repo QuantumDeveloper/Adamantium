@@ -3,6 +3,8 @@ using System.Collections.Generic;
 
 namespace Adamantium.UI.Core.Media.Animation;
 
+// (RenderDirty lives in the Adamantium.UI.Core namespace - same assembly.)
+
 /// <summary>
 /// The animation heartbeat: holds the running animations and advances them once per frame. The application loop calls
 /// <see cref="Tick"/> with the frame delta (see UIApplication.Update); animations register themselves via
@@ -45,6 +47,13 @@ public static class AnimationManager
             // cleared, and - being gone from Active - nothing would clear it again (a stuck offset). Active is small,
             // so the linear Contains check is negligible.
             if (!Active.Contains(animation)) continue;
+            // A property animation re-renders every tick. It usually animates an AffectsRender/AffectsMeasure property,
+            // which already marks that ONE component dirty (partial rebuild); but some animate a plain Transform's inner
+            // value (no AffectsRender), so mark structural to guarantee a correct frame - animations are brief and their
+            // trees small, so a full walk while animating is fine. A DelegateTicker (scroll inertia, the diagnostics
+            // overlay) is NOT marked: it dirties the scene only through its effects (a moved scroll offset re-arranges
+            // children; the overlay rewrites its TextBlock ~4x/sec), so a pure ticker never blocks the clean-frame path.
+            if (animation is not DelegateTicker) RenderDirty.MarkStructural();
             if (animation.Advance(deltaSeconds))
                 Active.Remove(animation);
         }

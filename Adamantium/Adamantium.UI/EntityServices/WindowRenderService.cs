@@ -1,7 +1,9 @@
-﻿using System.Threading;
+﻿using System.Diagnostics;
+using System.Threading;
 using Adamantium.Core;
 using Adamantium.ECS;
 using Adamantium.Imaging;
+using Adamantium.UI.Core.Diagnostics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Mathematics;
@@ -139,7 +141,9 @@ public class WindowRenderService : UiRenderService
         }
 
         windowRenderer?.Render(gameTime);   // content first
+        var t0 = Stopwatch.GetTimestamp();
         DrawProcessors(gameTime);           // then processors (adorner overlays) on top, same frame
+        RuntimeStats.LastProcessorsMs = Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
     }
 
     public override void EndDraw()
