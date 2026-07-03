@@ -42,6 +42,34 @@ namespace Adamantium.UITests
          }
       }
 
+      // StackPanel's default Orientation is Vertical (WPF-aligned; the old default was a non-standard Horizontal).
+      // Vertical stacks children DOWN -> desired = (max child width, sum of child heights); explicit Horizontal swaps
+      // the axes. ComplexSpanMeasuredTest covers the horizontal case (now with an EXPLICIT Orientation.Horizontal).
+      [Test]
+      public void StackPanel_DefaultOrientation_IsVertical()
+      {
+         Rectangle[] Kids() =>
+         [
+            new Rectangle { Width = 150, Height = 50 },
+            new Rectangle { Width = 100, Height = 70 },
+            new Rectangle { Width = 200, Height = 30 },
+         ];
+
+         var vertical = new StackPanel();   // no Orientation set -> the default
+         foreach (var r in Kids()) vertical.Children.Add(r);
+         vertical.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+
+         var horizontal = new StackPanel { Orientation = Orientation.Horizontal };
+         foreach (var r in Kids()) horizontal.Children.Add(r);
+         horizontal.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+
+         Assert.Multiple(() =>
+         {
+            Assert.AreEqual(new Size(200, 150), vertical.DesiredSize, "default (Vertical): max width, sum of heights");
+            Assert.AreEqual(new Size(450, 70), horizontal.DesiredSize, "Horizontal: sum of widths, max height");
+         });
+      }
+
       [Test]
       public void ComplexSpanMeasuredTest()
       {
@@ -100,7 +128,7 @@ namespace Adamantium.UITests
 
          Grid grid = new Grid();
          grid.Name = "grid1";
-         StackPanel stackpanel = new StackPanel();
+         StackPanel stackpanel = new StackPanel { Orientation = Orientation.Horizontal };
          grid.Background = Brushes.CornflowerBlue;
          grid.RowDefinitions.Add(new RowDefinition() { Height = new GridLength(1, GridUnitType.Star) });
          grid.RowDefinitions.Add(new RowDefinition() { Height = new GridLength(0, GridUnitType.Auto), MinHeight = 10 });
@@ -190,7 +218,7 @@ namespace Adamantium.UITests
          thumb.HorizontalAlignment = HorizontalAlignment.Right;
          Grid.SetRow(thumb, 1);
 
-         StackPanel stackpanel2 = new StackPanel();
+         StackPanel stackpanel2 = new StackPanel { Orientation = Orientation.Horizontal };
          stackpanel2.VerticalAlignment = VerticalAlignment.Top;
          stackpanel2.Children.Add(new Rectangle() { Width = 150, Height = 50, Fill = Brushes.Teal });
          stackpanel2.Children.Add(new Rectangle() { Width = 150, Height = 70, Fill = Brushes.Yellow });
@@ -208,7 +236,7 @@ namespace Adamantium.UITests
          Grid.SetColumn(stackpanel2, 2);
          Grid.SetColumnSpan(stackpanel2, 2);
 
-         StackPanel stackpanel3 = new StackPanel();
+         StackPanel stackpanel3 = new StackPanel { Orientation = Orientation.Horizontal };
          stackpanel3.Background = Brushes.DarkOrchid;
          stackpanel3.Name = "Stack3";
          stackpanel3.Height = 200;
