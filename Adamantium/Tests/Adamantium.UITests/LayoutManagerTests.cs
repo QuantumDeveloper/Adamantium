@@ -119,6 +119,56 @@ public class LayoutManagerTests
         });
     }
 
+    // Root-cause regression for the "recycled virtualized tiles frozen at a previous cell size" bug: when a child's
+    // measure is invalidated AFTER the parent measured but BEFORE the parent arranges (exactly what a mid-pass content
+    // rebind does to a container's inner ContentPresenter), the parent's arrange cascade reaches that child with an
+    // invalid measure. Arrange used to ABORT there, leaving the child frozen at its old size while the parent - arranged
+    // to the NEW size and now valid - never re-cascaded into it. It must instead re-measure inline and land at the
+    // parent's new slot. (The forced-Measure/Arrange virtualization tests never hit this because they never leave a child
+    // measure-invalid across a parent arrange.)
+    [Test]
+    public void Arrange_ChildMeasureInvalidatedAfterParentMeasure_LandsAtParentSlot_NotFrozen()
+    {
+        var child = new Border();                       // Stretch, no intrinsic size -> fills its slot
+        var parent = new Border { Child = child };
+
+        parent.Measure(new Size(100, 100));
+        parent.Arrange(new Rect(0, 0, 100, 100));
+        Assert.That(child.RenderSize.Width, Is.EqualTo(100).Within(0.5), "baseline: child fills the 100 slot");
+
+        // Grow the parent, but invalidate the child's measure AFTER the parent's measure (so the arrange cascade reaches
+        // a measure-invalid child) - the exact ordering a recycled container's content rebind produces mid-pass.
+        parent.Measure(new Size(200, 200));
+        child.InvalidateMeasure();
+        parent.Arrange(new Rect(0, 0, 200, 200));
+
+        Assert.That(child.RenderSize.Width, Is.EqualTo(200).Within(0.5),
+            "child must land at the parent's NEW slot (arrange re-measures inline), not freeze at the old size");
+        Assert.That(child.RenderSize.Height, Is.EqualTo(200).Within(0.5));
+    }
+
+    // InvalidateMeasureNextPass defers a re-measure to the NEXT pass (a virtualizing panel spreading a big realize burst
+    // over frames): it must NOT re-measure in the current/settled state, must re-measure on exactly the next pass, and
+    // must be one-shot (a subsequent clean pass does nothing).
+    [Test]
+    public void InvalidateMeasureNextPass_RemeasuresOnNextPassOnly_AndIsOneShot()
+    {
+        var leaf = new MeasureCountingBorder { Width = 50, Height = 50 };
+        var root = new Border { Width = 200, Height = 200, Child = leaf };
+        WindowExtension.UpdateTree(root);   // settle
+
+        var before = leaf.MeasureOverrideCount;
+        LayoutManager.For(leaf).InvalidateMeasureNextPass(leaf);
+        Assert.That(leaf.MeasureOverrideCount, Is.EqualTo(before), "the deferral alone must not measure anything yet");
+
+        WindowExtension.UpdateTree(root);   // promotes the deferral -> one re-measure
+        Assert.That(leaf.MeasureOverrideCount, Is.EqualTo(before + 1), "the next pass promoted the deferral into a re-measure");
+
+        var after = leaf.MeasureOverrideCount;
+        WindowExtension.UpdateTree(root);   // clean pass
+        Assert.That(leaf.MeasureOverrideCount, Is.EqualTo(after), "the deferral is one-shot, not sticky across passes");
+    }
+
     // Phase 2: arrange is top-down by saved slot. Invalidating ONLY a child's arrange must re-arrange that child into
     // its own last correct slot (not park it at the parent origin), and touch only its subtree - not re-arrange the
     // whole tree from the root.

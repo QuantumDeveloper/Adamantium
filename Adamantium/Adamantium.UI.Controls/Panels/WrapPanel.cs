@@ -8,6 +8,7 @@ public class WrapPanel : VirtualizingPanel
    // ---- Virtualized 2D state (items host) ----
    private const int Buffer = 1;        // extra lines on each side of the viewport
    private const int MaxCellPasses = 4; // bound the in-pass convergence of the auto-sized cell
+   private const int RealizeCap = 64;  // max NEW containers realized per pass (spread a big burst over frames)
    private double _cellFlow = 1;        // cell size along the flow axis
    private double _cellScroll = 1;      // cell size along the scroll (wrap) axis
    private int _columns = 1;            // items per line
@@ -283,6 +284,11 @@ public class WrapPanel : VirtualizingPanel
       // and then stays put across scrolls. The old code re-probed ONE variable-width item every pass, so the cell and
       // column count flickered -> the whole grid reflowed (overlapping/garbled rows) and every frame re-bound the window.
       int first = 0, last = -1;
+      var deferRealize = false;
+      // Realize-budget baseline: the window size at frame start. Read ONCE (not per pass) so the auto-cell convergence
+      // loop below - which calls SetWindow up to MaxCellPasses times - still realizes at most RealizeCap new containers
+      // this whole frame, not RealizeCap per pass.
+      var realizedAtStart = Owner.ItemContainerGenerator.RealizedCount;
       for (var pass = 0; pass < MaxCellPasses; pass++)
       {
          _columns = Math.Max(1, (int)Math.Floor(viewportFlow / _cellFlow));
@@ -302,6 +308,18 @@ public class WrapPanel : VirtualizingPanel
             _lastFirstLine = firstLine;
             first = firstLine * _columns;
             last = Math.Min(count - 1, (lastLine + 1) * _columns - 1);
+
+            // Spread a big realize BURST over frames: if the window suddenly needs far more containers than exist now
+            // (a shrink revealing hundreds of tiles), grow it by at most RealizeCap new containers this pass and finish
+            // over the next frames - so ~500 container constructions don't hang one frame (the resize freeze). Only
+            // GROWTH is capped: a scroll rebinds in place (same window size) and a grow-cell shrinks the window, so
+            // neither trips this. The extent below is formula-based (full count), so the scrollbar stays correct while
+            // the not-yet-realized tail fills in.
+            if (last - first + 1 > realizedAtStart + RealizeCap)
+            {
+               last = Math.Min(count - 1, first + realizedAtStart + RealizeCap - 1);
+               deferRealize = true;
+            }
          }
 
          // Reconcile the realized grid window to exactly [first,last] (rebind in place; hide only true surplus).
@@ -315,6 +333,11 @@ public class WrapPanel : VirtualizingPanel
          }
          if (!grew) break;
       }
+
+      // Capped this pass -> continue on the NEXT pass to realize the next RealizeCap slice (progressive fill-in). Must be
+      // the next-pass primitive, not InvalidateMeasure: we are inside the layout pass (with _inLayout set, which mutes the
+      // panel's own InvalidateMeasure anyway), and a same-pass re-measure would just realize the whole window this frame.
+      if (deferRealize) LayoutManager.For(this).InvalidateMeasureNextPass(this);
 
       var totalLines = (count + _columns - 1) / _columns;
       var flowExtent = _columns * _cellFlow;

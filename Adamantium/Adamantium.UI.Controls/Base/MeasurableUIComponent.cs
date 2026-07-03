@@ -345,12 +345,21 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             throw new InvalidOperationException("Invalid Arrange rectangle.");
         }
 
-        // If the measure was invalidated during an arrange pass, wait for the measure pass to
-        // be re-run.
+        // Measure was invalidated after this arrange was scheduled (classically: a virtualized container's content is
+        // rebound mid-pass, invalidating the inner ContentPresenter's measure). Arrange needs a valid measure. ABORTING
+        // here was wrong: the node then gets re-arranged later by the manager into its OWN cached slot, while its parent -
+        // which arranged to a NEW size and is now arrange-valid - never re-cascades into it, freezing the node at a
+        // PREVIOUS size (the recycled tiles stuck at an old cell size). Instead re-measure inline with the cached
+        // constraint and fall through to arrange into the slot the parent is giving NOW. A node that was never measured
+        // (no cached constraint) genuinely can't be arranged yet -> keep aborting.
         if (!IsMeasureValid)
         {
-            if (LayoutTrace.Enabled) LayoutTrace.Log($"  ARRANGE {LayoutName}: ABORT (measure invalid) rect={rect}");
-            return;
+            if (_previousMeasure is not { } cachedConstraint)
+            {
+                if (LayoutTrace.Enabled) LayoutTrace.Log($"  ARRANGE {LayoutName}: ABORT (never measured) rect={rect}");
+                return;
+            }
+            Measure(cachedConstraint);
         }
 
         if (force || !IsArrangeValid || _previousArrange != rect)
@@ -654,4 +663,5 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             LayoutManager.For(this).InvalidateArrange(this);
         }
     }
+
 }
