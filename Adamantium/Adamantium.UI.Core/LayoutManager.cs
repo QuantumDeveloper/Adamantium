@@ -158,12 +158,22 @@ public sealed class LayoutManager
     private bool DrainPhase(DirtyQueue queue, Action<IUIComponent> process, TimeSpan? budget, Rect? viewport)
     {
         queue.DrainInto(_passBuffer);
-        if (viewport.HasValue && _passBuffer.Count > 1) PrioritizeVisibleFirst(_passBuffer, viewport.Value);
         var count = _passBuffer.Count;
+
+        // On-screen work is NEVER budget-deferred - only OFF-screen work (which isn't drawn this frame) may spill to the
+        // next frame. Deferring an on-screen node renders it BEFORE it is laid out: a freshly-realized container piles at
+        // the origin (the resize "garble"), and a cohesive control tears (a slider's thumb, positioned by this arrange,
+        // lags its fill which was set immediately on the value change). So partition the buffer visible-first and let the
+        // budget cut in only PAST the on-screen prefix. With no budget or no viewport, everything is protected (drain
+        // fully) - the safe default (a frame with no known client area can't tell what's visible, so it never defers).
+        var protectedCount = count;
+        if (budget.HasValue && viewport.HasValue && count > 1)
+            protectedCount = PrioritizeVisibleFirst(_passBuffer, viewport.Value);
+
         for (var i = 0; i < count; i++)
         {
             process(_passBuffer[i]);
-            if (budget.HasValue && i + 1 < count && _passStopwatch.Elapsed >= budget.Value)
+            if (budget.HasValue && i + 1 >= protectedCount && i + 1 < count && _passStopwatch.Elapsed >= budget.Value)
             {
                 for (var j = i + 1; j < count; j++) queue.Enqueue(_passBuffer[j]);
                 return false;
@@ -178,8 +188,9 @@ public sealed class LayoutManager
         : null;
 
     // Stable-partition the buffer so on-screen nodes come first (each group keeps its ancestors-first depth order), so
-    // under the budget the visible work is done first and the off-screen work is what gets deferred.
-    private void PrioritizeVisibleFirst(List<IUIComponent> buffer, Rect viewport)
+    // under the budget the visible work is done first and the off-screen work is what gets deferred. Returns the number
+    // of on-screen nodes now at the front - the "protected" prefix the budget must not defer.
+    private int PrioritizeVisibleFirst(List<IUIComponent> buffer, Rect viewport)
     {
         _offscreenBuffer.Clear();
         var write = 0;
@@ -188,14 +199,20 @@ public sealed class LayoutManager
             if (IsOnScreen(buffer[read], viewport)) buffer[write++] = buffer[read];
             else _offscreenBuffer.Add(buffer[read]);
         }
+        var visibleCount = write;
         for (var k = 0; k < _offscreenBuffer.Count; k++) buffer[write++] = _offscreenBuffer[k];
+        return visibleCount;
     }
 
     private static bool IsOnScreen(IUIComponent node, Rect viewport)
     {
         var b = node.Bounds;
         if (b.Width <= 0 || b.Height <= 0) return true;   // unsized / brand-new -> don't deprioritise it
-        var w = b.TransformToAABB(node.WorldTransform);
+        // WorldTransform ALREADY carries this node's own offset (LocalTransform = Translation(Bounds.Location)), so map a
+        // LOCAL-origin rect - using Bounds (whose Location is that same offset) double-counts it and pushes on-screen
+        // nodes off-screen, so the budget wrongly deferred VISIBLE work (a cause of the resize garble). Mirrors the render
+        // path, which transforms new Rect(0,0,RenderSize) by the world matrix.
+        var w = new Rect(0, 0, b.Width, b.Height).TransformToAABB(node.WorldTransform);
         return w.X < viewport.X + viewport.Width && w.X + w.Width > viewport.X
             && w.Y < viewport.Y + viewport.Height && w.Y + w.Height > viewport.Y;
     }

@@ -8,7 +8,7 @@
             <TextBlock Text="{Binding StrokeThickness}" VerticalAlignment="Center" FontSize="16" Margin="12,0,0,0"/>
         </StackPanel>
 
-        <WrapPanel Orientation="Horizontal" Margin="0,20,0,0">
+        <WrapPanel Orientation="Horizontal" Margin="0,20,0,0" Background="White">
             <Ellipse Width="96" Height="96" Fill="#3B82F6" Stroke="Cyan" StrokeThickness="{Binding StrokeThickness}" Margin="10"/>
             <Rectangle Width="120" Height="90" Fill="#22C55E" Stroke="White" StrokeThickness="{Binding StrokeThickness}" CornerRadius="12" Margin="10"/>
             <Polygon Points="60,0 120,96 0,96" Fill="#F59E0B" Stroke="Black" StrokeThickness="{Binding StrokeThickness}" Margin="10"/>
