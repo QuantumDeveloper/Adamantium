@@ -8,7 +8,7 @@ public class WrapPanel : VirtualizingPanel
    // ---- Virtualized 2D state (items host) ----
    private const int Buffer = 1;        // extra lines on each side of the viewport
    private const int MaxCellPasses = 4; // bound the in-pass convergence of the auto-sized cell
-   private const int RealizeCap = 64;  // max NEW containers realized per pass (spread a big burst over frames)
+   private const int RealizeCap = 32;  // max NEW containers realized per pass (spread a big burst over frames)
    private double _cellFlow = 1;        // cell size along the flow axis
    private double _cellScroll = 1;      // cell size along the scroll (wrap) axis
    private int _columns = 1;            // items per line

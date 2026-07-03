@@ -14,7 +14,7 @@ public class StackPanel : VirtualizingPanel
 
    public static readonly AdamantiumProperty OrientationProperty = AdamantiumProperty.Register(nameof(Orientation),
       typeof(Orientation), typeof(StackPanel),
-      new PropertyMetadata(Orientation.Horizontal,
+      new PropertyMetadata(Orientation.Vertical,
          PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
 
 
