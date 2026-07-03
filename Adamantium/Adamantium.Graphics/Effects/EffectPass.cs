@@ -135,6 +135,10 @@ public sealed class EffectPass : DisposableObject, IEffectPass
     }
 
     // === VK_EXT_descriptor_heap: CB via push-address; textures/samplers — indices into heaps ===
+    // Which linker resource collection a heap-offset write pulls from - a plain kind so ApplyHeap's inner loop needs no
+    // per-draw delegate/closure.
+    private enum HeapResourceKind { ShaderResource, Sampler, Uav }
+
     private unsafe void ApplyHeap()
     {
         Effect.CurrentTechnique = Technique;
@@ -174,14 +178,9 @@ public sealed class EffectPass : DisposableObject, IEffectPass
             // linker collection), samplers and UAVs are their own lists. link.Parameter is ALREADY the resolved
             // EffectParameter, so there is no per-draw string lookup (the old Effect.Parameters[name] was redundant - the
             // constant-buffer loop above already keys parameterPushOffsets by link.Parameter directly).
-            WriteHeapOffsets(pushDataBytes, stageBlock.ShaderResourceViewSlotLinks,
-                l => l.IsStorageBuffer
-                    ? resourceLinker.GetShaderResourceBuffers(l.ResourceParamDescription)
-                    : resourceLinker.GetShaderResources(l.ResourceParamDescription));
-            WriteHeapOffsets(pushDataBytes, stageBlock.SamplerStateSlotLinks,
-                l => resourceLinker.GetSamplers(l.ResourceParamDescription));
-            WriteHeapOffsets(pushDataBytes, stageBlock.UnorderedAccessViewSlotLinks,
-                l => resourceLinker.GetUAVs(l.ResourceParamDescription));
+            WriteHeapOffsets(pushDataBytes, stageBlock.ShaderResourceViewSlotLinks, HeapResourceKind.ShaderResource);
+            WriteHeapOffsets(pushDataBytes, stageBlock.SamplerStateSlotLinks, HeapResourceKind.Sampler);
+            WriteHeapOffsets(pushDataBytes, stageBlock.UnorderedAccessViewSlotLinks, HeapResourceKind.Uav);
 
             stages.Add(stageBlock);
 
@@ -222,12 +221,22 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         // Writes each bound resource's stable heap-slot index into push data for one resource list. The actual descriptor
         // (SampledImage / Sampler / StorageBuffer) already sits in that heap slot (allocated by the linker); here we only
         // publish the index. link.Parameter is the pre-resolved EffectParameter, so no per-draw name lookup.
-        void WriteHeapOffsets(byte* push, List<SlotLink> links, System.Func<SlotLink, IHeapResource[]> getResources)
+        void WriteHeapOffsets(byte* push, List<SlotLink> links, HeapResourceKind kind)
         {
             for (int i = 0; i < links.Count; ++i)
             {
                 var link = links[i];
-                var resources = getResources(link);
+                // resourceLinker is read from the enclosing scope directly (a struct closure - no heap alloc). Passing a
+                // Func here allocated a delegate + closure PER Apply, i.e. per draw, which showed up as GC-driven frame
+                // spikes (240 -> 60 fps) under many draws. A plain kind switch keeps the single loop without the garbage.
+                IHeapResource[] resources = kind switch
+                {
+                    HeapResourceKind.ShaderResource => link.IsStorageBuffer
+                        ? (IHeapResource[])resourceLinker.GetShaderResourceBuffers(link.ResourceParamDescription)
+                        : resourceLinker.GetShaderResources(link.ResourceParamDescription),
+                    HeapResourceKind.Sampler => resourceLinker.GetSamplers(link.ResourceParamDescription),
+                    _ => resourceLinker.GetUAVs(link.ResourceParamDescription),
+                };
                 uint basePushOffset = parameterPushOffsets[link.Parameter];
                 for (int resIdx = 0; resIdx < resources.Length; resIdx++)
                     *(uint*)(push + basePushOffset + (uint)(resIdx * 4)) =
