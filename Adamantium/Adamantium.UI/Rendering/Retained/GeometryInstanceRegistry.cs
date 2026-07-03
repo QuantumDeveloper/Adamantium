@@ -95,6 +95,14 @@ public sealed class GeometryInstanceRegistry
 
     public bool Contains(Guid renderId) => _byElement.ContainsKey(renderId);
 
+    /// <summary>Empties the whole scene (every segment + element mapping) - the full-reset path (e.g. the designer
+    /// dropping all units between renders). The GPU layer keeps its per-key buffer cache, reused if a shape reappears.</summary>
+    public void Clear()
+    {
+        _segments.Clear();
+        _byElement.Clear();
+    }
+
     /// <summary>The segments to draw. Each is one instanced draw of <see cref="Segment.Instances"/> using
     /// <see cref="Segment.Mesh"/> (z-order / clip segmentation layers on top - a later phase).</summary>
     public IEnumerable<Segment> Segments => _segments.Values;

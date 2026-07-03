@@ -5,6 +5,7 @@ using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Rendering.Retained;
 using Adamantium.UI.Rendering.RenderUnits;
 using Adamantium.Vulkan.Core;
 
@@ -186,6 +187,7 @@ public class RenderCache
 
         _unitsByControl.Clear();
         _renderUnits.Clear();
+        _registry.Clear();
     }
 
     public void ProcessCommands(Matrix4x4F projectionMatrix, double renderScale)
@@ -196,6 +198,24 @@ public class RenderCache
         {
             var transform = World(unit.Component);
             unit.Update(transform, projectionMatrix, renderScale);
+            if (RetainedGeometryRenderer.Enabled) FeedInstance(unit, transform);
+        }
+    }
+
+    // Register (or refresh) an instanceable unit's fill in the retained scene; a unit that stopped being instanceable
+    // (flag off, brush turned non-solid, geometry lost its mesh) leaves the scene and reverts to per-unit drawing.
+    private void FeedInstance(IRenderUnit unit, Matrix4x4F world)
+    {
+        if (unit is not IInstanceableFill inst) return;
+        if (inst.TryGetInstancedFill(out var key, out var mesh, out var color))
+        {
+            _registry.Set(unit.Component.RenderId, key, mesh, GeometryInstance.FromWorld(world, color));
+            inst.FillInstanced = true;
+        }
+        else if (inst.FillInstanced)
+        {
+            _registry.Remove(unit.Component.RenderId);
+            inst.FillInstanced = false;
         }
     }
 
@@ -251,6 +271,13 @@ public class RenderCache
     private Rect2D _batchScissor;
     private bool _batchOpen;
 
+    // Retained geometry-instancing scene (RETAINED_INSTANCING=1). Fed in ProcessCommands (each instanceable unit's world
+    // + colour), drawn FIRST in Render so the instanced bodies sit UNDER the per-unit fringes/strokes. Own buffer manager:
+    // the instance SSBOs + shared meshes are distinct from the per-unit geometry buffers.
+    private readonly GeometryInstanceRegistry _registry = new();
+    private RetainedGeometryRenderer _retained;
+    private GpuBufferManager _instanceBuffers;
+
     /// <summary>Out-of-render-pass pass: recorded before BeginRendering (shared-surface latch copies).</summary>
     public void PreRender()
     {
@@ -272,6 +299,16 @@ public class RenderCache
     public void Render(IGraphicsDevice device, Rect2D fullScissor)
     {
         var scissorNarrowed = false;   // whether the active scissor is currently narrower than fullScissor
+
+        // Retained instanced fills FIRST (they sit UNDER the per-unit fringes/strokes drawn in the loop below): one
+        // InstancedFill draw per shared shape, from the scene fed in ProcessCommands. Retained across frames, so a clean
+        // frame (no ProcessCommands) still draws last-known instances. NB z/clip segmentation is a later phase.
+        if (device != null && RetainedGeometryRenderer.Enabled && _registry.SegmentCount > 0)
+        {
+            _instanceBuffers ??= new GpuBufferManager(device);
+            _retained ??= new RetainedGeometryRenderer(device, _instanceBuffers);
+            _retained.Draw(_registry, _projectionMatrix);
+        }
 
         // Text + item-background batches: reset per frame. Device renders only - GPU-free tests skip batching.
         if (device != null)
@@ -482,8 +519,19 @@ public class RenderCache
 
         if (!anyZ)
         {
-            foreach (var child in children.Reverse())
-                stack.Push(child);
+            // Reverse WITHOUT allocating (children.Reverse() buffers them all): the concrete VisualChildren is a
+            // ReadOnlyCollection (an IReadOnlyList), so walk it back-to-front by index. This runs per component on every
+            // full walk, so the per-call array Enumerable.Reverse allocated was per-component-per-walk garbage.
+            if (children is IReadOnlyList<IUIComponent> list)
+            {
+                for (var i = list.Count - 1; i >= 0; i--)
+                    stack.Push(list[i]);
+            }
+            else
+            {
+                foreach (var child in children.Reverse())
+                    stack.Push(child);
+            }
             return;
         }
 
@@ -595,6 +643,7 @@ public class RenderCache
     /// </summary>
     private void RemoveAndDeferDispose(Guid renderId)
     {
+        _registry.Remove(renderId);   // the element left the scene - drop its instanced fill too (no-op if not instanced)
         if (!_unitsByControl.Remove(renderId, out var units)) return;
 
         foreach (var unit in units)
