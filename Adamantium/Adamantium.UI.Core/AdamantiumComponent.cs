@@ -145,7 +145,10 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         var metadata = e.Property.GetDefaultMetadata(GetType());
         if (metadata is not { Inherits: true } || HasExplicitValue(e.Property)) return;
 
-        RaiseInheritedChange(e.Property, metadata, e.OldValue, e.NewValue);
+        // PUSH the inherited value into this element's Inherited slot, so a read resolves it from the local value store
+        // (one dictionary hit) instead of recursing up the WHOLE ancestor chain on every GetValue. Setting it fires this
+        // element's own PropertyChanged, which cascades the push to its children.
+        SetValue(e.Property, e.NewValue, ValuePriority.Inherited);
     }
 
     /// <summary>
@@ -184,7 +187,7 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
                 var newValue = inheritanceParent?.GetValue(property) ?? metadata.DefaultValue;
                 if (!Equals(oldValue, newValue))
                 {
-                    RaiseInheritedChange(property, metadata, oldValue, newValue);
+                    SetValue(property, newValue, ValuePriority.Inherited);
                 }
             }
         }
@@ -261,20 +264,9 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         {
             result = GetDefaultValue(property);
         }
-        else if (inheritanceParent != null)
-        {
-            // The constructor seeds every property with its Default value, so the effective value never falls through
-            // to GetDefaultValue's inheritance path. When an Inherits property has no explicit (locally-set) value,
-            // defer to the inheritance parent here instead — this is what carries DataContext down the tree. Resolve the
-            // metadata FIRST and only scan for an explicit value when the property actually inherits: the vast majority
-            // of reads are non-Inherits (Width/Margin/Alignment/... hammered by measure+arrange) and now skip the
-            // HasExplicitValue priority-scan (a lock + a 6-slot loop) entirely.
-            var metadata = property.GetDefaultMetadata(GetType());
-            if (metadata is { Inherits: true } && !HasExplicitValue(property))
-            {
-                result = inheritanceParent.GetValue(property);
-            }
-        }
+        // Inherited values are PUSHED into the Inherited slot (see ParentPropertyChanged / InheritanceParent), so the
+        // effective-value scan above already resolved them - no per-read recursion up the ancestor chain, and no
+        // per-read metadata lookup + HasExplicitValue scan on the hottest path in the engine.
 
         return result;
     }
@@ -312,11 +304,6 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
     // An inherited value changed (parent assigned/attached): fire the metadata callback (e.g. DataContext -> refresh
     // bindings) and re-raise so this element's own descendants inherit in turn.
-    private void RaiseInheritedChange(AdamantiumProperty property, PropertyMetadata metadata, object oldValue, object newValue)
-    {
-        metadata.PropertyChangedCallback?.Invoke(this, new AdamantiumPropertyChangedEventArgs(property, oldValue, newValue));
-        RaisePropertyChanged(property, oldValue, newValue);
-    }
 
     /// <summary>
     /// Gets a <see cref="AdamantiumProperty"/> value.
