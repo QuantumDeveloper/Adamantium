@@ -11,6 +11,7 @@ using Adamantium.UI.Core;
 using Adamantium.UI.Core.Data;
 using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.Templates;
+using Adamantium.UI.Extensions;
 using NUnit.Framework;
 
 namespace Adamantium.UITests;
@@ -142,6 +143,346 @@ public class ItemsControlTests
             Assert.That(gen.RealizedCount, Is.LessThan(60), "window stays bounded after scrolling");
             Assert.That(realized, Has.Some.InRange(80, 84), "window around line 20 (index ~80 = 20*4)");
             Assert.That(gen.ContainerFromIndex(0), Is.Null, "top rows recycled away");
+        });
+    }
+
+    [Test]
+    public void VirtualizingWrapPanel_HugeWindow_RealizesInCappedSlicesButReportsFullExtent()
+    {
+        // 600 tiles, tiny 10px cells, 300x300 viewport => 30 cols x 20 lines: the ENTIRE set is on-screen at once, so the
+        // natural window is all 600. Realizing 600 containers in one measure is the resize-freeze burst; the panel must
+        // instead realize at most RealizeCap (128) NEW containers per pass and finish over the next passes - while
+        // reporting the FULL extent immediately (so the scrollbar is correct and the not-yet-realized tail fills in).
+        var items = Enumerable.Range(0, 600).Cast<object>().ToList();
+        var ic = new ItemsControl
+        {
+            ItemsSource = items,
+            ItemsPanel = new ItemsPanelTemplate(() => new TemplateResult
+            {
+                RootComponent = new WrapPanel { Orientation = Orientation.Horizontal, ItemWidth = 10, ItemHeight = 10 }
+            })
+        };
+        ic.Template = ItemsPresenterTemplate();
+        var gen = ic.ItemContainerGenerator;
+
+        ic.Measure(new Size(300, 300));
+        ic.Arrange(new Rect(0, 0, 300, 300));
+        var panel = ic.ItemsHostPanel;
+        var scroll = (IScrollableContent)panel;
+
+        var firstRealized = gen.RealizedCount;
+        Assert.Multiple(() =>
+        {
+            // ~one capped slice, NOT all 600 (a little slack for the +/-Buffer line).
+            Assert.That(firstRealized, Is.GreaterThan(0));
+            Assert.That(firstRealized, Is.LessThanOrEqualTo(128 + 30), "first pass realizes one capped slice, not all 600");
+            // Extent reflects the full set from the first pass (formula-based): ceil(600/30)=20 lines * 10px.
+            Assert.That(scroll.Extent.Height, Is.EqualTo(20 * 10).Within(1), "extent covers all 600 while only a slice is realized");
+        });
+
+        // Simulate the following frames: each re-measure realizes the next capped slice until the whole visible set exists.
+        var prev = firstRealized;
+        var passes = 0;
+        while (gen.RealizedCount < 600 && passes < 20)
+        {
+            panel.Measure(new Size(300, 300), true);
+            panel.Arrange(new Rect(0, 0, 300, 300), true);
+            Assert.That(gen.RealizedCount - prev, Is.LessThanOrEqualTo(128), "a pass grows the window by at most RealizeCap");
+            prev = gen.RealizedCount;
+            passes++;
+        }
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(gen.RealizedCount, Is.EqualTo(600), "the full on-screen set is realized after enough passes");
+            Assert.That(passes, Is.GreaterThanOrEqualTo(4), "600 tiles / 128-cap => realized over several passes (actually spread)");
+        });
+    }
+
+    [Test]
+    public void VirtualizingWrapPanel_CellGrowsAfterRealize_ContainerAndContentResizeToNewCell()
+    {
+        // Repro of the STATIC "container resize" bug (LayoutView tiles): a tile is a Stretch Border with NO intrinsic
+        // size, so it must FILL its cell. Realize at a SMALL cell, then GROW the cell (slider up). Because both-pinned
+        // cells are measured with a CONSTANT CellConstraint (so a cell change doesn't re-measure every tile), the grown
+        // cell reaches the tiles only via ARRANGE. If the container's content isn't re-arranged to the new cell, it stays
+        // frozen at the old smaller size inside a now-larger cell - the garble the user sees.
+        var items = Enumerable.Range(0, 300).Cast<object>().ToList();
+        var ic = new ItemsControl
+        {
+            ItemsSource = items,
+            ItemsPanel = new ItemsPanelTemplate(() => new TemplateResult
+            {
+                RootComponent = new WrapPanel { Orientation = Orientation.Horizontal, ItemWidth = 30, ItemHeight = 30 }
+            }),
+            ItemTemplate = new DataTemplate(() => new TemplateResult { RootComponent = new Border() })
+        };
+        ic.Template = ItemsPresenterTemplate();
+
+        ic.Measure(new Size(300, 300));
+        ic.Arrange(new Rect(0, 0, 300, 300));
+        var panel = (WrapPanel)ic.ItemsHostPanel;
+        var gen = ic.ItemContainerGenerator;
+
+        // Slider up: grow the cell 30 -> 120. Panel re-measures + re-arranges its realized window.
+        panel.ItemWidth = 120;
+        panel.ItemHeight = 120;
+        panel.Measure(new Size(300, 300), true);
+        panel.Arrange(new Rect(0, 0, 300, 300), true);
+
+        Assert.Multiple(() =>
+        {
+            foreach (var idx in gen.RealizedIndices)
+            {
+                var c = gen.ContainerFromIndex(idx);
+                Assert.That(c.Bounds.Width, Is.EqualTo(120).Within(0.5), $"container {idx}: cell did not grow");
+                Assert.That(c.Bounds.Height, Is.EqualTo(120).Within(0.5), $"container {idx}: cell did not grow");
+
+                var content = (c as ContentPresenter)?.VisualChildren.OfType<Border>().FirstOrDefault();
+                Assert.That(content, Is.Not.Null, $"container {idx}: content Border missing");
+                Assert.That(content!.RenderSize.Width, Is.EqualTo(120).Within(0.5), $"container {idx}: content did NOT re-stretch to the grown cell (frozen small)");
+                Assert.That(content.RenderSize.Height, Is.EqualTo(120).Within(0.5), $"container {idx}: content did NOT re-stretch to the grown cell (frozen small)");
+            }
+        });
+    }
+
+    // Mirrors the FluentDark ListBoxItem template: ItemBorder(Padding) -> ContentPresenter(alignment=ContentAlignment).
+    private static ControlTemplate ListBoxItemChromeTemplate() => new(() =>
+    {
+        var border = new Border();
+        var cp = new ContentPresenter();
+        border.Child = cp;
+        var r = new TemplateResult { RootComponent = border };
+        r.RegisterName("ItemBorder", border);
+        r.RegisterName("PART_ContentPresenter", cp);
+        r.AddTemplateBinding(cp, "HorizontalAlignment", new TemplateBinding { Path = "HorizontalContentAlignment" });
+        r.AddTemplateBinding(cp, "VerticalAlignment", new TemplateBinding { Path = "VerticalContentAlignment" });
+        r.AddTemplateBinding(cp, "Content", new TemplateBinding { Path = "Content" });
+        r.AddTemplateBinding(cp, "ContentTemplate", new TemplateBinding { Path = "ContentTemplate" });
+        return r;
+    });
+
+    private static IEnumerable<IUIComponent> Descendants(IUIComponent root)
+    {
+        foreach (var child in root.VisualChildren)
+        {
+            yield return child;
+            foreach (var d in Descendants(child)) yield return d;
+        }
+    }
+
+    [Test]
+    public void ListBox_WrapPanelBothPinned_CellGrows_ContentFillsCell()
+    {
+        // The FULL LayoutView chain headless: ListBox + ListBoxItem chrome (Stretch content via TemplateBinding) + a
+        // DataTemplate tile (Border, no size) + a both-pinned WrapPanel. Realize at a small cell, then grow it. Every
+        // realized tile's CONTENT (the DataTemplate Border, built by the ContentPresenter) must fill the grown cell.
+        var items = Enumerable.Range(0, 300).Cast<object>().ToList();
+        var containerStyle = new Style { Selector = new StyleSelector { Types = { typeof(ListBoxItem) } } };
+        containerStyle.Setters.Add(new Setter("Template", ListBoxItemChromeTemplate()));
+        containerStyle.Setters.Add(new Setter("HorizontalContentAlignment", HorizontalAlignment.Stretch));
+        containerStyle.Setters.Add(new Setter("VerticalContentAlignment", VerticalAlignment.Stretch));
+        containerStyle.Setters.Add(new Setter("Padding", new Thickness(0)));
+
+        var lb = new ListBox
+        {
+            ItemsSource = items,
+            ItemContainerStyle = containerStyle,
+            ItemsPanel = new ItemsPanelTemplate(() => new TemplateResult
+            {
+                RootComponent = new WrapPanel { Orientation = Orientation.Horizontal, ItemWidth = 30, ItemHeight = 30 }
+            }),
+            ItemTemplate = new DataTemplate(() => new TemplateResult { RootComponent = new Border() })
+        };
+        lb.Template = ItemsPresenterTemplate();
+        lb.Measure(new Size(300, 300));
+        lb.Arrange(new Rect(0, 0, 300, 300));
+        var panel = (WrapPanel)lb.ItemsHostPanel;
+        var gen = lb.ItemContainerGenerator;
+
+        panel.ItemWidth = 120;
+        panel.ItemHeight = 120;
+        panel.Measure(new Size(300, 300), true);
+        panel.Arrange(new Rect(0, 0, 300, 300), true);
+
+        Assert.Multiple(() =>
+        {
+            foreach (var idx in gen.RealizedIndices)
+            {
+                var c = (ListBoxItem)gen.ContainerFromIndex(idx);
+                Assert.That(c.Bounds.Width, Is.EqualTo(120).Within(0.5), $"item {idx}: container cell not grown");
+                var cp = Descendants(c).OfType<ContentPresenter>().FirstOrDefault();
+                var content = cp?.VisualChildren.OfType<Border>().FirstOrDefault();
+                Assert.That(content, Is.Not.Null, $"item {idx}: DataTemplate content missing");
+                Assert.That(content!.RenderSize.Width, Is.EqualTo(120).Within(0.5), $"item {idx}: content did NOT fill the grown cell");
+                Assert.That(content.RenderSize.Height, Is.EqualTo(120).Within(0.5), $"item {idx}: content did NOT fill the grown cell");
+            }
+        });
+    }
+
+    [Test]
+    public void ListBoxItemChrome_MeasuredUnbounded_ArrangeGrows_ContentReStretches()
+    {
+        // The exact LayoutView chrome (ListBoxItem template + Stretch content), fed the WrapPanel both-pinned path:
+        // measured with a CONSTANT (unbounded) constraint, then arranged small, then LARGE. If arrange doesn't carry the
+        // grown cell all the way to the content, the tile freezes at the old small size in a large cell.
+        var content = new Border();
+        var item = new ListBoxItem
+        {
+            Template = ListBoxItemChromeTemplate(),
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            VerticalContentAlignment = VerticalAlignment.Stretch,
+            Padding = new Thickness(0),
+            Content = content
+        };
+
+        item.Measure(Size.Infinity);
+        item.Arrange(new Rect(0, 0, 30, 30));
+        item.Measure(Size.Infinity);              // cell grew; constraint unchanged -> measure gate-skips
+        item.Arrange(new Rect(0, 0, 120, 120));   // only arrange carries the grown cell
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(content.RenderSize.Width, Is.EqualTo(120).Within(0.5), "chrome content did NOT re-stretch to grown arrange");
+            Assert.That(content.RenderSize.Height, Is.EqualTo(120).Within(0.5), "chrome content did NOT re-stretch to grown arrange");
+        });
+    }
+
+    [Test]
+    public void VirtualizingWrapPanel_ReboundContainersAtNewCell_ResizeToNewCell()
+    {
+        // The user's hint: it's the RECYCLED/REBOUND containers (donors rebound to new items on scroll) that keep a stale
+        // size, not the fresh ones. Realize a window at a small cell, then scroll AND grow the cell so the realized
+        // containers are rebound to far-away indices at the new cell. Every rebound container - and its content - must be
+        // at the new cell size.
+        var items = Enumerable.Range(0, 600).Cast<object>().ToList();
+        var ic = new ItemsControl
+        {
+            ItemsSource = items,
+            ItemsPanel = new ItemsPanelTemplate(() => new TemplateResult
+            {
+                RootComponent = new WrapPanel { Orientation = Orientation.Horizontal, ItemWidth = 30, ItemHeight = 30 }
+            }),
+            ItemTemplate = new DataTemplate(() => new TemplateResult { RootComponent = new Border() })
+        };
+        ic.Template = ItemsPresenterTemplate();
+        ic.Measure(new Size(300, 300));
+        ic.Arrange(new Rect(0, 0, 300, 300));
+        var panel = (WrapPanel)ic.ItemsHostPanel;
+        var scroll = (IScrollableContent)panel;
+        var gen = ic.ItemContainerGenerator;
+
+        // Scroll far down (rebinds the realized containers to far indices) AND grow the cell in the same relayout.
+        scroll.SetOffset(new Vector2(0, 2000));
+        panel.ItemWidth = 120;
+        panel.ItemHeight = 120;
+        panel.Measure(new Size(300, 300), true);
+        panel.Arrange(new Rect(0, 0, 300, 300), true);
+
+        Assert.Multiple(() =>
+        {
+            foreach (var idx in gen.RealizedIndices)
+            {
+                var c = gen.ContainerFromIndex(idx);
+                Assert.That(c.Bounds.Width, Is.EqualTo(120).Within(0.5), $"rebound container {idx}: cell not grown");
+                var content = (c as ContentPresenter)?.VisualChildren.OfType<Border>().FirstOrDefault();
+                Assert.That(content?.RenderSize.Width, Is.EqualTo(120).Within(0.5), $"rebound container {idx}: content did NOT re-stretch");
+            }
+        });
+    }
+
+    [Test]
+    public void ListBox_LayoutManagerDrag_ChromeContentFillsFinalCell()
+    {
+        // The closest headless match to the LayoutView bug: REAL ListBoxItem chrome (Stretch content via TemplateBinding)
+        // + a DataTemplate tile, driven across FRAMES by the LayoutManager while the cell is dragged (so the spread +
+        // recycle pool are live). After settling, every realized tile's content must fill the final cell.
+        var items = Enumerable.Range(0, 600).Cast<object>().ToList();
+        var containerStyle = new Style { Selector = new StyleSelector { Types = { typeof(ListBoxItem) } } };
+        containerStyle.Setters.Add(new Setter("Template", ListBoxItemChromeTemplate()));
+        containerStyle.Setters.Add(new Setter("HorizontalContentAlignment", HorizontalAlignment.Stretch));
+        containerStyle.Setters.Add(new Setter("VerticalContentAlignment", VerticalAlignment.Stretch));
+        containerStyle.Setters.Add(new Setter("Padding", new Thickness(0)));
+
+        WrapPanel panel = null;
+        var lb = new ListBox
+        {
+            Width = 360,
+            Height = 360,
+            ItemsSource = items,
+            ItemContainerStyle = containerStyle,
+            ItemsPanel = new ItemsPanelTemplate(() => new TemplateResult
+            {
+                RootComponent = panel = new WrapPanel { Orientation = Orientation.Horizontal, ItemWidth = 30, ItemHeight = 30 }
+            }),
+            ItemTemplate = new DataTemplate(() => new TemplateResult { RootComponent = new Border() })
+        };
+        lb.Template = ItemsPresenterTemplate();
+
+        WindowExtension.UpdateTree(lb);
+
+        foreach (var cell in new[] { 30, 48, 72, 108, 150, 180 })
+        {
+            panel.ItemWidth = cell;
+            panel.ItemHeight = cell;
+            for (var frame = 0; frame < 8; frame++) WindowExtension.UpdateTree(lb);
+        }
+
+        var gen = lb.ItemContainerGenerator;
+        Assert.Multiple(() =>
+        {
+            foreach (var idx in gen.RealizedIndices.ToList())
+            {
+                var c = (ListBoxItem)gen.ContainerFromIndex(idx);
+                Assert.That(c.Bounds.Width, Is.EqualTo(180).Within(0.5), $"item {idx}: container cell not final");
+                var cp = Descendants(c).OfType<ContentPresenter>().FirstOrDefault();
+                var content = cp?.VisualChildren.OfType<Border>().FirstOrDefault();
+                Assert.That(content?.RenderSize.Width, Is.EqualTo(180).Within(0.5), $"item {idx}: content kept stale size ({content?.RenderSize.Width})");
+            }
+        });
+    }
+
+    [Test]
+    public void VirtualizingWrapPanel_LayoutManagerDrag_NoRealizedContainerKeepsStaleCell()
+    {
+        // Drive the REAL multi-frame path (LayoutManager passes + the sliced-realize spread + the recycle pool), not a
+        // single forced Measure/Arrange that heals everything each call. Simulate a slider drag GROWING the cell across
+        // frames; after it settles, every realized (visible-window) container and its content must be the final cell -
+        // no container "left over from before" may keep a stale smaller size (the static garble the user reported).
+        var items = Enumerable.Range(0, 600).Cast<object>().ToList();
+        WrapPanel panel = null;
+        var ic = new ItemsControl
+        {
+            Width = 360,
+            Height = 360,   // a finite viewport so the panel virtualizes (and the spread caps)
+            ItemsSource = items,
+            ItemsPanel = new ItemsPanelTemplate(() => new TemplateResult
+            {
+                RootComponent = panel = new WrapPanel { Orientation = Orientation.Horizontal, ItemWidth = 30, ItemHeight = 30 }
+            }),
+            ItemTemplate = new DataTemplate(() => new TemplateResult { RootComponent = new Border() })
+        };
+        ic.Template = ItemsPresenterTemplate();
+
+        WindowExtension.UpdateTree(ic);
+
+        foreach (var cell in new[] { 30, 48, 72, 108, 150, 180 })
+        {
+            panel.ItemWidth = cell;
+            panel.ItemHeight = cell;
+            for (var frame = 0; frame < 8; frame++) WindowExtension.UpdateTree(ic);   // let the spread + relayout settle
+        }
+
+        var gen = ic.ItemContainerGenerator;
+        Assert.Multiple(() =>
+        {
+            foreach (var idx in gen.RealizedIndices.ToList())
+            {
+                var c = gen.ContainerFromIndex(idx);
+                Assert.That(c.Bounds.Width, Is.EqualTo(180).Within(0.5), $"container {idx}: kept stale cell size (Bounds {c.Bounds.Width})");
+                var content = (c as ContentPresenter)?.VisualChildren.OfType<Border>().FirstOrDefault();
+                Assert.That(content?.RenderSize.Width, Is.EqualTo(180).Within(0.5), $"container {idx}: content kept stale size ({content?.RenderSize.Width})");
+            }
         });
     }
 

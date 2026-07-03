@@ -43,8 +43,14 @@ public sealed class LayoutManager
     private readonly DirtyQueue _toStyle = new();
     private readonly DirtyQueue _toMeasure = new();
     private readonly DirtyQueue _toArrange = new();
+    // Nodes that asked to be re-measured on the NEXT pass, not this one. A virtualizing panel realizing a large window in
+    // per-frame slices re-queues itself here so the continuation lands next frame - if it enqueued into _toMeasure the
+    // drain loop below would process it in THIS same pass, realizing the whole window in one frame (the very burst we are
+    // spreading). Promoted into the real measure queue at the start of each pass.
+    private readonly HashSet<IUIComponent> _toMeasureNextPass = new();
     private readonly List<IUIComponent> _passBuffer = new();   // reused snapshot buffer for one phase's drain
     private readonly List<IUIComponent> _offscreenBuffer = new();   // scratch for the visible-first partition
+    private readonly List<IUIComponent> _promoteBuffer = new();   // reused scratch for promoting next-pass deferrals
     private readonly System.Diagnostics.Stopwatch _passStopwatch = new();   // reused per pass (no per-frame allocation)
     private int _deferredStreak;   // consecutive budget-capped passes that didn't fully drain (anti-starvation)
     private const int MaxDeferredPasses = 4;   // after this many, drop the budget for one pass to clear the backlog
@@ -82,6 +88,12 @@ public sealed class LayoutManager
 
     public void InvalidateArrange(IUIComponent node) => _toArrange.Enqueue(node);
 
+    /// <summary>Requests that <paramref name="node"/> be re-measured on the NEXT pass rather than this one. Used by a
+    /// virtualizing panel that realized only a slice of a large window this frame and wants to continue next frame (so a
+    /// big realize burst is spread over frames instead of hanging one). Safe to call mid-pass: it does not touch this
+    /// pass's queues.</summary>
+    public void InvalidateMeasureNextPass(IUIComponent node) => _toMeasureNextPass.Add(node);
+
     /// <summary>Raised once at the end of a layout pass that actually did work (queues drained), i.e. when layout has
     /// settled for this frame. Not raised on a clean frame - so a consumer (e.g. the render cache) can rebuild on this
     /// signal instead of every frame.</summary>
@@ -98,6 +110,20 @@ public sealed class LayoutManager
         // measure/arrange invalidations they trigger are drained by this same pass. The global queue flushes once per
         // frame: the first root's pass empties it, later roots find it empty.
         BindingUpdateQueue.Flush();
+
+        // Promote nodes that deferred their re-measure to this pass (a virtualizing panel continuing a sliced realize).
+        // Snapshot + clear first: a promoted node re-measures later in this pass's drain and may re-defer itself for the
+        // NEXT pass, which must land in the now-empty set rather than being wiped. InvalidateMeasure (not a bare enqueue)
+        // so the validity flag is actually cleared - a bare enqueue would be gate-skipped by MeasureDirty. _inLayout is
+        // false here (pass start), so a panel's muted-invalidation override lets this through.
+        if (_toMeasureNextPass.Count > 0)
+        {
+            _promoteBuffer.Clear();
+            foreach (var node in _toMeasureNextPass) _promoteBuffer.Add(node);   // struct enumerator, no boxing/heap alloc
+            _toMeasureNextPass.Clear();
+            foreach (var node in _promoteBuffer)
+                if (node is IMeasurableComponent measurable) measurable.InvalidateMeasure();
+        }
 
         // Forward-progress safety net: if the root itself is dirty but was never enqueued (e.g. it was invalidated
         // during construction, before this manager existed / before the subtree was assembled under it), seed it now.
