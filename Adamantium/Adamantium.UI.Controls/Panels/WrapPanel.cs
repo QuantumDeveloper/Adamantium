@@ -331,9 +331,9 @@ public class WrapPanel : VirtualizingPanel
             // is constant so they stay valid. Touching the WHOLE growing window every spread-frame (RealizeInWindow's
             // Visibility set + GrowCell per slot) was O(realized)/pass = O(N^2) over the burst - even after only NEW items
             // measured. Only new/rebound/hidden slots need work.
-            // Cheap skip: an in-window container in the generator is already visible (SetWindow only collapses SURPLUS),
-            // so DON'T read the Visibility DP here - it is inherited, so GetValue walks the ancestor chain, and doing that
-            // per window slot was O(window*depth) = the bulk of the pass. IsMeasureValid is a plain field.
+            // Skip slots already realized+measured: attached, visible (SetWindow keeps in-window containers Visible and
+            // invalidates rebound ones), and contributed to the cell. IsMeasureValid is a plain field, so the whole scan
+            // of the window is cheap - no per-slot DP read on the scroll hot path.
             if (Owner.ItemContainerGenerator.ContainerFromIndex(i) is IMeasurableComponent { IsMeasureValid: true })
                continue;
             var child = (IMeasurableComponent)RealizeInWindow(i);

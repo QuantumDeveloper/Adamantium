@@ -93,6 +93,11 @@ public class ItemContainerGenerator
             }
             _byIndex[i] = container;
             _indexByContainer[container] = i;
+            // In-window => visible: a recycled donor was Collapsed as surplus and now holds a new item, so re-show it.
+            // Maintaining this invariant HERE lets the panel skip valid slots on IsMeasureValid alone (no per-slot
+            // Visibility DP read on the scroll hot path) and stops a rebound tile silently going missing. The rebound
+            // content updates via its bindings -> re-render; its size doesn't need re-measuring (a uniform cell forces it).
+            container.Visibility = Visibility.Visible;
         }
 
         // 3. Donors not reused (the window shrank) - park them for when it grows again, and report them so the panel
