@@ -47,8 +47,13 @@ internal sealed class TestControl : UIComponent
     /// <summary>Mark dirty so the next Render() actually re-runs OnRender (mirrors a property change).</summary>
     public void Invalidate() => InvalidateRender(false);
 
+    /// <summary>How many times OnRender actually ran - so a test can prove the partial rebuild re-renders ONLY the
+    /// dirty control, not its unchanged siblings.</summary>
+    public int OnRenderCount { get; private set; }
+
     protected override void OnRender(IDrawingContext context)
     {
+        OnRenderCount++;
         RenderAction?.Invoke(context.ForControl(this));
     }
 }

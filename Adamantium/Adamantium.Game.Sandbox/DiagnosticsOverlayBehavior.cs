@@ -1,3 +1,4 @@
+using System;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core.Behaviors;
@@ -28,6 +29,7 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
 
     private long _lastMeasure, _lastArrange, _lastBindings;
     private double _windowElapsed, _windowMaxLayoutMs;
+    private double _sumLayout, _sumBuild, _sumProc, _sumDraw, _sumProcs;   // per-frame sums -> averages over the window
     private int _windowFrames;
     private bool _windowDeferred;
     private bool _running;
@@ -52,6 +54,11 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
         _windowFrames++;
         if (RuntimeStats.LastLayoutPassMs > _windowMaxLayoutMs) _windowMaxLayoutMs = RuntimeStats.LastLayoutPassMs;
         if (RuntimeStats.LastPassBudgetDeferred) _windowDeferred = true;
+        _sumLayout += RuntimeStats.LastLayoutPassMs;
+        _sumBuild  += RuntimeStats.LastRenderBuildMs;
+        _sumProc   += RuntimeStats.LastRenderProcMs;
+        _sumDraw   += RuntimeStats.LastRenderDrawMs;
+        _sumProcs  += RuntimeStats.LastProcessorsMs;
         if (_windowElapsed < RefreshSeconds) return false;
 
         var measure = MeasurableUIComponent.TotalMeasureCalls;
@@ -59,15 +66,26 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
         var bindings = RuntimeStats.BindingUpdatesApplied;
         var fps = _windowFrames / _windowElapsed;
 
+        // Frame breakdown (averages over the window, so they sum to ~frame time). "other" = the residual the render
+        // pipeline can't see: GPU-fence wait in BeginDraw + swapchain blit + Present. Phase 0 of the render-cache
+        // redesign - shows whether the per-frame cache REBUILD (build+proc) or something else (GPU/present) dominates.
+        var f = 1.0 / _windowFrames;
+        var frameMs = _windowElapsed * 1000.0 * f;
+        var avgLayout = _sumLayout * f;
+        var avgBuild = _sumBuild * f; var avgProc = _sumProc * f; var avgDraw = _sumDraw * f; var avgProcs = _sumProcs * f;
+        var other = Math.Max(0, frameMs - avgLayout - avgBuild - avgProc - avgDraw - avgProcs);
+
         target.Text =
-            $"FPS              {fps,5:F0}\n" +
-            $"layout pass max  {_windowMaxLayoutMs,5:F2} ms{(_windowDeferred ? "  [DEFERRED]" : "")}\n" +
+            $"FPS   {fps,5:F0}     frame {frameMs,5:F1} ms\n" +
+            $"layout  {avgLayout,5:F2} (max {_windowMaxLayoutMs,4:F1}){(_windowDeferred ? " [DEFERRED]" : "")}\n" +
+            $"build/proc/draw  {avgBuild,4:F1} / {avgProc,4:F1} / {avgDraw,4:F1} ms\n" +
+            $"processors {avgProcs,4:F1}    other {other,4:F1} ms\n" +
             $"measure/arrange  {measure - _lastMeasure} / {arrange - _lastArrange}\n" +
-            $"bindings         {bindings - _lastBindings}\n" +
-            $"animations       {AnimationManager.ActiveCount}";
+            $"bindings {bindings - _lastBindings}    anim {AnimationManager.ActiveCount}";
 
         _lastMeasure = measure; _lastArrange = arrange; _lastBindings = bindings;
         _windowElapsed = 0; _windowFrames = 0; _windowMaxLayoutMs = 0; _windowDeferred = false;
+        _sumLayout = _sumBuild = _sumProc = _sumDraw = _sumProcs = 0;
         return false;   // keep ticking
     }
 }
