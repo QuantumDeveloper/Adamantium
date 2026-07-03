@@ -5,6 +5,12 @@
 // no separate AA fringe unit per fill. Positions are baked to WORLD space on the CPU during aggregation; the vertex
 // shader applies only a single static Projection (the one driver-safe form on this Turing - no per-instance matrix).
 // Slang bodies. Row-vector convention (matches the engine's other effects).
+//
+// This one effect now holds the whole retained batch/instancing family as separate PASSES: RectBatch (the SDF rounded-
+// rect instancing above) and InstancedFill (general geometry instancing - a SHARED local mesh drawn N times, per-instance
+// world transform + colour fetched from a StructuredBuffer by SV_InstanceID; docs/RENDER_CACHE_REDESIGN.md §4h/§4j).
+
+#include "Effects/CommonData.fxh"   // UI_VERTEX (the shared mesh's per-vertex layout)
 
 float4x4 Projection;
 
@@ -59,13 +65,63 @@ float4 RectBatchPS(PSInput input) : SV_Target
     return c;
 }
 
+// ---- InstancedFill pass: general retained geometry instancing (§4h/§4j) --------------------------------------------
+// A SHARED local mesh (bound as the only vertex buffer) drawn instanceCount times; each instance's world transform and
+// colour are fetched from this StructuredBuffer by SV_InstanceID. So N identical shapes = ONE instanced draw, and a
+// move/resize/recolour is a patch of one record - no per-frame re-record. Matches Retained/GeometryInstance.cs.
+struct GeometryInstance
+{
+    float4x4 World;   // full per-instance world transform (element local -> world). Matches Matrix4x4F World.
+    float4 Color;     // straight-alpha RGBA (element/brush opacity folded into .w by the producer)
+};
+
+// Read-only: the VS only fetches instances (by SV_InstanceID), so this is a ShaderResourceView (a StructuredBuffer),
+// not a read-write UAV. In Vulkan it is still a DescriptorType.StorageBuffer.
+StructuredBuffer<GeometryInstance> Instances;
+
+struct FillPSInput
+{
+    float4 Position : SV_Position;
+    float4 Color    : COLOR0;
+};
+
+[shader("vertex")]
+FillPSInput InstancedFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
+{
+    GeometryInstance inst = Instances[instanceId];
+    // Local mesh vertex -> world -> clip. Same row-vector form as UIBasicEffect (mul(pos, world) then * Projection),
+    // just with the per-instance World fetched from the SSBO instead of a uniform.
+    float4 world = mul(float4(v.position.xyz, 1.0), inst.World);
+    FillPSInput o;
+    o.Position = mul(world, Projection);
+    o.Color = inst.Color;
+    return o;
+}
+
+[shader("fragment")]
+float4 InstancedFillPS(FillPSInput input) : SV_Target
+{
+    return input.Color;   // solid fill (straight alpha, drawn with AlphaBlend); analytic-AA fringe is a later pass
+}
+
 technique RectBatch
 {
     pass Draw
     {
-        EffectName = "RectBatchEffect";
+        EffectName = "BatchEffect";
         Profile = 6.6;
         VertexShader = RectBatchVS;
         PixelShader = RectBatchPS;
+    }
+}
+
+technique InstancedFill
+{
+    pass Draw
+    {
+        EffectName = "BatchEffect";
+        Profile = 6.6;
+        VertexShader = InstancedFillVS;
+        PixelShader = InstancedFillPS;
     }
 }
