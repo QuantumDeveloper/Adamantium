@@ -1,6 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Extensions;
+using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
 using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Core;
@@ -9,10 +12,11 @@ using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Media.Imaging;
 using Adamantium.UI.Effects.Generated;
 using Adamantium.UI.Rendering.Payloads;
+using Adamantium.UI.Rendering.Retained;
 
 namespace Adamantium.UI.Rendering.RenderUnits;
 
-public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUnit where TPayload : class
+public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUnit, IInstanceableFill where TPayload : class
 {
     protected RenderUnit(IDrawCommand command, RenderUnitContext context) : base(context.GraphicsDevice)
     {
@@ -47,6 +51,19 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
     public UIRenderComponent FillFringeRenderer { get; set; }
 
     public UIRenderComponent GeometryRenderer { get; set; }
+
+    // --- retained geometry-instancing (IInstanceableFill) -------------------------------------------------------------
+    public bool FillInstanced { get; set; }
+
+    // Not instanceable by default (a unit draws its fill body per-unit). GeometryRenderUnit overrides this for solid
+    // arbitrary geometry so N identical shapes collapse to one instanced draw.
+    public virtual bool TryGetInstancedFill(out GeometryKey key, out object mesh, out Vector4F color)
+    {
+        key = default;
+        mesh = null;
+        color = default;
+        return false;
+    }
 
     protected void ProcessStrokeData(Pen pen, Geometry geometry)
     {
@@ -200,8 +217,9 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
 
     public virtual void Render()
     {
-        // Body first, then its analytic-AA fringe on top of the edge, then the stroke over the fill.
-        GeometryRenderer?.Render();
+        // Body first, then its analytic-AA fringe on top of the edge, then the stroke over the fill. The body is SKIPPED
+        // when it went to the retained instanced renderer (FillInstanced) - its fringe/stroke still draw over the instance.
+        if (!FillInstanced) GeometryRenderer?.Render();
         FillFringeRenderer?.Render();
         StrokeRenderer?.Render();
     }
@@ -232,6 +250,47 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
         GeometryRenderer.RenderData = DrawCommand.RenderData;
         ProcessFillFringe(Payload.Geometry, Payload.Brush);
         ProcessStrokeData(Payload.Pen, Payload.Geometry);
+    }
+
+    // Solid arbitrary geometry is instanceable: N identical Paths share one mesh + one instanced draw. A gradient/image
+    // fill (or a mesh with no indices) falls back to the per-unit body. The shape key - a fingerprint over the mesh's
+    // vertices + indices - is cached per mesh, recomputed only when the tessellation actually changes.
+    private object _fpMesh;
+    private GeometryKey _fpKey;
+
+    public override bool TryGetInstancedFill(out GeometryKey key, out object mesh, out Vector4F color)
+    {
+        key = default; mesh = null; color = default;
+        if (Payload.Brush is not SolidColorBrush solid) return false;
+        var m = Payload.Geometry?.Mesh;
+        if (m is not { Indices.Length: > 0 }) return false;
+
+        if (!ReferenceEquals(m, _fpMesh))
+        {
+            _fpKey = GeometryKey.ArbitraryMesh(Fingerprint(m));
+            _fpMesh = m;
+        }
+        key = _fpKey;
+        mesh = m;
+        var c = solid.Color.ToVector4();
+        // same bake as the per-unit fill: colour x brush opacity x element opacity
+        c.W *= (float)(solid.Opacity * (DrawCommand?.RenderData?.Opacity ?? 1.0f));
+        color = c;
+        return true;
+    }
+
+    // Stable content hash of the LOCAL mesh (vertex bytes + indices): identical tessellations share a key/segment, and
+    // ANY difference - including size - yields a different key, so same-topology-different-size shapes never merge.
+    private static long Fingerprint(Mesh mesh)
+    {
+        unchecked
+        {
+            ulong h = 14695981039346656037UL;   // FNV-1a
+            foreach (var b in MemoryMarshal.AsBytes(mesh.ToUIVertices().AsSpan())) { h ^= b; h *= 1099511628211UL; }
+            var idx = mesh.Indices;
+            for (var i = 0; i < idx.Length; i++) { h ^= (uint)idx[i]; h *= 1099511628211UL; }
+            return (long)h;
+        }
     }
 
     public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
