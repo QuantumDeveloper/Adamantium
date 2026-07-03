@@ -195,10 +195,11 @@ public class LayoutManagerTests
         });
     }
 
-    // F1: a per-frame layout time budget defers work past the deadline to the next frame, and that deferred work
-    // completes over subsequent frames. A zero budget processes ~one node per phase per pass (with forward progress).
+    // F1 (Phase B/C contract): a per-frame layout time budget defers OFF-SCREEN work past the deadline to the next frame
+    // (on-screen work is never deferred - see FrameBudget_NeverDefersOnScreenWork), and that deferred work completes over
+    // subsequent frames. A zero budget processes the on-screen prefix + ~one off-screen node per pass (forward progress).
     [Test]
-    public void FrameBudget_DefersWorkAndCompletesOverFrames()
+    public void FrameBudget_DefersOffScreenWorkAndCompletesOverFrames()
     {
         var stack = new StackPanel { Orientation = Orientation.Vertical };
         var children = new List<Border>();
@@ -208,7 +209,9 @@ public class LayoutManagerTests
             children.Add(b);
             stack.Children.Add(b);
         }
-        var root = new Border { Width = 100, Height = 1000, Child = stack };
+        // A 30px-tall viewport: only kids 0-2 are on-screen; kids 3..19 are off-screen and thus budget-deferrable.
+        var root = new TestWindowRoot { Width = 100, Height = 30, ClientWidth = 100, ClientHeight = 30 };
+        root.Children.Add(stack);
         WindowExtension.UpdateTree(root);   // settle
 
         foreach (var b in children) b.InvalidateArrange();   // 20 independent dirty arrange entries
@@ -216,15 +219,15 @@ public class LayoutManagerTests
         var savedBudget = LayoutManager.FrameBudget;
         try
         {
-            LayoutManager.FrameBudget = TimeSpan.Zero;   // process ~one node per phase per pass
+            LayoutManager.FrameBudget = TimeSpan.Zero;   // on-screen prefix + ~one off-screen node per pass
             var arrangeBefore = MeasurableUIComponent.TotalArrangeCalls;
             WindowExtension.UpdateTree(root);
             var firstPass = MeasurableUIComponent.TotalArrangeCalls - arrangeBefore;
 
             Assert.Multiple(() =>
             {
-                Assert.That(firstPass, Is.GreaterThan(0), "forward progress: at least one node processed under a zero budget");
-                Assert.That(firstPass, Is.LessThan(20), "a zero budget defers most work to later frames");
+                Assert.That(firstPass, Is.GreaterThan(0), "forward progress: at least the on-screen prefix is processed");
+                Assert.That(firstPass, Is.LessThan(20), "a zero budget defers the off-screen tail to later frames");
             });
 
             for (var f = 0; f < 40 && children.Any(b => !((IMeasurableComponent)b).IsArrangeValid); f++)
@@ -236,10 +239,12 @@ public class LayoutManagerTests
         finally { LayoutManager.FrameBudget = savedBudget; }
     }
 
-    // F1 refinement: under a budget, on-screen dirty nodes are processed before off-screen ones (the off-screen work
-    // is what gets deferred).
+    // F1 refinement (Phase B/C): on-screen dirty nodes are NEVER budget-deferred - the whole visible prefix is laid out
+    // in the first pass, and only the off-screen tail spills to later frames. (Deferring an on-screen node would render
+    // it before layout: a freshly-realized container piles at the origin = the resize "garble"; a cohesive control tears
+    // = a slider's thumb, positioned by arrange, lags its immediately-set fill.)
     [Test]
-    public void FrameBudget_ProcessesVisibleNodesBeforeOffScreen()
+    public void FrameBudget_NeverDefersOnScreenWork()
     {
         var root = new TestWindowRoot { Width = 200, Height = 200, ClientWidth = 200, ClientHeight = 200 };
         var stack = new StackPanel { Orientation = Orientation.Vertical };
@@ -253,15 +258,15 @@ public class LayoutManagerTests
         var savedBudget = LayoutManager.FrameBudget;
         try
         {
-            LayoutManager.FrameBudget = TimeSpan.Zero;   // ~one node/pass
-            for (var p = 0; p < 3; p++) WindowExtension.UpdateTree(root);   // 3 passes (< the anti-starvation threshold)
+            LayoutManager.FrameBudget = TimeSpan.Zero;   // ~one node/pass PAST the protected on-screen prefix
+            WindowExtension.UpdateTree(root);   // a SINGLE pass
 
             Assert.Multiple(() =>
             {
+                for (var i = 0; i < 4; i++)
+                    Assert.That(((IMeasurableComponent)kids[i]).IsArrangeValid, Is.True, $"on-screen kid {i} must never be budget-deferred (laid out in the first pass)");
                 for (var i = 4; i < 8; i++)
-                    Assert.That(((IMeasurableComponent)kids[i]).IsArrangeValid, Is.False, $"off-screen kid {i} must be deferred behind the visible ones");
-                Assert.That(Enumerable.Range(0, 4).Count(i => ((IMeasurableComponent)kids[i]).IsArrangeValid), Is.GreaterThan(0),
-                    "on-screen kids are processed first");
+                    Assert.That(((IMeasurableComponent)kids[i]).IsArrangeValid, Is.False, $"off-screen kid {i} is deferred behind the visible prefix");
             });
         }
         finally { LayoutManager.FrameBudget = savedBudget; }
@@ -275,7 +280,10 @@ public class LayoutManagerTests
         var stack = new StackPanel { Orientation = Orientation.Vertical };
         var kids = new List<Border>();
         for (var i = 0; i < 30; i++) { var b = new Border { Width = 40, Height = 10 }; kids.Add(b); stack.Children.Add(b); }
-        var root = new Border { Width = 100, Height = 2000, Child = stack };
+        // Small viewport (20px): kids 0-1 are on-screen, kids 2..29 off-screen - a big off-screen backlog for the budget
+        // to defer, so the anti-starvation drop is what has to clear it (on-screen work is never deferred, so it can't).
+        var root = new TestWindowRoot { Width = 100, Height = 20, ClientWidth = 100, ClientHeight = 20 };
+        root.Children.Add(stack);
         WindowExtension.UpdateTree(root);
 
         foreach (var b in kids) b.InvalidateArrange();
@@ -283,7 +291,7 @@ public class LayoutManagerTests
         var savedBudget = LayoutManager.FrameBudget;
         try
         {
-            LayoutManager.FrameBudget = TimeSpan.Zero;   // 1 node/pass without anti-starvation -> would need ~30 passes
+            LayoutManager.FrameBudget = TimeSpan.Zero;   // 1 off-screen node/pass without anti-starvation -> ~28 passes
             var passes = 0;
             while (kids.Any(b => !((IMeasurableComponent)b).IsArrangeValid) && passes < 50)
             {

@@ -12,6 +12,13 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
 
    private Dictionary<Type, PropertyMetadata> defaultValues;
 
+   // Memoises GetDefaultMetadata(concreteType): the raw resolve walks the base-type chain via reflection
+   // (GetTypeInfo().BaseType) until it finds an entry in `defaultValues`, and it ran on EVERY property read + write (the
+   // inherit branch of GetValue, and RunSetValueSequence) - several reflection hops per access for a deeply-derived type
+   // (e.g. Border). Keyed by the concrete type; invalidated whenever defaultValues changes (registration/OverrideMetadata,
+   // both static-init-time only, so this Clear never runs hot).
+   private readonly System.Collections.Concurrent.ConcurrentDictionary<Type, PropertyMetadata> metadataCache = new();
+
    private HashSet<Type> registeredTypes;
 
    private static Int32 nextPropertyId = 1;
@@ -79,6 +86,7 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
       }
 
       defaultValues.Add(ownerType, metadata);
+      metadataCache.Clear();   // a previously-resolved (base-walked) entry may now resolve to this newer, more-derived one
    }
 
    /// <summary>
@@ -93,6 +101,13 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
          throw new ArgumentNullException(nameof(ownerType));
       }
 
+      return metadataCache.GetOrAdd(ownerType, ResolveDefaultMetadata);
+   }
+
+   // Walks the type's ancestry for the nearest declared metadata (most-derived wins). Called once per concrete type, then
+   // cached - see metadataCache.
+   private PropertyMetadata ResolveDefaultMetadata(Type ownerType)
+   {
       while (ownerType != null)
       {
          if (defaultValues.TryGetValue(ownerType, out var result))

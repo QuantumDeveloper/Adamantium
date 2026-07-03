@@ -100,39 +100,52 @@ public class WrapPanel : VirtualizingPanel
             childSize.Height = itemHeight;
          }
 
+         // The panel's cross-axis extent is the sum of LINE sizes (each line = the max child along the cross axis); it must
+         // grow once per COMPLETED line, i.e. only when a child wraps to the next one (plus a final flush after the loop).
+         // The previous code accumulated lineSize into desiredSize on EVERY child, so a single row of N items reported a
+         // height of sum(item heights) instead of the row's height - inflating the panel ~N× (the huge empty WrapPanel).
          if (Orientation == Orientation.Horizontal)
          {
-            if (lineSize.Width + childSize.Width < availableSize.Width)
+            if (lineSize.Width + childSize.Width > availableSize.Width)   // wrap (matches ArrangePlain's <= "fits")
+            {
+               desiredSize.Width = Math.Max(desiredSize.Width, lineSize.Width);
+               desiredSize.Height += lineSize.Height;
+               lineSize = childSize;
+            }
+            else
             {
                lineSize.Width += childSize.Width;
                lineSize.Height = Math.Max(lineSize.Height, childSize.Height);
             }
-            else //moving to next line
-            {
-               desiredSize.Width = Math.Max(lineSize.Width, availableSize.Width);
-               desiredSize.Height += lineSize.Height;
-               lineSize = childSize;
-            }
-            desiredSize.Width = Math.Max(lineSize.Width, desiredSize.Width);
-            desiredSize.Height += lineSize.Height;
          }
          else
          {
-            if (lineSize.Height + childSize.Height < availableSize.Height)
+            if (lineSize.Height + childSize.Height > availableSize.Height)
+            {
+               desiredSize.Height = Math.Max(desiredSize.Height, lineSize.Height);
+               desiredSize.Width += lineSize.Width;
+               lineSize = childSize;
+            }
+            else
             {
                lineSize.Height += childSize.Height;
                lineSize.Width = Math.Max(lineSize.Width, childSize.Width);
             }
-            else //moving to next line
-            {
-               desiredSize.Height = Math.Max(lineSize.Height, availableSize.Height);
-               desiredSize.Width += lineSize.Width;
-               lineSize = childSize;
-            }
-            desiredSize.Height = Math.Max(lineSize.Height, desiredSize.Height);
-            desiredSize.Width += lineSize.Width;
          }
       }
+
+      // Flush the final (in-progress) line.
+      if (Orientation == Orientation.Horizontal)
+      {
+         desiredSize.Width = Math.Max(desiredSize.Width, lineSize.Width);
+         desiredSize.Height += lineSize.Height;
+      }
+      else
+      {
+         desiredSize.Height = Math.Max(desiredSize.Height, lineSize.Height);
+         desiredSize.Width += lineSize.Width;
+      }
+
       return desiredSize;
    }
 
@@ -348,6 +361,13 @@ public class WrapPanel : VirtualizingPanel
    // axis is left free so the item reports its natural size and we can grow the cell to fit it (text stays on one line).
    private Size CellConstraint(bool horizontal)
    {
+      // BOTH axes pinned (the uniform-tile case, e.g. the slider-driven grid): the item's MEASURED size is never used -
+      // GrowCell can't grow a pinned axis and ArrangeVirtualized forces every item to the exact cell. So measure with an
+      // UNBOUNDED (constant) constraint instead of the cell: it doesn't change when the cell does, so each item's measure
+      // gate SKIPS re-measuring the whole visible grid on every cell change (a slider drag). Only genuinely new/dirty
+      // items measure; the rest just re-ARRANGE into the new cell. This is the fix for the resize re-measure storm.
+      if (!double.IsNaN(ItemWidth) && !double.IsNaN(ItemHeight)) return Size.Infinity;
+
       var flow = (horizontal ? !double.IsNaN(ItemWidth) : !double.IsNaN(ItemHeight)) ? _cellFlow : double.PositiveInfinity;
       var scroll = (horizontal ? !double.IsNaN(ItemHeight) : !double.IsNaN(ItemWidth)) ? _cellScroll : double.PositiveInfinity;
       return horizontal ? new Size(flow, scroll) : new Size(scroll, flow);

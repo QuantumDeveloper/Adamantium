@@ -252,24 +252,25 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         }
 
         object result;
-        bool hasExplicit;
         lock (values)
         {
             result = GetOrCalculateEffectiveValue(property);
-            hasExplicit = HasExplicitValue(property);
         }
 
         if (result == AdamantiumProperty.UnsetValue)
         {
             result = GetDefaultValue(property);
         }
-        else if (inheritanceParent != null && !hasExplicit)
+        else if (inheritanceParent != null)
         {
             // The constructor seeds every property with its Default value, so the effective value never falls through
             // to GetDefaultValue's inheritance path. When an Inherits property has no explicit (locally-set) value,
-            // defer to the inheritance parent here instead — this is what carries DataContext down the tree.
+            // defer to the inheritance parent here instead — this is what carries DataContext down the tree. Resolve the
+            // metadata FIRST and only scan for an explicit value when the property actually inherits: the vast majority
+            // of reads are non-Inherits (Width/Margin/Alignment/... hammered by measure+arrange) and now skip the
+            // HasExplicitValue priority-scan (a lock + a 6-slot loop) entirely.
             var metadata = property.GetDefaultMetadata(GetType());
-            if (metadata is { Inherits: true })
+            if (metadata is { Inherits: true } && !HasExplicitValue(property))
             {
                 result = inheritanceParent.GetValue(property);
             }
@@ -478,21 +479,20 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
     private object GetOrCalculateEffectiveValue(AdamantiumProperty property)
     {
-        if (!values.ContainsKey(property)) return AdamantiumProperty.UnsetValue;
-        
-        var value = AdamantiumProperty.UnsetValue;
-        
-        foreach (var val in values[property].Values)
+        // One dictionary lookup (was three: ContainsKey + two indexers), and NO write-back. The Effective slot was
+        // rewritten on every read but nothing ever reads it - the resolution below scans the SOURCE slots
+        // (Animation..Default) and the Effective slot is only a trailing cache - so that write plus its extra lookups were
+        // pure overhead on the hottest path in the engine (measure+arrange read Margin/alignment/min-max on every node).
+        if (!values.TryGetValue(property, out var container)) return AdamantiumProperty.UnsetValue;
+
+        var slots = container.Values;
+        for (var i = 0; i <= (int)ValuePriority.Default; i++)   // source priorities only; skip the derived Effective slot
         {
-            if (val == AdamantiumProperty.UnsetValue) continue;
-            value = val;
-            break;
+            var val = slots[i];
+            if (val != AdamantiumProperty.UnsetValue) return val;
         }
-        
-        values[property].SetValue(value, ValuePriority.Effective);
 
-
-        return value;
+        return AdamantiumProperty.UnsetValue;
     }
 
     private void RunSetValueSequence(AdamantiumProperty property, object value, ValuePriority priority, bool raiseValueChangedEvent)

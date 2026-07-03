@@ -176,6 +176,16 @@ public class Slider : RangeBase
     // Setting Width carries AffectsRender, so it repaints live - a part sized only by the Track's arrange would not.
     protected override void OnValueChanged(double oldValue, double newValue)
     {
+        // Drive the thumb IN LOCKSTEP with the fill. The fill is set synchronously below, but the thumb is positioned by
+        // the Track's arrange off Track.Value - a (batched, next-frame) TemplateBinding to our Value - so without this the
+        // thumb lags the fill by a frame on every change (the visible thumb/fill desync while dragging). Push the value to
+        // the Track now at Binding priority (the same slot the TemplateBinding writes, so it neither masks the binding nor
+        // is masked by it), then re-arrange the Track this frame so the thumb moves together with the fill.
+        if (_track != null)
+        {
+            _track.SetValue(Track.ValueProperty, newValue, ValuePriority.Binding);
+            ForceArrangeTrack();
+        }
         UpdateFill();
         ForceArrangeFill();
     }
@@ -230,6 +240,14 @@ public class Slider : RangeBase
         if (_selectionRange is not IMeasurableComponent m || m.PreviousArrangeSlot is not { } slot) return;
         _selectionRange.Measure(new Size(slot.Width, slot.Height), force: true);
         _selectionRange.Arrange(slot);
+    }
+
+    // Re-arrange the Track into the slot it already occupies, synchronously, so the thumb repositions THIS frame (mirrors
+    // ForceArrangeFill). Without it the thumb waits for the next layout pass to pick up the batched Track.Value binding.
+    private void ForceArrangeTrack()
+    {
+        if (_track is IMeasurableComponent m && m.PreviousArrangeSlot is { } slot)
+            _track.Arrange(slot, force: true);
     }
 
     // Only re-set on a real change so layout settles instead of looping (NaN = never set yet -> always set the first time).
