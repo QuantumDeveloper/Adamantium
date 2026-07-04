@@ -115,8 +115,8 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         try
         {
             OnPropertyChanged(e);
-            property.OnChanged(e);
-            
+            property.RaiseChanged(this, e);   // global per-property hook: sender = THIS component (identity), not the property
+
             PropertyChanged?.Invoke(this, e);
             
             RaiseComponentUpdated();

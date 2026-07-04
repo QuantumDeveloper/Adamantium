@@ -68,6 +68,18 @@ public sealed class LayoutManager
     /// ancestor and getting (or creating) that root's manager.</summary>
     public static LayoutManager For(IUIComponent node)
     {
+        // The node's root visual is already cached and kept current by the attach/detach walk (SetVisualParent propagates
+        // RootVisual through the WHOLE subtree on both attach and detach), so read it directly - O(1) - instead of walking
+        // to the top on every call. For() is on the layout invalidation hot path: every InvalidateMeasure/InvalidateArrange
+        // resolves the owning manager through here. A not-yet-attached subtree (or a plain non-root test tree) has
+        // RootVisual == null; fall back to the walk so its local top still owns a manager - the same key the layout pass is
+        // driven from (GetOrCreate(window/root)), so the resolved manager is identical either way.
+        var root = node.RootVisual;
+        if (root != null)
+        {
+            return GetOrCreate(root);
+        }
+
         var top = node;
         while (top.VisualParent != null)
         {

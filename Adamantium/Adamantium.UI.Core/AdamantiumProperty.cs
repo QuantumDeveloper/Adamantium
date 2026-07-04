@@ -120,11 +120,23 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
       return null;
    }
 
-   public event EventHandler<AdamantiumPropertyChangedEventArgs> NotifyChanged;
+   /// <summary>
+   /// Global per-property change hook (Avalonia-style class handler). Raised for EVERY change of THIS property on ANY
+   /// component, with <c>sender</c> = the COMPONENT that changed (so a handler knows the source and can filter by
+   /// type/instance) and <c>e</c> carrying the property + old/new value.
+   /// <para>Intended for a BOUNDED set of cross-cutting handlers - subscribe ONCE (typically per control type in a static
+   /// ctor), then filter by sender. NEVER add one handler per live instance: this event fires for ALL instances, so a
+   /// per-instance subscription re-creates an O(live-instances) fan-out on every set - the exact anti-pattern that made a
+   /// templated list's scroll O(N). For reacting to a change on a SPECIFIC object, use that instance's
+   /// <see cref="AdamantiumComponent.PropertyChanged"/> (which <see cref="Data.TemplateBindingExpression"/> now uses).</para>
+   /// </summary>
+   public event EventHandler<AdamantiumPropertyChangedEventArgs> Changed;
 
-   internal void OnChanged(AdamantiumPropertyChangedEventArgs e)
+   /// <param name="source">The component whose property changed - passed as the event <c>sender</c> so handlers have the
+   /// source's identity (the missing piece that previously forced blind reactions).</param>
+   internal void RaiseChanged(object source, AdamantiumPropertyChangedEventArgs e)
    {
-      NotifyChanged?.Invoke(this, e);
+      Changed?.Invoke(source, e);
    }
 
    private AdamantiumProperty(String name, Type valueType, Type ownerType )

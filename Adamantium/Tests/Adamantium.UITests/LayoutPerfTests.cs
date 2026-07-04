@@ -115,4 +115,5 @@ public class LayoutPerfTests
         Assert.That(reMeasure, Is.LessThan(realized * 1.5),
             $"pinned-cell WrapPanel must not re-measure the visible grid on a cell change (got {reMeasure} for {realized} tiles)");
     }
+
 }

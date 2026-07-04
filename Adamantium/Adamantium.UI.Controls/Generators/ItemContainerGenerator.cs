@@ -17,6 +17,9 @@ public class ItemContainerGenerator
     private readonly Dictionary<IUIComponent, int> _indexByContainer = new();
     private readonly Stack<IUIComponent> _recyclePool = new();
     private readonly HashSet<IUIComponent> _generated = new();   // containers we created (recyclable); item-is-own are not
+    private readonly List<IUIComponent> _donorBuf = new();       // reused across SetWindow calls - zero per-scroll-frame alloc
+    private readonly List<int> _outKeysBuf = new();
+    private readonly List<IUIComponent> _surplusBuf = new();
 
     public ItemContainerGenerator(ItemsControl owner)
     {
@@ -58,8 +61,14 @@ public class ItemContainerGenerator
     {
         // 1. Unmap every realized index now outside the window; its generated container becomes a reusable donor (kept
         //    fully intact - same visual, same DataContext - until step 2 rebinds it). Item-is-own-container isn't reused.
-        var donors = new List<IUIComponent>();
-        foreach (var idx in _byIndex.Keys.Where(k => k < first || k > last).ToList())
+        // Reused buffers + a plain loop (no LINQ closure/ToList): SetWindow runs every scroll frame, so the old per-call
+        // Where().ToList() + two fresh Lists were the GC spikes (25-57 ms pauses) seen under scroll.
+        var donors = _donorBuf;
+        donors.Clear();
+        _outKeysBuf.Clear();
+        foreach (var idx in _byIndex.Keys)
+            if (idx < first || idx > last) _outKeysBuf.Add(idx);   // snapshot: can't remove from _byIndex mid-enumeration
+        foreach (var idx in _outKeysBuf)
         {
             var container = _byIndex[idx];
             _byIndex.Remove(idx);
@@ -93,23 +102,23 @@ public class ItemContainerGenerator
             }
             _byIndex[i] = container;
             _indexByContainer[container] = i;
-            // In-window => visible: a recycled donor was Collapsed as surplus and now holds a new item, so re-show it.
-            // Maintaining this invariant HERE lets the panel skip valid slots on IsMeasureValid alone (no per-slot
-            // Visibility DP read on the scroll hot path) and stops a rebound tile silently going missing. The rebound
-            // content updates via its bindings -> re-render; its size doesn't need re-measuring (a uniform cell forces it).
-            container.Visibility = Visibility.Visible;
+            // In-window => visible: a recycled donor parked as surplus was Collapsed and now holds a new item, so re-show
+            // it (keeps the panel's IsMeasureValid-only skip correct + stops a rebound tile silently going missing). Guard
+            // the set: an out-of-window donor reused in place is ALREADY Visible, and Visibility set would otherwise
+            // re-propagate down its whole subtree every rebind on the scroll hot path.
+            if (container.Visibility != Visibility.Visible) container.Visibility = Visibility.Visible;
         }
 
         // 3. Donors not reused (the window shrank) - park them for when it grows again, and report them so the panel
         //    hides ONLY these. During steady scroll donors == orphans, so this is empty and nothing is ever collapsed.
         if (next >= donors.Count) return System.Array.Empty<IUIComponent>();
-        var surplus = new List<IUIComponent>();
+        _surplusBuf.Clear();   // reused; the caller iterates it synchronously before the next SetWindow
         for (; next < donors.Count; next++)
         {
             _recyclePool.Push(donors[next]);
-            surplus.Add(donors[next]);
+            _surplusBuf.Add(donors[next]);
         }
-        return surplus;
+        return _surplusBuf;
     }
 
     private IUIComponent ProduceContainer(object item)
