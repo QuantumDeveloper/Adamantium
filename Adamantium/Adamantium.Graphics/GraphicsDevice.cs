@@ -1377,6 +1377,24 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         commandBuffer.DrawIndexed(indexCount > 0 ? indexCount : (uint)indexBuffer.ElementCount, instanceCount, 0, 0, 0);
     }
 
+    // Non-indexed instanced draw: binds the vertex buffer and draws vertexCount vertices as instanceCount instances. For
+    // a mesh that is an explicit triangle list with no index buffer (how UI shape fills tessellate) - the non-indexed
+    // twin of DrawIndexed; instancing (instanceCount) works identically, indices are not required.
+    public void Draw(IBuffer vertexBuffer, uint vertexCount, uint instanceCount = 1)
+    {
+        ulong offset = 0;
+        var commandBuffer = commandBuffers[CurrentFrame];
+
+        // BIND the vertex buffer BEFORE SetDrawingState (the proven SetVertexBuffer()+Draw() order). SetDrawingState emits
+        // the DYNAMIC vertex-input (SetVertexInputEXT); binding the buffer AFTER that emit read back as zero on this driver
+        // (a valid, populated buffer that the shader still fetched as 0 -> collapsed geometry, no fragments, no VL error).
+        commandBuffer.BindVertexBuffers(0, 1, vertexBuffer.GetBuffer(), offset);
+
+        SetDrawingState(commandBuffer);
+
+        commandBuffer.Draw(vertexCount, instanceCount, 0, 0);
+    }
+
     // --- GPU-driven geometry (compute amplification -> indirect draw) ---------------------------------------------
     // Building blocks for the stroke/line compute pipeline: a compute pass writes vertices + a draw-args buffer into
     // SSBOs, a barrier makes those writes visible, then an indirect draw consumes them. The amount of geometry is

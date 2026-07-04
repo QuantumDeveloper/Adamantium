@@ -23,9 +23,10 @@ namespace Adamantium.UI.Rendering.Retained;
 /// </summary>
 internal sealed class RetainedGeometryRenderer : DeferredDisposableObject
 {
-    // A/B gate for the retained-instancing path (RETAINED_INSTANCING=1). Off => every fill draws per-unit as before, so
-    // the instanced output can be snapshot-compared against the proven path.
-    public static readonly bool Enabled = Environment.GetEnvironmentVariable("RETAINED_INSTANCING") == "1";
+    // PARKED: the instanced-fill GPU path is a work-in-progress that does not render yet (valid pipeline/shaders/buffer/
+    // instance data, no validation errors, but zero fragments - see RENDER notes). Off = every fill draws per-unit as
+    // before (correct output). Flip to true to resume the WIP - the non-indexed feed + demo + gated diagnostics are ready.
+    public static readonly bool Enabled = false;
 
     private const MemoryPropertyFlags Mem = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal;
 
@@ -40,7 +41,9 @@ internal sealed class RetainedGeometryRenderer : DeferredDisposableObject
         public ReusableBuffer Ssbo;
         public Buffer VtxBuffer;
         public Buffer IdxBuffer;
+        public uint VertexCount;
         public uint IndexCount;
+        public bool Indexed;   // false = non-indexed triangle list (Draw), true = indexed (DrawIndexed)
         public PrimitiveType Topology;
         public bool MeshUploaded;
     }
@@ -63,14 +66,23 @@ internal sealed class RetainedGeometryRenderer : DeferredDisposableObject
     {
         // Shared InstancedFill state (all segments draw the same way; only the mesh topology varies per segment).
         _effect.Projection.SetValue(projection);
+        if (!_projDumped)   // TEMP: is the Projection reaching this draw a valid window ortho, or zero/garbage?
+        {
+            _projDumped = true;
+            Console.WriteLine($"[PROJDUMP] M11={projection.M11:F5} M22={projection.M22:F5} M33={projection.M33:F5} " +
+                $"M41={projection.M41:F3} M42={projection.M42:F3} M44={projection.M44:F3}");
+        }
         _device.VertexType = typeof(UIVertex);
         _device.PolygonMode = PolygonMode.Fill;
+        _device.RasterizerDiscardEnabled = false;   // this pass RASTERISES - a prior compute pass (fringe/stroke expander) may have left discard ON
+        _device.CullMode = CullModeFlagBits.None;    // 2D fills: never cull (tessellated winding is arbitrary)
         _device.ColorBlendEnabled = true;
         _device.ColorBlendEquation = ColorBlendEquations.AlphaBlend;
         _device.DepthTestEnabled = true;
         _device.DepthWriteEnable = true;
         _device.DepthCompareFunction = CompareOp.Always;
 
+        var __drawnSegs = 0; var __totalInst = 0;   // TEMP diagnostics
         foreach (var segment in registry.Segments)
         {
             var count = segment.Instances.Count;
@@ -79,12 +91,38 @@ internal sealed class RetainedGeometryRenderer : DeferredDisposableObject
             var gpu = GetOrCreate(segment);
             if (gpu == null) continue;   // no drawable mesh yet
 
-            _effect.Instances.SetResource(UploadInstances(gpu, segment.Instances, count));
+            if (__dumpKeys.Add(segment.Key) && count > 0)   // TEMP: dump each distinct segment's first instance once
+            {
+                var inst = segment.Instances.Span[0];
+                Console.WriteLine($"[INSTDUMP] count={count} verts={gpu.VertexCount} indexed={gpu.Indexed} " +
+                    $"World[M11={inst.World.M11:F2} M22={inst.World.M22:F2} M41={inst.World.M41:F1} M42={inst.World.M42:F1}] " +
+                    $"Color=({inst.Color.X:F2},{inst.Color.Y:F2},{inst.Color.Z:F2},{inst.Color.W:F2})");
+            }
+
+            _effect.InstancesAddress.SetValue(UploadInstances(gpu, segment.Instances, count).GetDeviceAddress());
+            // Match the WORKING RectBatch order: bind the vertex buffer + topology BEFORE Apply, then a plain Draw. Apply
+            // sends the push-data (Projection / InstancesAddress) as its LAST act; binding the vertex buffer AFTER Apply
+            // (the earlier Draw(buffer,...) form) reset that push data, so the shader read zeroes and the geometry
+            // collapsed to a point - a valid draw that emitted no fragments (no validation error).
+            _device.SetVertexBuffer(gpu.VtxBuffer);
             _device.PrimitiveTopology = gpu.Topology;
             _effect.InstancedFillDrawPass.Apply();
-            _device.DrawIndexed(gpu.VtxBuffer, gpu.IdxBuffer, instanceCount: (uint)count, indexCount: gpu.IndexCount);
+            if (gpu.Indexed)
+                _device.DrawIndexed(gpu.VtxBuffer, gpu.IdxBuffer, instanceCount: (uint)count, indexCount: gpu.IndexCount);
+            else
+                _device.Draw(gpu.VertexCount, (uint)count);
+            __drawnSegs++; __totalInst += count;
+        }
+        if (__drawnSegs != _lastSegs || __totalInst != _lastInst)   // TEMP: log only when the shape changes
+        {
+            _lastSegs = __drawnSegs; _lastInst = __totalInst;
+            Console.WriteLine($"[INSTANCING] segments(draws)={__drawnSegs} totalInstances={__totalInst}");
         }
     }
+
+    private int _lastSegs = -1, _lastInst = -1;   // TEMP diagnostics
+    private readonly HashSet<GeometryKey> __dumpKeys = new();   // TEMP
+    private bool _projDumped;   // TEMP
 
     // Build (once) the shared vtx/idx buffers for a segment's local mesh. Returns null until the segment has a drawable
     // mesh (its Mesh is a Mesh with indices) - an empty/released segment is simply skipped this frame.
@@ -94,20 +132,31 @@ internal sealed class RetainedGeometryRenderer : DeferredDisposableObject
 
         if (segment.Mesh is not Mesh mesh) return null;
         var vertices = mesh.ToUIVertices();
+        if (vertices.Length == 0) return null;
+        if (vertices.Length >= 3)   // TEMP: verify the CPU vertex data that gets uploaded (the buffer's source)
+            Console.WriteLine($"[VTXDUMP] verts={vertices.Length} stride={VertexStride} " +
+                $"v0=({vertices[0].Position.X:F1},{vertices[0].Position.Y:F1},{vertices[0].Position.Z:F1}) " +
+                $"v1=({vertices[1].Position.X:F1},{vertices[1].Position.Y:F1}) v2=({vertices[2].Position.X:F1},{vertices[2].Position.Y:F1})");
         var indices = mesh.Indices;
-        if (indices is not { Length: > 0 } || vertices.Length == 0) return null;
+        var indexed = indices is { Length: > 0 };   // UI shape fills tessellate to a NON-indexed list; support both
 
         gpu ??= new GpuSegment();
         gpu.Vtx ??= ToDispose(_bufferManager.CreateBuffer(BufferUsageFlags.VertexBuffer, Mem));
-        gpu.Idx ??= ToDispose(_bufferManager.CreateBuffer(BufferUsageFlags.IndexBuffer, Mem));
-        gpu.Ssbo ??= ToDispose(_bufferManager.CreateBuffer(BufferUsageFlags.StorageBuffer, Mem));
+        gpu.Ssbo ??= ToDispose(_bufferManager.CreateBuffer(BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem));
 
         gpu.VtxBuffer = gpu.Vtx.Acquire((ulong)(vertices.Length * VertexStride), out var writeV);
         if (writeV) gpu.VtxBuffer.SetData(vertices, 0, (uint)vertices.Length);
-        gpu.IdxBuffer = gpu.Idx.Acquire((ulong)(indices.Length * sizeof(int)), out var writeI);
-        if (writeI) gpu.IdxBuffer.SetData(indices, 0, (uint)indices.Length);
+        gpu.VertexCount = (uint)vertices.Length;
 
-        gpu.IndexCount = (uint)indices.Length;
+        gpu.Indexed = indexed;
+        if (indexed)
+        {
+            gpu.Idx ??= ToDispose(_bufferManager.CreateBuffer(BufferUsageFlags.IndexBuffer, Mem));
+            gpu.IdxBuffer = gpu.Idx.Acquire((ulong)(indices.Length * sizeof(int)), out var writeI);
+            if (writeI) gpu.IdxBuffer.SetData(indices, 0, (uint)indices.Length);
+            gpu.IndexCount = (uint)indices.Length;
+        }
+
         gpu.Topology = mesh.MeshTopology;
         gpu.MeshUploaded = true;
         _gpu[segment.Key] = gpu;

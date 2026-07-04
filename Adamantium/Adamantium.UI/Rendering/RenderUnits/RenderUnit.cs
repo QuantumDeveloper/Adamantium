@@ -263,7 +263,10 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
         key = default; mesh = null; color = default;
         if (Payload.Brush is not SolidColorBrush solid) return false;
         var m = Payload.Geometry?.Mesh;
-        if (m is not { Indices.Length: > 0 }) return false;
+        // Instanceable if the mesh has drawable vertices - an indexed OR a non-indexed triangle list. UI shape fills
+        // tessellate to a NON-indexed list, so requiring indices excluded them all; the retained renderer picks
+        // DrawIndexed vs Draw off the mesh. Only a null/empty mesh (or non-solid brush) falls back to the per-unit body.
+        if (m is not { HasPoints: true }) return false;
 
         if (!ReferenceEquals(m, _fpMesh))
         {

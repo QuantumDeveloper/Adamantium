@@ -12,7 +12,7 @@
                 Margin="16">
         <TabControl.ItemTemplate>
             <DataTemplate>
-                <TextBlock Text="{Binding Header}"/>
+                <TextBlock Text="{Binding Header}" VerticalTextAlignment="Center"/>
             </DataTemplate>
         </TabControl.ItemTemplate>
         <TabControl.ContentTemplateSelector>
