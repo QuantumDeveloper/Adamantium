@@ -195,15 +195,17 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     private IntPtr HandleActivate(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
         var state = Messages.GetWindowActivationState(wParam);
+        // Activation touches focus (FocusManager), the window's IsActive + the app's active-window - all loop-owned
+        // managed state that must not be mutated straight off the OS message thread. Marshal it like the input handlers.
         switch (state)
         {
             case WindowActivation.Active:
             case WindowActivation.ClickActive:
-                HandleActivation();
+                DispatchInput(HandleActivation);
                 break;
 
             case WindowActivation.Inactive:
-                HandleDeactivation();
+                DispatchInput(HandleDeactivation);
                 break;
         }
 
@@ -332,16 +334,27 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         {
             return IntPtr.Zero;
         }
-        //mutex.WaitOne();
-        Win32Interop.GetWindowRect(window.Handle, out var rect);
-        window.Width = rect.Width;
-        window.Height = rect.Height;
-            
-        Win32Interop.GetClientRect(window.Handle, out var client);
-        window.ClientWidth = (uint)client.Width;
-        window.ClientHeight = (uint)client.Height;
 
-        //mutex.ReleaseMutex();
+        // Read the new size synchronously (the message's transient state), but APPLY it on the UI loop thread via the
+        // same dispatch input uses. The Width/ClientWidth setters fire ClientSizeChanged, which mutates the renderer's
+        // viewport/scissor/projection + IsRendererUpToDate + re-runs layout - doing that straight off the OS message
+        // thread races the render/layout loop (a non-volatile flag it may never see, a torn viewport vs swapchain), so
+        // the picture stops tracking the window. Marshalled through the queue it runs in order at the next Update start.
+        Win32Interop.GetWindowRect(window.Handle, out var rect);
+        Win32Interop.GetClientRect(window.Handle, out var client);
+        var w = rect.Width;
+        var h = rect.Height;
+        var cw = (uint)client.Width;
+        var ch = (uint)client.Height;
+
+        DispatchInput(() =>
+        {
+            window.Width = w;
+            window.Height = h;
+            window.ClientWidth = cw;
+            window.ClientHeight = ch;
+        });
+
         return IntPtr.Zero;
     }
 
@@ -429,9 +442,10 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     private IntPtr HandleCaptureChanged(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
         // The OS revoked our capture (another window/app grabbed it, alt-tab, etc.). Drop the internal capture too so a
-        // captured control doesn't stay stuck believing the drag is still live.
+        // captured control doesn't stay stuck believing the drag is still live. Capture() re-routes input against the
+        // visual tree, so marshal it onto the loop thread (the check runs there too - no cross-thread read of Captured).
         osMouseCaptured = false;
-        if (MouseDevice.CurrentDevice.Captured != null) MouseDevice.CurrentDevice.Capture(null);
+        DispatchInput(() => { if (MouseDevice.CurrentDevice.Captured != null) MouseDevice.CurrentDevice.Capture(null); });
         handled = true;
         return IntPtr.Zero;
     }
@@ -477,37 +491,45 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
                     lastRawMouseModifiers = WindowsMouseDeviceExtension.GetRawMouseModifiers(inputData.Data.Mouse);
                 }
 
+                // Build the args synchronously (message-time screen position + modifiers), but marshal the ProcessEvent
+                // onto the loop thread - it routes into the visual tree, same as the other mouse handlers. The single
+                // FIFO queue keeps the button event ahead of the move.
                 if (inputData.Data.Mouse.Data.ButtonFlags.HasFlag(RawMouseButtons.LeftUp))
                 {
-                    MouseDevice.CurrentDevice.ProcessEvent(new RawMouseEventArgs(RawMouseEventType.RawLeftButtonUp, window,
+                    var args = new RawMouseEventArgs(RawMouseEventType.RawLeftButtonUp, window,
                         MouseDevice.CurrentDevice.GetScreenPosition(), GetKeyModifiers(lastRawMouseModifiers),
-                        MouseDevice.CurrentDevice, GetTimeStamp()));
+                        MouseDevice.CurrentDevice, GetTimeStamp());
+                    DispatchInput(() => MouseDevice.CurrentDevice.ProcessEvent(args));
                 }
                 else if (inputData.Data.Mouse.Data.ButtonFlags.HasFlag(RawMouseButtons.LeftDown))
                 {
-                    MouseDevice.CurrentDevice.ProcessEvent(new RawMouseEventArgs(RawMouseEventType.RawLeftButtonDown, window,
+                    var args = new RawMouseEventArgs(RawMouseEventType.RawLeftButtonDown, window,
                         MouseDevice.CurrentDevice.GetScreenPosition(), GetKeyModifiers(lastRawMouseModifiers),
-                        MouseDevice.CurrentDevice, GetTimeStamp()));
+                        MouseDevice.CurrentDevice, GetTimeStamp());
+                    DispatchInput(() => MouseDevice.CurrentDevice.ProcessEvent(args));
                 }
                 if (inputData.Data.Mouse.Data.ButtonFlags.HasFlag(RawMouseButtons.RightUp))
                 {
-                    MouseDevice.CurrentDevice.ProcessEvent(new RawMouseEventArgs(RawMouseEventType.RawRightButtonUp, window,
+                    var args = new RawMouseEventArgs(RawMouseEventType.RawRightButtonUp, window,
                         MouseDevice.CurrentDevice.GetScreenPosition(), GetKeyModifiers(lastRawMouseModifiers),
-                        MouseDevice.CurrentDevice, GetTimeStamp()));
+                        MouseDevice.CurrentDevice, GetTimeStamp());
+                    DispatchInput(() => MouseDevice.CurrentDevice.ProcessEvent(args));
                 }
                 else if (inputData.Data.Mouse.Data.ButtonFlags.HasFlag(RawMouseButtons.RightDown))
                 {
-                    MouseDevice.CurrentDevice.ProcessEvent(new RawMouseEventArgs(RawMouseEventType.RawRightButtonDown, window,
+                    var args = new RawMouseEventArgs(RawMouseEventType.RawRightButtonDown, window,
                         MouseDevice.CurrentDevice.GetScreenPosition(), GetKeyModifiers(lastRawMouseModifiers),
-                        MouseDevice.CurrentDevice, GetTimeStamp()));
+                        MouseDevice.CurrentDevice, GetTimeStamp());
+                    DispatchInput(() => MouseDevice.CurrentDevice.ProcessEvent(args));
                 }
 
                 //if (input.Data.Mouse.LastX!=0 || input.Data.Mouse.LastY!=0)
                 {
-                    MouseDevice.CurrentDevice.ProcessEvent(new RawInputMouseEventArgs(delta,
+                    var moveArgs = new RawInputMouseEventArgs(delta,
                         RawMouseEventType.RawMouseMove, window,
                         window.ScreenToClient(Mouse.ScreenCoordinates), GetKeyModifiers(lastRawMouseModifiers),
-                        MouseDevice.CurrentDevice, GetTimeStamp()));
+                        MouseDevice.CurrentDevice, GetTimeStamp());
+                    DispatchInput(() => MouseDevice.CurrentDevice.ProcessEvent(moveArgs));
                 }
             }
         }
