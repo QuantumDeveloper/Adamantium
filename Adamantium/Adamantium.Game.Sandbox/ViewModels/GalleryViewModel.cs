@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using System.Linq;
 using Adamantium.MVVM;
 
 namespace Adamantium.Game.Sandbox.ViewModels;
@@ -24,11 +23,6 @@ public partial class GalleryViewModel
         new InstancingViewModel(),
         new GameViewModel(),
     };
-
-    public GalleryViewModel()
-    {
-        _selectedTab = Tabs.First(t => t is InstancingViewModel);   // TEMP: default to the Instancing tab for validation
-    }
 
     [Bindable] private TabPageViewModel _selectedTab;
 }

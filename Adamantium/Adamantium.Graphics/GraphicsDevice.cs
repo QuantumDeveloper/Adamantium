@@ -78,6 +78,10 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         
     public Device LogicalDevice => MainDevice?.LogicalDevice;
     public GraphicsAdapter Adapter => VulkanInstance?.MainGraphicsAdapter;
+
+    private DeviceMemoryAllocator _memoryAllocator;
+    // Sub-allocates buffer memory from shared blocks so thousands of small buffers don't exhaust maxMemoryAllocationCount.
+    public DeviceMemoryAllocator MemoryAllocator => _memoryAllocator ??= new DeviceMemoryAllocator(this);
     public GraphicsPresenter Presenter { get; set; }
 
     public Queue GraphicsQueue { get; private set; }
@@ -1620,6 +1624,10 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
             disposableObject?.Dispose();
         }
+
+        // After every buffer has returned its sub-range, free the shared memory blocks (frees VkDeviceMemory + unmaps).
+        _memoryAllocator?.Dispose();
+        _memoryAllocator = null;
 
         _submissionSync?.Dispose();
         _graphicsResources?.Clear();

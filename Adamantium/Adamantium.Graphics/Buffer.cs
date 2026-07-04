@@ -27,7 +27,10 @@ namespace Adamantium.Graphics
     public partial class Buffer : GraphicsResource, IBuffer
     {
         private VulkanBuffer VulkanBuffer;
-        private DeviceMemory BufferMemory;
+        private DeviceMemoryAllocator.MemoryAllocation _allocation;   // sub-range of a shared block (see DeviceMemoryAllocator)
+
+        // The sub-allocator lives on the concrete device (not on IGraphicsDevice - it is internal to this assembly).
+        private DeviceMemoryAllocator Allocator => ((GraphicsDevice)GraphicsDevice).MemoryAllocator;
 
         public BufferUsageFlags Usage { get; private set; }
 
@@ -93,7 +96,7 @@ namespace Adamantium.Graphics
                 BufferUsageFlags.TransferDst | Usage,
                 MemoryFlags,
                 out VulkanBuffer,
-                out BufferMemory);
+                out _allocation);
         }
 
         private bool IsHostVisible => MemoryFlags.HasFlag(MemoryPropertyFlags.HostVisible);
@@ -104,20 +107,20 @@ namespace Adamantium.Graphics
         {
             CreateBuffer(dataPointer.Size, BufferUsageFlags.TransferSrc,
                 MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent,
-                out var stagingBuffer, out var stagingBufferMemory);
-            UpdateBufferContent(stagingBufferMemory, dataPointer);
+                out var stagingBuffer, out var stagingAllocation);
+            UpdateBufferContent(stagingAllocation, dataPointer);
             CopyBuffer(stagingBuffer, VulkanBuffer, dataPointer.Size, dstOffset);
             GraphicsDevice.Destroy(stagingBuffer);
-            GraphicsDevice.Destroy(stagingBufferMemory);
+            Allocator.Free(stagingAllocation);
         }
 
         private void Initialize(DataPointer dataPointer)
         {
-            CreateBuffer(TotalSize, BufferUsageFlags.TransferDst | Usage, MemoryFlags, out VulkanBuffer, out BufferMemory);
+            CreateBuffer(TotalSize, BufferUsageFlags.TransferDst | Usage, MemoryFlags, out VulkanBuffer, out _allocation);
             if (IsHostVisible)
             {
                 // Host-mappable (A): write the initial data straight in - no redundant full-size staging copy.
-                UpdateBufferContent(BufferMemory, dataPointer);
+                UpdateBufferContent(_allocation, dataPointer);
             }
             else
             {
@@ -127,11 +130,13 @@ namespace Adamantium.Graphics
             }
         }
 
-        private unsafe void UpdateBufferContent(DeviceMemory bufferMemory, DataPointer dataPointer, ulong offset = 0)
+        // Writes into a host-visible sub-allocation through the block's persistent map (MappedBase already points at the
+        // sub-allocation's offset). No vkMapMemory/Unmap: the shared block stays mapped for life, and the host-visible
+        // memory types in use are HOST_COHERENT, so the write is visible to the GPU without an explicit flush.
+        private unsafe void UpdateBufferContent(DeviceMemoryAllocator.MemoryAllocation allocation, DataPointer dataPointer, ulong offset = 0)
         {
-            var data = GraphicsDevice.MapMemory(bufferMemory, offset, dataPointer.Size, 0);
-            System.Buffer.MemoryCopy(dataPointer.Pointer.ToPointer(), (void*)data, dataPointer.Size, dataPointer.Size);
-            GraphicsDevice.UnmapMemory(bufferMemory);
+            System.Buffer.MemoryCopy(dataPointer.Pointer.ToPointer(), (void*)(allocation.MappedBase + (nuint)offset),
+                dataPointer.Size, dataPointer.Size);
         }
 
         /// <summary>
@@ -147,7 +152,7 @@ namespace Adamantium.Graphics
         //    return new Buffer(GraphicsDevice, stagingDesc, BufferUsageFlags, ViewFormat, IntPtr.Zero);
         //}
 
-        private void CreateBuffer(ulong size, BufferUsageFlags usage, MemoryPropertyFlags memoryProperties, out VulkanBuffer buffer, out DeviceMemory bufferMemory)
+        private void CreateBuffer(ulong size, BufferUsageFlags usage, MemoryPropertyFlags memoryProperties, out VulkanBuffer buffer, out DeviceMemoryAllocator.MemoryAllocation allocation)
         {
             BufferCreateInfo bufferInfo = new BufferCreateInfo();
             bufferInfo.Size = size;
@@ -157,22 +162,19 @@ namespace Adamantium.Graphics
             buffer = GraphicsDevice.LogicalDevice.CreateBuffer(bufferInfo);
 
             var memoryRequirements = GraphicsDevice.LogicalDevice.GetBufferMemoryRequirements(buffer);
+            var memoryTypeIndex = GraphicsDevice.Adapter.FindMemoryIndex(memoryRequirements.MemoryTypeBits, memoryProperties);
 
-            var allocInfo = new MemoryAllocateInfo();
-            allocInfo.AllocationSize = memoryRequirements.Size;
-            allocInfo.MemoryTypeIndex = GraphicsDevice.Adapter.FindMemoryIndex(memoryRequirements.MemoryTypeBits, memoryProperties);
-            
-            var allocFlagsInfo = new MemoryAllocateFlagsInfo();
+            // Sub-allocate the buffer's memory from a shared block instead of a dedicated vkAllocateMemory per buffer
+            // (VkDeviceMemory count is capped - see DeviceMemoryAllocator). The BDA flag is set on the block for buffers
+            // that use ShaderDeviceAddress; the address vkGetBufferDeviceAddress returns already includes this bind offset.
+            allocation = Allocator.Allocate(
+                memoryRequirements.Size,
+                memoryRequirements.Alignment,
+                memoryTypeIndex,
+                memoryProperties.HasFlag(MemoryPropertyFlags.HostVisible),
+                usage.HasFlag(BufferUsageFlags.ShaderDeviceAddress));
 
-            if (usage.HasFlag(BufferUsageFlags.ShaderDeviceAddress))
-            {
-                allocFlagsInfo.Flags = MemoryAllocateFlagBits.DeviceAddressBit;
-                allocInfo.PNext = allocFlagsInfo;
-            }
-
-            bufferMemory = GraphicsDevice.LogicalDevice.AllocateMemory(allocInfo);
-
-            var result = GraphicsDevice.LogicalDevice.BindBufferMemory(buffer, bufferMemory, 0);
+            var result = GraphicsDevice.LogicalDevice.BindBufferMemory(buffer, allocation.Memory, allocation.Offset);
             if (result != Result.Success)
             {
                 throw new GraphicsEngineException("Failed to bind buffer memory to buffer");
@@ -279,21 +281,20 @@ namespace Adamantium.Graphics
             if (!IsHostVisible)
                 throw new InvalidOperationException("GetData requires a host-visible buffer; this one is device-local (GPU-only).");
 
-            var data = GraphicsDevice.MapMemory(BufferMemory, 0, toData.Size, 0);
-            System.Buffer.MemoryCopy((void*)data, toData.Pointer.ToPointer(), toData.Size, toData.Size);
-            GraphicsDevice.UnmapMemory(BufferMemory);
+            System.Buffer.MemoryCopy((void*)_allocation.MappedBase, toData.Pointer.ToPointer(), toData.Size, toData.Size);
         }
 
         public nuint MapMemory()
         {
             if (!IsHostVisible)
                 throw new InvalidOperationException("MapMemory requires a host-visible buffer; this one is device-local (GPU-only). Use SetData instead.");
-            return GraphicsDevice.MapMemory(BufferMemory, 0, TotalSize, 0);
+            return _allocation.MappedBase;   // the owning block is persistently mapped; this points at this buffer's offset
         }
 
         public void UnmapMemory()
         {
-            GraphicsDevice.UnmapMemory(BufferMemory);
+            // No-op: the shared block stays mapped for its whole life (see DeviceMemoryAllocator). Kept so existing
+            // map -> write -> unmap call sites are unchanged.
         }
 
         /// <summary>
@@ -381,7 +382,7 @@ namespace Adamantium.Graphics
                 throw new ArgumentException("Size of data to upload + offset is larger than size of buffer");
 
             if (IsHostVisible)
-                UpdateBufferContent(BufferMemory, fromData, offsetInBytes);
+                UpdateBufferContent(_allocation, fromData, offsetInBytes);
             else
                 UploadViaStaging(fromData, offsetInBytes); // device-local: can't map, go through staging
         }
@@ -631,13 +632,13 @@ namespace Adamantium.Graphics
         
         public static implicit operator DeviceMemory(Buffer buffer)
         {
-            return buffer.BufferMemory;
+            return buffer._allocation.Memory;   // the shared block's memory (do NOT free it through this - it is sub-allocated)
         }
-        
+
         protected override void Dispose(bool disposeManagedResources)
         {
             GraphicsDevice.Destroy(VulkanBuffer);
-            GraphicsDevice.Destroy(BufferMemory);
+            Allocator.Free(_allocation);   // return the sub-range to its block; the block is retained
         }
     }
 }
