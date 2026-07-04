@@ -264,12 +264,14 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     {
         var point = new NativePoint((int)p.X, (int)p.Y);
         Win32Interop.ScreenToClient(Handle, ref point);
-        return point;
+        // Win32 returns PHYSICAL client px; the framework works in logical DIP -> divide by the DPI scale (identity at 100%).
+        return new Vector2(point.X / DpiScale.X, point.Y / DpiScale.Y);
     }
 
     public Vector2 ClientToScreen(Vector2 p)
     {
-        var point = new NativePoint((int)p.X, (int)p.Y);
+        // p is logical DIP -> back to physical client px before handing to Win32; the returned screen coords stay physical.
+        var point = new NativePoint((int)(p.X * DpiScale.X), (int)(p.Y * DpiScale.Y));
         Win32Interop.ClientToScreen(Handle, ref point);
         return point;
     }
@@ -356,4 +358,17 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     public event EventHandler<WindowRendererChangedEventArgs> RendererChanged;
 
     public event EventHandler<EventArgs> SourceInitialized;
+
+    private Vector2 _dpiScale = new Vector2(1, 1);
+    public Vector2 DpiScale
+    {
+        get => _dpiScale;
+        set
+        {
+            if (_dpiScale == value) return;
+            _dpiScale = value;
+            DpiChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+    public event EventHandler<EventArgs> DpiChanged;
 }
