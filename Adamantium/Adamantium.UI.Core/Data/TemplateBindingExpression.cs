@@ -34,11 +34,13 @@ public class TemplateBindingExpression : BindingExpressionBase
 
     private void OnSourcePropertyChanged(object sender, AdamantiumPropertyChangedEventArgs e)
     {
+        if (e.Property != SourceProperty) return;   // this source instance raises PropertyChanged for ALL its properties
         UpdateTarget();
     }
 
     private void OnTargetPropertyChanged(object sender, AdamantiumPropertyChangedEventArgs e)
     {
+        if (e.Property != TargetProperty) return;
         UpdateSource();
     }
 
@@ -65,23 +67,27 @@ public class TemplateBindingExpression : BindingExpressionBase
             SourceProperty = Source?.GetProperty(SourcePropertyName);
         }
         UpdateTarget();
-        SourceProperty.NotifyChanged += OnSourcePropertyChanged;
+        // Subscribe to the SOURCE INSTANCE's change event, not the property's global AdamantiumProperty.Changed. The
+        // latter fires for EVERY control that shares this AdamantiumProperty, so one templated control's Content change
+        // would run UpdateTarget() on every {TemplateBinding Content} in the whole app (O(all such bindings) per set - the
+        // scroll rebind hot path did this ~200x/frame). The instance event scopes the notification to this binding's own source.
+        Source.PropertyChanged += OnSourcePropertyChanged;
         if (Mode == BindingMode.TwoWay)
         {
-            TargetProperty.NotifyChanged += OnTargetPropertyChanged;
+            Target.PropertyChanged += OnTargetPropertyChanged;
         }
     }
 
     private void Destroy()
     {
-        if (SourceProperty != null)
+        if (Source != null)
         {
-            SourceProperty.NotifyChanged -= OnSourcePropertyChanged;
+            Source.PropertyChanged -= OnSourcePropertyChanged;
         }
 
-        if (Mode == BindingMode.TwoWay && TargetProperty != null)
+        if (Mode == BindingMode.TwoWay && Target != null)
         {
-            TargetProperty.NotifyChanged -= OnTargetPropertyChanged;
+            Target.PropertyChanged -= OnTargetPropertyChanged;
         }
     }
    
