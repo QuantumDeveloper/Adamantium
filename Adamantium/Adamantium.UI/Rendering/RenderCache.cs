@@ -204,10 +204,14 @@ public class RenderCache
 
     // Register (or refresh) an instanceable unit's fill in the retained scene; a unit that stopped being instanceable
     // (flag off, brush turned non-solid, geometry lost its mesh) leaves the scene and reverts to per-unit drawing.
+    private static readonly System.Collections.Generic.HashSet<string> __feedSeen = new();   // TEMP diagnostics
     private void FeedInstance(IRenderUnit unit, Matrix4x4F world)
     {
         if (unit is not IInstanceableFill inst) return;
-        if (inst.TryGetInstancedFill(out var key, out var mesh, out var color))
+        var __ok = inst.TryGetInstancedFill(out var key, out var mesh, out var color);
+        var __tag = unit.GetType().Name + ":" + (__ok ? "INSTANCED" : "false");   // TEMP: distinct unit-type/result seen
+        if (__feedSeen.Add(__tag)) System.Console.WriteLine($"[FEED] {__tag}");
+        if (__ok)
         {
             _registry.Set(unit.Component.RenderId, key, mesh, GeometryInstance.FromWorld(world, color));
             inst.FillInstanced = true;

@@ -1,0 +1,39 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters">
+    <!-- DataContext is the InstancingViewModel. A big virtualized grid of star polygons (arbitrary tessellated fill = NOT
+         an SDF batch, unlike the Layout tab's rounded rectangles). Every star is authored with the SAME local Points at
+         the SAME size, so all their meshes are byte-identical: with RETAINED_INSTANCING=1 the visible window collapses to
+         ONE instanced draw (shared mesh + per-instance world/colour), which is the whole point being validated here. -->
+    <Grid RowDefinitions="Auto,*" Margin="24">
+        <StackPanel Grid.Row="0" Orientation="Vertical">
+            <TextBlock Text="600 star polygons — identical tessellated mesh, per-item colour (non-SDF fill)."/>
+            <TextBlock Text="Run with env RETAINED_INSTANCING=1: the visible stars draw as ONE instanced call."
+                       Foreground="#94A3B8" Margin="0,4,0,0"/>
+        </StackPanel>
+
+        <ListBox Grid.Row="1" Margin="0,14,0,0" ItemsSource="{Binding Stars}">
+            <ListBox.ItemContainerStyle>
+                <Style Selector="ListBoxItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Padding" Value="0"/>
+                </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal" ItemWidth="60" ItemHeight="60"/>
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <!-- Fixed 5-point star in a 48x48 local box (Points are element-local, so the mesh is identical for
+                         every item; the grid position is the per-instance world transform, the colour the per-instance tint). -->
+                    <Polygon Points="24,2 29.3,16.7 44.9,17.2 32.6,26.8 36.9,41.8 24,33 11.1,41.8 15.4,26.8 3.1,17.2 18.7,16.7"
+                             Fill="{Binding Color, Converter={conv:StringToBrushConverter}}"
+                             Width="48" Height="48"
+                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </Grid>
+</View>

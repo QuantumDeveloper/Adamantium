@@ -75,9 +75,10 @@ struct GeometryInstance
     float4 Color;     // straight-alpha RGBA (element/brush opacity folded into .w by the producer)
 };
 
-// Read-only: the VS only fetches instances (by SV_InstanceID), so this is a ShaderResourceView (a StructuredBuffer),
-// not a read-write UAV. In Vulkan it is still a DescriptorType.StorageBuffer.
-StructuredBuffer<GeometryInstance> Instances;
+// Per-instance data by BUFFER DEVICE ADDRESS (BDA), not a descriptor-heap StructuredBuffer: the SV_InstanceID-indexed
+// StructuredBuffer form did not bind/read on this device (the fill rasterised nothing - World came out garbage), while
+// BDA is the engine's proven GPU-storage pattern (see StrokeEffect/FillFringeEffect: uint64_t address + (T*)addr).
+uint64_t InstancesAddress;
 
 struct FillPSInput
 {
@@ -88,9 +89,8 @@ struct FillPSInput
 [shader("vertex")]
 FillPSInput InstancedFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
 {
-    GeometryInstance inst = Instances[instanceId];
-    // Local mesh vertex -> world -> clip. Same row-vector form as UIBasicEffect (mul(pos, world) then * Projection),
-    // just with the per-instance World fetched from the SSBO instead of a uniform.
+    GeometryInstance* instances = (GeometryInstance*)InstancesAddress;
+    GeometryInstance inst = instances[instanceId];
     float4 world = mul(float4(v.position.xyz, 1.0), inst.World);
     FillPSInput o;
     o.Position = mul(world, Projection);
