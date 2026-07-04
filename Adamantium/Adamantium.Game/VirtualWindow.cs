@@ -107,5 +107,18 @@ public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopu
     public event EventHandler<EventArgs> Closed;
     public event EventHandler<WindowRendererChangedEventArgs> RendererChanged;
     public event EventHandler<EventArgs> SourceInitialized;
-    
+
+    // Virtual window has no OS monitor; stays 1,1 unless a host drives it (e.g. designer scale). Setter fires DpiChanged.
+    private Vector2 _dpiScale = new Vector2(1, 1);
+    public Vector2 DpiScale
+    {
+        get => _dpiScale;
+        set
+        {
+            if (_dpiScale == value) return;
+            _dpiScale = value;
+            DpiChanged?.Invoke(this, EventArgs.Empty);
+        }
+    }
+    public event EventHandler<EventArgs> DpiChanged;
 }

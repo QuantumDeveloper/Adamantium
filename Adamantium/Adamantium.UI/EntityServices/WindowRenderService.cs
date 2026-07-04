@@ -163,7 +163,7 @@ public class WindowRenderService : UiRenderService
         windowRenderer.OnFrameEnded();
         if (!windowRenderer.IsRendererUpToDate)
         {
-            windowRenderer.ResizePresenter((uint)Window.ClientWidth, (uint)Window.ClientHeight);
+            windowRenderer.ResizePresenter((uint)(Window.ClientWidth * RenderScale), (uint)(Window.ClientHeight * RenderScale));
         }
 
         if (_pendingRenderer == null) return;

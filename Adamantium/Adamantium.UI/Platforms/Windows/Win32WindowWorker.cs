@@ -26,6 +26,12 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 
     static Win32WindowWorker()
     {
+        // Declare the process Per-Monitor-DPI-Aware V2 before any window exists (this static ctor runs once, before the
+        // first worker instance = before the first HWND). PMv2 => the OS stops bitmap-stretching our frames and sends
+        // WM_DPICHANGED when the window crosses monitors; we scale the render ourselves (docs/PER_MONITOR_DPI_PLAN.md).
+        try { Win32Interop.SetProcessDpiAwarenessContext(Win32Interop.DpiAwarenessContextPerMonitorAwareV2); }
+        catch { /* pre-1703 OS without the API, or awareness already pinned by a manifest - ignore */ }
+
         RawInputDevice.RegisterDevice(HIDUsagePage.Generic, HIDUsageId.Mouse, InputDeviceFlags.None);
     }
 
@@ -40,6 +46,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         messageTable[(uint)WindowMessages.Nchittest] = HandleNcHittest;
         //messageTable[(uint)WindowMessages.Nccalcsize] = HandleNcCalcSize;
         messageTable[(uint)WindowMessages.Size] = HandleResize;
+        messageTable[(uint)WindowMessages.Dpichanged] = HandleDpiChanged;
         messageTable[(uint)WindowMessages.Keydown] = HandleKeyDown;
         messageTable[(uint)WindowMessages.Syskeydown] = HandleKeyDown;
         messageTable[(uint)WindowMessages.Keyup] = HandleKeyUp;
@@ -95,9 +102,13 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
                 
         source.AddHook(CustomWndProc);
 
+        this.window.DpiScale = ReadDpiScale(source.Handle);   // initial per-monitor DPI (PMv2)
+
         Win32Interop.GetClientRect(window.Handle, out var client);
-        this.window.ClientWidth = (uint)client.Width;
-        this.window.ClientHeight = (uint)client.Height;
+        // ClientWidth/Height are LOGICAL (DIP) = physical px / DPI scale (per-axis). The renderer sizes the swapchain
+        // back up by RenderScale (= DpiScale); the projection + layout stay logical. On a 100% monitor this is identity.
+        this.window.ClientWidth = client.Width / this.window.DpiScale.X;
+        this.window.ClientHeight = client.Height / this.window.DpiScale.Y;
 
         UIContext.ThemeContext.ApplyCurrentTheme(this.window);
         UIContext.UIApplication.AddWindow(this.window);
@@ -189,6 +200,14 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         var dispatcher = Threading.Dispatcher.CurrentDispatcher;
         if (dispatcher != null) dispatcher.Post(raise);
         else raise();
+    }
+
+    // OS mouse messages carry PHYSICAL client px; the layout / hit-test work in logical DIP. Divide by the window's DPI
+    // scale so the tracked position + reported GetPosition are logical (identity at 100%). Screen coords stay physical.
+    private Vector2 ToLogical(Vector2 physicalClient)
+    {
+        var dpi = window.DpiScale;
+        return new Vector2(physicalClient.X / dpi.X, physicalClient.Y / dpi.Y);
     }
 
 
@@ -344,18 +363,52 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         Win32Interop.GetClientRect(window.Handle, out var client);
         var w = rect.Width;
         var h = rect.Height;
-        var cw = (uint)client.Width;
-        var ch = (uint)client.Height;
+        var cw = client.Width;   // physical client px
+        var ch = client.Height;
 
         DispatchInput(() =>
         {
             window.Width = w;
             window.Height = h;
-            window.ClientWidth = cw;
-            window.ClientHeight = ch;
+            // ClientWidth/Height logical (DIP) = physical / DPI. DpiScale is read on the loop thread (where it's updated
+            // by the marshalled WM_DPICHANGED handler), so a DPI change that precedes this resize is already applied.
+            window.ClientWidth = cw / window.DpiScale.X;
+            window.ClientHeight = ch / window.DpiScale.Y;
         });
 
         return IntPtr.Zero;
+    }
+
+    // The window moved to a monitor with a different scale (or the scale changed). wParam packs the new DPI (LOWORD X /
+    // HIWORD Y); lParam is the RECT the OS wants the window at, already sized for the new DPI. Apply that rect
+    // synchronously here (a Win32 op that must run on the owning thread), but marshal the managed DpiScale update onto
+    // the loop thread - it fires DpiChanged, which re-scales the renderer + re-lays-out, and must not race the loop.
+    private IntPtr HandleDpiChanged(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
+    {
+        handled = true;
+        var packed = wParam.ToInt64();
+        var dpiX = (uint)(packed & 0xFFFF);
+        var dpiY = (uint)((packed >> 16) & 0xFFFF);
+
+        // Update DpiScale (loop thread) BEFORE SetWindowPos: SetWindowPos synchronously fires WM_SIZE -> HandleResize,
+        // which marshals ClientWidth = physical / DpiScale. Queuing the scale update ahead of it (one FIFO) makes that
+        // divide use the NEW scale. Setting DpiScale also fires DpiChanged -> the renderer re-scales RenderScale.
+        var scale = new Vector2(dpiX / 96.0, dpiY / 96.0);
+        DispatchInput(() => window.DpiScale = scale);
+
+        var r = Marshal.PtrToStructure<RECT>(lParam);
+        Win32Interop.SetWindowPos(window.Handle, IntPtr.Zero, r.Left, r.Top, r.Width, r.Height,
+            SetWindowPosFlags.Nozorder | SetWindowPosFlags.Noactivate);
+        return IntPtr.Zero;
+    }
+
+    // The window's current-monitor DPI as a per-axis scale (1,1 = 96 DPI / 100%). Falls back to 1,1 if the query fails.
+    private static Vector2 ReadDpiScale(IntPtr hwnd)
+    {
+        var monitor = Win32Interop.MonitorFromWindow(hwnd, Win32Interop.MonitorDefaultToNearest);
+        if (Win32Interop.GetDpiForMonitor(monitor, Win32Interop.MdtEffectiveDpi, out var dpiX, out var dpiY) == 0 && dpiX > 0)
+            return new Vector2(dpiX / 96.0, dpiY / 96.0);
+        return new Vector2(1, 1);
     }
 
     private IntPtr HandleKeyDown(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
@@ -401,7 +454,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
             trackMouse = true;
             Win32Interop.TrackMouseEvent(ref tm);
         }
-        var eventArgs = new RawMouseEventArgs(RawMouseEventType.MouseMove, window, Messages.PointFromLParam(lParam),
+        var eventArgs = new RawMouseEventArgs(RawMouseEventType.MouseMove, window, ToLogical(Messages.PointFromLParam(lParam)),
             WindowsMouseDeviceExtension.GetKeyModifiers(windowMessage, wParam), MouseDevice.CurrentDevice, GetTimeStamp());
         DispatchInput(() => MouseDevice.CurrentDevice.ProcessEvent(eventArgs));
         handled = true;
@@ -420,14 +473,28 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 
     private IntPtr HandleMouseLeftButtonDown(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
+        var modifiers = WindowsMouseDeviceExtension.GetKeyModifiers(windowMessage, wParam);
         var eventType = WindowsMouseDeviceExtension.EventTypeFromMessage(windowMessage, wParam);
-        var eventArgs = new RawMouseEventArgs(eventType, window, Messages.PointFromLParam(lParam),
-            WindowsMouseDeviceExtension.GetKeyModifiers(windowMessage, wParam), MouseDevice.CurrentDevice, GetTimeStamp());
+        var eventArgs = new RawMouseEventArgs(eventType, window, ToLogical(Messages.PointFromLParam(lParam)),
+            modifiers, MouseDevice.CurrentDevice, GetTimeStamp());
         DispatchInput(() => MouseDevice.CurrentDevice.ProcessEvent(eventArgs));
-        // Mirror the app's mouse capture to the OS (shared, cross-platform logic): an element that captured on press
-        // (a dragging thumb, a pressed button) then keeps getting move/up even when the pointer leaves the window, and
-        // the off-window release is caught instead of leaving the control stuck.
-        MouseDevice.CurrentDevice.SyncOsMouseCapture(this, ref osMouseCaptured);
+
+        // Hold the OS mouse capture on the WINDOW while ANY mouse button is down (button state read from wParam, which
+        // the OS sets per message). This guarantees the window receives the button-UP even when the release happens
+        // OUTSIDE it, so a drag past the window edge (a scrollbar thumb dragged out and released) still gets its release
+        // and stops - instead of sticking and then "following" the pointer with no button held. Runs on THIS message-pump
+        // thread that owns the window (SetCapture is thread-affine). The app-level routing capture (MouseDevice.Captured)
+        // is separate and set on the loop thread by the marshalled ProcessEvent above - which is exactly why mirroring
+        // THAT here was unreliable: Captured is not set yet when this line runs.
+        var anyButton = InputModifiers.LeftMouseButton | InputModifiers.RightMouseButton |
+            InputModifiers.MiddleMouseButton | InputModifiers.X1MouseButton | InputModifiers.X2MouseButton;
+        var buttonDown = (modifiers & anyButton) != 0;
+        if (buttonDown != osMouseCaptured)
+        {
+            osMouseCaptured = buttonDown;
+            SetMouseCapture(buttonDown);
+        }
+
         handled = true;
         return IntPtr.Zero;
     }

@@ -53,6 +53,24 @@ namespace Adamantium.Win32
         [DllImport("user32.dll")]
         public static extern bool GetClientRect(IntPtr hWnd, out RECT lpRect);
 
+        // --- Per-Monitor DPI (PMv2). See docs/PER_MONITOR_DPI_PLAN.md. ---
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool SetProcessDpiAwarenessContext(IntPtr value);
+
+        [DllImport("user32.dll")]
+        public static extern uint GetDpiForWindow(IntPtr hwnd);
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+        [DllImport("shcore.dll")]
+        public static extern int GetDpiForMonitor(IntPtr hmonitor, int dpiType, out uint dpiX, out uint dpiY);
+
+        // DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 is a pseudo-handle (-4), not a real pointer.
+        public static readonly IntPtr DpiAwarenessContextPerMonitorAwareV2 = new IntPtr(-4);
+        public const uint MonitorDefaultToNearest = 2;
+        public const int MdtEffectiveDpi = 0;   // MONITOR_DPI_TYPE.MDT_EFFECTIVE_DPI
+
         // Mouse capture: while a window holds the capture the OS delivers ALL mouse messages (move + button-up) to it,
         // even when the cursor is outside the client area - so a drag keeps tracking and the release is caught off-window.
         [DllImport("user32.dll", EntryPoint = "SetCapture")]

@@ -26,7 +26,11 @@ public interface IWindow : IRootVisualComponent, IContentControl
     bool AnalyticAntialiasing { get; set; }
 
     WindowState State { get; set; }
-    
+
+    /// <summary>Per-window DPI scale (device pixels per DIP), separate X/Y (usually equal on desktop). 1,1 = 96 DPI /
+    /// 100%. Set by the platform on create and on WM_DPICHANGED; drives the render scale and the DIP&lt;-&gt;physical map.</summary>
+    Vector2 DpiScale { get; set; }
+
     IWindowRenderer DefaultRenderer { get; set; }
 
     IWindowRenderer Renderer { get; set; }
@@ -55,7 +59,10 @@ public interface IWindow : IRootVisualComponent, IContentControl
     event EventHandler<WindowClosingEventArgs> Closing;
     event MSAALeveChangedHandler MSAALevelChanged;
     event StateChangedHandler StateChanged;
-    
+
+    /// <summary>Raised after <see cref="DpiScale"/> changes (the window moved to a monitor with a different scale).</summary>
+    event EventHandler<EventArgs> DpiChanged;
+
     event EventHandler<EventArgs> Closed;
 
     event EventHandler<WindowRendererChangedEventArgs> RendererChanged;

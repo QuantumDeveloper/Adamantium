@@ -52,15 +52,32 @@ public class ForwardWindowRenderer : WindowRendererBase
     protected override void UnsubscribeFromEvents()
     {
         if (Window == null) return;
-        
+
         Window.ClientSizeChanged -= OnClientSizeChanged;
         Window.MSAALevelChanged -= OnMSAALevelChanged;
+        Window.DpiChanged -= OnDpiChanged;
     }
 
     protected override void SubscribeToEvents()
     {
         Window.ClientSizeChanged += OnClientSizeChanged;
         Window.MSAALevelChanged += OnMSAALevelChanged;
+        Window.DpiChanged += OnDpiChanged;
+    }
+
+    // On-screen: render at the window's device-pixel density. ClientSize is logical (DIP); the presenter/viewport are
+    // sized ClientSize x RenderScale = physical px while the projection stays logical, so content scales crisply with
+    // the monitor. Desktop DPI is uniform (X==Y) so the scalar RenderScale takes the X axis (per-axis is a refinement).
+    public override void SetWindow(IWindow window)
+    {
+        if (window != null) RenderScale = window.DpiScale.X;
+        base.SetWindow(window);
+    }
+
+    private void OnDpiChanged(object sender, EventArgs e)
+    {
+        RenderScale = Window.DpiScale.X;
+        UpdateWindowResources();   // resize the presenter/viewport to the new physical size + re-init
     }
 
     private void OnMSAALevelChanged(object sender, MSAALevelChangedEventArgs e)
