@@ -64,6 +64,23 @@ public class ResourceProvider
         return null;
     }
 
+    // A key from dictionaries owned by EXACTLY this element. The caller (ResourceManager) walks the tree and asks each
+    // ancestor in turn, so a Local resource is visible only inside the owner's subtree - never from an unrelated element.
+    // Not cached: the same key can resolve to different values under different owners, so the flat _cache would leak
+    // across scopes; owner lookups are cheap (a handful of dictionaries).
+    public object FindResourceForOwner(IAdamantiumComponent owner, string key)
+    {
+        for (int i = _orderedDictionaries.Count - 1; i >= 0; i--)
+        {
+            var info = _orderedDictionaries[i];
+            if (info.Owners.Contains(owner) && info.Resource.TryGetValue(key, out var resource))
+            {
+                return resource;
+            }
+        }
+        return null;
+    }
+
     private void AddCacheFor(Type type, string key)
     {
         if (!_cacheByDictionary.TryGetValue(type, out var keys))

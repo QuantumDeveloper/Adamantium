@@ -74,14 +74,31 @@ public abstract class RangeBase : Control
         return value;
     }
 
-    private static void OnMinimumChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    // protected static so a subclass that wants a different default Minimum/Maximum (Slider/ProgressBar = 0..100,
+    // ScrollBar = 0..0) can re-use it in OverrideMetadata - keeping the re-coercion + OnRangeBoundsChanged behaviour that
+    // a fresh PropertyMetadata would otherwise drop. (Subclasses set the default via metadata, NOT a constructor set,
+    // which would write Local priority and permanently mask a {Binding}/Style/Trigger on the property.)
+    protected static void OnMinimumChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
     {
-        if (e.NewValue is double) ((RangeBase)d).ReCoerceValue();
+        if (e.NewValue is not double) return;
+        var range = (RangeBase)d;
+        range.ReCoerceValue();
+        range.OnRangeBoundsChanged();
     }
 
-    private static void OnMaximumChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    protected static void OnMaximumChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
     {
-        if (e.NewValue is double) ((RangeBase)d).ReCoerceValue();
+        if (e.NewValue is not double) return;
+        var range = (RangeBase)d;
+        range.ReCoerceValue();
+        range.OnRangeBoundsChanged();
+    }
+
+    /// <summary>Minimum or Maximum changed. The value fraction (Value-Min)/(Max-Min) shifts even when Value itself is
+    /// unchanged, so a value-fraction-driven visual (a Slider's accent fill) must recompute here - OnValueChanged alone
+    /// misses a pure range rescale.</summary>
+    protected virtual void OnRangeBoundsChanged()
+    {
     }
 
     // A Minimum/Maximum change can pull Value out of range. Re-assign Value so the coercion clamps it again; if it was

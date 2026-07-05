@@ -1,27 +1,127 @@
 <View xmlns="http://adamantium/ui"
-      xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters">
-    <!-- DataContext is the LayoutViewModel. A big virtualized, wrapping, scrolling grid of rectangles whose cell size is
-         slider-driven (the WrapPanel's ItemWidth/ItemHeight bind to RectSize). The ListBox virtualizes: only the on-screen
-         tiles are realized, so it stays smooth at hundreds of items. The tile colour is a string on the item, converted
-         to a Brush in the binding by StringToBrushConverter (a {Binding} does no string->Brush conversion itself). -->
-    <Grid RowDefinitions="Auto,*" Margin="24">
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:app="clr-namespace:Adamantium.Game.Sandbox"
+      ResourceContext.Source="{ResourceLink Source={x:Type app:LayoutResources}, Scope=Local}">
+    <!-- DataContext is the LayoutViewModel. A big virtualized, wrapping, scrolling grid of tiles whose cell WIDTH and
+         HEIGHT are driven by two independent sliders (bound to the WrapPanel), so the aspect ratio is adjustable. The
+         "Ellipses" toggle flips ShowEllipses; a DataTrigger then swaps ItemTemplate between the two templates that live
+         in LayoutResources (AUML) - a rounded RECTANGLE (RectBatch SDF) or an ELLIPSE (EllipseBatch SDF). Both are SDF,
+         so this is the live check that the ellipse SDF renders a real ellipse (rx != ry) crisply at any aspect. The
+         resource dictionary is linked into the Local scope above, so it lives only while this tab is open. -->
+    <Grid RowDefinitions="Auto,Auto,*" Margin="24">
         <StackPanel Grid.Row="0" Orientation="Horizontal">
-            <TextBlock Text="Rectangle size:" VerticalAlignment="Center"/>
-            <Slider Width="260" 
-                    Minimum="24" 
-                    Maximum="180" 
-                    Value="{Binding RectSize, Mode=TwoWay}" 
-                    Margin="12,0,0,0"
-                    TickFrequency="1"
-                    IsSnapToTickEnabled="true"
-            />
-            <TextBlock Text="{Binding RectSize}" VerticalAlignment="Center" FontSize="16" Margin="12,0,0,0"/>
-            <TextBlock Text="600 rectangles, virtualized" VerticalAlignment="Center" Foreground="#94A3B8" Margin="24,0,0,0"/>
+            <TextBlock Text="Width:" VerticalAlignment="Center"/>
+            <Slider Width="180" Minimum="24" Maximum="240" Value="{Binding CellWidth, Mode=TwoWay}" Margin="8,0,0,0"
+                    TickFrequency="1" IsSnapToTickEnabled="true"/>
+            <TextBlock Text="{Binding CellWidth}" VerticalAlignment="Center" FontSize="16" Margin="8,0,0,0"/>
+
+            <TextBlock Text="Height:" VerticalAlignment="Center" Margin="20,0,0,0"/>
+            <Slider Width="180" Minimum="24" Maximum="240" Value="{Binding CellHeight, Mode=TwoWay}" Margin="8,0,0,0"
+                    TickFrequency="1" IsSnapToTickEnabled="true"/>
+            <TextBlock Text="{Binding CellHeight}" VerticalAlignment="Center" FontSize="16" Margin="8,0,0,0"/>
+
+            <CheckBox Content="Ellipses" IsChecked="{Binding ShowEllipses, Mode=TwoWay}" VerticalAlignment="Center" Margin="24,0,0,0"/>
         </StackPanel>
 
-        <ListBox Grid.Row="1" Margin="0,14,0,0" ItemsSource="{Binding Rectangles}">
-            <!-- The ListBoxItem chrome is tuned for TEXT lists (Left/Center content, padding), which collapses an empty
-                 tile to 0 inside its (correctly binding-sized) cell. Make the container fill its cell so the tile shows. -->
+        <!-- Stroke ("кайма") preview: a big rectangle + ellipse driven by every Pen parameter through the sliders. A
+             solid stroke goes through the SDF batch; a dashed/trimmed one falls back to the compute stroke expander -
+             both correct. As dash/trim/caps land in the SDF shader, this same preview validates them. -->
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*" Margin="0,16,0,0">
+            <Grid Grid.Column="0" ColumnDefinitions="Auto,Auto">
+                <StackPanel Grid.Column="0" Orientation="Vertical" Margin="0,0,20,0">
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Thickness" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="30" Value="{Binding Stroke.StrokeWidth, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Stroke.StrokeWidth}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Dash on" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="40" Value="{Binding Stroke.DashOn, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Stroke.DashOn}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Dash gap" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="40" Value="{Binding Stroke.DashGap, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Stroke.DashGap}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Dash offset" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="60" Value="{Binding Stroke.DashOffset, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Stroke.DashOffset}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Trim start" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="1" Value="{Binding Stroke.TrimStart, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Stroke.TrimStart}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Vertical">
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Trim end" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="1" Value="{Binding Stroke.TrimEnd, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Stroke.TrimEnd}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Corner" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="60" Value="{Binding Stroke.Corner, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Stroke.Corner}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Cap 0/1/2" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="2" Value="{Binding Stroke.CapValue, Mode=TwoWay}" TickFrequency="1" IsSnapToTickEnabled="true"/>
+                        <TextBlock Text="{Binding Stroke.CapValue}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Join 0/1/2" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="2" Value="{Binding Stroke.JoinValue, Mode=TwoWay}" TickFrequency="1" IsSnapToTickEnabled="true"/>
+                        <TextBlock Text="{Binding Stroke.JoinValue}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Color (hue)" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="360" Value="{Binding Stroke.Hue, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Stroke.Hue}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+
+            <StackPanel Grid.Column="1" 
+                        Orientation="Horizontal" 
+                        HorizontalAlignment="Center" 
+                        VerticalAlignment="Center">
+                <Rectangle Width="160" Height="120" Fill="#1E293B" Stroke="{Binding Stroke.StrokeBrush}"
+                           CornerRadius="{Binding Stroke.CornerRadius}"
+                           StrokeThickness="{Binding Stroke.StrokeWidth}"
+                           StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
+                           StrokeDashOffset="{Binding Stroke.DashOffset}"
+                           StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                           StrokeLineJoin="{Binding Stroke.Join}"
+                           StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,24,0"/>
+                <Ellipse Width="160" Height="120" Fill="#1E293B" Stroke="{Binding Stroke.StrokeBrush}"
+                         StrokeThickness="{Binding Stroke.StrokeWidth}"
+                         StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
+                         StrokeDashOffset="{Binding Stroke.DashOffset}"
+                         StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                         StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"
+                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Grid>
+
+        <ListBox Grid.Row="2" 
+                 Margin="0 14 0 0" 
+                 ItemsSource="{Binding Rectangles}">
+            <!-- The base template (rounded rectangle) is a Setter, NOT a local ItemTemplate attribute: a local value
+                 (priority Local=1) would outrank the DataTrigger's Setter (Trigger=3) and the toggle could never swap it.
+                 As a Setter (Style=5) the trigger wins while ShowEllipses is true (-> ellipses) and falls back to the
+                 rectangle when it's false. Changing the effective ItemTemplate regenerates the containers. -->
+            <ListBox.Styles>
+                <Style Selector="ListBox">
+                    <Setter Property="ItemTemplate" Value="{ResourceReference RectTileTemplate}"/>
+                    <DataTrigger Binding="{Binding ShowEllipses}" Value="true">
+                        <Setter Property="ItemTemplate" Value="{ResourceReference EllipseTileTemplate}"/>
+                    </DataTrigger>
+                </Style>
+            </ListBox.Styles>
             <ListBox.ItemContainerStyle>
                 <Style Selector="ListBoxItem">
                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -31,14 +131,11 @@
             </ListBox.ItemContainerStyle>
             <ListBox.ItemsPanel>
                 <ItemsPanelTemplate>
-                    <WrapPanel Orientation="Horizontal" ItemWidth="{Binding RectSize}" ItemHeight="{Binding RectSize}"/>
+                    <WrapPanel Orientation="Horizontal" 
+                               ItemWidth="{Binding CellWidth}" 
+                               ItemHeight="{Binding CellHeight}"/>
                 </ItemsPanelTemplate>
             </ListBox.ItemsPanel>
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <Border Background="{Binding Color, Converter={conv:StringToBrushConverter}}" CornerRadius="4" Margin="3"/>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
         </ListBox>
     </Grid>
 </View>

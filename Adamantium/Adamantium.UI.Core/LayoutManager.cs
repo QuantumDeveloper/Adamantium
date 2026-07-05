@@ -318,7 +318,16 @@ public sealed class LayoutManager
         // old fallback parked a dirty child at its parent's origin (the "pile at (0,0)" bug, plan problem #3). The node's
         // ArrangeOverride then re-distributes correct rects to its children. Only a node that was never arranged (the
         // root, on first layout) has no saved slot -> it fills its own measured area.
-        var slot = control.PreviousArrangeSlot ?? new Rect(control.DesiredSize);
+        //
+        // The root visual is the exception: its slot is its CURRENT client area, never a saved slot. On a resize (e.g.
+        // maximize) the client size grows and the root re-measures to it (MeasureDirty uses ClientWidth), but its
+        // PreviousArrangeSlot still holds the OLD rect. ArrangeCore force-sets the root's RenderSize to DesiredSize (so
+        // Bounds looked correct), yet the alignment clamp re-derives ClipRectangle from finalRect - so the stale slot
+        // pinned the window's clip (and thus root-level hit-testing) to the old size while every child grew, killing
+        // hovers/scroll in the newly-exposed area. Feed the live client rect so measure and arrange agree.
+        var slot = node is IRootVisualComponent { ClientWidth: > 0, ClientHeight: > 0 } root
+            ? new Rect(0, 0, root.ClientWidth, root.ClientHeight)
+            : control.PreviousArrangeSlot ?? new Rect(control.DesiredSize);
         if (LayoutTrace.Enabled)
         {
             var name = string.IsNullOrEmpty(node.Name) ? node.GetType().Name : node.Name;

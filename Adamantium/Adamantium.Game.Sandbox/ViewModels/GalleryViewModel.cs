@@ -25,4 +25,9 @@ public partial class GalleryViewModel
     };
 
     [Bindable] private TabPageViewModel _selectedTab;
+
+    public GalleryViewModel()
+    {
+        SelectedTab = Tabs[0];
+    }
 }

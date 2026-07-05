@@ -20,11 +20,12 @@ public abstract class TriggerBase : ITrigger
                 component.SetBinding(setterProperty, binding);
                 break;
             case ResourceReference resourceReference:
-                if (!theme.TryGetResource(resourceReference.Name, out var resource))
-                    throw new ResourceNotFoundException(
-                        $"Resource {resourceReference.Name} is not found for theme: {theme.Name} and control: {component.GetType().Name}");
-                
-                component.SetValue(setterProperty, resource, ValuePriority.Trigger);
+                // Tree-scoped resolve from the triggered element. If it misses (e.g. the trigger is evaluated before the
+                // element is in a rooted tree, so a Local resource on an ancestor isn't reachable yet) skip rather than
+                // throw - a trigger re-evaluates when its condition next changes, by which point the tree is rooted. This
+                // mirrors the trigger activator, which also skips on miss.
+                if (theme.TryGetResource(component, resourceReference.Name, out var resource))
+                    component.SetValue(setterProperty, resource, ValuePriority.Trigger);
                 break;
             case ThemeResource themeResource:
                 themeResource.Apply(component, setterProperty, ValuePriority.Trigger);

@@ -1,0 +1,36 @@
+<ResourceDictionary xmlns="http://adamantium/ui"
+                    xmlns:x="http://adamantium/ui/xaml/extensions"
+                    xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters">
+
+    <!-- The two tile templates for the Layout demo, kept in AUML (not code). Linked into the Local scope by the
+         LayoutView (ResourceContext.Source), so they live only while that tab is open; referenced via {ResourceReference}
+         and swapped by a DataTrigger on ShowEllipses. Both bind the item's Color string to a Brush and fill the cell,
+         so each is drawn by its SDF batch (RectBatch / EllipseBatch) - no per-tile tessellation. -->
+
+    <!-- Grid tiles carry the FULL pen (thickness/corner/dash/gap/offset/trim). Solid AND dashed/trimmed strokes draw
+         analytically in the SDF batch (arc length per fragment - see BatchEffect.fx), so a stroked tile stays in the
+         instanced draw with no per-tile GPU buffers: the whole 6000-tile grid dashes/trims with no device-memory OOM. -->
+    <DataTemplate x:Key="RectTileTemplate">
+        <Rectangle Fill="{Binding Color, Converter={conv:StringToBrushConverter}}"
+                   Stroke="{Binding Stroke.StrokeBrush}" CornerRadius="{Binding Stroke.CornerRadius}"
+                   StrokeThickness="{Binding Stroke.StrokeWidth}"
+                   StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
+                   StrokeDashOffset="{Binding Stroke.DashOffset}"
+                   StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                   StrokeLineJoin="{Binding Stroke.Join}"
+                   StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"
+                   HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="3"/>
+    </DataTemplate>
+
+    <DataTemplate x:Key="EllipseTileTemplate">
+        <Ellipse Fill="{Binding Color, Converter={conv:StringToBrushConverter}}"
+                 Stroke="{Binding Stroke.StrokeBrush}"
+                 StrokeThickness="{Binding Stroke.StrokeWidth}"
+                 StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
+                 StrokeDashOffset="{Binding Stroke.DashOffset}"
+                 StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                 StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"
+                 HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="3"/>
+    </DataTemplate>
+
+</ResourceDictionary>

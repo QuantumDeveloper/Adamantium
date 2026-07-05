@@ -183,7 +183,7 @@ public abstract class Shape : InputUIComponent
 
    public static readonly AdamantiumProperty StrokeProperty = AdamantiumProperty.Register(nameof(Stroke),
       typeof (Brush), typeof (Shape),
-      new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.BindsTwoWayByDefault));
+      new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender));
 
    public static readonly AdamantiumProperty StrokeThicknessProperty =
       AdamantiumProperty.Register(nameof(StrokeThickness),
@@ -336,6 +336,11 @@ public abstract class Shape : InputUIComponent
 
    public Pen GetPen()
    {
+      // No visible stroke (no/transparent stroke brush, or zero thickness) => NO pen at all. A fill-only shape must not
+      // carry a phantom pen: it draws nothing, yet a non-null pen would disqualify the shape from its SDF fill batch
+      // (RectBatch/EllipseBatch) and force a per-frame tessellation - the ellipse-grid resize freeze was exactly this.
+      if (!IsVisibleBrush(Stroke) || StrokeThickness <= 0) return null;
+
       // A symbolic pattern (StrokeDashSymbols) expands into the dash array; otherwise the raw StrokeDashArray is used.
       return new Pen(
          Stroke,
@@ -462,8 +467,10 @@ public abstract class Shape : InputUIComponent
             shapeSize.Height = maxValue;
             break;
          case Stretch.Fill:
-            shapeSize.Width = Math.Max(desiredSize.Width, desiredSize.Height);
-            shapeSize.Height = Math.Max(desiredSize.Width, desiredSize.Height);
+            // Fill stretches to the available box in BOTH axes INDEPENDENTLY (a non-square cell -> a non-square shape).
+            // Forcing max(w,h) onto both made every Fill shape square, which then poisoned the intrinsic size reported to
+            // layout on the next measure - so a Rectangle in a non-square cell stayed a fixed (square-ish) aspect.
+            shapeSize = desiredSize;
             break;
          default:
             shapeSize = desiredSize;
@@ -483,6 +490,15 @@ public abstract class Shape : InputUIComponent
 
    protected override Size ArrangeOverride(Size finalSize)
    {
-      return Rect.Size;
+      // WPF Shape arrange: Stretch != None fills the arranged slot. Box shapes (Rectangle/Ellipse) default Stretch=Fill,
+      // so a Stretch shape in a layout cell renders at the cell size even when it was measured unbounded (which reports
+      // intrinsic 0). Stretch=None (a Path/Polygon/Line's default) keeps the measured geometry bounds - its authored
+      // coordinates. The parent has already folded alignment + any explicit Width/Height into finalSize.
+      if (Stretch == Stretch.None) return Rect.Size;
+
+      var box = new Size(finalSize.Width, finalSize.Height).Deflate(new Thickness(StrokeThickness / 2));
+      Rect = new Rect(box);
+      RenderBounds = new Rect(box);
+      return finalSize;
    }
 }

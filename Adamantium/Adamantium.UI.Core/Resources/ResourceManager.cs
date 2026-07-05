@@ -51,23 +51,50 @@ public class ResourceManager : IResourceManager
         }
     }
     
+    // Context-less lookup: Local scope is DELIBERATELY invisible here. A Local resource is only reachable through the
+    // requester-aware overload below (which tree-scopes it), so a lookup with no requesting element - a global/eager
+    // resolve - can never reach into a subtree's Local dictionary. Only Theme and Global are reachable this way.
     public object FindResource(string name)
     {
         if (_uriToTypeMap.Value.TryGetValue(name, out var type))
         {
             return type;
         }
-        var resource = FindResourceInScope(name);
-        if (resource != null) 
-            return resource;
-        
-        resource = FindResourceInScope(name, ResourceScope.Theme);
+
+        var resource = FindResourceInScope(name, ResourceScope.Theme);
         if (resource != null)
             return resource;
-        
-        resource = FindResourceInScope(name, ResourceScope.Global);
-        return resource;
+
+        return FindResourceInScope(name, ResourceScope.Global);
     }
+
+    // Requester-aware lookup: Local resources are TREE-SCOPED. Walk up from the requesting element (logical parent, or
+    // the visual parent where there's no logical one - e.g. templated content), and at each ancestor look only at
+    // dictionaries that ancestor OWNS. Nearest owner wins; then fall back to Theme, then Global. This is what makes a
+    // Local resource reachable from the subtree that declared it - and nowhere else.
+    public object FindResource(IFundamentalUIComponent requester, string name)
+    {
+        if (_uriToTypeMap.Value.TryGetValue(name, out var type))
+        {
+            return type;
+        }
+
+        for (var node = requester; node != null; node = LogicalOrVisualParent(node))
+        {
+            var local = _localResources.FindResourceForOwner(node, name);
+            if (local != null)
+                return local;
+        }
+
+        var themeResource = FindResourceInScope(name, ResourceScope.Theme);
+        if (themeResource != null)
+            return themeResource;
+
+        return FindResourceInScope(name, ResourceScope.Global);
+    }
+
+    private static IFundamentalUIComponent LogicalOrVisualParent(IFundamentalUIComponent node)
+        => node.LogicalParent ?? (node as IUIComponent)?.VisualParent;
 
     public T FindResourceInScope<T>(string name, ResourceScope scope = ResourceScope.Local)
     {

@@ -59,10 +59,8 @@ public class TabItem : ContentControl, ISelectable
     public static readonly AdamantiumProperty ForegroundSelectedProperty = AdamantiumProperty.Register(
         nameof(ForegroundSelected), typeof(Brush), typeof(TabItem), new PropertyMetadata(default(Brush)));
 
-    public TabItem()
-    {
-        Focusable = true;
-    }
+    // No constructor: Focusable already defaults to true (registered on InputUIComponent), so setting it here was
+    // redundant - and a constructor set writes Local priority, which would mask a {Binding}/Style/Trigger on Focusable.
 
     /// <summary>The tab-strip label - a string or any UI content. Distinct from <see cref="ContentControl.Content"/>,
     /// which is the body shown when the tab is selected.</summary>

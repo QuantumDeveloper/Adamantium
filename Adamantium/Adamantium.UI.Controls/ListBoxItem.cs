@@ -58,10 +58,8 @@ public class ListBoxItem : ContentControl, ISelectable
             new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
     }
 
-    public ListBoxItem()
-    {
-        Focusable = true;
-    }
+    // No constructor: Focusable already defaults to true (registered on InputUIComponent), so setting it here was
+    // redundant - and a constructor set writes Local priority, which would mask a {Binding}/Style/Trigger on Focusable.
 
     public bool IsSelected
     {

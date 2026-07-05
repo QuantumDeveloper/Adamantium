@@ -9,7 +9,7 @@
 
     <Style Selector="ProgressBar">
         <Setter Property="MinWidth" Value="120"/>
-        <Setter Property="MinHeight" Value="6"/>        
+        <Setter Property="MinHeight" Value="6"/>
     </Style>
 
     <!-- Linear template (default). -->
