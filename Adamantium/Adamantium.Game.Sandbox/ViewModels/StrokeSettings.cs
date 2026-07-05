@@ -31,10 +31,19 @@ public sealed class StrokeSettings : PropertyChangedBase
     public double Corner { get => _corner; set { if (SetProperty(ref _corner, value)) RaisePropertyChanged(nameof(CornerRadius)); } }
     public CornerRadius CornerRadius => new(_corner);
 
-    // Cap shape for dash-piece ends AND trim ends: slider 0 = flat, 1 = square, 2 = round.
+    // Cap shape for dash-piece ends AND trim ends. Slider 0..5 covers all six PenLineCaps (0 flat, 1 square, 2 convex
+    // round, 3 convex triangle, 4 concave triangle, 5 concave round). Set the Cap slider's Maximum to 5 to reach them.
     private double _capValue = 2;
     public double CapValue { get => _capValue; set { if (SetProperty(ref _capValue, value)) RaisePropertyChanged(nameof(Cap)); } }
-    public PenLineCap Cap => _capValue >= 1.5 ? PenLineCap.ConvexRound : _capValue >= 0.5 ? PenLineCap.Square : PenLineCap.Flat;
+    public PenLineCap Cap => (int)Math.Round(_capValue) switch
+    {
+        1 => PenLineCap.Square,
+        2 => PenLineCap.ConvexRound,
+        3 => PenLineCap.ConvexTriangle,
+        4 => PenLineCap.ConcaveTriangle,
+        5 => PenLineCap.ConcaveRound,
+        _ => PenLineCap.Flat,
+    };
 
     // Corner join: slider 0 = miter (sharp), 1 = bevel (chamfer), 2 = round. Visible on a sharp rectangle (Corner = 0).
     private double _joinValue = 2;

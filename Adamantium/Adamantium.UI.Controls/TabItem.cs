@@ -1,6 +1,7 @@
 using System.Linq;
 using Adamantium.Mathematics;
 using Adamantium.ProceduralGeometry;
+using Adamantium.UI.Controls.Primitives;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
@@ -58,6 +59,21 @@ public class TabItem : ContentControl, ISelectable
 
     public static readonly AdamantiumProperty ForegroundSelectedProperty = AdamantiumProperty.Register(
         nameof(ForegroundSelected), typeof(Brush), typeof(TabItem), new PropertyMetadata(default(Brush)));
+
+    // Close button (see TabControl.ShowCloseButton). IsClosable is the per-tab opt-out (author it False to keep a pinned
+    // tab open). ShowCloseButton + CloseButtonTemplate are EFFECTIVE values pulled from the owning TabControl on attach
+    // (so authored + generated tabs behave alike); the tab template binds the button's visibility/look to them.
+    public static readonly AdamantiumProperty IsClosableProperty = AdamantiumProperty.Register(nameof(IsClosable),
+        typeof(bool), typeof(TabItem), new PropertyMetadata(true, OnCloseConfigChanged));
+
+    public static readonly AdamantiumProperty ShowCloseButtonProperty = AdamantiumProperty.Register(nameof(ShowCloseButton),
+        typeof(bool), typeof(TabItem), new PropertyMetadata(false));
+
+    public static readonly AdamantiumProperty CloseButtonTemplateProperty = AdamantiumProperty.Register(nameof(CloseButtonTemplate),
+        typeof(ControlTemplate), typeof(TabItem), new PropertyMetadata(null));
+
+    private static void OnCloseConfigChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+        => ((TabItem)a).SyncCloseButton();
 
     // No constructor: Focusable already defaults to true (registered on InputUIComponent), so setting it here was
     // redundant - and a constructor set writes Local priority, which would mask a {Binding}/Style/Trigger on Focusable.
@@ -139,17 +155,89 @@ public class TabItem : ContentControl, ISelectable
         set => SetValue(ForegroundSelectedProperty, value);
     }
 
+    /// <summary>Whether THIS tab may show a close button when the owning <see cref="TabControl.ShowCloseButton"/> is on.
+    /// Author False to keep a pinned tab open. Default true.</summary>
+    public bool IsClosable
+    {
+        get => GetValue<bool>(IsClosableProperty);
+        set => SetValue(IsClosableProperty, value);
+    }
+
+    /// <summary>Effective close-button visibility for this tab (owner's ShowCloseButton AND this tab's IsClosable),
+    /// pulled from the owning TabControl. The tab template binds the button's visibility to it.</summary>
+    public bool ShowCloseButton
+    {
+        get => GetValue<bool>(ShowCloseButtonProperty);
+        set => SetValue(ShowCloseButtonProperty, value);
+    }
+
+    /// <summary>The close button's look, pulled from <see cref="TabControl.CloseButtonTemplate"/>.</summary>
+    public ControlTemplate CloseButtonTemplate
+    {
+        get => GetValue<ControlTemplate>(CloseButtonTemplateProperty);
+        set => SetValue(CloseButtonTemplateProperty, value);
+    }
+
+    private TabControl _closeOwner;
+    private ButtonBase _closeButton;
+
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
         // Own-container tabs (authored <TabItem/>) get no PrepareContainer call, and the owner reflects selection only on
         // change - so a tab realized into the strip pulls its current state here, lighting up the initially-selected tab.
         if (this.GetVisualAncestors().OfType<TabControl>().FirstOrDefault() is { } owner)
+        {
             IsSelected = owner.IsContainerSelected(this);
+            // Pull the close-button config from the owner (authored + generated tabs alike) and follow later changes.
+            _closeOwner = owner;
+            _closeOwner.PropertyChanged += OnOwnerPropertyChanged;
+            SyncCloseButton();
+        }
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        if (_closeOwner != null)
+        {
+            _closeOwner.PropertyChanged -= OnOwnerPropertyChanged;
+            _closeOwner = null;
+        }
+    }
+
+    public override void OnApplyTemplate()
+    {
+        base.OnApplyTemplate();
+        if (_closeButton != null) _closeButton.Click -= OnCloseButtonClick;
+        _closeButton = GetTemplateChild("PART_CloseButton") as ButtonBase;
+        if (_closeButton != null) _closeButton.Click += OnCloseButtonClick;
+    }
+
+    // Owner's close config changed at runtime (e.g. ShowCloseButton toggled) -> re-sync this tab.
+    private void OnOwnerPropertyChanged(object sender, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (e.Property == TabControl.ShowCloseButtonProperty || e.Property == TabControl.CloseButtonTemplateProperty)
+            SyncCloseButton();
+    }
+
+    // Effective button state = owner shows close buttons AND this tab is closable; the look comes from the owner.
+    private void SyncCloseButton()
+    {
+        var owner = _closeOwner ?? Owner;
+        ShowCloseButton = owner is { ShowCloseButton: true } && IsClosable;
+        CloseButtonTemplate = owner?.CloseButtonTemplate;
+    }
+
+    private void OnCloseButtonClick(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;   // don't let the click fall through to tab selection / drag
+        Owner?.RequestClose(this);
     }
 
     private const double DragThreshold = 4;   // px moved before a press becomes a reorder drag
     private Vector2 _pressPos;
+    private bool _pressed;
     private bool _dragging;
 
     private TabControl Owner => this.GetVisualAncestors().OfType<TabControl>().FirstOrDefault();
@@ -157,22 +245,26 @@ public class TabItem : ContentControl, ISelectable
     protected override void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonDown(sender, e);
-        if (!IsEnabled) return;
+        if (!IsEnabled || e.Handled) return;   // e.Handled -> the close button (or other child) took the click
         e.Handled = true;
         Focus();
         Owner?.SelectTab(this);
         _pressPos = e.GetPosition(this);
+        _pressed = true;
         _dragging = false;
-        CaptureMouse();   // so the drag keeps tracking even as the pointer leaves this tab
+        // Do NOT capture the mouse here: capturing on press swallows a plain click meant for an interactive child (the
+        // close button) - the up would route to this captured tab, not the button. Capture only once a drag actually
+        // starts (below), which is when we truly need to track the pointer past this tab's bounds.
     }
 
     protected override void OnMouseMove(object sender, MouseEventArgs e)
     {
         base.OnMouseMove(sender, e);
-        if (!IsMouseCaptured) return;
+        if (!_pressed) return;
         if (!_dragging && (e.GetPosition(this) - _pressPos).Length() > DragThreshold)
         {
             _dragging = true;
+            CaptureMouse();   // now the drag must keep tracking even as the pointer leaves this tab
             Owner?.BeginDrag(this, e);
         }
         if (_dragging) Owner?.UpdateDrag(this, e);
@@ -183,6 +275,7 @@ public class TabItem : ContentControl, ISelectable
         base.OnMouseLeftButtonUp(sender, e);
         if (_dragging) Owner?.EndDrag(this);
         if (IsMouseCaptured) ReleaseMouseCapture();
+        _pressed = false;
         _dragging = false;
     }
 }

@@ -1,12 +1,12 @@
-using System;
 using System.Collections;
 using System.Collections.Specialized;
-using Adamantium.Mathematics;
 using Adamantium.ProceduralGeometry;
+using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Media.Animation;
+using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.Core.Templates;
 
 namespace Adamantium.UI.Controls;
@@ -49,6 +49,42 @@ public class TabControl : Selector
     public static readonly AdamantiumProperty ReorderEasingProperty = AdamantiumProperty.Register(
         nameof(ReorderEasing), typeof(IEasingFunction), typeof(TabControl), new PropertyMetadata(null));
 
+    // The selection indicator: the accent bar that slides under the selected tab. Brush + thickness are themed (a
+    // {ThemeResource} accent, so an accent/theme swap recolours it live via the template's TemplateBinding); the slide's
+    // duration/easing are theme-settable like the reorder feel. The bar's geometry is driven in code (RenderTransform).
+    public static readonly AdamantiumProperty SelectionIndicatorBrushProperty = AdamantiumProperty.Register(
+        nameof(SelectionIndicatorBrush), typeof(Brush), typeof(TabControl),
+        new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
+
+    public static readonly AdamantiumProperty SelectionIndicatorThicknessProperty = AdamantiumProperty.Register(
+        nameof(SelectionIndicatorThickness), typeof(double), typeof(TabControl), new PropertyMetadata(3.0));
+
+    public static readonly AdamantiumProperty SelectionAnimationDurationProperty = AdamantiumProperty.Register(
+        nameof(SelectionAnimationDuration), typeof(TimeSpan), typeof(TabControl),
+        new PropertyMetadata(TimeSpan.FromMilliseconds(250)));
+
+    /// <summary>Accent brush of the sliding selection indicator. Themed via {ThemeResource}; a TemplateBinding in the
+    /// control template paints the bar, so an accent/theme swap recolours it live.</summary>
+    public Brush SelectionIndicatorBrush
+    {
+        get => GetValue<Brush>(SelectionIndicatorBrushProperty);
+        set => SetValue(SelectionIndicatorBrushProperty, value);
+    }
+
+    /// <summary>Thickness (height for a top/bottom strip, width for a left/right strip) of the selection indicator bar.</summary>
+    public double SelectionIndicatorThickness
+    {
+        get => GetValue<double>(SelectionIndicatorThicknessProperty);
+        set => SetValue(SelectionIndicatorThicknessProperty, value);
+    }
+
+    /// <summary>How long the indicator takes to slide/resize to a newly selected tab. Theme-settable.</summary>
+    public TimeSpan SelectionAnimationDuration
+    {
+        get => GetValue<TimeSpan>(SelectionAnimationDurationProperty);
+        set => SetValue(SelectionAnimationDurationProperty, value);
+    }
+
     // Content-area chrome (the panel below the tab strip that hosts the selected body). Set by the theme, TemplateBound
     // by the default template - so a theme/accent swap restyles it and a host can retheme it.
     public static readonly AdamantiumProperty BorderBrushProperty = AdamantiumProperty.Register(nameof(BorderBrush),
@@ -90,7 +126,11 @@ public class TabControl : Selector
 
     public TabControl()
     {
-        SelectionChanged += (_, _) => UpdateSelectedContent();
+        SelectionChanged += (_, _) =>
+        {
+            UpdateSelectedContent();
+            UpdateIndicator(animate: true);
+        };
         Items.CollectionChanged += OnItemsChanged;
     }
 
@@ -314,11 +354,11 @@ public class TabControl : Selector
         }, completed);
     }
 
-    private static Transform EnsureTransform(TabItem tab)
+    private static Transform EnsureTransform(UIComponent element)
     {
-        if (tab.RenderTransform is Transform t) return t;
+        if (element.RenderTransform is Transform t) return t;
         var transform = new Transform();
-        tab.RenderTransform = transform;
+        element.RenderTransform = transform;
         return transform;
     }
 
@@ -350,6 +390,112 @@ public class TabControl : Selector
     internal bool IsContainerSelected(TabItem container) =>
         SelectedItem != null &&
         (ReferenceEquals(SelectedItem, container) || ReferenceEquals(SelectedItem, container.DataContext));
+
+    // --- Selection indicator (the accent bar that slides under the selected tab) ----------------------------------
+    // A single template part PART_SelectionIndicator (a 1px-base rectangle) is driven ENTIRELY by its RenderTransform:
+    // TranslateX = the selected tab's offset along the strip, ScaleX = the tab's extent (Transform scales about the
+    // origin, so a 1px bar becomes exactly the tab's width). Both animate on a selection change (the slide) and snap on
+    // layout (initial place / resize / reorder). It lives in the strip's scroll content, so it pans and clips with the
+    // tabs for free. Vertical strips use Y/ScaleY. Same DoubleAnimation infra as the drag-reorder above.
+
+    private UIComponent _indicator;
+    private bool _indicatorPlaced;
+    private bool _animatingIndicator;
+    private LayoutManager _hookedManager;
+    private double _lastAlong, _lastExtent;
+
+    public override void OnApplyTemplate()
+    {
+        base.OnApplyTemplate();
+
+        _indicator = GetTemplateChild("PART_SelectionIndicator") as UIComponent;
+        if (_indicator != null)
+        {
+            _indicator.IsHitTestVisible = false;   // a thin overlay bar must never eat a tab click
+            _indicatorPlaced = false;
+        }
+
+        if (_hookedManager == null)
+        {
+            // Tab bounds are known only after a layout pass; snap the bar once the pass settles (and re-snap on resize/
+            // reorder). A selection CHANGE animates directly - the tabs are already laid out at that point. Cache the
+            // EXACT manager we subscribed to: LayoutManager.For(this) is resolved from the current root, so re-resolving
+            // it at unhook time (a different root) would leave the original manager holding this handler -> a leak.
+            _hookedManager = LayoutManager.For(this);
+            _hookedManager.LayoutUpdated += OnLayoutUpdated;
+            Unloaded += OnUnloadedDetachLayout;
+        }
+    }
+
+    private void OnUnloadedDetachLayout(object sender, RoutedEventArgs e)
+    {
+        if (_hookedManager == null) return;
+        _hookedManager.LayoutUpdated -= OnLayoutUpdated;
+        _hookedManager = null;
+        Unloaded -= OnUnloadedDetachLayout;
+    }
+
+    private void OnLayoutUpdated(object sender, EventArgs e)
+    {
+        // Snap (no animation) to wherever the selected tab now sits - covers first layout, a resize, and a reorder.
+        // Skipped mid-slide so it can't fight the running animation.
+        if (_indicator == null || _animatingIndicator) return;
+        UpdateIndicator(animate: false);
+    }
+
+    private void UpdateIndicator(bool animate)
+    {
+        if (_indicator == null || _indicator.VisualParent == null) return;
+        if (ItemContainerGenerator.ContainerFromIndex(SelectedIndex) is not TabItem container) return;
+
+        var bounds = container.Bounds;
+        if (bounds.Width <= 0 || bounds.Height <= 0) return;   // not laid out yet; OnLayoutUpdated will place it
+
+        var vertical = TabStripPlacement is TabStripPlacement.Left or TabStripPlacement.Right;
+
+        // Selected tab's offset expressed in the indicator's own coordinate space: walk up to the shared ancestor
+        // (the indicator's parent), summing each node's slot offset plus any RenderTransform pan (e.g. the strip's
+        // scroll, or a tab mid drag-reorder). Robust to how the strip nests the panel.
+        var reference = _indicator.VisualParent;
+        double along = -(vertical ? _indicator.Bounds.Y : _indicator.Bounds.X);
+        for (IUIComponent n = container; n != null && !ReferenceEquals(n, reference); n = n.VisualParent)
+        {
+            along += vertical ? n.Bounds.Y : n.Bounds.X;
+            if (n is UIComponent uc && uc.RenderTransform is Transform pan)
+                along += vertical ? pan.TranslateY : pan.TranslateX;
+        }
+        var extent = vertical ? bounds.Height : bounds.Width;
+
+        if (!animate && _indicatorPlaced && along == _lastAlong && extent == _lastExtent) return;
+        _lastAlong = along;
+        _lastExtent = extent;
+
+        var transform = EnsureTransform(_indicator);
+        var posProp = vertical ? Transform.TranslateYProperty : Transform.TranslateXProperty;
+        var scaleProp = vertical ? Transform.ScaleYProperty : Transform.ScaleXProperty;
+
+        if (animate && _indicatorPlaced)
+        {
+            var easing = ReorderEasing ?? DefaultReorderEasing;
+            var fromPos = vertical ? transform.TranslateY : transform.TranslateX;
+            var fromScale = vertical ? transform.ScaleY : transform.ScaleX;
+            _animatingIndicator = true;
+            transform.BeginAnimation(posProp,
+                new DoubleAnimation { From = fromPos, To = along, Duration = SelectionAnimationDuration, Easing = easing },
+                () => _animatingIndicator = false);
+            transform.BeginAnimation(scaleProp,
+                new DoubleAnimation { From = fromScale, To = extent, Duration = SelectionAnimationDuration, Easing = easing });
+        }
+        else
+        {
+            transform.CancelAnimation(posProp);
+            transform.CancelAnimation(scaleProp);
+            if (vertical) { transform.TranslateY = along; transform.ScaleY = extent; }
+            else { transform.TranslateX = along; transform.ScaleX = extent; }
+        }
+
+        _indicatorPlaced = true;
+    }
 
     // --- Container seam: TabControl hosts items in TabItem containers ---------------------------------------------
 
@@ -386,5 +532,51 @@ public class TabControl : Selector
             tab.DataContext = null;
             tab.IsSelected = false;
         }
+    }
+
+    // --- Closable tabs (an optional per-tab close button) ---------------------------------------------------------
+    // ShowCloseButton turns the button on for every tab; a tab can still opt out with TabItem.IsClosable. The button's
+    // LOOK is a separate CloseButtonTemplate (themed default = a small "x"), so it restyles without touching the tab
+    // template. Each TabItem pulls both from its owner on attach (authored + generated tabs alike) - see TabItem.
+
+    public static readonly AdamantiumProperty ShowCloseButtonProperty = AdamantiumProperty.Register(
+        nameof(ShowCloseButton), typeof(bool), typeof(TabControl), new PropertyMetadata(false));
+
+    public static readonly AdamantiumProperty CloseButtonTemplateProperty = AdamantiumProperty.Register(
+        nameof(CloseButtonTemplate), typeof(ControlTemplate), typeof(TabControl), new PropertyMetadata(null));
+
+    /// <summary>Show a close button on every tab (a tab can still opt out via <see cref="TabItem.IsClosable"/>). Default false.</summary>
+    public bool ShowCloseButton
+    {
+        get => GetValue<bool>(ShowCloseButtonProperty);
+        set => SetValue(ShowCloseButtonProperty, value);
+    }
+
+    /// <summary>Template for the tab close button - swap it to restyle the button without touching the tab template. The
+    /// theme provides a default "x". Its DataContext/TemplatedParent is the button; a click raises <see cref="TabCloseRequested"/>.</summary>
+    public ControlTemplate CloseButtonTemplate
+    {
+        get => GetValue<ControlTemplate>(CloseButtonTemplateProperty);
+        set => SetValue(CloseButtonTemplateProperty, value);
+    }
+
+    /// <summary>Raised when a tab's close button is clicked. Cancelable; if not canceled the tab is removed by default.</summary>
+    public event EventHandler<TabCloseRequestedEventArgs> TabCloseRequested;
+
+    // Called by a TabItem when its close button is clicked: raise the cancelable event, and unless vetoed remove the tab
+    // (mutating ItemsSource when data-bound to a writable list, else the authored Items) - mirroring MoveItem's source rule.
+    internal void RequestClose(TabItem tab)
+    {
+        var index = ItemContainerGenerator.IndexFromContainer(tab);
+        if (index < 0 || index >= Items.Count) return;
+
+        var args = new TabCloseRequestedEventArgs(tab, Items[index]);
+        TabCloseRequested?.Invoke(this, args);
+        if (args.Cancel) return;
+
+        if (ItemsSource is IList { IsReadOnly: false, IsFixedSize: false } src && index < src.Count)
+            src.RemoveAt(index);
+        else
+            Items.RemoveAt(index);
     }
 }

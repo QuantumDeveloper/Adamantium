@@ -63,6 +63,18 @@
             <Setter TargetName="InnerBorder" Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
             <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ThemeResource AccentForegroundColor}"/>
         </PropertyTrigger>
+        <!-- Checked + hover: dim the accent a notch (Fluent's checked PointerOver). Declared after IsChecked so it lands
+             ON TOP of the trigger value stack while active - without it, the plain IsMouseOver trigger above painted the
+             neutral pointer-over fill over the accent, leaving a checked toggle a blank box with only its accent border
+             (glaring on the light theme, where the neutral fill is near-white and the accent foreground vanished). -->
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="IsChecked" Value="true"/>
+                <Condition Property="IsMouseOver" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="InnerBorder" Property="Background" Value="{ThemeResource AccentFillColorSecondary}"/>
+            <Setter TargetName="InnerBorder" Property="BorderBrush" Value="{ThemeResource AccentFillColorSecondary}"/>
+        </MultiTrigger>
         <PropertyTrigger Property="IsPressed" Value="true">
             <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
         </PropertyTrigger>

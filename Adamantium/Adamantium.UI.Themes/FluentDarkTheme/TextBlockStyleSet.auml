@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Plain text follows the theme's primary text colour from the palette, so a Dark<->Light swap re-colours labels
+         (a {ResourceReference} re-resolves when the style is re-applied on the swap). Without this, TextBlock kept its
+         hard-coded default (white) and was invisible on the light theme's light background. -->
+    <Style Selector="TextBlock">
+        <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
+    </Style>
+
+</StyleSet>

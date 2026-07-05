@@ -9,6 +9,7 @@ public class DefaultTypeContainer
         TypeParser = typeResolver.Resolve("Adamantium.Core.TypeParsing.TypeParser");
         ResourceReference = typeResolver.ResolveByShortName("ResourceReference");
         ThemeResource = typeResolver.ResolveByShortName("ThemeResource");
+        ObservableResource = typeResolver.ResolveByShortName("ObservableResource");
         ResourceDictionary = typeResolver.ResolveByShortName("ResourceDictionary");
         ResourceResolver = typeResolver.ResolveByShortName("ResourceResolver");
         StyleSet =  typeResolver.ResolveByShortName("StyleSet");
@@ -24,6 +25,8 @@ public class DefaultTypeContainer
     public IResolvedType ResourceReference { get; }
 
     public IResolvedType ThemeResource { get; }
+
+    public IResolvedType ObservableResource { get; }
 
     public IResolvedType ResourceResolver { get; }
     

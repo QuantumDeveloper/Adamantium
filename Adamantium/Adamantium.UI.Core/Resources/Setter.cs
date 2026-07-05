@@ -33,6 +33,9 @@ public class Setter : ISetter, IEquatable<Setter>
             case ThemeResource themeResource:
                 themeResource.Apply(component, Property, ValuePriority.Style);
                 break;
+            case ObservableResource observableResource:
+                observableResource.Apply(component, Property, ValuePriority.Style);
+                break;
             default:
                 var prop = AdamantiumPropertyMap.FindRegistered(component.GetType(), Property);
                 if (prop == null)
@@ -90,6 +93,9 @@ public class Setter : ISetter, IEquatable<Setter>
                 break;
             case ThemeResource:
                 ThemeResource.Remove(component, Property, ValuePriority.Style);
+                break;
+            case ObservableResource:
+                ObservableResource.Remove(component, Property, ValuePriority.Style);
                 break;
             default:
                 component.RemoveStyleValue(Property, style);

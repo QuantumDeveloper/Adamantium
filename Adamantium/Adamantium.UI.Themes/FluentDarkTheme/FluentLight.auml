@@ -1,13 +1,40 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <Theme xmlns="http://adamantium/ui"
        xmlns:x="http://adamantium/ui/xaml/extensions"
 	   xmlns:fluentDark="clr-namespace:Adamantium.UI.Themes.FluentDarkTheme"
 	   Name="FluentLight"
-       ResourceContext.Source="{ResourceLink Source={x:Type fluentDark:Brushes}, Scope=Theme}">
+       ResourceContext.Source="{ResourceLink Source={x:Type fluentDark:BrushesLight}, Scope=Theme}">
 
+	<!-- Same templates as FluentDark (the StyleSets are palette-driven via {ResourceReference}); only the linked palette
+	     (BrushesLight above) and the accents below differ, so a Dark<->Light swap re-colours every control with no new
+	     templates. Switch at runtime with the arrow keys (Up = Dark, Down = Light). -->
 	<Theme.StyleIncludes>
-		<!--<StyleInclude Source="RectangleStyleSet.xml"/>-->
-		<StyleInclude Source="{x:Type fluentDark:BorderStyleSetLight}"/>
-		<!--<StyleInclude Source="ButtonStyleSet.xml"/>-->
+		<StyleInclude Source="{x:Type fluentDark:TextBlockStyleSet}"/>
+		<StyleInclude Source="{x:Type fluentDark:BorderStyleSet}"/>
+		<StyleInclude Source="{x:Type fluentDark:ButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ContentControlStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:RepeatButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ThumbStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ScrollBarStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ScrollViewerStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ToggleButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:CheckBoxStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:RadioButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ToggleSwitchStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:SliderStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ProgressBarStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ItemsControlStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ListBoxStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ListBoxItemStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ToolTipStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:TabControlStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:TabItemStyleSet}"/>
 	</Theme.StyleIncludes>
+
+	<!-- Accent: ONE seed; the theme derives the ramp + on-accent text colour (see FluentDark.auml). A darker seed here
+	     yields white text on checked controls, matching WinUI's light-theme accent. -->
+	<Theme.AccentColor><SolidColorBrush Color="#005FB8"/></Theme.AccentColor>
+	<Theme.AccentFillColorDisabled><SolidColorBrush Color="#E0E0E0"/></Theme.AccentFillColorDisabled>
+	<Theme.FocusStrokeColorOuter><SolidColorBrush Color="#000000"/></Theme.FocusStrokeColorOuter>
+	<Theme.FocusStrokeColorInner><SolidColorBrush Color="#FFFFFF"/></Theme.FocusStrokeColorInner>
 </Theme>

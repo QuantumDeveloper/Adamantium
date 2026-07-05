@@ -14,6 +14,7 @@ public partial class GalleryViewModel
     {
         new ButtonsViewModel(),
         new RangesViewModel(),
+        new ResourcesViewModel(),
         new ScrollBarViewModel(),
         new ListsViewModel(),
         new ShapesViewModel(),

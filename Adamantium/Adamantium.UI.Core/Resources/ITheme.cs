@@ -9,6 +9,22 @@ public interface ITheme: IInitializable, IAdamantiumComponent
 
     Brush AccentColor { get; set; }
 
+    // The theme's accent / focus brushes: its runtime-mutable identity, consumed across styles via {ThemeResource Key}.
+    // Assigning one live re-colours every consumer (checked toggles/checkboxes/radios, focus) with no theme reload.
+    Brush AccentFillColorDefault { get; set; }
+
+    Brush AccentFillColorSecondary { get; set; }
+
+    Brush AccentFillColorTertiary { get; set; }
+
+    Brush AccentFillColorDisabled { get; set; }
+
+    Brush AccentForegroundColor { get; set; }
+
+    Brush FocusStrokeColorOuter { get; set; }
+
+    Brush FocusStrokeColorInner { get; set; }
+
     /// <summary>The theme's font for text - consumed in styles via {ThemeResource FontFamily} and inherited via
     /// UIComponent.FontFamily.</summary>
     FontFamily FontFamily { get; }

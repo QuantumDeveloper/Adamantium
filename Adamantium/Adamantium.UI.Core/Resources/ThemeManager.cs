@@ -25,14 +25,31 @@ public class ThemeManager : IThemeManager
     public void SetTheme(ITheme theme)
     {
         if (CurrentTheme == theme) return;
-        
-        _resourceManager.RemoveSources(CurrentTheme);
+
+        // Palette activation is SYMMETRIC and LAZY: deactivate the outgoing theme's resource sources, then activate the
+        // incoming one's. A theme does NOT register its palette at construction (see ResourceContext.SetSource) - only
+        // the theme that is CURRENT has its palette live in the Theme provider, so N themes cost nothing until chosen.
+        // This is the single owner of the "exactly one palette live" invariant.
+        if (CurrentTheme != null) _resourceManager.RemoveSources(CurrentTheme);
         CurrentTheme = theme;
+        ActivateThemeSources(theme);
+
         var windows = UIAppContext.Current.Windows;
         foreach (var window in windows)
         {
             window.InvalidateStyles();
         }
+    }
+
+    // (Re)register the theme's linked palette into the resource manager. The ResourceLink authored as ResourceContext.Source
+    // on the theme element is kept as an attached-property value, so we can re-add it every time the theme becomes current.
+    private void ActivateThemeSources(ITheme theme)
+    {
+        if (theme is not AdamantiumComponent component) return;
+
+        var link = ResourceContext.GetSource(component);
+        if (link?.Source != null)
+            _resourceManager.AddSource(component, link.Source, link.Scope);
     }
 
     public void ApplyTheme(ITheme theme, IFundamentalUIComponent component)
@@ -92,7 +109,7 @@ public class ThemeManager : IThemeManager
     public void AddTheme(string name, ITheme theme)
     {
         if (!_themesMap.TryAdd(name, theme)) return;
-        
+
         theme.Initialize();
 
         _themes.Add(theme);

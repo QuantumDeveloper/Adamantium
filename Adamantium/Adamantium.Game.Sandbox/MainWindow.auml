@@ -10,7 +10,7 @@
         Width="1280"
         Height="720"
         AnalyticAntialiasing="true"
-        Background="{ResourceReference SolidBackgroundFillColorBase}">
+        Background="{ObservableResource SolidBackgroundFillColorBase}">
     <Grid>
         <!-- The control gallery: data-driven tabs, one View + view-model per tab (see GalleryView / GalleryViewModel).
              The old inline demos (shapes, images, the game panel) now live in their respective tabs. -->

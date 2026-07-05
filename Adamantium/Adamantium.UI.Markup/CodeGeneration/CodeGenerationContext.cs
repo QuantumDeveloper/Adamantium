@@ -201,6 +201,41 @@ public class CodeGenerationContext
                 var valueTypeName = value.TypeReference.GetFullTypeName();
                 var valueResolvedType = Metadata.TypeResolver.Resolve(valueTypeName);
 
+                // A ResourceDictionary-typed property authored as INLINE keyed children (ResourceContext.Resources):
+                //   <X><ResourceContext.Resources><SolidColorBrush x:Key="Accent"/></ResourceContext.Resources></X>
+                // Build a dictionary instance, add each x:Key'd child to it, and hand it to the setter. The child build
+                // runs with isResource:false so it does NOT emit the resource-file's trailing keyed Add - we add here,
+                // into THIS dictionary. Local + tree-scoped + live via {ObservableResource}.
+                if (Metadata.DefaultTypeContainer.ResourceDictionary != null && resolvedType != null
+                    && (resolvedType.FullName == Metadata.DefaultTypeContainer.ResourceDictionary.FullName
+                        || resolvedType.InheritsFrom(Metadata.DefaultTypeContainer.ResourceDictionary.FullName))
+                    && !value.IsTextNode())
+                {
+                    var rdVar = GenerateNextElementName("res");
+                    TextGenerator.WriteLine($"var {rdVar} = new {Metadata.DefaultTypeContainer.ResourceDictionary.FullName}();");
+                    foreach (var entry in prop.Values.OfType<AumlAstObjectNode>())
+                    {
+                        var entryKey = GetKeyDirective(entry);
+                        var entryName = ProcessControlElements(entry, diagnostics, isResource: false);
+                        if (!string.IsNullOrEmpty(entryKey))
+                            TextGenerator.WriteLine($@"{rdVar}.Add(""{entryKey}"", {entryName});");
+                        else
+                            diagnostics.ReportError(Metadata.ClassName,
+                                $"An inline resource in {propRef.Name} needs an x:Key.");
+                    }
+
+                    if (propRef.IsAttachedProperty)
+                    {
+                        var setTarget = isRoot ? "this" : CurrentParent;
+                        TextGenerator.WriteLine($"{propRef.OwnerType.GetFullTypeName()}.Set{propRef.Name}({setTarget}, {rdVar});");
+                    }
+                    else
+                    {
+                        TextGenerator.WriteLine($"{symbolName} = {rdVar};");
+                    }
+                    continue;
+                }
+
                 // ControlTemplate, DataTemplate (ItemTemplate/ContentTemplate) and ItemsPanelTemplate all derive UiTemplate
                 // and take a Func<TemplateResult> builder: emit a builder method that constructs the template's tree and
                 // returns a TemplateResult, then `new <Template>(builder)`. Without this a DataTemplate would be emitted as
@@ -268,6 +303,28 @@ public class CodeGenerationContext
                                     $"var {trVar} = new {Metadata.DefaultTypeContainer.ThemeResource.FullName}(\"{key}\");");
                                 var trTarget = isRoot ? "this" : CurrentParent;
                                 TextGenerator.WriteLine($"{trVar}.Apply({trTarget}, \"{propRef.Name}\");");
+                            }
+
+                            break;
+                        }
+                        case "ObservableResource":
+                        {
+                            // {ObservableResource Key} -> a LIVE, tree-scoped keyed-resource reference (re-resolves on a
+                            // theme swap / dictionary load-unload). As a Setter/trigger value it's stored as the marker
+                            // (Setter.Apply / the trigger activator call Apply); as a normal property it's connected now.
+                            var key = extension.Arguments[0].Value.GetTextValue();
+                            if (isResource && element.TypeReference.Namespace == "Adamantium.UI.Core.Resources")
+                            {
+                                TextGenerator.WriteLine(
+                                    $"{symbolName} = new {Metadata.DefaultTypeContainer.ObservableResource.FullName}(\"{key}\");");
+                            }
+                            else
+                            {
+                                var orVar = GenerateNextElementName("or");
+                                TextGenerator.WriteLine(
+                                    $"var {orVar} = new {Metadata.DefaultTypeContainer.ObservableResource.FullName}(\"{key}\");");
+                                var orTarget = isRoot ? "this" : CurrentParent;
+                                TextGenerator.WriteLine($"{orVar}.Apply({orTarget}, \"{propRef.Name}\");");
                             }
 
                             break;
@@ -646,6 +703,16 @@ public class CodeGenerationContext
     private const string ValueConverterFqn = "global::Adamantium.UI.Core.Data.IValueConverter";
     private const string MultiValueConverterFqn = "global::Adamantium.UI.Core.Data.IMultiValueConverter";
     private const string ResourceResolverFqn = "global::Adamantium.UI.Core.Resources.ResourceResolver";
+
+    // The x:Key directive of an inline object node (an inline resource entry), or null if it has none.
+    private static string GetKeyDirective(IAumlAstNode node)
+    {
+        if (node is not AumlAstObjectNode obj) return null;
+        foreach (var child in obj.Children)
+            if (child is AumlAstDirective d && d.Name == AumlDirectives.Key && d.Value is AumlAstTextNode t)
+                return t.Text;
+        return null;
+    }
 
     // A Binding/MultiBinding written as a markup extension ({Binding}/{MultiBinding}) or as an element
     // (<Binding/>, <MultiBinding>...</MultiBinding>). The codegen treats these by NAME (like ResourceReference).

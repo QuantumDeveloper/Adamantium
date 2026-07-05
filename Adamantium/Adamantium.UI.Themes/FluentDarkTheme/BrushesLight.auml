@@ -1,0 +1,36 @@
+<ResourceDictionary xmlns:x="http://adamantium/ui/xaml/extensions"
+        xmlns="http://adamantium/ui">
+
+    <!-- FluentLight static palette: the SAME keys as Brushes.auml (dark), light values (WinUI light tokens). The styles
+         reference these keys via {ResourceReference}, so swapping FluentDark <-> FluentLight only swaps this dictionary -
+         the templates are shared. Accent/focus live on the Theme (FluentLight.auml). -->
+
+    <!-- Layer / background fills -->
+    <SolidColorBrush x:Key="SolidBackgroundFillColorBase" Color="#F3F3F3"/>
+    <SolidColorBrush x:Key="SolidBackgroundFillColorSecondary" Color="#EEEEEE"/>
+    <SolidColorBrush x:Key="SolidBackgroundFillColorTertiary" Color="#F9F9F9"/>
+    <SolidColorBrush x:Key="CardBackgroundFillColorDefault" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="LayerFillColorDefault" Color="#80FFFFFF"/>
+
+    <!-- Control fills (subtle dark translucent over the light background) -->
+    <SolidColorBrush x:Key="ControlFillColorDefault" Color="#B3FFFFFF"/>
+    <SolidColorBrush x:Key="ControlFillColorSecondary" Color="#80F9F9F9"/>
+    <SolidColorBrush x:Key="ControlFillColorTertiary" Color="#4DF9F9F9"/>
+    <SolidColorBrush x:Key="ControlFillColorDisabled" Color="#4DF9F9F9"/>
+
+    <!-- Control strokes -->
+    <SolidColorBrush x:Key="ControlStrokeColorDefault" Color="#0F000000"/>
+    <SolidColorBrush x:Key="ControlStrokeColorSecondary" Color="#29000000"/>
+
+    <!-- Text (dark on light) -->
+    <SolidColorBrush x:Key="TextFillColorPrimary" Color="#E4000000"/>
+    <SolidColorBrush x:Key="TextFillColorSecondary" Color="#9E000000"/>
+    <SolidColorBrush x:Key="TextFillColorTertiary" Color="#72000000"/>
+    <SolidColorBrush x:Key="TextFillColorDisabled" Color="#5C000000"/>
+
+    <!-- Semantic (success / caution / critical) -->
+    <SolidColorBrush x:Key="SystemFillColorSuccess" Color="#0F7B0F"/>
+    <SolidColorBrush x:Key="SystemFillColorCaution" Color="#9D5D00"/>
+    <SolidColorBrush x:Key="SystemFillColorCritical" Color="#C42B1C"/>
+
+</ResourceDictionary>

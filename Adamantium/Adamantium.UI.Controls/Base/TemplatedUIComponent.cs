@@ -12,7 +12,10 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent
 
     public static readonly AdamantiumProperty TemplateProperty =
         AdamantiumProperty.Register(nameof(Template), typeof(ControlTemplate), typeof(MeasurableUIComponent),
-            new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender, TemplateChangedCallback));
+            // AffectsMeasure too: a NEW template can change the desired size (as in WPF). Without it a template that
+            // arrives AFTER the first measure - e.g. a part's Template set via {TemplateBinding} once the owner supplies
+            // it - re-renders but never re-measures, so the part stays 0x0 (the tab close button was invisible).
+            new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender, TemplateChangedCallback));
 
     private static void TemplateChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {

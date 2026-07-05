@@ -74,21 +74,24 @@ internal sealed class RectBatchCollector : BatchCollector<RectItem>
             dashOn = (float)(d[0] * sx);
             dashGap = (float)(d[1] * sx);
         }
-        // Packed for the shader: caps base-8 (0 flat, 1 square, 2 round) - DashCap for dash-piece ends, Start/EndLineCap
-        // for the contour's real ends (only exist when trimmed); the JOIN (0 miter, 1 bevel, 2 round) in the 512s place.
+        // Packed for the shader: caps base-8 (codes below) - DashCap for dash-piece ends, Start/EndLineCap for the
+        // contour's real ends (only exist when trimmed); the JOIN (0 miter, 1 bevel, 2 round) in the 512s place.
         var capFlags = CapCode(pen.DashCap) + 8f * CapCode(pen.StartLineCap) + 64f * CapCode(pen.EndLineCap)
                      + 512f * JoinCode(pen.PenLineJoin);
         stroke0 = new Vector4F((float)(pen.Thickness * sx), 0f, dashOn, dashGap);
         stroke1 = new Vector4F((float)(pen.DashOffset * sx), (float)pen.TrimStart, (float)pen.TrimEnd, capFlags);
     }
 
-    // The three cap shapes the SDF stroke draws analytically (see CapReach in BatchEffect.fx). Triangle/concave caps are
-    // approximated by the nearest of these for the batch fast path.
+    // All six caps, drawn analytically by CapReach in BatchEffect.fx. Codes MATCH the geometry stroker's MapCap so the two
+    // stroke paths render the same shape: 0 flat, 1 square, 2 convex round, 3 convex triangle, 4 concave triangle, 5 concave round.
     private static float CapCode(PenLineCap cap) => cap switch
     {
         PenLineCap.Square => 1f,
-        PenLineCap.ConvexRound or PenLineCap.ConcaveRound => 2f,
-        _ => 0f
+        PenLineCap.ConvexRound => 2f,
+        PenLineCap.ConvexTriangle => 3f,
+        PenLineCap.ConcaveTriangle => 4f,
+        PenLineCap.ConcaveRound => 5f,
+        _ => 0f   // Flat
     };
 
     // The three outer-corner joins the SDF draws (see SdRoundRectJoin): 0 miter (sharp), 1 bevel (chamfer), 2 round.

@@ -70,10 +70,14 @@ internal abstract class TriggerActivatorBase : ITriggerActivator
     /// <summary>Undo every applied setter and reset the edge state (called on Deactivate).</summary>
     protected void TearDown()
     {
-        foreach (var applied in _applied.Values)
-            applied.Teardown();
+        // Snapshot and clear state BEFORE running teardowns: a teardown clears a trigger value, whose property-changed
+        // callback can re-enter this activator (RemoveSetter/ApplySetter) and mutate _applied - iterating it live throws
+        // "Collection was modified". This is what broke a runtime theme swap on the first triggered control it hit.
+        (IFundamentalUIComponent Target, Action Teardown)[] teardowns = [.. _applied.Values];
         _applied.Clear();
         _conditionMet = false;
+        foreach (var applied in teardowns)
+            applied.Teardown();
     }
 
     private void InvokeActions(IEnumerable<ITriggerAction> actions)
@@ -120,6 +124,11 @@ internal abstract class TriggerActivatorBase : ITriggerActivator
             case ThemeResource themeResource:
                 themeResource.Apply(component, setter.Property, ValuePriority.Trigger, setter);
                 _applied[setter] = (component, () => ThemeResource.Remove(component, setter.Property, ValuePriority.Trigger, setter));
+                break;
+
+            case ObservableResource observableResource:
+                observableResource.Apply(component, setter.Property, ValuePriority.Trigger, setter);
+                _applied[setter] = (component, () => ObservableResource.Remove(component, setter.Property, ValuePriority.Trigger, setter));
                 break;
 
             case TemplateBinding templateBinding:

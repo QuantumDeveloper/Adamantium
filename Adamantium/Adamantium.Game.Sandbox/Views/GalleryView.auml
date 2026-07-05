@@ -9,6 +9,7 @@
          to its View. No per-tab wiring in markup - add a tab by adding its view-model to GalleryViewModel.Tabs. -->
     <TabControl ItemsSource="{Binding Tabs}"
                 SelectedItem="{Binding SelectedTab, Mode=TwoWay}"
+                ShowCloseButton="True"
                 Margin="16">
         <TabControl.ItemTemplate>
             <DataTemplate>

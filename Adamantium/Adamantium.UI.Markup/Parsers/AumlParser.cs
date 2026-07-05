@@ -133,11 +133,16 @@ public class ParserContext
             if (node is XElement elNode && elNode.Name.LocalName.Contains('.'))
             {
                 var names = elNode.Name.LocalName.Split('.');
+                // A property-element whose owner prefix differs from the element's own type is an ATTACHED property in
+                // property-element position: <StackPanel><ResourceContext.Resources>... The attribute path already sets
+                // this (propName.Contains('.')); the property-element path used to hardcode false, so an attached property
+                // written with child content resolved its member against the wrong type (the element) and failed.
+                var isAttachedProperty = names[0] != objectNode.TypeReference?.Name;
                 var property = new AumlAstPropertyNode(
                     elNode.ToLineInfo(),
                     new AumlAstPropertyReference(
                         elNode.ToLineInfo(),
-                        false,
+                        isAttachedProperty,
                         objectNode,
                         new AumlAstXmlTypeReference(elNode.ToLineInfo(), elNode.Name.NamespaceName, names[0]),
                         targetType,
