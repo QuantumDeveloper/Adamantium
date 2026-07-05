@@ -446,6 +446,24 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     }
 
     /// <summary>
+    /// Sets a property's value WITHOUT changing its value source (the WPF <c>SetCurrentValue</c> analog). Used by a
+    /// control to reflect USER INPUT into a property that may carry a two-way <see cref="ValuePriority.Binding"/> - a
+    /// Slider's thumb drag, a CheckBox toggle, a TextBox edit. A plain <see cref="SetValue(AdamantiumProperty, object,
+    /// ValuePriority)"/> defaults to <see cref="ValuePriority.Local"/>, which (1) outranks Binding (2) and would
+    /// permanently MASK the binding: the effective value freezes at the last user set and the source can never refresh
+    /// the control again (the "passive slider's fill/thumb stop tracking" bug). Instead we write into the slot the
+    /// value CURRENTLY comes from, capped at Binding: a bound property updates its Binding slot in place (so the next
+    /// source change overwrites it cleanly and the two-way write-back still fires); an unbound one lands at Binding
+    /// (above Style/Trigger, so user input still wins) without ever creating the masking Local slot.
+    /// </summary>
+    public void SetCurrentValue(AdamantiumProperty property, object value)
+    {
+        var basePriority = GetBaseValuePriority(property);
+        var priority = basePriority <= ValuePriority.Binding ? basePriority : ValuePriority.Binding;
+        SetValue(property, value, priority);
+    }
+
+    /// <summary>
     /// Sets a <see cref="AdamantiumProperty"/> value.
     /// </summary>
     /// <param name="property">Name of the AdamantiumProperty reference</param>

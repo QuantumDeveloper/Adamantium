@@ -272,6 +272,7 @@ public class RenderCache
     // into one SDF-AA'd instanced draw. Rects are the LOWER layer - FlushBatches draws rects THEN text. Both batches
     // share one clip GROUP (_batchScissor): a scissor (or text-atlas) change flushes both together, preserving order.
     private RectBatchCollector _rectBatch;
+    private EllipseBatchCollector _ellipseBatch;   // SDF family, same fill layer as rects (below text)
     private Rect2D _batchScissor;
     private bool _batchOpen;
 
@@ -319,8 +320,10 @@ public class RenderCache
         {
             _textBatch ??= new TextBatchCollector();
             _rectBatch ??= new RectBatchCollector();
+            _ellipseBatch ??= new EllipseBatchCollector();
             _textBatch.BeginFrame(device);
             _rectBatch.BeginFrame(device);
+            _ellipseBatch.BeginFrame(device);
             _batchOpen = false;
         }
 
@@ -366,6 +369,20 @@ public class RenderCache
                 rru.EnsureMachinery();
                 unit.Update(wt, _projectionMatrix, _renderScale);
             }
+            else if (device != null && unit is EllipseRenderUnit eru && _ellipseBatch.CanBatch(eru.EllipsePayload))
+            {
+                if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                if (_ellipseBatch.TryAdd(eru.EllipsePayload, wt, eru.FillOpacity, scissor, LogicalBounds(unit.Component, wt)))
+                {
+                    _batchScissor = scissor;
+                    _batchOpen = true;
+                    continue;
+                }
+                // Rejected (rotated/sheared world, or the instance buffer overflowed): build the body now + re-bake.
+                eru.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
+            }
             else if (device != null && unit is TextRenderUnit tru && tru.TextComponent is { } tc && _textBatch.CanBatch(tc, out var atlas))
             {
                 if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_textBatch.SameAtlas(atlas))
@@ -378,13 +395,28 @@ public class RenderCache
                 }
                 // else: rotated/sheared or overflow -> fall through to the per-block direct draw below
             }
-            else if (device != null && (_rectBatch.Active || _textBatch.Active))
+            else if (device != null && (_rectBatch.Active || _ellipseBatch.Active || _textBatch.Active))
             {
-                // A non-batchable unit that overlaps either pending batch: flush both first so this unit paints OVER
-                // them, as its later source order requires. Spatially disjoint units (a list's items) don't flush.
+                // A non-batchable unit that overlaps any pending batch: flush them first so this unit paints OVER them,
+                // as its later source order requires. Spatially disjoint units (a list's items) don't flush.
                 var lb = LogicalBounds(unit.Component, wt);
-                if (_rectBatch.OverlapsPending(lb) || _textBatch.OverlapsPending(lb))
+                if (_rectBatch.OverlapsPending(lb) || _ellipseBatch.OverlapsPending(lb) || _textBatch.OverlapsPending(lb))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
+            }
+            else if (device == null && unit is RectangleRenderUnit rruNoDev)
+            {
+                // No device = the overlay (popup / tooltip) path: it draws each unit individually via unit.Render() below,
+                // with NO batching (the batch collectors are never begun here). A batchable fill builds no per-unit
+                // machinery (it expects to be batched), so without building it now its unit.Render() draws NOTHING - which
+                // is why a tooltip badge's background vanished while its text (a non-batched unit) still showed. Build the
+                // body + re-bake this frame's transform, exactly as the batch-rejected path does above.
+                rruNoDev.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
+            }
+            else if (device == null && unit is EllipseRenderUnit eruNoDev)
+            {
+                eruNoDev.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
             }
 
             if (device != null)
@@ -420,6 +452,7 @@ public class RenderCache
     private void FlushBatches(IGraphicsDevice device, Rect2D fullScissor, ref bool scissorNarrowed)
     {
         _rectBatch.Flush(device, fullScissor, _projectionMatrix);
+        _ellipseBatch.Flush(device, fullScissor, _projectionMatrix);
         _textBatch.Flush(device, fullScissor, _projectionMatrix);
         scissorNarrowed = false;
         _batchOpen = false;

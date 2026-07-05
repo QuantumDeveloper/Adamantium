@@ -73,10 +73,8 @@ public abstract class ButtonBase : ContentControl
         Keyboard.KeyUpEvent.RegisterClassHandler<ButtonBase>(new KeyEventHandler(KeyUpClassHandler));
     }
 
-    protected ButtonBase()
-    {
-        Focusable = true;
-    }
+    // No constructor: Focusable already defaults to true (registered on InputUIComponent), so setting it here was
+    // redundant - and a constructor set writes Local priority, which would mask a {Binding}/Style/Trigger on Focusable.
 
     public event RoutedEventHandler Click
     {

@@ -46,14 +46,11 @@ public class Slider : RangeBase
     static Slider()
     {
         Keyboard.KeyDownEvent.RegisterClassHandler<Slider>(new KeyEventHandler(KeyDownClassHandler));
-    }
-
-    public Slider()
-    {
-        Maximum = 100;          // slider convention (RangeBase defaults to a 0..1 range)
-        LargeChange = 10;
-        SmallChange = 1;
-        Focusable = true;
+        // Slider convention: a 0..100 range (vs RangeBase's 0..1). A metadata default, NOT a constructor set - a set
+        // writes Local priority, which outranks and permanently masks a {Binding}/Style/Trigger on Maximum (the bug that
+        // froze a data-bound slider). Re-use RangeBase's OnMaximumChanged so the re-coercion still fires. LargeChange (10),
+        // SmallChange (1) and Focusable (true) already match the base defaults, so no override is needed for them.
+        MaximumProperty.OverrideMetadata(typeof(Slider), new PropertyMetadata(100.0, OnMaximumChanged));
     }
 
     /// <summary>Horizontal (default) or vertical track.</summary>
@@ -142,9 +139,15 @@ public class Slider : RangeBase
     private void OnThumbDragDelta(object sender, DragEventArgs e)
     {
         if (_track == null) return;
-        Value = SnapToTick(_dragStartValue + _track.ValueFromDistance(e.Change.X, e.Change.Y));
+        SetValueFromInput(SnapToTick(_dragStartValue + _track.ValueFromDistance(e.Change.X, e.Change.Y)));
         UpdateValueToolTipText();
     }
+
+    // Reflect USER INPUT into Value without masking a two-way {Binding}. A plain `Value = x` (SetValue at Local
+    // priority) outranks Binding and permanently freezes a data-bound slider - the source could never update it again,
+    // so a second slider bound to the same value stopped tracking (thumb/fill desync). SetCurrentValue writes the value
+    // in the binding's own slot instead, so the two-way write-back fires AND later source changes still apply.
+    private void SetValueFromInput(double value) => SetCurrentValue(ValueProperty, value);
 
     private void OnThumbDragCompleted(object sender, DragCompletedEventArgs e) => HideValueToolTip();
 
@@ -154,13 +157,13 @@ public class Slider : RangeBase
     private void OnIncrease(object sender, RoutedEventArgs e)
     {
         if (IsMoveToPointEnabled) MoveToMousePoint();
-        else Value = SnapToTick(Value + LargeChange);
+        else SetValueFromInput(SnapToTick(Value + LargeChange));
     }
 
     private void OnDecrease(object sender, RoutedEventArgs e)
     {
         if (IsMoveToPointEnabled) MoveToMousePoint();
-        else Value = SnapToTick(Value - LargeChange);
+        else SetValueFromInput(SnapToTick(Value - LargeChange));
     }
 
     // The page button that fired the Click captured the press, so the mouse is still at the click point: read it relative
@@ -168,7 +171,7 @@ public class Slider : RangeBase
     private void MoveToMousePoint()
     {
         if (_track == null) return;
-        Value = SnapToTick(_track.ValueFromPoint(MouseDevice.CurrentDevice.GetPosition(_track)));
+        SetValueFromInput(SnapToTick(_track.ValueFromPoint(MouseDevice.CurrentDevice.GetPosition(_track))));
     }
 
     // The accent fill (PART_SelectionRange) is driven exactly like ProgressBar's PART_Indicator: project the value
@@ -186,6 +189,15 @@ public class Slider : RangeBase
             _track.SetValue(Track.ValueProperty, newValue, ValuePriority.Binding);
             ForceArrangeTrack();
         }
+        UpdateFill();
+        ForceArrangeFill();
+    }
+
+    // A Minimum/Maximum change rescales the fill even when Value is unchanged (a second slider that shares Value while
+    // this one drives Maximum): the fraction (Value-Min)/(Max-Min) moved, so recompute the accent fill. The thumb already
+    // re-positions via the Track's Minimum/Maximum TemplateBindings (AffectsArrange); the fill has no such path.
+    protected override void OnRangeBoundsChanged()
+    {
         UpdateFill();
         ForceArrangeFill();
     }
@@ -338,12 +350,12 @@ public class Slider : RangeBase
         // Reversed so Up/Right increase and Down/Left decrease for BOTH orientations (a vertical slider's top is its max).
         switch (e.Key)
         {
-            case Key.RightArrow or Key.UpArrow: Value = SnapToTick(Value + SmallChange); e.Handled = true; break;
-            case Key.LeftArrow or Key.DownArrow: Value = SnapToTick(Value - SmallChange); e.Handled = true; break;
-            case Key.PageUp: Value = SnapToTick(Value + LargeChange); e.Handled = true; break;
-            case Key.PageDown: Value = SnapToTick(Value - LargeChange); e.Handled = true; break;
-            case Key.Home: Value = Minimum; e.Handled = true; break;
-            case Key.End: Value = Maximum; e.Handled = true; break;
+            case Key.RightArrow or Key.UpArrow: SetValueFromInput(SnapToTick(Value + SmallChange)); e.Handled = true; break;
+            case Key.LeftArrow or Key.DownArrow: SetValueFromInput(SnapToTick(Value - SmallChange)); e.Handled = true; break;
+            case Key.PageUp: SetValueFromInput(SnapToTick(Value + LargeChange)); e.Handled = true; break;
+            case Key.PageDown: SetValueFromInput(SnapToTick(Value - LargeChange)); e.Handled = true; break;
+            case Key.Home: SetValueFromInput(Minimum); e.Handled = true; break;
+            case Key.End: SetValueFromInput(Maximum); e.Handled = true; break;
         }
     }
 }

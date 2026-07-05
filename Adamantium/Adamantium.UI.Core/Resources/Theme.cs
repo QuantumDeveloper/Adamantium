@@ -135,6 +135,17 @@ public class Theme : AdamantiumComponent, ITheme
         return value != null;
     }
 
+    public object GetResource(IFundamentalUIComponent requester, string key)
+    {
+        return ResourceManager.FindResource(requester, key);
+    }
+
+    public bool TryGetResource(IFundamentalUIComponent requester, string key, out object value)
+    {
+        value = ResourceManager.FindResource(requester, key);
+        return value != null;
+    }
+
     public StyleSetCollection StyleSets { get; }
 
     public StyleIncludeCollection StyleIncludes { get; }

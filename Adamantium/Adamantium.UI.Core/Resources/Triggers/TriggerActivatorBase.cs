@@ -108,7 +108,11 @@ internal abstract class TriggerActivatorBase : ITriggerActivator
         switch (setter.Value)
         {
             case ResourceReference resourceReference:
-                if (Context.Theme != null && Context.Theme.TryGetResource(resourceReference.Name, out var resource))
+                // Context.Theme is captured when the trigger is wired up - which for an inline <X.Styles> happens during
+                // construction, before the element is themed, so it can be null. Fall back to the current theme (the
+                // trigger fires later, once live). Resolve tree-scoped from the target so a Local resource is reachable.
+                var theme = Context.Theme ?? UIAppContext.Current?.ThemeManager?.CurrentTheme;
+                if (theme != null && theme.TryGetResource(component, resourceReference.Name, out var resource))
                     component.SetTriggerValue(prop, resource, setter);
                 _applied[setter] = (component, () => component.ClearTriggerValue(prop, setter));
                 break;

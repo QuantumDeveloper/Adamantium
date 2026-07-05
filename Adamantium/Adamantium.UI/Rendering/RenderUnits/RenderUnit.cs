@@ -393,8 +393,11 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
     private static bool IsSdfBatchable(RectanglePayload p)
     {
         if (!RectBatchCollector.Enabled) return false;
-        if (p.Brush is not SolidColorBrush s || s.Color.A == 0) return false;
-        if (p.Pen != null) return false;
+        if (p.Brush is not (null or SolidColorBrush)) return false;
+        if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
+        var hasFill = p.Brush is SolidColorBrush { Color.A: > 0 };
+        var hasStroke = p.Pen is { Brush: SolidColorBrush { Color.A: > 0 } };
+        if (!hasFill && !hasStroke) return false;
         var c = p.CornerRadius;
         return c.TopLeft == c.TopRight && c.TopRight == c.BottomRight && c.BottomRight == c.BottomLeft;
     }
@@ -498,20 +501,70 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
 
 public class EllipseRenderUnit : RenderUnit<EllipsePayload>
 {
+    // The ellipse SDF batch (EllipseBatchCollector) reads the payload through this to bake it into the instanced draw.
+    public EllipsePayload EllipsePayload => Payload;
+
+    // The batch reads the fill opacity here: a batchable ellipse has no GeometryRenderer to carry RenderData.
+    public double FillOpacity => DrawCommand?.RenderData?.Opacity ?? 1.0;
+
+    // An ellipse the SDF batch will draw (solid fill, no pen, FULL ellipse): the batch shader reconstructs it from an
+    // implicit field and self-anti-aliases, so this unit needs NO tessellated body and NO AA fringe. Building them per
+    // ellipse is pure waste (and their per-unit GPU buffers are exactly what strained device memory). Mirrors
+    // EllipseBatchCollector.CanBatch so "no machinery built" == "the batch will draw it".
+    private static bool IsSdfBatchable(EllipsePayload p)
+    {
+        if (!EllipseBatchCollector.Enabled) return false;
+        if (p.Brush is not SolidColorBrush s || s.Color.A == 0) return false;
+        if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
+        return p.StartAngle <= 0.0 && p.SweepAngle >= 360.0;
+    }
+
     public EllipseRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
-        var ellipseGeometry = new EllipseGeometry(Payload.DestinationRect, Payload.StartAngle, Payload.SweepAngle, Payload.EllipseType);
-        ellipseGeometry.ProcessGeometry(GeometryType.Both);
-        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, ellipseGeometry.Mesh, Payload.Brush, BufferManager);
+        // A batchable ellipse is drawn ENTIRELY by the SDF batch (resolution-independent, self-AA) - build ZERO per-unit
+        // machinery: no tessellation, no geometry/fringe/stroke, no GPU buffers. The rare rejected case (rotated/sheared
+        // world, or per-frame overflow) builds its body lazily in Render via EnsureMachinery.
+        if (IsSdfBatchable(Payload)) return;
+        BuildMachinery(Payload);
+    }
+
+    // The per-unit tessellated fill/fringe/stroke for a NON-batched ellipse (a sector/arc, a stroked or gradient ellipse).
+    private void BuildMachinery(EllipsePayload payload)
+    {
+        var g = new EllipseGeometry(payload.DestinationRect, payload.StartAngle, payload.SweepAngle, payload.EllipseType);
+        g.ProcessGeometry(GeometryType.Both);
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, payload.Brush, BufferManager);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
-        ProcessFillFringe(ellipseGeometry, Payload.Brush);
-        ProcessStrokeData(Payload.Pen, ellipseGeometry);
+        ProcessFillFringe(g, payload.Brush);
+        ProcessStrokeData(payload.Pen, g);
+    }
+
+    // A batchable ellipse the batch REJECTED this frame (rotated/sheared world, or overflow) must draw itself, so build
+    // its BODY on demand. No fringe (its PreRender is already past this frame); the body self-fills its buffer in Render.
+    public void EnsureMachinery()
+    {
+        if (GeometryRenderer != null) return;
+        var g = new EllipseGeometry(Payload.DestinationRect, Payload.StartAngle, Payload.SweepAngle, Payload.EllipseType);
+        g.ProcessGeometry(GeometryType.Both);
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, Payload.Brush, BufferManager);
+        GeometryRenderer.RenderData = DrawCommand.RenderData;
     }
 
     public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
     {
         if (drawCommand.Payload is not EllipsePayload inputPayload) return;
 
+        // Fast path: no machinery (a batchable ellipse). Just repoint payload/command - NO tessellation, NO buffers.
+        // Build machinery only if it is now non-batchable (gained a pen, a gradient fill, or became a sector).
+        if (GeometryRenderer == null)
+        {
+            DrawCommand = drawCommand;
+            Payload = inputPayload;
+            if (!IsSdfBatchable(inputPayload)) BuildMachinery(inputPayload);
+            return;
+        }
+
+        // Machinery exists (a non-batchable ellipse, or a kept fallback body): update it incrementally.
         var oldPen = Payload.Pen;
         var oldBrush = Payload.Brush;
         var rebuild = Payload.RequiresBufferRebuild(inputPayload);
@@ -524,17 +577,20 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
             ((GeometryRenderComponent)GeometryRenderer).UpdateGeometry(ellipseGeometry.Mesh);
         }
         ((GeometryRenderComponent)GeometryRenderer).Background = inputPayload.Brush;
-
         DrawCommand = drawCommand;
         Payload = inputPayload;
+        GeometryRenderer.RenderData = drawCommand.RenderData;
 
-        if (GeometryRenderer != null)
+        // Fringe: skip for a batchable ellipse (the batch self-AAs); drop a stale one. Otherwise follow the fill.
+        if (IsSdfBatchable(inputPayload))
         {
-            GeometryRenderer.RenderData = drawCommand.RenderData;
+            FillFringeRenderer?.DeferDispose();
+            FillFringeRenderer = null;
         }
-
-        // Analytic-AA fringe follows the fill: cheap brush/colour change repoints it, a geometry change rebuilds it.
-        UpdateFillFringe(ellipseGeometry, inputPayload.Brush, rebuild, !Equals(oldBrush, inputPayload.Brush));
+        else
+        {
+            UpdateFillFringe(ellipseGeometry, inputPayload.Brush, rebuild, !Equals(oldBrush, inputPayload.Brush));
+        }
 
         // Stroke: geometry change -> full rebuild; pen-only change -> try a cheap uniform repoint (animation), else
         // rebuild (process the geometry first, since it wasn't processed in the non-rebuild branch).

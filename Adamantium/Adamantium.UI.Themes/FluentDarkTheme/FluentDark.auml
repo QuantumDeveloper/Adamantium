@@ -6,7 +6,6 @@
        ResourceContext.Source="{ResourceLink Source={x:Type fluentDark:Brushes}, Scope=Theme}">
 
 	<Theme.StyleIncludes>
-		<StyleInclude Source="{x:Type fluentDark:RectangleStyleSet}"/>
 		<StyleInclude Source="{x:Type fluentDark:BorderStyleSet}"/>
 		<StyleInclude Source="{x:Type fluentDark:ButtonStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ContentControlStyleSet}"/>

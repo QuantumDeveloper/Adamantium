@@ -95,6 +95,13 @@ public class CodeGenerationContext
         var properties = element.GetProperties();
         var children = element.GetLogicalChildrenObjects();
 
+        // A UiTemplate (DataTemplate/ControlTemplate/...) as a standalone element - e.g. a keyed entry in a
+        // ResourceDictionary - carries its content ONLY through a builder Func. Build it via the builder form (below),
+        // not as a plain `new()` with orphaned children, which produces an empty template that renders nothing.
+        var isTemplate = typeInfo != null
+                         && Metadata.DefaultTypeContainer.UiTemplate != null
+                         && typeInfo.InheritsFrom(Metadata.DefaultTypeContainer.UiTemplate.FullName);
+
         string elementName = string.Empty;
         bool isRoot = element == Metadata.RootNode;
 
@@ -116,7 +123,14 @@ public class CodeGenerationContext
                 && CurrentTemplate == null
                 && EntityType is not (EntityType.ResourceDictionary or EntityType.StyleSet or EntityType.Theme);
             var declaration = hasBackingField ? elementName : $"var {elementName}";
-            TextGenerator.WriteLine($"{declaration} = new {typeInfo.FullName}();");
+            if (isTemplate)
+            {
+                EmitTemplateBuilder(declaration, typeInfo.FullName, element, isResource, diagnostics);
+            }
+            else
+            {
+                TextGenerator.WriteLine($"{declaration} = new {typeInfo.FullName}();");
+            }
             if (isNamed && CurrentTemplate != null)
             {
                 TextGenerator.WriteLine($"{CurrentTemplate}.RegisterName(\"{named}\", {elementName});");
@@ -152,7 +166,13 @@ public class CodeGenerationContext
                 var propertyName = propRef.Name;
                 if (propRef.IsAttachedProperty)
                 {
-                    propertyType = typeContainer.Types.FirstOrDefault(x => x.Name == propRef.OwnerType.Name);
+                    // An attached property's owner (Grid, ToolTipService, ResourceContext, ...) can live in a DIFFERENT
+                    // assembly than the element it's set on, so resolve it from ITS OWN assembly - not the element's
+                    // container, which only happened to work while the owner shared the element's assembly (e.g. Grid.Row
+                    // on a Controls element). ResourceContext.Source on a View (owner in Adamantium.UI.Core) NRE'd here.
+                    var ownerContainer = Metadata.TypeResolver.GetResolvedAssembly(propRef.OwnerType.Assembly);
+                    propertyType = ownerContainer?.Types.FirstOrDefault(x => x.Name == propRef.OwnerType.Name)
+                                   ?? typeContainer.Types.FirstOrDefault(x => x.Name == propRef.OwnerType.Name);
                     // We are faced with Attached property, so its really not a property, but a method with Get and Set prefixes,
                     // so we need to handle this case properly
                     propertyName = $"Get{propRef.Name}";
@@ -190,52 +210,8 @@ public class CodeGenerationContext
                     && valueResolvedType.InheritsFrom(Metadata.DefaultTypeContainer.UiTemplate.FullName))
                 {
                     var templateName = GenerateNextElementName("template");
-                    var templateTypeName = valueTypeName;
-                    
-                    var templateBuilderMethod = $"Build_{templateName}";
-
-                    TextGenerator.WriteLine($"var {templateName} = new {templateTypeName}({templateBuilderMethod});");
+                    EmitTemplateBuilder($"var {templateName}", valueTypeName, value, isResource, diagnostics);
                     TextGenerator.WriteLine($"{CurrentParent}.{propRef.Name} = {templateName};");
-                    
-                    TextGenerator.NewLine();
-                    TextGenerator.WriteLine($"{Metadata.DefaultTypeContainer.TemplateResult.FullName} {templateBuilderMethod}()");
-                    TextGenerator.WriteOpenBraceAndIndent();
-                    
-                    TextGenerator.WriteLine($"var result = new {Metadata.DefaultTypeContainer.TemplateResult.FullName}();");
-                    
-                    PushTemplate("result");
-
-                    var child = value.GetLogicalChildrenObjects().FirstOrDefault();
-                    
-                    var childName = ProcessControlElements(child, diagnostics, false);
-                    TextGenerator.WriteLine($"result.RootComponent = {childName};");
-                    
-                    var templateProperties = value.GetProperties().ToList();
-                    WithElement("result", () => // Temporary Context for object "result"
-                    {
-                        PushTypeContext(Metadata.DefaultTypeContainer.ControlTemplate);
-                        foreach (var templateProp in templateProperties)
-                        {
-                            var templatePropRef = (AumlAstPropertyReference)templateProp.Property;
-                            if (templatePropRef.Name == "Triggers")
-                            {
-                                foreach (var triggerValueNode in templateProp.Values)
-                                {
-                                    if (triggerValueNode is AumlAstObjectNode triggerObjectNode)
-                                    {
-                                        var triggerVariableName = ProcessControlElements(triggerObjectNode, diagnostics, isResource);
-                                        TextGenerator.WriteLine($"result.Triggers.Add({triggerVariableName});");
-                                    }
-                                }
-                            }
-                        }
-                        PopTypeContext();
-                    });
-
-                    PopTemplate();
-                    
-                    TextGenerator.WriteLine($"return result;");
-                    TextGenerator.UnindentAndWriteCloseBrace();
                     continue;
                 }
                 else if (value is AumlAstMarkupExtensionLiteral literal)
@@ -252,15 +228,25 @@ public class CodeGenerationContext
                         case "ResourceReference":
                         {
                             var key = extension.Arguments[0].Value.GetTextValue();
-                            if (isResource && element.TypeReference.Namespace == "Adamantium.UI.Core.Resources")
+                            // A Setter/trigger value (its target type lives in Adamantium.UI.Core.Resources) is stored as
+                            // a ResourceReference MARKER, resolved later by Setter.Apply / the trigger activator - which
+                            // hold the styled element, so the lookup is TREE-SCOPED (a Local resource resolves only within
+                            // the owner's subtree). True even outside a resource file (e.g. an inline <Style> in a View),
+                            // so this is NOT gated on isResource.
+                            if (element.TypeReference.Namespace == "Adamantium.UI.Core.Resources")
                             {
                                 TextGenerator.WriteLine(
                                     $"{symbolName} = new {Metadata.DefaultTypeContainer.ResourceReference.FullName}(\"{key}\");");
                             }
                             else
                             {
+                                // A direct element property: the element isn't in the tree yet, so defer - resolve
+                                // Theme/Global now and upgrade to a tree-scoped Local hit once the element attaches (see
+                                // ResourceResolver.SetDeferred). Keeps Local resources out of reach of an eager,
+                                // context-free resolve.
+                                var target = isRoot ? "this" : CurrentParent;
                                 TextGenerator.WriteLine(
-                                    $"{symbolName} = {Metadata.DefaultTypeContainer.ResourceResolver.FullName}.Resolve<{resolvedType.FullName}>(\"{key}\");");
+                                    $"{Metadata.DefaultTypeContainer.ResourceResolver.FullName}.SetDeferred({target}, \"{propRef.Name}\", \"{key}\");");
                             }
 
                             break;
@@ -482,6 +468,9 @@ public class CodeGenerationContext
 
         Action emitBody = () =>
         {
+            // A template's whole body (child tree + Triggers) is emitted into its builder by EmitTemplateBuilder above,
+            // so there are no further properties/children to process here.
+            if (isTemplate) return;
             ProcessProperties(properties.ToArray());
             ProcessLogicalChildren(children.ToArray());
         };
@@ -504,7 +493,60 @@ public class CodeGenerationContext
 
         return elementName;
     }
-    
+
+    // Emits `{targetVar} = new {templateType}(Build_xxx);` plus the local builder function that constructs the template's
+    // visual tree and returns a TemplateResult (RootComponent = the single child, plus any Triggers). A UiTemplate
+    // (DataTemplate/ControlTemplate/ItemsPanelTemplate) carries its content ONLY through this builder, so it's used both
+    // when a template is a PROPERTY value (ItemTemplate/Template/...) AND when it's a KEYED RESOURCE entry - a
+    // DataTemplate stored in a ResourceDictionary must build its builder too, else it resolves to an empty template that
+    // renders nothing (a bare `new DataTemplate()` with an orphaned child).
+    private void EmitTemplateBuilder(string targetVar, string templateTypeName, IAumlAstNode templateNode,
+        bool isResource, IDiagnosticSink diagnostics)
+    {
+        var templateBuilderMethod = $"Build_{GenerateNextElementName("template")}";
+
+        TextGenerator.WriteLine($"{targetVar} = new {templateTypeName}({templateBuilderMethod});");
+
+        TextGenerator.NewLine();
+        TextGenerator.WriteLine($"{Metadata.DefaultTypeContainer.TemplateResult.FullName} {templateBuilderMethod}()");
+        TextGenerator.WriteOpenBraceAndIndent();
+
+        TextGenerator.WriteLine($"var result = new {Metadata.DefaultTypeContainer.TemplateResult.FullName}();");
+
+        PushTemplate("result");
+
+        var child = templateNode.GetLogicalChildrenObjects().FirstOrDefault();
+        var childName = ProcessControlElements(child, diagnostics, false);
+        TextGenerator.WriteLine($"result.RootComponent = {childName};");
+
+        var templateProperties = templateNode.GetProperties().ToList();
+        WithElement("result", () => // Temporary Context for object "result"
+        {
+            PushTypeContext(Metadata.DefaultTypeContainer.ControlTemplate);
+            foreach (var templateProp in templateProperties)
+            {
+                var templatePropRef = (AumlAstPropertyReference)templateProp.Property;
+                if (templatePropRef.Name == "Triggers")
+                {
+                    foreach (var triggerValueNode in templateProp.Values)
+                    {
+                        if (triggerValueNode is AumlAstObjectNode triggerObjectNode)
+                        {
+                            var triggerVariableName = ProcessControlElements(triggerObjectNode, diagnostics, isResource);
+                            TextGenerator.WriteLine($"result.Triggers.Add({triggerVariableName});");
+                        }
+                    }
+                }
+            }
+            PopTypeContext();
+        });
+
+        PopTemplate();
+
+        TextGenerator.WriteLine($"return result;");
+        TextGenerator.UnindentAndWriteCloseBrace();
+    }
+
     private void GenerateSimpleAssignment(string symbolName, string valueText, IResolvedType member)
     {
         TextGenerator.WriteLine($"{symbolName} = {BuildValueExpression(valueText, member)};");

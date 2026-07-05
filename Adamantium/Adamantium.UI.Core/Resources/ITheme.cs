@@ -24,6 +24,13 @@ public interface ITheme: IInitializable, IAdamantiumComponent
     Style[] FindStylesForComponent(IFundamentalUIComponent component);
     
     object GetResource(string key);
-    
+
     bool TryGetResource(string key, out object value);
+
+    // Requester-aware variants: resolve Local resources tree-scoped from the requesting element (then Theme, then
+    // Global). Setters and triggers use these so a {ResourceReference} sees only the Local dictionaries on its own
+    // subtree's ancestors.
+    object GetResource(IFundamentalUIComponent requester, string key);
+
+    bool TryGetResource(IFundamentalUIComponent requester, string key, out object value);
 }

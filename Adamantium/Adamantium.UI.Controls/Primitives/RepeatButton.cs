@@ -20,10 +20,13 @@ public class RepeatButton : ButtonBase
 
     private DispatcherTimer _timer;
 
-    public RepeatButton()
+    static RepeatButton()
     {
         // Press-and-hold: the first click fires immediately on press (ClickMode.Press), then the timer drives repeats.
-        ClickMode = ClickMode.Press;
+        // A class default via metadata, NOT a constructor set: a set writes Local priority, which outranks and permanently
+        // masks a {Binding}/Style/Trigger on ClickMode. ClickMode carries no change callback, so overriding its default
+        // loses nothing.
+        ClickModeProperty.OverrideMetadata(typeof(RepeatButton), new PropertyMetadata(ClickMode.Press));
     }
 
     /// <summary>Milliseconds the button must be held before auto-repeat begins.</summary>

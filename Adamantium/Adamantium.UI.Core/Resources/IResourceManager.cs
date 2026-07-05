@@ -8,6 +8,10 @@ public interface IResourceManager
     
     object FindResource(string name);
 
+    // Requester-aware: Local resources are visible only within the subtree of the element that declared them; walks up
+    // from the requester. Context-less FindResource cannot see Local at all.
+    object FindResource(IFundamentalUIComponent requester, string name);
+
     void AddSource(IAdamantiumComponent component, Type source, ResourceScope scope = ResourceScope.Local);
     
     void RemoveSources(IAdamantiumComponent component);
