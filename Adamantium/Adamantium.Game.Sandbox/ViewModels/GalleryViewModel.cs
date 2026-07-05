@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using Adamantium.MVVM;
+using Adamantium.UI.Controls;
 
 namespace Adamantium.Game.Sandbox.ViewModels;
 
@@ -26,6 +27,9 @@ public partial class GalleryViewModel
     };
 
     [Bindable] private TabPageViewModel _selectedTab;
+
+    // Drives the TabControl.TabStripPlacement from a DropDown (enum-bound) so the strip can move to any edge live.
+    [Bindable] private TabStripPlacement _tabPlacement = TabStripPlacement.Top;
 
     public GalleryViewModel()
     {

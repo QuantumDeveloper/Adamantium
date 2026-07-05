@@ -48,12 +48,13 @@ public static class AnimationManager
             // so the linear Contains check is negligible.
             if (!Active.Contains(animation)) continue;
             // A property animation re-renders every tick. It usually animates an AffectsRender/AffectsMeasure property,
-            // which already marks that ONE component dirty (partial rebuild); but some animate a plain Transform's inner
-            // value (no AffectsRender), so mark structural to guarantee a correct frame - animations are brief and their
-            // trees small, so a full walk while animating is fine. A DelegateTicker (scroll inertia, the diagnostics
-            // overlay) is NOT marked: it dirties the scene only through its effects (a moved scroll offset re-arranges
-            // children; the overlay rewrites its TextBlock ~4x/sec), so a pure ticker never blocks the clean-frame path.
-            if (animation is not DelegateTicker) RenderDirty.MarkStructural();
+            // which already marks that ONE component dirty (partial rebuild) via its own callback; a plain Transform's
+            // inner value now self-marks the cheap Transform path (see Transform.UpdateTransform). So the heartbeat only
+            // needs the Transform-level safety net here - NOT MarkStructural, which forced a full-window paint-order
+            // rebuild every animating frame (the tab-drag / indicator-slide lag, felt on ANY tab regardless of content).
+            // A DelegateTicker (scroll inertia, the diagnostics overlay) is NOT marked: it dirties the scene only through
+            // its effects (a moved scroll offset re-arranges children; the overlay rewrites its TextBlock ~4x/sec).
+            if (animation is not DelegateTicker) RenderDirty.MarkTransform();
             if (animation.Advance(deltaSeconds))
                 Active.Remove(animation);
         }

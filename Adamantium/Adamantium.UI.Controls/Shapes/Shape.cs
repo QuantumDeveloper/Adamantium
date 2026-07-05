@@ -496,9 +496,11 @@ public abstract class Shape : InputUIComponent
       // coordinates. The parent has already folded alignment + any explicit Width/Height into finalSize.
       if (Stretch == Stretch.None) return Rect.Size;
 
-      var box = new Size(finalSize.Width, finalSize.Height).Deflate(new Thickness(StrokeThickness / 2));
-      Rect = new Rect(box);
-      RenderBounds = new Rect(box);
+      // Rect is the FULL slot. Each box shape's OnRender already insets it by StrokeThickness/2 (so the stroke straddles
+      // the geometry edge and stays inside the slot). Insetting here too double-counted the stroke AND dropped the offset
+      // (new Rect(size) sits at 0,0), so the shape shrank toward the top-left with a right/bottom gap instead of filling.
+      Rect = new Rect(finalSize);
+      RenderBounds = new Rect(finalSize);
       return finalSize;
    }
 }

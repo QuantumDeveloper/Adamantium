@@ -1,4 +1,6 @@
-<View xmlns="http://adamantium/ui">
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:vm="clr-namespace:Adamantium.Game.Sandbox.ViewModels">
     <!-- DataContext is the ButtonsViewModel, injected by the TabControl's content presenter (no x:ViewModel here). -->
     <StackPanel Orientation="Vertical" Margin="24">
 
@@ -41,6 +43,41 @@
             <RadioButton Content="Pro" GroupName="plan" IsChecked="{Binding PlanPro, Mode=TwoWay}" Margin="0,0,16,0"/>
             <TextBlock Text="Selected:" VerticalAlignment="Center" Margin="0,0,6,0"/>
             <TextBlock Text="{Binding PlanStatus}" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- DropDown: a string list (via ItemsSource) and an enum (via EnumType - the dropdown shows each member's
+             [Display] name while the bound value stays the enum). Near the bottom, so opening tests the edge-aware flip. -->
+        <TextBlock Text="Dropdowns" FontSize="18" Margin="0,24,0,10"/>
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+            <DropDown ItemsSource="{Binding Cities}"
+                      SelectedItem="{Binding SelectedCity, Mode=TwoWay}"
+                      Placeholder="Select a city..."
+                      Width="200"/>
+            <TextBlock Text="{Binding CityStatus}" VerticalAlignment="Center" Margin="14,0,0,0"/>
+        </StackPanel>
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+            <DropDown EnumType="{x:Type vm:Priority}"
+                      SelectedItem="{Binding SelectedPriority, Mode=TwoWay}"
+                      Width="220"/>
+            <TextBlock Text="{Binding PriorityStatus}" VerticalAlignment="Center" Margin="14,0,0,0"/>
+        </StackPanel>
+
+        <!-- ItemTemplate DropDown: each row (and the header) renders a colour swatch + name, not plain text. -->
+        <StackPanel Orientation="Horizontal">
+            <DropDown ItemsSource="{Binding Palette}"
+                      SelectedItem="{Binding SelectedColor, Mode=TwoWay}"
+                      Width="200">
+                <DropDown.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <Border Background="{Binding Swatch}" Width="16" Height="16"
+                                    CornerRadius="3" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </DropDown.ItemTemplate>
+            </DropDown>
+            <TextBlock Text="{Binding ColorStatus}" VerticalAlignment="Center" Margin="14,0,0,0"/>
         </StackPanel>
     </StackPanel>
 </View>

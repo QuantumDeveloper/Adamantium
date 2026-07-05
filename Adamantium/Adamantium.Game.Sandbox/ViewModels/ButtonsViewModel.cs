@@ -8,7 +8,10 @@ namespace Adamantium.Game.Sandbox.ViewModels;
 [ViewModel]
 public partial class ButtonsViewModel : TabPageViewModel
 {
-    public ButtonsViewModel() : base("Buttons") { }
+    public ButtonsViewModel() : base("Buttons")
+    {
+        SelectedColor = Palette[0];   // seed so the templated header shows a real row from the start (no null-through-template)
+    }
 
     // Click counter: a plain Button and an auto-repeating RepeatButton both invoke Add; the count shows live.
     [Bindable] private int _clickCount;
@@ -33,4 +36,25 @@ public partial class ButtonsViewModel : TabPageViewModel
     [Bindable, Affects(nameof(PlanStatus))] private bool _planFree = true;
     [Bindable, Affects(nameof(PlanStatus))] private bool _planPro;
     public string PlanStatus => PlanPro ? "Pro" : "Free";
+
+    // DropDown (non-editable). A plain string list bound via ItemsSource; and an enum bound via EnumType (the dropdown
+    // shows each member's [Display] name while SelectedPriority stays the real enum value).
+    [Bindable] private string[] _cities = ["London", "Paris", "Berlin", "Tokyo", "New York", "Sydney"];
+    [Bindable, Affects(nameof(CityStatus))] private string _selectedCity;
+    public string CityStatus => SelectedCity != null ? $"City: {SelectedCity}" : "No city chosen";
+
+    [Bindable, Affects(nameof(PriorityStatus))] private Priority _selectedPriority = Priority.Normal;
+    public string PriorityStatus => $"Priority = {SelectedPriority}";
+
+    // Template-bound DropDown: items are ColorOption objects rendered by an ItemTemplate (swatch + name), not plain text.
+    [Bindable] private ColorOption[] _palette =
+    [
+        new ColorOption("Ocean", "#0091F7"),
+        new ColorOption("Forest", "#107C10"),
+        new ColorOption("Grape", "#8764B8"),
+        new ColorOption("Ember", "#CA5010"),
+        new ColorOption("Rose", "#C42B72"),
+    ];
+    [Bindable, Affects(nameof(ColorStatus))] private ColorOption _selectedColor;
+    public string ColorStatus => SelectedColor != null ? $"Color: {SelectedColor.Name}" : "No color chosen";
 }

@@ -31,6 +31,9 @@ public class Popup : MeasurableUIComponent, IContainer
     public static readonly AdamantiumProperty VerticalOffsetProperty = AdamantiumProperty.Register(nameof(VerticalOffset),
         typeof(double), typeof(Popup), new PropertyMetadata(0.0));
 
+    public static readonly AdamantiumProperty FlipToFitProperty = AdamantiumProperty.Register(nameof(FlipToFit),
+        typeof(bool), typeof(Popup), new PropertyMetadata(false));
+
     private IPopupHost _host;   // the window layer this popup is registered with while open
 
     public bool IsOpen
@@ -69,6 +72,14 @@ public class Popup : MeasurableUIComponent, IContainer
     {
         get => GetValue<double>(VerticalOffsetProperty);
         set => SetValue(VerticalOffsetProperty, value);
+    }
+
+    /// <summary>When the popup would overflow the window past the target on the placement axis, flip to the opposite side
+    /// if that fits better (a Bottom popup opens above when there's not enough room below). Default false (clamp only).</summary>
+    public bool FlipToFit
+    {
+        get => GetValue<bool>(FlipToFitProperty);
+        set => SetValue(FlipToFitProperty, value);
     }
 
     /// <summary>Explicit target, else the element this popup is declared under.</summary>

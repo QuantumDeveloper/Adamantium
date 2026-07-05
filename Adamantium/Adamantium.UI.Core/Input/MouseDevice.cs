@@ -269,9 +269,25 @@ public class MouseDevice
         }
     }
 
+    // Hit-test the OPEN POPUPS first (they render - and so receive input - above the main content, newest on top), then
+    // fall through to the window content. Without this a popup's contents (a DropDown list, a menu) are click-through.
+    private static IInputComponent HitTestTopmost(IInputComponent rootComponent, Vector2 p)
+    {
+        if (rootComponent is IWindow window)
+        {
+            // A popup ROOT is usually a plain container (a Border) that is NOT itself an IInputComponent - but its
+            // children (the list items) are. Hit-test the root as an IUIComponent so the walk descends into them.
+            var popups = window.PopupRoots;
+            for (var i = popups.Count - 1; i >= 0; i--)
+                if (InputExtensions.HitTest(popups[i], p) is { } popupHit)
+                    return popupHit;
+        }
+        return InputExtensions.HitTest(rootComponent, p);   // the plain visual hit-test (NOT this method - would recurse)
+    }
+
     private void MouseDoubleClick(IInputComponent rootComponent, Vector2 p, uint timestamp, MouseButtons button, InputModifiers inputModifiers)
     {
-        var hit = rootComponent.HitTest(p);
+        var hit = HitTestTopmost(rootComponent, p);
         if (hit != null)
         {
             MouseButtonEventArgs args = new MouseButtonEventArgs(this, button, GetState(button), inputModifiers, timestamp);
@@ -326,7 +342,7 @@ public class MouseDevice
 
     private IInputComponent SetMouseOver(IInputComponent rootComponent, Vector2 p, InputModifiers modifiers, uint timestamp)
     {
-        var element = rootComponent.HitTest(p);
+        var element = HitTestTopmost(rootComponent, p);
         return SetMouseOver(rootComponent, element, modifiers, timestamp);
     }
 
@@ -346,7 +362,7 @@ public class MouseDevice
 
     private void MouseDown(IInputComponent rootComponent, Vector2 p, uint timestamp, MouseButtons button, InputModifiers inputModifiers)
     {
-        var hit = Captured ?? rootComponent.HitTest(p);
+        var hit = Captured ?? HitTestTopmost(rootComponent, p);
 
         if (hit != null)
         {
@@ -372,7 +388,7 @@ public class MouseDevice
 
     private void MouseUp(IInputComponent rootComponent, Vector2 p, uint timestamp, MouseButtons button, InputModifiers inputModifiers)
     {
-        var hit = Captured ?? rootComponent.HitTest(p);
+        var hit = Captured ?? HitTestTopmost(rootComponent, p);
 
         if (hit != null)
         {
@@ -414,7 +430,7 @@ public class MouseDevice
 
     private void MouseWheel(IInputComponent rootComponent, Vector2 p, InputModifiers modifiers, uint timestemp, Int32 wheelDelta)
     {
-        var hit = rootComponent.HitTest(p);
+        var hit = HitTestTopmost(rootComponent, p);
 
         hit?.RaiseEvent(new MouseWheelEventArgs(this, modifiers, wheelDelta, timestemp) { RoutedEvent = Mouse.MouseWheelEvent });
     }

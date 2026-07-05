@@ -105,12 +105,24 @@ public class PopupLayer
         double x, y;
         switch (popup.Placement)
         {
-            case PlacementMode.Top:      x = cx; y = ty - size.Height;             break;
+            case PlacementMode.Top:      x = cx; y = FlipY(ty - size.Height, ty + th, above: true);   break;
             case PlacementMode.Left:     x = tx - size.Width;  y = cy;             break;
             case PlacementMode.Right:    x = tx + tw;          y = cy;             break;
             case PlacementMode.Center:   x = cx; y = cy;                           break;
             case PlacementMode.Relative: x = tx; y = ty;                           break;
-            default:                     x = cx; y = ty + th;                      break;   // Bottom
+            default:                     x = cx; y = FlipY(ty + th, ty - size.Height, above: false);  break;   // Bottom
+        }
+
+        // Edge-aware flip: keep the natural side while the popup fits there OR it has at least as much room as the other
+        // side; otherwise flip. So near the bottom edge a Bottom popup opens upward, and when it fits NEITHER side it
+        // opens on the roomier one (then the clamp below keeps it fully in the window). `above` = the primary side is
+        // above the target. `primary`/`flipped` are the y for each side.
+        double FlipY(double primary, double flipped, bool above)
+        {
+            if (!popup.FlipToFit) return primary;
+            var roomPrimary = above ? ty : windowSize.Height - (ty + th);
+            var roomFlipped = above ? windowSize.Height - (ty + th) : ty;
+            return (size.Height <= roomPrimary || roomPrimary >= roomFlipped) ? primary : flipped;
         }
         x += popup.HorizontalOffset;
         y += popup.VerticalOffset;
