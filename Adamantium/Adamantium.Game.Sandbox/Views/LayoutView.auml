@@ -1,7 +1,31 @@
 <View xmlns="http://adamantium/ui"
       xmlns:x="http://adamantium/ui/xaml/extensions"
-      xmlns:app="clr-namespace:Adamantium.Game.Sandbox"
-      ResourceContext.Source="{ResourceLink Source={x:Type app:LayoutResources}, Scope=Local}">
+      xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters"
+      xmlns:app="clr-namespace:Adamantium.Game.Sandbox">
+    <ResourceContext.Resources>
+        <DataTemplate x:Key="RectTileTemplate">
+            <Rectangle Fill="{Binding Color, Converter={conv:StringToBrushConverter}}"
+                       Stroke="{Binding Stroke.StrokeBrush}" CornerRadius="{Binding Stroke.CornerRadius}"
+                       StrokeThickness="{Binding Stroke.StrokeWidth}"
+                       StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
+                       StrokeDashOffset="{Binding Stroke.DashOffset}"
+                       StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                       StrokeLineJoin="{Binding Stroke.Join}"
+                       StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"
+                       HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="3"/>
+        </DataTemplate>
+
+        <DataTemplate x:Key="EllipseTileTemplate">
+            <Ellipse Fill="{Binding Color, Converter={conv:StringToBrushConverter}}"
+                     Stroke="{Binding Stroke.StrokeBrush}"
+                     StrokeThickness="{Binding Stroke.StrokeWidth}"
+                     StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
+                     StrokeDashOffset="{Binding Stroke.DashOffset}"
+                     StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                     StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"
+                     HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="3"/>
+        </DataTemplate>
+    </ResourceContext.Resources>
     <!-- DataContext is the LayoutViewModel. A big virtualized, wrapping, scrolling grid of tiles whose cell WIDTH and
          HEIGHT are driven by two independent sliders (bound to the WrapPanel), so the aspect ratio is adjustable. The
          "Ellipses" toggle flips ShowEllipses; a DataTrigger then swaps ItemTemplate between the two templates that live
@@ -68,7 +92,7 @@
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                         <TextBlock Text="Cap 0/1/2" Width="80" VerticalAlignment="Center"/>
-                        <Slider Width="130" Minimum="0" Maximum="2" Value="{Binding Stroke.CapValue, Mode=TwoWay}" TickFrequency="1" IsSnapToTickEnabled="true"/>
+                        <Slider Width="130" Minimum="0" Maximum="5" Value="{Binding Stroke.CapValue, Mode=TwoWay}" TickFrequency="1" IsSnapToTickEnabled="true"/>
                         <TextBlock Text="{Binding Stroke.CapValue}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">

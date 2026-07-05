@@ -5,7 +5,20 @@ public class ResourceManager : IResourceManager
     private ResourceProvider _localResources { get; }
     private ResourceProvider _globalResources { get; }
     private ResourceProvider _themeResources { get; }
-    
+
+    // Coalesced change signal for live {ObservableResource}s. A mutation only sets the flag; the actual event fires once
+    // per layout pass (FlushResourceChanges), so a theme swap - which removes the old sources then adds the new ones
+    // during the pass's re-theme - notifies ONCE, after everything settled, and startup's bulk AddSource never storms.
+    public event EventHandler ResourcesChanged;
+    private bool _resourcesDirty;
+
+    public void FlushResourceChanges()
+    {
+        if (!_resourcesDirty) return;
+        _resourcesDirty = false;
+        ResourcesChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     public ResourceManager()
     {
         _localResources = new ResourceProvider();
@@ -135,15 +148,47 @@ public class ResourceManager : IResourceManager
                 _themeResources.AddSource(owner, source);
                 break;
         }
+        _resourcesDirty = true;
+    }
+
+    // Register an INLINE (per-element) dictionary instance - the ResourceContext.Resources authored right on an element -
+    // rather than a shared dictionary type. Same scoping/lifecycle as a linked type.
+    public void AddSource(IAdamantiumComponent owner, ResourceDictionary instance, ResourceScope scope = ResourceScope.Local)
+    {
+        switch (scope)
+        {
+            case ResourceScope.Local:
+                _localResources.AddSource(owner, instance);
+                break;
+            case ResourceScope.Global:
+                _globalResources.AddSource(owner, instance);
+                break;
+            case ResourceScope.Theme:
+                _themeResources.AddSource(owner, instance);
+                break;
+        }
+        _resourcesDirty = true;
+    }
+
+    public void NotifyResourcesChanged()
+    {
+        // A resource VALUE changed IN PLACE (an inline dictionary entry was reassigned) rather than a whole dictionary
+        // being added/removed: drop the cached lookups so the next resolve re-reads, and mark dirty so the coalesced
+        // ResourcesChanged fires this pass - live {ObservableResource}s then pick up the new value.
+        _localResources.InvalidateCache();
+        _themeResources.InvalidateCache();
+        _globalResources.InvalidateCache();
+        _resourcesDirty = true;
     }
 
     public void RemoveSources(IAdamantiumComponent component)
     {
         if (component == null) return;
-        
+
         _localResources.RemoveOwner(component);
         _themeResources.RemoveOwner(component);
         _globalResources.RemoveOwner(component);
+        _resourcesDirty = true;
     }
 
     public object this[string name] => FindResource(name);

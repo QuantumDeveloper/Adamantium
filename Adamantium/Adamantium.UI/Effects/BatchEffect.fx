@@ -39,29 +39,31 @@ float4 CompositeFillStroke(float d, float4 fill, float4 stroke, float width, flo
 }
 
 // Cap "reach" along the contour, at a fragment whose PERPENDICULAR distance from the stroke centreline is dPerp: how far
-// past a piece end the stroke still paints. flat = 0 (hard cut); square = halfW (a rectangular nub); round =
-// sqrt(halfW^2 - dPerp^2) (a semicircle - the reach shrinks to 0 at the ring edges, tracing a disc). This is exactly the
-// analytic dash/line cap, no cap geometry.
+// past a piece end the stroke still paints (SIGNED - negative reach cuts the end INWARD, giving the concave caps). All six
+// PenLineCaps analytically, no cap geometry, matching the geometry stroker's codes (EmitCapTris): 0 flat, 1 square,
+// 2 convex round, 3 convex triangle, 4 concave triangle, 5 concave round. Convex/concave forms are mirror images (+/-).
 float CapReach(int cap, float dPerp, float halfW)
 {
-    if (cap == 1) return halfW;                                  // square
-    if (cap == 2) return sqrt(max(halfW * halfW - dPerp * dPerp, 0.0));   // round
-    return 0.0;                                                  // flat
+    if (cap == 1) return halfW;                                            // square: rectangular nub
+    if (cap == 2) return sqrt(max(halfW * halfW - dPerp * dPerp, 0.0));    // convex round: semicircle out
+    if (cap == 3) return halfW - abs(dPerp);                              // convex triangle: tip out at the centre
+    if (cap == 4) return abs(dPerp) - halfW;                              // concave triangle: V notch cut in
+    if (cap == 5) return -sqrt(max(halfW * halfW - dPerp * dPerp, 0.0));   // concave round: semicircular bite in
+    return 0.0;                                                            // flat: hard cut
 }
 
 // Dash + trim coverage (0..1) at arc-length `s` (device px) along a contour of length `perimeter`. Makes dashes/trim
 // ANALYTIC (per-fragment, no cut geometry) so a dashed/trimmed stroke still BATCHES. dashOn<=0 = solid. Piece/trim ends
 // are shaped by their caps (packed base-8 into capFlags: dash + 8*start + 64*end; 0 flat, 1 square, 2 round). dPerp =
 // signed perpendicular distance from the stroke centreline; halfW = half the stroke width. ~1px AA everywhere.
-// sTrim = the fragment's own arc-length (trim cuts smoothly anywhere). sDash = the DASH arc-length: on a corner it is
-// that corner's single mid value, so the whole corner is ONE dash state (a solid join, matching the stroke expander),
-// never a smeared dash. On straight edges sDash == sTrim.
+// sTrim cuts the trim window; sDash phases the dashes. Both are the fragment's continuous centreline arc-length (callers
+// pass the same value) - corners included, since the corner arc-length is angle-based and thus uniform across the width.
 float DashTrimMask(float sTrim, float sDash, float perimeter, float dashOn, float dashGap, float dashOffset,
     float trimStart, float trimEnd, float dPerp, float halfW, float capFlags)
 {
     int dashCap  = int(fmod(capFlags, 8.0));
     int startCap = int(fmod(floor(capFlags / 8.0), 8.0));
-    int endCap   = int(floor(capFlags / 64.0));
+    int endCap   = int(fmod(floor(capFlags / 64.0), 8.0));   // base-8 mask: else the JOIN in the 512s place leaks in
 
     float mask = 1.0;
     if (trimStart > 0.0 || trimEnd < 1.0)              // keep only s in [trimStart, trimEnd] * perimeter; ends get caps
@@ -85,13 +87,11 @@ float DashTrimMask(float sTrim, float sDash, float perimeter, float dashOn, floa
 // Arc-length `s` (device px) of the point on the ROUNDED-RECT contour nearest `p`, and the perimeter. Exact/closed-form.
 // Traversal CCW from the start of the top-right arc: TR arc, top edge, TL arc, left edge, BL arc, bottom edge, BR arc,
 // right edge. (Start point is arbitrary for dashes; dashOffset shifts the phase.)
-float RoundRectArc(float2 p, float2 b, float r, out float perimeter, out float sJoin)
+float RoundRectArc(float2 p, float2 b, float r, out float perimeter)
 {
-    // Dashes are measured on the CENTRELINE (uniform on the straight edges - no rate jump). A corner can't also be dashed
-    // uniformly across a centre stroke's width, so - exactly like the stroke expander - the corner is treated as a JOIN:
-    // every fragment in the corner shares that corner's SINGLE mid-arc value (sJoin), so the whole join is one dash state
-    // (a solid join when a dash crosses it, empty otherwise) instead of a smeared/stretched dash. Straight edges dash on
-    // their own arc-length (s == sJoin there).
+    // Dashes are measured on the CENTRELINE. In the corner, s = corner-start + phi*r uses the fragment's ANGLE (phi),
+    // not its radius, so it's already uniform across the stroke width AND continuous with the edges - the dash flows
+    // around the corner exactly like on a straight edge (and like the ellipse). No per-corner "single state" is needed.
     float ex = 2.0 * (b.x - r);
     float ey = 2.0 * (b.y - r);
     float qa = 1.5707963268 * r;
@@ -101,15 +101,14 @@ float RoundRectArc(float2 p, float2 b, float r, out float perimeter, out float s
     float ax = abs(p.x), ay = abs(p.y);
     float cx = ax - bx, cy = ay - by;
 
-    if (cx > 0.0 && cy > 0.0)                                   // corner -> one dash state for the whole join
+    if (cx > 0.0 && cy > 0.0)                                   // corner -> arc-length by angle (phi), uniform + continuous
     {
         float phi = atan2(cy, cx);
-        float cs, s;
-        if      (p.x >= 0.0 && p.y >= 0.0) { s = phi * r;                               cs = 0.0; }
-        else if (p.x <  0.0 && p.y >= 0.0) { s = qa + ex + (1.5707963268 - phi) * r;    cs = qa + ex; }
-        else if (p.x <  0.0 && p.y <  0.0) { s = 2.0 * qa + ex + ey + phi * r;          cs = 2.0 * qa + ex + ey; }
-        else                               { s = 3.0 * qa + 2.0 * ex + ey + (1.5707963268 - phi) * r; cs = 3.0 * qa + 2.0 * ex + ey; }
-        sJoin = cs + qa * 0.5;
+        float s;
+        if      (p.x >= 0.0 && p.y >= 0.0) s = phi * r;
+        else if (p.x <  0.0 && p.y >= 0.0) s = qa + ex + (1.5707963268 - phi) * r;
+        else if (p.x <  0.0 && p.y <  0.0) s = 2.0 * qa + ex + ey + phi * r;
+        else                               s = 3.0 * qa + 2.0 * ex + ey + (1.5707963268 - phi) * r;
         return s;
     }
     // Classify by the NEAREST edge, not just cx/cy vs the CORNER radius r: a thick stroke reaches MORE than r inside, so
@@ -120,7 +119,6 @@ float RoundRectArc(float2 p, float2 b, float r, out float perimeter, out float s
     float s;
     if (horizontal) s = (p.y >= 0.0) ? qa + (bx - p.x) : 3.0 * qa + ex + ey + (p.x + bx);
     else            s = (p.x >= 0.0) ? 4.0 * qa + 2.0 * ex + ey + (p.y + by) : 2.0 * qa + ex + (by - p.y);
-    sJoin = s;
     return s;
 }
 
@@ -227,10 +225,13 @@ float4 RectBatchPS(PSInput input) : SV_Target
     if (input.Stroke0.z > 0.0 || input.Stroke1.y > 0.0 || input.Stroke1.z < 1.0)   // dashed or trimmed -> arc length
     {
         float halfW = input.Stroke0.x * 0.5;
-        float perim, sJoin;
-        float s = RoundRectArc(input.Local, input.Half, r, perim, sJoin);
+        float perim;
+        float s = RoundRectArc(input.Local, input.Half, r, perim);
         float dPerp = d - input.Stroke0.y * halfW;
-        mask = DashTrimMask(s, sJoin, perim, input.Stroke0.z, input.Stroke0.w, input.Stroke1.x, input.Stroke1.y,
+        // Dash on the CONTINUOUS centreline arc-length through corners too (like the ellipse), so a dash flows around a
+        // corner uniformly instead of the whole corner snapping to one on/off state at its midpoint - the latter cut a
+        // dash short at the corner (a stub that wandered with the dash phase) when the run ended inside the corner arc.
+        mask = DashTrimMask(s, s, perim, input.Stroke0.z, input.Stroke0.w, input.Stroke1.x, input.Stroke1.y,
                             input.Stroke1.z, dPerp, halfW, input.Stroke1.w);
     }
     return CompositeFillStroke(d, input.Color, input.StrokeColor, input.Stroke0.x, input.Stroke0.y, mask);

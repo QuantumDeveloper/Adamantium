@@ -6,6 +6,7 @@
        ResourceContext.Source="{ResourceLink Source={x:Type fluentDark:Brushes}, Scope=Theme}">
 
 	<Theme.StyleIncludes>
+		<StyleInclude Source="{x:Type fluentDark:TextBlockStyleSet}"/>
 		<StyleInclude Source="{x:Type fluentDark:BorderStyleSet}"/>
 		<StyleInclude Source="{x:Type fluentDark:ButtonStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ContentControlStyleSet}"/>
@@ -27,13 +28,11 @@
         <StyleInclude Source="{x:Type fluentDark:TabItemStyleSet}"/>
 	</Theme.StyleIncludes>
 
-	<!-- Accent / focus: the theme's runtime-mutable identity. Referenced via {ThemeResource Key}; change any of these
-	     at runtime (theme.AccentFillColorDefault = ...) and every binding refreshes live. Static palette is in Brushes.auml. -->
-	<Theme.AccentFillColorDefault><SolidColorBrush Color="#60CDFF"/></Theme.AccentFillColorDefault>
-	<Theme.AccentFillColorSecondary><SolidColorBrush Color="#57B8E6"/></Theme.AccentFillColorSecondary>
-	<Theme.AccentFillColorTertiary><SolidColorBrush Color="#4FA6CF"/></Theme.AccentFillColorTertiary>
+	<!-- Accent: ONE seed. The theme derives the ramp (hover/pressed) and the on-accent TEXT colour for contrast (see
+	     Theme.DeriveAccentPalette), so a saturated seed here yields readable white text on checked controls. Change it at
+	     runtime (theme.AccentColor = ...) and every {ThemeResource Accent*} binding refreshes live. Palette: Brushes.auml. -->
+	<Theme.AccentColor><SolidColorBrush Color="#0091F7"/></Theme.AccentColor>
 	<Theme.AccentFillColorDisabled><SolidColorBrush Color="#3D3D3D"/></Theme.AccentFillColorDisabled>
-	<Theme.AccentForegroundColor><SolidColorBrush Color="#000000"/></Theme.AccentForegroundColor>
 	<Theme.FocusStrokeColorOuter><SolidColorBrush Color="#FFFFFF"/></Theme.FocusStrokeColorOuter>
 	<Theme.FocusStrokeColorInner><SolidColorBrush Color="#000000"/></Theme.FocusStrokeColorInner>
 </Theme>

@@ -187,6 +187,11 @@ public sealed class LayoutManager
         // LayoutUpdated = "layout settled this frame" - only when everything drained, not when budget-deferred.
         if (didWork && settled)
             LayoutUpdated?.Invoke(this, EventArgs.Empty);
+
+        // Coalesced resource-change notification: the style drain above may have loaded a new theme's dictionaries (a
+        // theme swap re-themes via the style queue), so fire ResourcesChanged HERE, once, after they're present - live
+        // {ObservableResource}s then re-resolve to the new values. No-op (a flag read) when nothing changed.
+        UIAppContext.Current?.ResourceManager?.FlushResourceChanges();
     }
 
     // Drains one queue as a snapshot, ancestors-first. Returns true if it emptied the snapshot, false if it stopped on

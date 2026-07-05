@@ -6,6 +6,10 @@ public class ResourceProvider
     private readonly Dictionary<string, object> _cache = new();
     private readonly Dictionary<Type, List<string>> _cacheByDictionary = new();
     private readonly Dictionary<Type, ResourceInfo> _loadedDictionaries = new();
+    // owner -> the dictionaries it owns, in add order. Lets FindResourceForOwner / RemoveOwner touch only THIS owner's
+    // handful of dictionaries instead of scanning every dictionary in the scope (the tree-walk lookup asks this per
+    // ancestor, so a global scan was O(ancestors x all-dictionaries) per resolve).
+    private readonly Dictionary<IAdamantiumComponent, List<ResourceInfo>> _byOwner = new();
 
     public void AddSource(IAdamantiumComponent owner, Type sourceType)
     {
@@ -14,33 +18,60 @@ public class ResourceProvider
             info = new ResourceInfo(sourceType);
             _loadedDictionaries[sourceType] = info;
             _orderedDictionaries.Add(info);
-            
+
             InvalidateCache();
         }
-    
-        info.Owners.Add(owner);
+
+        if (info.Owners.Add(owner))
+        {
+            if (!_byOwner.TryGetValue(owner, out var owned))
+            {
+                owned = new List<ResourceInfo>();
+                _byOwner[owner] = owned;
+            }
+            owned.Add(info);
+        }
     }
-   
+
+    // An INLINE (per-element) dictionary: a unique instance authored right on the element (ResourceContext.Resources),
+    // not a shared dictionary TYPE. No type-dedup (each instance is its own) - just register it under this owner, so it
+    // is tree-scoped and freed with the owner exactly like a linked type is.
+    public void AddSource(IAdamantiumComponent owner, ResourceDictionary instance)
+    {
+        var info = new ResourceInfo(instance);
+        _orderedDictionaries.Add(info);
+        info.Owners.Add(owner);
+        if (!_byOwner.TryGetValue(owner, out var owned))
+        {
+            owned = new List<ResourceInfo>();
+            _byOwner[owner] = owned;
+        }
+        owned.Add(info);
+        InvalidateCache();
+    }
+
     public void RemoveOwner(IAdamantiumComponent owner)
     {
-        var abandonedInfos = new List<ResourceInfo>();
+        if (!_byOwner.TryGetValue(owner, out var owned)) return;
+        _byOwner.Remove(owner);
 
-        foreach (var info in _orderedDictionaries)
+        List<ResourceInfo> abandonedInfos = null;
+        foreach (var info in owned)
         {
             if (info.Owners.Remove(owner) && info.Owners.Count == 0)
             {
-                abandonedInfos.Add(info);
+                (abandonedInfos ??= new List<ResourceInfo>()).Add(info);
             }
         }
 
-        if (abandonedInfos.Any())
+        if (abandonedInfos != null)
         {
             foreach (var info in abandonedInfos)
             {
-                _loadedDictionaries.Remove(info.Resource.GetType());
+                if (info.SourceType != null) _loadedDictionaries.Remove(info.SourceType);   // inline instances aren't in the type map
                 _orderedDictionaries.Remove(info);
             }
-                
+
             InvalidateCache();
         }
     }
@@ -67,13 +98,13 @@ public class ResourceProvider
     // A key from dictionaries owned by EXACTLY this element. The caller (ResourceManager) walks the tree and asks each
     // ancestor in turn, so a Local resource is visible only inside the owner's subtree - never from an unrelated element.
     // Not cached: the same key can resolve to different values under different owners, so the flat _cache would leak
-    // across scopes; owner lookups are cheap (a handful of dictionaries).
+    // across scopes. Iterate only this owner's own dictionaries (via _byOwner), newest-first for last-declared-wins.
     public object FindResourceForOwner(IAdamantiumComponent owner, string key)
     {
-        for (int i = _orderedDictionaries.Count - 1; i >= 0; i--)
+        if (!_byOwner.TryGetValue(owner, out var owned)) return null;
+        for (int i = owned.Count - 1; i >= 0; i--)
         {
-            var info = _orderedDictionaries[i];
-            if (info.Owners.Contains(owner) && info.Resource.TryGetValue(key, out var resource))
+            if (owned[i].Resource.TryGetValue(key, out var resource))
             {
                 return resource;
             }
@@ -110,13 +141,24 @@ public class ResourceProvider
     private class ResourceInfo
     {
         public ResourceDictionary Resource { get; }
-    
+
+        // The dictionary TYPE when this is a shared/deduped linked dictionary; null for an inline instance (which is
+        // unique and not tracked in _loadedDictionaries).
+        public Type SourceType { get; }
+
         public HashSet<IAdamantiumComponent> Owners { get; } = new();
 
         public ResourceInfo(Type dictionaryType)
         {
+            SourceType = dictionaryType;
             Resource = (ResourceDictionary)Activator.CreateInstance(dictionaryType);
             Resource?.Initialize();
+        }
+
+        public ResourceInfo(ResourceDictionary instance)
+        {
+            Resource = instance;
+            instance.Initialize();
         }
     }
 }

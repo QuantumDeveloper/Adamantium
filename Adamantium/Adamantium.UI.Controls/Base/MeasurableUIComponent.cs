@@ -412,7 +412,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             }
             else
             {
-                constrained = this.ApplyLayoutConstraints(availableSize).Deflate(margin);
+                constrained = this.ApplyLayoutConstraints(availableSize.Deflate(margin));
             }
 
             var measured = MeasureOverride(constrained);

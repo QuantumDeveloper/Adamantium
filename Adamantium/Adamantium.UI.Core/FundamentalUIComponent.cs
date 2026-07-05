@@ -447,11 +447,15 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         // resolve it now that the element is part of a live tree and the app context is reachable.
         ApplyViewModel();
         ApplyTriggers();
+        // Raise the public event so consumers can react to LOGICAL attach - the hook a non-visual element (which never
+        // enters the visual tree, so AttachedToVisualTreeEvent never fires for it) uses to tree-scope its resources.
+        AttachedToLogicalTree?.Invoke(this, e);
     }
 
     protected virtual void OnDetachedFromLogicalTree(LogicalTreeAttachmentEventArgs e)
     {
         DeactivateTriggers();
+        DetachedFromLogicalTree?.Invoke(this, e);
     }
 
     // Logical (control-level) triggers: activated against the control itself (StyleTriggerExecutionContext = self scope),

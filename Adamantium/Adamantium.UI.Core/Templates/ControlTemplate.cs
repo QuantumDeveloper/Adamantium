@@ -49,7 +49,10 @@ public class ControlTemplate : UiTemplate
             {
                 foreach (var trigger in result.Triggers)
                 {
-                    var context = new TemplateTriggerExecutionContext(result.RootComponent, UIAppContext.Current.ThemeManager.CurrentTheme, result);
+                    // A ControlTemplate trigger watches the TEMPLATED CONTROL (templatedParent) - like WPF - not the
+                    // template root: state like IsMouseOver/IsPressed lives on the control, and the root (often a plain
+                    // Border) may not even track it. TargetName still resolves against the template's named parts.
+                    var context = new TemplateTriggerExecutionContext(templatedParent, UIAppContext.Current.ThemeManager.CurrentTheme, result);
                     var activator = trigger.Apply(context);
                     result.Activators.Add(activator);
                 }

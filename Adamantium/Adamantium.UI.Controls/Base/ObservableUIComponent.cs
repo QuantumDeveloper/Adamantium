@@ -81,8 +81,11 @@ public class ObservableUIComponent : UIComponent, IObservableComponent
         {
             if (eventHandlers.ContainsKey(e.RoutedEvent))
             {
+                // Snapshot: a handler can add/remove handlers for this same event while it runs (e.g. an Unloaded
+                // handler that unsubscribes itself during a template teardown) - iterating the live list would throw
+                // "Collection was modified". The lock is reentrant, so the mutation itself is safe.
                 var handlersList = eventHandlers[e.RoutedEvent];
-                foreach (var handler in handlersList)
+                foreach (var handler in handlersList.ToArray())
                 {
                     if (!e.Handled || handler.HandledEventsToo)
                     {

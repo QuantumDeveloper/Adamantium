@@ -1,0 +1,74 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:local="clr-namespace:Adamantium.Game.Sandbox">
+    <!-- Pure declarative demo of live {ObservableResource} vs resolve-once {ResourceReference}, at two levels:
+         a THEME palette key (swap Dark<->Light) and an INLINE local resource (cycled by a view-layer behavior).
+         No view-model logic, no ResourceManager, no controls in the VM. -->
+    <StackPanel Orientation="Vertical" Margin="24">
+
+        <TextBlock Text="ObservableResource (live) vs ResourceReference (static)" FontSize="18" Margin="0,0,0,4"/>
+
+        <!-- THEME resource: swap the whole theme (Up = Dark, Down = Light). The live swatch re-resolves to the new
+             palette; the static one keeps the colour it resolved once. The rest of the UI re-colours too. -->
+        <TextBlock Text="Theme palette (SystemFillColorCritical) — press ↑ Dark / ↓ Light to swap the theme:" Margin="0,10,0,6"/>
+        <StackPanel Orientation="Horizontal">
+            <StackPanel Orientation="Vertical" Margin="0,0,32,0">
+                <TextBlock Text="ResourceReference — static" Margin="0,0,0,6"/>
+                <Rectangle Width="140" Height="60" CornerRadius="6" Fill="{ResourceReference SystemFillColorCritical}"/>
+            </StackPanel>
+            <StackPanel Orientation="Vertical">
+                <TextBlock Text="ObservableResource — live" Margin="0,0,0,6"/>
+                <Rectangle Width="140" Height="60" CornerRadius="6" Fill="{ObservableResource SystemFillColorCritical}"/>
+            </StackPanel>
+        </StackPanel>
+
+        <Button Content="Toggle theme (Dark / Light)" Width="220" Height="36" Margin="0,12,0,0">
+            <Button.Behaviors>
+                <local:ToggleThemeBehavior/>
+            </Button.Behaviors>
+        </Button>
+
+        <!-- ACCENT: the theme's accent brushes are observable theme properties consumed via {ThemeResource}. Cycling them
+             at runtime re-colours the live swatch and every accented control (checked toggle / checkbox / radio) at once. -->
+        <TextBlock Text="Theme accent ({ThemeResource}) — live-recolour every accented control:" Margin="0,28,0,6"/>
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <Rectangle Width="60" Height="60" CornerRadius="6" Margin="0,0,16,0" Fill="{ThemeResource AccentFillColorDefault}"/>
+            <ToggleButton Content="Toggle" IsChecked="true" Margin="0,0,16,0"/>
+            <CheckBox Content="Checked" IsChecked="true" Margin="0,0,16,0"/>
+            <RadioButton Content="Selected" IsChecked="true" Margin="0,0,16,0"/>
+            <Button Content="Cycle accent" Width="140" Height="36">
+                <Button.Behaviors>
+                    <local:CycleAccentBehavior/>
+                </Button.Behaviors>
+            </Button>
+        </StackPanel>
+
+        <!-- LOCAL inline resource: a private dictionary on THIS panel (invisible outside it). The Cycle button carries a
+             view-layer CycleResourceBehavior that swaps PanelAccent for a new brush; again the live swatch follows and
+             the static one keeps its first colour. The button is a descendant so the behavior finds the dictionary. -->
+        <StackPanel Orientation="Vertical" Margin="0,28,0,0">
+            <ResourceContext.Resources>
+                <SolidColorBrush x:Key="PanelAccent" Color="#22D3EE"/>
+            </ResourceContext.Resources>
+
+            <TextBlock Text="Inline local resource (ResourceContext.Resources — private to this panel):" Margin="0,0,0,6"/>
+            <StackPanel Orientation="Horizontal">
+                <StackPanel Orientation="Vertical" Margin="0,0,32,0">
+                    <TextBlock Text="ResourceReference — static" Margin="0,0,0,6"/>
+                    <Rectangle Width="140" Height="60" CornerRadius="6" Fill="{ResourceReference PanelAccent}"/>
+                </StackPanel>
+                <StackPanel Orientation="Vertical">
+                    <TextBlock Text="ObservableResource — live" Margin="0,0,0,6"/>
+                    <Rectangle Width="140" Height="60" CornerRadius="6" Fill="{ObservableResource PanelAccent}"/>
+                </StackPanel>
+            </StackPanel>
+
+            <Button Content="Cycle local accent" Width="180" Height="36" Margin="0,12,0,0">
+                <Button.Behaviors>
+                    <local:CycleResourceBehavior Key="PanelAccent"/>
+                </Button.Behaviors>
+            </Button>
+        </StackPanel>
+
+    </StackPanel>
+</View>
