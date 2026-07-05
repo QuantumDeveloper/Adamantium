@@ -254,6 +254,10 @@ public class TabControl : Selector
 
         SetOffset(tab, along - _grabOffset - SlotStart(tab));   // Bounds are stable during the drag -> exact follow
 
+        // The dragged tab IS the selected one; it moves by RenderTransform (no layout pass), so OnLayoutUpdated won't
+        // fire - drive the indicator here so the accent bar rides along with the tab under the cursor.
+        UpdateIndicator(animate: false);
+
         // Target index = how far the dragged tab's centre has passed the OTHER tabs' (stable) centres.
         var centre = along - _grabOffset + _draggedExtent / 2;
         var target = _dragStartIndex;
@@ -285,6 +289,22 @@ public class TabControl : Selector
             MoveItem(start, target);
             ClearDragOffsets();
             tab.ZIndex = 0;
+            // The indicator tracked the tab under the cursor during the drag, so _lastAlong/_lastExtent hold that drop
+            // position. Invalidate that cache so the post-reorder layout pass re-places the bar on the selected tab's
+            // FINAL slot instead of the OnLayoutUpdated snap short-circuiting on "along == _lastAlong".
+            _lastAlong = _lastExtent = double.NaN;
+        });
+
+        // Drive the indicator each frame WHILE the tab settles: it reads the tab's animating offset, so the bar slides to
+        // the final slot in lockstep with the tab instead of freezing at the drop point and popping a frame after the
+        // reorder commits. The ticker self-expires at the settle duration (then OnLayoutUpdated keeps it pinned).
+        var settleElapsed = 0.0;
+        var settleDuration = ReorderAnimationDuration.TotalSeconds;
+        AnimationManager.AddTicker(dt =>
+        {
+            UpdateIndicator(animate: false);
+            settleElapsed += dt;
+            return settleElapsed >= settleDuration;
         });
     }
 
@@ -413,26 +433,37 @@ public class TabControl : Selector
         {
             _indicator.IsHitTestVisible = false;   // a thin overlay bar must never eat a tab click
             _indicatorPlaced = false;
-        }
-
-        if (_hookedManager == null)
-        {
-            // Tab bounds are known only after a layout pass; snap the bar once the pass settles (and re-snap on resize/
-            // reorder). A selection CHANGE animates directly - the tabs are already laid out at that point. Cache the
-            // EXACT manager we subscribed to: LayoutManager.For(this) is resolved from the current root, so re-resolving
-            // it at unhook time (a different root) would leave the original manager holding this handler -> a leak.
-            _hookedManager = LayoutManager.For(this);
-            _hookedManager.LayoutUpdated += OnLayoutUpdated;
-            Unloaded += OnUnloadedDetachLayout;
+            // A fresh indicator (new template) has no animation running on it. If a selection-slide was mid-flight on the
+            // OLD indicator when the template swapped, its completion callback never fires (that indicator is gone), so
+            // this flag would stay stuck true and gate OnLayoutUpdated off forever - the bar would never re-place after a
+            // placement change until a click. Clear it here.
+            _animatingIndicator = false;
         }
     }
 
-    private void OnUnloadedDetachLayout(object sender, RoutedEventArgs e)
+    // Hook the layout manager on ATTACH, not in OnApplyTemplate: the manager is resolved from RootVisual (LayoutManager.
+    // For), which is set only once the control is attached to the window tree. OnApplyTemplate can run while the subtree
+    // is still detached (built during a measure pass) - there For(this) falls back to a transient local-root manager that
+    // never runs layout passes, so its LayoutUpdated never fires and the indicator never snapped to the selected tab (it
+    // moved ONLY on an explicit selection change / click). Attaching guarantees the real window manager.
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
-        if (_hookedManager == null) return;
-        _hookedManager.LayoutUpdated -= OnLayoutUpdated;
-        _hookedManager = null;
-        Unloaded -= OnUnloadedDetachLayout;
+        base.OnAttachedToVisualTree(e);
+        if (_hookedManager == null)
+        {
+            _hookedManager = LayoutManager.For(this);
+            _hookedManager.LayoutUpdated += OnLayoutUpdated;
+        }
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        if (_hookedManager != null)
+        {
+            _hookedManager.LayoutUpdated -= OnLayoutUpdated;
+            _hookedManager = null;
+        }
     }
 
     private void OnLayoutUpdated(object sender, EventArgs e)
@@ -492,6 +523,7 @@ public class TabControl : Selector
             transform.CancelAnimation(scaleProp);
             if (vertical) { transform.TranslateY = along; transform.ScaleY = extent; }
             else { transform.TranslateX = along; transform.ScaleX = extent; }
+            _animatingIndicator = false;   // we just cancelled + snapped: nothing is in flight (CancelAnimation fires no completion)
         }
 
         _indicatorPlaced = true;

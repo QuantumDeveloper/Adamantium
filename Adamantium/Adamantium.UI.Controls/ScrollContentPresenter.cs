@@ -272,10 +272,13 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
             RaiseMetricsChanged();
         }
 
-        // Occupy the viewport, not the content (the content extent only on an axis the viewer left unbounded).
+        // Desired size = the content, capped by the viewport (an unbounded axis reports the full extent). NOT the whole
+        // viewport: a viewer measured content-to-fit but capped by MaxHeight (e.g. a DropDown popup) must shrink to its
+        // content when it's shorter than the cap, not pad out to the cap. A viewer that should FILL a fixed slot still
+        // does - its Stretch alignment fills at ARRANGE regardless of this (smaller) desired size.
         return new Size(
-            double.IsInfinity(availableSize.Width) ? extent.Width : availableSize.Width,
-            double.IsInfinity(availableSize.Height) ? extent.Height : availableSize.Height);
+            double.IsInfinity(availableSize.Width) ? extent.Width : Math.Min(extent.Width, availableSize.Width),
+            double.IsInfinity(availableSize.Height) ? extent.Height : Math.Min(extent.Height, availableSize.Height));
     }
 
     protected override Size ArrangeOverride(Size finalSize)

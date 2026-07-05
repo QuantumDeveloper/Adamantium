@@ -23,6 +23,8 @@
         <StyleInclude Source="{x:Type fluentDark:ItemsControlStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ListBoxStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ListBoxItemStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:DropDownStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:DropDownItemStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ToolTipStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:TabControlStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:TabItemStyleSet}"/>

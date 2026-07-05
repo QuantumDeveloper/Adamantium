@@ -4,7 +4,7 @@ namespace Adamantium.UI.Core.Input;
 
 public static class InputExtensions
 {
-   public static IInputComponent HitTest(this IInputComponent root, Vector2 p)
+   public static IInputComponent HitTest(this IUIComponent root, Vector2 p)
    {
       return root.GetInputElementsAt(p).FirstOrDefault();
    }
@@ -16,7 +16,7 @@ public static class InputExtensions
    /// children. Earlier this returned the BOTTOM-most overlapping sibling, so a control drawn on top of another (e.g.
    /// a Line over a Panel) couldn't be hit/selected.
    /// </summary>
-   public static IEnumerable<IInputComponent> GetInputElementsAt(this IInputComponent root, Vector2 p)
+   public static IEnumerable<IInputComponent> GetInputElementsAt(this IUIComponent root, Vector2 p)
    {
       var result = new List<IInputComponent>();
       Collect(root, p, result);
@@ -38,9 +38,14 @@ public static class InputExtensions
 
    private static void CollectVisuals(IUIComponent element, Vector2 p, List<IUIComponent> result)
    {
-      if (!element.ClipRectangle.Contains(p)
-          || element.Visibility != Visibility.Visible
+      if (element.Visibility != Visibility.Visible
           || !element.IsHitTestVisible)
+         return;
+
+      // Same broad-phase rule as Collect: the box gates the SELF hit, but recursion into children is only pruned when
+      // the element actually clips them (ClipToBounds), so an overflowing (but rendered) child stays selectable.
+      var inBox = element.ClipRectangle.Contains(p);
+      if (element.ClipToBounds && !inBox)
          return;
 
       var local = p - element.ClipRectangle.Location;
@@ -49,16 +54,29 @@ public static class InputExtensions
 
       // Any visual on its actual geometry is a candidate (not only IInputComponent) - the only difference from the input
       // collector above, so non-interactive authored elements are reachable by the designer's selection.
-      if (element.HitTestCore(local))
+      if (inBox && element.HitTestCore(local))
          result.Add(element);
    }
 
    private static void Collect(IUIComponent element, Vector2 p, List<IInputComponent> result)
    {
-      if (!element.ClipRectangle.Contains(p)
-          || element.Visibility != Visibility.Visible
+      if (element.Visibility != Visibility.Visible
           || !element.IsEnabled
           || !element.IsHitTestVisible)
+         return;
+
+      // Broad phase. Whether the point is inside THIS element's own box gates the SELF hit below: the default narrow
+      // phase (UIComponent.HitTestCore => true, Panel => Background.IsVisible()) ignores the point and trusts this, so
+      // it must stay for self-hit or every filled element would register as hit everywhere.
+      var inBox = element.ClipRectangle.Contains(p);
+
+      // ...but it must NOT gate recursion into children when the element does not clip them. A non-clipping element
+      // (ClipToBounds=false, the default) does not clip its children in RENDER, so a child may legitimately overflow
+      // its parent's box and still be drawn - and therefore must stay hittable. Pruning recursion by the parent box
+      // made such overflow dead to the mouse (e.g. a StackPanel squeezed a few px shorter than its rows by a tight
+      // slot: the last row rendered but its lower part could not be clicked). A CLIPPING element (ClipToBounds=true)
+      // does hide what leaves its box, in render and here, so it still prunes.
+      if (element.ClipToBounds && !inBox)
          return;
 
       // Into the element's local space, then recurse into ALL visual children front-to-back (not only input ones), so a
@@ -69,10 +87,10 @@ public static class InputExtensions
       foreach (var child in ZSort(element.VisualChildren))
          Collect(child, local, result);
 
-      // Narrow phase: only an INPUT element is a hit target (non-input visuals are pure pass-through containers), and
-      // only if the point is on its actual geometry, not just inside its bounding box - so a click in a shape's empty
-      // bbox corner falls through to whatever is really there.
-      if (element is IInputComponent input && element.HitTestCore(local))
+      // Narrow phase: only an INPUT element is a hit target (non-input visuals are pure pass-through containers), the
+      // point must be inside its box (broad), and on its actual geometry, not just inside its bounding box - so a click
+      // in a shape's empty bbox corner falls through to whatever is really there.
+      if (inBox && element is IInputComponent input && element.HitTestCore(local))
          result.Add(input);
    }
 
