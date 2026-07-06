@@ -26,6 +26,10 @@ public class RenderTargetPanel : Grid
    {
       UseLayoutRoundingProperty.OverrideMetadata(typeof(RenderTargetPanel),
          new PropertyMetadata(true, PropertyMetadataOptions.AffectsMeasure));
+      // Unlike a plain panel, this one IS an interactive surface: the hosted game is activated and fed input ONLY while
+      // the panel holds focus (RenderTargetGameOutput keys IsActive/Got|LostFocus off it). So opt back IN to focus,
+      // since Panel's default is now false. A click on the panel then focuses it and the game starts receiving input.
+      FocusableProperty.OverrideMetadata(typeof(RenderTargetPanel), new PropertyMetadata(true));
    }
 
    /// <summary>The descriptor of the currently bound source, or <c>null</c> when nothing is bound.</summary>
