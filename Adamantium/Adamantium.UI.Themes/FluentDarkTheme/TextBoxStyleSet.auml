@@ -35,9 +35,13 @@
                             CornerRadius="{TemplateBinding CornerRadius}"
                             Padding="{TemplateBinding Padding}"
                             ClipToBounds="True">
-                        <controls:TextPresenter x:Name="PART_TextPresenter"
-                                HorizontalAlignment="Stretch"
-                                VerticalAlignment="Stretch"/>
+                        <controls:ScrollViewer x:Name="PART_ContentHost"
+                                HorizontalScrollBarVisibility="{TemplateBinding HorizontalScrollBarVisibility}"
+                                VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}">
+                            <controls:TextPresenter x:Name="PART_TextPresenter"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Stretch"/>
+                        </controls:ScrollViewer>
                     </controls:Border>
                 </ControlTemplate>
             </Setter.Value>

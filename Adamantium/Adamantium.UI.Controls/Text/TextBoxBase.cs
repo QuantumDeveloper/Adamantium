@@ -4,6 +4,7 @@ using System.Linq;
 using Adamantium.Graphics.Fonts;
 using Adamantium.Mathematics;
 using Adamantium.ProceduralGeometry;
+using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
@@ -57,6 +58,17 @@ public abstract class TextBoxBase : Control
         typeof(bool), typeof(TextBoxBase),
         new PropertyMetadata(false, PropertyMetadataOptions.AffectsMeasure, OnLayoutAffectingChanged));
 
+    // Scroll-bar policy forwarded to the hosting ScrollViewer (PART_ContentHost). Horizontal defaults to Hidden so a
+    // single-line box still scrolls the caret into view without ever showing a bar; when the box wraps (TextWrapping !=
+    // NoWrap) the horizontal axis is forced to Disabled - see PushScrollSettings - so content wraps to the viewport.
+    public static readonly AdamantiumProperty HorizontalScrollBarVisibilityProperty = AdamantiumProperty.Register(
+        nameof(HorizontalScrollBarVisibility), typeof(ScrollBarVisibility), typeof(TextBoxBase),
+        new PropertyMetadata(ScrollBarVisibility.Hidden, OnScrollSettingChanged));
+
+    public static readonly AdamantiumProperty VerticalScrollBarVisibilityProperty = AdamantiumProperty.Register(
+        nameof(VerticalScrollBarVisibility), typeof(ScrollBarVisibility), typeof(TextBoxBase),
+        new PropertyMetadata(ScrollBarVisibility.Hidden, OnScrollSettingChanged));
+
     // --- Presentation (Background + Foreground are inherited from Control) ----------------------------------------
 
     public static readonly AdamantiumProperty PlaceholderForegroundProperty = AdamantiumProperty.Register(nameof(PlaceholderForeground),
@@ -92,6 +104,9 @@ public abstract class TextBoxBase : Control
     {
         FontFamilyProperty.OverrideMetadata(typeof(TextBoxBase),
             new PropertyMetadata(null, PropertyMetadataOptions.Inherits, (a, _) => (a as TextBoxBase)?.OnFontChanged()));
+        // An editor is a keyboard-focus target - opt in (the base default is now false). Its inner TextPresenter stays
+        // non-focusable, so the focus walk from a click on the surface lands here, on the TextBox.
+        FocusableProperty.OverrideMetadata(typeof(TextBoxBase), new PropertyMetadata(true));
     }
 
     protected TextBoxBase()
@@ -148,6 +163,22 @@ public abstract class TextBoxBase : Control
     {
         get => GetValue<TextWrapping>(TextWrappingProperty);
         set => SetValue(TextWrappingProperty, value);
+    }
+
+    /// <summary>Scroll-bar policy on the horizontal axis (forwarded to the internal ScrollViewer). Ignored while the box
+    /// wraps - a wrapping box never scrolls horizontally.</summary>
+    public ScrollBarVisibility HorizontalScrollBarVisibility
+    {
+        get => GetValue<ScrollBarVisibility>(HorizontalScrollBarVisibilityProperty);
+        set => SetValue(HorizontalScrollBarVisibilityProperty, value);
+    }
+
+    /// <summary>Scroll-bar policy on the vertical axis (forwarded to the internal ScrollViewer). Use <c>Auto</c> for a
+    /// multi-line box so a bar appears once the text outgrows the height.</summary>
+    public ScrollBarVisibility VerticalScrollBarVisibility
+    {
+        get => GetValue<ScrollBarVisibility>(VerticalScrollBarVisibilityProperty);
+        set => SetValue(VerticalScrollBarVisibilityProperty, value);
     }
 
     /// <summary>Prompt text shown (in <see cref="PlaceholderForeground"/>) while the control is empty and unfocused.</summary>
@@ -227,6 +258,7 @@ public abstract class TextBoxBase : Control
 
     private TextPresenter _presenter;
     private IMeasurableComponent _border;   // PART_Border - between the box and the presenter; must be re-measured too
+    private ScrollViewer _scrollViewer;      // PART_ContentHost - owns the scroll offset + bars around the presenter
 
     public override void OnApplyTemplate()
     {
@@ -234,7 +266,9 @@ public abstract class TextBoxBase : Control
         if (_presenter != null) _presenter.Owner = null;
         _presenter = GetTemplateChild("PART_TextPresenter") as TextPresenter;
         _border = GetTemplateChild("PART_Border") as IMeasurableComponent;
+        _scrollViewer = GetTemplateChild("PART_ContentHost") as ScrollViewer;
         if (_presenter != null) _presenter.Owner = this;
+        PushScrollSettings();
         InvalidateSurface(measure: true);
     }
 
@@ -281,8 +315,7 @@ public abstract class TextBoxBase : Control
     private bool _caretVisible = true;
     private bool _blinking;
     private double _blinkAccum;
-    private double _scrollX;                    // horizontal text-local offset (NoWrap) keeping the caret visible
-    private double _scrollY;                    // vertical text-local offset keeping the caret line visible
+    private double _textOy;                     // vertical offset of the text within the surface (float strip + single-line centring)
     private double? _desiredColumnX;            // sticky X for Up/Down navigation (WPF behaviour); cleared by any horizontal move
 
     private double _floatProgress;             // floating placeholder: 0 = resting (in text), 1 = floated (small, top strip)
@@ -477,6 +510,7 @@ public abstract class TextBoxBase : Control
         }
         CaretIndex = newIndex;
         ResetBlink();
+        ScrollCaretIntoView();
     }
 
     // Move the caret one visual line up/down, preserving the sticky column X (WPF behaviour). Past the first/last line
@@ -545,6 +579,7 @@ public abstract class TextBoxBase : Control
         SelectionLength = 0;
         CaretIndex = newCaret;
         ResetBlink();
+        ScrollCaretIntoView();
     }
 
     // --- Undo / redo ---------------------------------------------------------------------------------------------
@@ -769,31 +804,31 @@ public abstract class TextBoxBase : Control
     internal void SurfaceMouseDown(double localX, double localY, bool extend)
     {
         Focus();
-        MoveCaretTo(IndexFromPoint(localX + _scrollX, localY + _scrollY - FloatStripHeight()), extend);
+        MoveCaretTo(IndexFromPoint(localX, localY - _textOy), extend);
     }
 
     internal void SurfaceMouseMove(double localX, double localY)
-        => MoveCaretTo(IndexFromPoint(localX + _scrollX, localY + _scrollY - FloatStripHeight()), extend: true);
+        => MoveCaretTo(IndexFromPoint(localX, localY - _textOy), extend: true);
 
     internal void RenderSurface(IDrawingSession session, Size size)
     {
         EnsureLayout();
-        EnsureCaretVisible(size.Width, size.Height);
 
         // First time the field is actually drawn: all initial bindings have settled, so snap the floating label to its
         // resolved state (floated if it already holds text) WITHOUT animating - only later user changes animate.
         if (!_floatLoaded) { _floatLoaded = true; _floatProgress = FloatTarget(); }
 
         var hasText = !string.IsNullOrEmpty(Text);
-        var ox = -_scrollX;   // text-local -> surface origin (scroll offsets)
-        // Text sits below the floating-label strip (zero when the effect is off). Single-line content then centres
-        // vertically in the remaining area (like WPF); multi-line content is top-aligned and scrolls. The presenter
-        // fills the box height (VerticalAlignment=Stretch), so there is room to centre. vOffset is 0 for the multi-line
-        // / overflowing case, so hit-testing (line 0 regardless there) is safe.
+        // Scrolling is owned by the enclosing ScrollViewer (its ScrollContentPresenter translates this whole surface by
+        // the offset), so we render the FULL content at our own origin (ox = 0). Text sits below the floating-label strip
+        // (zero when off); single-line content then centres vertically in the surface (which the ScrollContentPresenter
+        // sizes to at least the viewport), multi-line is top-aligned. vOffset is 0 for the multi-line case.
+        const double ox = 0;
         var stripH = FloatStripHeight();
         var textAreaH = size.Height - stripH;
         var vOffset = !AcceptsNewLines && ContentHeight < textAreaH ? (textAreaH - ContentHeight) / 2 : 0;
-        var oy = stripH + vOffset - _scrollY;
+        var oy = stripH + vOffset;
+        _textOy = oy;
 
         // Selection highlight (behind the text) - one rect per spanned visual line.
         if (HasSelection) DrawSelection(session, ox, oy);
@@ -837,25 +872,14 @@ public abstract class TextBoxBase : Control
         }
     }
 
-    // Slide the scroll offsets so the caret stays inside the viewport (WPF caret-follow: no scrollbar, the text slides).
-    // Horizontal only applies when not wrapping - wrapped text never exceeds the viewport width. Clamped to the content.
-    private void EnsureCaretVisible(double viewportWidth, double viewportHeight)
+    // Scroll the enclosing ScrollViewer the minimum needed to keep the caret visible (WPF caret-follow). The caret rect is
+    // in text-layout coords; content coords add the vertical text offset (float strip + single-line centring). Horizontal
+    // is 1:1 (ox = 0). No-op until the template's ScrollViewer exists / when the caret already fits.
+    private void ScrollCaretIntoView()
     {
+        if (_scrollViewer == null) return;
         var c = CaretRect(CaretIndex);
-        if (TextWrapping == TextWrapping.NoWrap && viewportWidth > 0)
-        {
-            if (c.X - _scrollX < 0) _scrollX = c.X;
-            else if (c.X - _scrollX > viewportWidth - CaretPadding) _scrollX = c.X - viewportWidth + CaretPadding;
-            _scrollX = Math.Clamp(_scrollX, 0, Math.Max(0, _textWidth + CaretWidth - viewportWidth));
-        }
-        else _scrollX = 0;
-
-        if (viewportHeight > 0)
-        {
-            if (c.Y - _scrollY < 0) _scrollY = c.Y;
-            else if (c.Y + c.Height - _scrollY > viewportHeight) _scrollY = c.Y + c.Height - viewportHeight;
-            _scrollY = Math.Clamp(_scrollY, 0, Math.Max(0, ContentHeight - viewportHeight));
-        }
+        _scrollViewer.BringIntoView(new Rect(c.X, c.Y + _textOy, CaretWidth + CaretPadding, c.Height));
     }
 
     private TextRenderingParameters BuildTextParameters(Brush color, double originX, double originY, Size size)
@@ -1026,7 +1050,21 @@ public abstract class TextBoxBase : Control
         if (a is not TextBoxBase tb) return;
         tb._lastShapedText = null;
         tb.UpdateFloatState();
+        tb.PushScrollSettings();   // TextWrapping toggles whether the horizontal axis is scrollable vs. wrapping
         tb.InvalidateSurface(measure: true);
+    }
+
+    private static void OnScrollSettingChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+        => (a as TextBoxBase)?.PushScrollSettings();
+
+    // Forward our policy to the internal ScrollViewer. A wrapping box must NOT scroll horizontally (the content is bound
+    // to the viewport width so it wraps), so we force Disabled there regardless of HorizontalScrollBarVisibility.
+    private void PushScrollSettings()
+    {
+        if (_scrollViewer == null) return;
+        _scrollViewer.HorizontalScrollBarVisibility =
+            TextWrapping != TextWrapping.NoWrap ? ScrollBarVisibility.Disabled : HorizontalScrollBarVisibility;
+        _scrollViewer.VerticalScrollBarVisibility = VerticalScrollBarVisibility;
     }
 
     private static readonly Brush DefaultSelectionBrush = new SolidColorBrush(new Color(0x33, 0x99, 0xFF, 0x66));

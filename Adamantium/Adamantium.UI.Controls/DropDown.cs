@@ -65,6 +65,12 @@ public class DropDown : Selector
     private IPopupHost _host;
     private readonly MouseButtonEventHandler _lightDismiss;
 
+    static DropDown()
+    {
+        // A drop-down is a keyboard-focus target (it Focus()es itself on open) - opt in, since the base default is false.
+        FocusableProperty.OverrideMetadata(typeof(DropDown), new PropertyMetadata(true));
+    }
+
     public DropDown()
     {
         _lightDismiss = OnGlobalPreviewDown;

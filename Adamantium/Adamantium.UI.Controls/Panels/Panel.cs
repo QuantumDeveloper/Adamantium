@@ -10,6 +10,9 @@ namespace Adamantium.UI.Controls.Panels;
 
 public abstract class Panel: InputUIComponent, IContainer
 {
+   // A panel is a passive layout container - never a keyboard-focus target. That now comes for free from the
+   // Focusable=false default (see InputUIComponent); no per-panel override needed.
+
    public static readonly AdamantiumProperty BackgroundProperty = AdamantiumProperty.Register(nameof(Background),
       typeof(Brush), typeof(Panel),
       new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));

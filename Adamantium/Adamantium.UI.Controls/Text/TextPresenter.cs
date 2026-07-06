@@ -17,36 +17,27 @@ public sealed class TextPresenter : InputUIComponent
     internal TextBoxBase Owner { get; set; }
 
     private bool _selecting;
+    private Size _lastArrangeSize;
 
     public TextPresenter()
     {
-        // NOTE: clipping is done by the template's Border (ClipToBounds=True) around this presenter - we deliberately do
-        // NOT set ClipToBounds here (a redundant second clip on this custom surface was making sibling content vanish).
+        // NOTE: clipping is done by the hosting ScrollContentPresenter (it scissors the overflow to the viewport) - we
+        // deliberately do NOT set ClipToBounds here.
         Focusable = false;     // focus belongs to the owning TextBox
     }
 
+    // The scroll surface: report the FULL content size (all lines, full width) so the enclosing ScrollViewer's
+    // ScrollContentPresenter knows the extent and provides the viewport/scrollbars. It measures us unbounded on the axes
+    // it lets scroll (so we report our natural extent) and constrained on a disabled axis (so wrapping fits the viewport);
+    // MeasureSurface already interprets an infinite width as "no wrap / full width" and a finite one as the wrap width.
     protected override Size MeasureOverride(Size availableSize)
-    {
-        if (Owner == null) return new Size();
-        var desired = Owner.MeasureSurface(availableSize.Width);
-        // Cap the DESIRED size at the slot ONLY on an axis the owner FIXED (explicit Width/Height): there the box can't
-        // grow, so content that doesn't fit scrolls (the owner's caret-follow offsets). On an AUTO axis report the full
-        // desired so the box grows to fit - capping there against a MinWidth/Height-derived slot would trap the box at
-        // that minimum (the floating-strip toggle then reserved the strip but the box never grew, clipping the text).
-        var width = !double.IsNaN(Owner.Width) && !double.IsInfinity(availableSize.Width)
-            ? System.Math.Min(desired.Width, availableSize.Width) : desired.Width;
-        var height = !double.IsNaN(Owner.Height) && !double.IsInfinity(availableSize.Height)
-            ? System.Math.Min(desired.Height, availableSize.Height) : desired.Height;
-        return new Size(width, height);
-    }
+        => Owner == null ? new Size() : Owner.MeasureSurface(availableSize.Width);
 
     protected override Size ArrangeOverride(Size finalSize)
     {
-        // Re-render on a (re-)arrange: the owner's RenderSurface positions text/caret/label against this size, so when the
-        // slot changes (e.g. the floating-label strip toggles the box height a frame after the render already ran with the
-        // stale size) it must redraw against the NEW size - otherwise the strip pushes the text below the old height and
-        // clips it. Arrange self-gates on the rect, so this only fires when the size actually changed.
-        InvalidateRender(false);
+        // Re-render only when the SLOT SIZE changes (content/box resized, e.g. the floating-strip toggle), not on a mere
+        // reposition (scrolling moves us via the arrange rect's ORIGIN - the same rendered units just shift, no redraw).
+        if (finalSize != _lastArrangeSize) { _lastArrangeSize = finalSize; InvalidateRender(false); }
         return finalSize;
     }
 

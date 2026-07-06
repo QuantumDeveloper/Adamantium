@@ -70,6 +70,7 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
         // The whole point of the presenter: the overflowing content is scissored to this viewport (see the renderer's
         // per-unit clip, which intersects every ClipToBounds ancestor).
         ClipToBounds = true;
+        // (Focusable=false comes from ContentPresenter's metadata override - a passive presenter is never a focus target.)
     }
 
     public Size Extent => Delegating ? _inner.Extent : _extent;

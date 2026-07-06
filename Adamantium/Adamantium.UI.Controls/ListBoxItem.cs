@@ -56,10 +56,10 @@ public class ListBoxItem : ContentControl, ISelectable
         // would build a fringe.)
         BackgroundProperty.OverrideMetadata(typeof(ListBoxItem),
             new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
+        // A list item is a keyboard-focus target (arrow-key navigation, selection) - opt in, since the base default is
+        // now false. Metadata priority, so a {Binding}/Style/Trigger can still override it.
+        FocusableProperty.OverrideMetadata(typeof(ListBoxItem), new PropertyMetadata(true));
     }
-
-    // No constructor: Focusable already defaults to true (registered on InputUIComponent), so setting it here was
-    // redundant - and a constructor set writes Local priority, which would mask a {Binding}/Style/Trigger on Focusable.
 
     public bool IsSelected
     {
