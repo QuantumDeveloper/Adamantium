@@ -31,6 +31,9 @@ public partial class GalleryViewModel
     // Drives the TabControl.TabStripPlacement from a DropDown (enum-bound) so the strip can move to any edge live.
     [Bindable] private TabStripPlacement _tabPlacement = TabStripPlacement.Top;
 
+    // Drives the TabControl.ContentTransition from a DropDown (enum-bound) so the tab-content slide mode switches live.
+    [Bindable] private ContentTransition _slideMode = ContentTransition.SlideLeft;
+
     public GalleryViewModel()
     {
         SelectedTab = Tabs[0];

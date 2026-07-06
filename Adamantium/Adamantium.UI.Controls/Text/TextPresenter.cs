@@ -28,11 +28,13 @@ public sealed class TextPresenter : InputUIComponent
     protected override Size MeasureOverride(Size availableSize)
     {
         if (Owner == null) return new Size();
-        var desired = Owner.MeasureSurface();
-        // Don't force the box to grow to the full text width - cap the DESIRED width at the available slot; the text
-        // that doesn't fit scrolls (the owner's caret-follow offset), it isn't laid out wider than the viewport.
+        var desired = Owner.MeasureSurface(availableSize.Width);
+        // Don't force the box to grow to the full content - cap the DESIRED size at the available slot on both axes; the
+        // text that doesn't fit scrolls (the owner's caret-follow offsets), it isn't laid out larger than the viewport.
+        // When an axis is unconstrained (infinite) the box takes the content size on that axis (auto-grow).
         var width = double.IsInfinity(availableSize.Width) ? desired.Width : System.Math.Min(desired.Width, availableSize.Width);
-        return new Size(width, desired.Height);
+        var height = double.IsInfinity(availableSize.Height) ? desired.Height : System.Math.Min(desired.Height, availableSize.Height);
+        return new Size(width, height);
     }
 
     protected override Size ArrangeOverride(Size finalSize) => finalSize;
@@ -51,7 +53,8 @@ public sealed class TextPresenter : InputUIComponent
         base.OnMouseLeftButtonDown(sender, e);
         if (Owner == null) return;
         var shift = (Keyboard.Modifiers & (InputModifiers.LeftShift | InputModifiers.RightShift)) != 0;
-        Owner.SurfaceMouseDown(e.GetPosition(this).X, shift);
+        var p = e.GetPosition(this);
+        Owner.SurfaceMouseDown(p.X, p.Y, shift);
         _selecting = true;
         CaptureMouse();
         e.Handled = true;
@@ -60,7 +63,7 @@ public sealed class TextPresenter : InputUIComponent
     protected override void OnMouseMove(object sender, MouseEventArgs e)
     {
         base.OnMouseMove(sender, e);
-        if (_selecting) Owner?.SurfaceMouseMove(e.GetPosition(this).X);
+        if (_selecting) { var p = e.GetPosition(this); Owner?.SurfaceMouseMove(p.X, p.Y); }
     }
 
     protected override void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)

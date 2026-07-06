@@ -34,6 +34,14 @@ public class TabControl : Selector
     public static readonly AdamantiumProperty ContentTemplateSelectorProperty = AdamantiumProperty.Register(nameof(ContentTemplateSelector),
         typeof(DataTemplateSelector), typeof(TabControl), new PropertyMetadata(null));
 
+    // How the selected tab's body animates when the selection changes; flows to the content host's ContentPresenter
+    // (which owns the slide). Default None so it is opt-in per usage/theme.
+    public static readonly AdamantiumProperty ContentTransitionProperty = AdamantiumProperty.Register(nameof(ContentTransition),
+        typeof(ContentTransition), typeof(TabControl), new PropertyMetadata(ContentTransition.None));
+
+    public static readonly AdamantiumProperty ContentTransitionDurationProperty = AdamantiumProperty.Register(nameof(ContentTransitionDuration),
+        typeof(double), typeof(TabControl), new PropertyMetadata(0.25));
+
     /// <summary>Which edge the tab strip sits on (default <see cref="TabStripPlacement.Top"/>). Each value selects its
     /// own control template via a theme trigger, so a placement can fully restyle the strip.</summary>
     public static readonly AdamantiumProperty TabStripPlacementProperty = AdamantiumProperty.Register(nameof(TabStripPlacement),
@@ -155,6 +163,20 @@ public class TabControl : Selector
     {
         get => GetValue<DataTemplateSelector>(ContentTemplateSelectorProperty);
         set => SetValue(ContentTemplateSelectorProperty, value);
+    }
+
+    /// <summary>How the selected tab's body animates on selection change (default None). E.g. SlideLeft/SlideRight.</summary>
+    public ContentTransition ContentTransition
+    {
+        get => GetValue<ContentTransition>(ContentTransitionProperty);
+        set => SetValue(ContentTransitionProperty, value);
+    }
+
+    /// <summary>Duration (seconds) of the tab-content transition.</summary>
+    public double ContentTransitionDuration
+    {
+        get => GetValue<double>(ContentTransitionDurationProperty);
+        set => SetValue(ContentTransitionDurationProperty, value);
     }
 
     public TabStripPlacement TabStripPlacement

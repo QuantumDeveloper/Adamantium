@@ -13,7 +13,13 @@ public partial class TextViewModel : TabPageViewModel
 
     [Bindable, Affects(nameof(CharInfo))] private string _message = "The quick brown fox jumps over the lazy dog";
 
+    // Multi-line editor content: hard newlines plus a long line to show soft wrapping.
+    [Bindable] private string _notes = "Multi-line editor.\nEnter inserts a newline; Up/Down move between lines.\nThis long line has no explicit breaks so it soft-wraps at the box width when TextWrapping is on, and you can select across several lines at once.";
+
     [Bindable] private double _fontSize = 22;
+
+    // Toggles the floating-label (watermark) effect on the editable TextBoxes live.
+    [Bindable] private bool _floatingWatermark = true;
 
     // Bound by a Run's Foreground - demonstrates that a Run's colour is bindable too, not just its text.
     [Bindable] private Brush _accentBrush = new SolidColorBrush("#22D3EE");

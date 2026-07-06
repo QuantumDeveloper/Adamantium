@@ -12,6 +12,10 @@
             <DropDown EnumType="{x:Type controls:TabStripPlacement}"
                       SelectedItem="{Binding TabPlacement, Mode=TwoWay}"
                       Width="140"/>
+            <TextBlock Text="Content slide:" VerticalAlignment="Center" Margin="20,0,8,0"/>
+            <DropDown EnumType="{x:Type controls:ContentTransition}"
+                      SelectedItem="{Binding SlideMode, Mode=TwoWay}"
+                      Width="140"/>
         </StackPanel>
 
         <!-- Data-driven tabs: the TabControl binds to the root view-model's Tabs collection. Each tab's header comes from
@@ -21,6 +25,7 @@
                     ItemsSource="{Binding Tabs}"
                     SelectedItem="{Binding SelectedTab, Mode=TwoWay}"
                     TabStripPlacement="{Binding TabPlacement}"
+                    ContentTransition="{Binding SlideMode}"
                     ShowCloseButton="True">
             <TabControl.ItemTemplate>
                 <DataTemplate>
