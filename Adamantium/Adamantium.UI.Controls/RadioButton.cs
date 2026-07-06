@@ -30,9 +30,10 @@ public class RadioButton : ToggleButton
     }
 
     // A click only ever checks a radio; it never toggles back off (selecting another in the group clears it instead).
+    // SetCurrentValue (not the CLR setter) so it doesn't write a Local value that masks a TwoWay binding (see ToggleButton).
     protected override void OnToggle()
     {
-        if (IsChecked != true) IsChecked = true;
+        if (IsChecked != true) SetCurrentValue(IsCheckedProperty, true);
     }
 
     protected override void OnToggleStateChanged(bool? value)
@@ -71,7 +72,7 @@ public class RadioButton : ToggleButton
     private void ClearGroupSiblings()
     {
         foreach (var other in GroupSiblings())
-            if (other.IsChecked == true) other.IsChecked = false;
+            if (other.IsChecked == true) other.SetCurrentValue(IsCheckedProperty, false);
     }
 
     private IEnumerable<RadioButton> GroupSiblings()

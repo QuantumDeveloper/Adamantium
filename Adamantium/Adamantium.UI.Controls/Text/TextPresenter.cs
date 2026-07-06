@@ -29,15 +29,26 @@ public sealed class TextPresenter : InputUIComponent
     {
         if (Owner == null) return new Size();
         var desired = Owner.MeasureSurface(availableSize.Width);
-        // Don't force the box to grow to the full content - cap the DESIRED size at the available slot on both axes; the
-        // text that doesn't fit scrolls (the owner's caret-follow offsets), it isn't laid out larger than the viewport.
-        // When an axis is unconstrained (infinite) the box takes the content size on that axis (auto-grow).
-        var width = double.IsInfinity(availableSize.Width) ? desired.Width : System.Math.Min(desired.Width, availableSize.Width);
-        var height = double.IsInfinity(availableSize.Height) ? desired.Height : System.Math.Min(desired.Height, availableSize.Height);
+        // Cap the DESIRED size at the slot ONLY on an axis the owner FIXED (explicit Width/Height): there the box can't
+        // grow, so content that doesn't fit scrolls (the owner's caret-follow offsets). On an AUTO axis report the full
+        // desired so the box grows to fit - capping there against a MinWidth/Height-derived slot would trap the box at
+        // that minimum (the floating-strip toggle then reserved the strip but the box never grew, clipping the text).
+        var width = !double.IsNaN(Owner.Width) && !double.IsInfinity(availableSize.Width)
+            ? System.Math.Min(desired.Width, availableSize.Width) : desired.Width;
+        var height = !double.IsNaN(Owner.Height) && !double.IsInfinity(availableSize.Height)
+            ? System.Math.Min(desired.Height, availableSize.Height) : desired.Height;
         return new Size(width, height);
     }
 
-    protected override Size ArrangeOverride(Size finalSize) => finalSize;
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        // Re-render on a (re-)arrange: the owner's RenderSurface positions text/caret/label against this size, so when the
+        // slot changes (e.g. the floating-label strip toggles the box height a frame after the render already ran with the
+        // stale size) it must redraw against the NEW size - otherwise the strip pushes the text below the old height and
+        // clips it. Arrange self-gates on the rect, so this only fires when the size actually changed.
+        InvalidateRender(false);
+        return finalSize;
+    }
 
     protected override void OnRender(IDrawingContext context)
     {

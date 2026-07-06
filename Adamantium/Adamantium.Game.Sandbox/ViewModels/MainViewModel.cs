@@ -14,4 +14,7 @@ public partial class MainViewModel
 
     [Bindable]
     private double _width = 150;
+
+    // Opens the diagnostics SlidePanel (so the live stats don't cover the window content unless asked for).
+    [Bindable] private bool _diagnosticsOpen;
 }

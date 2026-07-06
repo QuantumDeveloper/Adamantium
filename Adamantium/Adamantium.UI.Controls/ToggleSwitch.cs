@@ -11,8 +11,9 @@ namespace Adamantium.UI.Controls;
 /// </summary>
 public class ToggleSwitch : ToggleButton
 {
-    // A switch only ever flips on/off - it ignores IsThreeState (no indeterminate position on the track).
-    protected override void OnToggle() => IsChecked = !IsChecked;
+    // A switch only ever flips on/off - it ignores IsThreeState (no indeterminate position on the track). SetCurrentValue
+    // (not the CLR setter) so a user flip doesn't write a Local value that would mask a TwoWay binding (see ToggleButton).
+    protected override void OnToggle() => SetCurrentValue(IsCheckedProperty, !(IsChecked ?? false));
 
     // A switch can't stretch: its pill track + thumb + label are a fixed visual. Report the size it actually draws (not
     // the slot it was handed) so ActualWidth/RenderSize/ClipRectangle stop lying - see ContentControl.ArrangeContentSize.

@@ -20,6 +20,7 @@ public partial class GalleryViewModel
         new ListsViewModel(),
         new ShapesViewModel(),
         new TextViewModel(),
+        new SlidePanelViewModel(),
         new ImageViewModel(),
         new LayoutViewModel(),
         new InstancingViewModel(),

@@ -226,21 +226,30 @@ public abstract class TextBoxBase : Control
     // --- Template wiring -----------------------------------------------------------------------------------------
 
     private TextPresenter _presenter;
+    private IMeasurableComponent _border;   // PART_Border - between the box and the presenter; must be re-measured too
 
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
         if (_presenter != null) _presenter.Owner = null;
         _presenter = GetTemplateChild("PART_TextPresenter") as TextPresenter;
+        _border = GetTemplateChild("PART_Border") as IMeasurableComponent;
         if (_presenter != null) _presenter.Owner = this;
         InvalidateSurface(measure: true);
     }
 
-    // The presenter renders our text; changes to our state must re-render (and text changes re-measure) THAT element.
+    // The presenter renders our text; changes to our state must re-render (and text changes re-measure) THAT element. On
+    // a measure change we also invalidate the intervening Border: it is measure-valid and would otherwise GATE, so the
+    // box would re-measure against the Border's cached (e.g. strip-less) desired and never see the presenter's new size.
     private void InvalidateSurface(bool measure = false)
     {
         if (_presenter == null) return;
-        if (measure) _presenter.InvalidateMeasure();
+        if (measure)
+        {
+            _presenter.InvalidateMeasure();
+            _border?.InvalidateMeasure();
+            InvalidateMeasure();
+        }
         _presenter.InvalidateRender(false);
     }
 
@@ -278,7 +287,7 @@ public abstract class TextBoxBase : Control
 
     private double _floatProgress;             // floating placeholder: 0 = resting (in text), 1 = floated (small, top strip)
     private bool _floatAnimating;
-    private bool _floatInit;
+    private bool _floatLoaded;
     private const double FloatScale = 0.75;    // floated label font size = FloatScale * FontSize
     private const double FloatSeconds = 0.14;  // float in/out animation duration
 
@@ -771,6 +780,10 @@ public abstract class TextBoxBase : Control
         EnsureLayout();
         EnsureCaretVisible(size.Width, size.Height);
 
+        // First time the field is actually drawn: all initial bindings have settled, so snap the floating label to its
+        // resolved state (floated if it already holds text) WITHOUT animating - only later user changes animate.
+        if (!_floatLoaded) { _floatLoaded = true; _floatProgress = FloatTarget(); }
+
         var hasText = !string.IsNullOrEmpty(Text);
         var ox = -_scrollX;   // text-local -> surface origin (scroll offsets)
         // Text sits below the floating-label strip (zero when the effect is off). Single-line content then centres
@@ -935,9 +948,12 @@ public abstract class TextBoxBase : Control
 
     private void UpdateFloatState()
     {
-        if (!FloatingPlaceholder) return;
         var target = FloatTarget();
-        if (!_floatInit) { _floatInit = true; _floatProgress = target; InvalidateSurface(); return; }   // no anim on first show
+        // Before the field is first shown (initial bindings for Text/FloatingPlaceholder are still settling, in any
+        // order) - or whenever the effect is off - keep the label at its RESOLVED position with no animation. Otherwise
+        // (shown + effect on) a real change (focus, first char, last delete) animates. This fixes the label resting at
+        // the bottom when the field loads already holding text: it must start floated, not slide up on the first click.
+        if (!_floatLoaded || !FloatingPlaceholder) { _floatProgress = target; InvalidateSurface(); return; }
         if (Math.Abs(_floatProgress - target) > 1e-3) StartFloatAnim();
     }
 
@@ -1002,11 +1018,14 @@ public abstract class TextBoxBase : Control
     private static void OnCaretOrSelectionChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
         => (a as TextBoxBase)?.InvalidateSurface();
 
-    // A property that changes how the text lays out (e.g. wrapping): drop the shaping cache and re-measure the presenter.
+    // A property that changes how the text lays out (e.g. wrapping, the floating-label strip): drop the shaping cache,
+    // resolve the label state, and re-measure (InvalidateSurface re-measures the box + Border + presenter so the strip
+    // change actually reaches the presenter - see InvalidateSurface).
     private static void OnLayoutAffectingChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
         if (a is not TextBoxBase tb) return;
         tb._lastShapedText = null;
+        tb.UpdateFloatState();
         tb.InvalidateSurface(measure: true);
     }
 
