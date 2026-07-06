@@ -19,13 +19,9 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     public static readonly RoutedEvent InitializedEvent = EventManager.RegisterRoutedEvent(nameof(Initialized),
         RoutingStrategy.Direct, typeof(RoutedEventHandler), typeof(UIComponent));
 
-    public static readonly RoutedEvent TextInputEvent = EventManager.RegisterRoutedEvent("TextInput",
-        RoutingStrategy.Bubble, typeof(TextInputEventHandler), typeof(UIComponent));
+    // TextInputEvent / PreviewTextInputEvent moved to Core (Keyboard) so the Core KeyboardDevice can raise them; the CLR
+    // event wrappers below now bind to Keyboard.TextInputEvent / Keyboard.PreviewTextInputEvent.
 
-    public static readonly RoutedEvent PreviewTextInputEvent = 
-        EventManager.RegisterRoutedEvent("PreviewTextInput",
-            RoutingStrategy.Tunnel, typeof(TextInputEventHandler), typeof(UIComponent));
-        
     public static readonly RoutedEvent MouseLeftButtonDownEvent =
         EventManager.RegisterRoutedEvent( nameof(MouseLeftButtonDown),
             RoutingStrategy.Direct, typeof(MouseButtonEventHandler), typeof(UIComponent));
@@ -420,8 +416,8 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
 
     public event TextInputEventHandler TextInput
     {
-        add => AddHandler(TextInputEvent, value);
-        remove => RemoveHandler(TextInputEvent, value);
+        add => AddHandler(Keyboard.TextInputEvent, value);
+        remove => RemoveHandler(Keyboard.TextInputEvent, value);
     }
 
 
@@ -511,8 +507,8 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
 
     public event TextInputEventHandler PreviewTextInput
     {
-        add => AddHandler(PreviewTextInputEvent, value);
-        remove => RemoveHandler(PreviewTextInputEvent, value);
+        add => AddHandler(Keyboard.PreviewTextInputEvent, value);
+        remove => RemoveHandler(Keyboard.PreviewTextInputEvent, value);
     }
 
     public event MouseButtonEventHandler PreviewMouseDoubleClick

@@ -204,16 +204,20 @@ public class KeyboardDevice
                   break;
             }
          }
-         // else
-         // {
-         //    var inputArgs = eventArgs as RawTextInputEventArgs;
-         //    TextInputEventArgs textArgs = new TextInputEventArgs(inputArgs?.Text);
-         //    textArgs.RoutedEvent = InputUIComponent.PreviewTextInputEvent;
-         //    FocusedComponent.RaiseEvent(textArgs);
-         //
-         //    textArgs.RoutedEvent = InputUIComponent.TextInputEvent;
-         //    FocusedComponent.RaiseEvent(textArgs);
-         // }
+         else if (eventArgs is RawTextInputEventArgs inputArgs && !string.IsNullOrEmpty(inputArgs.Text))
+         {
+            // Typed character(s) from the OS (WM_CHAR, already filtered to >= space in the Win32 worker). Deliver as the
+            // tunnel PREVIEW first (so a container can pre-empt it), then the bubbling TextInput. A TextBox consumes this
+            // to insert text; controls that don't handle it simply ignore it.
+            var textArgs = new TextInputEventArgs(inputArgs.Text)
+            {
+               RoutedEvent = Keyboard.PreviewTextInputEvent
+            };
+            FocusedComponent.RaiseEvent(textArgs);
+
+            textArgs.RoutedEvent = Keyboard.TextInputEvent;
+            FocusedComponent.RaiseEvent(textArgs);
+         }
       }
    }
 
