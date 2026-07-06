@@ -79,7 +79,9 @@
                             <ContentPresenter x:Name="PART_SelectedContentHost"
                                               Content="{TemplateBinding SelectedContent}"
                                               ContentTemplate="{TemplateBinding ContentTemplate}"
-                                              ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                                              ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"
+                                              ContentTransition="{TemplateBinding ContentTransition}"
+                                              TransitionDuration="{TemplateBinding ContentTransitionDuration}"/>
                         </Border>
                     </Grid>
                 </ControlTemplate>
@@ -103,7 +105,9 @@
                             <ContentPresenter x:Name="PART_SelectedContentHost"
                                               Content="{TemplateBinding SelectedContent}"
                                               ContentTemplate="{TemplateBinding ContentTemplate}"
-                                              ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                                              ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"
+                                              ContentTransition="{TemplateBinding ContentTransition}"
+                                              TransitionDuration="{TemplateBinding ContentTransitionDuration}"/>
                         </Border>
                         <TabStripScroller x:Name="PART_TabStrip" Grid.Row="1" Orientation="Horizontal">
                             <Grid>
@@ -158,7 +162,9 @@
                             <ContentPresenter x:Name="PART_SelectedContentHost"
                                               Content="{TemplateBinding SelectedContent}"
                                               ContentTemplate="{TemplateBinding ContentTemplate}"
-                                              ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                                              ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"
+                                              ContentTransition="{TemplateBinding ContentTransition}"
+                                              TransitionDuration="{TemplateBinding ContentTransitionDuration}"/>
                         </Border>
                     </Grid>
                 </ControlTemplate>
@@ -189,7 +195,9 @@
                             <ContentPresenter x:Name="PART_SelectedContentHost"
                                               Content="{TemplateBinding SelectedContent}"
                                               ContentTemplate="{TemplateBinding ContentTemplate}"
-                                              ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                                              ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"
+                                              ContentTransition="{TemplateBinding ContentTransition}"
+                                              TransitionDuration="{TemplateBinding ContentTransitionDuration}"/>
                         </Border>
                         <TabStripScroller x:Name="PART_TabStrip" Grid.Column="1" Orientation="Vertical">
                             <Grid>

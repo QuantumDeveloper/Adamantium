@@ -26,6 +26,13 @@ public class TextLayout : DisposableObject
     private double dotGlyphsWidth;
     public Size CalculatedLayoutSize { get; private set; }
 
+    /// <summary>
+    /// When true, a newline (<c>\n</c>) is materialised as a zero-width glyph at the end of its line so a text editor
+    /// can address a caret position for it (carrying the true post-wrap line index). It is skipped by rendering. Off by
+    /// default so ordinary text blocks are completely unaffected.
+    /// </summary>
+    public bool EmitNewlineCarets { get; set; }
+
     private TextRenderingParameters _previousRenderingParameters;
 
     private List<GlyphWordData> _wordData;
@@ -230,6 +237,25 @@ public class TextLayout : DisposableObject
         bool ProcessWord(string word)
         {
             var wordWidth = GetWordWidth(scale, word);
+
+            // WrapByWords decides at the WORD boundary, BEFORE laying any glyph: if the whole word won't fit in
+            // what's left of the current line (and the line already has content), advance to a fresh line and place
+            // the word there in one pass. A word wider than the entire line only wraps when the line is non-empty; as
+            // the first word on a line it simply overflows, because an unbreakable word can't be split. Deciding
+            // up-front removes both the old per-glyph re-check (which re-fired on every glyph of an over-wide word and
+            // exploded the block vertically) and the post-hoc RearrangeData shuffle (whose walk-back mis-handled a
+            // leading over-wide word and left everything on one overflowing line).
+            if (renderingParameters.TextWrapping == TextWrapping.WrapByWords
+                && wordIndex > 0
+                && cursorPosition > 0
+                && cursorPosition + wordWidth > textArea.Width
+                && height + lineHeight < textArea.Height)
+            {
+                lineIndex++;
+                height += lineHeight;
+                cursorPosition = 0;
+            }
+
             wordStartPosition = cursorPosition;
             for (var i = 0; i < word.Length; i++)
             {
@@ -238,6 +264,14 @@ public class TextLayout : DisposableObject
                 switch (symbol)
                 {
                     case '\n':
+                        // With caret sentinels on (text editor), emit a zero-width glyph at the end of the current
+                        // line so the newline has a caret-addressable position carrying the true (post-wrap) line
+                        // index. Rendering skips it (Symbol == '\n', like a space). Then advance to the next line.
+                        if (EmitNewlineCarets)
+                        {
+                            var caretRect = new RectangleF((float)cursorPosition, (float)(height + baseLine), 0f, 0f);
+                            glyphsData.Add(new GlyphWordData(glyph, '\n', caretRect, positionInString, lineIndex));
+                        }
                         height += lineHeight;
                         cursorPosition = 0;
                         lineIndex++;
@@ -293,26 +327,7 @@ public class TextLayout : DisposableObject
                                     }
                                 }
                                 break;
-                            case TextWrapping.WrapByWords:
-                                if (wordStartPosition + wordWidth > textArea.Width && wordIndex > 0)
-                                {
-                                    if (height + lineHeight < textArea.Height)
-                                    {
-                                        wordStartPosition = 0;
-                                        lineIndex++;
-                                        height += lineHeight;
-                                        glyphBase = height + baseLine;
-                                        var glyphsDataCopy = glyphsData.ToArray();
-                                        RearrangeData(glyphsDataCopy, glyphBase);
-                                    }
-                                    else if (!IsLastGlyph(positionInString, text.Length))
-                                    {
-                                        var glyphsDataCopy = glyphsData.ToArray();
-                                        PrepareDataAndTrim(glyphsDataCopy, i, glyphBase);
-                                        return false;
-                                    }
-                                }
-                                break;
+                            // WrapByWords is handled at the word boundary in ProcessWord (see above), not per glyph.
                         }
                         break;
                     }
@@ -580,7 +595,7 @@ public class TextLayout : DisposableObject
         for (int i = 0; i < _wordData.Count; ++i)
         {
             var word = _wordData[i];
-            if (word.Glyph == spaceGlyph) continue;
+            if (word.Glyph == spaceGlyph || word.Symbol == '\n') continue;
 
             // Render the glyph quad as the FULL cell (body + margin), not just the body, so effects that
             // reach outside the contour (outline/glow/shadow) have geometry and field to draw into. The body

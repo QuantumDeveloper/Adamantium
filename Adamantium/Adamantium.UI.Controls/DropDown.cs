@@ -69,6 +69,20 @@ public class DropDown : Selector
     {
         _lightDismiss = OnGlobalPreviewDown;
         SelectionChanged += (_, _) => UpdateDisplayContent();
+        MouseWheel += OnHeaderMouseWheel;
+    }
+
+    // Wheel over the CLOSED drop-down steps the selection (WPF ComboBox behaviour): down = next item, up = previous.
+    // When the list is open we leave the event alone so the popup can scroll instead.
+    private void OnHeaderMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (!IsEnabled || IsDropDownOpen) return;
+        var count = Items.Count;
+        if (count == 0) return;
+        var from = SelectedIndex < 0 ? (e.Delta < 0 ? -1 : count) : SelectedIndex;   // start at an edge when unset
+        var next = Math.Clamp(from + (e.Delta < 0 ? 1 : -1), 0, count - 1);
+        if (next != SelectedIndex) SelectedIndex = next;
+        e.Handled = true;
     }
 
     /// <summary>Whether the popup list is open. Toggled by clicking the header; set false on pick or outside click.</summary>

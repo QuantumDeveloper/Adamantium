@@ -12,6 +12,7 @@
         <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
         <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
         <Setter Property="PlaceholderForeground" Value="{ResourceReference TextFillColorSecondary}"/>
+        <Setter Property="FloatingPlaceholderForeground" Value="{ThemeResource AccentFillColorDefault}"/>
         <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
         <Setter Property="CaretBrush" Value="{ResourceReference TextFillColorPrimary}"/>
         <Setter Property="BorderThickness" Value="1"/>
@@ -35,7 +36,7 @@
                             ClipToBounds="True">
                         <controls:TextPresenter x:Name="PART_TextPresenter"
                                 HorizontalAlignment="Stretch"
-                                VerticalAlignment="Center"/>
+                                VerticalAlignment="Stretch"/>
                     </controls:Border>
                 </ControlTemplate>
             </Setter.Value>

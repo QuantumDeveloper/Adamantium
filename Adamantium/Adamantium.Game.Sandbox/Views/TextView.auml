@@ -1,5 +1,6 @@
 <View xmlns="http://adamantium/ui">
     <!-- DataContext is the TextViewModel. FontSize is slider-driven; Message is shown by several TextBlocks. -->
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
     <StackPanel Orientation="Vertical" Margin="24">
 
         <StackPanel Orientation="Horizontal">
@@ -20,15 +21,31 @@
             <TextBlock Text="{Binding Message}" TextTrimming="CharEllipses"/>
         </Border>
 
+        <!-- Live toggle for the floating-label (watermark) effect on the editable boxes below. -->
+        <ToggleSwitch Content="Floating watermark" IsChecked="{Binding FloatingWatermark, Mode=TwoWay}"
+                      Margin="0,24,0,0" HorizontalAlignment="Left"/>
+
         <!-- Editable TextBox: two-way bound to the SAME Message, so typing here live-updates every TextBlock above. -->
-        <TextBlock Text="Editable (two-way to the same Message):" Margin="0,24,0,6"/>
+        <TextBlock Text="Editable (two-way to the same Message):" Margin="0,12,0,6"/>
         <TextBox Text="{Binding Message, Mode=TwoWay}"
                  Width="520" HorizontalAlignment="Left"
-                 Placeholder="Type a message..."/>
+                 Placeholder="Message" FloatingPlaceholder="{Binding FloatingWatermark}"/>
+
+        <!-- Floating placeholder from empty: the label rests inside the field and animates up + shrinks on focus/typing. -->
+        <TextBlock Text="Floating placeholder (empty - focus or type):" Margin="0,16,0,6"/>
+        <TextBox Width="520" HorizontalAlignment="Left"
+                 Placeholder="Your name" FloatingPlaceholder="{Binding FloatingWatermark}"/>
 
         <TextBlock Text="Read-only:" Margin="0,16,0,6"/>
         <TextBox Text="{Binding Message}" IsReadOnly="True"
                  Width="520" HorizontalAlignment="Left"/>
+
+        <!-- Multi-line editor: AcceptsReturn (Enter inserts a newline) + soft word wrapping, a fixed height so extra
+             lines scroll (caret-follow). Arrow Up/Down navigate lines; selection spans multiple rows. -->
+        <TextBlock Text="Multi-line (AcceptsReturn + WrapByWords):" Margin="0,16,0,6"/>
+        <TextBox Text="{Binding Notes, Mode=TwoWay}"
+                 AcceptsReturn="True" TextWrapping="WrapByWords"
+                 Width="520" Height="120" HorizontalAlignment="Left"/>
 
         <!-- Bindable Runs: a single TextBlock built from Run inlines. The middle run's Text binds to Message (updates
              live while you type in the box above) and its Foreground binds to a VM brush - both bindable, unlike WPF. -->
@@ -41,4 +58,5 @@
             </TextBlock.Inlines>
         </TextBlock>
     </StackPanel>
+    </ScrollViewer>
 </View>
