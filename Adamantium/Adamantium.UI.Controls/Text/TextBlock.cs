@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Collections.Specialized;
 using Adamantium.Graphics.Fonts;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core;
@@ -209,13 +211,92 @@ public class TextBlock : InputUIComponent
         set => SetValue(StrokeProperty, value);
     }
 
+    // --- Bindable inline runs -----------------------------------------------------------------------------------------
+    // When Inlines has content it REPLACES Text: the block renders each Run in sequence with its own (bindable) colour and
+    // size. Each Run is a logical child (so it inherits this block's DataContext and its {Binding}s resolve), and this
+    // block listens to every Run's Changed to re-shape when a bound value updates. Single line, no cross-run wrapping.
+
+    private InlineCollection _inlines;
+    private readonly List<InlinePiece> _pieces = [];
+    private bool _piecesDirty = true;
+    private Size _inlineSize;
+
+    private sealed class InlinePiece
+    {
+        public TextLayout Layout;
+        public double X;
+        public Size Size;
+        public Brush Foreground;
+    }
+
+    /// <summary>Bindable inline content. When non-empty it is rendered instead of <see cref="Text"/>: each <see cref="Run"/>
+    /// carries its own bound Text/Foreground/FontSize.</summary>
+    public InlineCollection Inlines
+    {
+        get
+        {
+            if (_inlines == null)
+            {
+                _inlines = [];
+                _inlines.CollectionChanged += OnInlinesChanged;
+            }
+            return _inlines;
+        }
+    }
+
+    private bool HasInlines => _inlines is { Count: > 0 };
+
+    private void OnInlinesChanged(object sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems != null)
+            foreach (Inline old in e.OldItems) { old.Changed -= OnInlineChanged; RemoveLogicalChild(old); }
+        if (e.NewItems != null)
+            foreach (Inline added in e.NewItems) { AddLogicalChild(added); added.Changed += OnInlineChanged; }
+        _piecesDirty = true;
+        InvalidateMeasure();
+    }
+
+    private void OnInlineChanged(object sender, System.EventArgs e)
+    {
+        _piecesDirty = true;
+        InvalidateMeasure();
+    }
+
+    // (Re)build the per-run layouts and their running X offsets. Cheap no-op unless a run/list/font changed.
+    private Size EnsureInlineLayout()
+    {
+        if (!_piecesDirty) return _inlineSize;
+
+        var font = FontFamily ?? DefaultFontFamily;
+        _pieces.Clear();
+        double x = 0, height = 0;
+        foreach (var inline in _inlines)
+        {
+            if (inline is not Run run) continue;
+            var text = run.Text ?? string.Empty;
+            var fs = double.IsNaN(run.FontSize) ? FontSize : run.FontSize;
+            var layout = new TextLayout(font.Typeface, font.Fonts[0]);
+            var size = text.Length == 0
+                ? Size.Zero
+                : layout.ProcessText(text, fs, new Size(double.PositiveInfinity, double.PositiveInfinity),
+                    TextWrapping.NoWrap, TextTrimming.None, HorizontalTextAlignment.Left, VerticalTextAlignment.Bottom);
+            _pieces.Add(new InlinePiece { Layout = layout, X = x, Size = size, Foreground = run.Foreground ?? Foreground });
+            x += size.Width;
+            height = System.Math.Max(height, size.Height);
+        }
+
+        _inlineSize = new Size(x, height);
+        _piecesDirty = false;
+        return _inlineSize;
+    }
+
     protected override Size MeasureOverride(Size availableSize)
     {
         _lastConstraint = availableSize;   // a wrapping block reflows to this (its container's width) when it has no explicit Width
-        return EnsureLayout();
+        return HasInlines ? EnsureInlineLayout() : EnsureLayout();
     }
 
-    protected override Size ArrangeOverride(Size finalSize) => EnsureLayout();
+    protected override Size ArrangeOverride(Size finalSize) => HasInlines ? EnsureInlineLayout() : EnsureLayout();
 
     TextRenderingParameters GetTextRenderingParameters()
     {
@@ -235,7 +316,28 @@ public class TextBlock : InputUIComponent
 
     protected override void OnRender(IDrawingContext context)
     {
+        var session = context.ForControl(this);
+        if (HasInlines)
+        {
+            EnsureInlineLayout();
+            foreach (var piece in _pieces)
+            {
+                if (piece.Size.Width <= 0) continue;
+                var pars = new TextRenderingParameters
+                {
+                    HorizontalTextAlignment = HorizontalTextAlignment.Left,
+                    VerticalTextAlignment = VerticalTextAlignment.Bottom,
+                    TextTrimming = TextTrimming.None,
+                    TextWrapping = TextWrapping.NoWrap,
+                    Color = (piece.Foreground as SolidColorBrush)?.Color ?? Colors.White,
+                    TextArea = new Rectangle(new Vector2F((float)piece.X, 0), piece.Size)
+                };
+                session.DrawText(pars, piece.Size, piece.Layout, piece.Foreground, Brushes.Transparent, Brushes.Transparent);
+            }
+            return;
+        }
+
         EnsureLayout();   // refresh shaping if a render-only property (alignment/wrapping) changed since the last measure
-        context.ForControl(this).DrawText(GetTextRenderingParameters(), DesiredSize, _textLayout, Foreground, Background, Stroke);
+        session.DrawText(GetTextRenderingParameters(), DesiredSize, _textLayout, Foreground, Background, Stroke);
     }
 }

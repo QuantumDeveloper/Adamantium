@@ -28,18 +28,23 @@ public static class FocusManager
          var element = e.OriginalSource as IInputComponent;
          if (element != null && !CanFocus(element))
          {
-            element = element.GetSelfAndVisualAncestors().OfType<IInputComponent>().FirstOrDefault();
+            // Walk up to the first FOCUSABLE self-or-ancestor (skip non-focusable input parts like a TextBox's inner
+            // TextPresenter). FirstOrDefault() without the predicate returns `element` itself (self is first), which is
+            // exactly the non-focusable part we're trying to skip - so focus never reached the real control.
+            element = element.GetSelfAndVisualAncestors().OfType<IInputComponent>().FirstOrDefault(CanFocus);
          }
 
          if (element != null && Focused != element)
          {
-            RoutedEventArgs args = new RoutedEventArgs(LostFocusEvent);
-            Focused?.RaiseEvent(args);
+            // Use a FRESH args per event: RaiseEvent only sets Source/OriginalSource when they are null (`??= this`), so
+            // reusing one args object across LostFocus then GotFocus made GotFocus carry the LOST element as its
+            // OriginalSource. OnGotFocus derives IsFocused from `OriginalSource == this`, so the newly-focused element
+            // never lit up (no caret, no focus visual). One args each -> each carries its own raiser.
+            Focused?.RaiseEvent(new RoutedEventArgs(LostFocusEvent));
 
             Focus(element);
 
-            args.RoutedEvent = GotFocusEvent;
-            Focused.RaiseEvent(args);
+            Focused.RaiseEvent(new RoutedEventArgs(GotFocusEvent));
          }
       }
    }

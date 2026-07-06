@@ -29,6 +29,15 @@ public static class Keyboard
    public static readonly RoutedEvent PreviewGotKeyboardFocusEvent = EventManager.RegisterRoutedEvent("PreviewGotKeyboardFocus",
       RoutingStrategy.Tunnel, typeof(KeyboardGotFocusEventHandler), typeof(Keyboard));
 
+   // Typed-character input (from the OS WM_CHAR pipeline, raised by KeyboardDevice on the focused element). Lives in Core
+   // alongside the key events so the Core input device can raise it; InputUIComponent (Controls) exposes the CLR-event
+   // wrappers. Tunnel preview first, then bubble.
+   public static readonly RoutedEvent TextInputEvent = EventManager.RegisterRoutedEvent("TextInput",
+      RoutingStrategy.Bubble, typeof(TextInputEventHandler), typeof(Keyboard));
+
+   public static readonly RoutedEvent PreviewTextInputEvent = EventManager.RegisterRoutedEvent("PreviewTextInput",
+      RoutingStrategy.Tunnel, typeof(TextInputEventHandler), typeof(Keyboard));
+
 
    private static Stopwatch timer;
    private static Dictionary<Key, ButtonState> KeyStates = new Dictionary<Key, ButtonState>();

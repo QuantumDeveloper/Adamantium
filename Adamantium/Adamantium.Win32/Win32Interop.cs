@@ -42,6 +42,37 @@ namespace Adamantium.Win32
         [DllImport("user32.dll", SetLastError = true, EntryPoint = "DefWindowProcW")]
         public static extern IntPtr DefWindowProcW(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
 
+        // --- Clipboard (used by the text-input controls via a WindowsClipboard : IClipboard) ---
+        public const uint CF_UNICODETEXT = 13;
+        public const uint GMEM_MOVEABLE = 0x0002;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool OpenClipboard(IntPtr hWndNewOwner);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool CloseClipboard();
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool EmptyClipboard();
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool IsClipboardFormatAvailable(uint format);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr GetClipboardData(uint uFormat);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern IntPtr SetClipboardData(uint uFormat, IntPtr hMem);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern IntPtr GlobalAlloc(uint uFlags, UIntPtr dwBytes);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern IntPtr GlobalLock(IntPtr hMem);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        public static extern bool GlobalUnlock(IntPtr hMem);
+
         public static IntPtr DefWindowProc(IntPtr hWnd, WindowMessages msg, IntPtr wParam, IntPtr lParam)
         {
             return DefWindowProcW(hWnd, (uint)msg, wParam, lParam);

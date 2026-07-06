@@ -4,7 +4,7 @@
 
         <StackPanel Orientation="Horizontal">
             <TextBlock Text="Font size:" VerticalAlignment="Center"/>
-            <Slider Width="240" Minimum="10" Maximum="48" Value="{Binding FontSize, Mode=TwoWay}" Margin="12,0,0,0"/>
+            <Slider Width="240" Minimum="10" Maximum="72" Value="{Binding FontSize, Mode=TwoWay}" Margin="12,0,0,0"/>
             <TextBlock Text="{Binding FontSize}" VerticalAlignment="Center" FontSize="16" Margin="12,0,0,0"/>
         </StackPanel>
 
@@ -20,7 +20,25 @@
             <TextBlock Text="{Binding Message}" TextTrimming="CharEllipses"/>
         </Border>
 
-        <TextBlock Text="(An editable TextBox is coming - it will two-way bind to this same Message.)"
-                   FontSize="12" Foreground="#94A3B8" Margin="0,20,0,0"/>
+        <!-- Editable TextBox: two-way bound to the SAME Message, so typing here live-updates every TextBlock above. -->
+        <TextBlock Text="Editable (two-way to the same Message):" Margin="0,24,0,6"/>
+        <TextBox Text="{Binding Message, Mode=TwoWay}"
+                 Width="520" HorizontalAlignment="Left"
+                 Placeholder="Type a message..."/>
+
+        <TextBlock Text="Read-only:" Margin="0,16,0,6"/>
+        <TextBox Text="{Binding Message}" IsReadOnly="True"
+                 Width="520" HorizontalAlignment="Left"/>
+
+        <!-- Bindable Runs: a single TextBlock built from Run inlines. The middle run's Text binds to Message (updates
+             live while you type in the box above) and its Foreground binds to a VM brush - both bindable, unlike WPF. -->
+        <TextBlock Text="Bindable runs:" Margin="0,20,0,6"/>
+        <TextBlock FontSize="16">
+            <TextBlock.Inlines>
+                <Run Text="You typed: " Foreground="#94A3B8"/>
+                <Run Text="{Binding Message}" Foreground="{Binding AccentBrush}"/>
+                <Run Text="{Binding CharInfo}" Foreground="#64748B"/>
+            </TextBlock.Inlines>
+        </TextBlock>
     </StackPanel>
 </View>

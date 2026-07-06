@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading;
 using Adamantium.Core.DependencyInjection;
+using Adamantium.UI.Core.Input;
 using Adamantium.Win32;
 
 namespace Adamantium.UI.Platforms.Windows;
@@ -17,6 +18,7 @@ public class WindowsPlatform : IApplicationPlatform
         window = new DispatcherWin32NativeSourceWrapper();
         window.AddHook(WndProc);
         dispatchMessage = Messages.RegisterWindowMessage("DispatcherProcessingMessage");
+        Clipboard.Current = new WindowsClipboard();   // swap the in-process default for the real OS clipboard
     }
 
     public void Run(CancellationToken token)
