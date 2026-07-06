@@ -447,16 +447,24 @@ public class TextLayout : DisposableObject
             {
                 case VerticalTextAlignment.Center:
                 {
-                    var realTextSize = RealTextDimensions;
-                    var center = (Vector2)(finalRect - realTextSize)/2;
-                    var diff = center.Y - minY;
+                    // Centre by a GLYPH-INDEPENDENT reference box (the ascent above the baseline per line), NOT this
+                    // string's ink bounding box. Ink extents differ between strings (ascenders/descenders/round
+                    // overshoot), so ink-centring shifted the baseline a pixel or two per string and same-size text
+                    // wobbled as content changed (visible scrolling a DropDown). We deliberately measure ascent-to-
+                    // baseline only (NO descent reserve below): almost all UI labels have no descender, and reserving
+                    // descent space would push the optical centre a couple pixels high. Descenders simply hang below,
+                    // as they should - the caps/x-height stay put regardless of the exact characters.
+                    var lineCount = _wordData.Max(x => x.LineIndex) + 1;
+                    var ascent = Font.Ascender * scale;
+                    var blockHeight = (lineCount - 1) * lineHeight + ascent;
+                    var blockTop = baseLine - ascent;                      // line 0's ascent top in the current coords
+                    var diff = (finalRect.Height - blockHeight) / 2 - blockTop;
                     foreach (var glyphWordData in _wordData)
                     {
                         var rect = glyphWordData.Rect;
                         rect.Y += (float)diff;
                         glyphWordData.Rect = rect;
                     }
-
                 }
                 break;
                 case VerticalTextAlignment.Bottom:
