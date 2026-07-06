@@ -1,5 +1,6 @@
 using System.Linq;
 using Adamantium.UI.Controls.Base;
+using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.RoutedEvents;
 
@@ -32,6 +33,12 @@ public class Popup : MeasurableUIComponent, IContainer
         typeof(double), typeof(Popup), new PropertyMetadata(0.0));
 
     public static readonly AdamantiumProperty FlipToFitProperty = AdamantiumProperty.Register(nameof(FlipToFit),
+        typeof(bool), typeof(Popup), new PropertyMetadata(false));
+
+    public static readonly AdamantiumProperty DockEdgeProperty = AdamantiumProperty.Register(nameof(DockEdge),
+        typeof(Dock?), typeof(Popup), new PropertyMetadata(null));
+
+    public static readonly AdamantiumProperty DockFillProperty = AdamantiumProperty.Register(nameof(DockFill),
         typeof(bool), typeof(Popup), new PropertyMetadata(false));
 
     private IPopupHost _host;   // the window layer this popup is registered with while open
@@ -80,6 +87,23 @@ public class Popup : MeasurableUIComponent, IContainer
     {
         get => GetValue<bool>(FlipToFitProperty);
         set => SetValue(FlipToFitProperty, value);
+    }
+
+    /// <summary>When set, the child is docked to that EDGE OF THE WINDOW (not positioned against a target): pinned to the
+    /// edge on the perpendicular axis, and along the edge either stretched to the window (child alignment = Stretch on the
+    /// cross axis) or sized to its content and aligned by the child's Horizontal/VerticalAlignment. Used by SlidePanel.</summary>
+    public Dock? DockEdge
+    {
+        get => GetValue<Dock?>(DockEdgeProperty);
+        set => SetValue(DockEdgeProperty, value);
+    }
+
+    /// <summary>When edge-docked, also fill the MAIN (thickness) axis with the window - a full-window panel. Default
+    /// false (the main axis is the child's content/explicit size). The cross axis always fills the window.</summary>
+    public bool DockFill
+    {
+        get => GetValue<bool>(DockFillProperty);
+        set => SetValue(DockFillProperty, value);
     }
 
     /// <summary>Explicit target, else the element this popup is declared under.</summary>

@@ -11,7 +11,8 @@
     <Style Selector="TextBox">
         <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
         <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
-        <Setter Property="PlaceholderForeground" Value="{ResourceReference TextFillColorSecondary}"/>
+        <!-- Dimmer than the text (Tertiary, not Secondary) so the watermark reads as a hint, not real entered text. -->
+        <Setter Property="PlaceholderForeground" Value="{ResourceReference TextFillColorTertiary}"/>
         <Setter Property="FloatingPlaceholderForeground" Value="{ThemeResource AccentFillColorDefault}"/>
         <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
         <Setter Property="CaretBrush" Value="{ResourceReference TextFillColorPrimary}"/>

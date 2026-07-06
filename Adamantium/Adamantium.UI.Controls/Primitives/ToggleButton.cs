@@ -73,12 +73,15 @@ public class ToggleButton : ButtonBase
     /// <summary>Advances the checked state on a click: false -&gt; true -&gt; (three-state ? null) -&gt; false.</summary>
     protected virtual void OnToggle()
     {
-        IsChecked = IsChecked switch
+        // SetCurrentValue, NOT the CLR setter: a user click must NOT write a Local value, which (higher priority than
+        // Binding) would mask a TwoWay binding and stop the toggle tracking its source afterwards - so an external change
+        // to the bound value (e.g. a SlidePanel closing itself) would no longer flip the switch back. Mirrors Slider.
+        SetCurrentValue(IsCheckedProperty, IsChecked switch
         {
             false => true,
-            true => IsThreeState ? null : false,
+            true => IsThreeState ? (bool?)null : false,
             _ => false
-        };
+        });
     }
 
     private static void OnIsCheckedChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)

@@ -21,7 +21,8 @@
             <TextBlock Text="{Binding Message}" TextTrimming="CharEllipses"/>
         </Border>
 
-        <!-- Live toggle for the floating-label (watermark) effect on the editable boxes below. -->
+        <!-- Live toggle for the floating-label (watermark) effect. Off = a plain static watermark (shown only when the
+             field is empty). -->
         <ToggleSwitch Content="Floating watermark" IsChecked="{Binding FloatingWatermark, Mode=TwoWay}"
                       Margin="0,24,0,0" HorizontalAlignment="Left"/>
 

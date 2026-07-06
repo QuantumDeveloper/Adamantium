@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Base;
+using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
 
 namespace Adamantium.UI.Controls;
@@ -16,6 +17,7 @@ namespace Adamantium.UI.Controls;
 public class PopupLayer
 {
     private readonly List<Popup> _popups = [];
+    private readonly Dictionary<IUIComponent, Rect> _lastRect = new();   // last arranged slot per popup child (arrange gate)
 
     /// <summary>The laid-out child of every open popup (declaration order = back-to-front), for the overlay to render.</summary>
     public IReadOnlyList<IUIComponent> Roots => _popups.Select(p => p.Child).OfType<IUIComponent>().ToList();
@@ -33,7 +35,11 @@ public class PopupLayer
         if (popup.Child is { } child) InvalidateSubtree(child);
     }
 
-    public void Remove(Popup popup) => _popups.Remove(popup);
+    public void Remove(Popup popup)
+    {
+        _popups.Remove(popup);
+        if (popup.Child is IUIComponent c) _lastRect.Remove(c);
+    }
 
     /// <summary>
     /// Re-evaluate every open popup's position from its target's CURRENT world position (so it follows a moving target)
@@ -47,18 +53,21 @@ public class PopupLayer
         {
             if (popup.Child is not MeasurableUIComponent child) continue;
 
+            // Edge-docked (SlidePanel): pin to a window edge; cross axis fills the window, main axis content or fill.
+            if (popup.DockEdge is { } edge)
+            {
+                LayoutDocked(edge, popup.DockFill, child, windowSize);
+                continue;
+            }
+
             // Measure UNCONSTRAINED so the content reports its intrinsic (fit-to-content) size - measuring against the
             // window made a stretchy child fill the window, which then built a window-sized text render target and FAULTED
             // the GPU. Guard every value: a NaN/non-positive size (or position) must NOT reach Arrange + the renderer, or
             // it produces invalid geometry / an oversized RT and faults the device.
             // Re-measure ONLY when the subtree is dirty (just opened, or its content changed) - NOT every frame: it's a
-            // DETACHED subtree (logical child only, no LayoutManager), so a content change flags IsMeasureValid=false on the
-            // changed element but nothing drains it; we detect that flag instead, so a static tooltip costs ~nothing.
-            // force:true because the dirty flag may sit on a DESCENDANT (the TextBlock) while the measured root (the Border)
-            // stayed valid - its gate would otherwise SKIP and the badge would keep its stale size (text clipped). Arrange
-            // below self-gates on the rect, so following a moving target stays cheap on its own.
-            if (NeedsLayout(child))
-                child.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity), force: true);
+            // DETACHED subtree (logical child only, no LayoutManager), so a content change flags IsMeasureValid=false and
+            // RemeasureIfDirty cascades the re-measure down to the dirty node, so a static tooltip costs ~nothing.
+            var remeasured = RemeasureIfDirty(child, new Size(double.PositiveInfinity, double.PositiveInfinity));
             var size = child.DesiredSize;
             if (!IsFinitePositive(size.Width) || !IsFinitePositive(size.Height)) continue;
 
@@ -67,8 +76,54 @@ public class PopupLayer
             var pos = ComputePosition(popup, size, windowSize);
             if (double.IsNaN(pos.X) || double.IsNaN(pos.Y)) continue;
 
-            child.Arrange(new Rect(pos.X, pos.Y, size.Width, size.Height));
+            ArrangeIfNeeded(child, new Rect(pos.X, pos.Y, size.Width, size.Height), remeasured);
         }
+    }
+
+    // Dock a child to a window edge. The CROSS axis (along the edge) ALWAYS fills the window. The MAIN axis (thickness,
+    // the slide direction) is the child's own content/explicit size, unless <paramref name="fill"/> is set - then it
+    // fills the window too (a full-window panel). Pinned to the edge; clamped to the window.
+    private void LayoutDocked(Dock edge, bool fill, MeasurableUIComponent child, Size win)
+    {
+        var horizontal = edge is Dock.Left or Dock.Right;   // main (thickness) axis is horizontal
+
+        // Cross axis constrained to the window; main axis to the window when filling, else free (content/explicit).
+        var measureW = horizontal ? (fill ? win.Width : double.PositiveInfinity) : win.Width;
+        var measureH = horizontal ? win.Height : (fill ? win.Height : double.PositiveInfinity);
+        var remeasured = RemeasureIfDirty(child, new Size(measureW, measureH));
+
+        var d = child.DesiredSize;
+        var w = horizontal ? (fill ? win.Width : d.Width) : win.Width;
+        var h = horizontal ? win.Height : (fill ? win.Height : d.Height);
+        if (!IsFinitePositive(w) || !IsFinitePositive(h)) return;
+        w = Math.Min(w, win.Width);
+        h = Math.Min(h, win.Height);
+
+        var x = edge == Dock.Right ? win.Width - w : 0;
+        var y = edge == Dock.Bottom ? win.Height - h : 0;
+        ArrangeIfNeeded(child, new Rect(x, y, w, h), remeasured);
+    }
+
+    // Re-measure a dirty overlay subtree; returns whether it did. The subtree is DETACHED (no LayoutManager drains its
+    // invalidations), and a deep dirty node does NOT mark its ancestors invalid - so force-measuring only the root gates
+    // at the still-valid intermediate nodes and never reaches it, leaving it dirty FOREVER (a nested panel then re-laid
+    // out + the overlay rebuilt every frame). Invalidate the whole subtree first so the forced re-measure cascades down
+    // and validates the deep node; then NeedsLayout stays false until content actually changes again.
+    private static bool RemeasureIfDirty(MeasurableUIComponent child, Size available)
+    {
+        if (!NeedsLayout(child)) return false;
+        InvalidateSubtree(child);
+        child.Measure(available, force: true);
+        return true;
+    }
+
+    // Arrange only when the slot changed or the content was just re-measured (which invalidated arrange). Arrange self-
+    // gates internally too, but skipping the call keeps a STATIC docked panel from re-arranging every frame for nothing.
+    private void ArrangeIfNeeded(MeasurableUIComponent child, Rect rect, bool remeasured)
+    {
+        if (!remeasured && _lastRect.TryGetValue(child, out var last) && last == rect) return;
+        child.Arrange(rect);
+        _lastRect[child] = rect;
     }
 
     // True if any element in the detached subtree needs re-measuring (its IsMeasureValid was cleared by a content change

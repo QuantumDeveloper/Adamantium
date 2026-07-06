@@ -32,6 +32,7 @@
         <StyleInclude Source="{x:Type fluentDark:ToolTipStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:TabControlStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:TabItemStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:SlidePanelStyleSet}"/>
 	</Theme.StyleIncludes>
 
 	<!-- Accent: ONE seed; the theme derives the ramp + on-accent text colour (see FluentDark.auml). A darker seed here

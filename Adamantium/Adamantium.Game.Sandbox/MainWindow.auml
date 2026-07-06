@@ -16,15 +16,17 @@
              The old inline demos (shapes, images, the game panel) now live in their respective tabs. -->
         <views:GalleryView/>
 
-        <!-- Live diagnostics overlay: RuntimeStats rewritten each frame by DiagnosticsOverlayBehavior. Kept on top. -->
-        <Border HorizontalAlignment="Right"
-                VerticalAlignment="Top"
-                Margin="12"
-                Width="240"
-                CornerRadius="6"
-                Background="#CC000000">
-            <TextBlock Margin="12,10"
-                       FontSize="13"
+        <!-- Diagnostics toggle - always visible, top-right. Opens the diagnostics SlidePanel on demand so the live stats
+             don't cover the window content. Two-way, so the panel's x button flips it back off. -->
+        <ToggleSwitch Content="Diagnostics"
+                      HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,16,0"
+                      IsChecked="{Binding DiagnosticsOpen, Mode=TwoWay}"/>
+
+        <!-- Live diagnostics (RuntimeStats rewritten each frame by DiagnosticsOverlayBehavior), now in a SlidePanel that
+             slides in from the right over everything instead of permanently occupying the corner. -->
+        <SlidePanel Placement="Right" Width="264" Header="Diagnostics"
+                    IsOpen="{Binding DiagnosticsOpen, Mode=TwoWay}">
+            <TextBlock FontSize="13"
                        Foreground="LightGreen"
                        TextWrapping="WrapBySymbols"
                        Text="diagnostics…">
@@ -32,6 +34,6 @@
                     <local:DiagnosticsOverlayBehavior/>
                 </TextBlock.Behaviors>
             </TextBlock>
-        </Border>
+        </SlidePanel>
     </Grid>
 </Window>
