@@ -6,7 +6,11 @@ public static class TypeCastFactory
 {
     public static object CastFromString(object input, Type finalType)
     {
-        if (input == null || input.GetType() == finalType) return input;
+        // Already a valid value for the target type -> use it as-is. Covers the exact type AND the assignable cases:
+        // a string set on an OBJECT-typed property (e.g. a trigger setting Button.Content="□"), or a derived instance
+        // on a base-typed property. Without this an object/base target fell through to TypeParser, which has no parser
+        // for `object` and threw -> UnsetValue -> the property was silently cleared (a triggered glyph vanished).
+        if (input == null || finalType.IsInstanceOfType(input)) return input;
 
         // Nullable<T> (e.g. ToggleButton.IsChecked is bool?): an empty/"null" string is null, otherwise parse the
         // underlying T - a boxed T is a valid boxed Nullable<T>. Done before the TypeParser fall-through, which has no

@@ -130,6 +130,15 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         typeof(WindowState), typeof(WindowBase),
         new PropertyMetadata(WindowState.Normal, PropertyMetadataOptions.AffectsRender, StateChangedCallback));
 
+    // Modern borderless chrome ON by default: the OS frame is removed and the window draws its own title bar (see the
+    // Window ControlTemplate). Read once by the platform worker at create time (the native frame styles are fixed then),
+    // so flip it in markup/ctor before the window is shown.
+    public static readonly AdamantiumProperty UseCustomChromeProperty = AdamantiumProperty.Register(nameof(UseCustomChrome),
+        typeof(bool), typeof(WindowBase), new PropertyMetadata(true));
+
+    public static readonly AdamantiumProperty ResizeModeProperty = AdamantiumProperty.Register(nameof(ResizeMode),
+        typeof(WindowResizeMode), typeof(WindowBase), new PropertyMetadata(WindowResizeMode.CanResize));
+
     private static void TitleChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
         if (!(a is WindowBase component)) return;
@@ -223,6 +232,41 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         get => GetValue<WindowState>(StateProperty);
         set => SetValue(StateProperty, value);
     }
+
+    public bool UseCustomChrome
+    {
+        get => GetValue<bool>(UseCustomChromeProperty);
+        set => SetValue(UseCustomChromeProperty, value);
+    }
+
+    public WindowResizeMode ResizeMode
+    {
+        get => GetValue<WindowResizeMode>(ResizeModeProperty);
+        set => SetValue(ResizeModeProperty, value);
+    }
+
+    /// <summary>Begins an OS-driven move of the window (custom-chrome caption drag). Wired from a title bar's press.</summary>
+    public void DragMove() => WindowWorkerService?.BeginMoveDrag();
+
+    /// <summary>Minimizes the window (title bar minimize button).</summary>
+    public void Minimize() => State = WindowState.Minimized;
+
+    /// <summary>Maximizes the window (title bar maximize button).</summary>
+    public void Maximize() => State = WindowState.Maximized;
+
+    /// <summary>Restores a maximized/minimized window to its normal size (title bar restore button).</summary>
+    public void RestoreDown() => State = WindowState.Normal;
+
+    /// <summary>Toggles between maximized and normal - the caption double-click / maximize button behaviour.</summary>
+    public void ToggleMaximizeRestore() =>
+        State = State == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+
+    // Caption metrics published by a hosted TitleBar on its arrange (loop thread). Read geometrically by the worker's
+    // hit-test (OS message thread) - plain doubles, so a torn read is at worst a one-frame-off hit, never a crash. This
+    // MUST stay geometric: the earlier visual-tree walk (GetVisualsAt) from WM_NCHITTEST raced the layout thread's
+    // VisualChildren mutation during a state-change relayout and spun the UI thread (every caption button froze the app).
+    public double CaptionHeight { get; set; }
+    public double CaptionRightInset { get; set; }
 
     public Double ClientWidth
     {

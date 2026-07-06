@@ -24,6 +24,14 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     private InputModifiers lastRawMouseModifiers;
     private Win32NativeWindowWrapper source;
 
+    // PLAIN-FIELD snapshots of the window state the WndProc handlers need. The WndProc runs on the OS message (pump)
+    // thread; reading an AdamantiumProperty there calls GetValue -> Monitor.Enter, which DEADLOCKS against the loop
+    // thread when it is mid-SetValue (holding the component lock) and blocked in a cross-thread ShowWindow. So the
+    // handlers read these instead. Updated on the loop thread (benign torn read of a bool/enum).
+    private bool chromeCustom;
+    private WindowResizeMode chromeResizeMode;
+    private WindowState chromeState;
+
     static Win32WindowWorker()
     {
         // Declare the process Per-Monitor-DPI-Aware V2 before any window exists (this static ctor runs once, before the
@@ -44,7 +52,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         messageTable[(uint)WindowMessages.Syscommand] = HandleSysCommand;
         messageTable[(uint)WindowMessages.Nclbuttondown] = HandleNcButtonDown;
         messageTable[(uint)WindowMessages.Nchittest] = HandleNcHittest;
-        //messageTable[(uint)WindowMessages.Nccalcsize] = HandleNcCalcSize;
+        messageTable[(uint)WindowMessages.Nccalcsize] = HandleNcCalcSize;
         messageTable[(uint)WindowMessages.Size] = HandleResize;
         messageTable[(uint)WindowMessages.Dpichanged] = HandleDpiChanged;
         messageTable[(uint)WindowMessages.Keydown] = HandleKeyDown;
@@ -78,6 +86,11 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     public void SetWindow(IWindow window)
     {
         this.window = window;
+        // Snapshot the chrome config (read once here, on the setup thread, before the loop runs) so the WndProc never
+        // has to touch a lockable AdamantiumProperty. State is kept current by WindowOnStateChanged / HandleSysCommand.
+        chromeCustom = window.UseCustomChrome;
+        chromeResizeMode = window.ResizeMode;
+        chromeState = window.State;
         this.window.Closed += OnWindowClosed;
         var classStyle = WindowClassStyle.OwnDC | WindowClassStyle.DoubleClicks; //| WindowClassStyle.VerticalRedraw | WindowClassStyle.HorizontalRedraw;
         var wndStyleEx = WindowStyleEx.Appwindow | WindowStyleEx.Acceptfiles;
@@ -101,6 +114,15 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         this.window.SetSurfaceHandle(source.Handle);
                 
         source.AddHook(CustomWndProc);
+
+        // The HWND was created BEFORE our hook was attached, so our WM_NCCALCSIZE never ran during creation. For custom
+        // chrome, force a frame re-calc now (FRAMECHANGED re-sends WM_NCCALCSIZE) so the borderless client takes effect.
+        if (chromeCustom)
+        {
+            Win32Interop.SetWindowPos(source.Handle, IntPtr.Zero, 0, 0, 0, 0,
+                SetWindowPosFlags.Nomove | SetWindowPosFlags.Nosize | SetWindowPosFlags.Nozorder |
+                SetWindowPosFlags.Noactivate | SetWindowPosFlags.Framechanged);
+        }
 
         this.window.DpiScale = ReadDpiScale(source.Handle);   // initial per-monitor DPI (PMv2)
 
@@ -148,6 +170,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 
     private void WindowOnStateChanged(object sender, StateChangedEventArgs e)
     {
+        chromeState = e.State;   // keep the WndProc snapshot current (this fires on every State change)
         Win32Interop.ShowWindow(window.Handle, ConvertStateToShowStyle(e.State));
     }
 
@@ -255,44 +278,98 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 
     private IntPtr HandleNcHittest(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
-        var uHitTest = Win32Interop.DefWindowProc(window.Handle, WindowMessages.Nchittest, wParam, lParam);
-        var result = (NcHitTest)(Environment.Is64BitProcess ? uHitTest.ToInt64() : uHitTest.ToInt32());
-        isOverSizeFrame = result != NcHitTest.Client;
-        handled = false;
-        return Win32Interop.DefWindowProc(window.Handle, windowMessage, wParam, lParam);
+        if (!chromeCustom)
+        {
+            // Native frame: let the OS decide the hit region; remember whether it's a sizing frame so HandleSetCursor
+            // hands the resize cursor back to DefWindowProc.
+            var native = Win32Interop.DefWindowProc(window.Handle, WindowMessages.Nchittest, wParam, lParam);
+            var nativeHt = (NcHitTest)(Environment.Is64BitProcess ? native.ToInt64() : native.ToInt32());
+            isOverSizeFrame = nativeHt != NcHitTest.Client;
+            handled = false;
+            return native;
+        }
+
+        // Custom chrome: WM_NCCALCSIZE removed the OS frame, so the OS reports HTCLIENT everywhere. Re-create the resize
+        // borders ourselves (a margin along each edge -> HTLEFT/HTTOP/... so DefWindowProc still runs the native resize
+        // loop + Aero Snap). Everything else is HTCLIENT: the managed content (title bar included) gets the mouse, and a
+        // caption drag is a managed DragMove(). No resizing while maximized or when ResizeMode forbids it.
+        var pt = Messages.PointFromLParam(lParam);   // SCREEN coordinates
+        Win32Interop.GetWindowRect(window.Handle, out var r);
+
+        var result = NcHitTest.Client;
+        var canResize = chromeResizeMode == WindowResizeMode.CanResize && chromeState != WindowState.Maximized;
+        if (canResize)
+        {
+            var margin = Win32Interop.GetSystemMetrics(SystemMetrics.Cxframe) +
+                         Win32Interop.GetSystemMetrics(SystemMetrics.Cxpaddedborder);
+            if (margin < 6) margin = 6;
+            var left = pt.X < r.Left + margin;
+            var right = pt.X >= r.Right - margin;
+            var top = pt.Y < r.Top + margin;
+            var bottom = pt.Y >= r.Bottom - margin;
+            if (top && left) result = NcHitTest.Topleft;
+            else if (top && right) result = NcHitTest.Topright;
+            else if (bottom && left) result = NcHitTest.Bottomleft;
+            else if (bottom && right) result = NcHitTest.Bottomright;
+            else if (left) result = NcHitTest.Left;
+            else if (right) result = NcHitTest.Right;
+            else if (top) result = NcHitTest.Top;
+            else if (bottom) result = NcHitTest.Bottom;
+        }
+
+        // Not a resize edge: is this the draggable caption strip? Compute geometrically from the window rect + the plain
+        // (non-locking) caption metrics a TitleBar published (CaptionHeight, CaptionRightInset - the right band reserved
+        // for the buttons). HTCAPTION -> the OS runs the caption drag / Aero Snap / double-click-maximize natively; the
+        // buttons stay HTCLIENT. NOTE: read no AdamantiumProperty here (ClientWidth etc.) - that would lock and deadlock.
+        if (result == NcHitTest.Client && window.CaptionHeight > 0)
+        {
+            var dpi = window.DpiScale;
+            var yDip = (pt.Y - r.Top) / dpi.Y;
+            var xDip = (pt.X - r.Left) / dpi.X;
+            var widthDip = (r.Right - r.Left) / dpi.X;
+            if (yDip >= 0 && yDip < window.CaptionHeight && xDip < widthDip - window.CaptionRightInset)
+                result = NcHitTest.Caption;
+        }
+
+        isOverSizeFrame = result == NcHitTest.Left || result == NcHitTest.Right || result == NcHitTest.Top ||
+                          result == NcHitTest.Bottom || result == NcHitTest.Topleft || result == NcHitTest.Topright ||
+                          result == NcHitTest.Bottomleft || result == NcHitTest.Bottomright;
+        handled = true;
+        return (IntPtr)(int)result;
     }
 
     private IntPtr HandleNcCalcSize(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
-        handled = false;
-        bool bValue = Convert.ToBoolean(wParam.ToInt32());
-        NCCALCSIZE_PARAMS param = new NCCALCSIZE_PARAMS();
-        RECT wRect;
-        if (bValue)
+        // Native frame, or the FALSE form (a single RECT we don't touch): let the OS compute the non-client area.
+        if (!chromeCustom || wParam == IntPtr.Zero)
         {
-            param = Marshal.PtrToStructure<NCCALCSIZE_PARAMS>(lParam);
-            wRect = param.rgrc[0];
-        }
-        else
-        {
-            wRect = Marshal.PtrToStructure<RECT>(lParam);
+            handled = false;
+            return Win32Interop.DefWindowProc(window.Handle, windowMessage, wParam, lParam);
         }
 
-        if (bValue)
+        // Custom chrome: return the proposed window rect UNCHANGED as the client rect -> the whole window is client, so
+        // the OS draws no visible frame. WS_THICKFRAME is still set, so native resize / Aero Snap / the drop shadow /
+        // maximize-to-work-area keep working; the resize borders come back via WM_NCHITTEST.
+        if (chromeState == WindowState.Maximized)
         {
-            wRect.Top = wRect.Top + 1;
-            param.rgrc[1] = wRect;
-            param.rgrc[0] = wRect;
-            param.rgrc[0].Left += 7;
-            param.rgrc[0].Right -= 7;
-            param.rgrc[0].Bottom -= 7;
-
-            Marshal.StructureToPtr(param, lParam, true);
-
-            handled = true;
-            return IntPtr.Zero;
+            // A maximized WS_THICKFRAME window is oversized by the frame on every edge (positioned at -frame), so a full
+            // client would spill off-screen / under the taskbar. Inset by the frame thickness so the client == work area.
+            // Touch ONLY rgrc[0] (the proposed rect, at offset 0) as a bare RECT - NOT the whole NCCALCSIZE_PARAMS: its
+            // lppos field is a NATIVE POINTER, and writing the struct back would clobber it, sending the OS into a spin.
+            var fx = Win32Interop.GetSystemMetrics(SystemMetrics.Cxframe) +
+                     Win32Interop.GetSystemMetrics(SystemMetrics.Cxpaddedborder);
+            var fy = Win32Interop.GetSystemMetrics(SystemMetrics.Cyframe) +
+                     Win32Interop.GetSystemMetrics(SystemMetrics.Cxpaddedborder);
+            var rect = Marshal.PtrToStructure<RECT>(lParam);
+            rect.Left += fx;
+            rect.Right -= fx;
+            rect.Top += fy;
+            rect.Bottom -= fy;
+            Marshal.StructureToPtr(rect, lParam, false);
         }
-        return Win32Interop.DefWindowProc(window.Handle, windowMessage, wParam, lParam);
+
+        handled = true;
+        return IntPtr.Zero;
     }
 
     private WindowState lastWindowState;
@@ -316,16 +393,18 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
                     (int)window.Height, SetWindowPosFlags.Asyncwindowpos | SetWindowPosFlags.Nosize);
                 break;
             case SystemCommands.MAXIMIZE:
+                chromeState = WindowState.Maximized;
                 window.State = WindowState.Maximized;
                 Win32Interop.ShowWindow(window.Handle, WindowShowStyle.Maximize);
                 break;
             case SystemCommands.MINIMIZE:
-                lastWindowState = window.State;
+                lastWindowState = chromeState;
+                chromeState = WindowState.Minimized;
                 window.State = WindowState.Minimized;
                 Win32Interop.ShowWindow(window.Handle, WindowShowStyle.Minimize);
                 break;
             case SystemCommands.RESTORE:
-                if (lastWindowState == WindowState.Maximized && window.State == WindowState.Minimized)
+                if (lastWindowState == WindowState.Maximized && chromeState == WindowState.Minimized)
                 {
                     lastWindowState = WindowState.Maximized;
                 }
@@ -334,6 +413,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
                     lastWindowState = WindowState.Normal;
                 }
                 var style = ConvertStateToShowStyle(lastWindowState);
+                chromeState = lastWindowState;
                 window.State = lastWindowState;
                 Win32Interop.ShowWindow(window.Handle, style);
                 break;
@@ -349,7 +429,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     private IntPtr HandleResize(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
         handled = true;
-        if (window.State == WindowState.Minimized)
+        if (chromeState == WindowState.Minimized)
         {
             return IntPtr.Zero;
         }
@@ -504,6 +584,18 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     {
         if (capture) Win32Interop.SetCapture(window.Handle);
         else Win32Interop.ReleaseCapture();
+    }
+
+    // Caption drag: hand the window to the OS modal move loop (which also does Aero Snap). Faking a non-client caption
+    // press after releasing our capture is the standard trick. Safe here because this runs on the UI/pump thread that
+    // owns the HWND (managed input is marshalled to it), so ReleaseCapture drops OUR capture and SendMessage is in-thread.
+    public void BeginMoveDrag()
+    {
+        if (window == null || window.Handle == IntPtr.Zero) return;
+        if (window.State == WindowState.Maximized) return;   // WPF: a maximized window isn't caption-draggable
+        Win32Interop.ReleaseCapture();
+        osMouseCaptured = false;
+        Win32Interop.SendMessage(window.Handle, WindowMessages.Nclbuttondown, (IntPtr)(int)NcHitTest.Caption, IntPtr.Zero);
     }
 
     private IntPtr HandleCaptureChanged(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)

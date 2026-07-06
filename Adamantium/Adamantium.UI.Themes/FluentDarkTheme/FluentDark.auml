@@ -30,6 +30,8 @@
         <StyleInclude Source="{x:Type fluentDark:TabControlStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:TabItemStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:SlidePanelStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:TitleBarStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:WindowStyleSet}"/>
 	</Theme.StyleIncludes>
 
 	<!-- Accent: ONE seed. The theme derives the ramp (hover/pressed) and the on-accent TEXT colour for contrast (see

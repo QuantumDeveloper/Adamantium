@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions"
+          xmlns:controls="http://adamantium/ui">
+
+    <!-- The default Window chrome: a themed background with a custom TitleBar on top and the window Content below. Applies
+         to any Window (and subclasses like an AUML-generated MainWindow - the selector matches IS-A). The OS frame is
+         removed by UseCustomChrome (default on); when it is off the TitleBar collapses and the native frame is used. -->
+
+    <Style Selector="Window">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Window">
+                    <controls:Border Background="{TemplateBinding Background}">
+                        <controls:Grid RowDefinitions="Auto,*">
+                            <controls:TitleBar x:Name="PART_TitleBar" Grid.Row="0"
+                                    Title="{TemplateBinding Title}"/>
+                            <controls:ContentPresenter x:Name="PART_ContentPresenter" Grid.Row="1"
+                                    Content="{TemplateBinding Content}"
+                                    ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                        </controls:Grid>
+                    </controls:Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="Window">
+        <!-- Native frame (custom chrome off): hide the custom caption; the OS draws its own title bar. -->
+        <PropertyTrigger Property="UseCustomChrome" Value="false">
+            <Setter TargetName="PART_TitleBar" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>
