@@ -50,11 +50,32 @@ public class StyleSelector
 
         // AND of every SPECIFIED facet (CSS/WPF semantics): "Button.Accent" = type Button AND class Accent; a
         // single-facet selector ("Button") still matches purely on that facet.
-        if (Types.Count > 0 && !Types.Contains(control.GetType())) return false;
+        // Type match is IS-A (assignable), not exact: a "Window" style applies to a MainWindow : Window, a "ContentControl"
+        // style to every ContentControl - the CSS/WPF way. When several matched styles overlap, SpecificityDistance orders
+        // them so the MORE-DERIVED selector wins (see FindStylesForComponent), so a base style never clobbers a derived one.
+        if (Types.Count > 0 && !Types.Any(t => t.IsAssignableFrom(control.GetType()))) return false;
         if (Id != null && control.Id != Id) return false;
         if (Classes.Count > 0 && !HasAllClasses(control)) return false;
         if (ClassGroups.Count > 0 && !ContainsClassGroup(control)) return false;
         return true;
+    }
+
+    // How closely this selector's type facet matches a control's runtime type: 0 = the selector targets the EXACT type,
+    // N = it targets a type N inheritance steps up (a base). A selector with no type facet (class/id/condition only) is
+    // the least type-specific. Used to order overlapping matched styles base-first so the most-derived one applies last.
+    public int SpecificityDistance(Type controlType)
+    {
+        if (Types.Count == 0) return int.MaxValue;
+        var best = int.MaxValue;
+        foreach (var t in Types)
+        {
+            var distance = 0;
+            for (var cur = controlType; cur != null; cur = cur.BaseType, distance++)
+            {
+                if (cur == t) { if (distance < best) best = distance; break; }
+            }
+        }
+        return best;
     }
 
     private bool HasAllClasses(IFundamentalUIComponent control)

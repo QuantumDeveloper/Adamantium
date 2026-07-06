@@ -60,6 +60,11 @@ public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopu
     public MSAALevel MSAALevel { get; set; }
     public bool AnalyticAntialiasing { get; set; } = true;
     public WindowState State { get; set; }
+    // A virtual (in-game/designer) window has no OS frame, so custom chrome is moot here.
+    public bool UseCustomChrome => false;
+    public WindowResizeMode ResizeMode => WindowResizeMode.NoResize;
+    public double CaptionHeight { get; set; }
+    public double CaptionRightInset { get; set; }
     public IWindowRenderer DefaultRenderer { get; set; }
     public IWindowRenderer Renderer { get; set; }
 

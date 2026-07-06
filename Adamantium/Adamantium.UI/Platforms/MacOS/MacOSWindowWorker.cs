@@ -105,6 +105,12 @@ public class MacOSWindowWorker : AdamantiumComponent, IWindowWorkerService
     {
     }
 
+    // TODO(macOS): start an AppKit window drag (NSWindow performWindowDragWithEvent:) for custom-chrome caption drag.
+    // No-op until the macOS input/window pipeline lands.
+    public void BeginMoveDrag()
+    {
+    }
+
     public IUIContext UIContext { get; }
 
     public static implicit operator IntPtr(MacOSWindowWorker worker)

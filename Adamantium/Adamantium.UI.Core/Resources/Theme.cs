@@ -201,7 +201,15 @@ public class Theme : AdamantiumComponent, ITheme
     {
         if (component == null) return [];
 
-        return MergedStyles.Styles.Where(x => x.Selector.Match(component)).ToArray();
+        // Base-first ordering: a matched style that targets a BASE type (larger SpecificityDistance) is applied BEFORE
+        // one that targets a more-derived type, so the most-specific style's setters land last and win (e.g. Button's
+        // template overrides the ContentControl template it now also matches). OrderByDescending is stable, so styles of
+        // equal specificity keep their document/include order (the existing base + template + triggers + Accent cascade).
+        var type = component.GetType();
+        return MergedStyles.Styles
+            .Where(x => x.Selector.Match(component))
+            .OrderByDescending(x => x.Selector.SpecificityDistance(type))
+            .ToArray();
     }
 
     public object GetResource(string key)

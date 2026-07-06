@@ -27,6 +27,23 @@ public interface IWindow : IRootVisualComponent, IContentControl
 
     WindowState State { get; set; }
 
+    /// <summary>When true the OS frame is removed (WM_NCCALCSIZE reclaims the non-client area) and the window draws its
+    /// own chrome (title bar) - the modern borderless look. WS_THICKFRAME is kept so native resize borders, Aero Snap,
+    /// the drop shadow and maximize-to-work-area still work. Read by the platform worker.</summary>
+    bool UseCustomChrome { get; }
+
+    /// <summary>How the user may resize the window (honoured by the custom-chrome hit-test). Default CanResize.</summary>
+    WindowResizeMode ResizeMode { get; }
+
+    /// <summary>Height (client DIP) of the draggable caption strip at the top of the window; 0 = none. A TitleBar sets
+    /// this on layout. Read (thread-safely, geometrically) by the platform worker's hit-test.</summary>
+    double CaptionHeight { get; set; }
+
+    /// <summary>Width (client DIP) reserved on the RIGHT of the caption strip for the window buttons - that band is NOT
+    /// draggable (the buttons need clicks). A TitleBar sets this on layout. The platform worker reads both metrics
+    /// (geometrically, from the OS message thread) to return HTCAPTION for the drag strip.</summary>
+    double CaptionRightInset { get; set; }
+
     /// <summary>Per-window DPI scale (device pixels per DIP), separate X/Y (usually equal on desktop). 1,1 = 96 DPI /
     /// 100%. Set by the platform on create and on WM_DPICHANGED; drives the render scale and the DIP&lt;-&gt;physical map.</summary>
     Vector2 DpiScale { get; set; }

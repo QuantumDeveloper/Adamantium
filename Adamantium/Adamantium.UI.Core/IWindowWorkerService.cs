@@ -16,5 +16,10 @@ public interface IWindowWorkerService
     /// the same behaviour.</summary>
     public void SetMouseCapture(bool capture);
 
+    /// <summary>Start an OS-driven move of the window from the current cursor (custom-chrome caption drag). Runs the
+    /// native modal move loop, so Aero Snap and snap-to-edges work. Call from a title bar's mouse-down. No-op on
+    /// platforms without a native move loop.</summary>
+    public void BeginMoveDrag();
+
     public IUIContext UIContext { get; }
 }

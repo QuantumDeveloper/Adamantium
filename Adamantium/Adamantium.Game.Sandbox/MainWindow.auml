@@ -11,6 +11,8 @@
         Height="720"
         AnalyticAntialiasing="true"
         Background="{ObservableResource SolidBackgroundFillColorBase}">
+    <!-- The custom TitleBar (draggable caption, min/max/close) comes from the default Window ControlTemplate now, so this
+         is just the window CONTENT - hosted below the caption by the template's ContentPresenter. -->
     <Grid>
         <!-- The control gallery: data-driven tabs, one View + view-model per tab (see GalleryView / GalleryViewModel).
              The old inline demos (shapes, images, the game panel) now live in their respective tabs. -->

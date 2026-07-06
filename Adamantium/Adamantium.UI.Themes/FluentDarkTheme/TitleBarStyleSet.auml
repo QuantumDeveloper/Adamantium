@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions"
+          xmlns:controls="http://adamantium/ui">
+
+    <!-- TitleBar: the custom-chrome caption. A draggable caption area (icon + title) on the left and the
+         minimize / maximize-restore / close buttons on the right. The control resolves the window it is hosted in and
+         drives DragMove / Minimize / ToggleMaximizeRestore / Close; the template just wires the named parts. Per the
+         small-styles convention: properties, then template. -->
+
+    <Style Selector="TitleBar">
+        <Setter Property="Background" Value="{ResourceReference SolidBackgroundFillColorBase}"/>
+        <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
+        <Setter Property="Height" Value="36"/>
+        <Setter Property="FontSize" Value="13"/>
+    </Style>
+
+    <Style Selector="TitleBar">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TitleBar">
+                    <controls:Grid Background="{TemplateBinding Background}" ColumnDefinitions="*,Auto">
+
+                        <!-- Caption drag zone (icon + title). Transparent Background so a Panel gets the hit and the
+                             control's MouseLeftButtonDown fires DragMove / double-click maximize. -->
+                        <controls:Grid x:Name="PART_CaptionArea" Grid.Column="0" Background="Transparent">
+                            <controls:StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                    HorizontalAlignment="{TemplateBinding TitleAlignment}" Margin="12,0,0,0">
+                                <controls:ContentPresenter x:Name="PART_Icon"
+                                        Content="{TemplateBinding Icon}"
+                                        VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                <controls:TextBlock x:Name="PART_Title"
+                                        Text="{TemplateBinding Title}"
+                                        Foreground="{TemplateBinding Foreground}"
+                                        FontSize="{TemplateBinding FontSize}"
+                                        VerticalAlignment="Center"/>
+                            </controls:StackPanel>
+                        </controls:Grid>
+
+                        <!-- Window buttons (right). Flat caption buttons (Button.CaptionButton); close highlights red. Icons
+                             are VECTOR Path geometry (SVG-style Data + Stroke), NOT font glyphs - crisp and font-independent. -->
+                        <controls:StackPanel x:Name="PART_ButtonsPanel" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Stretch">
+                            <controls:Button x:Name="PART_MinButton" Classes="CaptionButton" Height="{TemplateBinding Height}">
+                                <controls:Path Data="M0,5 L10,5"
+                                        Stroke="{ResourceReference TextFillColorPrimary}" StrokeThickness="1"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </controls:Button>
+                            <!-- Maximize <-> restore: two overlaid glyphs, only one shown; the IsWindowMaximized trigger
+                                 swaps their Opacity (the CheckBox pattern). -->
+                            <controls:Button x:Name="PART_MaxButton" Classes="CaptionButton" Height="{TemplateBinding Height}">
+                                <controls:Grid>
+                                    <controls:Path x:Name="MaximizeGlyph" Data="M0,0 L10,0 L10,10 L0,10 Z"
+                                            Stroke="{ResourceReference TextFillColorPrimary}" StrokeThickness="1"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    <controls:Path x:Name="RestoreGlyph" Data="M0,3 L7,3 L7,10 L0,10 Z M3,3 L3,0 L10,0 L10,7 L7,7"
+                                            Stroke="{ResourceReference TextFillColorPrimary}" StrokeThickness="1" Opacity="0"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </controls:Grid>
+                            </controls:Button>
+                            <controls:Button x:Name="PART_CloseButton" Classes="CaptionButton CloseButton" Height="{TemplateBinding Height}">
+                                <controls:Path Data="M0,0 L10,10 M10,0 L0,10"
+                                        Stroke="{ResourceReference TextFillColorPrimary}" StrokeThickness="1"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </controls:Button>
+                        </controls:StackPanel>
+                    </controls:Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="TitleBar">
+        <PropertyTrigger Property="ShowMinButton" Value="false">
+            <Setter TargetName="PART_MinButton" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="ShowMaxRestoreButton" Value="false">
+            <Setter TargetName="PART_MaxButton" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="ShowCloseButton" Value="false">
+            <Setter TargetName="PART_CloseButton" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="ShowTitle" Value="false">
+            <Setter TargetName="PART_Title" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="ShowIcon" Value="false">
+            <Setter TargetName="PART_Icon" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+        <!-- Maximized: hide the single-square (maximize) glyph, show the overlapping-squares (restore) glyph. A trigger
+             overrides the local Opacity defaults (trigger outranks a local value), so the swap applies both ways. -->
+        <PropertyTrigger Property="IsWindowMaximized" Value="true">
+            <Setter TargetName="MaximizeGlyph" Property="Opacity" Value="0"/>
+            <Setter TargetName="RestoreGlyph" Property="Opacity" Value="1"/>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- Caption buttons: reuse the base Button template but flatten it (no rounding, no border, no min-height) and give
+         a subtle hover. They are click-only, so not focus targets. The close button overrides the hover to red. -->
+    <Style Selector="Button.CaptionButton">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference SubtleFillColorTertiary}"/>
+        <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="MinWidth" Value="46"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="Button.CloseButton">
+        <Setter Property="BackgroundPointerOver" Value="#E81123"/>
+        <Setter Property="BackgroundPressed" Value="#F1707A"/>
+    </Style>
+
+</StyleSet>
