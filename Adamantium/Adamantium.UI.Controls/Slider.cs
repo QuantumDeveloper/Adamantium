@@ -48,9 +48,12 @@ public class Slider : RangeBase
         Keyboard.KeyDownEvent.RegisterClassHandler<Slider>(new KeyEventHandler(KeyDownClassHandler));
         // Slider convention: a 0..100 range (vs RangeBase's 0..1). A metadata default, NOT a constructor set - a set
         // writes Local priority, which outranks and permanently masks a {Binding}/Style/Trigger on Maximum (the bug that
-        // froze a data-bound slider). Re-use RangeBase's OnMaximumChanged so the re-coercion still fires. LargeChange (10),
-        // SmallChange (1) and Focusable (true) already match the base defaults, so no override is needed for them.
+        // froze a data-bound slider). Re-use RangeBase's OnMaximumChanged so the re-coercion still fires. LargeChange (10)
+        // and SmallChange (1) already match the base defaults, so no override is needed for them.
         MaximumProperty.OverrideMetadata(typeof(Slider), new PropertyMetadata(100.0, OnMaximumChanged));
+        // A slider takes keyboard focus (arrows nudge the value) - opt in, since the base default is now false. Its Thumb
+        // and track RepeatButtons stay non-focusable, so the focus lands on the Slider itself.
+        FocusableProperty.OverrideMetadata(typeof(Slider), new PropertyMetadata(true));
     }
 
     /// <summary>Horizontal (default) or vertical track.</summary>

@@ -24,6 +24,12 @@ namespace Adamantium.UI.Controls;
 /// </summary>
 public class ListBox : Selector
 {
+    static ListBox()
+    {
+        // A list box takes keyboard focus (arrow-key navigation delegates to its items) - opt in, base default is false.
+        FocusableProperty.OverrideMetadata(typeof(ListBox), new PropertyMetadata(true));
+    }
+
     private HashSet<object> _selectedSet = [];  // O(1) membership truth - used to reflect selection onto (recycled) containers
     private int _anchorIndex = -1;              // Extended-mode Shift-range anchor
 

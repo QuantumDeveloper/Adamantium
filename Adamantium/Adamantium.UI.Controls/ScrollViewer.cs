@@ -28,11 +28,22 @@ public class ScrollViewer : ContentControl
 
     public static readonly AdamantiumProperty HorizontalScrollBarVisibilityProperty = AdamantiumProperty.Register(
         nameof(HorizontalScrollBarVisibility), typeof(ScrollBarVisibility), typeof(ScrollViewer),
-        new PropertyMetadata(ScrollBarVisibility.Auto, PropertyMetadataOptions.AffectsMeasure));
+        new PropertyMetadata(ScrollBarVisibility.Auto, PropertyMetadataOptions.AffectsMeasure, OnScrollBarVisibilityChanged));
 
     public static readonly AdamantiumProperty VerticalScrollBarVisibilityProperty = AdamantiumProperty.Register(
         nameof(VerticalScrollBarVisibility), typeof(ScrollBarVisibility), typeof(ScrollViewer),
-        new PropertyMetadata(ScrollBarVisibility.Auto, PropertyMetadataOptions.AffectsMeasure));
+        new PropertyMetadata(ScrollBarVisibility.Auto, PropertyMetadataOptions.AffectsMeasure, OnScrollBarVisibilityChanged));
+
+    // Changing bar visibility at runtime (e.g. a TextBox toggling wrap) must re-push the CanScroll flags onto the
+    // presenter - Disabled means "don't scroll this axis" (measure the content to the viewport so it wraps/fits), any
+    // other value means "scrollable". Without this the presenter kept the flags captured once in OnApplyTemplate.
+    private static void OnScrollBarVisibilityChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is not ScrollViewer sv || sv._presenter == null) return;
+        sv._presenter.CanScrollHorizontally = sv.HorizontalScrollBarVisibility != ScrollBarVisibility.Disabled;
+        sv._presenter.CanScrollVertically = sv.VerticalScrollBarVisibility != ScrollBarVisibility.Disabled;
+        sv._presenter.InvalidateMeasure();
+    }
 
     public static readonly AdamantiumProperty PanningModeProperty = AdamantiumProperty.Register(
         nameof(PanningMode), typeof(PanningMode), typeof(ScrollViewer),
@@ -55,6 +66,9 @@ public class ScrollViewer : ContentControl
         nameof(InertiaSmoothRate), typeof(double), typeof(ScrollViewer),
         new PropertyMetadata(14.0, OnInertiaSettingChanged));
 
+    // A scroll viewer is a passive container - not a keyboard-focus target (matches WPF). Comes for free from the
+    // Focusable=false default (see InputUIComponent). A specific scrollable region that needs arrow-key scrolling can
+    // opt back in with Focusable="True" in its markup.
     public ScrollViewer()
     {
         MouseWheel += OnMouseWheel;
@@ -211,6 +225,45 @@ public class ScrollViewer : ContentControl
         var x = _horizontalBar?.Value ?? _presenter.Offset.X;
         var y = _verticalBar?.Value ?? _presenter.Offset.Y;
         _presenter.SetOffset(new Vector2(x, y));
+    }
+
+    /// <summary>Current scroll offset of the content (top-left of the viewport within the extent). Zero before templating.</summary>
+    public Vector2 ScrollOffset => _presenter?.Offset ?? default;
+
+    /// <summary>Size of the visible window onto the content. Zero before templating.</summary>
+    public Size ViewportSize => _presenter?.Viewport ?? default;
+
+    /// <summary>Scroll the minimum amount so <paramref name="rect"/> (in CONTENT coordinates) is fully inside the viewport
+    /// - the caret-follow primitive for a TextBox hosting its surface here. No-op until the presenter exists.</summary>
+    public void BringIntoView(Rect rect)
+    {
+        if (_presenter == null) return;
+        var off = _presenter.Offset;
+        var vp = _presenter.Viewport;
+        double x = off.X, y = off.Y;
+        if (rect.X < x) x = rect.X;
+        else if (rect.Right > x + vp.Width) x = rect.Right - vp.Width;
+        if (rect.Y < y) y = rect.Y;
+        else if (rect.Bottom > y + vp.Height) y = rect.Bottom - vp.Height;
+        if (x != off.X || y != off.Y) _presenter.SetOffset(new Vector2(x, y));
+    }
+
+    /// <summary>Scroll so a descendant element becomes visible. Its bounds are projected from its own local space into the
+    /// content space (via the world transforms) and handed to <see cref="BringIntoView(Rect)"/>. No-op if the element is
+    /// not actually under this viewer's content, or before templating.</summary>
+    public void BringDescendantIntoView(IUIComponent target)
+    {
+        if (_presenter == null || target == null) return;
+        // target-local -> world -> content-presenter-local (== viewport space; the content is already shifted by -offset
+        // there, so add the current offset back to land in content space, which is what BringIntoView compares against).
+        var toContent = target.WorldTransform * Matrix4x4F.Invert(_presenter.WorldTransform);
+        var size = target.RenderSize;
+        var p0 = Vector3F.TransformCoordinate(new Vector3F(0f, 0f, 0f), toContent);
+        var p1 = Vector3F.TransformCoordinate(new Vector3F((float)size.Width, (float)size.Height, 0f), toContent);
+        var off = _presenter.Offset;
+        BringIntoView(new Rect(
+            Math.Min(p0.X, p1.X) + off.X, Math.Min(p0.Y, p1.Y) + off.Y,
+            Math.Abs(p1.X - p0.X), Math.Abs(p1.Y - p0.Y)));
     }
 
     private void OnMouseWheel(object sender, MouseWheelEventArgs e)

@@ -46,6 +46,7 @@
         <TextBlock Text="Multi-line (AcceptsReturn + WrapByWords):" Margin="0,16,0,6"/>
         <TextBox Text="{Binding Notes, Mode=TwoWay}"
                  AcceptsReturn="True" TextWrapping="WrapByWords"
+                 VerticalScrollBarVisibility="Auto"
                  Width="520" Height="120" HorizontalAlignment="Left"/>
 
         <!-- Bindable Runs: a single TextBlock built from Run inlines. The middle run's Text binds to Message (updates

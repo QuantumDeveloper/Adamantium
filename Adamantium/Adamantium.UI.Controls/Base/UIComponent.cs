@@ -310,6 +310,16 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     /// geometry so a click off the shape (but inside its bounding box) doesn't select it.</summary>
     public virtual bool HitTestCore(Vector2 localPoint) => true;
 
+    /// <summary>Scroll every enclosing <see cref="ScrollViewer"/> the minimum needed to make this element visible (WPF's
+    /// <c>BringIntoView</c>). Walks the visual tree from here outward, so nested viewers all scroll (innermost first).
+    /// NOTE: this brings the CURRENTLY REALIZED element into view; under UI virtualization an item that has not been
+    /// realized yet has no visual to scroll to - that requires the panel to first materialize it (a separate concern).</summary>
+    public void BringIntoView()
+    {
+        for (IUIComponent node = VisualParent; node != null; node = node.VisualParent)
+            (node as ScrollViewer)?.BringDescendantIntoView(this);
+    }
+
     public Vector2 ClipPosition { get; set; }
 
     public IUIComponent VisualParent { get; private set; }

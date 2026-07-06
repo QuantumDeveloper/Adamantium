@@ -71,10 +71,11 @@ public abstract class ButtonBase : ContentControl
     {
         Keyboard.KeyDownEvent.RegisterClassHandler<ButtonBase>(new KeyEventHandler(KeyDownClassHandler));
         Keyboard.KeyUpEvent.RegisterClassHandler<ButtonBase>(new KeyEventHandler(KeyUpClassHandler));
+        // A button IS a keyboard-focus target (space/enter activate it) - opt in, since the base default is now false.
+        // Metadata priority (not a ctor set), so a {Binding}/Style/Trigger can still override it (e.g. a scrollbar's
+        // repeat buttons set Focusable="False" in their template). Covers Button/RepeatButton/Toggle*/CheckBox/Radio.
+        FocusableProperty.OverrideMetadata(typeof(ButtonBase), new PropertyMetadata(true));
     }
-
-    // No constructor: Focusable already defaults to true (registered on InputUIComponent), so setting it here was
-    // redundant - and a constructor set writes Local priority, which would mask a {Binding}/Style/Trigger on Focusable.
 
     public event RoutedEventHandler Click
     {

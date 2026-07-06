@@ -75,8 +75,12 @@ public class TabItem : ContentControl, ISelectable
     private static void OnCloseConfigChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
         => ((TabItem)a).SyncCloseButton();
 
-    // No constructor: Focusable already defaults to true (registered on InputUIComponent), so setting it here was
-    // redundant - and a constructor set writes Local priority, which would mask a {Binding}/Style/Trigger on Focusable.
+    static TabItem()
+    {
+        // A tab is a keyboard-focus target (arrow-key navigation between tabs) - opt in, since the base default is now
+        // false. Metadata priority, so a {Binding}/Style/Trigger can still override it.
+        FocusableProperty.OverrideMetadata(typeof(TabItem), new PropertyMetadata(true));
+    }
 
     /// <summary>The tab-strip label - a string or any UI content. Distinct from <see cref="ContentControl.Content"/>,
     /// which is the body shown when the tab is selected.</summary>

@@ -140,8 +140,13 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         AdamantiumProperty.RegisterReadOnly(nameof(IsFocused),
             typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false));
     
+    // Default FALSE (as in WPF's UIElement): most elements - panels, presenters, decorators, text, shapes, plain
+    // containers - are NOT keyboard-focus targets. Genuinely interactive controls opt IN via OverrideMetadata(true)
+    // in their own static ctor (ButtonBase, TextBoxBase, Slider, Selector items, ...). This keeps the focus walk from
+    // a clicked template part landing on some passive container instead of the owning control, WITHOUT having to
+    // remember to opt every new container OUT.
     public static readonly AdamantiumProperty FocusableProperty = AdamantiumProperty.Register(nameof(Focusable),
-        typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(true));
+        typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false));
     
     public static readonly AdamantiumProperty CursorProperty = AdamantiumProperty.Register(nameof(Cursor),
         typeof(Cursor), typeof(InputUIComponent), new PropertyMetadata(Cursor.Default));

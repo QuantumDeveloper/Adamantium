@@ -10,6 +10,9 @@ namespace Adamantium.UI.Controls;
 
 public class ContentPresenter : InputUIComponent
 {
+    // A content presenter is a passive host for another element - never a keyboard-focus target. Comes for free from the
+    // Focusable=false default (see InputUIComponent); covers ScrollContentPresenter and any templated content host.
+
     // The currently hosted content (the incoming one while a transition runs) and, when it came from a DataTemplate,
     // the result to destroy on replacement. While a transition plays we also keep the previous content alive as the
     // "outgoing" pair so it can slide out before being removed.
