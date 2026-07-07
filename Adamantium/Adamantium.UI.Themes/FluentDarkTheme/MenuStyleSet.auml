@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions"
+          xmlns:controls="http://adamantium/ui">
+
+    <!-- MenuItem: a flyout row - icon | label (Content) | gesture hint. Reuses ButtonBase click/command; a flat leaf. -->
+
+    <Style Selector="MenuItem">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="MinHeight" Value="34"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="MenuItem">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <controls:Border x:Name="Root" Background="{TemplateBinding Background}"
+                            CornerRadius="4" Padding="10 6 10 6">
+                        <controls:Grid ColumnDefinitions="Auto,*,Auto">
+                            <controls:ContentPresenter Grid.Column="0" Content="{TemplateBinding Icon}"
+                                    VerticalAlignment="Center" Margin="0 0 10 0"/>
+                            <controls:ContentPresenter x:Name="PART_ContentPresenter" Grid.Column="1"
+                                    Content="{TemplateBinding Content}"
+                                    ContentTemplate="{TemplateBinding ContentTemplate}"
+                                    Foreground="{TemplateBinding Foreground}"
+                                    FontSize="{TemplateBinding FontSize}"
+                                    HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                            <controls:TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}"
+                                    Foreground="{ResourceReference TextFillColorSecondary}"
+                                    FontSize="12" VerticalAlignment="Center" Margin="24 0 0 0"/>
+                        </controls:Grid>
+                    </controls:Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="MenuItem">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="Root" Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ResourceReference TextFillColorDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- ContextMenu: a light-dismiss flyout of MenuItems in the popup overlay. Template = a Popup portal whose content is
+         a themed card hosting the items (PART_ItemsPresenter). The control is zero-size inline (items live in the overlay). -->
+
+    <Style Selector="ContextMenu">
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <controls:StackPanel Orientation="Vertical"/>
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="ContextMenu">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContextMenu">
+                    <controls:Grid>
+                        <controls:Popup x:Name="PART_Popup" Placement="Bottom" FlipToFit="True" VerticalOffset="4">
+                            <controls:Border x:Name="PART_MenuRoot"
+                                    Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                    BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                    BorderThickness="1" CornerRadius="6" Padding="4" MinWidth="160">
+                                <controls:ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                            </controls:Border>
+                        </controls:Popup>
+                    </controls:Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

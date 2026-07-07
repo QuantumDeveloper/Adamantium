@@ -10,13 +10,23 @@
         Width="1280"
         Height="720"
         AnalyticAntialiasing="true"
+        LeftWindowCommands="{Binding LeftWindowCommands}"
+        RightWindowCommands="{Binding RightWindowCommands}"
         Background="{ObservableResource SolidBackgroundFillColorBase}">
+    <Window.Icon>
+        <Border Width="16" Height="16" CornerRadius="4" Background="{ThemeResource AccentFillColorDefault}"/>
+    </Window.Icon>
     <!-- The custom TitleBar (draggable caption, min/max/close) comes from the default Window ControlTemplate now, so this
          is just the window CONTENT - hosted below the caption by the template's ContentPresenter. -->
     <Grid>
         <!-- The control gallery: data-driven tabs, one View + view-model per tab (see GalleryView / GalleryViewModel).
              The old inline demos (shapes, images, the game panel) now live in their respective tabs. -->
         <views:GalleryView/>
+
+        <!-- Shows which title-bar command last ran, so the caption commands visibly do distinct things. -->
+        <TextBlock Text="{Binding LastCommand}" FontSize="12"
+                   Foreground="{ResourceReference TextFillColorSecondary}"
+                   HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16,10,0,0"/>
 
         <!-- Diagnostics toggle - always visible, top-right. Opens the diagnostics SlidePanel on demand so the live stats
              don't cover the window content. Two-way, so the panel's x button flips it back off. -->

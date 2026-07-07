@@ -139,6 +139,18 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     public static readonly AdamantiumProperty ResizeModeProperty = AdamantiumProperty.Register(nameof(ResizeMode),
         typeof(WindowResizeMode), typeof(WindowBase), new PropertyMetadata(WindowResizeMode.CanResize));
 
+    // MahApps-style caption command bars, forwarded to the TitleBar by the default Window template. Bind a view-model's
+    // collection of WindowCommand items to show quick actions in the title bar (left of it / right, before the buttons).
+    public static readonly AdamantiumProperty LeftWindowCommandsProperty = AdamantiumProperty.Register(nameof(LeftWindowCommands),
+        typeof(System.Collections.IEnumerable), typeof(WindowBase), new PropertyMetadata(null));
+
+    public static readonly AdamantiumProperty RightWindowCommandsProperty = AdamantiumProperty.Register(nameof(RightWindowCommands),
+        typeof(System.Collections.IEnumerable), typeof(WindowBase), new PropertyMetadata(null));
+
+    // Window icon/logo shown at the left of the custom title bar (forwarded to the TitleBar by the default template).
+    public static readonly AdamantiumProperty IconProperty = AdamantiumProperty.Register(nameof(Icon),
+        typeof(object), typeof(WindowBase), new PropertyMetadata(null));
+
     private static void TitleChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
         if (!(a is WindowBase component)) return;
@@ -245,6 +257,25 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         set => SetValue(ResizeModeProperty, value);
     }
 
+    public System.Collections.IEnumerable LeftWindowCommands
+    {
+        get => GetValue<System.Collections.IEnumerable>(LeftWindowCommandsProperty);
+        set => SetValue(LeftWindowCommandsProperty, value);
+    }
+
+    public System.Collections.IEnumerable RightWindowCommands
+    {
+        get => GetValue<System.Collections.IEnumerable>(RightWindowCommandsProperty);
+        set => SetValue(RightWindowCommandsProperty, value);
+    }
+
+    /// <summary>Icon/logo content shown at the left of the custom title bar.</summary>
+    public object Icon
+    {
+        get => GetValue<object>(IconProperty);
+        set => SetValue(IconProperty, value);
+    }
+
     /// <summary>Begins an OS-driven move of the window (custom-chrome caption drag). Wired from a title bar's press.</summary>
     public void DragMove() => WindowWorkerService?.BeginMoveDrag();
 
@@ -265,8 +296,7 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     // hit-test (OS message thread) - plain doubles, so a torn read is at worst a one-frame-off hit, never a crash. This
     // MUST stay geometric: the earlier visual-tree walk (GetVisualsAt) from WM_NCHITTEST raced the layout thread's
     // VisualChildren mutation during a state-change relayout and spun the UI thread (every caption button froze the app).
-    public double CaptionHeight { get; set; }
-    public double CaptionRightInset { get; set; }
+    public Rect CaptionDragRect { get; set; }
 
     public Double ClientWidth
     {

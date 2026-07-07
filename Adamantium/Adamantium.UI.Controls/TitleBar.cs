@@ -1,3 +1,5 @@
+using System;
+using System.Collections;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Primitives;
@@ -21,7 +23,7 @@ public class TitleBar : Control
         typeof(object), typeof(TitleBar), new PropertyMetadata(null));
 
     public static readonly AdamantiumProperty ShowIconProperty = AdamantiumProperty.Register(nameof(ShowIcon),
-        typeof(bool), typeof(TitleBar), new PropertyMetadata(false));
+        typeof(bool), typeof(TitleBar), new PropertyMetadata(true));
 
     public static readonly AdamantiumProperty ShowTitleProperty = AdamantiumProperty.Register(nameof(ShowTitle),
         typeof(bool), typeof(TitleBar), new PropertyMetadata(true));
@@ -51,6 +53,26 @@ public class TitleBar : Control
     {
         get => GetValue<bool>(IsWindowMaximizedProperty);
         set => SetValue(IsWindowMaximizedProperty, value);
+    }
+
+    // MahApps-style caption command bars: a collection of WindowCommand items shown LEFT (after the title) and RIGHT
+    // (before the min/max/close buttons). Bindable from a view-model; the Window forwards its own collections here.
+    public static readonly AdamantiumProperty LeftWindowCommandsProperty = AdamantiumProperty.Register(nameof(LeftWindowCommands),
+        typeof(IEnumerable), typeof(TitleBar), new PropertyMetadata(null));
+
+    public static readonly AdamantiumProperty RightWindowCommandsProperty = AdamantiumProperty.Register(nameof(RightWindowCommands),
+        typeof(IEnumerable), typeof(TitleBar), new PropertyMetadata(null));
+
+    public IEnumerable LeftWindowCommands
+    {
+        get => GetValue<IEnumerable>(LeftWindowCommandsProperty);
+        set => SetValue(LeftWindowCommandsProperty, value);
+    }
+
+    public IEnumerable RightWindowCommands
+    {
+        get => GetValue<IEnumerable>(RightWindowCommandsProperty);
+        set => SetValue(RightWindowCommandsProperty, value);
     }
 
     public double FontSize
@@ -112,7 +134,9 @@ public class TitleBar : Control
     private ButtonBase _minButton;
     private ButtonBase _maxButton;
     private ButtonBase _closeButton;
-    private IUIComponent _buttonsPanel;
+    private ButtonBase _rightOverflowButton;
+    private ContextMenu _rightOverflowMenu;
+    private IUIComponent _dragArea;    // the ONE draggable region; its bounds become the window's CaptionDragRect
 
     public override void OnApplyTemplate()
     {
@@ -122,13 +146,16 @@ public class TitleBar : Control
         _minButton = GetTemplateChild("PART_MinButton") as ButtonBase;
         _maxButton = GetTemplateChild("PART_MaxButton") as ButtonBase;
         _closeButton = GetTemplateChild("PART_CloseButton") as ButtonBase;
-        _buttonsPanel = GetTemplateChild("PART_ButtonsPanel") as IUIComponent;
+        _rightOverflowButton = GetTemplateChild("PART_RightOverflowButton") as ButtonBase;
+        _rightOverflowMenu = GetTemplateChild("PART_RightOverflowMenu") as ContextMenu;
+        _dragArea = GetTemplateChild("PART_DragArea") as IUIComponent;
 
         // The caption DRAG + double-click maximize are handled natively by the OS (WM_NCHITTEST returns HTCAPTION over
         // the title area - see WindowBase.IsDraggableCaptionPoint), so the title bar only wires the command buttons.
         if (_minButton != null) _minButton.Click += OnMinClick;
         if (_maxButton != null) _maxButton.Click += OnMaxClick;
         if (_closeButton != null) _closeButton.Click += OnCloseClick;
+        if (_rightOverflowButton != null) _rightOverflowButton.Click += OnRightOverflowClick;
     }
 
     private void DetachParts()
@@ -136,20 +163,33 @@ public class TitleBar : Control
         if (_minButton != null) _minButton.Click -= OnMinClick;
         if (_maxButton != null) _maxButton.Click -= OnMaxClick;
         if (_closeButton != null) _closeButton.Click -= OnCloseClick;
+        if (_rightOverflowButton != null) _rightOverflowButton.Click -= OnRightOverflowClick;
     }
 
-    // After arrange, publish the caption geometry to the owning window so the worker's WM_NCHITTEST can flag the drag
-    // strip geometrically (no visual-tree walk from the OS thread). Assumes the title bar sits at the top of the window.
+    // "..." button: open the overflow menu (all right commands) against the button. Safe, layout-loop-free overflow -
+    // full command access when the caption is too narrow to show every button.
+    private void OnRightOverflowClick(object sender, RoutedEventArgs e) => _rightOverflowMenu?.Open(_rightOverflowButton as UIComponent);
+
+    // After arrange, publish the drag-area element's bounds (in window-client coords) as the window's ONE draggable
+    // caption region. The worker's WM_NCHITTEST checks a point against this rect only - a plain Rect, safe to read from
+    // the OS message thread. Everything outside it (commands, buttons) stays HTCLIENT and clickable.
     protected override Size ArrangeOverride(Size finalSize)
     {
         var size = base.ArrangeOverride(finalSize);
         var window = OwnerWindow;
         if (window != null)
-        {
-            window.CaptionHeight = size.Height;
-            window.CaptionRightInset = _buttonsPanel?.RenderSize.Width ?? 0;
-        }
+            window.CaptionDragRect = _dragArea != null ? RectRelativeTo(_dragArea, window) : default;
         return size;
+    }
+
+    // element's bounds expressed in ancestor-local (here: window-client) coordinates, via the world transforms.
+    private static Rect RectRelativeTo(IUIComponent element, IUIComponent ancestor)
+    {
+        var m = element.WorldTransform * Matrix4x4F.Invert(ancestor.WorldTransform);
+        var sz = element.RenderSize;
+        var p0 = Vector3F.TransformCoordinate(new Vector3F(0f, 0f, 0f), m);
+        var p1 = Vector3F.TransformCoordinate(new Vector3F((float)sz.Width, (float)sz.Height, 0f), m);
+        return new Rect(Math.Min(p0.X, p1.X), Math.Min(p0.Y, p1.Y), Math.Abs(p1.X - p0.X), Math.Abs(p1.Y - p0.Y));
     }
 
     private void OnMinClick(object sender, RoutedEventArgs e) => OwnerWindow?.Minimize();

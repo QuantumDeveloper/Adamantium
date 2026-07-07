@@ -139,7 +139,19 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     public static readonly AdamantiumProperty IsFocusedProperty =
         AdamantiumProperty.RegisterReadOnly(nameof(IsFocused),
             typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false));
-    
+
+    // A REGULAR (bindable) tooltip on every input element - like WPF's FrameworkElement.ToolTip (distinct from the
+    // ToolTipService.ToolTip attached form, kept for advanced/non-input targets). Being a real registered property, it
+    // resolves for binding (ToolTip="{Binding}"); its change is forwarded to the shared hover service so both forms drive
+    // one code path.
+    public static readonly AdamantiumProperty ToolTipProperty = AdamantiumProperty.Register(nameof(ToolTip),
+        typeof(object), typeof(InputUIComponent), new PropertyMetadata(null, OnToolTipChanged));
+
+    private static void OnToolTipChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is InputUIComponent c) ToolTipService.SetToolTip(c, e.NewValue);
+    }
+
     // Default FALSE (as in WPF's UIElement): most elements - panels, presenters, decorators, text, shapes, plain
     // containers - are NOT keyboard-focus targets. Genuinely interactive controls opt IN via OverrideMetadata(true)
     // in their own static ctor (ButtonBase, TextBoxBase, Slider, Selector items, ...). This keeps the focus walk from
@@ -198,13 +210,12 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         set => SetValue(CursorProperty, value);
     }
 
-    /// <summary>Content shown as a hover tooltip - a string, or any UI content. WPF-style shorthand for the attached
-    /// <see cref="Adamantium.UI.Controls.ToolTipService.ToolTipProperty"/> (registered on every component), so a plain
-    /// <c>&lt;Button ToolTip="…"/&gt;</c> works on any input element and drives the same hover/show/hide service.</summary>
+    /// <summary>Content shown as a hover tooltip - a string, or any UI content. A regular, bindable property (WPF's
+    /// FrameworkElement.ToolTip); its change is forwarded to the shared <see cref="ToolTipService"/> that shows the card.</summary>
     public object ToolTip
     {
-        get => ToolTipService.GetToolTip(this);
-        set => ToolTipService.SetToolTip(this, value);
+        get => GetValue<object>(ToolTipProperty);
+        set => SetValue(ToolTipProperty, value);
     }
 
     public Boolean IsFocused

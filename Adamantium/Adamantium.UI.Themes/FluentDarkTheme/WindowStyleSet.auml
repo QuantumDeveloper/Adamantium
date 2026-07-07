@@ -14,7 +14,10 @@
                     <controls:Border Background="{TemplateBinding Background}">
                         <controls:Grid RowDefinitions="Auto,*">
                             <controls:TitleBar x:Name="PART_TitleBar" Grid.Row="0"
-                                    Title="{TemplateBinding Title}"/>
+                                    Title="{TemplateBinding Title}"
+                                    Icon="{TemplateBinding Icon}"
+                                    LeftWindowCommands="{TemplateBinding LeftWindowCommands}"
+                                    RightWindowCommands="{TemplateBinding RightWindowCommands}"/>
                             <controls:ContentPresenter x:Name="PART_ContentPresenter" Grid.Row="1"
                                     Content="{TemplateBinding Content}"
                                     ContentTemplate="{TemplateBinding ContentTemplate}"/>
