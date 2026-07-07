@@ -381,7 +381,7 @@ public class CodeGenerationContext
                             {
                                 // Ordinary property: establish a live binding on it.
                                 var bindingTarget = isRoot ? "this" : CurrentParent;
-                                TextGenerator.WriteLine($"{bindingTarget}.SetBinding(\"{propRef.Name}\", {bindingVar});");
+                                TextGenerator.WriteLine(EmitSetBinding(bindingTarget, propRef, bindingVar));
                             }
                             break;
                         }
@@ -476,7 +476,7 @@ public class CodeGenerationContext
                             else
                             {
                                 var bindingTarget = isRoot ? "this" : CurrentParent;
-                                TextGenerator.WriteLine($"{bindingTarget}.SetBinding(\"{propRef.Name}\", {bindingVar});");
+                                TextGenerator.WriteLine(EmitSetBinding(bindingTarget, propRef, bindingVar));
                             }
                             continue;
                         }
@@ -695,6 +695,17 @@ public class CodeGenerationContext
     }
 
     // ---- bindings -------------------------------------------------------------------------------------------------
+
+    // Emit the SetBinding call. An ATTACHED property (ToolTipService.ToolTip, Grid.Row, ...) is NOT registered on the
+    // target's type, so binding by NAME (SetBinding("ToolTip", ...)) can't resolve it and throws. Bind to the property
+    // OBJECT instead - <Owner>.<Name>Property - exactly as WPF binds to the DependencyProperty; the target type is
+    // irrelevant, the property object fully identifies it.
+    private static string EmitSetBinding(string bindingTarget, AumlAstPropertyReference propRef, string bindingVar)
+    {
+        if (propRef.IsAttachedProperty)
+            return $"{bindingTarget}.SetBinding({propRef.OwnerType.GetFullTypeName()}.{propRef.Name}Property, {bindingVar});";
+        return $"{bindingTarget}.SetBinding(\"{propRef.Name}\", {bindingVar});";
+    }
 
     private const string BindingFqn = "global::Adamantium.UI.Core.Data.Binding";
     private const string MultiBindingFqn = "global::Adamantium.UI.Core.Data.MultiBinding";

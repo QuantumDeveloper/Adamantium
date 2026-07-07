@@ -35,14 +35,11 @@ public interface IWindow : IRootVisualComponent, IContentControl
     /// <summary>How the user may resize the window (honoured by the custom-chrome hit-test). Default CanResize.</summary>
     WindowResizeMode ResizeMode { get; }
 
-    /// <summary>Height (client DIP) of the draggable caption strip at the top of the window; 0 = none. A TitleBar sets
-    /// this on layout. Read (thread-safely, geometrically) by the platform worker's hit-test.</summary>
-    double CaptionHeight { get; set; }
-
-    /// <summary>Width (client DIP) reserved on the RIGHT of the caption strip for the window buttons - that band is NOT
-    /// draggable (the buttons need clicks). A TitleBar sets this on layout. The platform worker reads both metrics
-    /// (geometrically, from the OS message thread) to return HTCAPTION for the drag strip.</summary>
-    double CaptionRightInset { get; set; }
+    /// <summary>The ONE draggable caption region (client DIP): the bounds of the title bar's drag-area element. A point
+    /// inside it is HTCAPTION (native window drag + Aero Snap); everything else - commands, buttons - stays HTCLIENT and
+    /// clickable. A TitleBar publishes this on layout; the platform worker reads it (a plain Rect, thread-safe) from the
+    /// OS message thread. Empty = nothing draggable (custom chrome off, or no title bar).</summary>
+    Rect CaptionDragRect { get; set; }
 
     /// <summary>Per-window DPI scale (device pixels per DIP), separate X/Y (usually equal on desktop). 1,1 = 96 DPI /
     /// 100%. Set by the platform on create and on WM_DPICHANGED; drives the render scale and the DIP&lt;-&gt;physical map.</summary>

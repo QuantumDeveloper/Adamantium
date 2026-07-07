@@ -31,6 +31,8 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     private bool chromeCustom;
     private WindowResizeMode chromeResizeMode;
     private WindowState chromeState;
+    private double chromeMinWidth;    // DIP; the WM_GETMINMAXINFO floor so the caption can't be crushed
+    private double chromeMinHeight;
 
     static Win32WindowWorker()
     {
@@ -53,6 +55,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         messageTable[(uint)WindowMessages.Nclbuttondown] = HandleNcButtonDown;
         messageTable[(uint)WindowMessages.Nchittest] = HandleNcHittest;
         messageTable[(uint)WindowMessages.Nccalcsize] = HandleNcCalcSize;
+        messageTable[(uint)WindowMessages.Getminmaxinfo] = HandleGetMinMaxInfo;
         messageTable[(uint)WindowMessages.Size] = HandleResize;
         messageTable[(uint)WindowMessages.Dpichanged] = HandleDpiChanged;
         messageTable[(uint)WindowMessages.Keydown] = HandleKeyDown;
@@ -91,6 +94,8 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         chromeCustom = window.UseCustomChrome;
         chromeResizeMode = window.ResizeMode;
         chromeState = window.State;
+        chromeMinWidth = !double.IsNaN(window.MinWidth) && window.MinWidth > 0 ? window.MinWidth : 320;
+        chromeMinHeight = !double.IsNaN(window.MinHeight) && window.MinHeight > 0 ? window.MinHeight : 120;
         this.window.Closed += OnWindowClosed;
         var classStyle = WindowClassStyle.OwnDC | WindowClassStyle.DoubleClicks; //| WindowClassStyle.VerticalRedraw | WindowClassStyle.HorizontalRedraw;
         var wndStyleEx = WindowStyleEx.Appwindow | WindowStyleEx.Acceptfiles;
@@ -321,14 +326,13 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         // (non-locking) caption metrics a TitleBar published (CaptionHeight, CaptionRightInset - the right band reserved
         // for the buttons). HTCAPTION -> the OS runs the caption drag / Aero Snap / double-click-maximize natively; the
         // buttons stay HTCLIENT. NOTE: read no AdamantiumProperty here (ClientWidth etc.) - that would lock and deadlock.
-        if (result == NcHitTest.Client && window.CaptionHeight > 0)
+        if (result == NcHitTest.Client)
         {
+            // The ONE draggable region is the title bar's drag-area element, published as a client-DIP rect. A point in it
+            // is HTCAPTION (native drag + snap); everything else (commands, buttons) stays HTCLIENT and clickable.
             var dpi = window.DpiScale;
-            var yDip = (pt.Y - r.Top) / dpi.Y;
-            var xDip = (pt.X - r.Left) / dpi.X;
-            var widthDip = (r.Right - r.Left) / dpi.X;
-            if (yDip >= 0 && yDip < window.CaptionHeight && xDip < widthDip - window.CaptionRightInset)
-                result = NcHitTest.Caption;
+            var clientDip = new Vector2((pt.X - r.Left) / dpi.X, (pt.Y - r.Top) / dpi.Y);
+            if (window.CaptionDragRect.Contains(clientDip)) result = NcHitTest.Caption;
         }
 
         isOverSizeFrame = result == NcHitTest.Left || result == NcHitTest.Right || result == NcHitTest.Top ||
@@ -368,6 +372,25 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
             Marshal.StructureToPtr(rect, lParam, false);
         }
 
+        handled = true;
+        return IntPtr.Zero;
+    }
+
+    // Floor the drag-resize track size so a custom-chrome window can't be shrunk until the caption is crushed. Only the
+    // MIN track is set; the OS-proposed maximize size/position are left alone (so maximize still fits the work area).
+    // No lockable property read here (chromeMinWidth/Height were cached at SetWindow; DpiScale is non-locking).
+    private IntPtr HandleGetMinMaxInfo(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
+    {
+        if (!chromeCustom)
+        {
+            handled = false;
+            return Win32Interop.DefWindowProc(window.Handle, windowMessage, wParam, lParam);
+        }
+        var mmi = Marshal.PtrToStructure<MINMAXINFO>(lParam);
+        var dpi = window.DpiScale;
+        mmi.ptMinTrackSize.X = (int)(chromeMinWidth * dpi.X);
+        mmi.ptMinTrackSize.Y = (int)(chromeMinHeight * dpi.Y);
+        Marshal.StructureToPtr(mmi, lParam, false);
         handled = true;
         return IntPtr.Zero;
     }

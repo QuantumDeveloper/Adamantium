@@ -63,8 +63,7 @@ public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopu
     // A virtual (in-game/designer) window has no OS frame, so custom chrome is moot here.
     public bool UseCustomChrome => false;
     public WindowResizeMode ResizeMode => WindowResizeMode.NoResize;
-    public double CaptionHeight { get; set; }
-    public double CaptionRightInset { get; set; }
+    public Rect CaptionDragRect { get; set; }
     public IWindowRenderer DefaultRenderer { get; set; }
     public IWindowRenderer Renderer { get; set; }
 

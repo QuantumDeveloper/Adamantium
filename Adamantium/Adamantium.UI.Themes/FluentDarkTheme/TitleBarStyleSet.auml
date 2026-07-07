@@ -19,27 +19,80 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TitleBar">
-                    <controls:Grid Background="{TemplateBinding Background}" ColumnDefinitions="*,Auto">
+                    <controls:Grid Background="{TemplateBinding Background}" ColumnDefinitions="Auto,*,Auto">
 
-                        <!-- Caption drag zone (icon + title). Transparent Background so a Panel gets the hit and the
-                             control's MouseLeftButtonDown fires DragMove / double-click maximize. -->
-                        <controls:Grid x:Name="PART_CaptionArea" Grid.Column="0" Background="Transparent">
+                        <!-- LEFT commands: interactive, sit before the drag area (so they stay clickable). -->
+                        <controls:ItemsControl Grid.Column="0" ItemsSource="{TemplateBinding LeftWindowCommands}"
+                                VerticalAlignment="Stretch">
+                            <controls:ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><controls:StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                            </controls:ItemsControl.ItemsPanel>
+                            <controls:ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <controls:Button Classes="CaptionButton" VerticalAlignment="Stretch"
+                                            ToolTip="{Binding ToolTip}"
+                                            Command="{Binding Command}"
+                                            CommandParameter="{Binding CommandParameter}">
+                                        <controls:Path Data="{Binding Icon}"
+                                                Stroke="{ResourceReference TextFillColorPrimary}" StrokeThickness="1"
+                                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </controls:Button>
+                                </DataTemplate>
+                            </controls:ItemsControl.ItemTemplate>
+                        </controls:ItemsControl>
+
+                        <!-- THE draggable zone: icon + title, fills the middle. Transparent = a solid hit region; its bounds
+                             become the window's CaptionDragRect (the only place the OS runs the window drag). Clips so a long
+                             title doesn't spill onto the commands. Double-click here = maximize (native, from HTCAPTION). -->
+                        <controls:Grid x:Name="PART_DragArea" Grid.Column="1" Background="Transparent" ClipToBounds="True">
                             <controls:StackPanel Orientation="Horizontal" VerticalAlignment="Center"
                                     HorizontalAlignment="{TemplateBinding TitleAlignment}" Margin="12,0,0,0">
-                                <controls:ContentPresenter x:Name="PART_Icon"
-                                        Content="{TemplateBinding Icon}"
+                                <controls:ContentPresenter x:Name="PART_Icon" Content="{TemplateBinding Icon}"
                                         VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <controls:TextBlock x:Name="PART_Title"
-                                        Text="{TemplateBinding Title}"
-                                        Foreground="{TemplateBinding Foreground}"
-                                        FontSize="{TemplateBinding FontSize}"
+                                <controls:TextBlock x:Name="PART_Title" Text="{TemplateBinding Title}"
+                                        Foreground="{TemplateBinding Foreground}" FontSize="{TemplateBinding FontSize}"
                                         VerticalAlignment="Center"/>
                             </controls:StackPanel>
                         </controls:Grid>
 
-                        <!-- Window buttons (right). Flat caption buttons (Button.CaptionButton); close highlights red. Icons
-                             are VECTOR Path geometry (SVG-style Data + Stroke), NOT font glyphs - crisp and font-independent. -->
-                        <controls:StackPanel x:Name="PART_ButtonsPanel" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Stretch">
+                        <!-- RIGHT zone (interactive): right commands + "..." overflow menu + the window buttons. -->
+                        <controls:StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Stretch">
+                            <controls:ItemsControl ItemsSource="{TemplateBinding RightWindowCommands}" VerticalAlignment="Stretch">
+                                <controls:ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><controls:StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                </controls:ItemsControl.ItemsPanel>
+                                <controls:ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <controls:Button Classes="CaptionButton" VerticalAlignment="Stretch"
+                                                ToolTip="{Binding ToolTip}"
+                                                Command="{Binding Command}"
+                                                CommandParameter="{Binding CommandParameter}">
+                                            <controls:Path Data="{Binding Icon}"
+                                                    Stroke="{ResourceReference TextFillColorPrimary}" StrokeThickness="1"
+                                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </controls:Button>
+                                    </DataTemplate>
+                                </controls:ItemsControl.ItemTemplate>
+                            </controls:ItemsControl>
+
+                            <controls:Button x:Name="PART_RightOverflowButton" Classes="CaptionButton" VerticalAlignment="Stretch">
+                                <controls:Path Data="M0,4 L2,4 L2,6 L0,6 Z M4,4 L6,4 L6,6 L4,6 Z M8,4 L10,4 L10,6 L8,6 Z"
+                                        Fill="{ResourceReference TextFillColorPrimary}"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </controls:Button>
+
+                            <controls:ContextMenu x:Name="PART_RightOverflowMenu" ItemsSource="{TemplateBinding RightWindowCommands}">
+                                <controls:ContextMenu.ItemTemplate>
+                                    <DataTemplate>
+                                        <controls:MenuItem Content="{Binding OverflowLabel}"
+                                                Command="{Binding Command}" CommandParameter="{Binding CommandParameter}"/>
+                                    </DataTemplate>
+                                </controls:ContextMenu.ItemTemplate>
+                            </controls:ContextMenu>
+
+                            <!-- Window buttons. Flat caption buttons (Button.CaptionButton); close highlights red. VECTOR Path
+                                 icons (SVG Data + Stroke), NOT font glyphs - crisp and font-independent. -->
+                            <controls:StackPanel x:Name="PART_ButtonsPanel" Orientation="Horizontal" VerticalAlignment="Stretch">
                             <controls:Button x:Name="PART_MinButton" Classes="CaptionButton" Height="{TemplateBinding Height}">
                                 <controls:Path Data="M0,5 L10,5"
                                         Stroke="{ResourceReference TextFillColorPrimary}" StrokeThickness="1"
@@ -62,6 +115,7 @@
                                         Stroke="{ResourceReference TextFillColorPrimary}" StrokeThickness="1"
                                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </controls:Button>
+                            </controls:StackPanel>
                         </controls:StackPanel>
                     </controls:Grid>
                 </ControlTemplate>
