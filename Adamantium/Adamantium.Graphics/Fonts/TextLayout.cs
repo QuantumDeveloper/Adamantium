@@ -591,7 +591,11 @@ public class TextLayout : DisposableObject
 
     public void Update(IGraphicsDevice graphicsDevice)
     {
-        if (!_textUpdated) return;
+        // Nothing to upload until ProcessText has shaped the text into _wordData. A render unit can be built for a text
+        // component in the SAME frame its text changed but BEFORE it was measured/shaped (a popup added + built before
+        // its layout pass ran), so _textUpdated is set but _wordData is still null - guard it, and retry next frame
+        // (_textUpdated stays set) once ProcessText has run.
+        if (!_textUpdated || _wordData == null) return;
 
         FontAtlas ??= FontAtlasStore.GetOrCreateFrom(graphicsDevice, Typeface, FontParameters.Default(sortingVariant:GlyphSortingVariant.ByIndex));
         FontAtlas.Update(Text+".");

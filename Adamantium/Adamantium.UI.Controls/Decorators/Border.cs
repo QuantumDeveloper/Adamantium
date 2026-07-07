@@ -92,16 +92,33 @@ public class Border : Decorator
 
       var ctx = context.ForControl(this);
 
-      // Only record draws that produce visible pixels. A null or fully-transparent brush (Border's DEFAULT Background
-      // is Brushes.Transparent) would otherwise still build a fill unit + its analytic-AA fringe every frame - an
-      // invisible per-element cost that multiplies across a long list, where every rest-state ListBoxItem is a Border
-      // (this was the ListBox FPS drop). Hit-testing is bounds-based, so nothing depends on the invisible draw.
+      var hasThickness = borderThickness.Left != 0 || borderThickness.Top != 0 || borderThickness.Right != 0 || borderThickness.Bottom != 0;
+
+      // UNIFORM border (equal thickness on all sides + equal corner radii): draw the fill AND the border as ONE rounded
+      // rect with a pen, so it goes to the SDF item-background batch - reconstructed analytically and self-anti-aliased in
+      // one instanced draw, exactly like a plain solid fill. The old separate CombinedGeometry ring went through the per-
+      // unit analytic-AA fringe, whose outward-offset ring OVER-BLENDED its own coincident inner/outer edges (a 1px ring is
+      // as thin as the fringe) and hatched the corners - visible on a translucent card (the menu). The batch's SDF stroke
+      // is CENTRE-aligned, so drawing the pen on the rect inset by HALF the thickness lands the stroke in the outer
+      // `thickness` px == a WPF inside border, with the fill composited under it in the same pass.
+      if (borderThickness.IsUniform && cornerRadius.IsUniform && hasThickness && BorderBrush.IsVisible())
+      {
+         var t = borderThickness.Left;
+         var half = t * 0.5;
+         var penRect = outerRect.Deflate(new Thickness(half));
+         var penRadius = new CornerRadius(Math.Max(0.0, cornerRadius.TopLeft - half));
+         var fill = Background.IsVisible() ? Background : Brushes.Transparent;
+         ctx.DrawRectangle(fill, penRect, penRadius, new Pen(BorderBrush, t));
+         return;
+      }
+
+      // Fallback (no border, or a NON-uniform border/corner the SDF rect model can't express): the solid fill still SDF-
+      // batches; the ring goes through the per-unit path. Only record draws that produce visible pixels - a transparent
+      // brush would otherwise still build a fill unit + fringe every frame (the ListBox FPS drop); hit-testing is
+      // bounds-based, so nothing depends on the invisible draw.
       if (Background.IsVisible())
          ctx.DrawRectangle(Background, innerRect, innerRadius);
 
-      // Same for the border ring: skip when there's no visible brush or zero thickness (its geometry would be an
-      // empty/invisible ring anyway, but building + drawing it still costs a unit + fringe).
-      var hasThickness = borderThickness.Left != 0 || borderThickness.Top != 0 || borderThickness.Right != 0 || borderThickness.Bottom != 0;
       if (hasThickness && BorderBrush.IsVisible())
       {
          var combined = new CombinedGeometry

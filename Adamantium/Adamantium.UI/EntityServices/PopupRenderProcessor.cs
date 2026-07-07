@@ -6,6 +6,7 @@ using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Rendering;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.UI.EntityServices;
 
@@ -86,7 +87,24 @@ public class PopupRenderProcessor : EntityProcessor<WindowRenderService>
         return changed;
     }
 
-    public override void Draw(AppTime gameTime) => _cache?.Render();
+    // Render the overlay with the SAME device + full-window scissor the content pass uses, so the popup layer runs the
+    // FULL render path: the SDF item-background BATCH (a rounded-rect fill+stroke - e.g. a menu / SlidePanel card's border,
+    // now drawn as an SDF-batched pen instead of a separate ring), per-unit ClipToBounds scissor, and the off-clip cull.
+    // The old device-less Render() skipped ALL of that, so a batchable popup rect fell to the fill-only per-unit path and
+    // its border vanished (and flickered as it batched in some frames but not others).
+    public override void Draw(AppTime gameTime)
+    {
+        if (_cache == null) return;
+        var window = AssociatedService.Window;
+        var scale = AssociatedService.RenderScale;
+        var scissor = new Rect2D
+        {
+            Offset = new Offset2D(),
+            Extent = new Extent2D { Width = (uint)(window.ClientWidth * scale), Height = (uint)(window.ClientHeight * scale) }
+        };
+        AssociatedService.GraphicsDevice.SetScissors(scissor);
+        _cache.Render(AssociatedService.GraphicsDevice, scissor);
+    }
 
     // Pre-order flatten of each popup subtree: BuildFromComponents renders a flat list in order, so a parent must come
     // before its children for correct layering. (The children are already measured/arranged by LayoutPopups.)

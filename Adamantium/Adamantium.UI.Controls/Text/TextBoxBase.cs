@@ -294,6 +294,8 @@ public abstract class TextBoxBase : Control
     private GlyphWordData[] _glyphs = [];      // shaped glyphs in text order; with newline sentinels, glyph i == character i
     private double _textWidth;                 // widest line's ink width (horizontal scroll bound in NoWrap)
     private double _lineHeight;
+    private double _glyphLineHeight;           // real single-line ink extent (ascent+descent+gap) - reserves the LAST
+                                               // line's descent so hanging tails (g y p q j) aren't clipped by the control
 
     // Caret model, rebuilt on every (re)shape. For each of the TextLength+1 caret slots (slot i = caret BEFORE character
     // i; slot TextLength = the end) its text-local X and visual line index. Built from the shaped glyphs (one per
@@ -356,6 +358,11 @@ public abstract class TextBoxBase : Control
         var iFont = _textLayout.Font;
         var lgScale = FontSize / iFont.UnitsPerEm;
         _lineHeight = (iFont.LineGap == 0 ? FontSize : iFont.LineGap * lgScale) + FontSize;
+        // ProcessText places each line's baseline at Font.Baseline*scale from the line top (NOT ascent - this font's
+        // Baseline is ~the full line box) and lets descenders "hang below" without reserving space, so a single-line
+        // field's tails overflow _lineHeight and the control's clip cuts them. Reserve the TRUE bottom of the last line's
+        // ink - its baseline (Baseline*scale) plus the descent below it - never less than the line advance.
+        _glyphLineHeight = Math.Max(_lineHeight, (iFont.Baseline + Math.Abs(iFont.Descender)) * lgScale);
 
         var text = Text ?? string.Empty;
         var wrapping = TextWrapping;
@@ -430,7 +437,9 @@ public abstract class TextBoxBase : Control
     // --- Caret / selection geometry ------------------------------------------------------------------------------
 
     private int MaxLineIndex => _lineCount - 1;
-    private double ContentHeight => _lineCount * _lineHeight;
+    // Lines advance by _lineHeight; the LAST line reserves its full ink height (ascent+descent) so hanging descenders
+    // aren't clipped by the control's bottom edge (the em-based advance can be shorter than ascent+descent).
+    private double ContentHeight => (_lineCount - 1) * _lineHeight + _glyphLineHeight;
 
     // Text-local caret rect (before the scroll offset) sitting BEFORE character index: X from the caret model, Y from
     // the line index (uniform line height), height = one line.

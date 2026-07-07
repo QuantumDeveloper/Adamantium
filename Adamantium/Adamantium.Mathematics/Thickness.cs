@@ -43,6 +43,9 @@ public struct Thickness
       Left = Top = Right = Bottom = uniformValue;
    }
 
+   /// <summary>True when all four sides are equal (a single value describes the whole thickness).</summary>
+   public bool IsUniform => Left == Top && Top == Right && Right == Bottom;
+
    /// <summary>
    /// Adds two Thicknesses.
    /// </summary>

@@ -39,7 +39,12 @@ namespace Adamantium.ProceduralGeometry
         public Double BottomRight;
 
         public Double BottomLeft;
-        
+
+        /// <summary>True when all four corners have the same radius (a single value describes the whole shape).</summary>
+        public bool IsUniform => MathHelper.NearEqual(TopLeft, TopRight)
+                                 && MathHelper.NearEqual(TopRight, BottomRight)
+                                 && MathHelper.NearEqual(BottomRight, BottomLeft);
+
         public bool Equals(CornerRadius other)
         {
             return TopLeft.Equals(other.TopLeft) && TopRight.Equals(other.TopRight) && BottomRight.Equals(other.BottomRight) && BottomLeft.Equals(other.BottomLeft);
