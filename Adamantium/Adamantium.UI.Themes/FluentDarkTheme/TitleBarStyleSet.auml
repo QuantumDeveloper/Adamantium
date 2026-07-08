@@ -33,8 +33,11 @@
                                             ToolTip="{Binding ToolTip}"
                                             Command="{Binding Command}"
                                             CommandParameter="{Binding CommandParameter}">
+                                        <!-- {Ancestor} walks the visual tree up to the hosting TitleBar and binds its LIVE
+                                             Foreground, so a command icon follows the SAME active/inactive colour as the
+                                             title text + window buttons (and re-resolves if the tree rebuilds). -->
                                         <controls:Path Data="{Binding Icon}"
-                                                Stroke="{ResourceReference TextFillColorPrimary}" StrokeThickness="1"
+                                                Stroke="{Ancestor TitleBar, Foreground}" StrokeThickness="1"
                                                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </controls:Button>
                                 </DataTemplate>
@@ -68,7 +71,7 @@
                                                 Command="{Binding Command}"
                                                 CommandParameter="{Binding CommandParameter}">
                                             <controls:Path Data="{Binding Icon}"
-                                                    Stroke="{ResourceReference TextFillColorPrimary}" StrokeThickness="1"
+                                                    Stroke="{Ancestor TitleBar, Foreground}" StrokeThickness="1"
                                                     HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </controls:Button>
                                     </DataTemplate>
@@ -77,7 +80,7 @@
 
                             <controls:Button x:Name="PART_RightOverflowButton" Classes="CaptionButton" VerticalAlignment="Stretch">
                                 <controls:Path Data="M0,4 L2,4 L2,6 L0,6 Z M4,4 L6,4 L6,6 L4,6 Z M8,4 L10,4 L10,6 L8,6 Z"
-                                        Fill="{ResourceReference TextFillColorPrimary}"
+                                        Fill="{TemplateBinding Foreground}"
                                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </controls:Button>
 
@@ -95,7 +98,7 @@
                             <controls:StackPanel x:Name="PART_ButtonsPanel" Orientation="Horizontal" VerticalAlignment="Stretch">
                             <controls:Button x:Name="PART_MinButton" Classes="CaptionButton" Height="{TemplateBinding Height}">
                                 <controls:Path Data="M0,5 L10,5"
-                                        Stroke="{ResourceReference TextFillColorPrimary}" StrokeThickness="1"
+                                        Stroke="{TemplateBinding Foreground}" StrokeThickness="1"
                                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </controls:Button>
                             <!-- Maximize <-> restore: two overlaid glyphs, only one shown; the IsWindowMaximized trigger
@@ -103,16 +106,16 @@
                             <controls:Button x:Name="PART_MaxButton" Classes="CaptionButton" Height="{TemplateBinding Height}">
                                 <controls:Grid>
                                     <controls:Path x:Name="MaximizeGlyph" Data="M0,0 L10,0 L10,10 L0,10 Z"
-                                            Stroke="{ResourceReference TextFillColorPrimary}" StrokeThickness="1"
+                                            Stroke="{TemplateBinding Foreground}" StrokeThickness="1"
                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     <controls:Path x:Name="RestoreGlyph" Data="M0,3 L7,3 L7,10 L0,10 Z M3,3 L3,0 L10,0 L10,7 L7,7"
-                                            Stroke="{ResourceReference TextFillColorPrimary}" StrokeThickness="1" Opacity="0"
+                                            Stroke="{TemplateBinding Foreground}" StrokeThickness="1" Opacity="0"
                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </controls:Grid>
                             </controls:Button>
                             <controls:Button x:Name="PART_CloseButton" Classes="CaptionButton CloseButton" Height="{TemplateBinding Height}">
                                 <controls:Path Data="M0,0 L10,10 M10,0 L0,10"
-                                        Stroke="{ResourceReference TextFillColorPrimary}" StrokeThickness="1"
+                                        Stroke="{TemplateBinding Foreground}" StrokeThickness="1"
                                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </controls:Button>
                             </controls:StackPanel>

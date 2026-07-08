@@ -6,6 +6,7 @@ using Adamantium.UI.Controls.Internals;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Input.Raw;
+using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.Win32;
 using Adamantium.Win32.RawInput;
@@ -127,6 +128,18 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
             Win32Interop.SetWindowPos(source.Handle, IntPtr.Zero, 0, 0, 0, 0,
                 SetWindowPosFlags.Nomove | SetWindowPosFlags.Nosize | SetWindowPosFlags.Nozorder |
                 SetWindowPosFlags.Noactivate | SetWindowPosFlags.Framechanged);
+
+            // Real OS drop shadow on the borderless window: extend the DWM frame 1px into the client. With WM_NCCALCSIZE
+            // keeping the window client-only, this is the standard WindowChrome trick - DWM draws the window's ambient
+            // shadow (and Aero Snap preview) around it without a visible frame.
+            var shadowMargins = new Margins { Left = 1, Right = 1, Top = 1, Bottom = 1 };
+            Win32Interop.DwmExtendFrameIntoClientArea(source.Handle, ref shadowMargins);
+
+            // Windows 11 native accent border: DWMWA_BORDER_COLOR (34) = a COLORREF (0x00BBGGRR). DWM draws a crisp 1px
+            // border around the window in that colour - no extra windows, resize-free. A no-op on Windows 10 (the call
+            // just returns a failing HRESULT, which we ignore). Colour follows the THEME accent, not a hardcoded value.
+            var accentBorder = AccentColorRef();
+            Win32Interop.DwmSetWindowAttribute(source.Handle, 34, ref accentBorder, sizeof(int));
         }
 
         this.window.DpiScale = ReadDpiScale(source.Handle);   // initial per-monitor DPI (PMv2)
@@ -142,6 +155,23 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
                 
         this.window.OnSourceInitialized();
         this.window.StateChanged += WindowOnStateChanged;
+        this.window.ResizeModeChanged += WindowOnResizeModeChanged;
+    }
+
+    // Runtime ResizeMode change (e.g. toggling grip-resize): refresh the hit-test snapshot. Fires on the loop thread (the
+    // property is set there), so reading window.ResizeMode is safe - not the OS message thread that must never lock it.
+    private void WindowOnResizeModeChanged(object sender, EventArgs e) => chromeResizeMode = window.ResizeMode;
+
+    // The current theme's accent as a Win32 COLORREF (0x00BBGGRR) for the DWM window border. Falls back to the Fluent
+    // accent if the theme exposes no solid accent brush.
+    private static int AccentColorRef()
+    {
+        if (UIAppContext.Current?.ThemeManager?.CurrentTheme?.AccentColor is SolidColorBrush accent)
+        {
+            var c = accent.Color;
+            return c.R | (c.G << 8) | (c.B << 16);
+        }
+        return 0x00F79100;
     }
 
     public void SetTitle(string title)
@@ -320,6 +350,15 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
             else if (right) result = NcHitTest.Right;
             else if (top) result = NcHitTest.Top;
             else if (bottom) result = NcHitTest.Bottom;
+        }
+        else if (chromeResizeMode == WindowResizeMode.CanResizeWithGrip && chromeState != WindowState.Maximized)
+        {
+            // Grip-only resize (the fully-custom-chrome mode): NO edge borders - the bottom-right ResizeGripper is the
+            // ONLY sizing region. A point in its published rect hit-tests as the bottom-right corner, so WS_THICKFRAME's
+            // native resize runs from the grip. Plain-Rect read (thread-safe), like CaptionDragRect below.
+            var dpi = window.DpiScale;
+            var gripDip = new Vector2((pt.X - r.Left) / dpi.X, (pt.Y - r.Top) / dpi.Y);
+            if (window.ResizeGripRect.Contains(gripDip)) result = NcHitTest.Bottomright;
         }
 
         // Not a resize edge: is this the draggable caption strip? Compute geometrically from the window rect + the plain

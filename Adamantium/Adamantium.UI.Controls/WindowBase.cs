@@ -5,6 +5,7 @@ using Adamantium.UI.Core;
 using Adamantium.UI.Core.Controls;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Input;
+using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.Win32;
 
@@ -137,7 +138,22 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         typeof(bool), typeof(WindowBase), new PropertyMetadata(true));
 
     public static readonly AdamantiumProperty ResizeModeProperty = AdamantiumProperty.Register(nameof(ResizeMode),
-        typeof(WindowResizeMode), typeof(WindowBase), new PropertyMetadata(WindowResizeMode.CanResize));
+        typeof(WindowResizeMode), typeof(WindowBase), new PropertyMetadata(WindowResizeMode.CanResize, ResizeModeChangedCallback));
+
+    // Whether this window is the active (focused) one - set by the platform on WM_ACTIVATE. An AdamantiumProperty so the
+    // theme can trigger on it (accent title bar / border when active, dimmed when not), AffectsRender to repaint the swap.
+    public static readonly AdamantiumProperty IsActiveProperty = AdamantiumProperty.Register(nameof(IsActive),
+        typeof(bool), typeof(WindowBase), new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
+
+    // A plain .NET event (not a routed one): the platform worker keeps a thread-safe ResizeMode snapshot for the hit-test
+    // and refreshes it here when the mode changes at runtime (e.g. toggling grip-resize on).
+    public event EventHandler ResizeModeChanged;
+
+    private static void ResizeModeChangedCallback(AdamantiumComponent adamantiumComponent, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (adamantiumComponent is WindowBase component)
+            component.ResizeModeChanged?.Invoke(component, EventArgs.Empty);
+    }
 
     // MahApps-style caption command bars, forwarded to the TitleBar by the default Window template. Bind a view-model's
     // collection of WindowCommand items to show quick actions in the title bar (left of it / right, before the buttons).
@@ -150,6 +166,48 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     // Window icon/logo shown at the left of the custom title bar (forwarded to the TitleBar by the default template).
     public static readonly AdamantiumProperty IconProperty = AdamantiumProperty.Register(nameof(Icon),
         typeof(object), typeof(WindowBase), new PropertyMetadata(null));
+
+    // Caption background for the ACTIVE (focused) and INACTIVE window - the default template paints the TitleBar with
+    // InactiveTitleBarBackground and swaps to TitleBarBackground while IsActive. Theme sets the defaults (accent / neutral);
+    // a user can override either on the window (e.g. a brand colour when focused, a custom dim when not).
+    public static readonly AdamantiumProperty TitleBarBackgroundProperty = AdamantiumProperty.Register(nameof(TitleBarBackground),
+        typeof(Brush), typeof(WindowBase), new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
+
+    public static readonly AdamantiumProperty InactiveTitleBarBackgroundProperty = AdamantiumProperty.Register(nameof(InactiveTitleBarBackground),
+        typeof(Brush), typeof(WindowBase), new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
+
+    public Brush TitleBarBackground
+    {
+        get => GetValue<Brush>(TitleBarBackgroundProperty);
+        set => SetValue(TitleBarBackgroundProperty, value);
+    }
+
+    public Brush InactiveTitleBarBackground
+    {
+        get => GetValue<Brush>(InactiveTitleBarBackgroundProperty);
+        set => SetValue(InactiveTitleBarBackgroundProperty, value);
+    }
+
+    // Caption FOREGROUND (title text + caption-button glyphs) for the ACTIVE and INACTIVE window - mirrors the background
+    // pair. Default active = the theme's on-accent contrast colour (white on a dark accent, black on a light one) so the
+    // caption reads on an accent-painted bar; inactive = the neutral primary text colour. Overridable per window.
+    public static readonly AdamantiumProperty TitleBarForegroundProperty = AdamantiumProperty.Register(nameof(TitleBarForeground),
+        typeof(Brush), typeof(WindowBase), new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
+
+    public static readonly AdamantiumProperty InactiveTitleBarForegroundProperty = AdamantiumProperty.Register(nameof(InactiveTitleBarForeground),
+        typeof(Brush), typeof(WindowBase), new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
+
+    public Brush TitleBarForeground
+    {
+        get => GetValue<Brush>(TitleBarForegroundProperty);
+        set => SetValue(TitleBarForegroundProperty, value);
+    }
+
+    public Brush InactiveTitleBarForeground
+    {
+        get => GetValue<Brush>(InactiveTitleBarForegroundProperty);
+        set => SetValue(InactiveTitleBarForegroundProperty, value);
+    }
 
     private static void TitleChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
@@ -298,6 +356,10 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     // VisualChildren mutation during a state-change relayout and spun the UI thread (every caption button froze the app).
     public Rect CaptionDragRect { get; set; }
 
+    // Published by a ResizeGripper on layout; read by the platform hit-test (OS message thread). Plain Rect for the same
+    // thread-safety reason as CaptionDragRect. Empty = no grip / not in grip-resize mode.
+    public Rect ResizeGripRect { get; set; }
+
     public Double ClientWidth
     {
         get => GetValue<Double>(ClientWidthProperty);
@@ -361,7 +423,11 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     public abstract void Close();
     public abstract void Hide();
         
-    public abstract bool IsActive { get; internal set; }
+    public bool IsActive
+    {
+        get => GetValue<bool>(IsActiveProperty);
+        internal set => SetValue(IsActiveProperty, value);
+    }
 
     public IDrawingContext GetDrawingContext()
     {

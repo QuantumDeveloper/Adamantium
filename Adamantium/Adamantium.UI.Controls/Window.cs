@@ -43,6 +43,4 @@ public class Window : WindowBase
     {
         WindowWorkerService.HideWindow();
     }
-
-    public override bool IsActive { get; internal set; }
 }

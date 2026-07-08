@@ -279,8 +279,17 @@ public class MouseDevice
             // children (the list items) are. Hit-test the root as an IUIComponent so the walk descends into them.
             var popups = window.PopupRoots;
             for (var i = popups.Count - 1; i >= 0; i--)
+            {
                 if (InputExtensions.HitTest(popups[i], p) is { } popupHit)
                     return popupHit;
+                // Click landed on the popup's own OPAQUE card, not one of its child controls (a SlidePanel/menu root is a
+                // Border, which HitTest lets clicks fall through - fine for content, WRONG for an overlay). A panel/menu is
+                // opaque to the mouse: ABSORB the click within its bounds so it can't reach the window content behind it
+                // (e.g. the title bar's close button showing through the diagnostics SlidePanel). Returning the root cast to
+                // IInputComponent (may be null = nothing routed) still stops the fall-through to the content below.
+                if (popups[i].ClipRectangle.Contains(p))
+                    return popups[i] as IInputComponent;
+            }
         }
         return InputExtensions.HitTest(rootComponent, p);   // the plain visual hit-test (NOT this method - would recurse)
     }

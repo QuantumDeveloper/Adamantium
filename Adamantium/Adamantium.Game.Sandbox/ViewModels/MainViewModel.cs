@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Adamantium.MVVM;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Core;
 using Adamantium.Win32;
 
 namespace Adamantium.Game.Sandbox.ViewModels;
@@ -29,6 +30,15 @@ public partial class MainViewModel
     // One parameterized command the caption buttons share; the CommandParameter says which action it was.
     [Command] private void RunAction(string name) => LastCommand = name;
 
+    // Window resize mode (bound two-way to Window.ResizeMode) + a toggle between full edge resize and grip-only resize
+    // (the borderless ResizeGripper in the bottom-right corner).
+    [Bindable] private WindowResizeMode _windowResizeMode = WindowResizeMode.CanResize;
+
+    [Command] private void ToggleGripResize() =>
+        WindowResizeMode = WindowResizeMode == WindowResizeMode.CanResizeWithGrip
+            ? WindowResizeMode.CanResize
+            : WindowResizeMode.CanResizeWithGrip;
+
     // Right-side caption command bar (bound to Window.RightWindowCommands). Deliberately several items so they overflow
     // into the "..." menu when the window is narrowed - the resize-smaller use-case. Built lazily so the generated
     // commands exist by first bind.
@@ -49,5 +59,7 @@ public partial class MainViewModel
         // A real, distinct action to show variety: "Diagnostics" toggles the side panel; "File" just reports itself.
         new WindowCommand { IconData = "M1,13 L1,7 M6,13 L6,2 M11,13 L11,9",       Label = "Diagnostics", ToolTip = "Toggle diagnostics", Command = ToggleDiagnosticsCommand },
         new WindowCommand { IconData = "M2,0 L9,0 L12,3 L12,14 L2,14 Z M9,0 L9,3 L12,3", Label = "File",  ToolTip = "File",              Command = RunActionCommand, CommandParameter = "File" },
+        // Grip-only resize toggle - a diagonal resize double-arrow.
+        new WindowCommand { IconData = "M2,2 L12,12 M12,12 L12,8 M12,12 L8,12 M2,2 L2,6 M2,2 L6,2", Label = "Resize mode", ToolTip = "Toggle grip-only resize", Command = ToggleGripResizeCommand },
     };
 }

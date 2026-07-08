@@ -18,6 +18,20 @@
                   Width="200" Height="200" Margin="10"/>
         </WrapPanel>
 
+        <!-- Border showcase: uniform + non-uniform thickness, sharp + rounded corners, all with TRANSLUCENT fills and
+             brushes (the alpha composites over whatever is behind). Left-to-right: uniform | non-uniform thickness |
+             single-side accent | thick non-uniform sharp | thin non-uniform rounded | thin non-uniform sharp. -->
+        <TextBlock Text="Borders — non-uniform thickness &amp; translucent brushes:" Margin="0,20,0,6"/>
+        <WrapPanel Orientation="Horizontal">
+            <Border Width="120" Height="80" Margin="8" Background="#30FFFFFF" BorderBrush="#803B82F6" BorderThickness="4" CornerRadius="12"/>
+            <Border Width="120" Height="80" Margin="8" Background="#30FFFFFF" BorderBrush="#803B82F6" BorderThickness="2,6,10,14" CornerRadius="12"/>
+            <Border Width="120" Height="80" Margin="8" Background="#303B82F6" BorderBrush="#B0F59E0B" BorderThickness="0,0,0,10"/>
+            <Border Width="120" Height="80" Margin="8" Background="#20000000" BorderBrush="#90EF4444" BorderThickness="12,3,12,3"/>
+            <!-- Thin non-uniform rings (~1px per side). -->
+            <Border Width="120" Height="80" Margin="8" Background="#30FFFFFF" BorderBrush="#C03B82F6" BorderThickness="1,2,1,2" CornerRadius="10"/>
+            <Border Width="120" Height="80" Margin="8" Background="#30FFFFFF" BorderBrush="#C0EF4444" BorderThickness="1,1,2,1" CornerRadius="0"/>
+        </WrapPanel>
+
         <!-- Animated dashed outline (hover to trace it) - moved from the old MainWindow demo. -->
         <TextBlock Text="Hover the line to animate its dash:" Margin="0,16,0,6"/>
         <Line X1="0" Y1="0" X2="360" Y2="0"

@@ -36,11 +36,12 @@
                             <controls:Grid>
                                 <!-- Geometry normalised to start at (0,0): a Path's box is its geometry bounds, so leading
                                      empty space (the old M4.5,10...) pushed the centred glyph down-right = the "crooked"
-                                     look. White stroke (TextFillColorPrimary) reads on the accent-filled box; the theme's
-                                     AccentForegroundColor is black, which is what made the check look wrong. -->
+                                     look. The check sits on the accent-filled box, so it uses the theme's ON-ACCENT
+                                     contrast colour (white on a dark accent, black on a light one) - it adapts live when
+                                     the accent is cycled, matching the RadioButton dot / ToggleSwitch thumb. -->
                                 <controls:Path x:Name="CheckGlyph"
                                         Data="M0,4.5 L3.5,8 L10,0"
-                                        Stroke="{ResourceReference TextFillColorPrimary}"
+                                        Stroke="{ThemeResource AccentForegroundColor}"
                                         StrokeThickness="2"
                                         StrokeLineJoin="Round"
                                         Opacity="0"
@@ -50,7 +51,7 @@
                                         Width="10"
                                         Height="10"
                                         CornerRadius="2"
-                                        Background="{ResourceReference TextFillColorPrimary}"
+                                        Background="{ThemeResource AccentForegroundColor}"
                                         Opacity="0"
                                         HorizontalAlignment="Center"
                                         VerticalAlignment="Center"/>

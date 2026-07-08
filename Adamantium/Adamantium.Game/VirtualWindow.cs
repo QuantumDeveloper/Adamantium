@@ -64,6 +64,7 @@ public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopu
     public bool UseCustomChrome => false;
     public WindowResizeMode ResizeMode => WindowResizeMode.NoResize;
     public Rect CaptionDragRect { get; set; }
+    public Rect ResizeGripRect { get; set; }
     public IWindowRenderer DefaultRenderer { get; set; }
     public IWindowRenderer Renderer { get; set; }
 
@@ -108,6 +109,7 @@ public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopu
     public event EventHandler<WindowClosingEventArgs> Closing;
     public event MSAALeveChangedHandler MSAALevelChanged;
     public event StateChangedHandler StateChanged;
+    public event EventHandler ResizeModeChanged;   // never raised: a virtual window has no custom chrome / native worker
     public event EventHandler<EventArgs> Closed;
     public event EventHandler<WindowRendererChangedEventArgs> RendererChanged;
     public event EventHandler<EventArgs> SourceInitialized;

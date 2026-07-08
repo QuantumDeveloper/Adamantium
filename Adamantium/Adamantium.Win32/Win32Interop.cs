@@ -361,6 +361,11 @@ namespace Adamantium.Win32
         [DllImport("dwmapi.dll")]
         public static extern IntPtr DwmExtendFrameIntoClientArea(IntPtr hwnd, ref Margins margins);
 
+        // Windows 11 (build 22000+): set a DWM window attribute. For DWMWA_BORDER_COLOR (34) the value is a COLORREF
+        // (0x00BBGGRR); DWMWA_COLOR_DEFAULT/NONE are sentinels. Returns S_OK (0) on success, an error HRESULT on older OS.
+        [DllImport("dwmapi.dll")]
+        public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int pvAttribute, int cbAttribute);
+
         /*
             Graphics
         */
