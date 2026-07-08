@@ -88,9 +88,7 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         var clamped = ClampOffset(offset, _extent, _viewport);
         if (clamped == _offset) return;
         _offset = clamped;
-        InvalidateMeasure();   // re-window: realize/rebind the rows that just entered. Tiles keep ABSOLUTE slots (stable
-                               // across scroll -> Arrange short-circuits); the scroll presenter applies -offset as a single
-                               // translation of this extent-sized panel + clips (the physical-scroll seam, now shared).
+        InvalidateMeasure();   // a new window must be realized/measured
     }
 
     protected override Size MeasureOverride(Size availableSize)
@@ -111,10 +109,7 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         }
         finally { _inLayout = false; }
         RaiseMetrics();
-        // Report the FULL extent (not the viewport) as desired size: the scroll presenter then arranges this panel across
-        // the whole scrollable content and slides it by -offset (physical-scroll seam), so tiles sit at absolute slots and
-        // never overflow the panel's own bounds (which would be render-culled). Only the realized window is populated.
-        return _extent;
+        return _viewport;
     }
 
     protected override Size ArrangeOverride(Size finalSize)
@@ -124,8 +119,7 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         _inLayout = true;
         try
         {
-            // Do NOT set _viewport from finalSize here: finalSize is now the EXTENT the presenter arranges us across, while
-            // _viewport must stay the VISIBLE size (from measure) that drives windowing + the scrollbar thumb.
+            _viewport = finalSize;
             // Position against the SAME offset the measure realized/decided visibility with - NOT a fresh _offset (which
             // a mid-pass scroll may have moved). _offset itself is left as-is so the next pass picks up that newer value.
             var arrangeOffset = ClampOffset(_passOffset, _extent, finalSize);

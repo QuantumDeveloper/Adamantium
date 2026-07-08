@@ -27,6 +27,10 @@ public static class RenderDirty
     private static bool _transform;
     private static bool _structural;
 
+    // Monotonic test hook (like MeasurableUIComponent.TotalMeasureCalls): recycling-ring tests assert ZERO structural
+    // marks per continuous-scroll step, which is how they catch attach/detach/Visibility churn headlessly.
+    public static long TotalStructuralMarks;
+
     /// <summary>Records that <paramref name="component"/>'s recorded geometry changed - it will re-render.</summary>
     public static void MarkGeometry(IUIComponent component)
     {
@@ -37,7 +41,7 @@ public static class RenderDirty
     public static void MarkTransform() => _transform = true;
 
     /// <summary>Records a structural change (add/remove/command-count change) - the paint-order list must be rebuilt.</summary>
-    public static void MarkStructural() => _structural = true;
+    public static void MarkStructural() { _structural = true; TotalStructuralMarks++; }
 
     /// <summary>Any dirty state at all (else the frame is fully clean).</summary>
     public static bool HasWork => _structural || _transform || GeometrySet.Count > 0;

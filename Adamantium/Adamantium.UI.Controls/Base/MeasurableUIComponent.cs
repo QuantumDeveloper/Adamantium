@@ -243,10 +243,15 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             width = Math.Max(width, child.DesiredSize.Width);
             height = Math.Max(height, child.DesiredSize.Height);
         }
-        
-        foreach (var visual in LogicalChildren)
+
+        // Logical children that are NOT also visual children (rare) still need measuring; a child in BOTH collections
+        // (the norm) was already measured above - measuring it again is a wasted call for every element on every layout
+        // (the whole visual tree paid a 2x measure). A visual child has VisualParent == this, so that O(1) check skips the
+        // duplicate. (NB: we can't skip on IsMeasureValid - a valid child STILL re-measures when availableSize changes;
+        // Measure handles that via its own short-circuit, but only if we actually CALL it.)
+        foreach (var logical in LogicalChildren)
         {
-            var child = (MeasurableUIComponent)visual;
+            if (logical is not MeasurableUIComponent child || ReferenceEquals(child.VisualParent, this)) continue;
             child.Measure(availableSize);
             width = Math.Max(width, child.DesiredSize.Width);
             height = Math.Max(height, child.DesiredSize.Height);
@@ -319,10 +324,13 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             var child = (IMeasurableComponent)visual;
             child.Arrange(new Rect(finalSize));
         }
-        
-        foreach (var visual in LogicalChildren)
+
+        // Same O(1) de-dup as MeasureOverride: a logical child already arranged as a visual child (VisualParent == this)
+        // must not be arranged twice. (Not an IsArrangeValid check: a valid child still re-arranges when finalSize
+        // changes - Arrange short-circuits on an unchanged rect, but only if we CALL it.)
+        foreach (var logical in LogicalChildren)
         {
-            var child = (IMeasurableComponent)visual;
+            if (logical is not IMeasurableComponent child || ReferenceEquals(((IUIComponent)logical).VisualParent, this)) continue;
             child.Arrange(new Rect(finalSize));
         }
 
