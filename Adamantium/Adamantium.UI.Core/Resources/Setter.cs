@@ -36,6 +36,12 @@ public class Setter : ISetter, IEquatable<Setter>
             case ObservableResource observableResource:
                 observableResource.Apply(component, Property, ValuePriority.Style);
                 break;
+            case Ancestor ancestor:
+                ancestor.Apply(component, Property);
+                break;
+            case Self self:
+                self.Apply(component, Property);
+                break;
             default:
                 var prop = AdamantiumPropertyMap.FindRegistered(component.GetType(), Property);
                 if (prop == null)
@@ -96,6 +102,10 @@ public class Setter : ISetter, IEquatable<Setter>
                 break;
             case ObservableResource:
                 ObservableResource.Remove(component, Property, ValuePriority.Style);
+                break;
+            case Ancestor:
+            case Self:
+                component.RemoveBinding(Property);   // .Apply registered the expression in BindingEngine, keyed by property
                 break;
             default:
                 component.RemoveStyleValue(Property, style);

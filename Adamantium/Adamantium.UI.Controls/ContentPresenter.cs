@@ -39,10 +39,15 @@ public class ContentPresenter : InputUIComponent
     public static readonly AdamantiumProperty TransitionDurationProperty = AdamantiumProperty.Register(nameof(TransitionDuration),
         typeof(Double), typeof(ContentPresenter), new PropertyMetadata(0.25));
 
-    // Text styling for string content (the auto-generated TextBlock). Template-bound from the templated parent (e.g. a
-    // Button's Foreground/FontSize) so theme states - Pressed/Disabled text colour - drive it.
-    public static readonly AdamantiumProperty ForegroundProperty = AdamantiumProperty.Register(nameof(Foreground),
-        typeof(Brush), typeof(ContentPresenter), new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender, OnTextStyleChanged));
+    // Text styling for string content (the auto-generated TextBlock). Foreground is the INHERITED property from
+    // UIComponent; the override keeps the render flag + the OnTextStyleChanged callback that repaints generated text, and
+    // preserves Inherits. It's also template-bound from the templated parent (e.g. a Button's Foreground) so theme states
+    // - Pressed/Disabled text colour - drive it.
+    static ContentPresenter()
+    {
+        ForegroundProperty.OverrideMetadata(typeof(ContentPresenter),
+            new PropertyMetadata(null, PropertyMetadataOptions.Inherits | PropertyMetadataOptions.AffectsRender, OnTextStyleChanged));
+    }
 
     public static readonly AdamantiumProperty FontSizeProperty = AdamantiumProperty.Register(nameof(FontSize),
         typeof(Double), typeof(ContentPresenter), new PropertyMetadata(14.0, PropertyMetadataOptions.AffectsMeasure, OnTextStyleChanged));
@@ -254,12 +259,6 @@ public class ContentPresenter : InputUIComponent
     {
         get => GetValue<Double>(TransitionDurationProperty);
         set => SetValue(TransitionDurationProperty, value);
-    }
-
-    public Brush Foreground
-    {
-        get => GetValue<Brush>(ForegroundProperty);
-        set => SetValue(ForegroundProperty, value);
     }
 
     public Double FontSize

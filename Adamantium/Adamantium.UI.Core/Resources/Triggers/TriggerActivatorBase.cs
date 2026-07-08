@@ -135,6 +135,19 @@ internal abstract class TriggerActivatorBase : ITriggerActivator
                 ApplyTemplateBinding(setter, component, prop, templateBinding);
                 break;
 
+            // {Ancestor}/{Self} as a part-targeting trigger value: wire a live binding at Trigger priority, torn down on
+            // exit. NOTE: unlike the per-token stack above, two triggers writing the SAME part property via a relative
+            // binding don't stack (removal clears the whole binding slot) - fine for the normal single-trigger case.
+            case Ancestor ancestor:
+                ancestor.Apply(component, setter.Property, ValuePriority.Trigger);
+                _applied[setter] = (component, () => component.RemoveBinding(setter.Property));
+                break;
+
+            case Self self:
+                self.Apply(component, setter.Property, ValuePriority.Trigger);
+                _applied[setter] = (component, () => component.RemoveBinding(setter.Property));
+                break;
+
             default:
                 component.SetTriggerValue(prop, TypeCastFactory.CastFromString(setter.Value, prop.PropertyType), setter);
                 _applied[setter] = (component, () => component.ClearTriggerValue(prop, setter));
