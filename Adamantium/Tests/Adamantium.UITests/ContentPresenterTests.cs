@@ -1,6 +1,7 @@
 using System.Linq;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Decorators;
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
@@ -9,6 +10,49 @@ using Adamantium.UI.Core.Templates;
 using NUnit.Framework;
 
 namespace Adamantium.UITests;
+
+// Correctness contract for the recycling-list rebind optimisation, held for BOTH the recycling case (a virtualized list
+// rebinding a container to another same-template item) and the GENERAL ContentPresenter case (a Button/header whose
+// content changes to a different-sized element). Both must stay green.
+[TestFixture]
+public class ContentPresenterRebindTests
+{
+    // Invariant #2 (rebind = data-only): rebinding to a DIFFERENT item of the SAME DataTemplate must NOT re-measure the
+    // reused template subtree. Without it, every scrolled row re-measured its whole tile subtree (the Layout-tab cost).
+    [Test]
+    public void DataRebind_SameTemplate_DoesNotReMeasureSubtree()
+    {
+        var template = new DataTemplate(() => new TemplateResult { RootComponent = new Border { Child = new Border() } });
+        var cp = new ContentPresenter { ContentTemplate = template, Content = new object() };
+        cp.Measure(new Size(24, 24));
+        cp.Arrange(new Rect(0, 0, 24, 24));
+
+        var m0 = MeasurableUIComponent.TotalMeasureCalls;
+        // Exactly what ItemsControl.PrepareContainer does on a recycled rebind (same template):
+        cp.DataContext = new object();
+        cp.Content = new object();
+        cp.Measure(new Size(24, 24));   // the panel re-measures the container at the (unchanged) cell
+
+        var measures = MeasurableUIComponent.TotalMeasureCalls - m0;
+        Assert.That(measures, Is.LessThanOrEqualTo(1),
+            $"a same-template data rebind must not re-measure the reused subtree (got {measures} measure calls)");
+    }
+
+    // General correctness (NOT recycling): replacing content with a DIFFERENT-sized element must re-measure + resize the
+    // presenter. The recycling optimisation must not break this.
+    [Test]
+    public void ContentReplace_DifferentSizedElement_ResizesPresenter()
+    {
+        var cp = new ContentPresenter { Content = new Border { Width = 10, Height = 10 } };
+        cp.Measure(Size.Infinity);
+        Assert.That(cp.DesiredSize, Is.EqualTo(new Size(10, 10)));
+
+        cp.Content = new Border { Width = 50, Height = 40 };
+        cp.Measure(Size.Infinity);
+        Assert.That(cp.DesiredSize, Is.EqualTo(new Size(50, 40)),
+            "replacing content with a bigger element must re-measure and resize the presenter");
+    }
+}
 
 // The recycling fast-path that keeps a virtualized list from churning GPU buffers on every scroll frame: rebinding a
 // ContentPresenter to new content of the SAME shape reuses the existing visual instead of tearing it down and rebuilding

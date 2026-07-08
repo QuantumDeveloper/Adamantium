@@ -23,6 +23,8 @@ public class ContentPresenter : InputUIComponent
     private TemplateResult _outgoingTemplateResult;
     private bool _isContentChanged;
     private bool _transitionPending;
+    private bool _lastContentRebuilt;                          // did the last measure REBUILD the visual (vs data-only reuse)?
+    private Size _lastArrangeSize = new(double.NaN, double.NaN);   // last finalSize we actually walked in ArrangeOverride
 
     public static readonly AdamantiumProperty ContentProperty = AdamantiumProperty.Register(nameof(Content),
         typeof(object), typeof(ContentPresenter), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, OnContentPropertyChanged));
@@ -81,10 +83,13 @@ public class ContentPresenter : InputUIComponent
         }
     }
 
-    private void UpdateVisualContent(object newContent)
+    // Returns TRUE if it tore down and built a NEW visual (so the presenter must re-measure/arrange the new subtree),
+    // FALSE if the existing visual was reused or nothing changed (a data-only rebind: the reused subtree keeps its size,
+    // so the presenter can skip re-walking it - the reused child invalidates ITSELF if its own size actually changed).
+    private bool UpdateVisualContent(object newContent)
     {
         if (!_isContentChanged)
-            return;
+            return false;
 
         _isContentChanged = false;
 
@@ -96,7 +101,7 @@ public class ContentPresenter : InputUIComponent
         {
             var reuseTemplate = ContentTemplate ?? ContentTemplateSelector?.SelectTemplate(newContent, this);
             if (ReferenceEquals(reuseTemplate, _currentTemplate))
-                return;   // reuse: no teardown, no rebuild
+                return false;   // reuse: no teardown, no rebuild (data updates via the reused visual's DataContext)
         }
 
         // Recycling fast-path 2: plain (no-template) content already hosted in the auto-generated TextBlock - just update
@@ -108,8 +113,8 @@ public class ContentPresenter : InputUIComponent
             && _currentRoot is TextBlock reusableText
             && ContentTemplate == null && ContentTemplateSelector == null)
         {
-            reusableText.Text = newContent.ToString();
-            return;
+            reusableText.Text = newContent.ToString();   // Text is AffectsMeasure -> the TextBlock re-measures itself if it grew
+            return false;
         }
 
         // A new swap supersedes one still mid-flight: finish the previous transition instantly before starting over.
@@ -149,6 +154,7 @@ public class ContentPresenter : InputUIComponent
         _transitionPending = animate && _currentRoot != null;
         if (animate && !_transitionPending)
             RemoveOutgoing();
+        return true;   // a new visual was built -> the presenter must measure/arrange it
     }
 
     private void BuildCurrent(object newContent)
@@ -283,12 +289,25 @@ public class ContentPresenter : InputUIComponent
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        UpdateVisualContent(Content);
+        _lastContentRebuilt = UpdateVisualContent(Content);
+        // Data-only reuse (a virtualized list rebinding a recycled container): the visual is kept and only its bound data
+        // changed, so the subtree's SIZE is unchanged - skip re-walking it. If the reused child's OWN size actually changed
+        // (a string's text, an AffectsMeasure binding), it invalidated ITSELF, so IsMeasureValid is false and we fall
+        // through to measure it. A genuine content REBUILD (_lastContentRebuilt) always measures the new subtree.
+        if (!_lastContentRebuilt && _currentRoot is IMeasurableComponent { IsMeasureValid: true }
+            && PreviousMeasureConstraint == availableSize)
+            return DesiredSize;
         return base.MeasureOverride(availableSize);
     }
 
     protected override Size ArrangeOverride(Size finalSize)
     {
+        // Mirror the measure skip: a data-only reuse at the same arranged size leaves the subtree positioned as-is, so
+        // don't re-walk it. A rebuilt/resized child was re-measured (arrange-invalid) and is handled by base below.
+        if (!_lastContentRebuilt && _currentRoot is IMeasurableComponent { IsArrangeValid: true } && finalSize == _lastArrangeSize)
+            return finalSize;
+
+        _lastArrangeSize = finalSize;
         var size = base.ArrangeOverride(finalSize);
 
         if (_transitionPending)

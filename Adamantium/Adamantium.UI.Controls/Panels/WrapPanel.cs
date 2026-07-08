@@ -303,8 +303,15 @@ public class WrapPanel : VirtualizingPanel
          else
          {
             var scrollOffset = horizontal ? offset.Y : offset.X;
-            var firstLine = Math.Max(0, (int)Math.Floor(scrollOffset / _cellScroll) - Buffer);
-            var lastLine = Math.Min(lines - 1, (int)Math.Ceiling((scrollOffset + viewportScroll) / _cellScroll) + Buffer);
+            // Recycling-ring invariant #1 (CONSTANT window): derive BOTH edges from the same floor(top) so they move in
+            // lockstep. Independent floor(top)/ceil(bottom) advance at different sub-cell offsets, so a fractional (real
+            // inertia) scroll oscillated the window by one row each frame - which broke donor reuse and churned a whole
+            // row's Visibility every frame. A fixed spanRows slides cleanly: floor advances 1 => first++ AND last++, so
+            // every leaving row's container is reused for the entering row. spanRows covers viewport + top/bottom buffer.
+            var spanRows = (int)Math.Ceiling(viewportScroll / _cellScroll) + 1 + 2 * Buffer;
+            var topLine = (int)Math.Floor(scrollOffset / _cellScroll);
+            var firstLine = Math.Max(0, topLine - Buffer);
+            var lastLine = Math.Min(lines - 1, firstLine + spanRows);
             _lastFirstLine = firstLine;
             first = firstLine * _columns;
             last = Math.Min(count - 1, (lastLine + 1) * _columns - 1);
@@ -357,19 +364,15 @@ public class WrapPanel : VirtualizingPanel
    protected override void ArrangeVirtualized(Size finalSize, Vector2 offset)
    {
       var horizontal = Orientation == Orientation.Horizontal;
+      var scrollOffset = horizontal ? offset.Y : offset.X;
 
-      // ABSOLUTE grid positions - the scroll offset is applied by the panel's RenderTransform (see VirtualizingPanel's
-      // scroll transform), NOT baked into each tile's slot. A tile's arranged rect is therefore CONSTANT across scroll, so
-      // Arrange() short-circuits (rect == _previousArrange) for every tile that stayed put; only rows that just entered the
-      // window actually re-arrange. That turns per-scroll arrange from a deep re-layout of every visible tile (the
-      // ContentPresenter+Shape recursion that dropped FPS to zero) into O(rows entering view).
       foreach (var index in Owner.ItemContainerGenerator.RealizedIndices.ToList())
       {
          if (Owner.ItemContainerGenerator.ContainerFromIndex(index) is not IMeasurableComponent container) continue;
          var line = index / _columns;
          var col = index % _columns;
          var flowPos = col * _cellFlow;
-         var scrollPos = line * _cellScroll;
+         var scrollPos = line * _cellScroll - scrollOffset;
          container.Arrange(horizontal
             ? new Rect(flowPos, scrollPos, _cellFlow, _cellScroll)
             : new Rect(scrollPos, flowPos, _cellScroll, _cellFlow));

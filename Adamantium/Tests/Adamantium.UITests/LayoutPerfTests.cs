@@ -150,6 +150,49 @@ public class LayoutPerfTests
         for (var i = 0; i < 5; i++) { ScrollStep(root, ic, panel, y += ViewportH); Settle(root, ic); }
     }
 
+    // The mature-virtualizer contract, asserted on CONTINUOUS scroll (one row per step, NO settle between steps - the app
+    // scrolls continuously, which is exactly what my earlier Settle()-per-step bench masked). A correct recycling ring:
+    //  - realized container count is CONSTANT (a fixed ring, not a growing/oscillating window);
+    //  - ZERO structural marks per scroll step (containers are rebound in place - no attach/detach, no Visibility toggle);
+    //  - measure calls per step are O(one row), not O(whole window) (rebind is data-only; stable tiles don't re-measure).
+    // This test is expected to FAIL on the pre-fix code (it oscillates + churns) - it defines "correct" so drift can't hide.
+    [Test]
+    public void Scroll_RecyclingRingInvariants()
+    {
+        var (root, ic, panel) = BuildTiles(6000, 24);
+        Settle(root, ic);
+        // Warm up with a few FRACTIONAL (sub-cell) scroll steps: real inertia scrolls by fractional pixels, so the offset
+        // sits mid-cell where floor(top)/ceil(bottom) diverge - the exact condition my earlier whole-cell (y+=24) steps
+        // land ON the boundary and hid. Warm past the initial 1250->1300 fill first, then lock the invariants.
+        double y = 500;
+        for (var i = 0; i < 5; i++) { y += 7; panel.SetOffset(new Vector2(0, (float)y)); WindowExtension.UpdateTree(root); }
+        var baseline = ic.ItemContainerGenerator.RealizedCount;
+        var rowStride = baseline / 6;                         // generous O(one row) bound
+        TestContext.WriteLine($"=== Recycling-ring invariants (6000 @24, fractional scroll, ring={baseline}) ===");
+
+        var failures = new System.Collections.Generic.List<string>();
+        for (var step = 0; step < 30; step++)
+        {
+            var m0 = MeasurableUIComponent.TotalMeasureCalls;
+            var s0 = RenderDirty.TotalStructuralMarks;
+
+            y += 7;                                           // fractional (sub-cell) scroll, CONTINUOUS (no Settle)
+            panel.SetOffset(new Vector2(0, (float)y));
+            WindowExtension.UpdateTree(root);
+
+            var measures = MeasurableUIComponent.TotalMeasureCalls - m0;
+            var structs = RenderDirty.TotalStructuralMarks - s0;
+            var realized = ic.ItemContainerGenerator.RealizedCount;
+            TestContext.WriteLine($"step {step,2}: realized={realized,-5} measures={measures,-5} struct={structs}");
+
+            if (realized != baseline) failures.Add($"step {step}: realized {realized} != {baseline} (ring oscillates/not constant)");
+            if (structs != 0)         failures.Add($"step {step}: struct {structs} != 0 (attach/Visibility churn)");
+            if (measures > rowStride)  failures.Add($"step {step}: measures {measures} > {rowStride} (~O(one row)) - re-measuring the window");
+        }
+
+        Assert.That(failures, Is.Empty, "recycling-ring invariants violated:\n" + string.Join("\n", failures.Take(8)));
+    }
+
     [Test]
     public void Shrink_ReLayoutCost()
     {
