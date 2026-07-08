@@ -54,4 +54,11 @@ public struct FontItem
     /// </summary>
     [VertexInputElement("BLENDINDICES0")]
     public int SpriteEffects;
+
+    /// <summary>
+    /// Atlas array LAYER: which Texture2DArray slice this glyph's UVs live in. The vertex shader passes it as UV.z so
+    /// the pixel shader samples the right slice. Kept as float for a portable vertex attribute.
+    /// </summary>
+    [VertexInputElement("PSIZE2")]
+    public Single Layer;
 }

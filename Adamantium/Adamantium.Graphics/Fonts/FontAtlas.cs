@@ -16,6 +16,7 @@ namespace Adamantium.Graphics.Fonts
     {
         private TextureAtlasGenerator atlasGenerator;
         private Dictionary<uint, Glyph> processedGlyphs;
+        private bool _warnedLayersExhausted;
         
         private SamplerState assignedSamplerState;
         private Color foregroundColor;
@@ -45,6 +46,11 @@ namespace Adamantium.Graphics.Fonts
 
         public double LineSpacingMultiplier { get; set; }
 
+        // The dynamic atlas is a Texture2DArray: each layer is one atlasSize x atlasSize slice holding ~225 shelf-packed
+        // glyphs, so N layers give ~N*225 glyph capacity (v1: fixed 8 => ~1800, enough for Latin + Cyrillic + symbols).
+        // When the packer fills all layers it clamps to the last one (LayersExhausted) instead of the old past-256 crash.
+        public const uint AtlasLayerCount = 8;
+
         public FontAtlas(IGraphicsDevice device, Typeface typeface, FontParameters parameters, uint atlasSize = 1024) : base(device)
         {
             processedGlyphs = new Dictionary<uint, Glyph>();
@@ -60,7 +66,7 @@ namespace Adamantium.Graphics.Fonts
             GlyphMargin = parameters.GlyphMargin;
             LineSpacingMultiplier = Font.LineSpacingMultiplier;
             
-            AtlasData = new FontAtlasData(MSDFTextureSize, new Size(atlasSize, atlasSize));
+            AtlasData = new FontAtlasData(MSDFTextureSize, new Size(atlasSize, atlasSize), AtlasLayerCount);
             
             atlasGenerator = new TextureAtlasGenerator(
                 Typeface, 
@@ -73,7 +79,7 @@ namespace Adamantium.Graphics.Fonts
                 Width = atlasSize,
                 Height = atlasSize,
                 Depth = 1,
-                ArrayLayers = 1,
+                ArrayLayers = AtlasLayerCount,
                 MipLevels = 1,
                 Samples = MSAALevel.None,
                 Format = Format.R8G8B8A8_UNORM,
@@ -113,6 +119,12 @@ namespace Adamantium.Graphics.Fonts
                 ProcessTextureData(textureDataArray);
             }
 
+            if (AtlasData.LayersExhausted && !_warnedLayersExhausted)
+            {
+                _warnedLayersExhausted = true;
+                System.Console.WriteLine($"[FONT] Dynamic atlas exhausted all {AtlasLayerCount} layers; further glyphs overwrite the last. Raise FontAtlas.AtlasLayerCount or add dynamic growth.");
+            }
+
             foreach (var glyph in glyphsToProcess)
             {
                 processedGlyphs[glyph.Index] = glyph;
@@ -143,7 +155,10 @@ namespace Adamantium.Graphics.Fonts
                 region.ImageSubresource = new ImageSubresourceLayers();
                 region.ImageSubresource.AspectMask = ImageAspectFlagBits.ColorBit;
                 region.ImageSubresource.MipLevel = 0;
-                region.ImageSubresource.BaseArrayLayer = 0;
+                // The glyph goes into its ARRAY LAYER (DepthLayer), at its 2D position within that layer. Depth stays 1
+                // (a 2D-array slice is 1 deep); the layer selects the slice via BaseArrayLayer. The old code put the layer
+                // in ImageExtent.Depth on a 1-deep 2D image, which the GPU rejected once a second layer appeared.
+                region.ImageSubresource.BaseArrayLayer = textureData.DepthLayer;
                 region.ImageSubresource.LayerCount = 1;
                 region.ImageOffset = new Offset3D()
                 {
@@ -153,9 +168,9 @@ namespace Adamantium.Graphics.Fonts
                 };
                 region.ImageExtent = new Extent3D()
                 {
-                    Width = (uint)textureData.FullGlyphSize.Width, 
-                    Height = (uint)textureData.FullGlyphSize.Height, 
-                    Depth = textureData.DepthLayer
+                    Width = (uint)textureData.FullGlyphSize.Width,
+                    Height = (uint)textureData.FullGlyphSize.Height,
+                    Depth = 1
                 };
 
                 commandBuffer.CopyBufferToImage(buffer, Atlas, ImageLayout.TransferDstOptimal, 1, region);

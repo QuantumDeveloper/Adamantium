@@ -72,6 +72,7 @@ namespace Adamantium.Fonts.TextureGeneration
             // side, body centred by the generator), so no extra alignment is needed here. The cursor lives on
             // atlasData so packing continues correctly as the dynamic atlas keeps adding glyphs across calls.
             var atlasWidth = (int)atlasData.AtlasSize.Width;
+            var atlasHeight = (int)atlasData.AtlasSize.Height;
 
             foreach (var glyphData in textureData)
             {
@@ -85,11 +86,21 @@ namespace Adamantium.Fonts.TextureGeneration
                     atlasData.ShelfHeight = 0;
                 }
 
+                // The shelf overflows this LAYER's height -> move to the next array layer (reset cursor + layer++). This
+                // is what lets the atlas hold more than one 1024x1024 slice's worth of glyphs. The old code let PackY grow
+                // past the texture (off-atlas UVs) and separately drove the upload Depth from the layer, which crashed the
+                // GPU once a second layer appeared (>~256 glyphs).
+                if (atlasData.PackY + h > atlasHeight)
+                {
+                    atlasData.AdvanceToNextLayer();
+                }
+
                 glyphData.BoundingRect.Left = atlasData.PackX;
                 glyphData.BoundingRect.Top = atlasData.PackY;
+                glyphData.DepthLayer = atlasData.CurrentDepthLayer;
 
                 atlasData.PackX += w;
-                if (h > atlasData.ShelfHeight) 
+                if (h > atlasData.ShelfHeight)
                     atlasData.ShelfHeight = h;
 
                 glyphData.CalculateUV(atlasData.AtlasSize);
@@ -210,12 +221,8 @@ namespace Adamantium.Fonts.TextureGeneration
                 new ParallelOptions() { MaxDegreeOfParallelism = Environment.ProcessorCount }, GenerateTextureForGlyph);
 
             var data = atlasData.GetGlyphData(glyphs.Select(x=>x.Index).ToArray());
-            foreach (var glyphTextureData in data)
-            {
-                glyphTextureData.IndexInAtlas = atlasData.NextIndexInArray;
-                glyphTextureData.DepthLayer = atlasData.CurrentDepthLayer;
-            }
-            
+            // Shelf-packs each glyph and assigns its BoundingRect, DepthLayer (which array slice) and UV. The layer now
+            // comes from the packer overflowing a slice, not a fixed 256 counter.
             CalculateTextureDataForAtlas(data);
 
             return data;

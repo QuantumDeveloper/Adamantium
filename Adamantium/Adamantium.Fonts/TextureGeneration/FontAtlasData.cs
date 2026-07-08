@@ -25,34 +25,39 @@ namespace Adamantium.Fonts.TextureGeneration
         public int PackY { get; set; }
         public int ShelfHeight { get; set; }
 
-        public uint CurrentIndexInArray { get; private set; }
-        
+        // Which array-texture LAYER glyphs are currently packed into (0-based). Each layer is one AtlasSize slice; the
+        // shelf packer advances to the next layer (AdvanceToNextLayer) when a glyph won't fit in the current one's height.
         public uint CurrentDepthLayer { get; private set; }
-        
-        public uint NextIndexInArray
+
+        // Number of array layers the atlas texture has. Packing never advances past the last one.
+        public uint LayerCount { get; }
+
+        // Set once packing has had to clamp to the last layer (further glyphs overwrite it). The caller can warn; the old
+        // behaviour instead wrote layer 2 into a 1-layer 2D image, which crashed the GPU past ~256 glyphs.
+        public bool LayersExhausted { get; private set; }
+
+        // Move packing to the next array layer: reset the shelf cursor and bump the layer, clamped at the last layer.
+        public void AdvanceToNextLayer()
         {
-            get
-            {
-                var index = CurrentIndexInArray++;
-                if (index > 255)
-                {
-                    CurrentIndexInArray = 0;
-                    index = 0;
-                    CurrentDepthLayer++;
-                }
-                return index;
-            }
+            PackX = 0;
+            PackY = 0;
+            ShelfHeight = 0;
+            if (CurrentDepthLayer + 1 < LayerCount)
+                CurrentDepthLayer++;
+            else
+                LayersExhausted = true;
         }
 
-        public FontAtlasData(uint glyphTextureSize)
+        public FontAtlasData(uint glyphTextureSize, uint layerCount = 1)
         {
             GlyphTextureSize = glyphTextureSize;
             glyphData = new List<GlyphTextureData>();
             glyphDataMap = new Dictionary<uint, GlyphTextureData>();
-            CurrentDepthLayer = 1;
+            LayerCount = Math.Max(1, layerCount);
+            CurrentDepthLayer = 0;
         }
 
-        public FontAtlasData(uint glyphTextureSize, Size atlasSize) : this(glyphTextureSize)
+        public FontAtlasData(uint glyphTextureSize, Size atlasSize, uint layerCount = 1) : this(glyphTextureSize, layerCount)
         {
             AtlasSize = atlasSize;
         }

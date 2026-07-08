@@ -10,7 +10,24 @@ struct FontItem
     float Rotation : PSIZE1;
     float4 Color: COLOR0;
     int SpriteEffect : BLENDINDICES0;
+    // The C# FontItem sends the atlas array slice here (per glyph), but the shader does NOT read it yet - see the
+    // DRIVER-BUG note below. Kept so the pipeline is ready to go dynamic without a vertex-format change.
+    float Layer : PSIZE2;
 };
+
+// ============================================================================================================
+// DRIVER BUG WORKAROUND (NVIDIA Quadro RTX 4000, VK_EXT_shader_object). This driver's shader-object compiler AVs
+// (vkCreateShadersEXT, 0xC0000005) on ANY non-trivial Texture2DArray use in this shader: a runtime layer index, an
+// extra VS->PS varying, OR a switch of constant-index samples ALL crash it. Bisection proved the ONLY form that
+// compiles is a SINGLE sample with a COMPILE-TIME-CONSTANT layer (validation-clean, so a pure driver compiler bug).
+// So for now we sample layer 0 (constant) and carry NO layer varying. The atlas IS a real Texture2DArray and the C#
+// side packs glyphs across layers, so when the driver is fixed, GO DYNAMIC by:
+//   1) add `nointerpolation float Layer : TEXCOORD2;` to PSInput
+//   2) in ExpandGlyphCorner: `vertex.Layer = item.Layer;`
+//   3) replace each `float3(input.UV, 0)` below with `float3(input.UV, input.Layer)`
+// Until then only layer-0 glyphs render correctly (~one 1024x1024 layer's worth); glyphs the packer spills to layers
+// 1+ will mis-sample (they read layer 0) - NOT a crash. Effective capacity today ~= the old single-layer atlas.
+// ============================================================================================================
 
 struct PSInput
 {
@@ -19,7 +36,7 @@ struct PSInput
     float4 Color : COLOR;
 };
 
-Texture2D Texture : register(t1);
+Texture2DArray Texture : register(t1);
 SamplerState TextureSampler : register(s1);
 
 float4x4 MatrixTransform;
@@ -124,7 +141,7 @@ float4 FontPixelShader(PSInput input) : SV_Target
     float2 uv = input.UV * MSDFAtlasSize;
     float2 Jdx = ddx(uv);
     float2 Jdy = ddy(uv);
-    float4 samp = Texture.Sample(TextureSampler, input.UV);
+    float4 samp = Texture.Sample(TextureSampler, float3(input.UV, 0));
 
     // Signed distance (normalized, contour at 0.5). FontWeight shifts the contour for thinner/thicker
     // stems. Coverage source switches MSDF -> true-SDF with minification (see SampleGlyphCoverage).
@@ -154,7 +171,7 @@ float4 FontPixelShader(PSInput input) : SV_Target
 [shader("fragment")]
 float4 FontPixelShaderMsdf(PSInput input) : SV_Target
 {
-    float4 samp = Texture.Sample(TextureSampler, input.UV);
+    float4 samp = Texture.Sample(TextureSampler, float3(input.UV, 0));
     float sd = SampleGlyphCoverage(samp, input.UV);
     float opacity = clamp(ScreenPxRange(input.UV) * (sd - 0.5 + FontWeight) + 0.5, 0.0, 1.0);
     // Gamma-boost the coverage (same as the gradient pass): raises partial opacities so thin stems keep
@@ -172,7 +189,7 @@ float4 FontPixelShaderMsdf(PSInput input) : SV_Target
 [shader("fragment")]
 float4 FontPixelShaderMsdfBatch(PSInput input) : SV_Target
 {
-    float4 samp = Texture.Sample(TextureSampler, input.UV);
+    float4 samp = Texture.Sample(TextureSampler, float3(input.UV, 0));
     float sd = SampleGlyphCoverage(samp, input.UV);
     float opacity = clamp(ScreenPxRange(input.UV) * (sd - 0.5 + FontWeight) + 0.5, 0.0, 1.0);
     float alpha = pow(input.Color.a * opacity, 1.0 / 2.2);
@@ -187,7 +204,7 @@ float4 FontPixelShaderMsdfBatch(PSInput input) : SV_Target
 [shader("fragment")]
 float4 FontPixelShaderMsdfOutline(PSInput input) : SV_Target
 {
-    float3 samp = Texture.Sample(TextureSampler, input.UV).rgb;
+    float3 samp = Texture.Sample(TextureSampler, float3(input.UV, 0)).rgb;
     float sd = Median(samp.r, samp.g, samp.b);
     float screenPx = ScreenPxRange(input.UV);
 
@@ -207,7 +224,7 @@ float4 StrokedTextPS(PSInput input) : SV_Target
     if (FontSize > FontSizeThreshold) // large stroke
     {
         float2 msdfUnit = PxRange / MSDFAtlasSize;
-        float3 samp = Texture.Sample(TextureSampler, input.UV).rgb;
+        float3 samp = Texture.Sample(TextureSampler, float3(input.UV, 0)).rgb;
 
         float sigDist = Median(samp.r, samp.g, samp.b) - 0.5;
         sigDist = sigDist * dot(msdfUnit, 0.5 / fwidth(input.UV));
@@ -225,7 +242,7 @@ float4 StrokedTextPS(PSInput input) : SV_Target
         float2 uv = input.UV * MSDFAtlasSize;
         float2 Jdx = ddx(uv);
         float2 Jdy = ddy(uv);
-        float4 samp = Texture.Sample(TextureSampler, input.UV);
+        float4 samp = Texture.Sample(TextureSampler, float3(input.UV, 0));
 
         // Same coverage source as the plain text pass: MSDF when magnified, true-SDF when minified.
         float coverage = SampleGlyphCoverage(samp, input.UV);
