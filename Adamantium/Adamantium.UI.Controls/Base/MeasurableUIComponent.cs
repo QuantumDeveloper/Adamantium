@@ -226,6 +226,11 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
 
     public static long TotalArrangeCalls { get; private set; }
 
+    // Test hook: arranges that actually did WORK (ran ArrangeCore + recursed), vs TotalArrangeCalls which also counts
+    // arranges that short-circuited on an unchanged rect. Transform-only scroll keeps a staying tile's rect constant, so
+    // it short-circuits here; a steady-state scroll runs ArrangeCore only for the rows that entered the window.
+    public static long TotalArrangeCores { get; private set; }
+
     /// <summary>
     /// Measures the control and its child elements as part of a layout pass.
     /// </summary>
@@ -373,6 +378,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         if (force || !IsArrangeValid || _previousArrange != rect)
         {
             IsArrangeValid = true;
+            TotalArrangeCores++;
             ArrangeCore(rect);
             _previousArrange = rect;
             if (LayoutTrace.Enabled) LayoutTrace.Log($"  ARRANGE {LayoutName}: rect={rect} -> bounds={Bounds} render={RenderSize}");

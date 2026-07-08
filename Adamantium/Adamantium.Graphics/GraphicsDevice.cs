@@ -1295,9 +1295,19 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         // invalidated at BeginDraw, so the first draw of a command buffer still emits everything.
         if (!_stateInitialized || _cVertexType != VertexType)
         {
-            var bindingDescription = VertexType.GetBindingDescription2();
-            var attributes = VertexType.GetVertexAttributeDescription2();
-            commandBuffer.SetVertexInputEXT(1, bindingDescription, (uint)attributes.Length, attributes);
+            if (VertexType == null)
+            {
+                // No vertex input: a draw whose vertices come only from SV_VertexID and whose per-instance data is read
+                // from a storage buffer by SV_InstanceID (the instanced SDF batch). Bind an EMPTY vertex-input state so
+                // the pipeline expects no vertex buffer (else GetBindingDescription2(null) throws + aborts the frame).
+                commandBuffer.SetVertexInputEXT(0, default(VertexInputBindingDescription2EXT), 0, System.Array.Empty<VertexInputAttributeDescription2EXT>());
+            }
+            else
+            {
+                var bindingDescription = VertexType.GetBindingDescription2();
+                var attributes = VertexType.GetVertexAttributeDescription2();
+                commandBuffer.SetVertexInputEXT(1, bindingDescription, (uint)attributes.Length, attributes);
+            }
             _cVertexType = VertexType;
         }
         if (!_stateInitialized || _cRasterizerDiscard != RasterizerDiscardEnabled)

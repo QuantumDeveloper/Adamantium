@@ -39,6 +39,13 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     /// <summary>GPU-buffer element capacity for THIS frame - derived TryAdd guards against overflowing it.</summary>
     protected int GpuCapacity => _gpuCapacity;
 
+    /// <summary>Override to allocate the batch buffer as a BDA STORAGE buffer (per-instance data read in the vertex shader
+    /// by SV_InstanceID) instead of a per-instance VERTEX buffer. Enables the retained/incremental instanced path.</summary>
+    protected virtual bool UsesStorageBuffer => false;
+
+    /// <summary>The batch buffer (its device address feeds the instanced shader when <see cref="UsesStorageBuffer"/>).</summary>
+    protected Buffer<TItem> GpuBuffer => _gpu;
+
     public void BeginFrame(IGraphicsDevice device)
     {
         Count = 0;
@@ -47,7 +54,11 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         if (_gpu == null || _gpuCapacity < Items.Length)
         {
             _gpu?.Dispose();
-            _gpu = Adamantium.Graphics.Buffer.Vertex.New<TItem>(device, (uint)Items.Length, BufferMemoryUsage.UploadFromCpuToGpu);
+            _gpu = UsesStorageBuffer
+                ? Adamantium.Graphics.Buffer.New<TItem>(device, (uint)Items.Length,
+                    BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
+                    MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal)
+                : Adamantium.Graphics.Buffer.Vertex.New<TItem>(device, (uint)Items.Length, BufferMemoryUsage.UploadFromCpuToGpu);
             _gpuCapacity = Items.Length;
         }
         OnBeginFrame(device);

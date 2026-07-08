@@ -99,7 +99,8 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
     {
         if (Delegating)
         {
-            _inner.SetOffset(offset);   // the panel clamps, re-windows, and raises its own metrics
+            _inner.SetOffset(offset);   // the panel clamps, re-windows (realizes/rebinds entering rows), raises metrics
+            InvalidateArrange();        // ...and WE re-translate the panel by the new -offset (transform-only scroll)
             return;
         }
 
@@ -288,10 +289,14 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
 
         if (Delegating)
         {
-            // The inner panel owns the offset (it positions its realized window itself), so just arrange the content
-            // across the viewport - no pixel translation.
+            // The inner virtualizing panel realizes only the visible window and arranges those tiles at ABSOLUTE slots
+            // (offset NOT baked in). We scroll it like physical content: keep the panel VIEWPORT-sized (so its clamp +
+            // scrollbar stay correct) and slide it up/left by the offset. Tiles that scrolled off overflow the panel; our
+            // ClipToBounds trims to the viewport. A scroll is then ONE translation here plus the panel rebinding the row
+            // that entered - staying tiles keep their slots and Arrange short-circuits.
+            var offset = _inner.Offset;
             if (VisualChildren.FirstOrDefault() is IMeasurableComponent inner)
-                inner.Arrange(new Rect(finalSize));
+                inner.Arrange(new Rect(-offset.X, -offset.Y, finalSize.Width, finalSize.Height));
             RaiseMetricsChanged();
             return finalSize;
         }

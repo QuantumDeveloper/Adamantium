@@ -19,10 +19,16 @@ public partial class MainViewModel
     [Bindable]
     private double _width = 150;
 
-    // Opens the diagnostics SlidePanel (so the live stats don't cover the window content unless asked for).
+    // Shows the permanent diagnostics PLATE (top-right overlay). Driven by the right-side Diagnostics ToggleSwitch.
     [Bindable] private bool _diagnosticsOpen;
 
     [Command] private void ToggleDiagnostics() => DiagnosticsOpen = !DiagnosticsOpen;
+
+    // Opens the diagnostics SLIDEPANEL (slides in from the right). Driven by the LEFT caption "Diagnostics" command -
+    // kept separate from the plate so the two diagnostics surfaces are toggled independently.
+    [Bindable] private bool _diagnosticsPanelOpen;
+
+    [Command] private void ToggleDiagnosticsPanel() => DiagnosticsPanelOpen = !DiagnosticsPanelOpen;
 
     // Last title-bar command that ran - shown in the content so the demo commands do something visible AND distinct.
     [Bindable] private string _lastCommand = "(none)";
@@ -57,7 +63,7 @@ public partial class MainViewModel
     public IEnumerable LeftWindowCommands => _leftWindowCommands ??= new()
     {
         // A real, distinct action to show variety: "Diagnostics" toggles the side panel; "File" just reports itself.
-        new WindowCommand { IconData = "M1,13 L1,7 M6,13 L6,2 M11,13 L11,9",       Label = "Diagnostics", ToolTip = "Toggle diagnostics", Command = ToggleDiagnosticsCommand },
+        new WindowCommand { IconData = "M1,13 L1,7 M6,13 L6,2 M11,13 L11,9",       Label = "Diagnostics", ToolTip = "Toggle diagnostics panel", Command = ToggleDiagnosticsPanelCommand },
         new WindowCommand { IconData = "M2,0 L9,0 L12,3 L12,14 L2,14 Z M9,0 L9,3 L12,3", Label = "File",  ToolTip = "File",              Command = RunActionCommand, CommandParameter = "File" },
         // Grip-only resize toggle - a diagonal resize double-arrow.
         new WindowCommand { IconData = "M2,2 L12,12 M12,12 L12,8 M12,12 L8,12 M2,2 L2,6 M2,2 L6,2", Label = "Resize mode", ToolTip = "Toggle grip-only resize", Command = ToggleGripResizeCommand },

@@ -63,10 +63,11 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
     {
         Children.Clear();   // drop any plain children; the window is managed via the generator from here
         Owner = owner;
-        // The realized window positions items at offset-relative coords, so a couple of buffer items (and, mid-scroll,
-        // items being realized/recycled) sit just outside the panel's viewport. Clip to the panel's own bounds so those
-        // never paint past the list - the closest clip to the items, independent of the ScrollViewer above.
-        ClipToBounds = true;
+        // Do NOT clip on the panel itself. In transform-only scroll the ScrollContentPresenter SLIDES this panel by -offset,
+        // so a self-clip would move WITH the panel (its clip rect lands at [-offset, -offset+viewport] in world space) and
+        // scissor out the very tiles now scrolled into view - the "only the first page renders" bug. Buffer/overflow tiles
+        // are trimmed by the ScrollContentPresenter's clip instead, which stays anchored at the viewport (world origin) and
+        // is the correct place to bound the list. (A virtualizing panel is always hosted inside that clipping presenter.)
         InvalidateMeasure();
     }
 

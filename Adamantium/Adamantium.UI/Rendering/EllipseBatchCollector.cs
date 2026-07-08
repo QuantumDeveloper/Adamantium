@@ -1,6 +1,7 @@
 using System;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.EffectsFramework;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Media;
@@ -14,16 +15,15 @@ namespace Adamantium.UI.Rendering;
 // - each baked to WORLD space on the CPU - into ONE instanced draw. The shader evaluates the ellipse implicit and
 // self-anti-aliases via fwidth, so N circles/ellipses cost ~1 draw AND are resolution-independent (no tessellation, crisp
 // at any DPI/zoom, no AA fringe). Sibling of RectBatchCollector; drawn in the SAME fill layer (below the text batch).
-internal sealed class EllipseBatchCollector : BatchCollector<EllipseItem>
+internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
 {
     // A/B / safety-valve toggle: off routes every ellipse back to its per-unit tessellated fill + AA-fringe draw.
     public static bool Enabled = true;
 
-    private BatchEffect _effect;
-
     public EllipseBatchCollector() : base(2048) { }
 
-    protected override void OnBeginFrame(IGraphicsDevice device) => _effect ??= new BatchEffect(device);
+    protected override IEffectPass StorageDrawPass => Effect.EllipseBatchInstancedDrawPass;
+    protected override IEffectPass VertexDrawPass => Effect.EllipseBatchDrawPass;
 
     // Batchable = a visible solid fill + a batchable pen (none, or a SOLID stroke the SDF shader draws analytically), a
     // FULL ellipse (StartAngle 0 .. SweepAngle 360). A sector/arc, a non-solid/dashed/trimmed pen, a gradient/image fill,
@@ -68,22 +68,5 @@ internal sealed class EllipseBatchCollector : BatchCollector<EllipseItem>
         };
         MarkPending(scissor, logicalBounds);
         return true;
-    }
-
-    // Straight-alpha AlphaBlend (matches solid fills); depth like the other main-pass units (Always, test+write).
-    protected override void DrawSegment(IGraphicsDevice device, Buffer<EllipseItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
-    {
-        device.ColorBlendEnabled = true;
-        device.ColorBlendEquation = ColorBlendEquations.AlphaBlend;
-        device.PrimitiveRestartEnable = true;
-        device.DepthTestEnabled = true;
-        device.DepthWriteEnable = true;
-        device.DepthCompareFunction = CompareOp.Always;
-        _effect.Projection.SetValue(projection);
-        device.VertexType = typeof(EllipseItem);
-        device.SetVertexBuffer(buffer);
-        device.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
-        _effect.EllipseBatchDrawPass.Apply();
-        device.Draw(4, count, 0, firstInstance);
     }
 }
