@@ -41,6 +41,13 @@ public interface IWindow : IRootVisualComponent, IContentControl
     /// OS message thread. Empty = nothing draggable (custom chrome off, or no title bar).</summary>
     Rect CaptionDragRect { get; set; }
 
+    /// <summary>The resize-grip region (client DIP): the bounds of a <c>ResizeGripper</c> in the bottom-right corner. A
+    /// point inside it hit-tests as the bottom-right sizing corner (HTBOTTOMRIGHT) so the window resizes from the grip,
+    /// used by the grip-only <see cref="Core.WindowResizeMode.CanResizeWithGrip"/> mode (a fully custom-chromed window
+    /// with no edge resize borders). A ResizeGripper publishes it on layout; the worker reads it (plain Rect, thread-safe)
+    /// from the OS message thread. Empty = no grip.</summary>
+    Rect ResizeGripRect { get; set; }
+
     /// <summary>Per-window DPI scale (device pixels per DIP), separate X/Y (usually equal on desktop). 1,1 = 96 DPI /
     /// 100%. Set by the platform on create and on WM_DPICHANGED; drives the render scale and the DIP&lt;-&gt;physical map.</summary>
     Vector2 DpiScale { get; set; }
@@ -73,6 +80,10 @@ public interface IWindow : IRootVisualComponent, IContentControl
     event EventHandler<WindowClosingEventArgs> Closing;
     event MSAALeveChangedHandler MSAALevelChanged;
     event StateChangedHandler StateChanged;
+
+    /// <summary>Raised after <see cref="ResizeMode"/> changes, so the platform worker can refresh its thread-safe snapshot
+    /// (the WM_NCHITTEST hit-test must not read the lockable ResizeMode property from the OS message thread).</summary>
+    event System.EventHandler ResizeModeChanged;
 
     /// <summary>Raised after <see cref="DpiScale"/> changes (the window moved to a monitor with a different scale).</summary>
     event EventHandler<EventArgs> DpiChanged;

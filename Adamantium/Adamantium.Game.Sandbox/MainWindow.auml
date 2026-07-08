@@ -10,6 +10,7 @@
         Width="1280"
         Height="720"
         AnalyticAntialiasing="true"
+        ResizeMode="{Binding WindowResizeMode, Mode=TwoWay}"
         LeftWindowCommands="{Binding LeftWindowCommands}"
         RightWindowCommands="{Binding RightWindowCommands}"
         Background="{ObservableResource SolidBackgroundFillColorBase}">
