@@ -99,6 +99,57 @@ public class LayoutPerfTests
         return measures;
     }
 
+    // One scroll step: move the virtualizing panel's offset and run ONE real layout pass, reporting realized count +
+    // measure/arrange calls + wall-time. SetOffset InvalidateMeasure()s the panel, so this exercises the exact per-scroll
+    // path the Sandbox hits. Returns the pass's measure count.
+    private static long ScrollStep(TestWindowRoot root, ItemsControl ic, WrapPanel panel, double y)
+    {
+        var m0 = MeasurableUIComponent.TotalMeasureCalls;
+        var a0 = MeasurableUIComponent.TotalArrangeCalls;
+        var cp = (CountingWrapPanel)panel;
+        cp.MeasureOverrides = 0; cp.ArrangeOverrides = 0;
+
+        panel.SetOffset(new Vector2(0, (float)y));
+
+        var sw = Stopwatch.StartNew();
+        WindowExtension.UpdateTree(root);
+        sw.Stop();
+
+        var measures = MeasurableUIComponent.TotalMeasureCalls - m0;
+        var arranges = MeasurableUIComponent.TotalArrangeCalls - a0;
+        var realized = ic.ItemContainerGenerator.RealizedCount;
+        TestContext.WriteLine($"scrollY->{y,-6:F0} realized={realized,-4} measures={measures,-6} arranges={arranges,-6} panelMeasure={cp.MeasureOverrides} panelArrange={cp.ArrangeOverrides} {sw.Elapsed.TotalMilliseconds,7:F2} ms");
+        return measures;
+    }
+
+    // Reproduce the Sandbox Layout-tab scroll freeze: 6000 tiles at 24px, scroll a row at a time and a fast jump, and
+    // report the per-step measure/arrange cost. This is the number the transform-only-scroll fix must collapse.
+    // Pump layout passes (as the app's per-frame loop would) until the virtualized window stops growing - i.e. the burst
+    // fill of the initially-visible grid has completed. Returns the settled realized count.
+    private static int Settle(TestWindowRoot root, ItemsControl ic)
+    {
+        var prev = -1;
+        for (var i = 0; i < 60 && ic.ItemContainerGenerator.RealizedCount != prev; i++)
+        {
+            prev = ic.ItemContainerGenerator.RealizedCount;
+            WindowExtension.UpdateTree(root);
+        }
+        return ic.ItemContainerGenerator.RealizedCount;
+    }
+
+    [Test]
+    public void Scroll_ReLayoutCost()
+    {
+        var (root, ic, panel) = BuildTiles(6000, 24);
+        var settled = Settle(root, ic);
+        TestContext.WriteLine($"=== Layout-tab scroll re-layout cost (6000 tiles @24, {ViewportW}x{ViewportH} viewport, settled realized={settled}) ===");
+        double y = 0;
+        TestContext.WriteLine("-- STEADY-STATE slow scroll (one 24px row per step, grid pre-filled) --");
+        for (var i = 0; i < 10; i++) { ScrollStep(root, ic, panel, y += 24); Settle(root, ic); }
+        TestContext.WriteLine("-- fast scroll (one viewport-height jump per step) --");
+        for (var i = 0; i < 5; i++) { ScrollStep(root, ic, panel, y += ViewportH); Settle(root, ic); }
+    }
+
     [Test]
     public void Shrink_ReLayoutCost()
     {

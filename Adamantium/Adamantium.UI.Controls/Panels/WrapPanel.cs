@@ -357,15 +357,19 @@ public class WrapPanel : VirtualizingPanel
    protected override void ArrangeVirtualized(Size finalSize, Vector2 offset)
    {
       var horizontal = Orientation == Orientation.Horizontal;
-      var scrollOffset = horizontal ? offset.Y : offset.X;
 
+      // ABSOLUTE grid positions - the scroll offset is applied by the panel's RenderTransform (see VirtualizingPanel's
+      // scroll transform), NOT baked into each tile's slot. A tile's arranged rect is therefore CONSTANT across scroll, so
+      // Arrange() short-circuits (rect == _previousArrange) for every tile that stayed put; only rows that just entered the
+      // window actually re-arrange. That turns per-scroll arrange from a deep re-layout of every visible tile (the
+      // ContentPresenter+Shape recursion that dropped FPS to zero) into O(rows entering view).
       foreach (var index in Owner.ItemContainerGenerator.RealizedIndices.ToList())
       {
          if (Owner.ItemContainerGenerator.ContainerFromIndex(index) is not IMeasurableComponent container) continue;
          var line = index / _columns;
          var col = index % _columns;
          var flowPos = col * _cellFlow;
-         var scrollPos = line * _cellScroll - scrollOffset;
+         var scrollPos = line * _cellScroll;
          container.Arrange(horizontal
             ? new Rect(flowPos, scrollPos, _cellFlow, _cellScroll)
             : new Rect(scrollPos, flowPos, _cellScroll, _cellFlow));
