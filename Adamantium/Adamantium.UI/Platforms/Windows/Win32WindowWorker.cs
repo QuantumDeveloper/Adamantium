@@ -85,7 +85,15 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         messageTable[(uint)WindowMessages.MouseWheel] = HandleMouseWheel;
         messageTable[(uint)WindowMessages.Input] = HandleRawInput;
         messageTable[(uint)WindowMessages.Setcursor] = HandleSetCursor;
+        messageTable[BeginMoveDragMessage] = HandleBeginMoveDrag;
     }
+
+    // App-private message (WM_APP range) the loop thread posts to hand a caption drag BACK to the HWND-owning thread.
+    // The classic ReleaseCapture + WM_NCLBUTTONDOWN/HTCAPTION trick MUST run on the thread that owns the window's input
+    // queue, else the native move loop reads no held button and returns instantly. Input routing (where a drag is decided)
+    // runs on the loop thread, so BeginMoveDrag PostMessages this; CustomWndProc then runs HandleBeginMoveDrag on the
+    // owner thread. lParam carries the packed screen cursor position (LOWORD x, HIWORD y).
+    private const uint BeginMoveDragMessage = (uint)WindowMessages.App + 1;
 
     public void SetWindow(IWindow window)
     {
@@ -361,18 +369,11 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
             if (window.ResizeGripRect.Contains(gripDip)) result = NcHitTest.Bottomright;
         }
 
-        // Not a resize edge: is this the draggable caption strip? Compute geometrically from the window rect + the plain
-        // (non-locking) caption metrics a TitleBar published (CaptionHeight, CaptionRightInset - the right band reserved
-        // for the buttons). HTCAPTION -> the OS runs the caption drag / Aero Snap / double-click-maximize natively; the
-        // buttons stay HTCLIENT. NOTE: read no AdamantiumProperty here (ClientWidth etc.) - that would lock and deadlock.
-        if (result == NcHitTest.Client)
-        {
-            // The ONE draggable region is the title bar's drag-area element, published as a client-DIP rect. A point in it
-            // is HTCAPTION (native drag + snap); everything else (commands, buttons) stays HTCLIENT and clickable.
-            var dpi = window.DpiScale;
-            var clientDip = new Vector2((pt.X - r.Left) / dpi.X, (pt.Y - r.Top) / dpi.Y);
-            if (window.CaptionDragRect.Contains(clientDip)) result = NcHitTest.Caption;
-        }
+        // The caption strip stays HTCLIENT: the drag is MANAGED. A geometric HTCAPTION here couldn't know the z-order, so
+        // any interactive content floating over the title bar (a popup, a SlidePanel, an overlay button) had its clicks
+        // stolen by the OS caption move-loop. Instead the TitleBar's PART_DragArea handles MouseLeftButtonDown and calls
+        // DragMove() (ReleaseCapture + WM_NCLBUTTONDOWN/HTCAPTION -> the SAME native drag + Aero Snap). Managed hit-testing
+        // already respects overlays, so a drag only starts when the drag area is genuinely the topmost element.
 
         isOverSizeFrame = result == NcHitTest.Left || result == NcHitTest.Right || result == NcHitTest.Top ||
                           result == NcHitTest.Bottom || result == NcHitTest.Topleft || result == NcHitTest.Topright ||
@@ -393,7 +394,10 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         // Custom chrome: return the proposed window rect UNCHANGED as the client rect -> the whole window is client, so
         // the OS draws no visible frame. WS_THICKFRAME is still set, so native resize / Aero Snap / the drop shadow /
         // maximize-to-work-area keep working; the resize borders come back via WM_NCHITTEST.
-        if (chromeState == WindowState.Maximized)
+        // Query the LIVE maximized state, not the cached chromeState: a native caption drag restores a maximized window
+        // mid-loop and fires WM_NCCALCSIZE before our chromeState catches up. Trusting the stale "Maximized" then inset a
+        // now-normal window, leaving a ~2px frame strip poking through the top. IsZoomed is always correct at this instant.
+        if (Win32Interop.IsZoomed(window.Handle))
         {
             // A maximized WS_THICKFRAME window is oversized by the frame on every edge (positioned at -frame), so a full
             // client would spill off-screen / under the taskbar. Inset by the frame thickness so the client == work area.
@@ -508,6 +512,17 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         var cw = client.Width;   // physical client px
         var ch = client.Height;
 
+        // WM_SIZE's type tells us when the OS itself changed the maximize state (Aero Snap, drag-to-maximize, a caption
+        // restore-drag) - paths that never go through our button/SysCommand. Sync window.State so StateChanged fires and
+        // the title bar's maximize<->restore glyph follows; otherwise it sticks on the state it had before the drag.
+        var sizeType = Environment.Is64BitProcess ? wParam.ToInt64() : wParam.ToInt32();
+        WindowState? osState = sizeType switch
+        {
+            0 => WindowState.Normal,      // SIZE_RESTORED
+            2 => WindowState.Maximized,   // SIZE_MAXIMIZED
+            _ => null                     // SIZE_MINIMIZED etc. - handled elsewhere / not a caption-drag case
+        };
+
         DispatchInput(() =>
         {
             window.Width = w;
@@ -516,6 +531,15 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
             // by the marshalled WM_DPICHANGED handler), so a DPI change that precedes this resize is already applied.
             window.ClientWidth = cw / window.DpiScale.X;
             window.ClientHeight = ch / window.DpiScale.Y;
+
+            if (osState.HasValue && window.State != osState.Value)
+            {
+                // Detach the managed->OS driver first so this OS-originated sync doesn't bounce back into ShowWindow.
+                window.StateChanged -= WindowOnStateChanged;
+                chromeState = osState.Value;
+                window.State = osState.Value;
+                window.StateChanged += WindowOnStateChanged;
+            }
         });
 
         return IntPtr.Zero;
@@ -648,16 +672,30 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         else Win32Interop.ReleaseCapture();
     }
 
-    // Caption drag: hand the window to the OS modal move loop (which also does Aero Snap). Faking a non-client caption
-    // press after releasing our capture is the standard trick. Safe here because this runs on the UI/pump thread that
-    // owns the HWND (managed input is marshalled to it), so ReleaseCapture drops OUR capture and SendMessage is in-thread.
+    // Caption drag: hand the window to the OS modal move loop (which also does Aero Snap + maximized restore-drag). This
+    // is called on the LOOP thread (input routing), but the native WM_NCLBUTTONDOWN/HTCAPTION handoff must run on the
+    // thread that OWNS the HWND's input queue - otherwise the move loop reads no held button and returns instantly. So we
+    // just PostMessage the request to the window; CustomWndProc runs HandleBeginMoveDrag on the owner thread and does the
+    // in-thread trick there. lParam = packed screen cursor pos so the native loop starts from the right point.
     public void BeginMoveDrag()
     {
         if (window == null || window.Handle == IntPtr.Zero) return;
-        if (window.State == WindowState.Maximized) return;   // WPF: a maximized window isn't caption-draggable
+        Win32Interop.GetCursorPos(out var cur);
+        var lp = (IntPtr)((cur.Y << 16) | (cur.X & 0xFFFF));
+        Messages.PostMessage(window.Handle, BeginMoveDragMessage, IntPtr.Zero, lp);
+    }
+
+    // Runs on the HWND-owning thread (posted by BeginMoveDrag). ReleaseCapture drops our own button capture, then faking a
+    // non-client caption press hands off to the OS modal move loop - in-thread, so it sees the held button and engages. A
+    // maximized window is intentionally allowed: the native loop restores it under the cursor and keeps dragging.
+    private IntPtr HandleBeginMoveDrag(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
+    {
+        handled = true;
+        if (window == null || window.Handle == IntPtr.Zero) return IntPtr.Zero;
         Win32Interop.ReleaseCapture();
         osMouseCaptured = false;
-        Win32Interop.SendMessage(window.Handle, WindowMessages.Nclbuttondown, (IntPtr)(int)NcHitTest.Caption, IntPtr.Zero);
+        Win32Interop.SendMessage(window.Handle, WindowMessages.Nclbuttondown, (IntPtr)(int)NcHitTest.Caption, lParam);
+        return IntPtr.Zero;
     }
 
     private IntPtr HandleCaptureChanged(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)

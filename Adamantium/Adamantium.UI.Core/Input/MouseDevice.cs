@@ -375,7 +375,10 @@ public class MouseDevice
 
         if (hit != null)
         {
-            if (lastClickTime - timestamp > PlatformSettings.DoubleClickTime || lastClickedComponent != hit)
+            // Elapsed since the previous click = timestamp - lastClickTime (NOT the reverse: both are uint, so the wrong
+            // order underflows to a huge value and reset ALWAYS fired, pinning clickCount at 1 - double-clicks never
+            // registered anywhere). uint subtraction also wraps correctly across the GetMessageTime rollover.
+            if (timestamp - lastClickTime > PlatformSettings.DoubleClickTime || lastClickedComponent != hit)
             {
                 clickCount = 0;
             }

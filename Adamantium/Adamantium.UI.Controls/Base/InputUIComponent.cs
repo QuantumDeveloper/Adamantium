@@ -565,7 +565,7 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     {
         if (sender is IInputComponent input)
         {
-            var args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp);
+            var args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp) { ClickCount = e.ClickCount };
             if (e.ChangedButton == MouseButtons.Left)
             {
                 args.RoutedEvent = PreviewMouseLeftButtonDownEvent;
@@ -586,7 +586,7 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     {
         if (sender is IInputComponent input)
         {
-            var args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp);
+            var args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp) { ClickCount = e.ClickCount };
             if (e.ChangedButton == MouseButtons.Left)
             {
                 args.RoutedEvent = PreviewMouseLeftButtonUpEvent;
@@ -607,7 +607,7 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     {
         if (sender is IInputComponent input)
         {
-            var args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp);
+            var args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp) { ClickCount = e.ClickCount };
             if (e.ChangedButton == MouseButtons.Left)
             {
                 args.RoutedEvent = MouseLeftButtonDownEvent;
@@ -629,7 +629,7 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     {
         if (sender is IInputComponent input)
         {
-            var args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp);
+            var args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp) { ClickCount = e.ClickCount };
             if (e.ChangedButton == MouseButtons.Left)
             {
                 args.RoutedEvent = MouseLeftButtonUpEvent;
@@ -651,7 +651,7 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     {
         if (sender is IInputComponent input)
         {
-            var args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp);
+            var args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp) { ClickCount = e.ClickCount };
             if (e.ChangedButton == MouseButtons.Left)
             {
                 args.RoutedEvent = RawMouseLeftButtonDownEvent;
@@ -676,7 +676,7 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     {
         if (sender is IInputComponent input)
         {
-            var args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp);
+            var args = new MouseButtonEventArgs(e.MouseDevice, e.ChangedButton, e.ButtonState, e.Modifiers, e.Timestamp) { ClickCount = e.ClickCount };
             if (e.ChangedButton == MouseButtons.Left)
             {
                 args.RoutedEvent = RawMouseLeftButtonUpEvent;
