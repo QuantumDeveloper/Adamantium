@@ -376,8 +376,13 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         {
             if (old != null && logicalParent != null)
             {
-                throw new InvalidOperationException("The Control already has a parent.Parent Element is: " +
-                                                    LogicalParent);
+                // Re-parenting a MOVED element (old AND new both non-null): a re-theme rebuilds a control's template and
+                // re-homes the SAME element content from the torn-down ContentPresenter into the new one without detaching
+                // it first. Rather than throw, detach from the previous parent so the move succeeds. RemoveLogicalChild
+                // fires the detach (via ClearLogicalParent -> SetParent(null), which sets parent=null and raises the
+                // detach event) and keeps the old collection consistent; null the local so the detach isn't raised twice.
+                old.RemoveLogicalChild(this);
+                old = null;
             }
 
             parent = logicalParent;
@@ -424,6 +429,15 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         if (UIAppContext.Current == null)
             return;
 
+        InvalidateStylesCore([]);
+    }
+
+    // A node can be reached by BOTH the logical and the visual walk below (content is usually a child in both trees), so
+    // recurse through a shared visited-set to keep the combined traversal linear instead of exponential in tree depth.
+    private void InvalidateStylesCore(HashSet<IFundamentalUIComponent> visited)
+    {
+        if (!visited.Add(this)) return;
+
         IsStyleApplied = false;
 
         // Register for re-theming on the next layout pass instead of relying on a per-frame full-tree walk to notice
@@ -437,7 +451,20 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
 
         foreach (var child in LogicalChildrenCollection)
         {
-            child.InvalidateStyles();
+            (child as FundamentalUIComponent)?.InvalidateStylesCore(visited);
+        }
+
+        // Cross the template boundary too: template parts (and the content they host) are attached as VISUAL children
+        // via AddTemplateChild, NOT as logical children, so a purely logical walk stops at a templated control and never
+        // re-themes its title bar / content presenter / hosted content. On a theme swap that left them with the OLD
+        // theme's resolved {ThemeResource}/{ResourceReference} setter values (only live {ObservableResource}s updated,
+        // via the global resource-change flush). Walking visual children re-themes the whole rendered subtree.
+        if (this is IUIComponent visual)
+        {
+            foreach (var child in visual.VisualChildren)
+            {
+                (child as FundamentalUIComponent)?.InvalidateStylesCore(visited);
+            }
         }
     }
 

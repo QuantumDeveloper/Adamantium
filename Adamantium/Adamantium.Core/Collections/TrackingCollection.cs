@@ -121,7 +121,14 @@ namespace Adamantium.Core.Collections
 
         protected override void OnClear(T[] items)
         {
-            NotifyReset();
+            // Clearing an already-empty collection removed nothing, so raise no notification at all (a bare Reset here
+            // still reached handlers - e.g. LogicalChildren, which threw "Reset not supported" - for a no-op change).
+            if (items is not { Length: > 0 }) return;
+
+            // A Clear() IS a bulk removal, so report the removed items as a Remove rather than a bare Reset. Downstream
+            // mirror collections need to know WHAT left to unwind per-item state - e.g. a control's LogicalChildren must
+            // clear each removed child's Parent, which an itemless Reset cannot convey.
+            NotifyRemove(items, 0);
         }
     }
 }
