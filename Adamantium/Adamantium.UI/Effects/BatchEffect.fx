@@ -287,6 +287,53 @@ technique RectBatch
     }
 }
 
+// ---- RectBatchInstanced: the SAME SDF rounded-rect batch, but per-instance RectItem read from a BDA STORAGE buffer by
+// SV_InstanceID (like InstancedFill) instead of a per-instance VERTEX buffer. This lets the instance data be RETAINED +
+// patched only over its dirty range (no full re-upload each frame) and, with tiles baked in a stable space, a scroll
+// updates one offset uniform instead of re-baking N instances. Plain (no vertex semantics) struct matching the CPU
+// RectItem's Vector4F layout; the quad still comes from SV_VertexID. Pixel shader is the shared RectBatchPS.
+struct RectData
+{
+    float4 Bounds;       // world-space x, y, w, h (baked on the CPU)
+    float4 Params;       // .x = corner radius (uniform); .yzw reserved
+    float4 Color;        // straight RGBA, opacity folded in
+    float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
+    float4 Stroke0;      // width_px, align, dashOn, dashGap
+    float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
+};
+
+[shader("vertex")]
+PSInput RectBatchInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
+{
+    RectData* items = (RectData*)InstancesAddress;
+    RectData item = items[instanceId];
+
+    PSInput o;
+    float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
+    float outset = max(item.Stroke0.x * (0.5 * (1.0 + item.Stroke0.y) + 0.5), 0.0) + 1.0;
+    float2 worldPos = item.Bounds.xy + corner * item.Bounds.zw + (corner * 2.0 - 1.0) * outset;
+    o.Position = mul(float4(worldPos, 0.0, 1.0), Projection);
+    o.Half   = item.Bounds.zw * 0.5;
+    o.Local  = (corner - 0.5) * item.Bounds.zw + (corner * 2.0 - 1.0) * outset;
+    o.Radius = item.Params.x;
+    o.Color  = item.Color;
+    o.StrokeColor = item.StrokeColor;
+    o.Stroke0 = item.Stroke0;
+    o.Stroke1 = item.Stroke1;
+    return o;
+}
+
+technique RectBatchInstanced
+{
+    pass Draw
+    {
+        EffectName = "BatchEffect";
+        Profile = 6.6;
+        VertexShader = RectBatchInstancedVS;
+        PixelShader = RectBatchPS;
+    }
+}
+
 technique InstancedFill
 {
     pass Draw
@@ -378,6 +425,49 @@ technique EllipseBatch
         EffectName = "BatchEffect";
         Profile = 6.6;
         VertexShader = EllipseBatchVS;
+        PixelShader = EllipseBatchPS;
+    }
+}
+
+// ---- EllipseBatchInstanced: the SAME SDF ellipse batch, per-instance EllipseItem read from a BDA STORAGE buffer by
+// SV_InstanceID (mirrors RectBatchInstanced). Plain struct matching the CPU EllipseItem's Vector4F layout; quad from
+// SV_VertexID; shared EllipseBatchPS.
+struct EllipseData
+{
+    float4 Bounds;       // world-space x, y, w, h
+    float4 Color;        // straight RGBA, opacity folded in
+    float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
+    float4 Stroke0;      // width_px, align, dashOn, dashGap
+    float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
+};
+
+[shader("vertex")]
+EllipsePSInput EllipseBatchInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
+{
+    EllipseData* items = (EllipseData*)InstancesAddress;
+    EllipseData item = items[instanceId];
+
+    EllipsePSInput o;
+    float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
+    float outset = max(item.Stroke0.x * (0.5 * (1.0 + item.Stroke0.y) + 0.5), 0.0) + 1.0;
+    float2 worldPos = item.Bounds.xy + corner * item.Bounds.zw + (corner * 2.0 - 1.0) * outset;
+    o.Position = mul(float4(worldPos, 0.0, 1.0), Projection);
+    o.Half   = item.Bounds.zw * 0.5;
+    o.Local  = (corner - 0.5) * item.Bounds.zw + (corner * 2.0 - 1.0) * outset;
+    o.Color  = item.Color;
+    o.StrokeColor = item.StrokeColor;
+    o.Stroke0 = item.Stroke0;
+    o.Stroke1 = item.Stroke1;
+    return o;
+}
+
+technique EllipseBatchInstanced
+{
+    pass Draw
+    {
+        EffectName = "BatchEffect";
+        Profile = 6.6;
+        VertexShader = EllipseBatchInstancedVS;
         PixelShader = EllipseBatchPS;
     }
 }

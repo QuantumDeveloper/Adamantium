@@ -64,13 +64,31 @@ public class BindingExpression : BindingExpressionBase
 
    public override void EstablishConnection()
    {
-      CloseConnection();            // idempotent: a DataContext change re-establishes against the new source
+      // Re-resolve against the (possibly new) DataContext BEFORE touching subscriptions.
+      var previousObserved = _observed;
       ResolveSource();
-      Refresh();                    // initial push (or produce)
-      if (ResolvedSource is INotifyPropertyChanged notify)
+      var newObserved = ResolvedSource as INotifyPropertyChanged;
+
+      // Fast path: the resolved SOURCE OBJECT is unchanged. This is the norm for a virtualized-list rebind whose bound
+      // path points at a shared sub-view-model every item exposes (e.g. item.Stroke): the DataContext changed, but
+      // item.Stroke is the SAME object for every item. The existing PropertyChanged subscription is therefore still
+      // correct - so do NOT unsubscribe + re-subscribe. On a source with many subscribers (one per such binding per
+      // realized tile), each -=/+= rebuilds the whole multicast invocation list (O(subscribers)); doing that for every
+      // tile every scroll frame is O(N^2) and was the ~118 KB-per-binding rebind allocation storm (gen2 GC freeze). Just
+      // re-read the value against the new DataContext.
+      if (ReferenceEquals(newObserved, previousObserved) && previousObserved != null)
       {
-         _observed = notify;
-         notify.PropertyChanged += OnSourcePropertyChanged;
+         Refresh();
+         return;
+      }
+
+      // Source object genuinely changed: tear down the old subscription and establish the new one.
+      CloseConnection();
+      Refresh();                    // initial push (or produce)
+      if (newObserved != null)
+      {
+         _observed = newObserved;
+         newObserved.PropertyChanged += OnSourcePropertyChanged;
       }
       if (Mode == BindingMode.TwoWay && !IsProducer && Target != null)
          Target.PropertyChanged += OnTargetPropertyChanged;

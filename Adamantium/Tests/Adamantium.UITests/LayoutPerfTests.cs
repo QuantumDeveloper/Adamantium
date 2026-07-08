@@ -193,6 +193,37 @@ public class LayoutPerfTests
         Assert.That(failures, Is.Empty, "recycling-ring invariants violated:\n" + string.Join("\n", failures.Take(8)));
     }
 
+    // The transform-only-scroll invariant: a tile that KEEPS its index across a scroll step must NOT re-run ArrangeCore.
+    // With the offset baked into each slot (slot = line*cell - offset) every realized tile got a new rect every step ->
+    // ArrangeCore recursed into every ContentPresenter (the freeze). With the offset applied as a single translation of the
+    // panel (tiles at ABSOLUTE slots), a staying tile's rect is constant -> Arrange short-circuits, and only the rebound
+    // row runs ArrangeCore. Steady-state ArrangeCore work is O(one row), NOT O(whole window). Asserted via TotalArrangeCores
+    // (real ArrangeCore runs, not short-circuited calls).
+    [Test]
+    public void Scroll_StableTilesDoNotReArrange()
+    {
+        var (root, ic, panel) = BuildTiles(6000, 24);
+        Settle(root, ic);
+        double y = 500;
+        for (var i = 0; i < 5; i++) { y += 7; panel.SetOffset(new Vector2(0, (float)y)); WindowExtension.UpdateTree(root); }
+        var realized = ic.ItemContainerGenerator.RealizedCount;
+        var bound = realized;   // offset-baked re-arranges the WHOLE window (>= realized); absolute re-arranges ~one row
+        TestContext.WriteLine($"=== Arrange short-circuit (6000 @24, fractional scroll, realized={realized}, bound<{bound}) ===");
+
+        var failures = new System.Collections.Generic.List<string>();
+        for (var step = 0; step < 20; step++)
+        {
+            var c0 = MeasurableUIComponent.TotalArrangeCores;
+            y += 7;
+            panel.SetOffset(new Vector2(0, (float)y));
+            WindowExtension.UpdateTree(root);
+            var cores = MeasurableUIComponent.TotalArrangeCores - c0;
+            TestContext.WriteLine($"step {step,2}: arrangeCores={cores}");
+            if (cores >= bound) failures.Add($"step {step}: ArrangeCore ran {cores} times (>= {bound}) - staying tiles re-arranged (offset baked into slots)");
+        }
+        Assert.That(failures, Is.Empty, "stable tiles re-arranged on scroll:\n" + string.Join("\n", failures.Take(8)));
+    }
+
     [Test]
     public void Shrink_ReLayoutCost()
     {

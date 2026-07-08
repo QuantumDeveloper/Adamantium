@@ -885,6 +885,70 @@ public class ItemsControlTests
         });
     }
 
+    // Same continuous-scroll correctness contract, but on the 2D WrapPanel - the panel the DENSE grid (Layout tab) actually
+    // uses. The StackPanel test above exercises the 1D path; this one locks the WrapPanel path under transform-only scroll:
+    // a scroll is ONE translation of the (viewport-sized) panel + clip, tiles at ABSOLUTE grid slots. Every realized tile
+    // must stay at its own (col, row-offset) world position after every fractional step. Explicit 20x20 cells in a 100-wide
+    // viewport => exactly 5 columns, so index i sits at world (col*20, row*20 - offset).
+    [Test]
+    public void VirtualizedWrapGridStaysCorrectUnderContinuousScroll()
+    {
+        const int columns = 5, cell = 20;
+        var people = Enumerable.Range(0, 2500)
+            .Select(i => new Person { Name = $"P{i}", Size = cell }).ToList();
+        var template = new DataTemplate(() => new TemplateResult { RootComponent = new Border { Width = cell, Height = cell } });
+
+        var ic = new ItemsControl
+        {
+            ItemTemplate = template,
+            ItemsSource = people,
+            Template = ItemsPresenterTemplate(),
+            ItemsPanel = new ItemsPanelTemplate(() => new TemplateResult
+            {
+                RootComponent = new WrapPanel { Orientation = Orientation.Horizontal, ItemWidth = cell, ItemHeight = cell }
+            })
+        };
+        var scp = new ScrollContentPresenter { CanContentScroll = true, Content = ic };
+        var host = new Border { Width = columns * cell, Height = 300, Child = scp };
+        Adamantium.UI.Extensions.WindowExtension.UpdateTree(host);
+
+        var gen = ic.ItemContainerGenerator;
+        var panel = ic.ItemsHostPanel;
+        var surface = (IScrollableContent)scp;
+        static Vector2 World(IUIComponent c)
+        {
+            var p = new Rect(0, 0, c.RenderSize.Width, c.RenderSize.Height).TransformToAABB(c.WorldTransform);
+            return new Vector2((float)p.X, (float)p.Y);
+        }
+
+        Assert.Multiple(() =>
+        {
+            double off = 0;
+            for (var step = 0; step < 600; step++)
+            {
+                off += step < 300 ? 17 : -17;
+                surface.SetOffset(new Vector2(0, off));
+                Adamantium.UI.Extensions.WindowExtension.UpdateTree(host);
+                var actual = surface.Offset.Y;
+
+                var realized = gen.RealizedIndices.Select(idx => gen.ContainerFromIndex(idx)).ToHashSet();
+                foreach (var i in gen.RealizedIndices.ToList())
+                {
+                    var c = gen.ContainerFromIndex(i);
+                    var w = World(c);
+                    Assert.That(w.X, Is.EqualTo(i % columns * cell).Within(1.0),
+                        $"step {step} (off {actual}), index {i}: column position must stay index-ordered");
+                    Assert.That(w.Y, Is.EqualTo(i / columns * cell - actual).Within(1.0),
+                        $"step {step} (off {actual}), index {i}: row position must follow index order (not jumbled/stale)");
+                }
+
+                foreach (var child in panel.VisualChildren)
+                    Assert.That(child.Visibility == Visibility.Visible, Is.EqualTo(realized.Contains(child)),
+                        $"step {step} (off {actual}): a container is Visible iff it's realized");
+            }
+        });
+    }
+
     // The render walks the VISUAL tree once per node; a node that appears twice in some parent's VisualChildren is
     // walked (and drawn) twice. This reproduces the "every item rendered twice" overdraw by asserting no component
     // has a duplicate in its VisualChildren after realizing + scrolling.

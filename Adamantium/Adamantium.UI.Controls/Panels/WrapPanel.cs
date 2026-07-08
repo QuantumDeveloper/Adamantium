@@ -364,15 +364,17 @@ public class WrapPanel : VirtualizingPanel
    protected override void ArrangeVirtualized(Size finalSize, Vector2 offset)
    {
       var horizontal = Orientation == Orientation.Horizontal;
-      var scrollOffset = horizontal ? offset.Y : offset.X;
 
+      // ABSOLUTE grid slots - the scroll offset is applied by the ScrollContentPresenter translating this panel and
+      // clipping (transform-only scroll), NOT baked into each tile. A tile's rect is then CONSTANT across scroll, so
+      // Arrange short-circuits for tiles that kept their index; only the rebound row re-runs ArrangeCore (O(one row)).
       foreach (var index in Owner.ItemContainerGenerator.RealizedIndices.ToList())
       {
          if (Owner.ItemContainerGenerator.ContainerFromIndex(index) is not IMeasurableComponent container) continue;
          var line = index / _columns;
          var col = index % _columns;
          var flowPos = col * _cellFlow;
-         var scrollPos = line * _cellScroll - scrollOffset;
+         var scrollPos = line * _cellScroll;
          container.Arrange(horizontal
             ? new Rect(flowPos, scrollPos, _cellFlow, _cellScroll)
             : new Rect(scrollPos, flowPos, _cellScroll, _cellFlow));

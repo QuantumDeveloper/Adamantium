@@ -1,6 +1,7 @@
 using System;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.EffectsFramework;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Media;
@@ -14,16 +15,20 @@ namespace Adamantium.UI.Rendering;
 // space on the CPU - into ONE instanced draw per segment (RectBatchEffect reconstructs the rounded corners from an SDF
 // = self-anti-aliasing, so N item backgrounds cost ~1 draw AND no separate AA fringe). Segment/buffer/overlap
 // machinery is in BatchCollector; this adds rect baking + the SDF draw. Rendered BELOW the text batch (lower layer).
-internal sealed class RectBatchCollector : BatchCollector<RectItem>
+internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
 {
     // A/B / safety-valve toggle: off routes every rect back to its per-unit fill + AA-fringe draw (the pre-batch path).
     public static bool Enabled = true;
 
-    private BatchEffect _effect;
+    // Master toggle for the SDF instancing family (rect + ellipse): draw via the *Instanced passes (per-instance data read
+    // from a BDA STORAGE buffer by SV_InstanceID) instead of a per-instance VERTEX buffer. Off = the proven vertex-buffer
+    // draw (fallback). Only affects HOW the same item data is fed to the same SDF pixel shader.
+    public static bool UseStorageInstancing = true;
 
     public RectBatchCollector() : base(4096) { }
 
-    protected override void OnBeginFrame(IGraphicsDevice device) => _effect ??= new BatchEffect(device);
+    protected override IEffectPass StorageDrawPass => Effect.RectBatchInstancedDrawPass;
+    protected override IEffectPass VertexDrawPass => Effect.RectBatchDrawPass;
 
     // Batchable = a visible solid fill + a batchable pen (none, or a SOLID stroke the SDF shader draws analytically),
     // uniform corner radius. Gradient/image fill, a non-solid/dashed/trimmed pen, per-corner radii, or Enabled=off fall
@@ -138,22 +143,5 @@ internal sealed class RectBatchCollector : BatchCollector<RectItem>
         };
         MarkPending(scissor, logicalBounds);
         return true;
-    }
-
-    // Straight-alpha AlphaBlend (matches solid fills); depth like the other main-pass units (Always, test+write).
-    protected override void DrawSegment(IGraphicsDevice device, Buffer<RectItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
-    {
-        device.ColorBlendEnabled = true;
-        device.ColorBlendEquation = ColorBlendEquations.AlphaBlend;
-        device.PrimitiveRestartEnable = true;
-        device.DepthTestEnabled = true;
-        device.DepthWriteEnable = true;
-        device.DepthCompareFunction = CompareOp.Always;
-        _effect.Projection.SetValue(projection);
-        device.VertexType = typeof(RectItem);
-        device.SetVertexBuffer(buffer);
-        device.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
-        _effect.RectBatchDrawPass.Apply();
-        device.Draw(4, count, 0, firstInstance);
     }
 }

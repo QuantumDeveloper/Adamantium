@@ -130,10 +130,15 @@ public class StackPanel : VirtualizingPanel
          : new Size(double.PositiveInfinity, crossAvailable);
 
       // Probe a representative item for the (uniform) main-axis extent. Reuse the last window start as the probe so the
-      // estimate tracks the items actually on screen.
+      // estimate tracks the items actually on screen. KEEP the last good size if the probe momentarily measures to nothing
+      // (a recycled container mid-rebind can report a stale/zero DesiredSize): collapsing _itemExtent to 1 shrinks the whole
+      // extent (count*1), which then mis-clamps the scroll offset. Offset-baked arrange tolerated that (arrange + reported
+      // offset stay same-pass consistent); transform-only scroll does NOT (the presenter's translation desyncs from the
+      // reported offset across a flip). Re-probe freely on any POSITIVE measure so a real size change still tracks.
       var probe = (IMeasurableComponent)RealizeInWindow(Math.Clamp(_lastFirst, 0, count - 1));
       probe.Measure(childConstraint);
-      _itemExtent = Math.Max(1, vertical ? probe.DesiredSize.Height : probe.DesiredSize.Width);
+      var probeExtent = vertical ? probe.DesiredSize.Height : probe.DesiredSize.Width;
+      if (probeExtent > 0) _itemExtent = probeExtent;
 
       int first, last;
       if (double.IsInfinity(mainViewport))
@@ -170,12 +175,14 @@ public class StackPanel : VirtualizingPanel
    {
       var vertical = Orientation == Orientation.Vertical;
       var cross = vertical ? finalSize.Width : finalSize.Height;
-      var mainOffset = vertical ? offset.Y : offset.X;
 
+      // ABSOLUTE slots (no -offset): the scroll offset is applied once, by the ScrollContentPresenter translating this
+      // viewport-sized panel and clipping (same physical-scroll seam as WrapPanel). A tile's rect is constant across
+      // scroll, so Arrange short-circuits for tiles that kept their index; only the rebound row re-runs ArrangeCore.
       foreach (var index in System.Linq.Enumerable.ToList(Owner.ItemContainerGenerator.RealizedIndices))
       {
          if (Owner.ItemContainerGenerator.ContainerFromIndex(index) is not IMeasurableComponent container) continue;
-         var main = index * _itemExtent - mainOffset;
+         var main = index * _itemExtent;
          container.Arrange(vertical
             ? new Rect(0, main, cross, _itemExtent)
             : new Rect(main, 0, _itemExtent, cross));
