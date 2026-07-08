@@ -385,6 +385,134 @@ public class CodeGenerationContext
                             }
                             break;
                         }
+                        case "Ancestor":
+                        {
+                            // {Ancestor Type, Path, Skip=, Name=, Stop=, Logical=, Mode=} -> resolve the ancestor type
+                            // (short name -> typeof, preserving is-a) and wire a live ancestor binding via .Apply, which
+                            // (re)resolves against the tree on attach. Works in a ControlTemplate, a DataTemplate, or on a
+                            // plain element - target is just the current element.
+                            var acVar = GenerateNextElementName("anc");
+                            TextGenerator.WriteLine($"var {acVar} = new {extension.TypeReference.GetFullTypeName()}();");
+
+                            var positional = 0;
+                            foreach (var argument in extension.Arguments)
+                            {
+                                var text = argument.Value.GetTextValue();
+                                if (string.IsNullOrEmpty(argument.Name))
+                                {
+                                    if (positional == 0)
+                                    {
+                                        var resolved = Metadata.TypeResolver.ResolveByShortName(text);
+                                        if (resolved == null)
+                                            diagnostics.ReportError(Metadata.ClassName, $"Ancestor: type '{text}' could not be resolved.");
+                                        else
+                                            TextGenerator.WriteLine($"{acVar}.AncestorType = typeof({resolved.FullName});");
+                                    }
+                                    else if (positional == 1)
+                                    {
+                                        TextGenerator.WriteLine($"{acVar}.Path = \"{text}\";");
+                                    }
+                                    positional++;
+                                }
+                                else
+                                {
+                                    switch (argument.Name)
+                                    {
+                                        case "Path": TextGenerator.WriteLine($"{acVar}.Path = \"{text}\";"); break;
+                                        case "Skip": TextGenerator.WriteLine($"{acVar}.Skip = {text};"); break;
+                                        case "Name": TextGenerator.WriteLine($"{acVar}.Name = \"{text}\";"); break;
+                                        case "Logical": TextGenerator.WriteLine($"{acVar}.Logical = {text.ToLowerInvariant()};"); break;
+                                        case "Stop":
+                                        {
+                                            var st = Metadata.TypeResolver.ResolveByShortName(text);
+                                            if (st == null)
+                                                diagnostics.ReportError(Metadata.ClassName, $"Ancestor: Stop type '{text}' could not be resolved.");
+                                            else
+                                                TextGenerator.WriteLine($"{acVar}.Stop = typeof({st.FullName});");
+                                            break;
+                                        }
+                                        case "Mode":
+                                            TextGenerator.WriteLine($"{acVar}.Mode = {argument.Value.TypeReference.GetFullTypeName()}.{text};");
+                                            break;
+                                        case "Converter":
+                                            var acConv = EmitValueExpression(argument.Value, ValueConverterFqn, diagnostics, isResource);
+                                            if (acConv != null) TextGenerator.WriteLine($"{acVar}.Converter = {acConv};");
+                                            else diagnostics.ReportError(Metadata.ClassName, "Ancestor: Converter must be a resource or converter markup extension.");
+                                            break;
+                                        case "ConverterParameter":
+                                            TextGenerator.WriteLine($"{acVar}.ConverterParameter = {EmitValueExpression(argument.Value, "object", diagnostics, isResource) ?? $"\"{text}\""};");
+                                            break;
+                                        case "FallbackValue":
+                                            TextGenerator.WriteLine($"{acVar}.FallbackValue = {EmitValueExpression(argument.Value, "object", diagnostics, isResource) ?? $"\"{text}\""};");
+                                            break;
+                                        case "TargetNullValue":
+                                            TextGenerator.WriteLine($"{acVar}.TargetNullValue = {EmitValueExpression(argument.Value, "object", diagnostics, isResource) ?? $"\"{text}\""};");
+                                            break;
+                                        default:
+                                            diagnostics.ReportError(Metadata.ClassName, $"Ancestor: unknown argument '{argument.Name}'.");
+                                            break;
+                                    }
+                                }
+                            }
+
+                            if (isResource && element.TypeReference.Namespace == "Adamantium.UI.Core.Resources")
+                            {
+                                // {Ancestor ...} as a Setter/trigger value: store the marker; Setter.Apply (or the trigger
+                                // activator) calls .Apply against each matched element when the setter fires.
+                                TextGenerator.WriteLine($"{symbolName} = {acVar};");
+                            }
+                            else
+                            {
+                                var acTarget = isRoot ? "this" : CurrentParent;
+                                TextGenerator.WriteLine($"{acVar}.Apply({acTarget}, \"{propRef.Name}\");");
+                            }
+                            break;
+                        }
+                        case "Self":
+                        {
+                            // {Self Path, Mode=} -> bind a target property to another property on the SAME element.
+                            var slfVar = GenerateNextElementName("self");
+                            TextGenerator.WriteLine($"var {slfVar} = new {extension.TypeReference.GetFullTypeName()}();");
+                            foreach (var argument in extension.Arguments)
+                            {
+                                var text = argument.Value.GetTextValue();
+                                if (string.IsNullOrEmpty(argument.Name) || argument.Name == "Path")
+                                    TextGenerator.WriteLine($"{slfVar}.Path = \"{text}\";");
+                                else switch (argument.Name)
+                                {
+                                    case "Mode":
+                                        TextGenerator.WriteLine($"{slfVar}.Mode = {argument.Value.TypeReference.GetFullTypeName()}.{text};");
+                                        break;
+                                    case "Converter":
+                                        var slfConv = EmitValueExpression(argument.Value, ValueConverterFqn, diagnostics, isResource);
+                                        if (slfConv != null) TextGenerator.WriteLine($"{slfVar}.Converter = {slfConv};");
+                                        else diagnostics.ReportError(Metadata.ClassName, "Self: Converter must be a resource or converter markup extension.");
+                                        break;
+                                    case "ConverterParameter":
+                                        TextGenerator.WriteLine($"{slfVar}.ConverterParameter = {EmitValueExpression(argument.Value, "object", diagnostics, isResource) ?? $"\"{text}\""};");
+                                        break;
+                                    case "FallbackValue":
+                                        TextGenerator.WriteLine($"{slfVar}.FallbackValue = {EmitValueExpression(argument.Value, "object", diagnostics, isResource) ?? $"\"{text}\""};");
+                                        break;
+                                    case "TargetNullValue":
+                                        TextGenerator.WriteLine($"{slfVar}.TargetNullValue = {EmitValueExpression(argument.Value, "object", diagnostics, isResource) ?? $"\"{text}\""};");
+                                        break;
+                                    default:
+                                        diagnostics.ReportError(Metadata.ClassName, $"Self: unknown argument '{argument.Name}'.");
+                                        break;
+                                }
+                            }
+                            if (isResource && element.TypeReference.Namespace == "Adamantium.UI.Core.Resources")
+                            {
+                                TextGenerator.WriteLine($"{symbolName} = {slfVar};");
+                            }
+                            else
+                            {
+                                var slfTarget = isRoot ? "this" : CurrentParent;
+                                TextGenerator.WriteLine($"{slfVar}.Apply({slfTarget}, \"{propRef.Name}\");");
+                            }
+                            break;
+                        }
                         default:
                             string nestedName = ProcessNestedValue(extension, diagnostics, isResource);
                             if (propRef.IsAttachedProperty)

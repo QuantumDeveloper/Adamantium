@@ -89,6 +89,21 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         typeof(FontFamily), typeof(UIComponent),
         new PropertyMetadata(null, PropertyMetadataOptions.Inherits));
 
+    // Foreground is INHERITED (like FontFamily / DataContext): set it on an ancestor and descendant text picks it up
+    // unless it sets its own (an explicit local/style value stops the cascade; a mere default does not, so overriding the
+    // default per type is safe). Declared once here so the SAME property flows across Control / TextBlock / ContentPresenter
+    // (inheritance is by property IDENTITY - three separate registrations would never cross-inherit). Leaf types
+    // OverrideMetadata to keep their own default brush + render/measure callbacks while preserving Inherits.
+    public static readonly AdamantiumProperty ForegroundProperty = AdamantiumProperty.Register(nameof(Foreground),
+        typeof(Brush), typeof(UIComponent),
+        new PropertyMetadata(null, PropertyMetadataOptions.Inherits));
+
+    public Brush Foreground
+    {
+        get => GetValue<Brush>(ForegroundProperty);
+        set => SetValue(ForegroundProperty, value);
+    }
+
     #endregion
 
     #region Events

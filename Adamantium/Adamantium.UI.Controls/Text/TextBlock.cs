@@ -43,6 +43,11 @@ public class TextBlock : InputUIComponent
     {
         FontFamilyProperty.OverrideMetadata(typeof(TextBlock),
             new PropertyMetadata(null, PropertyMetadataOptions.Inherits, OnFontFamilyChanged));
+        // Foreground is the inherited property from UIComponent; keep the White default + two-way + render flag a TextBlock
+        // had, and preserve Inherits so an ancestor's set Foreground cascades into unstyled text.
+        ForegroundProperty.OverrideMetadata(typeof(TextBlock),
+            new PropertyMetadata(Brushes.White,
+                PropertyMetadataOptions.Inherits | PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender));
     }
 
     private static void OnFontFamilyChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
@@ -58,9 +63,6 @@ public class TextBlock : InputUIComponent
         typeof (Brush), typeof (TextBlock),
         new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.BindsTwoWayByDefault|PropertyMetadataOptions.AffectsRender));
     
-    public static readonly AdamantiumProperty ForegroundProperty = AdamantiumProperty.Register(nameof(Foreground),
-        typeof (Brush), typeof (TextBlock),
-        new PropertyMetadata(Brushes.White, PropertyMetadataOptions.BindsTwoWayByDefault|PropertyMetadataOptions.AffectsRender));
 
     public static readonly AdamantiumProperty StrokeProperty = AdamantiumProperty.Register(nameof(Stroke),
     typeof(Brush), typeof(TextBlock),
@@ -199,12 +201,6 @@ public class TextBlock : InputUIComponent
         set => SetValue(BackgroundProperty, value);
     }
     
-    public Brush Foreground
-    {
-        get => GetValue<Brush>(ForegroundProperty);
-        set => SetValue(ForegroundProperty, value);
-    }
-
     public Brush Stroke
     {
         get => GetValue<Brush>(StrokeProperty);
