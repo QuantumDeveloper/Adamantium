@@ -293,7 +293,12 @@ public unsafe class Texture : GraphicsResource, ITexture
     {
         var createInfo = new ImageViewCreateInfo();
         createInfo.Image = VulkanImage;
-        createInfo.ViewType = (ImageViewType)description.Dimension;
+        // A 2D image with ArrayLayers > 1 (a Texture2DArray) MUST use a 2D-ARRAY view: the spec forbids layerCount > 1 on
+        // a plain VK_IMAGE_VIEW_TYPE_2D view (validation VUID-VkImageViewCreateInfo-imageViewType-04973). The shader then
+        // selects a slice by the layer index.
+        createInfo.ViewType = description.Dimension == TextureDimension.Texture2D && description.ArrayLayers > 1
+            ? ImageViewType._2dArray
+            : (ImageViewType)description.Dimension;
         createInfo.Format = SurfaceFormat;
         var componentMapping = new ComponentMapping
         {
@@ -309,7 +314,7 @@ public unsafe class Texture : GraphicsResource, ITexture
             BaseMipLevel = 0,
             LevelCount = 1,
             BaseArrayLayer = 0,
-            LayerCount = 1
+            LayerCount = description.ArrayLayers > 1 ? description.ArrayLayers : 1
         };
         createInfo.SubresourceRange = subresourceRange;
 

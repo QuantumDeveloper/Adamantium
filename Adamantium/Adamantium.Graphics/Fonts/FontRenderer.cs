@@ -192,6 +192,7 @@ public class FontRenderer : GraphicsResource
         effectSdfBlendLo.SetValue(SdfBlendLo);
         effectSdfBlendHi.SetValue(SdfBlendHi);
         GraphicsDevice.VertexType = vertexType;
+        layout.EnsureVertexBuffer(GraphicsDevice);   // lazily allocate/upload the per-block buffer only for a direct draw
         GraphicsDevice.SetVertexBuffer(layout.VertexBuffer);
         // Instanced quad: 4-vertex triangle strip per glyph (corners from SV_VertexID), one instance per glyph.
         GraphicsDevice.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
@@ -250,6 +251,7 @@ public class FontRenderer : GraphicsResource
         effectSdfBlendLo.SetValue(SdfBlendLo);
         effectSdfBlendHi.SetValue(SdfBlendHi);
         GraphicsDevice.VertexType = vertexType;
+        layout.EnsureVertexBuffer(GraphicsDevice);   // lazily allocate/upload the per-block buffer only for a direct draw
         GraphicsDevice.SetVertexBuffer(layout.VertexBuffer);
         GraphicsDevice.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
         // Direct text is never stroked (both text paths pass no stroke) - pick outline, else canonical / gradient MSDF.

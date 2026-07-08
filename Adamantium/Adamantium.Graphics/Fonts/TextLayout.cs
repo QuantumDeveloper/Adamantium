@@ -60,6 +60,7 @@ public class TextLayout : DisposableObject
     public Size RealTextDimensions { get; private set; }
 
     private bool _textUpdated;
+    private bool _vertexBufferDirty;
 
     public TextLayout(Typeface typeface, IFont font)
     {
@@ -600,9 +601,11 @@ public class TextLayout : DisposableObject
         FontAtlas ??= FontAtlasStore.GetOrCreateFrom(graphicsDevice, Typeface, FontParameters.Default(sortingVariant:GlyphSortingVariant.ByIndex));
         FontAtlas.Update(Text+".");
         ElementsCount = 0;
-        // Rewritten via SetData when text changes → CPU-to-GPU upload (BAR window), not device-local.
-        VertexBuffer ??= Adamantium.Graphics.Buffer.Vertex.New<FontItem>(graphicsDevice, MaxItemsCount,
-            Adamantium.Graphics.BufferMemoryUsage.UploadFromCpuToGpu);
+        // NOTE: the per-block GPU VertexBuffer is NOT created here. It's only needed by the DIRECT draw path
+        // (rotated/sheared text); the common batched path bakes fontItems into the shared aggregate buffer via
+        // TryBakeWorldGlyphs and never touches it. Creating it here allocated a fixed 4096-glyph buffer (~300 KB) in the
+        // tiny 214 MB BAR heap for EVERY text block - batched or not - which exhausted that heap (OOM). EnsureVertexBuffer
+        // now creates + uploads it lazily, only when a block is actually drawn direct.
 
         for (int i = 0; i < _wordData.Count; ++i)
         {
@@ -633,6 +636,7 @@ public class TextLayout : DisposableObject
                     ArrangeRect = new Vector4F((float)(rect.X - mx), (float)(rect.Y - my),
                         (float)(rect.Width + 2 * mx), (float)(rect.Height + 2 * my)),
                     Source = gd.UVRectFull,
+                    Layer = gd.DepthLayer,
                     Depth = 1.0f
                 };
             }
@@ -642,6 +646,7 @@ public class TextLayout : DisposableObject
                 {
                     ArrangeRect = word.Rect,
                     Source = FontAtlas.GetUVCoordinatesForGlyph(word.Glyph.Index),
+                    Layer = gd?.DepthLayer ?? 0,
                     Depth = 1.0f
                 };
             }
@@ -649,9 +654,24 @@ public class TextLayout : DisposableObject
             ElementsCount++;
         }
 
-        VertexBuffer.SetData(fontItems, 0, ElementsCount, 0);
+        _vertexBufferDirty = true;   // the direct path re-uploads on next draw (EnsureVertexBuffer); batched path ignores it
 
         _textUpdated = true;
+    }
+
+    /// <summary>
+    /// Lazily create + upload the per-block GPU vertex buffer, used ONLY by the direct draw path (rotated/sheared text).
+    /// Batched text never calls this, so batched blocks allocate ZERO GPU (BAR) memory - see Update's note.
+    /// </summary>
+    public void EnsureVertexBuffer(IGraphicsDevice graphicsDevice)
+    {
+        VertexBuffer ??= Adamantium.Graphics.Buffer.Vertex.New<FontItem>(graphicsDevice, MaxItemsCount,
+            Adamantium.Graphics.BufferMemoryUsage.UploadFromCpuToGpu);
+        if (_vertexBufferDirty)
+        {
+            VertexBuffer.SetData(fontItems, 0, ElementsCount, 0);
+            _vertexBufferDirty = false;
+        }
     }
 
     // CPU pre-transform text batch (docs/TEXT_GLYPH_BATCH_PLAN.md §9 Stage 2): copy this block's glyphs into a shared
