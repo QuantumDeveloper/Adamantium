@@ -71,12 +71,12 @@ public abstract class Panel: InputUIComponent, IContainer
       context.ForControl(this).DrawRectangle(Background, new Rect(new Size(ActualWidth, ActualHeight)));
   }
 
-   // A layout panel catches the mouse only where it paints a VISIBLE background; its transparent/empty areas are
-   // pass-through, so a panel that overlaps other content (e.g. the centered slider bar over the centered wrap list)
-   // doesn't eat clicks meant for what's behind it. Panel.Background DEFAULTS to Brushes.Transparent, so without this
-   // every panel was a full-box hit target. Children are hit-tested BEFORE the panel, so this only frees the panel's
-   // own empty gaps - a click on a real child (or on interactive content behind a gap) still lands.
-   public override bool HitTestCore(Vector2 localPoint) => Background.IsVisible();
+   // NO HitTestCore override: hit-testing is DECOUPLED from Background. A panel catches the mouse across its whole
+   // (honest, content-tight) bounds like every other container (Border/Decorator/Control), whether or not a Background
+   // is set - so "I forgot to set a Background" never silently makes a container click-through (the WPF gotcha this
+   // engine deliberately avoids). Children are still hit-tested BEFORE the panel, so a real child always wins. To make
+   // a panel (or any element) intentionally pass-through - e.g. a transparent overlay covering interactive siblings
+   // behind it - set IsHitTestVisible="False" explicitly; that is the one, discoverable opt-out.
 
    public void AddOrSetChildComponent(object component)
    {

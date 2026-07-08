@@ -4,6 +4,7 @@ using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Primitives;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Controls;
@@ -150,8 +151,11 @@ public class TitleBar : Control
         _rightOverflowMenu = GetTemplateChild("PART_RightOverflowMenu") as ContextMenu;
         _dragArea = GetTemplateChild("PART_DragArea") as IUIComponent;
 
-        // The caption DRAG + double-click maximize are handled natively by the OS (WM_NCHITTEST returns HTCAPTION over
-        // the title area - see WindowBase.IsDraggableCaptionPoint), so the title bar only wires the command buttons.
+        // Caption drag is MANAGED (not a geometric HTCAPTION), so it respects z-order: the drag only starts when the
+        // drag area is genuinely the topmost element under the pointer. Any overlay floating over the title bar (a popup,
+        // a SlidePanel, an overlay button) is hit first and keeps its click. A press hands off to the native move loop via
+        // DragMove(); a double-click toggles maximize/restore (the native NCLBUTTONDOWN handoff never sees WM_NCLBUTTONDBLCLK).
+        if (_dragArea is IInputComponent dragInput) dragInput.MouseLeftButtonDown += OnDragAreaMouseLeftButtonDown;
         if (_minButton != null) _minButton.Click += OnMinClick;
         if (_maxButton != null) _maxButton.Click += OnMaxClick;
         if (_closeButton != null) _closeButton.Click += OnCloseClick;
@@ -160,10 +164,24 @@ public class TitleBar : Control
 
     private void DetachParts()
     {
+        if (_dragArea is IInputComponent dragInput) dragInput.MouseLeftButtonDown -= OnDragAreaMouseLeftButtonDown;
         if (_minButton != null) _minButton.Click -= OnMinClick;
         if (_maxButton != null) _maxButton.Click -= OnMaxClick;
         if (_closeButton != null) _closeButton.Click -= OnCloseClick;
         if (_rightOverflowButton != null) _rightOverflowButton.Click -= OnRightOverflowClick;
+    }
+
+    // A press on the drag strip: double-click toggles maximize/restore, a single press begins the native window move.
+    // (e.Handled so the press doesn't also focus/interact with anything beneath the strip.)
+    private void OnDragAreaMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var window = OwnerWindow;
+        if (window == null) return;
+        e.Handled = true;
+        if (e.ClickCount == 2)
+            window.ToggleMaximizeRestore();
+        else
+            window.DragMove();
     }
 
     // "..." button: open the overflow menu (all right commands) against the button. Safe, layout-loop-free overflow -

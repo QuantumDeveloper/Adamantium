@@ -44,9 +44,11 @@
                             </controls:ItemsControl.ItemTemplate>
                         </controls:ItemsControl>
 
-                        <!-- THE draggable zone: icon + title, fills the middle. Transparent = a solid hit region; its bounds
-                             become the window's CaptionDragRect (the only place the OS runs the window drag). Clips so a long
-                             title doesn't spill onto the commands. Double-click here = maximize (native, from HTCAPTION). -->
+                        <!-- THE draggable zone: icon + title, fills the middle `*` column. Transparent = invisible but fully
+                             hit-testable (hit-testing is decoupled from Background in this engine), so the whole strip drags.
+                             Clips so a long title doesn't spill onto the commands. The command columns (0 and 2) sit outside
+                             this element, so their buttons stay clickable; the drag is initiated from managed input here
+                             (see TitleBar), which respects z-order so overlays on top keep their clicks. -->
                         <controls:Grid x:Name="PART_DragArea" Grid.Column="1" Background="Transparent" ClipToBounds="True">
                             <controls:StackPanel Orientation="Horizontal" VerticalAlignment="Center"
                                     HorizontalAlignment="{TemplateBinding TitleAlignment}" Margin="12,0,0,0">

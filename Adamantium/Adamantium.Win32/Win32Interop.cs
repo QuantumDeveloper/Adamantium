@@ -320,6 +320,11 @@ namespace Adamantium.Win32
         [DllImport("kernel32.dll")]
         public static extern uint GetCurrentThreadId();
 
+        // True if the window is currently maximized (zoomed). Queried live from the OS so frame math never trusts a
+        // cached state that can lag a native restore-drag.
+        [DllImport("user32.dll")]
+        public static extern bool IsZoomed(IntPtr hWnd);
+
         [DllImport("kernel32.dll", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool CloseHandle(IntPtr hObject);
