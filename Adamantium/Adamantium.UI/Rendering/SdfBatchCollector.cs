@@ -19,18 +19,15 @@ internal abstract class SdfBatchCollector<TItem> : BatchCollector<TItem> where T
 
     protected SdfBatchCollector(int initialCapacity) : base(initialCapacity) { }
 
-    // Per-instance data lives in a BDA storage buffer (read in the vertex shader by SV_InstanceID) rather than a
-    // per-instance vertex buffer, so it can be retained + patched incrementally. RectBatchCollector owns the master toggle.
-    protected override bool UsesStorageBuffer => RectBatchCollector.UseStorageInstancing;
-
     protected override void OnBeginFrame(IGraphicsDevice device) => Effect ??= new BatchEffect(device);
 
-    // The two SDF draw passes for this shape: the storage-instanced form (per-instance TItem from the buffer's device
-    // address) and the vertex-buffer fallback (TItem bound as per-instance vertex attributes).
-    protected abstract IEffectPass StorageDrawPass { get; }
-    protected abstract IEffectPass VertexDrawPass { get; }
+    // The SDF draw pass for this shape (per-instance TItem read from the buffer's device address by SV_InstanceID).
+    protected abstract IEffectPass DrawPass { get; }
 
-    // Straight-alpha AlphaBlend (matches solid fills); depth like the other main-pass units (Always, test+write).
+    // Straight-alpha AlphaBlend (matches solid fills); depth like the other main-pass units (Always, test+write). The quad
+    // comes from SV_VertexID and the per-instance TItem from the buffer's device address (no vertex buffer). The address
+    // is offset by firstInstance and drawn at base 0 so items[0..count-1] read THIS segment regardless of SV_InstanceID's
+    // base (whether it includes firstInstance is translation-defined).
     protected override void DrawSegment(IGraphicsDevice device, Buffer<TItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
     {
         device.ColorBlendEnabled = true;
@@ -42,23 +39,10 @@ internal abstract class SdfBatchCollector<TItem> : BatchCollector<TItem> where T
         Effect.Projection.SetValue(projection);
         device.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
 
-        if (UsesStorageBuffer)
-        {
-            // Quad from SV_VertexID, per-instance TItem from the buffer's device address (no vertex buffer). Offset the
-            // address by firstInstance + Draw at 0 so items[0..count-1] reads THIS segment regardless of SV_InstanceID's
-            // base (whether it includes firstInstance is translation-defined).
-            device.VertexType = null;
-            var stride = (ulong)System.Runtime.InteropServices.Marshal.SizeOf<TItem>();
-            Effect.InstancesAddress.SetValue(buffer.GetDeviceAddress() + firstInstance * stride);
-            StorageDrawPass.Apply();
-            device.Draw(4, count, 0, 0);
-        }
-        else
-        {
-            device.VertexType = typeof(TItem);
-            device.SetVertexBuffer(buffer);
-            VertexDrawPass.Apply();
-            device.Draw(4, count, 0, firstInstance);
-        }
+        device.VertexType = null;
+        var stride = (ulong)System.Runtime.InteropServices.Marshal.SizeOf<TItem>();
+        Effect.InstancesAddress.SetValue(buffer.GetDeviceAddress() + firstInstance * stride);
+        DrawPass.Apply();
+        device.Draw(4, count, 0, 0);
     }
 }

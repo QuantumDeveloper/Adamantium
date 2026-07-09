@@ -20,15 +20,9 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
     // A/B / safety-valve toggle: off routes every rect back to its per-unit fill + AA-fringe draw (the pre-batch path).
     public static bool Enabled = true;
 
-    // Master toggle for the SDF instancing family (rect + ellipse): draw via the *Instanced passes (per-instance data read
-    // from a BDA STORAGE buffer by SV_InstanceID) instead of a per-instance VERTEX buffer. Off = the proven vertex-buffer
-    // draw (fallback). Only affects HOW the same item data is fed to the same SDF pixel shader.
-    public static bool UseStorageInstancing = true;
-
     public RectBatchCollector() : base(4096) { }
 
-    protected override IEffectPass StorageDrawPass => Effect.BatchRectInstancedPass;
-    protected override IEffectPass VertexDrawPass => Effect.BatchRectPass;
+    protected override IEffectPass DrawPass => Effect.BatchRectPass;
 
     // Batchable = a visible solid fill + a batchable pen (none, or a SOLID stroke the SDF shader draws analytically),
     // uniform corner radius. Gradient/image fill, a non-solid/dashed/trimmed pen, per-corner radii, or Enabled=off fall

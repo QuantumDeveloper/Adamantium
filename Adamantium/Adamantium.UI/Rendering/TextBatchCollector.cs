@@ -20,6 +20,10 @@ internal sealed class TextBatchCollector : BatchCollector<FontItem>
 
     public TextBatchCollector() : base(8192) { }
 
+    // The glyph batch still binds its instances as a per-instance VERTEX buffer (FontRenderer.DrawBatch + the MSDF glyph
+    // shader read vertex attributes), unlike the SDF fills which are storage-instanced. Opt out of the storage default.
+    protected override bool UsesStorageBuffer => false;
+
     // Whether this block can batch at all (and its atlas). Canonical MSDF only - the batch pixel shader is the MSDF
     // variant; outline / gradient-AA / empty / non-solid-foreground text (and UseTextBatch=off) fall back to the
     // per-block direct draw. The clip-group check lives in RenderCache; the atlas check is SameAtlas below.

@@ -143,6 +143,10 @@ public class RenderCache
     /// </summary>
     public void BuildFromComponents(IReadOnlyList<IUIComponent> components, Matrix4x4F projectionMatrix)
     {
+        // A FULL rebuild every call (clears + re-renders every component). Must record that: the batches' Clean-frame
+        // upload-skip reads LastBuildKind, and without this it stays at its default (Clean) so the overlay batch would
+        // skip EVERY GPU upload - its SSBO never fills and the whole overlay (menus, tooltips, SlidePanel) renders nothing.
+        LastBuildKind = RenderBuildKind.Full;
         _commands.Clear();
         _renderUnits.Clear();
         _worldCache.Clear();   // new frame: drop last frame's transform + clip memos

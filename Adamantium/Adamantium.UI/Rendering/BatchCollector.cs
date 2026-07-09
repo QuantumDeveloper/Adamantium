@@ -46,9 +46,10 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     /// <summary>GPU-buffer element capacity for THIS frame - derived TryAdd guards against overflowing it.</summary>
     protected int GpuCapacity => _gpuCapacity;
 
-    /// <summary>Override to allocate the batch buffer as a BDA STORAGE buffer (per-instance data read in the vertex shader
-    /// by SV_InstanceID) instead of a per-instance VERTEX buffer. Enables the retained/incremental instanced path.</summary>
-    protected virtual bool UsesStorageBuffer => false;
+    /// <summary>The batch buffer is a BDA STORAGE buffer by default (per-instance data read in the vertex shader by
+    /// SV_InstanceID, quad from SV_VertexID - no per-instance vertex buffer). Override to <c>false</c> only for a batch
+    /// that still binds its instances as a per-instance VERTEX buffer (the glyph/text batch).</summary>
+    protected virtual bool UsesStorageBuffer => true;
 
     /// <summary>The batch buffer (its device address feeds the instanced shader when <see cref="UsesStorageBuffer"/>).</summary>
     protected Buffer<TItem> GpuBuffer => _gpu;
