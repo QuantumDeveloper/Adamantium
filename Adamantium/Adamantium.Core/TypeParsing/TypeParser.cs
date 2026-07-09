@@ -59,17 +59,30 @@ public static class TypeParser
         var parser = Activator.CreateInstance(parserType);
         var parse = parserType.GetMethod(nameof(ITypeParser<object>.Parse), [typeof(string)])
                     ?? throw new InvalidOperationException($"{parserType.FullName} has no Parse(string) method");
-        return value =>
+
+        // Bind the parser's Parse(string) as a direct delegate ONCE, so each parse is a plain call - not a per-call
+        // MethodInfo.Invoke (reflection dispatch + a `[value]` args-array allocation). A converter on a virtualized list
+        // re-parses per realized item every scroll frame (e.g. a colour string -> Brush per tile), so the reflection
+        // Invoke + array alloc was steady CPU + GC churn on the hot path. Return types are reference (Brush, etc.), so
+        // Func<string,object> binds by reference-covariance; a value-type return can't, so fall back to Invoke there.
+        try
         {
-            try
+            return (Func<string, object>)Delegate.CreateDelegate(typeof(Func<string, object>), parser, parse);
+        }
+        catch (ArgumentException)
+        {
+            return value =>
             {
-                return parse.Invoke(parser, [value]);
-            }
-            catch (Exception e)
-            {
-                throw new InvalidOperationException($"Cannot parse {value} as input for {targetType.FullName}",
-                    e is TargetInvocationException tie ? tie.InnerException : e);
-            }
-        };
+                try
+                {
+                    return parse.Invoke(parser, [value]);
+                }
+                catch (Exception e)
+                {
+                    throw new InvalidOperationException($"Cannot parse {value} as input for {targetType.FullName}",
+                        e is TargetInvocationException tie ? tie.InnerException : e);
+                }
+            };
+        }
     }
 }

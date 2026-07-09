@@ -19,6 +19,15 @@ public class RenderCache
     private IDrawingContextInternal _drawingContextInternal;
     private readonly Dictionary<Guid, List<IRenderUnit>> _unitsByControl = new Dictionary<Guid, List<IRenderUnit>>();
 
+    // Paint-order (DFS visit) index of each component, assigned during the full walk - kept even for a component that
+    // rendered 0 units. Lets a PARTIAL re-render whose draw-command COUNT changed (a hover background appearing 0->1, or
+    // vanishing) splice that ONE component's units into the retained paint-order list at the right spot, instead of
+    // falling back to a full tree walk that re-renders every element (the hover / mouse-move FPS cliff on a big list).
+    private readonly Dictionary<Guid, int> _orderByControl = new();
+    private IRootVisualComponent _lastVisualRoot;             // for an on-demand order re-walk (a component appearing mid-partial)
+    private readonly Stack<IUIComponent> _orderStack = new(); // reused by ReassignOrders (no per-call alloc)
+    private readonly HashSet<Guid> _orderVisited = new();
+
     private readonly IRenderUnitFactory _renderUnitFactory;
 
     // Reusable snapshot of the geometry-dirty set for the partial pass: ReRenderInPlace re-renders components, and a
@@ -79,7 +88,7 @@ public class RenderCache
             var fellBack = false;
             foreach (var component in _geometryDirtyBuffer)
             {
-                if (!ReRenderInPlace(component)) { fellBack = true; break; }   // count/type/visibility change -> full walk
+                if (!ReRenderInPlace(component)) { fellBack = true; break; }
             }
 
             // Partial completes ONLY if nothing structural surfaced and NO new geometry was marked during the pass (the
@@ -103,35 +112,74 @@ public class RenderCache
         RenderDirty.Clear();
     }
 
-    // Re-render ONE already-cached component IN PLACE (its geometry went dirty). Returns false - "structural" - when the
-    // update would change the retained paint-order list (the component is new / now hidden / draws a different NUMBER of
-    // commands / a command's payload type changed, all of which add, remove or replace unit OBJECTS): the caller then
-    // does a full walk. On a true same-shape update the unit objects are reused via UpdateWithDrawCommand, so
-    // _renderUnits - which already references them - needs no change.
+    // Re-render ONE already-cached component IN PLACE (its geometry went dirty). Returns false - "needs a full walk" -
+    // only when this component has no recorded paint position yet (never in a full build). On a same-shape update the
+    // unit objects are reused via UpdateWithDrawCommand (the retained _renderUnits already references them - no change).
+    // On a COUNT change - a hover background appearing (0->1 commands) or vanishing (1->0), the mouse-move hover cliff -
+    // it rebuilds just this component's units and SPLICES them into the paint-order list at the component's recorded
+    // DFS rank, instead of forcing a full tree walk that re-renders every element.
     private bool ReRenderInPlace(IUIComponent component)
     {
         if (component.Visibility != Visibility.Visible) return false;   // (no Render() run yet - nothing to undo)
-        if (!_unitsByControl.TryGetValue(component.RenderId, out var units) || units.Count == 0) return false;
 
         _drawingContextInternal.Clear();
         component.Render(_drawingContext);   // NB: consumes the dirty flag (Render sets IsGeometryValid back to true)
         var drawCommands = _drawingContextInternal.GetDrawCommands();
 
-        var structural = drawCommands.Count != units.Count;
-        for (var i = 0; !structural && i < drawCommands.Count; i++)
+        _unitsByControl.TryGetValue(component.RenderId, out var units);
+        var oldCount = units?.Count ?? 0;
+
+        // Fast path: same command count and every unit still matches -> update in place; the paint-order list is untouched
+        // (it already holds these exact unit objects at the right spot).
+        if (units != null && drawCommands.Count == oldCount && oldCount > 0)
         {
-            var command = drawCommands[i];
-            command.RenderData.ProjectionMatrix = _projectionMatrix;
-            if (!units[i].Match(command)) { structural = true; break; }   // payload type changed -> unit would be replaced
-            units[i].UpdateWithDrawCommand(command);
+            var allMatch = true;
+            for (var i = 0; i < drawCommands.Count; i++)
+            {
+                drawCommands[i].RenderData.ProjectionMatrix = _projectionMatrix;
+                if (!units[i].Match(drawCommands[i])) { allMatch = false; break; }   // payload type changed
+            }
+            if (allMatch)
+            {
+                for (var i = 0; i < drawCommands.Count; i++) units[i].UpdateWithDrawCommand(drawCommands[i]);
+                return true;
+            }
         }
 
-        if (structural)
+        // Count (or a unit type) changed. Splice this component's units into the retained paint-order list in place.
+        if (!_orderByControl.ContainsKey(component.RenderId))
         {
-            // We already rendered (and consumed the dirty flag), but the paint-order list needs rebuilding. Re-invalidate
-            // so the caller's full walk re-renders + re-caches this component instead of skipping it as "still valid".
-            component.InvalidateRender(false);
-            return false;
+            // The component has no recorded paint rank - it was invisible/absent during the last full walk and has now
+            // appeared (e.g. an auto-hide ScrollBar fading in on mouse activity). Rather than re-render the WHOLE tree,
+            // re-derive paint ranks with a cheap ORDER-ONLY walk (no Render, no unit work) so this one component can be
+            // spliced in. O(N) dictionary writes (~tens of us) vs a full render of thousands of units.
+            ReassignOrders();
+            if (!_orderByControl.ContainsKey(component.RenderId))
+                return false;   // genuinely not in the tree -> let the caller do a full walk
+        }
+
+        // Where the OLD block sits (contiguous). Capture BEFORE BuildUnitsFor mutates the list in place.
+        var oldStart = oldCount > 0 ? _renderUnits.IndexOf(units[0]) : -1;
+        if (oldCount > 0 && oldStart < 0) return false;   // shouldn't happen; be safe and fall back
+
+        var newUnits = BuildUnitsFor(component, drawCommands, _projectionMatrix);
+
+        if (oldStart >= 0)
+        {
+            _renderUnits.RemoveRange(oldStart, oldCount);
+            _renderUnits.InsertRange(oldStart, newUnits);   // same slot -> paint order preserved
+        }
+        else if (newUnits.Count > 0)
+        {
+            // Old block was empty (a background appearing): insert by the component's DFS rank - before the first unit
+            // whose component ranks after it.
+            var order = _orderByControl[component.RenderId];
+            var pos = _renderUnits.Count;
+            for (var i = 0; i < _renderUnits.Count; i++)
+            {
+                if (_orderByControl.GetValueOrDefault(_renderUnits[i].Component.RenderId, int.MaxValue) > order) { pos = i; break; }
+            }
+            _renderUnits.InsertRange(pos, newUnits);
         }
         return true;
     }
@@ -512,9 +560,33 @@ public class RenderCache
         };
     }
     
+    // Re-derive every component's paint-order rank WITHOUT rendering (no Render, no unit build) - the same DFS + paint
+    // order as the full walk, just assigning _orderByControl. Used when a component appears mid-partial (needs a rank to
+    // be spliced into the retained paint-order list) so we don't have to re-render the whole tree to place one element.
+    private void ReassignOrders()
+    {
+        if (_lastVisualRoot == null) return;
+        _orderByControl.Clear();
+        _orderStack.Clear();
+        _orderVisited.Clear();
+        var order = 0;
+        _orderStack.Push(_lastVisualRoot);
+        while (_orderStack.Count > 0)
+        {
+            var component = _orderStack.Pop();
+            if (component.Visibility != Visibility.Visible) continue;
+            if (!_orderVisited.Add(component.RenderId)) continue;
+            _orderByControl[component.RenderId] = order++;
+            PushChildrenInPaintOrder(_orderStack, component.VisualChildren);
+        }
+    }
+
     private void BuildRenderCommands(IRootVisualComponent visualRoot)
     {
         _renderUnits.Clear();
+        _orderByControl.Clear();
+        _lastVisualRoot = visualRoot;
+        var order = 0;
         var projectionMatrix = visualRoot.GetProjectionMatrix();
         var stack = new Stack<IUIComponent>();
         var visited = new HashSet<Guid>();
@@ -530,6 +602,8 @@ public class RenderCache
             // would add its units to _renderUnits a second time -> every such element is drawn TWICE (overdraw at the
             // same spot). Guard against that here so each component (and its subtree) is built once.
             if (!visited.Add(component.RenderId)) continue;
+
+            _orderByControl[component.RenderId] = order++;   // paint-order rank (for the incremental partial-patch)
 
             // Capture dirtiness BEFORE Render: a clean control's Render() is a no-op (records nothing),
             // so an empty command list means "reuse the cached units". A dirty control re-records, so an
@@ -584,55 +658,56 @@ public class RenderCache
         }
     }
 
+    // Refresh a component's cached units from its freshly recorded draw commands: reuse a still-matching unit in place,
+    // replace a type-changed one, create the extra, dispose the surplus. Updates _unitsByControl but does NOT touch the
+    // paint-order list (_renderUnits) - the caller places them (full build appends; a partial patch splices by order).
+    private List<IRenderUnit> BuildUnitsFor(IUIComponent component, IReadOnlyList<IDrawCommand> drawCommands, Matrix4x4F projectionMatrix)
+    {
+        if (!_unitsByControl.TryGetValue(component.RenderId, out var units))
+        {
+            units = new List<IRenderUnit>();
+            _unitsByControl[component.RenderId] = units;
+        }
+
+        for (int i = 0; i < drawCommands.Count; i++)
+        {
+            var command = drawCommands[i];
+            command.RenderData.ProjectionMatrix = projectionMatrix;
+            if (i >= units.Count)
+            {
+                units.Add(_renderUnitFactory.CreateRenderUnitFromCommand(command));
+            }
+            else
+            {
+                var unit = units[i];
+                if (unit.Match(command))
+                {
+                    unit.UpdateWithDrawCommand(command);
+                }
+                else
+                {
+                    unit.DeferDispose();
+                    units[i] = _renderUnitFactory.CreateRenderUnitFromCommand(command);
+                }
+            }
+        }
+
+        if (units.Count > drawCommands.Count)
+        {
+            for (int i = drawCommands.Count; i < units.Count; i++)
+                units[i].DeferDispose();
+            units.RemoveRange(drawCommands.Count, units.Count - drawCommands.Count);
+        }
+
+        return units;
+    }
+
     private void ProcessRenderCommands(IUIComponent component, Matrix4x4F projectionMatrix, bool wasGeometryValid)
     {
         var drawCommands = _drawingContextInternal.GetDrawCommands();
         if (drawCommands.Count > 0)
         {
-            bool isNewControl = false;
-            if (!_unitsByControl.TryGetValue(component.RenderId, out var units))
-            {
-                units = new List<IRenderUnit>();
-                _unitsByControl[component.RenderId] = units;
-                isNewControl = true;
-            }
-
-            for (int i = 0; i < drawCommands.Count; i++)
-            {
-                var command = drawCommands[i];
-                command.RenderData.ProjectionMatrix = projectionMatrix;
-                if (i >= units.Count || isNewControl)
-                {
-                    var unit = _renderUnitFactory.CreateRenderUnitFromCommand(command);
-                    units.Add(unit);
-                }
-                else
-                {
-                    var unit = units[i];
-                    if (unit.Match(command))
-                    {
-                        unit.UpdateWithDrawCommand(command);
-                    }
-                    else
-                    {
-                        unit.DeferDispose();
-                        unit = _renderUnitFactory.CreateRenderUnitFromCommand(command);
-                        units[i] = unit;
-                    }
-                }
-            }
-
-            // Remove extra units
-            if (units.Count > drawCommands.Count)
-            {
-                for (int i = drawCommands.Count; i < units.Count; i++)
-                    units[i].DeferDispose();
-
-                units.RemoveRange(drawCommands.Count, units.Count - drawCommands.Count);
-            }
-
-            _unitsByControl[component.RenderId] = units;
-            _renderUnits.AddRange(units);
+            _renderUnits.AddRange(BuildUnitsFor(component, drawCommands, projectionMatrix));
         }
         else
         {

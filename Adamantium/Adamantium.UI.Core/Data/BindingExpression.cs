@@ -30,6 +30,7 @@ public class BindingExpression : BindingExpressionBase
    private PropertyInfo _sourceProperty;
    private Func<object, object> _sourceGetter;   // compiled reader for _sourceProperty (the hot ComputeValue path)
    private INotifyPropertyChanged _observed;
+   private string[] _segments;   // cached Binding.Path split on '.', computed once (path is fixed per expression)
 
    // Property-accessor cache: `GetType().GetProperty(name)` is a slow metadata search and `PropertyInfo.GetValue` a slow
    // reflection invoke, and a virtualized list re-runs both for EVERY binding of EVERY recycled row on scroll (a fling can
@@ -94,11 +95,16 @@ public class BindingExpression : BindingExpressionBase
       // item.Stroke is the SAME object for every item. The existing PropertyChanged subscription is therefore still
       // correct - so do NOT unsubscribe + re-subscribe. On a source with many subscribers (one per such binding per
       // realized tile), each -=/+= rebuilds the whole multicast invocation list (O(subscribers)); doing that for every
-      // tile every scroll frame is O(N^2) and was the ~118 KB-per-binding rebind allocation storm (gen2 GC freeze). Just
-      // re-read the value against the new DataContext.
+      // tile every scroll frame is O(N^2) and was the ~118 KB-per-binding rebind allocation storm (gen2 GC freeze).
       if (ReferenceEquals(newObserved, previousObserved) && previousObserved != null)
       {
-         Refresh();
+         // The source object AND our subscription are unchanged, so the value cannot have moved since it was last
+         // pushed (a real change arrives via OnSourcePropertyChanged -> batched apply). The recycled target already
+         // holds exactly this value - the item it previously showed bound to this SAME shared source. So skip the
+         // re-push entirely: for a shared sub-VM (the 12 Stroke.* bindings per tile) this was re-computing + re-writing
+         // an identical value on every rebind of every tile every scroll frame - the dominant per-rebind cost
+         // (updTarget ~33 ms/frame, incl. the brush-string re-parse). Producer mode must still republish for its parent.
+         if (IsProducer) Refresh();
          return;
       }
 
@@ -139,7 +145,10 @@ public class BindingExpression : BindingExpressionBase
       var path = Binding.Path?.Path;
       if (root == null || string.IsNullOrEmpty(path)) return;
 
-      var segments = path.Split('.');
+      // Split ONCE per expression, not per resolve: the path is fixed for the binding's life, but ResolveSource runs on
+      // every DataContext change (every rebind of every recycled tile) - a fresh string[] alloc per call was steady GC
+      // churn on the scroll hot path.
+      var segments = _segments ??= path.Split('.');
       object current = root;
       for (var i = 0; i < segments.Length - 1 && current != null; i++)
          current = GetAccessor(current.GetType(), segments[i]).Getter?.Invoke(current);
@@ -191,10 +200,36 @@ public class BindingExpression : BindingExpressionBase
       if (_sourceProperty == null) return BindingBase.FallbackValue;
       var value = _sourceGetter != null ? _sourceGetter(ResolvedSource) : _sourceProperty.GetValue(ResolvedSource);
       if (Binding.Converter != null)
-         value = Binding.Converter.Convert(value, targetType, Binding.ConverterParameter, CultureInfo.CurrentCulture);
+         value = ConvertCached(value, targetType);
       if (value == null)
          value = BindingBase.TargetNullValue ?? BindingBase.FallbackValue;
       return value;
+   }
+
+   // Per-SOURCE-OBJECT converted-value cache. A value-converter (e.g. a colour string -> Brush) is otherwise re-run for
+   // every realized tile every scroll frame - the dominant per-rebind cost. Keyed by the SOURCE OBJECT (the item), so
+   // each item gets ONE converted instance: reused across rebinds and across whichever recycled container currently shows
+   // the item, yet DISTINCT per item (mutating one item's brush never bleeds into another item that happens to share a
+   // colour string). Weak keys -> an item's cached conversions die with the item, no manual eviction. The stored RAW
+   // input guards staleness: if the source property changed (item.Color mutated -> re-convert), the raw differs and we
+   // rebuild. A boxed value-type source can't key a weak table (identity-less), so it falls back to a direct convert.
+   private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object,
+      Dictionary<(IValueConverter, Type, string), (object Raw, object Converted)>> _convertCache = new();
+
+   private object ConvertCached(object raw, Type targetType)
+   {
+      var source = ResolvedSource;
+      if (source == null || source.GetType().IsValueType)
+         return Binding.Converter.Convert(raw, targetType, Binding.ConverterParameter, CultureInfo.CurrentCulture);
+
+      var cache = _convertCache.GetOrCreateValue(source);
+      var key = (Binding.Converter, targetType, SourcePropertyName);
+      if (cache.TryGetValue(key, out var entry) && Equals(entry.Raw, raw))
+         return entry.Converted;
+
+      var converted = Binding.Converter.Convert(raw, targetType, Binding.ConverterParameter, CultureInfo.CurrentCulture);
+      cache[key] = (raw, converted);
+      return converted;
    }
 
    public override void UpdateTarget()

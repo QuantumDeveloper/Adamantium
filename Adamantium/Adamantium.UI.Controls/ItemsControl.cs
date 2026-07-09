@@ -32,6 +32,11 @@ public class ItemsControl : Control, IContainer
     public static readonly AdamantiumProperty ItemTemplateSelectorProperty = AdamantiumProperty.Register(nameof(ItemTemplateSelector),
         typeof(DataTemplateSelector), typeof(ItemsControl), new PropertyMetadata(null, OnRegenerateContainers));
 
+    /// <summary>Visual shown in a virtualized slot whose real item hasn't been (re)bound yet this frame (a fast fling or a
+    /// big fill exceeds the per-frame bind budget). Null = the panel's built-in themed skeleton (a muted rounded tile).</summary>
+    public static readonly AdamantiumProperty ItemSkeletonTemplateProperty = AdamantiumProperty.Register(nameof(ItemSkeletonTemplate),
+        typeof(DataTemplate), typeof(ItemsControl), new PropertyMetadata(null));
+
     public static readonly AdamantiumProperty ItemContainerStyleProperty = AdamantiumProperty.Register(nameof(ItemContainerStyle),
         typeof(Style), typeof(ItemsControl), new PropertyMetadata(null, OnRegenerateContainers));
 
@@ -64,6 +69,13 @@ public class ItemsControl : Control, IContainer
     {
         get => GetValue<DataTemplate>(ItemTemplateProperty);
         set => SetValue(ItemTemplateProperty, value);
+    }
+
+    /// <summary>Placeholder template for a not-yet-bound virtualized slot (see <see cref="ItemSkeletonTemplateProperty"/>).</summary>
+    public DataTemplate ItemSkeletonTemplate
+    {
+        get => GetValue<DataTemplate>(ItemSkeletonTemplateProperty);
+        set => SetValue(ItemSkeletonTemplateProperty, value);
     }
 
     /// <summary>Picks the <see cref="DataTemplate"/> per item (when no <see cref="ItemTemplate"/> is set).</summary>

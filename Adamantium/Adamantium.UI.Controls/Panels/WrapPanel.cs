@@ -1,14 +1,58 @@
 ﻿using Adamantium.Mathematics;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Input;
 
 namespace Adamantium.UI.Controls.Panels;
 
-public class WrapPanel : VirtualizingPanel
+public class WrapPanel : VirtualizingPanel, IHitTestChildren
 {
+   private readonly IUIComponent[] _hitOne = new IUIComponent[1];   // reused single-child hit-test result (no per-move alloc)
+
+   // O(1) hit-test: the tile that a point can hit is the ONE at its grid slot (tiles are absolute + non-overlapping), so
+   // resolve the slot by arithmetic and return just that container/skeleton - instead of the base walk visiting every
+   // realized tile's whole subtree (thousands of nodes) on every mouse move (the second-monitor freeze). `local` is in
+   // panel space (absolute slot coordinates); null = let the caller do the default full walk (a plain, non-items panel).
+   IReadOnlyList<IUIComponent> IHitTestChildren.GetHitTestChildren(Vector2 local)
+   {
+      if (!IsItemsHost) return null;
+      var horizontal = Orientation == Orientation.Horizontal;
+      var flow = horizontal ? local.X : local.Y;
+      var scroll = horizontal ? local.Y : local.X;
+      if (flow < 0 || scroll < 0 || _cellFlow <= 0 || _cellScroll <= 0) return System.Array.Empty<IUIComponent>();
+      var col = (int)(flow / _cellFlow);
+      if (col >= _columns) return System.Array.Empty<IUIComponent>();
+      var index = (int)(scroll / _cellScroll) * _columns + col;
+      var hit = Owner.ItemContainerGenerator.ContainerFromIndex(index) ?? SkeletonAt(index);
+      if (hit == null) return System.Array.Empty<IUIComponent>();
+      _hitOne[0] = hit;
+      return _hitOne;
+   }
+
    // ---- Virtualized 2D state (items host) ----
    private const int Buffer = 1;        // extra lines on each side of the viewport
    private const int MaxCellPasses = 4; // bound the in-pass convergence of the auto-sized cell
-   private const int RealizeCap = 64;  // max NEW containers realized per pass (spread a big burst over frames)
+   // Per-frame (re)bind TIME budget. A rebind is cheap (~20 us) but CREATING a container (new item + template + bindings)
+   // is ~50x that, so a fixed COUNT that is fine for scroll would spend >100 ms/frame building the initial window (or a
+   // post-resize burst) - freezing the app. Instead SetWindow (re)binds until BindBudgetMs of frame time is spent, then
+   // defers the rest to skeletons + the next pass. Time-based self-tunes INSTANTLY to per-op cost: few EXPENSIVE
+   // creates/frame (UI stays live, skeletons show progress) but many CHEAP rebinds/frame (fast scroll) - with no
+   // count-estimate to mis-size on a cheap->expensive regime change (the multi-monitor DPI-resize freeze).
+   private const double BindBudgetMs = 6.0;   // frame-time slice for (re)binds (headroom under a 16 ms frame)
+   private const int MinBinds = 8;            // always (re)bind at least this many/frame so the window keeps filling
+
+   private bool _measuringHorizontal;               // orientation snapshot for OnSlotBound (called from SetWindow)
+   private bool _cellGrew;                           // did a bound tile grow the auto cell? -> another MaxCellPasses pass
+   private System.Action<IUIComponent> _onSlotBound; // cached delegate (no per-frame closure alloc)
+
+   // Called by SetWindow for each newly-(re)bound tile, INSIDE the time budget: attach (fresh ones), measure, and grow
+   // the auto cell to fit. Measuring HERE (not in a later loop) is what lets the budget bound bind+measure together.
+   private void OnSlotBound(IUIComponent container)
+   {
+      if (container.VisualParent != this) { AddVisualChild(container); AddLogicalChild(container); }
+      var m = (IMeasurableComponent)container;
+      if (!m.IsMeasureValid) m.Measure(CellConstraint(_measuringHorizontal));
+      _cellGrew |= GrowCell(_measuringHorizontal, m.DesiredSize);
+   }
    private double _cellFlow = 1;        // cell size along the flow axis
    private double _cellScroll = 1;      // cell size along the scroll (wrap) axis
    private int _columns = 1;            // items per line
@@ -284,11 +328,6 @@ public class WrapPanel : VirtualizingPanel
       // and then stays put across scrolls. The old code re-probed ONE variable-width item every pass, so the cell and
       // column count flickered -> the whole grid reflowed (overlapping/garbled rows) and every frame re-bound the window.
       int first = 0, last = -1;
-      var deferRealize = false;
-      // Realize-budget baseline: the window size at frame start. Read ONCE (not per pass) so the auto-cell convergence
-      // loop below - which calls SetWindow up to MaxCellPasses times - still realizes at most RealizeCap new containers
-      // this whole frame, not RealizeCap per pass.
-      var realizedAtStart = Owner.ItemContainerGenerator.RealizedCount;
       for (var pass = 0; pass < MaxCellPasses; pass++)
       {
          _columns = Math.Max(1, (int)Math.Floor(viewportFlow / _cellFlow));
@@ -315,51 +354,44 @@ public class WrapPanel : VirtualizingPanel
             _lastFirstLine = firstLine;
             first = firstLine * _columns;
             last = Math.Min(count - 1, (lastLine + 1) * _columns - 1);
-
-            // Spread a big realize BURST over frames: if the window suddenly needs far more containers than exist now
-            // (a shrink revealing hundreds of tiles), grow it by at most RealizeCap new containers this pass and finish
-            // over the next frames - so ~500 container constructions don't hang one frame (the resize freeze). Only
-            // GROWTH is capped: a scroll rebinds in place (same window size) and a grow-cell shrinks the window, so
-            // neither trips this. The extent below is formula-based (full count), so the scrollbar stays correct while
-            // the not-yet-realized tail fills in.
-            if (last - first + 1 > realizedAtStart + RealizeCap)
-            {
-               last = Math.Min(count - 1, first + realizedAtStart + RealizeCap - 1);
-               deferRealize = true;
-            }
+            // The window is ALWAYS the full visible range - NOT truncated to a per-frame realize cap. A big burst (a huge
+            // viewport filling from empty, or a far fling) would otherwise hang one frame building ~hundreds of containers
+            // (the resize freeze); instead SetWindow's RebindBudget caps how many are (re)bound this pass and the rest
+            // become PendingIndices - covered by skeletons this frame and streamed in over the next passes. So the whole
+            // viewport shows content (real or skeleton) immediately, and the fill is bounded WITHOUT shrinking the window.
          }
 
-         // Reconcile the realized grid window to exactly [first,last] (rebind in place; hide only true surplus).
-         foreach (var c in Owner.ItemContainerGenerator.SetWindow(first, last)) c.Visibility = Visibility.Collapsed;
-         var grew = false;
-         for (var i = first; i <= last; i++)
-         {
-            // Skip slots already realized+measured+visible: they're attached, contributed to the cell, and CellConstraint
-            // is constant so they stay valid. Touching the WHOLE growing window every spread-frame (RealizeInWindow's
-            // Visibility set + GrowCell per slot) was O(realized)/pass = O(N^2) over the burst - even after only NEW items
-            // measured. Only new/rebound/hidden slots need work.
-            // Skip slots already realized+measured: attached, visible (SetWindow keeps in-window containers Visible and
-            // invalidates rebound ones), and contributed to the cell. IsMeasureValid is a plain field, so the whole scan
-            // of the window is cheap - no per-slot DP read on the scroll hot path.
-            if (Owner.ItemContainerGenerator.ContainerFromIndex(i) is IMeasurableComponent { IsMeasureValid: true })
-               continue;
-            var child = (IMeasurableComponent)RealizeInWindow(i);
-            if (!child.IsMeasureValid) child.Measure(CellConstraint(horizontal));
-            grew |= GrowCell(horizontal, child.DesiredSize);
-         }
-         if (!grew) break;
+         // Reconcile the realized grid window to exactly [first,last] (rebind in place; hide only true surplus). Cap the
+         // rebinds this pass to RebindBudget: an aggressive fling that turns the whole window over in one frame does
+         // O(window) rebinds (layout+render both scale with it) and drops frames. Past the budget, slots are DEFERRED
+         // (generator.PendingIndices) - a skeleton fills them this frame and the next pass rebinds them. Slow/normal
+         // scroll rebinds far fewer than the budget, so nothing defers and there is zero visible difference.
+         // Bind + attach + MEASURE each newly-(re)bound tile INSIDE SetWindow's time budget (OnSlotBound does the measure),
+         // so the budget bounds bind+measure together - the expensive measure is no longer a separate unbudgeted loop that
+         // blows the frame (the multi-monitor/resize 2200-tile freeze). Deferred slots become PendingIndices -> skeletons.
+         // GrowCell (unpinned-cell convergence) feeds back through _cellGrew.
+         _measuringHorizontal = horizontal;
+         _cellGrew = false;
+         _onSlotBound ??= OnSlotBound;
+         foreach (var c in Owner.ItemContainerGenerator.SetWindow(first, last, BindBudgetMs, MinBinds, _onSlotBound))
+            c.Visibility = Visibility.Collapsed;
+         if (!_cellGrew) break;
       }
 
-      // Capped this pass -> continue on the NEXT pass to realize the next RealizeCap slice (progressive fill-in). Must be
-      // the next-pass primitive, not InvalidateMeasure: we are inside the layout pass (with _inLayout set, which mutes the
-      // panel's own InvalidateMeasure anyway), and a same-pass re-measure would just realize the whole window this frame.
-      if (deferRealize) LayoutManager.For(this).InvalidateMeasureNextPass(this);
+      // Budget-deferred slots remain this frame -> continue on the NEXT pass to (re)bind the next RebindBudget slice
+      // (skeletons cover them meanwhile). Must be the next-pass primitive, not a bare InvalidateMeasure: we are inside
+      // the layout pass (with _inLayout set, which mutes the panel's own InvalidateMeasure anyway), and a same-pass
+      // re-measure would just try to realize the whole window this frame - defeating the budget.
+      if (Owner.ItemContainerGenerator.PendingIndices.Count > 0)
+         LayoutManager.For(this).InvalidateMeasureNextPass(this);
 
       var totalLines = (count + _columns - 1) / _columns;
       var flowExtent = _columns * _cellFlow;
       var scrollExtent = totalLines * _cellScroll;
       return horizontal ? new Size(flowExtent, scrollExtent) : new Size(scrollExtent, flowExtent);
    }
+
+   private readonly List<int> _arrangeIndexBuf = [];   // reused each arrange - no per-frame List alloc over the window
 
    protected override void ArrangeVirtualized(Size finalSize, Vector2 offset)
    {
@@ -368,7 +400,11 @@ public class WrapPanel : VirtualizingPanel
       // ABSOLUTE grid slots - the scroll offset is applied by the ScrollContentPresenter translating this panel and
       // clipping (transform-only scroll), NOT baked into each tile. A tile's rect is then CONSTANT across scroll, so
       // Arrange short-circuits for tiles that kept their index; only the rebound row re-runs ArrangeCore (O(one row)).
-      foreach (var index in Owner.ItemContainerGenerator.RealizedIndices.ToList())
+      // Snapshot indices into a REUSED buffer (not a fresh ToList): the window scan runs every scroll frame, so the
+      // per-frame list alloc over ~800 realized indices was steady gen0 churn.
+      _arrangeIndexBuf.Clear();
+      _arrangeIndexBuf.AddRange(Owner.ItemContainerGenerator.RealizedIndices);
+      foreach (var index in _arrangeIndexBuf)
       {
          if (Owner.ItemContainerGenerator.ContainerFromIndex(index) is not IMeasurableComponent container) continue;
          var line = index / _columns;
@@ -379,6 +415,20 @@ public class WrapPanel : VirtualizingPanel
             ? new Rect(flowPos, scrollPos, _cellFlow, _cellScroll)
             : new Rect(scrollPos, flowPos, _cellScroll, _cellFlow));
       }
+
+      // Budget-deferred slots (generator.PendingIndices): fill each with a skeleton at its grid slot so a fast fling
+      // shows a "loading" placeholder instead of a hole. Reconciled here (after the real tiles) since this is where the
+      // slot geometry lives; the panel owns the skeleton pool + lifecycle.
+      ReconcileSkeletons(i =>
+      {
+         var line = i / _columns;
+         var col = i % _columns;
+         var flowPos = col * _cellFlow;
+         var scrollPos = line * _cellScroll;
+         return horizontal
+            ? new Rect(flowPos, scrollPos, _cellFlow, _cellScroll)
+            : new Rect(scrollPos, flowPos, _cellScroll, _cellFlow);
+      });
    }
 
    // Seed the assumed uniform cell. Explicit ItemWidth/ItemHeight are taken as-is; an unspecified axis is probed from a

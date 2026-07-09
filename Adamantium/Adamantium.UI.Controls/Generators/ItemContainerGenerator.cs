@@ -20,6 +20,7 @@ public class ItemContainerGenerator
     private readonly List<IUIComponent> _donorBuf = new();       // reused across SetWindow calls - zero per-scroll-frame alloc
     private readonly List<int> _outKeysBuf = new();
     private readonly List<IUIComponent> _surplusBuf = new();
+    private readonly List<int> _pendingBuf = new();              // in-window slots deferred this pass (budget spent) - skeletons
 
     public ItemContainerGenerator(ItemsControl owner)
     {
@@ -28,6 +29,11 @@ public class ItemContainerGenerator
 
     /// <summary>The indices currently realized (for a virtualizing panel: only the visible window).</summary>
     public IReadOnlyCollection<int> RealizedIndices => _byIndex.Keys;
+
+    /// <summary>In-window slots the last <see cref="SetWindow"/> DEFERRED because the per-frame rebind budget was spent.
+    /// They have no real container yet (the panel shows a skeleton there); the next pass rebinds them. Empty when the
+    /// whole window fit the budget (normal/slow scroll).</summary>
+    public IReadOnlyList<int> PendingIndices => _pendingBuf;
 
     /// <summary>How many containers are currently realized.</summary>
     public int RealizedCount => _byIndex.Count;
@@ -57,8 +63,10 @@ public class ItemContainerGenerator
     /// it again with the same range is a no-op. Returns the surplus containers (only when the window is now smaller than
     /// before - i.e. at a list edge where fewer items exist than the window) so the panel can hide just those.
     /// </summary>
-    public IReadOnlyList<IUIComponent> SetWindow(int first, int last)
+    public IReadOnlyList<IUIComponent> SetWindow(int first, int last, double budgetMs = double.MaxValue, int minBinds = 0,
+        Action<IUIComponent> onBound = null)
     {
+        var budgetStart = System.Diagnostics.Stopwatch.GetTimestamp();
         // 1. Unmap every realized index now outside the window; its generated container becomes a reusable donor (kept
         //    fully intact - same visual, same DataContext - until step 2 rebinds it). Item-is-own-container isn't reused.
         // Reused buffers + a plain loop (no LINQ closure/ToList): SetWindow runs every scroll frame, so the old per-call
@@ -78,8 +86,15 @@ public class ItemContainerGenerator
         // Also draw on containers parked by a previous shrink (the window growing back).
         while (_recyclePool.Count > 0) donors.Add(_recyclePool.Pop());
 
-        // 2. Give every in-window index that lacks a container a donor (rebound in place) or a fresh one.
+        // 2. Give every in-window index that lacks a container a donor (rebound in place) or a fresh one. A rebind (new
+        //    DataContext -> re-resolve the item template's bindings + re-measure) is the real per-tile cost, so at most
+        //    maxRebinds of them run this pass: an aggressive fling that turns the whole window over in one frame would
+        //    otherwise do O(window) rebinds/frame. Slots past the budget are DEFERRED (collected in _pendingBuf); the
+        //    panel shows a skeleton there and the next pass rebinds them (unused donors were pooled in step 3, so they're
+        //    drained back as donors next time). A normal/slow scroll rebinds far fewer than the budget, so nothing defers.
+        _pendingBuf.Clear();
         var next = 0;
+        var rebinds = 0;
         for (var i = first; i <= last; i++)
         {
             if (_byIndex.ContainsKey(i)) continue;   // stayed in the window - keep its container + binding
@@ -89,15 +104,28 @@ public class ItemContainerGenerator
             {
                 container = (IUIComponent)item;
             }
+            else if (rebinds >= minBinds &&
+                     System.Diagnostics.Stopwatch.GetElapsedTime(budgetStart).TotalMilliseconds >= budgetMs)
+            {
+                // TIME budget spent (checked AFTER a minimum of minBinds so we always make progress): defer this slot -
+                // skeleton this frame, real (re)bind next pass. Time-based, not count-based, so an EXPENSIVE burst
+                // (creating containers from empty, or after a DPI/resize regime change) stops after budgetMs instead of
+                // running a whole stale count and freezing the frame; a CHEAP burst (scroll rebinds) fits many in the
+                // same budget.
+                _pendingBuf.Add(i);
+                continue;
+            }
             else if (next < donors.Count)
             {
                 container = donors[next++];
+                rebinds++;
                 _owner.PrepareContainer(container, item);   // rebind: DataContext/content -> the new item
             }
             else
             {
                 container = _owner.GetContainerForItem();
                 _generated.Add(container);
+                rebinds++;
                 _owner.PrepareContainer(container, item);
             }
             _byIndex[i] = container;
@@ -107,6 +135,10 @@ public class ItemContainerGenerator
             // the set: an out-of-window donor reused in place is ALREADY Visible, and Visibility set would otherwise
             // re-propagate down its whole subtree every rebind on the scroll hot path.
             if (container.Visibility != Visibility.Visible) container.Visibility = Visibility.Visible;
+            // Attach + MEASURE this tile now, INSIDE the time budget (via the panel's callback): a rebind is cheap but the
+            // measure that follows it is the expensive part, so measuring here (not in a separate unbudgeted loop) is what
+            // makes the budget actually bound the frame - the next iteration's time check sees the measure cost too.
+            onBound?.Invoke(container);
         }
 
         // 3. Donors not reused (the window shrank) - park them for when it grows again, and report them so the panel

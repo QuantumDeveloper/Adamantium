@@ -1,7 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Mathematics;
+using Adamantium.ProceduralGeometry;
+using Adamantium.UI.Controls.Base;
+using Adamantium.UI.Controls.Decorators;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Media;
 
 namespace Adamantium.UI.Controls.Panels;
 
@@ -179,11 +184,102 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         foreach (var child in VisualChildren)
         {
             if (child.Visibility != Visibility.Visible) continue;
+            if (_skeletons.Contains(child)) continue;   // panel-owned placeholder, not a generator container - leave it
             if (generator.IndexFromContainer(child) >= 0) continue;   // in the realized window - keep
             child.Visibility = Visibility.Collapsed;
             generator.ReclaimDetached(child);
         }
     }
+
+    // ---- Skeleton placeholders for budget-deferred slots (fast-fling "loading" tiles) ----
+    private readonly Stack<IUIComponent> _skeletonPool = new();          // reusable skeleton visuals
+    private readonly Dictionary<int, IUIComponent> _skeletonBySlot = new();   // active skeletons keyed by grid slot
+    private readonly HashSet<IUIComponent> _skeletons = new();           // identity set (excluded from HideUnmappedContainers)
+    private readonly HashSet<int> _pendingSet = new();                   // reused per reconcile
+    private readonly List<int> _skelStaleBuf = new();
+
+    /// <summary>Reconciles skeleton placeholders to EXACTLY the generator's budget-deferred slots. A pending slot with no
+    /// real container gets a pooled (or new) skeleton arranged at its grid rect; a slot that got its real tile - or
+    /// scrolled out - has its skeleton collapsed and pooled. The subclass calls this from ArrangeVirtualized (it owns the
+    /// slot geometry, passed as <paramref name="slotRect"/>). When nothing is deferred (normal/slow scroll) both the
+    /// pending list and the active map are empty, so this is a couple of cheap no-op scans.</summary>
+    protected void ReconcileSkeletons(Func<int, Rect> slotRect)
+    {
+        var pending = Owner.ItemContainerGenerator.PendingIndices;
+
+        // Retire skeletons whose slot is no longer pending (real tile landed, or the slot left the window).
+        if (_skeletonBySlot.Count > 0)
+        {
+            _pendingSet.Clear();
+            for (var i = 0; i < pending.Count; i++) _pendingSet.Add(pending[i]);
+            _skelStaleBuf.Clear();
+            foreach (var slot in _skeletonBySlot.Keys)
+                if (!_pendingSet.Contains(slot)) _skelStaleBuf.Add(slot);
+            foreach (var slot in _skelStaleBuf)
+            {
+                var sk = _skeletonBySlot[slot];
+                _skeletonBySlot.Remove(slot);
+                sk.Visibility = Visibility.Collapsed;
+                _skeletonPool.Push(sk);
+            }
+        }
+
+        // Advance the shimmer once per reconcile. While any slot is pending the panel re-measures every frame (the
+        // budget's next-pass), so this runs per-frame without a dedicated ticker; a frame-based step is fine for a shimmer.
+        _shimmerPhase += ShimmerStep;
+
+        // Place a skeleton at every pending slot, pulsing its opacity in a WAVE across the grid (offset by slot) so the
+        // whole area breathes like a Telegram "loading" placeholder instead of a flat block.
+        for (var i = 0; i < pending.Count; i++)
+        {
+            var slot = pending[i];
+            if (!_skeletonBySlot.TryGetValue(slot, out var sk))
+            {
+                sk = _skeletonPool.Count > 0 ? _skeletonPool.Pop() : CreateSkeletonInternal();
+                _skeletonBySlot[slot] = sk;
+            }
+            if (sk.Visibility != Visibility.Visible) sk.Visibility = Visibility.Visible;
+            if (sk is UIComponent uc)
+                uc.Opacity = 0.55 + 0.45 * Math.Sin(_shimmerPhase + slot * ShimmerWave);
+            var rect = slotRect(slot);
+            var m = (IMeasurableComponent)sk;
+            if (!m.IsMeasureValid) m.Measure(new Size(rect.Width, rect.Height));
+            m.Arrange(rect);
+        }
+    }
+
+    private double _shimmerPhase;
+    private const double ShimmerStep = 0.18;   // phase advance per frame (shimmer speed)
+    private const double ShimmerWave = 0.30;   // per-slot phase offset -> a travelling wave across the grid
+
+    /// <summary>The active skeleton at grid slot <paramref name="slot"/>, or null. For the panel's O(1) spatial hit-test.</summary>
+    protected IUIComponent SkeletonAt(int slot) => _skeletonBySlot.GetValueOrDefault(slot);
+
+    private IUIComponent CreateSkeletonInternal()
+    {
+        var sk = CreateSkeleton();
+        _skeletons.Add(sk);
+        AddVisualChild(sk);
+        return sk;
+    }
+
+    /// <summary>Builds ONE skeleton placeholder visual: the owner's <see cref="ItemsControl.ItemSkeletonTemplate"/> if
+    /// set, else the built-in themed default (a muted rounded tile). Virtual so a panel can further customise.</summary>
+    protected virtual IUIComponent CreateSkeleton()
+    {
+        var template = Owner?.ItemSkeletonTemplate;
+        if (template != null && template.Build(this)?.RootComponent is { } root)
+            return root;
+        return DefaultSkeleton();
+    }
+
+    // Built-in fallback skeleton: a muted, rounded, inset tile that reads as "loading" over the surface.
+    private static IUIComponent DefaultSkeleton() => new Border
+    {
+        Background = new SolidColorBrush("#22FFFFFF"),   // subtle translucent fill over the dark surface
+        CornerRadius = new CornerRadius(6),
+        Margin = new Thickness(3)
+    };
 
     /// <summary>Called when the scroll axis is unbounded (no viewport) so everything has to be realized. Override to log.</summary>
     protected virtual void OnNoViewport()
