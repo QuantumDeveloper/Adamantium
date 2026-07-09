@@ -166,16 +166,6 @@ float EllipseArc(float2 p, float2 h, out float perimeter)
     return s;
 }
 
-struct RectItem
-{
-    float4 Bounds : Position;    // world-space x, y, w, h (baked on the CPU)
-    float4 Params : TEXCOORD0;   // .x = corner radius (uniform); .yzw reserved
-    float4 Color  : COLOR0;      // straight (non-premultiplied) RGBA, opacity already folded in
-    float4 StrokeColor : COLOR1; // straight stroke RGBA (.w == 0 -> no stroke)
-    float4 Stroke0 : TEXCOORD1;  // width_px, align, dashOn, dashGap
-    float4 Stroke1 : TEXCOORD2;  // dashOffset, trimStart, trimEnd, flags
-};
-
 struct PSInput
 {
     float4 Position : SV_Position;
@@ -187,26 +177,6 @@ struct PSInput
     float4 Stroke0  : TEXCOORD3;
     float4 Stroke1  : TEXCOORD4;
 };
-
-[shader("vertex")]
-PSInput RectBatchVS(RectItem item, uint vertexId : SV_VertexID)
-{
-    PSInput o;
-    // 4-vertex triangle strip: corner = (0,0),(1,0),(0,1),(1,1) from the two low bits of the vertex id. The quad is
-    // grown by the OUTWARD stroke reach so an outside/centre stroke isn't clipped by the fill's own bounds.
-    float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
-    float outset = max(item.Stroke0.x * (0.5 * (1.0 + item.Stroke0.y) + 0.5), 0.0) + 1.0;   // outward reach + 1px AA
-    float2 worldPos = item.Bounds.xy + corner * item.Bounds.zw + (corner * 2.0 - 1.0) * outset;
-    o.Position = mul(float4(worldPos, 0.0, 1.0), Projection);
-    o.Half   = item.Bounds.zw * 0.5;
-    o.Local  = (corner - 0.5) * item.Bounds.zw + (corner * 2.0 - 1.0) * outset;
-    o.Radius = item.Params.x;
-    o.Color  = item.Color;
-    o.StrokeColor = item.StrokeColor;
-    o.Stroke0 = item.Stroke0;
-    o.Stroke1 = item.Stroke1;
-    return o;
-}
 
 // Signed distance to a rounded box (iq): negative inside, 0 on the edge, positive outside.
 float SdRoundBox(float2 p, float2 b, float r)
@@ -312,20 +282,10 @@ PSInput RectBatchInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_I
     return o;
 }
 
-// ---- EllipseBatch pass: solid ellipse/circle fills, resolution-independent SDF (docs/PER_MONITOR_DPI_PLAN.md, the
-// "SDF family"). Draws MANY solid ellipses in ONE instanced draw: each fill is a per-instance EllipseItem expanded to a
-// quad in the vertex stage (corner from SV_VertexID), and the pixel shader reconstructs the ellipse coverage from its
-// implicit field - self-anti-aliasing, so no separate AA fringe per fill and no tessellation (crisp at any DPI/zoom).
-// Positions baked to WORLD on the CPU; the vertex shader applies only the static Projection (matches RectBatch).
-struct EllipseItem
-{
-    float4 Bounds : Position;   // world-space x, y, w, h (baked on the CPU)
-    float4 Color  : COLOR0;     // straight (non-premultiplied) RGBA, opacity already folded into .w
-    float4 StrokeColor : COLOR1; // straight stroke RGBA (.w == 0 -> no stroke)
-    float4 Stroke0 : TEXCOORD0;  // width_px, align, dashOn, dashGap
-    float4 Stroke1 : TEXCOORD1;  // dashOffset, trimStart, trimEnd, flags
-};
-
+// ---- Ellipse batch: solid ellipse/circle fills, resolution-independent SDF (docs/PER_MONITOR_DPI_PLAN.md, the "SDF
+// family"). Draws MANY solid ellipses in ONE instanced draw: each fill is a per-instance EllipseData record (from the BDA
+// storage buffer) expanded to a quad in the vertex stage (corner from SV_VertexID), and the pixel shader reconstructs the
+// ellipse coverage from its implicit field - self-anti-aliasing, no AA fringe, no tessellation (crisp at any DPI/zoom).
 struct EllipsePSInput
 {
     float4 Position : SV_Position;
@@ -336,25 +296,6 @@ struct EllipsePSInput
     float4 Stroke0  : TEXCOORD2;
     float4 Stroke1  : TEXCOORD3;
 };
-
-[shader("vertex")]
-EllipsePSInput EllipseBatchVS(EllipseItem item, uint vertexId : SV_VertexID)
-{
-    EllipsePSInput o;
-    // 4-vertex triangle strip: corner = (0,0),(1,0),(0,1),(1,1) from the two low bits of the vertex id. Grown by the
-    // outward stroke reach so an outside/centre stroke isn't clipped by the fill's bounds.
-    float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
-    float outset = max(item.Stroke0.x * (0.5 * (1.0 + item.Stroke0.y) + 0.5), 0.0) + 1.0;
-    float2 worldPos = item.Bounds.xy + corner * item.Bounds.zw + (corner * 2.0 - 1.0) * outset;
-    o.Position = mul(float4(worldPos, 0.0, 1.0), Projection);
-    o.Half   = item.Bounds.zw * 0.5;
-    o.Local  = (corner - 0.5) * item.Bounds.zw + (corner * 2.0 - 1.0) * outset;
-    o.Color  = item.Color;
-    o.StrokeColor = item.StrokeColor;
-    o.Stroke0 = item.Stroke0;
-    o.Stroke1 = item.Stroke1;
-    return o;
-}
 
 // Approximate SIGNED DISTANCE (device px) to an ellipse boundary: the implicit F = length(p/half) - 1 normalised by the
 // length of its gradient (first-order/Taylor distance). Exact for a circle (rx==ry); for rx!=ry it's the correct shape
@@ -420,22 +361,14 @@ EllipsePSInput EllipseBatchInstancedVS(uint vertexId : SV_VertexID, uint instanc
 // =====================================================================================================================
 // TECHNIQUE - one technique, one pass per draw variant (kept together at the end of the file so the shader code above
 // reads top-to-bottom without technique boilerplate breaking it up). Each pass names its vertex + pixel shader; the C#
-// accessor for a pass is "{Technique}{Pass}Pass" (e.g. pass Rect -> Effect.BatchRectPass). SDF fills (Rect/Ellipse) come
-// in a VERTEX-buffer form and an *Instanced BDA-storage form; Fill is the general shared-mesh geometry instancing.
+// accessor for a pass is "{Technique}{Pass}Pass" (e.g. pass Rect -> Effect.BatchRectPass). Every pass is INSTANCED: the
+// per-instance data lives in a BDA storage buffer read by SV_InstanceID, so there is NO per-instance vertex buffer (Rect
+// and Ellipse generate their quad from SV_VertexID; Fill draws a shared local mesh).
 // =====================================================================================================================
 technique Batch
 {
-    // SDF rounded-rect fills - per-instance data from a VERTEX buffer.
+    // SDF rounded-rect fills - per-instance RectData from a BDA storage buffer by SV_InstanceID; quad from SV_VertexID.
     pass Rect
-    {
-        EffectName = "BatchEffect";
-        Profile = 6.6;
-        VertexShader = RectBatchVS;
-        PixelShader = RectBatchPS;
-    }
-
-    // SDF rounded-rect fills - per-instance RectData from a BDA STORAGE buffer by SV_InstanceID (retained/incremental).
-    pass RectInstanced
     {
         EffectName = "BatchEffect";
         Profile = 6.6;
@@ -452,17 +385,8 @@ technique Batch
         PixelShader = InstancedFillPS;
     }
 
-    // SDF ellipse/circle fills - per-instance data from a VERTEX buffer.
+    // SDF ellipse/circle fills - per-instance EllipseData from a BDA storage buffer by SV_InstanceID; quad from SV_VertexID.
     pass Ellipse
-    {
-        EffectName = "BatchEffect";
-        Profile = 6.6;
-        VertexShader = EllipseBatchVS;
-        PixelShader = EllipseBatchPS;
-    }
-
-    // SDF ellipse/circle fills - per-instance EllipseData from a BDA STORAGE buffer by SV_InstanceID.
-    pass EllipseInstanced
     {
         EffectName = "BatchEffect";
         Profile = 6.6;

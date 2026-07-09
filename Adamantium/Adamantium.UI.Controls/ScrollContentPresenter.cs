@@ -295,6 +295,7 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
             // ClipToBounds trims to the viewport. A scroll is then ONE translation here plus the panel rebinding the row
             // that entered - staying tiles keep their slots and Arrange short-circuits.
             var offset = _inner.Offset;
+            _lastTranslatedInnerOffset = offset;   // so OnInnerMetricsChanged only re-invalidates on a REAL offset change
             if (VisualChildren.FirstOrDefault() is IMeasurableComponent inner)
                 inner.Arrange(new Rect(-offset.X, -offset.Y, finalSize.Width, finalSize.Height));
             RaiseMetricsChanged();
@@ -337,7 +338,18 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
         return null;
     }
 
-    private void OnInnerMetricsChanged(object sender, EventArgs e) => RaiseMetricsChanged();
+    private Vector2 _lastTranslatedInnerOffset;
+
+    private void OnInnerMetricsChanged(object sender, EventArgs e)
+    {
+        // The inner panel re-clamped its offset (e.g. the content shrank): re-translate the panel by the new -Offset so the
+        // content snaps into view WITHOUT a manual scroll nudge. GUARD on an actual offset change - this event also fires
+        // from the panel's OWN arrange, so an unconditional InvalidateArrange would re-enqueue us mid-arrange, re-arrange
+        // the panel, re-fire this, and loop (the crash). The re-clamp is idempotent, so once we've translated to the new
+        // offset the values match and the loop stops.
+        if (Delegating && _inner.Offset != _lastTranslatedInnerOffset) InvalidateArrange();
+        RaiseMetricsChanged();
+    }
 
     private void RaiseMetricsChanged() => ScrollMetricsChanged?.Invoke(this, EventArgs.Empty);
 

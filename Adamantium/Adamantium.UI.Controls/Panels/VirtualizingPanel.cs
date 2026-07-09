@@ -107,6 +107,16 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
             _viewport = new Size(
                 double.IsInfinity(availableSize.Width) ? extent.Width : availableSize.Width,
                 double.IsInfinity(availableSize.Height) ? extent.Height : availableSize.Height);
+            // The NEW extent can be SMALLER than the one _offset was clamped to above (e.g. the cells just shrank): an
+            // offset that was valid against the old, larger extent now over-scrolls the content off the top/left. Re-clamp
+            // to the new extent and, if it moved, schedule a follow-up pass so the window realizes at the corrected offset.
+            var reclamped = ClampOffset(_offset, _extent, _viewport);
+            if (reclamped != _offset)
+            {
+                _offset = reclamped;
+                _passOffset = reclamped;
+                LayoutManager.For(this).InvalidateMeasureNextPass(this);
+            }
         }
         finally { _inLayout = false; }
         RaiseMetrics();

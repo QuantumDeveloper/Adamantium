@@ -249,18 +249,11 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             height = Math.Max(height, child.DesiredSize.Height);
         }
 
-        // Logical children that are NOT also visual children (rare) still need measuring; a child in BOTH collections
-        // (the norm) was already measured above - measuring it again is a wasted call for every element on every layout
-        // (the whole visual tree paid a 2x measure). A visual child has VisualParent == this, so that O(1) check skips the
-        // duplicate. (NB: we can't skip on IsMeasureValid - a valid child STILL re-measures when availableSize changes;
-        // Measure handles that via its own short-circuit, but only if we actually CALL it.)
-        foreach (var logical in LogicalChildren)
-        {
-            if (logical is not MeasurableUIComponent child || ReferenceEquals(child.VisualParent, this)) continue;
-            child.Measure(availableSize);
-            width = Math.Max(width, child.DesiredSize.Width);
-            height = Math.Max(height, child.DesiredSize.Height);
-        }
+        // Layout is a VISUAL-tree walk ONLY (above) - it is the complete layout tree; the logical tree is for inheritance/
+        // resources/DataContext/events, never layout (same as WPF). A control that wants a child laid out MUST add it to
+        // its visual children. Do NOT re-add a LogicalChildren loop: it would measure a templated control's Content twice
+        // (once via its ContentPresenter, once here) - the 2x pass over every templated element's subtree. Portalled
+        // children (a Popup's Child) are sized by their overlay host (PopupLayer), not here.
 
         if (UseLayoutRounding)
         {
@@ -330,14 +323,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             child.Arrange(new Rect(finalSize));
         }
 
-        // Same O(1) de-dup as MeasureOverride: a logical child already arranged as a visual child (VisualParent == this)
-        // must not be arranged twice. (Not an IsArrangeValid check: a valid child still re-arranges when finalSize
-        // changes - Arrange short-circuits on an unchanged rect, but only if we CALL it.)
-        foreach (var logical in LogicalChildren)
-        {
-            if (logical is not IMeasurableComponent child || ReferenceEquals(((IUIComponent)logical).VisualParent, this)) continue;
-            child.Arrange(new Rect(finalSize));
-        }
+        // Arrange the VISUAL tree ONLY (above) - see MeasureOverride. No LogicalChildren loop.
 
         return finalSize;
     }
