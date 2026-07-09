@@ -187,7 +187,6 @@ public class RenderCache
 
         _unitsByControl.Clear();
         _renderUnits.Clear();
-        _registry.Clear();
     }
 
     public void ProcessCommands(Matrix4x4F projectionMatrix, double renderScale)
@@ -198,28 +197,6 @@ public class RenderCache
         {
             var transform = World(unit.Component);
             unit.Update(transform, projectionMatrix, renderScale);
-            if (RetainedGeometryRenderer.Enabled) FeedInstance(unit, transform);
-        }
-    }
-
-    // Register (or refresh) an instanceable unit's fill in the retained scene; a unit that stopped being instanceable
-    // (flag off, brush turned non-solid, geometry lost its mesh) leaves the scene and reverts to per-unit drawing.
-    private static readonly System.Collections.Generic.HashSet<string> __feedSeen = new();   // TEMP diagnostics
-    private void FeedInstance(IRenderUnit unit, Matrix4x4F world)
-    {
-        if (unit is not IInstanceableFill inst) return;
-        var __ok = inst.TryGetInstancedFill(out var key, out var mesh, out var color);
-        var __tag = unit.GetType().Name + ":" + (__ok ? "INSTANCED" : "false");   // TEMP: distinct unit-type/result seen
-        if (__feedSeen.Add(__tag)) System.Console.WriteLine($"[FEED] {__tag}");
-        if (__ok)
-        {
-            _registry.Set(unit.Component.RenderId, key, mesh, GeometryInstance.FromWorld(world, color));
-            inst.FillInstanced = true;
-        }
-        else if (inst.FillInstanced)
-        {
-            _registry.Remove(unit.Component.RenderId);
-            inst.FillInstanced = false;
         }
     }
 
@@ -276,12 +253,11 @@ public class RenderCache
     private Rect2D _batchScissor;
     private bool _batchOpen;
 
-    // Retained geometry-instancing scene (RETAINED_INSTANCING=1). Fed in ProcessCommands (each instanceable unit's world
-    // + colour), drawn FIRST in Render so the instanced bodies sit UNDER the per-unit fringes/strokes. Own buffer manager:
-    // the instance SSBOs + shared meshes are distinct from the per-unit geometry buffers.
-    private readonly GeometryInstanceRegistry _registry = new();
-    private RetainedGeometryRenderer _retained;
+    // General instanced fills (arbitrary tessellated geometry sharing a mesh), collected in the render walk and flushed in
+    // PAINT ORDER (their natural z-layer) via FlushBatches. Own buffer manager: the instance SSBOs + shared meshes are
+    // distinct from the per-unit geometry buffers.
     private GpuBufferManager _instanceBuffers;
+    private InstancedFillCollector _instancedFill;
 
     /// <summary>Out-of-render-pass pass: recorded before BeginRendering (shared-surface latch copies).</summary>
     public void PreRender()
@@ -305,17 +281,7 @@ public class RenderCache
     {
         var scissorNarrowed = false;   // whether the active scissor is currently narrower than fullScissor
 
-        // Retained instanced fills FIRST (they sit UNDER the per-unit fringes/strokes drawn in the loop below): one
-        // InstancedFill draw per shared shape, from the scene fed in ProcessCommands. Retained across frames, so a clean
-        // frame (no ProcessCommands) still draws last-known instances. NB z/clip segmentation is a later phase.
-        if (device != null && RetainedGeometryRenderer.Enabled && _registry.SegmentCount > 0)
-        {
-            _instanceBuffers ??= new GpuBufferManager(device);
-            _retained ??= new RetainedGeometryRenderer(device, _instanceBuffers);
-            _retained.Draw(_registry, _projectionMatrix);
-        }
-
-        // Text + item-background batches: reset per frame. Device renders only - GPU-free tests skip batching.
+        // Text + item-background + instanced-fill batches: reset per frame. Device renders only - GPU-free tests skip batching.
         if (device != null)
         {
             _textBatch ??= new TextBatchCollector();
@@ -324,6 +290,19 @@ public class RenderCache
             _textBatch.BeginFrame(device);
             _rectBatch.BeginFrame(device);
             _ellipseBatch.BeginFrame(device);
+            var sceneClean = LastBuildKind == RenderBuildKind.Clean;
+            _textBatch.SceneClean = sceneClean;
+            _rectBatch.SceneClean = sceneClean;
+            _ellipseBatch.SceneClean = sceneClean;
+            // Incremental upload: a Clean frame changed nothing, so the batches re-bake byte-identical items into slots the
+            // retained GPU buffers already hold - Flush then skips the redundant upload (zero bytes move on an idle frame).
+            if (InstancedFillCollector.Enabled)
+            {
+                _instanceBuffers ??= new GpuBufferManager(device);
+                _instancedFill ??= new InstancedFillCollector(device, _instanceBuffers);
+                _instancedFill.BeginFrame();
+                _instancedFill.SceneClean = sceneClean;
+            }
             _batchOpen = false;
         }
 
@@ -395,12 +374,29 @@ public class RenderCache
                 }
                 // else: rotated/sheared or overflow -> fall through to the per-block direct draw below
             }
-            else if (device != null && (_rectBatch.Active || _ellipseBatch.Active || _textBatch.Active))
+            else if (device != null && InstancedFillCollector.Enabled && unit is GeometryRenderUnit gru && _instancedFill.CanBatch(gru))
+            {
+                // General instanced fill (arbitrary tessellated geometry sharing a mesh): collect the fill into the
+                // instanced batch and DEFER this unit's fringe/stroke to the flush (drawn over the fill). A clip change
+                // flushes the group; the fill lands in its natural z-layer (paint order), not all-at-once.
+                if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                if (_instancedFill.TryAdd(gru, wt, scissor, LogicalBounds(unit.Component, wt)))
+                {
+                    gru.FillInstanced = true;
+                    _batchScissor = scissor;
+                    _batchOpen = true;
+                    continue;   // fill batched; fringe/stroke drawn at the flush, over the fill
+                }
+                // Rejected (no drawable mesh / instance buffer overflow): draw the whole unit per-unit (fill included).
+                gru.FillInstanced = false;
+            }
+            else if (device != null && (_rectBatch.Active || _ellipseBatch.Active || _textBatch.Active || (_instancedFill?.Active ?? false)))
             {
                 // A non-batchable unit that overlaps any pending batch: flush them first so this unit paints OVER them,
                 // as its later source order requires. Spatially disjoint units (a list's items) don't flush.
                 var lb = LogicalBounds(unit.Component, wt);
-                if (_rectBatch.OverlapsPending(lb) || _ellipseBatch.OverlapsPending(lb) || _textBatch.OverlapsPending(lb))
+                if (_rectBatch.OverlapsPending(lb) || _ellipseBatch.OverlapsPending(lb) || _textBatch.OverlapsPending(lb) || (_instancedFill?.OverlapsPending(lb) ?? false))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
             }
             else if (device == null && unit is RectangleRenderUnit rruNoDev)
@@ -437,7 +433,7 @@ public class RenderCache
             unit.Render();
         }
 
-        // Drain the tail batches (rects under text), then leave the device on the full scissor for the next pass.
+        // Drain the tail batches (rects under fills under text), then leave the device on the full scissor for next pass.
         if (device != null) FlushBatches(device, fullScissor, ref scissorNarrowed);
         if (scissorNarrowed) device.SetScissors(fullScissor);
     }
@@ -447,12 +443,14 @@ public class RenderCache
     private static Rect LogicalBounds(IUIComponent component, Matrix4x4F worldTransform)
         => new Rect(0, 0, component.RenderSize.Width, component.RenderSize.Height).TransformToAABB(worldTransform);
 
-    // Flush both batches in LAYER order - item-background rects first, then text on top - and mark the group closed.
-    // Both Flush calls leave the device on fullScissor, so the per-unit scissor state resets to "not narrowed".
+    // Flush all batches in LAYER order - item-background rects, then instanced geometry fills (+ their deferred
+    // fringe/stroke), then text on top - and mark the group closed. Each Flush leaves the device on fullScissor, so the
+    // per-unit scissor state resets to "not narrowed".
     private void FlushBatches(IGraphicsDevice device, Rect2D fullScissor, ref bool scissorNarrowed)
     {
         _rectBatch.Flush(device, fullScissor, _projectionMatrix);
         _ellipseBatch.Flush(device, fullScissor, _projectionMatrix);
+        _instancedFill?.Flush(fullScissor, _projectionMatrix);
         _textBatch.Flush(device, fullScissor, _projectionMatrix);
         scissorNarrowed = false;
         _batchOpen = false;
@@ -680,7 +678,6 @@ public class RenderCache
     /// </summary>
     private void RemoveAndDeferDispose(Guid renderId)
     {
-        _registry.Remove(renderId);   // the element left the scene - drop its instanced fill too (no-op if not instanced)
         if (!_unitsByControl.Remove(renderId, out var units)) return;
 
         foreach (var unit in units)

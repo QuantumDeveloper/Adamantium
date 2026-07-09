@@ -27,8 +27,8 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
 
     public RectBatchCollector() : base(4096) { }
 
-    protected override IEffectPass StorageDrawPass => Effect.RectBatchInstancedDrawPass;
-    protected override IEffectPass VertexDrawPass => Effect.RectBatchDrawPass;
+    protected override IEffectPass StorageDrawPass => Effect.BatchRectInstancedPass;
+    protected override IEffectPass VertexDrawPass => Effect.BatchRectPass;
 
     // Batchable = a visible solid fill + a batchable pen (none, or a SOLID stroke the SDF shader draws analytically),
     // uniform corner radius. Gradient/image fill, a non-solid/dashed/trimmed pen, per-corner radii, or Enabled=off fall

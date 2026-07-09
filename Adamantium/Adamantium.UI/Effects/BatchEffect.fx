@@ -276,17 +276,6 @@ float4 InstancedFillPS(FillPSInput input) : SV_Target
     return input.Color;   // solid fill (straight alpha, drawn with AlphaBlend); analytic-AA fringe is a later pass
 }
 
-technique RectBatch
-{
-    pass Draw
-    {
-        EffectName = "BatchEffect";
-        Profile = 6.6;
-        VertexShader = RectBatchVS;
-        PixelShader = RectBatchPS;
-    }
-}
-
 // ---- RectBatchInstanced: the SAME SDF rounded-rect batch, but per-instance RectItem read from a BDA STORAGE buffer by
 // SV_InstanceID (like InstancedFill) instead of a per-instance VERTEX buffer. This lets the instance data be RETAINED +
 // patched only over its dirty range (no full re-upload each frame) and, with tiles baked in a stable space, a scroll
@@ -321,28 +310,6 @@ PSInput RectBatchInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_I
     o.Stroke0 = item.Stroke0;
     o.Stroke1 = item.Stroke1;
     return o;
-}
-
-technique RectBatchInstanced
-{
-    pass Draw
-    {
-        EffectName = "BatchEffect";
-        Profile = 6.6;
-        VertexShader = RectBatchInstancedVS;
-        PixelShader = RectBatchPS;
-    }
-}
-
-technique InstancedFill
-{
-    pass Draw
-    {
-        EffectName = "BatchEffect";
-        Profile = 6.6;
-        VertexShader = InstancedFillVS;
-        PixelShader = InstancedFillPS;
-    }
 }
 
 // ---- EllipseBatch pass: solid ellipse/circle fills, resolution-independent SDF (docs/PER_MONITOR_DPI_PLAN.md, the
@@ -418,17 +385,6 @@ float4 EllipseBatchPS(EllipsePSInput input) : SV_Target
     return CompositeFillStroke(d, input.Color, input.StrokeColor, input.Stroke0.x, input.Stroke0.y, mask);
 }
 
-technique EllipseBatch
-{
-    pass Draw
-    {
-        EffectName = "BatchEffect";
-        Profile = 6.6;
-        VertexShader = EllipseBatchVS;
-        PixelShader = EllipseBatchPS;
-    }
-}
-
 // ---- EllipseBatchInstanced: the SAME SDF ellipse batch, per-instance EllipseItem read from a BDA STORAGE buffer by
 // SV_InstanceID (mirrors RectBatchInstanced). Plain struct matching the CPU EllipseItem's Vector4F layout; quad from
 // SV_VertexID; shared EllipseBatchPS.
@@ -461,9 +417,52 @@ EllipsePSInput EllipseBatchInstancedVS(uint vertexId : SV_VertexID, uint instanc
     return o;
 }
 
-technique EllipseBatchInstanced
+// =====================================================================================================================
+// TECHNIQUE - one technique, one pass per draw variant (kept together at the end of the file so the shader code above
+// reads top-to-bottom without technique boilerplate breaking it up). Each pass names its vertex + pixel shader; the C#
+// accessor for a pass is "{Technique}{Pass}Pass" (e.g. pass Rect -> Effect.BatchRectPass). SDF fills (Rect/Ellipse) come
+// in a VERTEX-buffer form and an *Instanced BDA-storage form; Fill is the general shared-mesh geometry instancing.
+// =====================================================================================================================
+technique Batch
 {
-    pass Draw
+    // SDF rounded-rect fills - per-instance data from a VERTEX buffer.
+    pass Rect
+    {
+        EffectName = "BatchEffect";
+        Profile = 6.6;
+        VertexShader = RectBatchVS;
+        PixelShader = RectBatchPS;
+    }
+
+    // SDF rounded-rect fills - per-instance RectData from a BDA STORAGE buffer by SV_InstanceID (retained/incremental).
+    pass RectInstanced
+    {
+        EffectName = "BatchEffect";
+        Profile = 6.6;
+        VertexShader = RectBatchInstancedVS;
+        PixelShader = RectBatchPS;
+    }
+
+    // General geometry instancing - a shared local mesh drawn N times, per-instance world+colour from a BDA buffer.
+    pass Fill
+    {
+        EffectName = "BatchEffect";
+        Profile = 6.6;
+        VertexShader = InstancedFillVS;
+        PixelShader = InstancedFillPS;
+    }
+
+    // SDF ellipse/circle fills - per-instance data from a VERTEX buffer.
+    pass Ellipse
+    {
+        EffectName = "BatchEffect";
+        Profile = 6.6;
+        VertexShader = EllipseBatchVS;
+        PixelShader = EllipseBatchPS;
+    }
+
+    // SDF ellipse/circle fills - per-instance EllipseData from a BDA STORAGE buffer by SV_InstanceID.
+    pass EllipseInstanced
     {
         EffectName = "BatchEffect";
         Profile = 6.6;
