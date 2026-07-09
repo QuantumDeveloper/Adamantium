@@ -30,6 +30,13 @@ internal abstract class BatchCollector<TItem> where TItem : struct
 
     private Buffer<TItem> _gpu;
     private int _gpuCapacity;
+    private bool _recreatedThisFrame;  // the GPU buffer was (re)allocated this frame -> its old contents are gone
+
+    /// <summary>Set by the caller each frame BEFORE the walk: true when the render scene is provably unchanged since last
+    /// frame (RenderBuildKind.Clean). The walk still re-runs (re-bakes identical items, re-records identical draws), but
+    /// Flush then SKIPS the GPU upload - last frame's bytes are still in the retained buffer at the same offsets, so
+    /// re-uploading them is pure waste. This is the incremental-upload path: on an idle frame, zero bytes move.</summary>
+    public bool SceneClean { get; set; }
 
     protected BatchCollector(int initialCapacity) => Items = new TItem[initialCapacity];
 
@@ -51,6 +58,7 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         Count = 0;
         _segmentStart = 0;
         _hasUnion = false;
+        _recreatedThisFrame = false;
         if (_gpu == null || _gpuCapacity < Items.Length)
         {
             _gpu?.Dispose();
@@ -60,6 +68,7 @@ internal abstract class BatchCollector<TItem> where TItem : struct
                     MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal)
                 : Adamantium.Graphics.Buffer.Vertex.New<TItem>(device, (uint)Items.Length, BufferMemoryUsage.UploadFromCpuToGpu);
             _gpuCapacity = Items.Length;
+            _recreatedThisFrame = true;   // fresh buffer holds no prior data -> a SceneClean skip is unsafe this frame
         }
         OnBeginFrame(device);
     }
@@ -80,7 +89,11 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         if (!Active) return;
 
         var count = Count - _segmentStart;
-        _gpu.SetData(Items.AsSpan(_segmentStart, count), (uint)(_segmentStart * Stride));
+        // Incremental upload: on a provably-clean frame the retained buffer already holds these exact bytes at this exact
+        // offset (the walk is deterministic, so identical items landed at identical slots last frame) - so skip the copy.
+        // A buffer (re)allocated this frame has no prior contents, so it must still upload.
+        if (!SceneClean || _recreatedThisFrame)
+            _gpu.SetData(Items.AsSpan(_segmentStart, count), (uint)(_segmentStart * Stride));
         device.SetScissors(_scissor);
         DrawSegment(device, _gpu, (uint)count, (uint)_segmentStart, projection);
         device.SetScissors(fullScissor);

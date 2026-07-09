@@ -22,8 +22,8 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
 
     public EllipseBatchCollector() : base(2048) { }
 
-    protected override IEffectPass StorageDrawPass => Effect.EllipseBatchInstancedDrawPass;
-    protected override IEffectPass VertexDrawPass => Effect.EllipseBatchDrawPass;
+    protected override IEffectPass StorageDrawPass => Effect.BatchEllipseInstancedPass;
+    protected override IEffectPass VertexDrawPass => Effect.BatchEllipsePass;
 
     // Batchable = a visible solid fill + a batchable pen (none, or a SOLID stroke the SDF shader draws analytically), a
     // FULL ellipse (StartAngle 0 .. SweepAngle 360). A sector/arc, a non-solid/dashed/trimmed pen, a gradient/image fill,
