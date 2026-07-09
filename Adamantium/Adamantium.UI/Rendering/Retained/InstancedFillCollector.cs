@@ -76,6 +76,21 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     private double _uL, _uT, _uR, _uB;
     private bool _hasUnion;
 
+    // One clip group's draw, retained for the clean-frame op replay (so retained-draw covers instanced fills too, not
+    // just the SDF/text batches - otherwise a single vector icon on screen disables replay for the whole window). Each
+    // Flush records its key-draws (buffer range per shared mesh) + the deferred fringe/stroke units + the clip; a Clean
+    // frame re-issues them via ReplayFlush with NO re-upload (the retained buffers still hold the bytes). Objects are
+    // pooled (reset, not reallocated) across frames.
+    private sealed class FlushRecord
+    {
+        public readonly List<(KeySegment Seg, uint First, uint Count)> Keys = new();
+        public readonly List<IRenderUnit> Units = new();
+        public Rect2D Scissor;
+        public void Reset() { Keys.Clear(); Units.Clear(); }
+    }
+    private readonly List<FlushRecord> _flushRecords = new();
+    private int _flushCount;   // records used this frame (pooled objects reused up to this count)
+
     /// <summary>Set by the caller each frame: true when the scene is provably unchanged (RenderBuildKind.Clean) so the
     /// per-key instance upload is skipped (the retained buffer already holds these exact bytes).</summary>
     public bool SceneClean { get; set; }
@@ -116,6 +131,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         _pendingKeys.Clear();
         _pendingUnits.Clear();
         _hasUnion = false;
+        _flushCount = 0;   // pooled flush records reused from index 0 this frame
     }
 
     /// <summary>True if this unit's fill can join the instanced batch (solid arbitrary geometry with a drawable mesh).</summary>
@@ -163,51 +179,79 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         => _hasUnion && r.X < _uR && _uL < r.Right && r.Y < _uB && _uT < r.Bottom;
 
     /// <summary>Draw the pending clip group: each key's new instances as one instanced call (fills), then the collected
-    /// units' fringe/stroke ON TOP (fill-under-fringe). Restores <paramref name="fullScissor"/> for the caller.</summary>
-    public void Flush(Rect2D fullScissor, Matrix4x4F projection)
+    /// units' fringe/stroke ON TOP (fill-under-fringe). Records the group into a pooled <see cref="FlushRecord"/> and
+    /// draws THROUGH it (so the immediate draw and a later clean-frame replay share one path). Returns the record index
+    /// for the op stream, or -1 if nothing was pending. Restores <paramref name="fullScissor"/> for the caller.</summary>
+    public int Flush(Rect2D fullScissor, Matrix4x4F projection)
     {
-        if (_pendingKeys.Count == 0 && _pendingUnits.Count == 0) return;
+        if (_pendingKeys.Count == 0 && _pendingUnits.Count == 0) return -1;
 
-        if (_pendingKeys.Count > 0)
+        // Record this group's draws + upload each key's new instances NOW (recording frame). The record captures the
+        // buffer range (first,count) per key so replay re-issues the exact same draw with no upload.
+        var rec = _flushCount < _flushRecords.Count ? _flushRecords[_flushCount] : AddFlushRecord();
+        _flushCount++;
+        rec.Reset();
+        rec.Scissor = _scissor;
+
+        foreach (var seg in _pendingKeys)
+        {
+            var count = seg.Count - seg.Flushed;
+            if (count > 0)
+            {
+                // Incremental upload: skip on a clean frame (retained buffer already holds these bytes), but never on a
+                // buffer (re)allocated this frame. Offset the BDA by firstInstance so SV_InstanceID starts at 0.
+                if (!SceneClean || seg.Recreated)
+                    seg.Gpu.SetData(seg.Items.AsSpan(seg.Flushed, count), (uint)(seg.Flushed * InstanceStride));
+                rec.Keys.Add((seg, (uint)seg.Flushed, (uint)count));
+                seg.Flushed = seg.Count;
+            }
+            seg.InPending = false;
+        }
+        foreach (var u in _pendingUnits) rec.Units.Add(u);
+
+        _pendingKeys.Clear();
+        _pendingUnits.Clear();
+        _hasUnion = false;
+
+        DrawFlushRecord(rec, fullScissor, projection);
+        return _flushCount - 1;
+    }
+
+    /// <summary>Re-issue a flush recorded earlier this cycle (a clean-frame replay): same key draws + deferred unit
+    /// fringe/stroke, NO re-upload (the retained instance buffers still hold the bytes).</summary>
+    public void ReplayFlush(int index, Rect2D fullScissor, Matrix4x4F projection)
+        => DrawFlushRecord(_flushRecords[index], fullScissor, projection);
+
+    private FlushRecord AddFlushRecord() { var r = new FlushRecord(); _flushRecords.Add(r); return r; }
+
+    private void DrawFlushRecord(FlushRecord rec, Rect2D fullScissor, Matrix4x4F projection)
+    {
+        if (rec.Keys.Count > 0)
         {
             SetupInstancedState(projection);
-            _device.SetScissors(_scissor);
-            foreach (var seg in _pendingKeys)
+            _device.SetScissors(rec.Scissor);
+            foreach (var (seg, first, count) in rec.Keys)
             {
-                var count = seg.Count - seg.Flushed;
-                if (count > 0)
-                {
-                    // Incremental upload: skip on a clean frame (retained buffer already holds these bytes), but never
-                    // on a buffer (re)allocated this frame. Offset the BDA by firstInstance so SV_InstanceID starts at 0.
-                    if (!SceneClean || seg.Recreated)
-                        seg.Gpu.SetData(seg.Items.AsSpan(seg.Flushed, count), (uint)(seg.Flushed * InstanceStride));
-                    _effect.InstancesAddress.SetValue(seg.Gpu.GetDeviceAddress() + (ulong)(seg.Flushed * InstanceStride));
-                    _device.SetVertexBuffer(seg.VtxBuffer);
-                    _device.PrimitiveTopology = seg.Topology;
-                    _effect.BatchFillPass.Apply();
-                    if (seg.Indexed)
-                        _device.DrawIndexed(seg.VtxBuffer, seg.IdxBuffer, instanceCount: (uint)count, indexCount: seg.IndexCount);
-                    else
-                        _device.Draw(seg.VertexCount, (uint)count);
-                    seg.Flushed = seg.Count;
-                }
-                seg.InPending = false;
+                _effect.InstancesAddress.SetValue(seg.Gpu.GetDeviceAddress() + (ulong)(first * InstanceStride));
+                _device.SetVertexBuffer(seg.VtxBuffer);
+                _device.PrimitiveTopology = seg.Topology;
+                _effect.BatchFillPass.Apply();
+                if (seg.Indexed)
+                    _device.DrawIndexed(seg.VtxBuffer, seg.IdxBuffer, instanceCount: count, indexCount: seg.IndexCount);
+                else
+                    _device.Draw(seg.VertexCount, count);
             }
             _device.SetScissors(fullScissor);
         }
 
         // Deferred fringe/stroke of the collected units, drawn OVER their now-flushed fills, in the same clip. The unit's
         // Render() skips its fill body (FillInstanced) and draws only the analytic-AA fringe + stroke.
-        if (_pendingUnits.Count > 0)
+        if (rec.Units.Count > 0)
         {
-            _device.SetScissors(_scissor);
-            foreach (var u in _pendingUnits) u.Render();
+            _device.SetScissors(rec.Scissor);
+            foreach (var u in rec.Units) u.Render();
             _device.SetScissors(fullScissor);
         }
-
-        _pendingKeys.Clear();
-        _pendingUnits.Clear();
-        _hasUnion = false;
     }
 
     // Shared InstancedFill device state (all keys draw the same way; only the mesh topology varies).

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
@@ -41,6 +42,13 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     private TItem[] _prevItems;
     private int _prevCount;
 
+    // Segments drawn THIS frame (each = a clip + a buffer range), retained for the clean-frame op replay. RenderCache
+    // records an ordered op stream during the walk; on a fully-unchanged (Clean) frame it skips the walk entirely and
+    // replays each segment via DrawRecordedSegment - no re-bake, no upload (the GPU buffer still holds these exact
+    // bytes). Cleared at BeginFrame; a segment's index is stable within the frame that recorded it.
+    protected struct Segment { public Rect2D Scissor; public uint Count; public uint First; }
+    private readonly List<Segment> _segments = new();
+
     /// <summary>Set by the caller each frame BEFORE the walk: true when the render scene is provably unchanged since last
     /// frame (RenderBuildKind.Clean). The walk still re-runs (re-bakes identical items, re-records identical draws), but
     /// Flush then SKIPS the GPU upload - last frame's bytes are still in the retained buffer at the same offsets, so
@@ -70,6 +78,7 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         _segmentStart = 0;
         _hasUnion = false;
         _recreatedThisFrame = false;
+        _segments.Clear();
         if (_gpu == null || _gpuCapacity < Items.Length)
         {
             _gpu?.Dispose();
@@ -95,9 +104,9 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     /// <summary>Draw the pending segment (if any) and advance. Uploads ONLY this segment at its byte offset (earlier
     /// segments' GPU data stays intact for their recorded draws), sets its scissor, draws it via DrawSegment with a
     /// firstInstance offset, then restores fullScissor so the caller's per-unit scissor state stays valid.</summary>
-    public void Flush(IGraphicsDevice device, Rect2D fullScissor, Matrix4x4F projection)
+    public int Flush(IGraphicsDevice device, Rect2D fullScissor, Matrix4x4F projection)
     {
-        if (!Active) return;
+        if (!Active) return -1;
 
         var segStart = _segmentStart;
         var count = Count - segStart;
@@ -130,13 +139,37 @@ internal abstract class BatchCollector<TItem> where TItem : struct
             Items.AsSpan(segStart, count).CopyTo(_prevItems.AsSpan(segStart));
         }
 
-        device.SetScissors(_scissor);
-        DrawSegment(device, _gpu, (uint)count, (uint)segStart, projection);
-        device.SetScissors(fullScissor);
+        // Record the segment (clip + buffer range) and draw it. On a Clean frame the walk is skipped and RenderCache
+        // replays this exact segment via DrawRecordedSegment (same code path, no upload) - so the immediate draw here
+        // and the replayed draw are byte-for-byte the same.
+        var index = _segments.Count;
+        _segments.Add(new Segment { Scissor = _scissor, Count = (uint)count, First = (uint)segStart });
+        OnSegmentRecorded(index);
 
         _segmentStart = Count;
         _hasUnion = false;
+
+        DrawRecordedSegment(device, index, fullScissor, projection);
+        return index;
     }
+
+    /// <summary>Draw a segment recorded this frame (by its <see cref="Flush"/> index): set its clip, bind any per-segment
+    /// state, issue the instanced draw, restore <paramref name="fullScissor"/>. Called by the immediate draw in Flush AND
+    /// by RenderCache's clean-frame op replay - the latter re-issues last frame's segments with zero re-bake/upload.</summary>
+    public void DrawRecordedSegment(IGraphicsDevice device, int index, Rect2D fullScissor, Matrix4x4F projection)
+    {
+        var s = _segments[index];
+        device.SetScissors(s.Scissor);
+        BindSegment(index);
+        DrawSegment(device, _gpu, s.Count, s.First, projection);
+        device.SetScissors(fullScissor);
+    }
+
+    /// <summary>Hook: capture per-segment state at record time (the text batch stashes the segment's atlas). Base no-op.</summary>
+    protected virtual void OnSegmentRecorded(int index) { }
+
+    /// <summary>Hook: restore the per-segment state captured by <see cref="OnSegmentRecorded"/> before its draw. Base no-op.</summary>
+    protected virtual void BindSegment(int index) { }
 
     // Did slot i bake byte-identical to last frame? A blittable per-item bytewise compare (the items are unmanaged
     // Vector4F structs), SIMD-accelerated by SequenceEqual - cheap relative to the GPU upload it lets us skip.

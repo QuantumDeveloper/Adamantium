@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Fonts;
@@ -18,7 +19,26 @@ internal sealed class TextBatchCollector : BatchCollector<FontItem>
     private FontAtlas _atlas;            // the pending segment's atlas (one bind per draw)
     private FontRenderer _fontRenderer;
 
+    // Per-segment atlas + renderer, parallel to the base segment list, so the clean-frame op replay can re-bind each
+    // recorded segment's atlas (DrawSegment reads _atlas/_fontRenderer, which otherwise hold only the LAST segment's).
+    private readonly List<(FontAtlas Atlas, FontRenderer Renderer)> _segState = new();
+
     public TextBatchCollector() : base(8192) { }
+
+    protected override void OnBeginFrame(IGraphicsDevice device) => _segState.Clear();
+
+    protected override void OnSegmentRecorded(int index)
+    {
+        while (_segState.Count <= index) _segState.Add(default);
+        _segState[index] = (_atlas, _fontRenderer);
+    }
+
+    protected override void BindSegment(int index)
+    {
+        var s = _segState[index];
+        _atlas = s.Atlas;
+        _fontRenderer = s.Renderer;
+    }
 
     // The glyph batch still binds its instances as a per-instance VERTEX buffer (FontRenderer.DrawBatch + the MSDF glyph
     // shader read vertex attributes), unlike the SDF fills which are storage-instanced. Opt out of the storage default.
