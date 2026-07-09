@@ -109,11 +109,14 @@ public class ForwardWindowRenderer : WindowRendererBase
         var t0 = Stopwatch.GetTimestamp();
         _renderCache.BuildFromVisualTree(Window);
         var buildMs = Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
-        if (_renderCache.LastBuildKind == RenderBuildKind.Clean)
+        // Skip the per-unit transform re-bake (proc) when nothing MOVED: a Clean frame (nothing changed at all) or a
+        // GEOMETRY-ONLY partial (a hover re-recorded some draw contents, but no transform changed). Proc walks EVERY unit
+        // (O(N)) and the draw pass re-bakes each drawn unit anyway, so on a big list a hover would otherwise pay an O(N)
+        // re-bake for nothing - the mouse-move FPS drop. Only a real move (transform-dirty partial, or a full re-layout)
+        // needs it before PreRender reads the baked transforms.
+        if (_renderCache.LastBuildKind == RenderBuildKind.Clean
+            || (_renderCache.LastBuildKind == RenderBuildKind.Partial && !_renderCache.LastBuildTransformDirty))
         {
-            // Nothing changed: no rebuild AND nothing moved, so last frame's baked transforms are still valid - skip
-            // the per-unit re-bake too. The render pass re-draws the retained units as-is. (A PARTIAL frame still runs
-            // proc: a move re-bakes transforms, and PreRender reads them before the draw.)
             RuntimeStats.LastRenderBuildMs = buildMs;
             RuntimeStats.LastRenderProcMs = 0;
             return;
