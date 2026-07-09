@@ -66,6 +66,7 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
         var bindings = RuntimeStats.BindingUpdatesApplied;
         var fps = _windowFrames / _windowElapsed;
 
+
         // Frame breakdown (averages over the window, so they sum to ~frame time). "other" = the residual the render
         // pipeline can't see: GPU-fence wait in BeginDraw + swapchain blit + Present. Phase 0 of the render-cache
         // redesign - shows whether the per-frame cache REBUILD (build+proc) or something else (GPU/present) dominates.

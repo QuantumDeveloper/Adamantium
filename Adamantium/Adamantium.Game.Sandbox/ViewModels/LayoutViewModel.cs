@@ -14,7 +14,7 @@ public partial class LayoutViewModel : TabPageViewModel
 {
     public LayoutViewModel() : base("Layout")
     {
-        Rectangles = new(Enumerable.Range(0, 6000)
+        Rectangles = new(Enumerable.Range(0, 60000)
             .Select(i => new ColorRect { Color = Palette[i % Palette.Length], Stroke = Stroke }));
     }
 

@@ -249,11 +249,6 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     {
         ArgumentNullException.ThrowIfNull(property);
 
-        if (!AdamantiumPropertyMap.IsRegistered(this, property))
-        {
-            ThrowNotRegistered(property);
-        }
-
         object result;
         lock (values)
         {
@@ -262,6 +257,13 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
         if (result == AdamantiumProperty.UnsetValue)
         {
+            // COLD path only: the property has no value at any source priority. Validate registration HERE (not on every
+            // read) - a set property short-circuits above, so measure/arrange reading Margin/alignment/min-max skips the
+            // per-read map lookup + HasExplicitValue scan that used to sit on the hottest path in the engine.
+            if (!AdamantiumPropertyMap.IsRegistered(this, property))
+            {
+                ThrowNotRegistered(property);
+            }
             result = GetDefaultValue(property);
         }
         // Inherited values are PUSHED into the Inherited slot (see ParentPropertyChanged / InheritanceParent), so the
@@ -490,14 +492,8 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         // pure overhead on the hottest path in the engine (measure+arrange read Margin/alignment/min-max on every node).
         if (!values.TryGetValue(property, out var container)) return AdamantiumProperty.UnsetValue;
 
-        var slots = container.Values;
-        for (var i = 0; i <= (int)ValuePriority.Default; i++)   // source priorities only; skip the derived Effective slot
-        {
-            var val = slots[i];
-            if (val != AdamantiumProperty.UnsetValue) return val;
-        }
-
-        return AdamantiumProperty.UnsetValue;
+        // Cached: scans the source slots (Animation..Default) only after a Set dirtied them, not on every read.
+        return container.GetEffective((int)ValuePriority.Default);
     }
 
     private void RunSetValueSequence(AdamantiumProperty property, object value, ValuePriority priority, bool raiseValueChangedEvent)

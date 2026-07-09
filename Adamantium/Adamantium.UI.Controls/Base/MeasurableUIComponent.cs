@@ -224,6 +224,9 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     // nothing when nothing is dirty (vs. the old full-tree walk, which called Measure/Arrange on every node each frame).
     public static long TotalMeasureCalls { get; private set; }
 
+    // Test hook: measures that actually ran MeasureCore (real work), vs TotalMeasureCalls which also counts short-circuits.
+    public static long TotalMeasureCores { get; private set; }
+
     public static long TotalArrangeCalls { get; private set; }
 
     // Test hook: arranges that actually did WORK (ran ArrangeCore + recursed), vs TotalArrangeCalls which also counts
@@ -282,6 +285,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
 
         if (force || !IsMeasureValid || _previousMeasure != availableSize)
         {
+            TotalMeasureCores++;
             IsMeasureValid = true;
             IsArrangeValid = false;
             IsGeometryValid = false;

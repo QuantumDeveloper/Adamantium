@@ -49,7 +49,7 @@ public static class InputExtensions
          return;
 
       var local = p - element.ClipRectangle.Location;
-      foreach (var child in ZSort(element.VisualChildren))
+      foreach (var child in HitTestChildren(element, local))
          CollectVisuals(child, local, result);
 
       // Any visual on its actual geometry is a candidate (not only IInputComponent) - the only difference from the input
@@ -84,7 +84,7 @@ public static class InputExtensions
       // reachable. Filtering to IInputComponent here made anything inside a Border dead to the mouse (e.g. a ScrollBar
       // whose template root is a Border: its Track/Thumb were unhittable).
       var local = p - element.ClipRectangle.Location;
-      foreach (var child in ZSort(element.VisualChildren))
+      foreach (var child in HitTestChildren(element, local))
          Collect(child, local, result);
 
       // Narrow phase: only an INPUT element is a hit target (non-input visuals are pure pass-through containers), the
@@ -94,13 +94,43 @@ public static class InputExtensions
          result.Add(input);
    }
 
-   // Front-to-back paint order: higher ZIndex first, then later siblings (higher index) first.
+   // The children to recurse into for a hit-test, front-to-back. A container that can spatially resolve the point (a
+   // virtualizing panel) returns just the candidate(s) - O(1) instead of walking thousands of tiles; else recurse ALL
+   // visual children in paint order.
+   private static IEnumerable<IUIComponent> HitTestChildren(IUIComponent element, Vector2 local)
+   {
+      if (element is IHitTestChildren provider)
+      {
+         var subset = provider.GetHitTestChildren(local);
+         if (subset != null) return subset;
+      }
+      return ZSort(element.VisualChildren);
+   }
+
+   // Front-to-back paint order: higher ZIndex first, then later siblings (higher index) first. Fast path: when NO child
+   // sets a non-zero ZIndex (the overwhelmingly common case) paint order IS child order, so just walk it in reverse with
+   // ZERO allocation - the old unconditional LINQ Select+OrderBy+Select allocated several buffers PER visited node, which
+   // over a deep hit-test of thousands of nodes per mouse move was a GC storm (the mouse-move freeze).
    private static IEnumerable<IUIComponent> ZSort(IEnumerable<IUIComponent> elements)
    {
-      return elements
+      var list = elements as IReadOnlyList<IUIComponent> ?? elements.ToList();
+      var anyZ = false;
+      for (var i = 0; i < list.Count; i++)
+         if (list[i].ZIndex != 0) { anyZ = true; break; }
+
+      if (!anyZ)
+         return ReverseOf(list);
+
+      return list
          .Select((element, index) => (element, index))
          .OrderByDescending(x => x.element.ZIndex)
          .ThenByDescending(x => x.index)
          .Select(x => x.element);
+   }
+
+   private static IEnumerable<IUIComponent> ReverseOf(IReadOnlyList<IUIComponent> list)
+   {
+      for (var i = list.Count - 1; i >= 0; i--)
+         yield return list[i];
    }
 }
