@@ -37,8 +37,17 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
    // defers the rest to skeletons + the next pass. Time-based self-tunes INSTANTLY to per-op cost: few EXPENSIVE
    // creates/frame (UI stays live, skeletons show progress) but many CHEAP rebinds/frame (fast scroll) - with no
    // count-estimate to mis-size on a cheap->expensive regime change (the multi-monitor DPI-resize freeze).
-   private const double BindBudgetMs = 6.0;   // frame-time slice for (re)binds (headroom under a 16 ms frame)
+   private const double BindBudgetMs = 6.0;   // frame-time slice for (re)binds WHILE SCROLLING (headroom under a 16 ms frame)
+   private const double FillBudgetMs = 30.0;  // slice when NOT scrolling (initial fill / a settled fling): drain the backlog fast
    private const int MinBinds = 8;            // always (re)bind at least this many/frame so the window keeps filling
+
+   // The offset the previous measure ran against - to tell an ACTIVE scroll (offset moving frame-to-frame) from a static
+   // fill (initial tab-switch, or a fling that has settled). While scrolling, a small per-frame budget keeps the app
+   // responsive and skeletons cover the deferred slots; when NOT scrolling there is no interaction to protect, so a big
+   // budget blasts through the whole visible window in a handful of frames instead of dribbling ~12 tiles/frame for 10 s.
+   // The total BUILD work (one visual per newly-realized tile) is fixed either way; a big budget just pays the per-frame
+   // O(window) overhead (skeleton reconcile + arrange + render) a dozen times instead of ~400.
+   private Vector2 _lastMeasuredOffset = new(double.NaN, double.NaN);
 
    private bool _measuringHorizontal;               // orientation snapshot for OnSlotBound (called from SetWindow)
    private bool _cellGrew;                           // did a bound tile grow the auto cell? -> another MaxCellPasses pass
@@ -323,6 +332,12 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
       // Seed the assumed cell so we have a sane column count before windowing (explicit ItemWidth/Height win).
       SeedCell(horizontal, count);
 
+      // Adaptive (re)bind budget: small while the user is actively scrolling (offset moving) to stay responsive; large
+      // when the offset is static (initial fill / settled fling) to drain the deferred backlog in a few frames.
+      var scrolling = offset != _lastMeasuredOffset;
+      _lastMeasuredOffset = offset;
+      var bindBudget = scrolling ? BindBudgetMs : FillBudgetMs;
+
       // Resolve columns + the realized window and measure it; if a realized item is bigger than the assumed uniform
       // cell, grow the cell (only along axes the user didn't pin) and resolve again. This converges in a couple of passes
       // and then stays put across scrolls. The old code re-probed ONE variable-width item every pass, so the cell and
@@ -373,7 +388,7 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
          _measuringHorizontal = horizontal;
          _cellGrew = false;
          _onSlotBound ??= OnSlotBound;
-         foreach (var c in Owner.ItemContainerGenerator.SetWindow(first, last, BindBudgetMs, MinBinds, _onSlotBound))
+         foreach (var c in Owner.ItemContainerGenerator.SetWindow(first, last, bindBudget, MinBinds, _onSlotBound))
             c.Visibility = Visibility.Collapsed;
          if (!_cellGrew) break;
       }
