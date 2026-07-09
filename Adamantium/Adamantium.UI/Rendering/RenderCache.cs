@@ -334,6 +334,30 @@ public class RenderCache
     private GpuBufferManager _instanceBuffers;
     private InstancedFillCollector _instancedFill;
 
+    // --- Retained draw (clean-frame op replay) ---
+    // On a fully-Clean frame the walk would re-bake byte-identical batch items and re-issue identical draws for every
+    // one of thousands of units - the idle draw floor (measured ~15 ms for the 60k-tile stress view -> ~0.8 ms replayed).
+    // Instead, every NON-clean frame RECORDS the ordered GPU op stream the walk emits (scissor changes, per-unit direct
+    // draws, SDF/text batch segments, instanced-fill flushes), and the next Clean frame REPLAYS it directly: the retained
+    // batch/instance buffers still hold last frame's bytes (BeginFrame is skipped, uploads were already skipped by
+    // SceneClean), so replay reproduces the exact frame with ~0 per-unit CPU. The immediate-draw path is UNCHANGED -
+    // recording only appends alongside it. _opsReplayable is the escape hatch for a draw type the flat op stream can't
+    // faithfully reproduce (there is none today - the SDF/text batches AND the general instanced fills all replay via
+    // their recorded segments/flushes); a future such type clears it and that Clean frame safely re-walks instead.
+    private enum RenderOpKind : byte { Scissor, Unit, Segment, InstancedFlush }
+    private struct RenderOp
+    {
+        public RenderOpKind Kind;
+        public Rect2D Scissor;    // Scissor
+        public IRenderUnit Unit;  // Unit
+        public byte Batch;        // Segment: which collector (0 rect, 1 ellipse, 2 text)
+        public int SegIndex;      // Segment: index into that collector's recorded segment list; InstancedFlush: flush index
+    }
+    private readonly List<RenderOp> _ops = new();
+    private bool _recording;       // this frame runs the walk and is appending ops
+    private bool _opsRecorded;     // _ops holds a complete frame from a prior walk
+    private bool _opsReplayable;   // the recorded stream faithfully reproduces the frame (currently always true - see above)
+
     /// <summary>Out-of-render-pass pass: recorded before BeginRendering (shared-surface latch copies).</summary>
     public void PreRender()
     {
@@ -354,7 +378,19 @@ public class RenderCache
     /// </summary>
     public void Render(IGraphicsDevice device, Rect2D fullScissor)
     {
+        // Clean-frame replay: nothing changed since the last recorded walk, so re-issue that walk's op stream directly
+        // and skip the whole per-unit loop (the retained batch buffers still hold its bytes). Only a fully-Clean build
+        // qualifies; a Partial/Full re-runs the walk below and re-records.
+        if (device != null && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Clean)
+        {
+            ExecuteOps(device, fullScissor);
+            return;
+        }
+
         var scissorNarrowed = false;   // whether the active scissor is currently narrower than fullScissor
+
+        _recording = device != null;   // a device walk records its op stream for a later clean-frame replay
+        if (_recording) { _ops.Clear(); _opsReplayable = true; }
 
         // Text + item-background + instanced-fill batches: reset per frame. Device renders only - GPU-free tests skip batching.
         if (device != null)
@@ -496,21 +532,61 @@ public class RenderCache
                 {
                     device.SetScissors(scissor);
                     scissorNarrowed = true;
+                    RecordScissor(scissor);
                 }
                 else if (scissorNarrowed)
                 {
                     // First unclipped unit after a clipped one (or after a flush): restore the full window scissor.
                     device.SetScissors(fullScissor);
                     scissorNarrowed = false;
+                    RecordScissor(fullScissor);
                 }
             }
 
             unit.Render();
+            if (_recording) _ops.Add(new RenderOp { Kind = RenderOpKind.Unit, Unit = unit });
         }
 
         // Drain the tail batches (rects under fills under text), then leave the device on the full scissor for next pass.
         if (device != null) FlushBatches(device, fullScissor, ref scissorNarrowed);
-        if (scissorNarrowed) device.SetScissors(fullScissor);
+        if (scissorNarrowed) { device.SetScissors(fullScissor); RecordScissor(fullScissor); }
+
+        if (_recording) { _opsRecorded = true; _recording = false; }
+    }
+
+    private void RecordScissor(Rect2D scissor)
+    {
+        if (_recording) _ops.Add(new RenderOp { Kind = RenderOpKind.Scissor, Scissor = scissor });
+    }
+
+    // Replay a recorded frame's op stream (a Clean frame): re-issue its scissor changes, per-unit direct draws and batch
+    // segment draws in order. No walk, no bake, no upload - the batch GPU buffers still hold last frame's bytes, and each
+    // unit's RenderData still holds last frame's baked transform (nothing moved on a Clean frame).
+    private void ExecuteOps(IGraphicsDevice device, Rect2D fullScissor)
+    {
+        foreach (var op in _ops)
+        {
+            switch (op.Kind)
+            {
+                case RenderOpKind.Scissor:
+                    device.SetScissors(op.Scissor);
+                    break;
+                case RenderOpKind.Unit:
+                    op.Unit.Render();
+                    break;
+                case RenderOpKind.Segment:
+                    switch (op.Batch)
+                    {
+                        case 0: _rectBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
+                        case 1: _ellipseBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
+                        default: _textBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
+                    }
+                    break;
+                case RenderOpKind.InstancedFlush:
+                    _instancedFill.ReplayFlush(op.SegIndex, fullScissor, _projectionMatrix);
+                    break;
+            }
+        }
     }
 
     // A unit's own viewport (local 0,0..RenderSize) mapped into window-logical space - the same box ResolveScissor
@@ -523,12 +599,27 @@ public class RenderCache
     // per-unit scissor state resets to "not narrowed".
     private void FlushBatches(IGraphicsDevice device, Rect2D fullScissor, ref bool scissorNarrowed)
     {
-        _rectBatch.Flush(device, fullScissor, _projectionMatrix);
-        _ellipseBatch.Flush(device, fullScissor, _projectionMatrix);
-        _instancedFill?.Flush(fullScissor, _projectionMatrix);
-        _textBatch.Flush(device, fullScissor, _projectionMatrix);
+        RecordSegment(0, _rectBatch.Flush(device, fullScissor, _projectionMatrix));
+        RecordSegment(1, _ellipseBatch.Flush(device, fullScissor, _projectionMatrix));
+        // The general instanced-fill flush (each key's instances + the collected units' deferred fringe/stroke) is
+        // retained too: Flush records the group and returns its index, which the op stream replays via ReplayFlush - so
+        // a vector icon no longer disables replay for the whole window.
+        if (_instancedFill != null)
+        {
+            var fi = _instancedFill.Flush(fullScissor, _projectionMatrix);
+            if (_recording && fi >= 0) _ops.Add(new RenderOp { Kind = RenderOpKind.InstancedFlush, SegIndex = fi });
+        }
+        RecordSegment(2, _textBatch.Flush(device, fullScissor, _projectionMatrix));
         scissorNarrowed = false;
         _batchOpen = false;
+    }
+
+    // Record a batch segment op (the immediate draw already happened inside Flush; this only appends it to the op stream
+    // for a later clean-frame replay). A Flush that drew nothing returns -1 and records nothing.
+    private void RecordSegment(byte batch, int segIndex)
+    {
+        if (_recording && segIndex >= 0)
+            _ops.Add(new RenderOp { Kind = RenderOpKind.Segment, Batch = batch, SegIndex = segIndex });
     }
 
     private static bool ScissorEquals(Rect2D a, Rect2D b)
