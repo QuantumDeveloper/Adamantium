@@ -1,5 +1,8 @@
+using System;
+using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Globalization;
+using System.Linq.Expressions;
 using System.Reflection;
 using Adamantium.UI.Core.Diagnostics;
 using Adamantium.UI.Core.RoutedEvents;
@@ -25,7 +28,24 @@ public class BindingExpression : BindingExpressionBase
    public string SourcePropertyName { get; private set; }
 
    private PropertyInfo _sourceProperty;
+   private Func<object, object> _sourceGetter;   // compiled reader for _sourceProperty (the hot ComputeValue path)
    private INotifyPropertyChanged _observed;
+
+   // Property-accessor cache: `GetType().GetProperty(name)` is a slow metadata search and `PropertyInfo.GetValue` a slow
+   // reflection invoke, and a virtualized list re-runs both for EVERY binding of EVERY recycled row on scroll (a fling can
+   // rebind hundreds of rows x ~15 bindings/frame). Cache the PropertyInfo + a COMPILED getter delegate per (type, name)
+   // so a rebind is a dictionary hit + a near-native call instead. Shared across all bindings, populated once per shape.
+   private static readonly ConcurrentDictionary<(Type, string), (PropertyInfo Prop, Func<object, object> Getter)> _accessors = new();
+
+   private static (PropertyInfo Prop, Func<object, object> Getter) GetAccessor(Type type, string name)
+      => _accessors.GetOrAdd((type, name), static key =>
+      {
+         var prop = key.Item1.GetProperty(key.Item2);
+         if (prop is not { CanRead: true }) return (prop, null);
+         var o = Expression.Parameter(typeof(object), "o");
+         var body = Expression.Convert(Expression.Property(Expression.Convert(o, key.Item1), prop), typeof(object));
+         return (prop, Expression.Lambda<Func<object, object>>(body, o).Compile());
+      });
 
    public Binding Binding { get; set; }
    public BindingMode Mode { get; set; }
@@ -112,6 +132,7 @@ public class BindingExpression : BindingExpressionBase
    {
       ResolvedSource = null;
       _sourceProperty = null;
+      _sourceGetter = null;
       SourcePropertyName = null;
 
       var root = Binding.Source ?? Target?.DataContext;
@@ -121,14 +142,14 @@ public class BindingExpression : BindingExpressionBase
       var segments = path.Split('.');
       object current = root;
       for (var i = 0; i < segments.Length - 1 && current != null; i++)
-         current = current.GetType().GetProperty(segments[i])?.GetValue(current);
+         current = GetAccessor(current.GetType(), segments[i]).Getter?.Invoke(current);
 
       if (current == null)
          return;
 
       ResolvedSource = current;
       SourcePropertyName = segments[^1];
-      _sourceProperty = current.GetType().GetProperty(SourcePropertyName);
+      (_sourceProperty, _sourceGetter) = GetAccessor(current.GetType(), SourcePropertyName);
    }
 
    private void OnSourcePropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -168,7 +189,7 @@ public class BindingExpression : BindingExpressionBase
    private object ComputeValue(Type targetType)
    {
       if (_sourceProperty == null) return BindingBase.FallbackValue;
-      var value = _sourceProperty.GetValue(ResolvedSource);
+      var value = _sourceGetter != null ? _sourceGetter(ResolvedSource) : _sourceProperty.GetValue(ResolvedSource);
       if (Binding.Converter != null)
          value = Binding.Converter.Convert(value, targetType, Binding.ConverterParameter, CultureInfo.CurrentCulture);
       if (value == null)
