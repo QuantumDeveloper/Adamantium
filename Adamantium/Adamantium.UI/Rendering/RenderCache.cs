@@ -49,6 +49,12 @@ public class RenderCache
     /// (only a <see cref="RenderBuildKind.Clean"/> frame skips the transform re-bake).</summary>
     public RenderBuildKind LastBuildKind { get; private set; }
 
+    /// <summary>Did the last build actually MOVE anything (transform-dirty / a full re-layout)? A geometry-only partial
+    /// re-records draw contents but nothing moved, so the per-unit transform re-bake (proc) is redundant - the draw pass
+    /// re-bakes each drawn unit anyway - and can be skipped, which is the difference between a cheap and an O(N) frame
+    /// while hovering a big list.</summary>
+    public bool LastBuildTransformDirty { get; private set; }
+
     private bool _built;
 
     /// <summary>
@@ -72,12 +78,18 @@ public class RenderCache
         }
 
         // Non-structural change on an existing scene -> PARTIAL update: re-render only the geometry-dirty components in
-        // place. A move (transform-dirty) needs no re-record - just drop the frame-scoped memos so the render pass
-        // re-bakes the world transforms live. Either way _renderUnits + _unitsByControl stay retained.
+        // place. Either way _renderUnits + _unitsByControl stay retained. Drop the frame-scoped world/clip memos ONLY on
+        // a MOVE (transform-dirty) - then last frame's baked transforms are stale and must be recomputed. A GEOMETRY-only
+        // partial (a hover recolouring a tile) moved nothing, so the memos are still valid: keeping them lets the render
+        // pass reuse cached world transforms + clips instead of recomputing them for every one of thousands of units
+        // (the O(N) that made a hover cost ~2x a clean frame on a big list).
         if (_built && !RenderDirty.IsStructural)
         {
-            _worldCache.Clear();
-            _clipCache.Clear();
+            if (RenderDirty.IsTransform)
+            {
+                _worldCache.Clear();
+                _clipCache.Clear();
+            }
 
             // Snapshot the dirty set: ReRenderInPlace re-renders each component, and a component's Render can mark MORE
             // geometry dirty (e.g. an image finishing decode), ADDING to the live RenderDirty.Geometry set mid-loop and
@@ -96,6 +108,7 @@ public class RenderCache
             if (!fellBack && !RenderDirty.IsStructural && RenderDirty.Geometry.Count == _geometryDirtyBuffer.Count)
             {
                 LastBuildKind = RenderBuildKind.Partial;   // no full walk (only the dirty components' unit contents)
+                LastBuildTransformDirty = RenderDirty.IsTransform;   // geometry-only partial -> nothing moved -> proc can be skipped
                 RenderDirty.Clear();
                 return;
             }
@@ -104,6 +117,7 @@ public class RenderCache
 
         // Full walk: first build, a structural change, or a partial that surfaced one.
         LastBuildKind = RenderBuildKind.Full;
+        LastBuildTransformDirty = true;   // a full walk rebuilds the paint-order list; positions must be re-baked
         _commands.Clear();
         _worldCache.Clear();
         _clipCache.Clear();
@@ -121,6 +135,15 @@ public class RenderCache
     private bool ReRenderInPlace(IUIComponent component)
     {
         if (component.Visibility != Visibility.Visible) return false;   // (no Render() run yet - nothing to undo)
+
+        // Not in the live paint tree: DETACHED (no visual parent) or effectively hidden by a COLLAPSED ancestor. The full
+        // walk never reaches such a component, so it has no paint rank and re-rendering it draws nothing - yet it used to
+        // force a FULL tree rebuild EVERY frame it was geometry-dirty (a detached/pooled text block, a text block inside a
+        // collapsed panel, an auto-hide scrollbar's parts). Skip it: it holds no units (a real detach/collapse is
+        // STRUCTURAL and already removed them via a full walk), so there is nothing to draw or reclaim here.
+        if (!component.IsAttachedToVisualTree) return true;
+        for (var a = component.VisualParent; a != null; a = a.VisualParent)
+            if (a.Visibility != Visibility.Visible) return true;
 
         _drawingContextInternal.Clear();
         component.Render(_drawingContext);   // NB: consumes the dirty flag (Render sets IsGeometryValid back to true)
