@@ -32,6 +32,15 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     private int _gpuCapacity;
     private bool _recreatedThisFrame;  // the GPU buffer was (re)allocated this frame -> its old contents are gone
 
+    // Last frame's baked items (a CPU mirror of what the GPU buffer holds) + how many were valid. The walk is
+    // deterministic and _renderUnits is retained across partial frames, so slot i holds the SAME item as last frame while
+    // the layout is stable (a hover). Comparing the freshly baked items to this and uploading only the CHANGED span moves
+    // a few hundred bytes on a hover instead of re-uploading every instance - the incremental-upload path for NON-clean
+    // frames (a clean frame skips it entirely via SceneClean). A scroll/structural change shifts most slots, so most
+    // differ and we upload ~everything (correct - no worse than the old full upload).
+    private TItem[] _prevItems;
+    private int _prevCount;
+
     /// <summary>Set by the caller each frame BEFORE the walk: true when the render scene is provably unchanged since last
     /// frame (RenderBuildKind.Clean). The walk still re-runs (re-bakes identical items, re-records identical draws), but
     /// Flush then SKIPS the GPU upload - last frame's bytes are still in the retained buffer at the same offsets, so
@@ -56,6 +65,7 @@ internal abstract class BatchCollector<TItem> where TItem : struct
 
     public void BeginFrame(IGraphicsDevice device)
     {
+        _prevCount = Count;   // last frame's total (Count still holds it) - the valid length of _prevItems for the diff
         Count = 0;
         _segmentStart = 0;
         _hasUnion = false;
@@ -89,19 +99,49 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     {
         if (!Active) return;
 
-        var count = Count - _segmentStart;
-        // Incremental upload: on a provably-clean frame the retained buffer already holds these exact bytes at this exact
-        // offset (the walk is deterministic, so identical items landed at identical slots last frame) - so skip the copy.
-        // A buffer (re)allocated this frame has no prior contents, so it must still upload.
+        var segStart = _segmentStart;
+        var count = Count - segStart;
+
+        // Upload strategy for this segment:
+        //  - buffer (re)allocated this frame  -> no prior GPU contents, upload the whole segment;
+        //  - SceneClean                        -> the retained buffer already holds these exact bytes, upload nothing;
+        //  - otherwise (a partial/full change) -> upload ONLY the [lo,hi] slots whose baked bytes differ from last frame.
+        if (_recreatedThisFrame)
+        {
+            _gpu.SetData(Items.AsSpan(segStart, count), (uint)(segStart * Stride));
+        }
+        else if (!SceneClean)
+        {
+            int lo = -1, hi = -1;
+            for (var i = segStart; i < Count; i++)
+            {
+                if (i < _prevCount && SlotUnchanged(i)) continue;
+                if (lo < 0) lo = i;
+                hi = i;
+            }
+            if (lo >= 0)
+                _gpu.SetData(Items.AsSpan(lo, hi - lo + 1), (uint)(lo * Stride));
+        }
+
+        // Mirror this segment into _prevItems for next frame's diff (skip only a clean frame - it is already identical).
         if (!SceneClean || _recreatedThisFrame)
-            _gpu.SetData(Items.AsSpan(_segmentStart, count), (uint)(_segmentStart * Stride));
+        {
+            if (_prevItems == null || _prevItems.Length < Items.Length) Array.Resize(ref _prevItems, Items.Length);
+            Items.AsSpan(segStart, count).CopyTo(_prevItems.AsSpan(segStart));
+        }
+
         device.SetScissors(_scissor);
-        DrawSegment(device, _gpu, (uint)count, (uint)_segmentStart, projection);
+        DrawSegment(device, _gpu, (uint)count, (uint)segStart, projection);
         device.SetScissors(fullScissor);
 
         _segmentStart = Count;
         _hasUnion = false;
     }
+
+    // Did slot i bake byte-identical to last frame? A blittable per-item bytewise compare (the items are unmanaged
+    // Vector4F structs), SIMD-accelerated by SequenceEqual - cheap relative to the GPU upload it lets us skip.
+    private bool SlotUnchanged(int i)
+        => MemoryMarshal.AsBytes(Items.AsSpan(i, 1)).SequenceEqual(MemoryMarshal.AsBytes(_prevItems.AsSpan(i, 1)));
 
     /// <summary>Emit the instanced draw for [firstInstance, firstInstance + count) of <paramref name="buffer"/>. The
     /// segment's scissor is already set; the derived type sets its own blend/depth/effect state + pass.</summary>
