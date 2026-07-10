@@ -507,6 +507,11 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         {
             if (_dpiScale == value) return;
             _dpiScale = value;
+            // A DPI change re-scales the renderer (RenderScale/projection) and re-lays-out the tree over the next few
+            // frames - and, like a theme swap, parts of that settle through paths that never mark the render dirty. A
+            // Clean-frame op-replay then keeps showing the OLD-scale content (shrunken in the corner) until an unrelated
+            // mark (a mouse move's hover) forces a walk. Force full render walks until the layout settles.
+            RenderDirty.ForceStructuralUntilSettled();
             DpiChanged?.Invoke(this, EventArgs.Empty);
         }
     }
