@@ -39,6 +39,11 @@ public class ThemeManager : IThemeManager
         {
             window.InvalidateStyles();
         }
+
+        // The restyle + resource re-resolution (brushes) above settles over the next few frames through paths that don't
+        // all mark the render dirty, so force full render walks until the layout signals the cascade has fully drained -
+        // otherwise re-styled controls stay blank until an unrelated mark (a mouse-over) forces a rebuild.
+        RenderDirty.ForceStructuralUntilSettled();
     }
 
     // (Re)register the theme's linked palette into the resource manager. The ResourceLink authored as ResourceContext.Source

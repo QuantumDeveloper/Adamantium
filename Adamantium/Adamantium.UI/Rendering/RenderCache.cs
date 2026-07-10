@@ -163,6 +163,19 @@ public class RenderCache
         for (var a = component.VisualParent; a != null; a = a.VisualParent)
             if (a.Visibility != Visibility.Visible) return true;
 
+        // A geometry-dirty component from a FOREIGN visual tree - a popup/menu/tooltip subtree (a PopupRoot), drawn by
+        // the popup stage's OWN cache, never by this one. Skip it WITHOUT rendering: Render() below would consume its
+        // IsGeometryValid=false, and that flag is precisely the signal the popup stage's rebuild gate
+        // (PopupRenderProcessor.OverlayChanged) polls to notice the change - the MAIN cache building first and eating it
+        // starved that gate, so a menu item's hover recolour never redrew. (Tree-top walk: cheap - it only runs for the
+        // handful of dirty components of a partial frame.)
+        if (_lastVisualRoot != null)
+        {
+            var top = component;
+            while (top.VisualParent != null) top = top.VisualParent;
+            if (!ReferenceEquals(top, _lastVisualRoot)) return true;
+        }
+
         _drawingContextInternal.Clear();
         component.Render(_drawingContext);   // NB: consumes the dirty flag (Render sets IsGeometryValid back to true)
         var drawCommands = _drawingContextInternal.GetDrawCommands();
@@ -413,8 +426,13 @@ public class RenderCache
         // Fast-path PARTIAL replay: a geometry-only partial that only recoloured/updated already-batched tiles in place
         // (no splice). Patch just those tiles' slots in the retained batch buffer, then replay the recorded op stream -
         // O(dirty) instead of re-walking every unit (the hover FPS drop). Bails to the full walk below on any doubt.
+        // ONLY when nothing MOVED (!LastBuildTransformDirty): ExecuteOps re-draws each batch SEGMENT from its retained GPU
+        // bytes (last frame's baked positions) and re-issues per-unit draws from their baked transforms - valid only if the
+        // transforms are unchanged. On a TRANSFORM partial (a content slide, a RenderTransform animation) the world moved,
+        // so the per-unit draws follow the new transform while the batched fills/text stay at their stale baked positions -
+        // the "outline runs ahead of its fill" tear. A move must re-bake everything, so fall through to the full walk.
         if (device != null && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Partial
-            && !_partialSpliced && _rectBatch != null && TryPartialReplay(device, fullScissor))
+            && !LastBuildTransformDirty && !_partialSpliced && _rectBatch != null && TryPartialReplay(device, fullScissor))
             return;
 
         var scissorNarrowed = false;   // whether the active scissor is currently narrower than fullScissor
