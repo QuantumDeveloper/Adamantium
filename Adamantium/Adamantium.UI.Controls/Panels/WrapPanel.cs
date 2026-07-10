@@ -38,6 +38,7 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
    // creates/frame (UI stays live, skeletons show progress) but many CHEAP rebinds/frame (fast scroll) - with no
    // count-estimate to mis-size on a cheap->expensive regime change (the multi-monitor DPI-resize freeze).
    private const double BindBudgetMs = 6.0;   // frame-time slice for (re)binds WHILE SCROLLING (headroom under a 16 ms frame)
+   private const int ParallelArrangeThreshold = 64;   // arrange tiles across cores only above this many realized (else thread overhead > win)
    private const double FillBudgetMs = 30.0;  // slice when NOT scrolling (initial fill / a settled fling): drain the backlog fast
    private const int MinBinds = 8;            // always (re)bind at least this many/frame so the window keeps filling
 
@@ -419,9 +420,10 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
       // per-frame list alloc over ~800 realized indices was steady gen0 churn.
       _arrangeIndexBuf.Clear();
       _arrangeIndexBuf.AddRange(Owner.ItemContainerGenerator.RealizedIndices);
-      foreach (var index in _arrangeIndexBuf)
+
+      void ArrangeAt(int index)
       {
-         if (Owner.ItemContainerGenerator.ContainerFromIndex(index) is not IMeasurableComponent container) continue;
+         if (Owner.ItemContainerGenerator.ContainerFromIndex(index) is not IMeasurableComponent container) return;
          var line = index / _columns;
          var col = index % _columns;
          var flowPos = col * _cellFlow;
@@ -430,6 +432,17 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
             ? new Rect(flowPos, scrollPos, _cellFlow, _cellScroll)
             : new Rect(scrollPos, flowPos, _cellScroll, _cellFlow));
       }
+
+      // Each tile's slot is CONSTANT from its index (absolute grid, no cumulative dependency), so the tiles' Arrange are
+      // INDEPENDENT - fan them across cores when there are enough to amortise the thread overhead (a maximize-to-4K storm
+      // arranges thousands at once; a range Partitioner keeps per-tile overhead low). Small windows stay sequential.
+      // The only shared write a tile arrange makes is RenderDirty.MarkGeometry (locked); diagnostic counters race harmlessly.
+      if (_arrangeIndexBuf.Count >= ParallelArrangeThreshold)
+         System.Threading.Tasks.Parallel.ForEach(
+            System.Collections.Concurrent.Partitioner.Create(0, _arrangeIndexBuf.Count),
+            range => { for (var i = range.Item1; i < range.Item2; i++) ArrangeAt(_arrangeIndexBuf[i]); });
+      else
+         foreach (var index in _arrangeIndexBuf) ArrangeAt(index);
 
       // Budget-deferred slots (generator.PendingIndices): fill each with a skeleton at its grid slot so a fast fling
       // shows a "loading" placeholder instead of a hole. Reconciled here (after the real tiles) since this is where the
