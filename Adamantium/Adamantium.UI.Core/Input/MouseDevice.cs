@@ -296,9 +296,33 @@ public class MouseDevice
                     return popups[i] as IInputComponent;
             }
         }
-        return boundsForContent
-            ? InputExtensions.HitTestBounds(rootComponent, p)
-            : InputExtensions.HitTest(rootComponent, p);
+        
+        var pixel = InputExtensions.HitTest(rootComponent, p);
+        if (!boundsForContent) return pixel;
+
+        // Mouse-over (boundsForContent): PREFER the pixel-accurate hit so a real control keeps precise hover + click (a
+        // CheckBox/RadioButton/Button whose IsMouseOver drives its hover trigger and its release-click gate). Fall back to
+        // the geometric bounds hit ONLY when the pixel hit fell THROUGH to an ANCESTOR of it - i.e. the pointer sits in a
+        // transparent gap (between tiles) and pixel-testing resolved to the container behind them; there the bounds hit is
+        // the more specific content element, so taking it keeps the over-chain anchored (no ScrollViewer IsMouseOver
+        // flicker / auto-hide restart). Blanket-geometric (the previous behaviour) broke controls: it returned transparent
+        // overlay/descendant parts a pixel test skips, mis-driving their IsMouseOver-based hover + click.
+        var bounds = InputExtensions.HitTestBounds(rootComponent, p);
+        if (pixel == null) return bounds;
+        if (bounds != null && !ReferenceEquals(pixel, bounds) && IsAncestorOf(pixel, bounds)) return bounds;
+        return pixel;
+    }
+
+    // Is <paramref name="ancestor"/> a strict visual ancestor of <paramref name="node"/>? Walks the visual parent chain.
+    private static bool IsAncestorOf(IInputComponent ancestor, IInputComponent node)
+    {
+        var parent = (node as IUIComponent)?.VisualParent;
+        while (parent != null)
+        {
+            if (ReferenceEquals(parent, ancestor)) return true;
+            parent = parent.VisualParent;
+        }
+        return false;
     }
 
     private void MouseDoubleClick(IInputComponent rootComponent, Vector2 p, uint timestamp, MouseButtons button, InputModifiers inputModifiers)
