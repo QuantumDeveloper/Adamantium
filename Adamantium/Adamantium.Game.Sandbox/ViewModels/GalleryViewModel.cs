@@ -19,6 +19,7 @@ public partial class GalleryViewModel
         new ScrollBarViewModel(),
         new ListsViewModel(),
         new ShapesViewModel(),
+        new BrushesViewModel(),
         new TextViewModel(),
         new SlidePanelViewModel(),
         new ImageViewModel(),

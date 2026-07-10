@@ -30,6 +30,7 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
     private readonly FillFringeEffect _effect;
     private readonly List<Contour> _contours = [];
     private float _expandedFringe = float.NaN;
+    private Vector4F _localBounds;   // shape local bounds (minX, minY, sizeX, sizeY): the fragment->gradient uv basis
 
     // The fill brush, read LIVE at Render (like the body's GeometryRenderComponent.Background) so an in-place colour
     // change or a cheap brush repoint shows without rebuilding the contour. A non-solid brush => the fringe doesn't draw
@@ -64,6 +65,24 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
         }
         AssignNesting(built);
         foreach (var (contour, _) in built) _contours.Add(contour);
+        _localBounds = ComputeLocalBounds(contours);
+    }
+
+    // Bounding box of all contour points (local geometry space) as (minX, minY, sizeX, sizeY) - the gradient uv basis, so
+    // the fringe evaluates the SAME gradient as the fill (which uses the geometry's local bounds).
+    private static Vector4F ComputeLocalBounds(IReadOnlyList<(Vector2[] Points, bool IsClosed)> contours)
+    {
+        float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
+        foreach (var (points, _) in contours)
+            foreach (var p in points)
+            {
+                if (p.X < minX) minX = (float)p.X;
+                if (p.Y < minY) minY = (float)p.Y;
+                if (p.X > maxX) maxX = (float)p.X;
+                if (p.Y > maxY) maxY = (float)p.Y;
+            }
+        if (minX > maxX) return new Vector4F(0, 0, 1, 1);
+        return new Vector4F(minX, minY, Math.Max(maxX - minX, 1e-4f), Math.Max(maxY - minY, 1e-4f));
     }
 
     // Even-odd nesting: a contour inside an ODD number of the others is a HOLE - the fill is OUTSIDE it, so its fringe
@@ -154,6 +173,7 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
             c.VertexBuffer.Invalidate();    // re-expand into the current ring slot
         }
         Brush = brush;
+        _localBounds = ComputeLocalBounds(contours);
         return true;
     }
 
@@ -185,7 +205,7 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
     // when that slot is stale (a static fill settles to zero work; an animated one re-expands the current slot).
     public override void PreRender()
     {
-        if (!AnalyticAa.Enabled || Brush is not SolidColorBrush) return;   // AA off or non-solid: skip the expander
+        if (!AnalyticAa.Enabled || Brush is not (SolidColorBrush or GradientBrush)) return;   // AA off / no fill: skip the expander
         var fringeWidth = ComputeFringeWidth();
         if (fringeWidth != _expandedFringe)
         {
@@ -218,12 +238,22 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
 
     public override void Render()
     {
-        if (!AnalyticAa.Enabled || _contours.Count == 0 || Brush is not SolidColorBrush solid) return;
+        if (!AnalyticAa.Enabled || _contours.Count == 0 || Brush is not (SolidColorBrush or GradientBrush)) return;
 
         _effect.Projection.SetValue(RenderData.TransformMatrix * RenderData.ProjectionMatrix);
-        var color = solid.Color.ToVector4();
-        color.W *= (float)solid.Opacity * RenderData.Opacity;   // colour alpha x brush Opacity x element Opacity
-        _effect.FillColor.SetValue(color);
+        if (Brush is GradientBrush g)
+        {
+            SetGradientUniforms(g);
+            _effect.IsGradient.SetValue(1);
+        }
+        else
+        {
+            var solid = (SolidColorBrush)Brush;
+            var color = solid.Color.ToVector4();
+            color.W *= (float)solid.Opacity * RenderData.Opacity;   // colour alpha x brush Opacity x element Opacity
+            _effect.FillColor.SetValue(color);
+            _effect.IsGradient.SetValue(0);
+        }
 
         _device.VertexType = typeof(FringeVertex);
         _device.PolygonMode = PolygonMode.Fill;
@@ -240,5 +270,25 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
             _device.SetVertexBuffer(vertices);
             _device.Draw(c.VertexCount, 1);
         }
+    }
+
+    // Push the fill gradient into the fringe Draw uniforms (packed by the shared GradientBake, same as the fill batch), so
+    // the ring is coloured by the gradient at each fragment - the AA edge matches the fill instead of one flat colour.
+    private void SetGradientUniforms(GradientBrush g)
+    {
+        var alpha = (float)(g.Opacity * RenderData.Opacity);
+        Span<Vector4F> cols = stackalloc Vector4F[GradientBake.MaxStops];
+        Span<float> offs = stackalloc float[GradientBake.MaxStops];
+        var count = GradientBake.PackStops(g, alpha, cols, offs);
+        var type = GradientBake.PackGeometry(g, out var geom0, out var geom1);
+
+        _effect.GParams.SetValue(new Vector4F(0, type, count, (float)g.SpreadMethod));
+        _effect.GGeom0.SetValue(geom0);
+        _effect.GGeom1.SetValue(geom1);
+        _effect.GLocalBounds.SetValue(_localBounds);
+        _effect.GS0.SetValue(cols[0]); _effect.GS1.SetValue(cols[1]); _effect.GS2.SetValue(cols[2]); _effect.GS3.SetValue(cols[3]);
+        _effect.GS4.SetValue(cols[4]); _effect.GS5.SetValue(cols[5]); _effect.GS6.SetValue(cols[6]); _effect.GS7.SetValue(cols[7]);
+        _effect.GOff0.SetValue(new Vector4F(offs[0], offs[1], offs[2], offs[3]));
+        _effect.GOff1.SetValue(new Vector4F(offs[4], offs[5], offs[6], offs[7]));
     }
 }
