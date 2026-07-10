@@ -213,6 +213,13 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 
     private void WindowOnStateChanged(object sender, StateChangedEventArgs e)
     {
+        // Minimizing via the custom title-bar button drives this managed path (Window.State = Minimized), NOT the
+        // SC_MINIMIZE SysCommand path - so remember what we're minimizing FROM here too. Otherwise lastWindowState keeps
+        // its stale default (Normal) and a later SC_RESTORE (un-minimize from the taskbar) restores to Normal, losing a
+        // Maximized window's state (the "always comes back default" bug). Guard on the real transition so a redundant
+        // Minimized->Minimized re-raise can't overwrite the saved pre-minimize state with Minimized itself.
+        if (e.State == WindowState.Minimized && chromeState != WindowState.Minimized)
+            lastWindowState = chromeState;
         chromeState = e.State;   // keep the WndProc snapshot current (this fires on every State change)
         Win32Interop.ShowWindow(window.Handle, ConvertStateToShowStyle(e.State));
     }
