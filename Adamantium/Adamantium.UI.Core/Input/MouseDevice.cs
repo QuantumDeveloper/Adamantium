@@ -271,7 +271,12 @@ public class MouseDevice
 
     // Hit-test the OPEN POPUPS first (they render - and so receive input - above the main content, newest on top), then
     // fall through to the window content. Without this a popup's contents (a DropDown list, a menu) are click-through.
-    private static IInputComponent HitTestTopmost(IInputComponent rootComponent, Vector2 p)
+    // boundsForContent=false (click routing): pixel-accurate hit - a shape's real geometry, a panel's visible background -
+    // so a click in a transparent gap falls through to what's really behind. true (the mouse-over chain): bounds
+    // containment - the pointer over a gap between transparent tiles is still geometrically inside its container
+    // (a ScrollViewer), so IsMouseOver must NOT fall through to an ANCESTOR's background, which would drop the container
+    // from the over-chain and restart its auto-hide fade every few frames (the hover FPS drop on a big grid).
+    private static IInputComponent HitTestTopmost(IInputComponent rootComponent, Vector2 p, bool boundsForContent = false)
     {
         if (rootComponent is IWindow window)
         {
@@ -291,7 +296,9 @@ public class MouseDevice
                     return popups[i] as IInputComponent;
             }
         }
-        return InputExtensions.HitTest(rootComponent, p);   // the plain visual hit-test (NOT this method - would recurse)
+        return boundsForContent
+            ? InputExtensions.HitTestBounds(rootComponent, p)
+            : InputExtensions.HitTest(rootComponent, p);
     }
 
     private void MouseDoubleClick(IInputComponent rootComponent, Vector2 p, uint timestamp, MouseButtons button, InputModifiers inputModifiers)
@@ -351,7 +358,9 @@ public class MouseDevice
 
     private IInputComponent SetMouseOver(IInputComponent rootComponent, Vector2 p, InputModifiers modifiers, uint timestamp)
     {
-        var element = HitTestTopmost(rootComponent, p);
+        // Mouse-over is GEOMETRIC: bounds containment, so the over-chain doesn't fall through a transparent gap to an
+        // ancestor's background (see HitTestTopmost). Click routing (MouseDown/etc.) still uses the pixel-accurate hit.
+        var element = HitTestTopmost(rootComponent, p, boundsForContent: true);
         return SetMouseOver(rootComponent, element, modifiers, timestamp);
     }
 

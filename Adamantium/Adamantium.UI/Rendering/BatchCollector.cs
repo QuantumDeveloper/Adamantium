@@ -60,6 +60,10 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     /// <summary>A pending (not-yet-flushed) segment exists.</summary>
     public bool Active => Count > _segmentStart;
 
+    /// <summary>Absolute slot index of the item written by the LAST successful TryAdd (= its position in the retained
+    /// buffer). RenderCache records it per unit during the walk so a partial-replay can address that unit's slot.</summary>
+    public int LastSlot => Count - 1;
+
     /// <summary>GPU-buffer element capacity for THIS frame - derived TryAdd guards against overflowing it.</summary>
     protected int GpuCapacity => _gpuCapacity;
 
@@ -163,6 +167,20 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         BindSegment(index);
         DrawSegment(device, _gpu, s.Count, s.First, projection);
         device.SetScissors(fullScissor);
+    }
+
+    /// <summary>
+    /// Patch ONE already-flushed slot in place: overwrite its retained CPU + GPU bytes without touching any other slot or
+    /// re-baking the frame. Lets a fast-path partial (a hover recolouring one tile) update just the dirty units' instances
+    /// and then REPLAY last frame's op stream - the recorded segments still point at the same buffer, now with this slot
+    /// updated - instead of re-baking every unit (the O(N) draw-phase cost of a partial). The caller must NOT have begun a
+    /// new frame (Items/_gpu still hold the last walk's data) and slot must be within that retained data.
+    /// </summary>
+    public void UpdateSlot(IGraphicsDevice device, int slot, TItem item)
+    {
+        Items[slot] = item;
+        if (_prevItems != null && slot < _prevItems.Length) _prevItems[slot] = item;
+        _gpu.SetData(Items.AsSpan(slot, 1), (uint)(slot * Stride));
     }
 
     /// <summary>Hook: capture per-segment state at record time (the text batch stashes the segment's atlas). Base no-op.</summary>

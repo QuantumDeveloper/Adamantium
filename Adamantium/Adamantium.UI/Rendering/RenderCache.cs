@@ -35,6 +35,15 @@ public class RenderCache
     // (no per-frame allocation), same pattern as LayoutManager's promote buffer.
     private readonly List<IUIComponent> _geometryDirtyBuffer = new();
 
+    // Draw-phase partial replay: a geometry-only partial re-renders the dirty components IN PLACE (build side), but the
+    // DRAW used to re-walk EVERY unit to re-bake the batches (the O(N) 14ms at 4K - the hover FPS drop). Instead, a batched
+    // rect records its slot during the full walk (_rectSlotByUnit); a fast-path partial then patches only the dirty tiles'
+    // slots (UpdateSlot) and REPLAYS the op stream - O(dirty). Any doubt (spliced list, non-rect/unbatched dirty unit,
+    // a tile that stopped being batchable) falls back to the full walk, so replay is a pure speedup, never a correctness risk.
+    private readonly List<IUIComponent> _partialDirty = new();               // dirty components of the last fast-path partial
+    private readonly Dictionary<IRenderUnit, int> _rectSlotByUnit = new();   // batched rect unit -> its slot in _rectBatch
+    private bool _partialSpliced;                                            // last partial mutated the paint-order list -> ops/slots stale
+
     // Last render scale seen in ProcessCommands; maps a unit's window-logical clip rect to framebuffer-pixel scissor.
     private double _renderScale = 1.0;
 
@@ -85,6 +94,7 @@ public class RenderCache
         // (the O(N) that made a hover cost ~2x a clean frame on a big list).
         if (_built && !RenderDirty.IsStructural)
         {
+            _partialSpliced = false;   // ReRenderInPlace sets it if it splices the paint-order list (a count change)
             if (RenderDirty.IsTransform)
             {
                 _worldCache.Clear();
@@ -109,6 +119,9 @@ public class RenderCache
             {
                 LastBuildKind = RenderBuildKind.Partial;   // no full walk (only the dirty components' unit contents)
                 LastBuildTransformDirty = RenderDirty.IsTransform;   // geometry-only partial -> nothing moved -> proc can be skipped
+                // Remember which components changed so the draw phase can patch just their slots + replay (below).
+                _partialDirty.Clear();
+                _partialDirty.AddRange(_geometryDirtyBuffer);
                 RenderDirty.Clear();
                 return;
             }
@@ -134,7 +147,12 @@ public class RenderCache
     // DFS rank, instead of forcing a full tree walk that re-renders every element.
     private bool ReRenderInPlace(IUIComponent component)
     {
-        if (component.Visibility != Visibility.Visible) return false;   // (no Render() run yet - nothing to undo)
+        // Invisible (Collapsed/Hidden - e.g. an auto-hide ScrollBar that re-marks geometry dirty on every mouse-move):
+        // it draws nothing. If it holds no units (the norm - going invisible was STRUCTURAL and already removed them),
+        // SKIP it like a detached/collapsed one below, instead of forcing a full tree walk every dirty frame (the hover
+        // FPS hitch). Only if it somehow still holds units fall back to a full walk to reconcile them.
+        if (component.Visibility != Visibility.Visible)
+            return !_unitsByControl.TryGetValue(component.RenderId, out var stillHeld) || stillHeld.Count == 0;
 
         // Not in the live paint tree: DETACHED (no visual parent) or effectively hidden by a COLLAPSED ancestor. The full
         // walk never reaches such a component, so it has no paint rank and re-rendering it draws nothing - yet it used to
@@ -170,6 +188,9 @@ public class RenderCache
         }
 
         // Count (or a unit type) changed. Splice this component's units into the retained paint-order list in place.
+        // This shifts slots after the splice point, so the recorded op stream + rect-slot map are stale -> the draw phase
+        // must do a full walk, not a replay.
+        _partialSpliced = true;
         if (!_orderByControl.ContainsKey(component.RenderId))
         {
             // The component has no recorded paint rank - it was invisible/absent during the last full walk and has now
@@ -389,10 +410,17 @@ public class RenderCache
             return;
         }
 
+        // Fast-path PARTIAL replay: a geometry-only partial that only recoloured/updated already-batched tiles in place
+        // (no splice). Patch just those tiles' slots in the retained batch buffer, then replay the recorded op stream -
+        // O(dirty) instead of re-walking every unit (the hover FPS drop). Bails to the full walk below on any doubt.
+        if (device != null && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Partial
+            && !_partialSpliced && _rectBatch != null && TryPartialReplay(device, fullScissor))
+            return;
+
         var scissorNarrowed = false;   // whether the active scissor is currently narrower than fullScissor
 
         _recording = device != null;   // a device walk records its op stream for a later clean-frame replay
-        if (_recording) { _ops.Clear(); _opsReplayable = true; }
+        if (_recording) { _ops.Clear(); _opsReplayable = true; _rectSlotByUnit.Clear(); }
 
         // Text + item-background + instanced-fill batches: reset per frame. Device renders only - GPU-free tests skip batching.
         if (device != null)
@@ -458,6 +486,7 @@ public class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 if (_rectBatch.TryAdd(rru.RectPayload, wt, rru.FillOpacity, scissor, LogicalBounds(unit.Component, wt)))
                 {
+                    if (_recording) _rectSlotByUnit[unit] = _rectBatch.LastSlot;   // for a later fast-path partial replay
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -609,6 +638,39 @@ public class RenderCache
     private void RecordScissor(Rect2D scissor)
     {
         if (_recording) _ops.Add(new RenderOp { Kind = RenderOpKind.Scissor, Scissor = scissor });
+    }
+
+    // Draw a fast-path partial by patching only the dirty tiles' batch slots, then replaying last frame's op stream.
+    // Returns false (caller falls back to the full walk) if ANY dirty unit isn't a still-batchable rect we recorded a slot
+    // for - its bytes live elsewhere (a per-unit / text / instanced unit, or a tile that just switched to a gradient).
+    // Validate fully BEFORE patching so a rejected frame leaves no half-applied slots the fallback wouldn't overwrite.
+    private bool TryPartialReplay(IGraphicsDevice device, Rect2D fullScissor)
+    {
+        foreach (var comp in _partialDirty)
+        {
+            // A dirty component with NO drawn units (a detached/pooled/collapsed element - e.g. a text block that
+            // re-marks geometry every frame but isn't in the paint tree) contributes nothing to the frame: the op stream
+            // is unchanged, so skip it and let the replay stand. This is the common hover case (nothing visible changed).
+            if (!_unitsByControl.TryGetValue(comp.RenderId, out var units)) continue;
+            foreach (var u in units)
+                if (u is not RectangleRenderUnit rru || !_rectSlotByUnit.ContainsKey(u) || !_rectBatch.CanBatch(rru.RectPayload))
+                    return false;   // a per-unit / text / instanced / no-longer-batchable dirty unit -> full walk
+        }
+        // Nothing moved on a geometry-only partial, so the cached world transform is still valid; re-bake each dirty tile
+        // from its (just-updated) payload into its retained slot. (No-units components patched nothing above.)
+        foreach (var comp in _partialDirty)
+        {
+            if (!_unitsByControl.TryGetValue(comp.RenderId, out var units)) continue;
+            foreach (var u in units)
+            {
+                var rru = (RectangleRenderUnit)u;
+                if (!RectBatchCollector.BakeItem(rru.RectPayload, World(u.Component), rru.FillOpacity, out var item))
+                    return false;   // became non-bakeable (rotated); the full walk re-bakes everything anyway
+                _rectBatch.UpdateSlot(device, _rectSlotByUnit[u], item);
+            }
+        }
+        ExecuteOps(device, fullScissor);
+        return true;
     }
 
     // Replay a recorded frame's op stream (a Clean frame): re-issue its scissor changes, per-unit direct draws and batch

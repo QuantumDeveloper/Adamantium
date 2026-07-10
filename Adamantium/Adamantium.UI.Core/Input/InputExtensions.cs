@@ -58,7 +58,19 @@ public static class InputExtensions
          result.Add(element);
    }
 
-   private static void Collect(IUIComponent element, Vector2 p, List<IInputComponent> result)
+   /// <summary>The top-most INPUT element whose BOUNDS contain <paramref name="p"/> - the narrow phase (a shape's real
+   /// geometry, a panel's visible background) is skipped, so a transparent container still counts. The mouse-over
+   /// FALLBACK when the pixel-accurate <see cref="HitTest"/> misses: the pointer over a gap between transparent tiles is
+   /// still geometrically inside the scroll viewer, so the over-chain must stay anchored there instead of collapsing to
+   /// the window root (which flickers the viewer's IsMouseOver and restarts its auto-hide fade every few frames).</summary>
+   public static IInputComponent HitTestBounds(this IUIComponent root, Vector2 p)
+   {
+      var result = new List<IInputComponent>();
+      Collect(root, p, result, boundsOnly: true);
+      return result.FirstOrDefault();
+   }
+
+   private static void Collect(IUIComponent element, Vector2 p, List<IInputComponent> result, bool boundsOnly = false)
    {
       if (element.Visibility != Visibility.Visible
           || !element.IsEnabled
@@ -85,12 +97,13 @@ public static class InputExtensions
       // whose template root is a Border: its Track/Thumb were unhittable).
       var local = p - element.ClipRectangle.Location;
       foreach (var child in HitTestChildren(element, local))
-         Collect(child, local, result);
+         Collect(child, local, result, boundsOnly);
 
       // Narrow phase: only an INPUT element is a hit target (non-input visuals are pure pass-through containers), the
       // point must be inside its box (broad), and on its actual geometry, not just inside its bounding box - so a click
-      // in a shape's empty bbox corner falls through to whatever is really there.
-      if (inBox && element is IInputComponent input && element.HitTestCore(local))
+      // in a shape's empty bbox corner falls through to whatever is really there. boundsOnly skips the geometry test
+      // (the mouse-over fallback: bounds containment is enough).
+      if (inBox && element is IInputComponent input && (boundsOnly || element.HitTestCore(local)))
          result.Add(input);
    }
 
