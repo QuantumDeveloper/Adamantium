@@ -18,6 +18,11 @@
     <SolidColorBrush x:Key="ControlFillColorTertiary" Color="#4DF9F9F9"/>
     <SolidColorBrush x:Key="ControlFillColorDisabled" Color="#4DF9F9F9"/>
 
+    <!-- Subtle fills (WinUI tokens): hover/press washes for chrome-less items - menu rows, title-bar buttons. Missing
+         counterparts of the dark palette's entries (a {ResourceReference} miss is a silent no-op - see Brushes.auml). -->
+    <SolidColorBrush x:Key="SubtleFillColorSecondary" Color="#09000000"/>
+    <SolidColorBrush x:Key="SubtleFillColorTertiary" Color="#06000000"/>
+
     <!-- Control strokes -->
     <SolidColorBrush x:Key="ControlStrokeColorDefault" Color="#0F000000"/>
     <SolidColorBrush x:Key="ControlStrokeColorSecondary" Color="#29000000"/>

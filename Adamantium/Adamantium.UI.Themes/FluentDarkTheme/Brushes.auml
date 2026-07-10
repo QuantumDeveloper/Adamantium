@@ -18,6 +18,12 @@
     <SolidColorBrush x:Key="ControlFillColorTertiary" Color="#08FFFFFF"/>
     <SolidColorBrush x:Key="ControlFillColorDisabled" Color="#0BFFFFFF"/>
 
+    <!-- Subtle fills (WinUI tokens): hover/press washes for chrome-less items - menu rows, title-bar buttons. These were
+         REFERENCED by MenuStyleSet/TitleBarStyleSet but missing from the palette, so those hovers silently never applied
+         (a {ResourceReference} that fails to resolve is a silent no-op). -->
+    <SolidColorBrush x:Key="SubtleFillColorSecondary" Color="#0FFFFFFF"/>
+    <SolidColorBrush x:Key="SubtleFillColorTertiary" Color="#0AFFFFFF"/>
+
     <!-- Control strokes -->
     <SolidColorBrush x:Key="ControlStrokeColorDefault" Color="#12FFFFFF"/>
     <SolidColorBrush x:Key="ControlStrokeColorSecondary" Color="#18FFFFFF"/>

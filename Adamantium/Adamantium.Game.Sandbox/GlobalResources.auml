@@ -1,0 +1,10 @@
+<ResourceDictionary xmlns:x="http://adamantium/ui/xaml/extensions"
+        xmlns="http://adamantium/ui">
+
+    <!-- Sandbox GLOBAL-scope resources (linked with Scope=Global from ResourcesView): app-wide keys that belong to NO
+         theme, so a theme swap re-colours every palette-derived brush but leaves these untouched - that difference is
+         exactly what the Resources tab's "Global resource" demo shows. -->
+
+    <SolidColorBrush x:Key="GlobalAccent" Color="#F59E0B"/>
+
+</ResourceDictionary>
