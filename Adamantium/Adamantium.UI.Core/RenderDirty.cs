@@ -34,7 +34,11 @@ public static class RenderDirty
     /// <summary>Records that <paramref name="component"/>'s recorded geometry changed - it will re-render.</summary>
     public static void MarkGeometry(IUIComponent component)
     {
-        if (component != null) GeometrySet.Add(component);
+        // Locked: a PARALLEL arrange pass (VirtualizingPanel) calls this concurrently as each tile's size settles;
+        // HashSet is not thread-safe so a lock-free Add could corrupt it. Uncontended in the single-threaded case (the
+        // common path). The scalar counters below stay lock-free (a lost increment only mis-counts a diagnostic).
+        if (component == null) return;
+        lock (GeometrySet) GeometrySet.Add(component);
     }
 
     /// <summary>Records that something moved (world transforms must be re-baked; no re-record).</summary>
