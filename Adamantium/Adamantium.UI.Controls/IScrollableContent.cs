@@ -22,6 +22,12 @@ public interface IScrollableContent
     /// <summary>Top-left of the viewport within the extent; always within [0, Extent - Viewport].</summary>
     Vector2 Offset { get; }
 
+    /// <summary>The offset the content's LAST layout pass actually realized/arranged its window for (a virtualizing panel
+    /// snapshots this at measure). A host translating the content must use THIS - not <see cref="Offset"/>, which can be a
+    /// newer value the window hasn't realized yet - so the translation and the realized window agree and the leading edge
+    /// never shows a gap. For a non-virtualizing content it equals <see cref="Offset"/>.</summary>
+    Vector2 RealizedOffset { get; }
+
     /// <summary>Whether the viewer permits scrolling on the horizontal axis (the content measures unbounded there).</summary>
     bool CanScrollHorizontally { get; set; }
 

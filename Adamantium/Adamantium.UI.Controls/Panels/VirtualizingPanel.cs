@@ -59,6 +59,10 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
     public Size Extent => _extent;
     public Size Viewport => _viewport;
     public Vector2 Offset => _offset;
+
+    // The offset the last measure realized/arranged the window for (see IScrollableContent.RealizedOffset). A host that
+    // translates this panel must use this, not Offset, or the translation and the realized window disagree for a frame.
+    public Vector2 RealizedOffset => _passOffset;
     public bool CanScrollHorizontally { get; set; } = true;
     public bool CanScrollVertically { get; set; } = true;
     public event EventHandler ScrollMetricsChanged;
@@ -120,6 +124,12 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
             {
                 _offset = reclamped;
                 _passOffset = reclamped;
+                // The window above was realized for the PRE-clamp offset, but the arrange positions against _passOffset
+                // (now the corrected offset) - so the realized window and the translation would disagree for THIS frame:
+                // a gap at the leading edge that only fills on the next pass. Re-realize the window for the corrected
+                // offset NOW so window + arrange agree this frame. The extent is offset-independent (item count x cell), so
+                // re-realizing can't shrink it again -> no loop. (Still schedule a follow-up pass as a safety net.)
+                MeasureVirtualized(availableSize, _offset);
                 LayoutManager.For(this).InvalidateMeasureNextPass(this);
             }
         }
