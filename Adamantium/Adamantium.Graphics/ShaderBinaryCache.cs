@@ -26,22 +26,17 @@ public static class ShaderBinaryCache
 
     private static string _deviceDir;   // per-device cache folder, resolved once
 
-    // The per-device cache folder: %LOCALAPPDATA%/Adamantium/ShaderCache/<deviceHash>/. The hash folds the pipeline-cache
-    // UUID + driver version + device/vendor id, so it changes exactly when a cached binary would become incompatible.
+    // The per-device cache folder: %LOCALAPPDATA%/Adamantium/ShaderCache/<deviceHash>/. Keyed by the STABLE identity of
+    // the GPU + driver (device name + vendor/device id + driver version) - which changes exactly when a cached binary
+    // would become incompatible. NB pipelineCacheUUID is deliberately NOT used: its marshalled bytes were not stable
+    // across runs here, so it spawned a fresh folder every launch and the cache never hit (the whole point defeated).
     private static string DeviceDir(GraphicsDevice device)
     {
         if (_deviceDir != null) return _deviceDir;
         var props = device.MainDevice.GraphicsAdapter.AdapterProperties;
+        var key = $"{props.DeviceName}|{props.VendorID:X}|{props.DeviceID:X}|{props.DriverVersion:X}";
         using var sha = SHA256.Create();
-        var seed = new MemoryStream();
-        var uuid = props.PipelineCacheUUID;
-        if (!uuid.IsEmpty) seed.Write(uuid.Span);
-        var scalars = new byte[12];
-        BitConverter.TryWriteBytes(scalars.AsSpan(0), props.DriverVersion);
-        BitConverter.TryWriteBytes(scalars.AsSpan(4), props.VendorID);
-        BitConverter.TryWriteBytes(scalars.AsSpan(8), props.DeviceID);
-        seed.Write(scalars);
-        var hash = Convert.ToHexString(sha.ComputeHash(seed.ToArray())).Substring(0, 16);
+        var hash = Convert.ToHexString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(key))).Substring(0, 16);
         var root = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         _deviceDir = Path.Combine(root, "Adamantium", "ShaderCache", hash);
         return _deviceDir;
@@ -54,10 +49,10 @@ public static class ShaderBinaryCache
         using var sha = SHA256.Create();
         var buf = new MemoryStream();
         if (!info.PCode.IsEmpty) buf.Write(info.PCode.Span);
-        var tail = new byte[8];
-        BitConverter.TryWriteBytes(tail.AsSpan(0), (uint)info.Stage);
-        BitConverter.TryWriteBytes(tail.AsSpan(4), (uint)(info.PName?.GetHashCode() ?? 0));
-        buf.Write(tail);
+        buf.Write(BitConverter.GetBytes((uint)info.Stage));
+        // Hash the entry-point NAME's bytes, not String.GetHashCode - the latter is RANDOMISED per process, so it made
+        // the file name differ every run and the cache never hit.
+        if (!string.IsNullOrEmpty(info.PName)) buf.Write(System.Text.Encoding.UTF8.GetBytes(info.PName));
         var name = Convert.ToHexString(sha.ComputeHash(buf.ToArray()));
         return Path.Combine(DeviceDir(device), name + ".shaderbin");
     }
