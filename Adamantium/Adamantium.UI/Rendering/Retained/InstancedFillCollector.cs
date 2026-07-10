@@ -10,7 +10,9 @@ using Adamantium.Graphics.Core.Vertices;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Core.Media;
 using Adamantium.UI.Effects.Generated;
+using Adamantium.UI.Rendering;
 using Adamantium.UI.Rendering.RenderUnits;
 using Adamantium.Vulkan.Core;
 using Buffer = Adamantium.Graphics.Buffer;
@@ -42,6 +44,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     private const MemoryPropertyFlags Mem = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal;
     private static readonly int VertexStride = Marshal.SizeOf<UIVertex>();
     private static readonly int InstanceStride = Marshal.SizeOf<GeometryInstance>();
+    private static readonly int GradInstanceStride = Marshal.SizeOf<GradientGeometryInstance>();
 
     // Per-key GPU + per-frame accumulation state. The mesh buffers are immutable once uploaded; the instance buffer is
     // rewritten each frame (grown only at BeginFrame).
@@ -61,6 +64,15 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         public int GpuCapacity;
         public bool Recreated;   // grown this frame -> a clean-skip is unsafe (fresh buffer holds no prior bytes)
         public bool InPending;   // currently listed in _pendingKeys
+
+        // Parallel GRADIENT instance state for this key's shared mesh (a gradient fill on the same geometry). Solid and
+        // gradient instances of one mesh share the vtx/idx buffers but have separate instance buffers + draw passes.
+        public GradientGeometryInstance[] GradItems = new GradientGeometryInstance[16];
+        public int GradCount;
+        public int GradFlushed;
+        public Buffer GradGpu;
+        public int GradGpuCapacity;
+        public bool GradRecreated;
     }
 
     private readonly GraphicsDevice _device;
@@ -84,9 +96,10 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     private sealed class FlushRecord
     {
         public readonly List<(KeySegment Seg, uint First, uint Count)> Keys = new();
+        public readonly List<(KeySegment Seg, uint First, uint Count)> GradKeys = new();
         public readonly List<IRenderUnit> Units = new();
         public Rect2D Scissor;
-        public void Reset() { Keys.Clear(); Units.Clear(); }
+        public void Reset() { Keys.Clear(); GradKeys.Clear(); Units.Clear(); }
     }
     private readonly List<FlushRecord> _flushRecords = new();
     private int _flushCount;   // records used this frame (pooled objects reused up to this count)
@@ -124,8 +137,26 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
                 seg.Recreated = true;
             }
             else seg.Recreated = false;
+
+            // Parallel grow/reset for the gradient instance buffer (only when this key has ever held gradient instances).
+            if (seg.GradGpu != null && seg.GradGpuCapacity < seg.GradItems.Length)
+            {
+                seg.GradGpu.Dispose();
+                seg.GradGpu = null;
+            }
+            if (seg.GradGpu == null && seg.MeshUploaded && seg.GradCount > 0)
+            {
+                seg.GradGpu = Buffer.New<GradientGeometryInstance>(_device, (uint)seg.GradItems.Length,
+                    BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+                seg.GradGpuCapacity = seg.GradItems.Length;
+                seg.GradRecreated = true;
+            }
+            else seg.GradRecreated = false;
+
             seg.Count = 0;
             seg.Flushed = 0;
+            seg.GradCount = 0;
+            seg.GradFlushed = 0;
             seg.InPending = false;
         }
         _pendingKeys.Clear();
@@ -173,6 +204,66 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         return true;
     }
 
+    /// <summary>True if this unit's fill can join the GRADIENT instanced batch (arbitrary geometry with a gradient fill).</summary>
+    public bool CanBatchGradient(GeometryRenderUnit unit) => unit.TryGetInstancedGradientFill(out _, out _, out _, out _, out _);
+
+    /// <summary>Collect one instanceable GRADIENT fill: append its per-instance world + gradient to its key's gradient
+    /// buffer, and register the unit for a deferred fringe/stroke draw. False if it can't be batched (no drawable mesh or
+    /// buffer overflow) - the caller draws it per-unit.</summary>
+    public bool TryAddGradient(GeometryRenderUnit unit, Matrix4x4F world, Rect2D scissor, Rect logicalBounds)
+    {
+        if (!unit.TryGetInstancedGradientFill(out var key, out var meshObj, out var brush, out var localBounds, out var opacity)) return false;
+        if (meshObj is not Mesh mesh) return false;
+        var seg = GetOrCreate(key, mesh);
+        if (seg == null) return false;
+
+        if (seg.GradCount + 1 > seg.GradItems.Length) Array.Resize(ref seg.GradItems, seg.GradItems.Length * 2);
+        if (seg.GradGpu == null)
+        {
+            seg.GradGpu = Buffer.New<GradientGeometryInstance>(_device, (uint)seg.GradItems.Length,
+                BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+            seg.GradGpuCapacity = seg.GradItems.Length;
+            seg.GradRecreated = true;
+        }
+        if (seg.GradCount + 1 > seg.GradGpuCapacity) return false;
+
+        seg.GradItems[seg.GradCount++] = BuildGradientInstance(brush, world, localBounds, opacity);
+
+        _scissor = scissor;
+        if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
+        _pendingUnits.Add(unit);
+        if (!_hasUnion) { _uL = logicalBounds.X; _uT = logicalBounds.Y; _uR = logicalBounds.Right; _uB = logicalBounds.Bottom; _hasUnion = true; }
+        else
+        {
+            if (logicalBounds.X < _uL) _uL = logicalBounds.X;
+            if (logicalBounds.Y < _uT) _uT = logicalBounds.Y;
+            if (logicalBounds.Right > _uR) _uR = logicalBounds.Right;
+            if (logicalBounds.Bottom > _uB) _uB = logicalBounds.Bottom;
+        }
+        return true;
+    }
+
+    // Pack a gradient brush + world + local bounds into one gradient instance record (stops/geometry via the shared
+    // GradientBake; Params = (type, spread, stopCount, _) to match the gradient-fill vertex shader).
+    private static GradientGeometryInstance BuildGradientInstance(GradientBrush g, Matrix4x4F world, Rect localBounds, double opacity)
+    {
+        var inst = new GradientGeometryInstance { World = world };
+        var alpha = (float)(g.Opacity * opacity);
+        Span<Vector4F> cols = stackalloc Vector4F[GradientBake.MaxStops];
+        Span<float> offs = stackalloc float[GradientBake.MaxStops];
+        var count = GradientBake.PackStops(g, alpha, cols, offs);
+        inst.Stop0 = cols[0]; inst.Stop1 = cols[1]; inst.Stop2 = cols[2]; inst.Stop3 = cols[3];
+        inst.Stop4 = cols[4]; inst.Stop5 = cols[5]; inst.Stop6 = cols[6]; inst.Stop7 = cols[7];
+        inst.Offsets0 = new Vector4F(offs[0], offs[1], offs[2], offs[3]);
+        inst.Offsets1 = new Vector4F(offs[4], offs[5], offs[6], offs[7]);
+        var type = GradientBake.PackGeometry(g, out var geom0, out var geom1);
+        inst.Geom0 = geom0;
+        inst.Geom1 = geom1;
+        inst.LocalBounds = new Vector4F((float)localBounds.X, (float)localBounds.Y, (float)localBounds.Width, (float)localBounds.Height);
+        inst.Params = new Vector4F(type, (float)g.SpreadMethod, count, 0f);
+        return inst;
+    }
+
     /// <summary>Does a unit's logical bounds overlap the pending group? A later overlapping non-batched unit must draw
     /// AFTER a flush so it paints on top.</summary>
     public bool OverlapsPending(Rect r)
@@ -205,6 +296,14 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
                 rec.Keys.Add((seg, (uint)seg.Flushed, (uint)count));
                 seg.Flushed = seg.Count;
             }
+            var gcount = seg.GradCount - seg.GradFlushed;
+            if (gcount > 0)
+            {
+                if (!SceneClean || seg.GradRecreated)
+                    seg.GradGpu.SetData(seg.GradItems.AsSpan(seg.GradFlushed, gcount), (uint)(seg.GradFlushed * GradInstanceStride));
+                rec.GradKeys.Add((seg, (uint)seg.GradFlushed, (uint)gcount));
+                seg.GradFlushed = seg.GradCount;
+            }
             seg.InPending = false;
         }
         foreach (var u in _pendingUnits) rec.Units.Add(u);
@@ -236,6 +335,26 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
                 _device.SetVertexBuffer(seg.VtxBuffer);
                 _device.PrimitiveTopology = seg.Topology;
                 _effect.BatchFillPass.Apply();
+                if (seg.Indexed)
+                    _device.DrawIndexed(seg.VtxBuffer, seg.IdxBuffer, instanceCount: count, indexCount: seg.IndexCount);
+                else
+                    _device.Draw(seg.VertexCount, count);
+            }
+            _device.SetScissors(fullScissor);
+        }
+
+        // Gradient instanced fills for this group (same shared meshes, gradient pass + per-instance gradient buffer),
+        // drawn after the solid fills in the same clip. State is the same as the solid fill; only the pass differs.
+        if (rec.GradKeys.Count > 0)
+        {
+            SetupInstancedState(projection);
+            _device.SetScissors(rec.Scissor);
+            foreach (var (seg, first, count) in rec.GradKeys)
+            {
+                _effect.InstancesAddress.SetValue(seg.GradGpu.GetDeviceAddress() + (ulong)(first * GradInstanceStride));
+                _device.SetVertexBuffer(seg.VtxBuffer);
+                _device.PrimitiveTopology = seg.Topology;
+                _effect.BatchGradientFillPass.Apply();
                 if (seg.Indexed)
                     _device.DrawIndexed(seg.VtxBuffer, seg.IdxBuffer, instanceCount: count, indexCount: seg.IndexCount);
                 else

@@ -1,0 +1,144 @@
+<View xmlns="http://adamantium/ui">
+    <!-- DataContext is the BrushesViewModel. Every gradient below is authored in AUML (element syntax:
+         <Shape.Fill><LinearGradientBrush><GradientStop/>...) - proving gradients are fully markup-authorable, on any
+         element, and batched by the SDF gradient batches. -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Orientation="Vertical" Margin="24">
+
+            <TextBlock Text="Linear gradients — rectangles" FontSize="18" Margin="0,0,0,10"/>
+            <WrapPanel Orientation="Horizontal">
+                <!-- diagonal, 3 stops -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#3B82F6" Offset="0"/>
+                            <GradientStop Color="#8B5CF6" Offset="0.5"/>
+                            <GradientStop Color="#EC4899" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <!-- horizontal -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <LinearGradientBrush StartPoint="0,0.5" EndPoint="1,0.5">
+                            <GradientStop Color="#22C55E" Offset="0"/>
+                            <GradientStop Color="#EAB308" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <!-- vertical, with a stroke -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10" Stroke="White" StrokeThickness="3">
+                    <Rectangle.Fill>
+                        <LinearGradientBrush StartPoint="0.5,0" EndPoint="0.5,1">
+                            <GradientStop Color="#F59E0B" Offset="0"/>
+                            <GradientStop Color="#EF4444" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
+            </WrapPanel>
+
+            <TextBlock Text="Radial gradients — rectangles" FontSize="18" Margin="0,20,0,10"/>
+            <WrapPanel Orientation="Horizontal">
+                <!-- centred spotlight -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.6" RadiusY="0.6">
+                            <GradientStop Color="#FDE68A" Offset="0"/>
+                            <GradientStop Color="#F59E0B" Offset="1"/>
+                        </RadialGradientBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <!-- off-centre focal (top-left highlight) -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.3,0.28" RadiusX="0.7" RadiusY="0.7">
+                            <GradientStop Color="#A7F3D0" Offset="0"/>
+                            <GradientStop Color="#14B8A6" Offset="0.6"/>
+                            <GradientStop Color="#0F766E" Offset="1"/>
+                        </RadialGradientBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
+            </WrapPanel>
+
+            <TextBlock Text="Gradients — ellipses" FontSize="18" Margin="0,20,0,10"/>
+            <WrapPanel Orientation="Horizontal">
+                <Ellipse Width="120" Height="120" Margin="10">
+                    <Ellipse.Fill>
+                        <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.35,0.32" RadiusX="0.55" RadiusY="0.55">
+                            <GradientStop Color="#FFFFFF" Offset="0"/>
+                            <GradientStop Color="#3B82F6" Offset="0.7"/>
+                            <GradientStop Color="#1E3A8A" Offset="1"/>
+                        </RadialGradientBrush>
+                    </Ellipse.Fill>
+                </Ellipse>
+                <Ellipse Width="160" Height="110" Margin="10" Stroke="#40FFFFFF" StrokeThickness="2">
+                    <Ellipse.Fill>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#EC4899" Offset="0"/>
+                            <GradientStop Color="#8B5CF6" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Ellipse.Fill>
+                </Ellipse>
+            </WrapPanel>
+
+            <TextBlock Text="Gradients — arbitrary shapes (Polygon / Path)" FontSize="18" Margin="0,20,0,10"/>
+            <WrapPanel Orientation="Horizontal">
+                <Polygon Points="70,0 140,120 0,120" Margin="10">
+                    <Polygon.Fill>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                            <GradientStop Color="#F472B6" Offset="0"/>
+                            <GradientStop Color="#7C3AED" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Polygon.Fill>
+                </Polygon>
+                <Polygon Points="60,0 75,45 120,45 84,72 96,116 60,90 24,116 36,72 0,45 45,45" Margin="10">
+                    <Polygon.Fill>
+                        <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.4" RadiusX="0.55" RadiusY="0.55">
+                            <GradientStop Color="#FEF08A" Offset="0"/>
+                            <GradientStop Color="#F59E0B" Offset="0.6"/>
+                            <GradientStop Color="#B45309" Offset="1"/>
+                        </RadialGradientBrush>
+                    </Polygon.Fill>
+                </Polygon>
+                <Path Data="F0 M110,10 L168.78,190.9 L14.89,79.1 L205.11,79.1 L51.22,190.9 Z" Width="200" Height="200" Margin="10">
+                    <Path.Fill>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                            <GradientStop Color="#22D3EE" Offset="0"/>
+                            <GradientStop Color="#3B82F6" Offset="0.5"/>
+                            <GradientStop Color="#1E1B4B" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Path.Fill>
+                </Path>
+            </WrapPanel>
+
+            <TextBlock Text="Spread method — Pad / Reflect / Repeat (stops span 0..0.5)" FontSize="18" Margin="0,20,0,10"/>
+            <WrapPanel Orientation="Horizontal">
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <LinearGradientBrush StartPoint="0,0.5" EndPoint="0.5,0.5" SpreadMethod="Pad">
+                            <GradientStop Color="#0EA5E9" Offset="0"/>
+                            <GradientStop Color="#111827" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <LinearGradientBrush StartPoint="0,0.5" EndPoint="0.5,0.5" SpreadMethod="Reflect">
+                            <GradientStop Color="#0EA5E9" Offset="0"/>
+                            <GradientStop Color="#111827" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <LinearGradientBrush StartPoint="0,0.5" EndPoint="0.5,0.5" SpreadMethod="Repeat">
+                            <GradientStop Color="#0EA5E9" Offset="0"/>
+                            <GradientStop Color="#111827" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
+            </WrapPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</View>

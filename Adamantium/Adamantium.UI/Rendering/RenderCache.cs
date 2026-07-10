@@ -325,6 +325,8 @@ public class RenderCache
     // share one clip GROUP (_batchScissor): a scissor (or text-atlas) change flushes both together, preserving order.
     private RectBatchCollector _rectBatch;
     private EllipseBatchCollector _ellipseBatch;   // SDF family, same fill layer as rects (below text)
+    private GradientRectCollector _gradientRectBatch;   // SDF family: rounded rects with a linear/radial GRADIENT fill
+    private GradientEllipseCollector _gradientEllipseBatch;   // SDF family: ellipses with a linear/radial GRADIENT fill
     private Rect2D _batchScissor;
     private bool _batchOpen;
 
@@ -398,13 +400,19 @@ public class RenderCache
             _textBatch ??= new TextBatchCollector();
             _rectBatch ??= new RectBatchCollector();
             _ellipseBatch ??= new EllipseBatchCollector();
+            _gradientRectBatch ??= new GradientRectCollector();
+            _gradientEllipseBatch ??= new GradientEllipseCollector();
             _textBatch.BeginFrame(device);
             _rectBatch.BeginFrame(device);
             _ellipseBatch.BeginFrame(device);
+            _gradientRectBatch.BeginFrame(device);
+            _gradientEllipseBatch.BeginFrame(device);
             var sceneClean = LastBuildKind == RenderBuildKind.Clean;
             _textBatch.SceneClean = sceneClean;
             _rectBatch.SceneClean = sceneClean;
             _ellipseBatch.SceneClean = sceneClean;
+            _gradientRectBatch.SceneClean = sceneClean;
+            _gradientEllipseBatch.SceneClean = sceneClean;
             // Incremental upload: a Clean frame changed nothing, so the batches re-bake byte-identical items into slots the
             // retained GPU buffers already hold - Flush then skips the redundant upload (zero bytes move on an idle frame).
             if (InstancedFillCollector.Enabled)
@@ -459,6 +467,21 @@ public class RenderCache
                 rru.EnsureMachinery();
                 unit.Update(wt, _projectionMatrix, _renderScale);
             }
+            else if (device != null && unit is RectangleRenderUnit grru && _gradientRectBatch.CanBatch(grru.RectPayload))
+            {
+                // A rounded rect with a LINEAR/RADIAL gradient fill: same SDF-batch family as the solid rect, different
+                // pass (the pixel shader evaluates the gradient). Shares the clip group with the other batches.
+                if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                if (_gradientRectBatch.TryAdd(grru.RectPayload, wt, grru.FillOpacity, scissor, LogicalBounds(unit.Component, wt)))
+                {
+                    _batchScissor = scissor;
+                    _batchOpen = true;
+                    continue;
+                }
+                grru.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
+            }
             else if (device != null && unit is EllipseRenderUnit eru && _ellipseBatch.CanBatch(eru.EllipsePayload))
             {
                 if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
@@ -471,6 +494,20 @@ public class RenderCache
                 }
                 // Rejected (rotated/sheared world, or the instance buffer overflowed): build the body now + re-bake.
                 eru.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
+            }
+            else if (device != null && unit is EllipseRenderUnit geru && _gradientEllipseBatch.CanBatch(geru.EllipsePayload))
+            {
+                // A full ellipse with a LINEAR/RADIAL gradient fill: gradient sibling of the solid ellipse SDF batch.
+                if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                if (_gradientEllipseBatch.TryAdd(geru.EllipsePayload, wt, geru.FillOpacity, scissor, LogicalBounds(unit.Component, wt)))
+                {
+                    _batchScissor = scissor;
+                    _batchOpen = true;
+                    continue;
+                }
+                geru.EnsureMachinery();
                 unit.Update(wt, _projectionMatrix, _renderScale);
             }
             else if (device != null && unit is TextRenderUnit tru && tru.TextComponent is { } tc && _textBatch.CanBatch(tc, out var atlas))
@@ -502,12 +539,27 @@ public class RenderCache
                 // Rejected (no drawable mesh / instance buffer overflow): draw the whole unit per-unit (fill included).
                 gru.FillInstanced = false;
             }
-            else if (device != null && (_rectBatch.Active || _ellipseBatch.Active || _textBatch.Active || (_instancedFill?.Active ?? false)))
+            else if (device != null && InstancedFillCollector.Enabled && unit is GeometryRenderUnit ggru && _instancedFill.CanBatchGradient(ggru))
+            {
+                // General instanced GRADIENT fill (arbitrary geometry with a linear/radial gradient): same instanced path,
+                // gradient pass. The unit's fill body is skipped (FillInstanced) and its fringe/stroke draw at the flush.
+                if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                if (_instancedFill.TryAddGradient(ggru, wt, scissor, LogicalBounds(unit.Component, wt)))
+                {
+                    ggru.FillInstanced = true;
+                    _batchScissor = scissor;
+                    _batchOpen = true;
+                    continue;
+                }
+                ggru.FillInstanced = false;
+            }
+            else if (device != null && (_rectBatch.Active || _ellipseBatch.Active || _gradientRectBatch.Active || _gradientEllipseBatch.Active || _textBatch.Active || (_instancedFill?.Active ?? false)))
             {
                 // A non-batchable unit that overlaps any pending batch: flush them first so this unit paints OVER them,
                 // as its later source order requires. Spatially disjoint units (a list's items) don't flush.
                 var lb = LogicalBounds(unit.Component, wt);
-                if (_rectBatch.OverlapsPending(lb) || _ellipseBatch.OverlapsPending(lb) || _textBatch.OverlapsPending(lb) || (_instancedFill?.OverlapsPending(lb) ?? false))
+                if (_rectBatch.OverlapsPending(lb) || _ellipseBatch.OverlapsPending(lb) || _gradientRectBatch.OverlapsPending(lb) || _gradientEllipseBatch.OverlapsPending(lb) || _textBatch.OverlapsPending(lb) || (_instancedFill?.OverlapsPending(lb) ?? false))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
             }
             else if (device == null && unit is RectangleRenderUnit rruNoDev)
@@ -579,6 +631,8 @@ public class RenderCache
                     {
                         case 0: _rectBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
                         case 1: _ellipseBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
+                        case 3: _gradientRectBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
+                        case 4: _gradientEllipseBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
                         default: _textBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
                     }
                     break;
@@ -601,6 +655,8 @@ public class RenderCache
     {
         RecordSegment(0, _rectBatch.Flush(device, fullScissor, _projectionMatrix));
         RecordSegment(1, _ellipseBatch.Flush(device, fullScissor, _projectionMatrix));
+        RecordSegment(3, _gradientRectBatch.Flush(device, fullScissor, _projectionMatrix));
+        RecordSegment(4, _gradientEllipseBatch.Flush(device, fullScissor, _projectionMatrix));
         // The general instanced-fill flush (each key's instances + the collected units' deferred fringe/stroke) is
         // retained too: Flush records the group and returns its index, which the op stream replays via ReplayFlush - so
         // a vector icon no longer disables replay for the whole window.

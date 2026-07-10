@@ -358,6 +358,202 @@ EllipsePSInput EllipseBatchInstancedVS(uint vertexId : SV_VertexID, uint instanc
     return o;
 }
 
+// ---- GradientRect: the SAME SDF rounded-rect batch, but the FILL is a LINEAR or RADIAL gradient (up to 8 stops)
+// evaluated per fragment, instead of one solid colour. Per-instance GradientRectData from the BDA storage buffer by
+// SV_InstanceID; the pixel shader reads the record (BDA) to get the gradient geometry + stops. Solid rects stay in the
+// cheaper RectBatch untouched - this is a sibling pass only rects with a gradient fill route to. Matches CPU
+// GradientRectItem. Fill+stroke are composited by the shared CompositeFillStroke, so a gradient tile still strokes.
+struct GradientRectData
+{
+    float4 Bounds;       // world x, y, w, h
+    float4 Params;       // .x corner radius, .y type (1 linear/2 radial), .z stop count, .w spread (0 pad/1 reflect/2 repeat)
+    float4 Geom0;        // LOCAL 0..1: linear (startXY, endXY) | radial (centerXY, radiusXY)
+    float4 Geom1;        // radial focal (originXY, _, _); unused for linear
+    float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
+    float4 Stroke0;      // width_px, align, dashOn, dashGap
+    float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
+    float4 Stop0; float4 Stop1; float4 Stop2; float4 Stop3;   // straight stop RGBA (opacity folded), only .z of Params valid
+    float4 Stop4; float4 Stop5; float4 Stop6; float4 Stop7;
+    float4 Offsets0;     // stop offsets 0..3
+    float4 Offsets1;     // stop offsets 4..7
+};
+
+// Apply the spread mode to a raw gradient parameter t: pad = clamp, reflect = mirror-tile, repeat = tile.
+float GradSpread(float t, int spread)
+{
+    if (spread == 1) { float m = fmod(abs(t), 2.0); return m > 1.0 ? 2.0 - m : m; }   // reflect
+    if (spread == 2) { return frac(t); }                                              // repeat
+    return saturate(t);                                                               // pad
+}
+
+// The gradient parameter t at fragment `uv` (0..1 across the bounds). Linear = projection onto the start->end axis.
+// Radial = SVG focal formula: the fraction of the way from the focal point (origin) to the ellipse boundary, so an
+// off-centre origin gives a real "spotlight". Coordinates are normalised by the radius so an ellipse becomes a unit circle.
+float GradParam(GradientRectData it, float2 uv)
+{
+    if (int(it.Params.y) == 2)
+    {
+        float2 center = it.Geom0.xy;
+        float2 radius = max(it.Geom0.zw, float2(1e-4, 1e-4));
+        float2 focal = (it.Geom1.xy - center) / radius;   // focal in unit-circle space
+        float2 q = (uv - center) / radius;
+        float2 dir = q - focal;
+        float dlen = length(dir);
+        if (dlen < 1e-6) return 0.0;
+        float2 dn = dir / dlen;
+        float b = dot(focal, dn);
+        float c = dot(focal, focal) - 1.0;
+        float sEdge = -b + sqrt(max(b * b - c, 0.0));      // dist focal->unit-circle along the ray
+        return (sEdge > 1e-6) ? (dlen / sEdge) : 0.0;
+    }
+    float2 start = it.Geom0.xy;
+    float2 axis = it.Geom0.zw - start;
+    float denom = dot(axis, axis);
+    if (denom < 1e-9) return 0.0;
+    return dot(uv - start, axis) / denom;
+}
+
+// The colour at parameter t by interpolating the (offset-sorted) stops. t is already spread-mapped to 0..1.
+float4 GradColor(GradientRectData it, float t)
+{
+    int n = int(it.Params.z);
+    if (n <= 0) return float4(0.0, 0.0, 0.0, 0.0);
+    float offs[8];
+    offs[0] = it.Offsets0.x; offs[1] = it.Offsets0.y; offs[2] = it.Offsets0.z; offs[3] = it.Offsets0.w;
+    offs[4] = it.Offsets1.x; offs[5] = it.Offsets1.y; offs[6] = it.Offsets1.z; offs[7] = it.Offsets1.w;
+    float4 cols[8];
+    cols[0] = it.Stop0; cols[1] = it.Stop1; cols[2] = it.Stop2; cols[3] = it.Stop3;
+    cols[4] = it.Stop4; cols[5] = it.Stop5; cols[6] = it.Stop6; cols[7] = it.Stop7;
+    if (t <= offs[0]) return cols[0];
+    for (int i = 1; i < n; i++)
+    {
+        if (t <= offs[i])
+        {
+            float seg = max(offs[i] - offs[i - 1], 1e-6);
+            return lerp(cols[i - 1], cols[i], saturate((t - offs[i - 1]) / seg));
+        }
+    }
+    return cols[n - 1];
+}
+
+struct GradPSInput
+{
+    float4 Position : SV_Position;
+    float2 Local    : TEXCOORD0;   // fragment relative to the rect CENTRE (SDF space, device px)
+    float2 Half     : TEXCOORD1;   // rect half-size
+    float  Radius   : TEXCOORD2;   // corner radius
+    nointerpolation uint InstId : TEXCOORD3;   // instance -> re-read GradientRectData in the PS for its gradient
+};
+
+[shader("vertex")]
+GradPSInput GradientRectInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
+{
+    GradientRectData* items = (GradientRectData*)InstancesAddress;
+    GradientRectData it = items[instanceId];
+
+    GradPSInput o;
+    float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
+    float outset = max(it.Stroke0.x * (0.5 * (1.0 + it.Stroke0.y) + 0.5), 0.0) + 1.0;
+    float2 worldPos = it.Bounds.xy + corner * it.Bounds.zw + (corner * 2.0 - 1.0) * outset;
+    o.Position = mul(float4(worldPos, 0.0, 1.0), Projection);
+    o.Half   = it.Bounds.zw * 0.5;
+    o.Local  = (corner - 0.5) * it.Bounds.zw + (corner * 2.0 - 1.0) * outset;
+    o.Radius = it.Params.x;
+    o.InstId = instanceId;
+    return o;
+}
+
+// ONE gradient pixel shader for BOTH shapes (rounded rect + ellipse), branched on the per-instance shape flag (Geom1.z:
+// >=0.5 = ellipse). A single gradient shader instead of two - so there is not a second near-identical BDA-reading shader.
+[shader("fragment")]
+float4 GradientPS(GradPSInput input) : SV_Target
+{
+    GradientRectData* items = (GradientRectData*)InstancesAddress;
+    GradientRectData it = items[input.InstId];
+
+    bool ellipse = it.Geom1.z >= 0.5;
+    float r = min(input.Radius, min(input.Half.x, input.Half.y));
+    int joinType = int(fmod(floor(it.Stroke1.w / 512.0), 8.0));
+    float d = ellipse ? SdEllipse(input.Local, input.Half) : SdRoundRectJoin(input.Local, input.Half, r, joinType);
+
+    float2 uv = input.Local / max(input.Half * 2.0, float2(1e-4, 1e-4)) + 0.5;   // 0..1 across the bounds
+    float4 fill = GradColor(it, GradSpread(GradParam(it, uv), int(it.Params.w)));
+
+    float mask = 1.0;
+    if (it.Stroke0.z > 0.0 || it.Stroke1.y > 0.0 || it.Stroke1.z < 1.0)
+    {
+        float halfW = it.Stroke0.x * 0.5;
+        float perim;
+        float s = ellipse ? EllipseArc(input.Local, input.Half, perim)
+                          : RoundRectArc(input.Local, input.Half, r, perim);
+        float dPerp = d - it.Stroke0.y * halfW;
+        mask = DashTrimMask(s, s, perim, it.Stroke0.z, it.Stroke0.w, it.Stroke1.x, it.Stroke1.y,
+                            it.Stroke1.z, dPerp, halfW, it.Stroke1.w);
+    }
+    return CompositeFillStroke(d, fill, it.StrokeColor, it.Stroke0.x, it.Stroke0.y, mask);
+}
+
+// ---- GradientFill: general instanced geometry (a shared tessellated mesh drawn N times) whose FILL is a LINEAR/RADIAL
+// gradient - the gradient sibling of InstancedFill. Per-instance GradientGeometryInstance from a BDA storage buffer by
+// SV_InstanceID. Mirrors the PROVEN-STABLE unified GradientPS profile: the PIXEL shader re-reads the record by BDA and
+// only a FEW interpolators cross the stage (the fragment's local mesh position + the instance id). Passing the whole
+// gradient (15 float4) as interpolators was a much heavier shader signature and tripped the driver's shader-object flake
+// far more often; BDA-in-PS with a light signature is what the stable rect/ellipse gradient already does.
+struct GradGeomData
+{
+    float4x4 World;
+    float4 Params;       // .x type (1 linear/2 radial), .y spread, .z stop count, .w _
+    float4 Geom0;        // LOCAL 0..1: linear (startXY, endXY) | radial (centerXY, radiusXY)
+    float4 Geom1;        // radial focal (originXY, _, _)
+    float4 LocalBounds;  // shape local bounds: minXY, sizeXY
+    float4 Stop0; float4 Stop1; float4 Stop2; float4 Stop3;
+    float4 Stop4; float4 Stop5; float4 Stop6; float4 Stop7;
+    float4 Offsets0; float4 Offsets1;
+};
+
+struct GradFillPSInput
+{
+    float4 Position : SV_Position;
+    float2 Local : TEXCOORD0;                   // varying: fragment's local mesh xy (for uv)
+    nointerpolation uint InstId : TEXCOORD1;    // instance -> re-read GradGeomData in the PS (light signature)
+};
+
+[shader("vertex")]
+GradFillPSInput GradientFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
+{
+    GradGeomData* items = (GradGeomData*)InstancesAddress;
+    GradGeomData it = items[instanceId];
+    float4 world = mul(float4(v.position.xyz, 1.0), it.World);
+
+    GradFillPSInput o;
+    o.Position = mul(world, Projection);
+    o.Local = v.position.xy;
+    o.InstId = instanceId;
+    return o;
+}
+
+[shader("fragment")]
+float4 GradientFillPS(GradFillPSInput input) : SV_Target
+{
+    GradGeomData* items = (GradGeomData*)InstancesAddress;
+    GradGeomData it = items[input.InstId];
+
+    // Reconstruct a GradientRectData for the shared GradParam/GradColor (Bounds/stroke fields unused by the fill eval).
+    GradientRectData gd;
+    gd.Bounds = float4(0.0, 0.0, 0.0, 0.0);
+    gd.Params = float4(0.0, it.Params.x, it.Params.z, it.Params.y);   // (_, type, stopCount, spread)
+    gd.Geom0 = it.Geom0; gd.Geom1 = it.Geom1;
+    gd.StrokeColor = float4(0.0, 0.0, 0.0, 0.0);
+    gd.Stroke0 = float4(0.0, 0.0, 0.0, 0.0);
+    gd.Stroke1 = float4(0.0, 0.0, 0.0, 0.0);
+    gd.Stop0 = it.Stop0; gd.Stop1 = it.Stop1; gd.Stop2 = it.Stop2; gd.Stop3 = it.Stop3;
+    gd.Stop4 = it.Stop4; gd.Stop5 = it.Stop5; gd.Stop6 = it.Stop6; gd.Stop7 = it.Stop7;
+    gd.Offsets0 = it.Offsets0; gd.Offsets1 = it.Offsets1;
+
+    float2 uv = (input.Local - it.LocalBounds.xy) / max(it.LocalBounds.zw, float2(1e-4, 1e-4));
+    return GradColor(gd, GradSpread(GradParam(gd, uv), int(gd.Params.w)));
+}
+
 // =====================================================================================================================
 // TECHNIQUE - one technique, one pass per draw variant (kept together at the end of the file so the shader code above
 // reads top-to-bottom without technique boilerplate breaking it up). Each pass names its vertex + pixel shader; the C#
@@ -385,6 +581,16 @@ technique Batch
         PixelShader = InstancedFillPS;
     }
 
+    // General geometry instancing with a LINEAR/RADIAL GRADIENT fill (per-instance GradientGeometryInstance; gradient
+    // passed VS->PS via interpolators, evaluated per fragment). Solid fills use pass Fill instead.
+    pass GradientFill
+    {
+        EffectName = "BatchEffect";
+        Profile = 6.6;
+        VertexShader = GradientFillVS;
+        PixelShader = GradientFillPS;
+    }
+
     // SDF ellipse/circle fills - per-instance EllipseData from a BDA storage buffer by SV_InstanceID; quad from SV_VertexID.
     pass Ellipse
     {
@@ -392,5 +598,15 @@ technique Batch
         Profile = 6.6;
         VertexShader = EllipseBatchInstancedVS;
         PixelShader = EllipseBatchPS;
+    }
+
+    // SDF rounded-rect OR ellipse fills with a LINEAR/RADIAL GRADIENT fill (per-instance GradientRectData; PS reads the
+    // record by SV_InstanceID, branches shape on Geom1.z); quad from SV_VertexID. Solid shapes use pass Rect/Ellipse.
+    pass Gradient
+    {
+        EffectName = "BatchEffect";
+        Profile = 6.6;
+        VertexShader = GradientRectInstancedVS;
+        PixelShader = GradientPS;
     }
 }

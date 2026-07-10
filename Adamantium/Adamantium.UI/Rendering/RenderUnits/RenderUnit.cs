@@ -125,12 +125,16 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
     {
         FillFringeRenderer?.DeferDispose();
         FillFringeRenderer = null;
-        if (!UseGpuFill || FillFringeEffect == null || brush is not SolidColorBrush solid) return;
+        // A solid OR a gradient fill gets an analytic-AA fringe (the fringe shader now colours the ring by the gradient
+        // too - so a tessellated gradient shape no longer has aliased edges). Image/null fills still don't.
+        if (!UseGpuFill || FillFringeEffect == null || brush is not (SolidColorBrush or GradientBrush)) return;
 
-        var contours = BuildFillContours(geometry);
+        // Feather the RESOLVED fill boundary (outer outline + holes, extracted from the fill mesh) so self-intersecting /
+        // holed shapes get their inner edges AA'd too; fall back to the raw path contours if extraction finds nothing.
+        var contours = FillBoundary.ExtractLoops(geometry?.Mesh) ?? BuildFillContours(geometry);
         if (contours == null) return;
 
-        FillFringeRenderer = new GpuFillRenderComponent(GraphicsDevice, UIBasicEffect, FillFringeEffect, contours, solid, BufferManager);
+        FillFringeRenderer = new GpuFillRenderComponent(GraphicsDevice, UIBasicEffect, FillFringeEffect, contours, brush, BufferManager);
         FillFringeRenderer.RenderData = DrawCommand.RenderData;
     }
 
@@ -160,7 +164,7 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
             // (contour count or a contour's point count changed) rebuild it.
             if (brush is SolidColorBrush solid && FillFringeRenderer is GpuFillRenderComponent existingFringe)
             {
-                var contours = BuildFillContours(geometry);
+                var contours = FillBoundary.ExtractLoops(geometry?.Mesh) ?? BuildFillContours(geometry);
                 if (contours != null && existingFringe.TryUpdateContours(contours, solid))
                 {
                     FillFringeRenderer.RenderData = DrawCommand.RenderData;
@@ -279,6 +283,30 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
         // same bake as the per-unit fill: colour x brush opacity x element opacity
         c.W *= (float)(solid.Opacity * (DrawCommand?.RenderData?.Opacity ?? 1.0f));
         color = c;
+        return true;
+    }
+
+    // Gradient sibling of TryGetInstancedFill: a GRADIENT fill on arbitrary geometry batches through the gradient
+    // instanced-fill path. Returns the shared-mesh key (same fingerprint, so identical shapes still merge), the mesh, the
+    // gradient brush, and the shape's LOCAL bounds (the shader maps a fragment's local position to a 0..1 gradient uv).
+    public bool TryGetInstancedGradientFill(out GeometryKey key, out object mesh, out GradientBrush brush,
+        out Rect localBounds, out double opacity)
+    {
+        key = default; mesh = null; brush = null; localBounds = default; opacity = 1.0;
+        if (Payload.Brush is not GradientBrush g) return false;
+        var m = Payload.Geometry?.Mesh;
+        if (m is not { HasPoints: true }) return false;
+
+        if (!ReferenceEquals(m, _fpMesh))
+        {
+            _fpKey = GeometryKey.ArbitraryMesh(Fingerprint(m));
+            _fpMesh = m;
+        }
+        key = _fpKey;
+        mesh = m;
+        brush = g;
+        localBounds = Payload.Geometry.Bounds;
+        opacity = DrawCommand?.RenderData?.Opacity ?? 1.0;
         return true;
     }
 
@@ -402,14 +430,27 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
         return c.TopLeft == c.TopRight && c.TopRight == c.BottomRight && c.BottomRight == c.BottomLeft;
     }
 
+    // A rect the GRADIENT SDF batch (GradientRectCollector) will draw: a linear/radial gradient fill, a batchable pen,
+    // uniform corners. Like IsSdfBatchable it means "build ZERO per-unit machinery" - the batch's pixel shader draws the
+    // gradient + self-AAs. Mirrors GradientRectCollector.CanBatch.
+    private static bool IsGradientBatchable(RectanglePayload p)
+    {
+        if (!GradientRectCollector.Enabled) return false;
+        if (p.Brush is not GradientBrush g || g.GradientStops.Count == 0) return false;
+        if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
+        var c = p.CornerRadius;
+        return c.TopLeft == c.TopRight && c.TopRight == c.BottomRight && c.BottomRight == c.BottomLeft;
+    }
+
     public RectangleRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
         // A batchable rect (solid, no pen, uniform corners) is drawn ENTIRELY by the item-background SDF batch, which
         // self-AAs - so build ZERO per-unit machinery: no tessellation, no geometry/fringe/stroke, no GPU buffers. This
         // is what makes a big virtualized tile grid cheap: a slider shrink that realizes hundreds of tiles no longer
         // tessellates + allocates per tile (that was the 1-fps freeze and the resize OOM). The rare rejected case
-        // (rotated/sheared world, or per-frame overflow) builds its body lazily in Render via EnsureMachinery.
-        if (IsSdfBatchable(Payload)) return;
+        // (rotated/sheared world, or per-frame overflow) builds its body lazily in Render via EnsureMachinery. A gradient
+        // fill routes to the gradient SDF batch, also machinery-free.
+        if (IsSdfBatchable(Payload) || IsGradientBatchable(Payload)) return;
         BuildMachinery(Payload);
     }
 
@@ -451,7 +492,7 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
         {
             DrawCommand = drawCommand;
             Payload = inputPayload;
-            if (!IsSdfBatchable(inputPayload)) BuildMachinery(inputPayload);
+            if (!IsSdfBatchable(inputPayload) && !IsGradientBatchable(inputPayload)) BuildMachinery(inputPayload);
             return;
         }
 
@@ -473,7 +514,7 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
 
         // Fringe: skip for a batchable rect (the batch self-AAs, and a per-tile fringe rebuilt on resize is the OOM);
         // drop a stale one. Otherwise follow the fill.
-        if (IsSdfBatchable(inputPayload))
+        if (IsSdfBatchable(inputPayload) || IsGradientBatchable(inputPayload))
         {
             FillFringeRenderer?.DeferDispose();
             FillFringeRenderer = null;
@@ -519,12 +560,23 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
         return p.StartAngle <= 0.0 && p.SweepAngle >= 360.0;
     }
 
+    // A full ellipse the GRADIENT ellipse SDF batch will draw (linear/radial gradient fill). Like IsSdfBatchable it means
+    // "build ZERO per-unit machinery". Mirrors GradientEllipseCollector.CanBatch.
+    private static bool IsGradientBatchable(EllipsePayload p)
+    {
+        if (!GradientEllipseCollector.Enabled) return false;
+        if (p.Brush is not GradientBrush g || g.GradientStops.Count == 0) return false;
+        if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
+        return p.StartAngle <= 0.0 && p.SweepAngle >= 360.0;
+    }
+
     public EllipseRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
         // A batchable ellipse is drawn ENTIRELY by the SDF batch (resolution-independent, self-AA) - build ZERO per-unit
         // machinery: no tessellation, no geometry/fringe/stroke, no GPU buffers. The rare rejected case (rotated/sheared
-        // world, or per-frame overflow) builds its body lazily in Render via EnsureMachinery.
-        if (IsSdfBatchable(Payload)) return;
+        // world, or per-frame overflow) builds its body lazily in Render via EnsureMachinery. A gradient fill routes to
+        // the gradient ellipse batch, also machinery-free.
+        if (IsSdfBatchable(Payload) || IsGradientBatchable(Payload)) return;
         BuildMachinery(Payload);
     }
 
@@ -560,7 +612,7 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
         {
             DrawCommand = drawCommand;
             Payload = inputPayload;
-            if (!IsSdfBatchable(inputPayload)) BuildMachinery(inputPayload);
+            if (!IsSdfBatchable(inputPayload) && !IsGradientBatchable(inputPayload)) BuildMachinery(inputPayload);
             return;
         }
 
@@ -582,7 +634,7 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
         GeometryRenderer.RenderData = drawCommand.RenderData;
 
         // Fringe: skip for a batchable ellipse (the batch self-AAs); drop a stale one. Otherwise follow the fill.
-        if (IsSdfBatchable(inputPayload))
+        if (IsSdfBatchable(inputPayload) || IsGradientBatchable(inputPayload))
         {
             FillFringeRenderer?.DeferDispose();
             FillFringeRenderer = null;
