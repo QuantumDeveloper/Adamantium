@@ -101,16 +101,14 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
         _ => 0f
     };
 
-    // Bake one solid rounded-rect fill (position -> world, colour straight with opacity folded in) into the pending
-    // segment. False only if it can't be baked (rotated/sheared world or a GPU-buffer overflow this frame) - the
-    // caller then draws that rect via the per-unit path.
-    public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds)
+    // Bake one solid rounded-rect fill (position -> world, colour straight with opacity folded in) into an instance.
+    // False = not bakeable this way (rotated/sheared world). Shared by TryAdd (append) AND the partial-replay UpdateSlot
+    // path, which re-bakes ONE dirty tile in place (a hover recolour) without re-walking the scene.
+    public static bool BakeItem(RectanglePayload p, Matrix4x4F world, double opacity, out RectItem item)
     {
+        item = default;
         const float eps = 1e-4f;
         if (Math.Abs(world.M12) > eps || Math.Abs(world.M21) > eps) return false;   // rotation/shear -> per-unit
-
-        EnsureCpuCapacity(Count + 1);
-        if (Count + 1 > GpuCapacity) return false;
 
         var color = Vector4F.Zero;
         if (p.Brush is SolidColorBrush solid)
@@ -126,7 +124,7 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
         BakeStroke(p.Pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1);
 
         var r = p.DestinationRect;
-        Items[Count++] = new RectItem
+        item = new RectItem
         {
             Bounds = new Vector4F((float)(r.X * sx + tx), (float)(r.Y * sy + ty), (float)(r.Width * sx), (float)(r.Height * sy)),
             Params = new Vector4F((float)(p.CornerRadius.TopLeft * sx), 0, 0, 0),
@@ -135,6 +133,17 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
             Stroke0 = stroke0,
             Stroke1 = stroke1
         };
+        return true;
+    }
+
+    // Bake one solid rounded-rect fill into the pending segment. False only if it can't be baked (rotated/sheared world
+    // or a GPU-buffer overflow this frame) - the caller then draws that rect via the per-unit path.
+    public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds)
+    {
+        EnsureCpuCapacity(Count + 1);
+        if (Count + 1 > GpuCapacity) return false;
+        if (!BakeItem(p, world, opacity, out var item)) return false;   // rotation/shear -> per-unit
+        Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
         return true;
     }
