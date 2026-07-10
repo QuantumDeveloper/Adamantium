@@ -79,6 +79,11 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
 
     public Vector2 Offset => Delegating ? _inner.Offset : _offset;
 
+    // The offset our LAST arrange actually translated the content to (see IScrollableContent.RealizedOffset). When we
+    // delegate to a virtualizing panel, that's the offset ITS window was realized for; a physical (non-delegating) content
+    // arranges to _offset directly, so it's just _offset.
+    public Vector2 RealizedOffset => Delegating ? _inner.RealizedOffset : _offset;
+
     public bool CanScrollHorizontally { get; set; } = true;
 
     public bool CanScrollVertically { get; set; } = true;

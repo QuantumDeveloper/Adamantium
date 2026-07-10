@@ -27,6 +27,19 @@ public static class RenderDirty
     private static bool _transform;
     private static bool _structural;
 
+    // Force full structural rebuilds while a multi-frame state swap SETTLES (a theme swap, a DPI change): those cascades
+    // re-style, re-resolve keyed resources (brushes) and re-layout over SEVERAL passes - spread further by the layout
+    // frame budget - and some of their writes don't route through a RenderDirty mark (the restyle/ResourcesChanged
+    // flush), so a Clean-frame op-replay would keep showing the stale build until an unrelated mark (a hover) forced a
+    // walk. "Settled" is signalled by the LAYOUT itself (NotifyLayoutQuiescent - a pass that found NO work: every queue
+    // empty), not by a frame count: a heavy tree under a tight budget keeps forcing for exactly as long as it drains, a
+    // light one stops after a couple of frames. All the swap's activity flows through the layout pass (binding flush at
+    // its start, style/measure/arrange drains, the resource flush at its end), and the pass runs BEFORE the frame's
+    // render build - so the quiescent frame's OWN build (still forced, via _finalForcedBuild) is guaranteed to see even
+    // the writes made by the LAST pass's end-of-pass resource flush. Then the flag clears in Clear().
+    private static bool _forceUntilSettled;
+    private static bool _finalForcedBuild;
+
     // Monotonic test hook (like MeasurableUIComponent.TotalMeasureCalls): recycling-ring tests assert ZERO structural
     // marks per continuous-scroll step, which is how they catch attach/detach/Visibility churn headlessly.
     public static long TotalStructuralMarks;
@@ -47,10 +60,24 @@ public static class RenderDirty
     /// <summary>Records a structural change (add/remove/command-count change) - the paint-order list must be rebuilt.</summary>
     public static void MarkStructural() { _structural = true; TotalStructuralMarks++; }
 
-    /// <summary>Any dirty state at all (else the frame is fully clean).</summary>
-    public static bool HasWork => _structural || _transform || GeometrySet.Count > 0;
+    /// <summary>Force full structural rebuilds until the layout signals it has fully settled (see
+    /// <see cref="_forceUntilSettled"/>). Call when starting a multi-frame state swap (theme, DPI).</summary>
+    public static void ForceStructuralUntilSettled() => _forceUntilSettled = true;
 
-    public static bool IsStructural => _structural;
+    /// <summary>Called by the layout manager after a pass that found NO work (every queue empty) - the settle signal for
+    /// <see cref="ForceStructuralUntilSettled"/>. The current frame's build stays forced (the final walk, which follows
+    /// this pass and so sees every settle write); after it, forcing ends.</summary>
+    public static void NotifyLayoutQuiescent()
+    {
+        if (!_forceUntilSettled) return;
+        _forceUntilSettled = false;
+        _finalForcedBuild = true;
+    }
+
+    /// <summary>Any dirty state at all (else the frame is fully clean).</summary>
+    public static bool HasWork => _structural || _transform || GeometrySet.Count > 0 || _forceUntilSettled || _finalForcedBuild;
+
+    public static bool IsStructural => _structural || _forceUntilSettled || _finalForcedBuild;
     public static bool IsTransform => _transform;
 
     /// <summary>The geometry-dirty components to re-render this build (only valid until <see cref="Clear"/>).</summary>
@@ -62,5 +89,6 @@ public static class RenderDirty
         GeometrySet.Clear();
         _transform = false;
         _structural = false;
+        _finalForcedBuild = false;   // the post-settle walk ran; forcing ends (_forceUntilSettled survives Clear by design)
     }
 }

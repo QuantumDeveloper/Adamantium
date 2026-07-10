@@ -92,13 +92,42 @@ public sealed class LayoutManager
 
     public void InvalidateMeasure(IUIComponent node)
     {
+        // Parallel-rebind window (a virtualizing panel is preparing+measuring its tiles across threads): a rebind's
+        // synchronous binding writes flip AffectsMeasure props -> InvalidateMeasure, which would concurrently mutate this
+        // root's DirtyQueue (PriorityQueue + HashSet, NOT thread-safe). COLLECT lock-free and REPLAY sequentially when the
+        // pass ends (BeginDeferredInvalidation/EndDeferredInvalidation) - deferred write, no locks on the layout hot path.
+        if (_deferInvalidations) { DeferredMeasure.Enqueue(node); return; }
         // A measure-invalid node also needs re-arranging; enqueue it for both so the arrange phase re-runs after the
         // measure phase recomputes sizes.
         _toMeasure.Enqueue(node);
         _toArrange.Enqueue(node);
     }
 
-    public void InvalidateArrange(IUIComponent node) => _toArrange.Enqueue(node);
+    public void InvalidateArrange(IUIComponent node)
+    {
+        if (_deferInvalidations) { DeferredArrange.Enqueue(node); return; }
+        _toArrange.Enqueue(node);
+    }
+
+    // ---- Parallel-rebind deferred invalidation ---------------------------------------------------------------------
+    // A virtualizing panel rebinds+measures its tiles across cores (each tile is a disjoint subtree, so its own
+    // component-flag writes are isolated); the ONLY escape is the shared per-root DirtyQueue enqueue above. While the
+    // flag is set, InvalidateMeasure/Arrange route into these lock-free concurrent queues instead; EndDeferredInvalidation
+    // replays them through the normal path on the (single) coordinating thread once the parallel pass has joined.
+    // Static: the flag is toggled around a Parallel.ForEach (a full fork/join barrier, so the write is visible to workers
+    // and their enqueues are visible back), and only worker threads run in between, so a single global switch is enough.
+    private static volatile bool _deferInvalidations;
+    private static readonly System.Collections.Concurrent.ConcurrentQueue<IUIComponent> DeferredMeasure = new();
+    private static readonly System.Collections.Concurrent.ConcurrentQueue<IUIComponent> DeferredArrange = new();
+
+    public static void BeginDeferredInvalidation() => _deferInvalidations = true;
+
+    public static void EndDeferredInvalidation()
+    {
+        _deferInvalidations = false;
+        while (DeferredMeasure.TryDequeue(out var n)) For(n).InvalidateMeasure(n);
+        while (DeferredArrange.TryDequeue(out var n)) For(n).InvalidateArrange(n);
+    }
 
     /// <summary>Requests that <paramref name="node"/> be re-measured on the NEXT pass rather than this one. Used by a
     /// virtualizing panel that realized only a slice of a large window this frame and wants to continue next frame (so a
@@ -171,15 +200,28 @@ public sealed class LayoutManager
 
             // Drain each queue as a SNAPSHOT (process only what's queued now), ordered style -> measure -> arrange. Work
             // re-dirtied DURING a phase lands back in the queues and is handled on the NEXT iteration - keeping the
-            // phases ordered and letting re-entrant invalidation converge. Stop the whole pass the moment a phase runs
-            // out of budget (its tail is re-queued for the next frame).
-            withinBudget = DrainPhase(_toStyle, ApplyTheme, budget, viewport)
-                        && DrainPhase(_toMeasure, MeasureDirty, budget, viewport)
-                        && DrainPhase(_toArrange, ArrangeDirty, budget, viewport);
+            // phases ordered and letting re-entrant invalidation converge.
+            var styleOk = DrainPhase(_toStyle, ApplyTheme, budget, viewport);
+            var measureOk = styleOk && DrainPhase(_toMeasure, MeasureDirty, budget, viewport);
+            // The ARRANGE phase must RUN even when style/measure exhausted the budget - short-circuiting it here tore the
+            // frame: a virtualizing panel's measure REBINDS containers to new window slots, so until its arrange runs the
+            // rebound tiles still sit at their PREVIOUS Bounds (drawn scattered over/between the new rows) and the newly
+            // deferred slots have no skeletons (ReconcileSkeletons lives in arrange) - the fast-scroll "holes with nothing
+            // in them" + the resize overlap, self-healing a frame later when arrange finally ran. DrainPhase's own
+            // on-screen protection still applies (its visible prefix always completes; only the off-screen tail defers) and
+            // ArrangeDirty re-queues any node whose measure was itself deferred, so this can't pull deferred measure work in.
+            var arrangeOk = DrainPhase(_toArrange, ArrangeDirty, budget, viewport);
+            withinBudget = measureOk && arrangeOk;
         }
 
         var settled = _toStyle.IsEmpty && _toMeasure.IsEmpty && _toArrange.IsEmpty;
         _deferredStreak = settled ? 0 : _deferredStreak + 1;
+
+        // A pass that found NOTHING to do (queues empty at start, nothing promoted) is the "swap has settled" signal for
+        // RenderDirty.ForceStructuralUntilSettled (theme/DPI): every settle write flows through this pass (binding flush,
+        // style/measure/arrange drains, the resource flush below), so a workless pass means the cascade is done - and the
+        // frame's render build, which runs AFTER this, still does one final forced walk to pick up the tail.
+        if (!didWork) RenderDirty.NotifyLayoutQuiescent();
 
         RuntimeStats.LastLayoutPassMs = _passStopwatch.Elapsed.TotalMilliseconds;
         RuntimeStats.LastPassBudgetDeferred = !settled;

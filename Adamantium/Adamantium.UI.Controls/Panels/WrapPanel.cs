@@ -50,10 +50,15 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
    // O(window) overhead (skeleton reconcile + arrange + render) a dozen times instead of ~400.
    private Vector2 _lastMeasuredOffset = new(double.NaN, double.NaN);
 
+   // The last FINITE viewport extent on the scroll axis. When a measure comes in with an infinite scroll-axis viewport (a
+   // ScrollViewer probing its content's extent, e.g. the first measure on tab-entry), we realize a window sized to this
+   // instead of the whole list - so a tab-entry doesn't build all N tiles. Seeded to a default screenful until a real one.
+   private double _lastViewportScroll;
+   private const double DefaultViewportScroll = 1080.0;   // fallback viewport (px) before any real one is known
+
    private bool _measuringHorizontal;               // orientation snapshot for OnSlotBound (called from SetWindow)
    private bool _cellGrew;                           // did a bound tile grow the auto cell? -> another MaxCellPasses pass
    private System.Action<IUIComponent> _onSlotBound; // cached delegate (no per-frame closure alloc)
-
    // Called by SetWindow for each newly-(re)bound tile, INSIDE the time budget: attach (fresh ones), measure, and grow
    // the auto cell to fit. Measuring HERE (not in a later loop) is what lets the budget bound bind+measure together.
    private void OnSlotBound(IUIComponent container)
@@ -349,33 +354,42 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
          _columns = Math.Max(1, (int)Math.Floor(viewportFlow / _cellFlow));
          var lines = (count + _columns - 1) / _columns;
 
+         // A ScrollViewer measures its content UNCONSTRAINED on the scroll axis (to learn the natural extent), so a
+         // virtualizing panel gets viewportScroll == infinity on the FIRST measure after (re)entering a view - BEFORE
+         // arrange establishes the real viewport. Realizing all `count` items then (the old OnNoViewport path) rebuilt the
+         // WHOLE list every tab-entry (the 4590-tile freeze). Instead realize a BOUNDED window sized to the last real
+         // viewport (or a default screenful), and still return the full extent below - so the ScrollViewer gets correct
+         // scrollbars and the next measure, with the real finite viewport, corrects the window. O(count) freeze -> O(viewport).
+         double effectiveViewport;
          if (double.IsInfinity(viewportScroll))
          {
             OnNoViewport();
-            first = 0;
-            last = count - 1;
+            effectiveViewport = _lastViewportScroll > 0 ? _lastViewportScroll : DefaultViewportScroll;
          }
          else
          {
-            var scrollOffset = horizontal ? offset.Y : offset.X;
-            // Recycling-ring invariant #1 (CONSTANT window): derive BOTH edges from the same floor(top) so they move in
-            // lockstep. Independent floor(top)/ceil(bottom) advance at different sub-cell offsets, so a fractional (real
-            // inertia) scroll oscillated the window by one row each frame - which broke donor reuse and churned a whole
-            // row's Visibility every frame. A fixed spanRows slides cleanly: floor advances 1 => first++ AND last++, so
-            // every leaving row's container is reused for the entering row. spanRows covers viewport + top/bottom buffer.
-            var spanRows = (int)Math.Ceiling(viewportScroll / _cellScroll) + 1 + 2 * Buffer;
-            var topLine = (int)Math.Floor(scrollOffset / _cellScroll);
-            var firstLine = Math.Max(0, topLine - Buffer);
-            var lastLine = Math.Min(lines - 1, firstLine + spanRows);
-            _lastFirstLine = firstLine;
-            first = firstLine * _columns;
-            last = Math.Min(count - 1, (lastLine + 1) * _columns - 1);
-            // The window is ALWAYS the full visible range - NOT truncated to a per-frame realize cap. A big burst (a huge
-            // viewport filling from empty, or a far fling) would otherwise hang one frame building ~hundreds of containers
-            // (the resize freeze); instead SetWindow's RebindBudget caps how many are (re)bound this pass and the rest
-            // become PendingIndices - covered by skeletons this frame and streamed in over the next passes. So the whole
-            // viewport shows content (real or skeleton) immediately, and the fill is bounded WITHOUT shrinking the window.
+            effectiveViewport = viewportScroll;
+            _lastViewportScroll = viewportScroll;
          }
+
+         var scrollOffset = horizontal ? offset.Y : offset.X;
+         // Recycling-ring invariant #1 (CONSTANT window): derive BOTH edges from the same floor(top) so they move in
+         // lockstep. Independent floor(top)/ceil(bottom) advance at different sub-cell offsets, so a fractional (real
+         // inertia) scroll oscillated the window by one row each frame - which broke donor reuse and churned a whole
+         // row's Visibility every frame. A fixed spanRows slides cleanly: floor advances 1 => first++ AND last++, so
+         // every leaving row's container is reused for the entering row. spanRows covers viewport + top/bottom buffer.
+         var spanRows = (int)Math.Ceiling(effectiveViewport / _cellScroll) + 1 + 2 * Buffer;
+         var topLine = (int)Math.Floor(scrollOffset / _cellScroll);
+         var firstLine = Math.Max(0, topLine - Buffer);
+         var lastLine = Math.Min(lines - 1, firstLine + spanRows);
+         _lastFirstLine = firstLine;
+         first = firstLine * _columns;
+         last = Math.Min(count - 1, (lastLine + 1) * _columns - 1);
+         // The window is ALWAYS the full visible range - NOT truncated to a per-frame realize cap. A big burst (a huge
+         // viewport filling from empty, or a far fling) would otherwise hang one frame building ~hundreds of containers
+         // (the resize freeze); instead SetWindow's RebindBudget caps how many are (re)bound this pass and the rest
+         // become PendingIndices - covered by skeletons this frame and streamed in over the next passes. So the whole
+         // viewport shows content (real or skeleton) immediately, and the fill is bounded WITHOUT shrinking the window.
 
          // Reconcile the realized grid window to exactly [first,last] (rebind in place; hide only true surplus). Cap the
          // rebinds this pass to RebindBudget: an aggressive fling that turns the whole window over in one frame does

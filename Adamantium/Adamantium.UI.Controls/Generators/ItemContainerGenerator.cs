@@ -21,6 +21,11 @@ public class ItemContainerGenerator
     private readonly List<int> _outKeysBuf = new();
     private readonly List<IUIComponent> _surplusBuf = new();
     private readonly List<int> _pendingBuf = new();              // in-window slots deferred this pass (budget spent) - skeletons
+    private int _lastWindowFirst;                                // previous window start - fallback direction on a far jump
+    private readonly List<int> _bindOrderBuf = new();            // missing slots in nearest-to-realized-first bind order
+    private List<int> _waveBuf = new();                          // current expansion layer (swapped with next - not readonly)
+    private List<int> _nextWaveBuf = new();
+    private bool[] _reachedBuf = [];                             // per-window-slot visited marks for the expansion
 
     public ItemContainerGenerator(ItemsControl owner)
     {
@@ -95,7 +100,46 @@ public class ItemContainerGenerator
         _pendingBuf.Clear();
         var next = 0;
         var rebinds = 0;
-        for (var i = first; i <= last; i++)
+        // Bind missing slots NEAREST-TO-REALIZED-FIRST: grow the realized region contiguously OUTWARD from the content
+        // already on screen, whichever side the window extends. A plain first->last loop opened a second island at the
+        // window's far edge when scrolling UP (kept block at the bottom, binding started at the top) with a skeleton band
+        // between them - and a scroll-DIRECTION heuristic still mis-ordered the CONTINUATION passes that drain the
+        // budget-deferred backlog with a STATIC window (delta=0 read as "forward" -> top-down again after an up-scroll).
+        // Nearest-first is direction-agnostic: a layered expansion from every realized slot orders the missing ones by
+        // distance to the kept content in O(window), so the budget always defers the FAR edge - where a skeleton band
+        // looks natural - never a mid-viewport strip. A far jump (nothing kept in-window) falls back to scroll direction.
+        _bindOrderBuf.Clear();
+        var winSize = last - first + 1;
+        if (winSize > 0)
+        {
+            if (_reachedBuf.Length < winSize) _reachedBuf = new bool[Math.Max(winSize, _reachedBuf.Length * 2)];
+            Array.Clear(_reachedBuf, 0, winSize);
+            _waveBuf.Clear();
+            foreach (var idx in _byIndex.Keys)
+                if (idx >= first && idx <= last) { _reachedBuf[idx - first] = true; _waveBuf.Add(idx); }
+            if (_waveBuf.Count == 0)
+            {
+                var reverse = first < _lastWindowFirst;   // far jump: realize from the edge the content enters
+                for (var k = 0; k < winSize; k++) _bindOrderBuf.Add(reverse ? last - k : first + k);
+            }
+            else
+            {
+                while (_waveBuf.Count > 0)
+                {
+                    _nextWaveBuf.Clear();
+                    foreach (var idx in _waveBuf)
+                    {
+                        var up = idx - 1;
+                        var down = idx + 1;
+                        if (up >= first && !_reachedBuf[up - first]) { _reachedBuf[up - first] = true; _bindOrderBuf.Add(up); _nextWaveBuf.Add(up); }
+                        if (down <= last && !_reachedBuf[down - first]) { _reachedBuf[down - first] = true; _bindOrderBuf.Add(down); _nextWaveBuf.Add(down); }
+                    }
+                    (_waveBuf, _nextWaveBuf) = (_nextWaveBuf, _waveBuf);
+                }
+            }
+        }
+        _lastWindowFirst = first;
+        foreach (var i in _bindOrderBuf)
         {
             if (_byIndex.ContainsKey(i)) continue;   // stayed in the window - keep its container + binding
             var item = _owner.Items[i];

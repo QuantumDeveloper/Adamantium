@@ -11,6 +11,10 @@ public class StackPanel : VirtualizingPanel
 
    private double _itemExtent = 1;   // measured (uniform) item size along the stacking axis
    private int _lastFirst;           // remembered window start -> the probe index next pass
+   private double _lastViewport;     // last FINITE scroll-axis viewport -> window size when a measure comes in infinite (tab-entry)
+   private const double DefaultViewport = 1080.0;   // fallback viewport (px) before any real one is known
+   private const int ParallelArrangeThreshold = 64;   // arrange tiles across cores only above this many realized (else thread overhead > win)
+   private readonly List<int> _arrangeIndexBuf = [];  // reused each arrange - no per-frame List alloc over the window
 
    public static readonly AdamantiumProperty OrientationProperty = AdamantiumProperty.Register(nameof(Orientation),
       typeof(Orientation), typeof(StackPanel),
@@ -140,19 +144,26 @@ public class StackPanel : VirtualizingPanel
       var probeExtent = vertical ? probe.DesiredSize.Height : probe.DesiredSize.Width;
       if (probeExtent > 0) _itemExtent = probeExtent;
 
-      int first, last;
+      // A ScrollViewer measures its content UNCONSTRAINED on the scroll axis to learn the extent, so we get an infinite
+      // mainViewport on the first measure after (re)entering a view - before arrange sets the real viewport. Realizing all
+      // `count` items then (the old OnNoViewport path) rebuilt the whole list every tab-entry (the freeze). Instead realize
+      // a window sized to the last real viewport (or a default screenful) and still return the full extent below - the next
+      // measure with the real viewport corrects it. O(count) freeze -> O(viewport).
+      double effectiveViewport;
       if (double.IsInfinity(mainViewport))
       {
          OnNoViewport();
-         first = 0;
-         last = count - 1;
+         effectiveViewport = _lastViewport > 0 ? _lastViewport : DefaultViewport;
       }
       else
       {
-         var mainOffset = vertical ? offset.Y : offset.X;
-         first = Math.Max(0, (int)Math.Floor(mainOffset / _itemExtent) - Buffer);
-         last = Math.Min(count - 1, (int)Math.Ceiling((mainOffset + mainViewport) / _itemExtent) + Buffer);
+         effectiveViewport = mainViewport;
+         _lastViewport = mainViewport;
       }
+
+      var mainOffset = vertical ? offset.Y : offset.X;
+      var first = Math.Max(0, (int)Math.Floor(mainOffset / _itemExtent) - Buffer);
+      var last = Math.Min(count - 1, (int)Math.Ceiling((mainOffset + effectiveViewport) / _itemExtent) + Buffer);
       _lastFirst = first;
 
       // Reconcile the realized set to exactly [first,last]: containers leaving the window are rebound in place to the
@@ -179,13 +190,28 @@ public class StackPanel : VirtualizingPanel
       // ABSOLUTE slots (no -offset): the scroll offset is applied once, by the ScrollContentPresenter translating this
       // viewport-sized panel and clipping (same physical-scroll seam as WrapPanel). A tile's rect is constant across
       // scroll, so Arrange short-circuits for tiles that kept their index; only the rebound row re-runs ArrangeCore.
-      foreach (var index in System.Linq.Enumerable.ToList(Owner.ItemContainerGenerator.RealizedIndices))
+      // Snapshot indices into a REUSED buffer (not a fresh ToList): the window scan runs every scroll frame.
+      _arrangeIndexBuf.Clear();
+      _arrangeIndexBuf.AddRange(Owner.ItemContainerGenerator.RealizedIndices);
+
+      void ArrangeAt(int index)
       {
-         if (Owner.ItemContainerGenerator.ContainerFromIndex(index) is not IMeasurableComponent container) continue;
+         if (Owner.ItemContainerGenerator.ContainerFromIndex(index) is not IMeasurableComponent container) return;
          var main = index * _itemExtent;
          container.Arrange(vertical
             ? new Rect(0, main, cross, _itemExtent)
             : new Rect(main, 0, _itemExtent, cross));
       }
+
+      // Each tile's slot is CONSTANT from its index (absolute stack, no cumulative dependency), so the tiles' Arrange are
+      // INDEPENDENT - fan them across cores when there are enough to amortise the thread overhead (same pattern + safety
+      // as WrapPanel: the only shared write a tile arrange makes is RenderDirty.MarkGeometry, which is locked). Small
+      // windows stay sequential.
+      if (_arrangeIndexBuf.Count >= ParallelArrangeThreshold)
+         System.Threading.Tasks.Parallel.ForEach(
+            System.Collections.Concurrent.Partitioner.Create(0, _arrangeIndexBuf.Count),
+            range => { for (var i = range.Item1; i < range.Item2; i++) ArrangeAt(_arrangeIndexBuf[i]); });
+      else
+         foreach (var index in _arrangeIndexBuf) ArrangeAt(index);
    }
 }
