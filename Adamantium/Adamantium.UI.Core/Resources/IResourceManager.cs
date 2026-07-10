@@ -31,6 +31,12 @@ public interface IResourceManager
     // A resource VALUE changed in place (an inline dictionary was mutated): re-resolve live {ObservableResource}s.
     void NotifyResourcesChanged();
 
+    // Runtime resource override: replace the VALUE of an existing keyed resource in the given scope (e.g. cycle a theme
+    // palette entry live). The dictionary that currently resolves the key gets the new value and live
+    // {ObservableResource}s re-resolve (coalesced, this pass); a {ResourceReference} keeps its resolved-once value.
+    // Returns false when no dictionary in that scope declares the key (nothing changed, no notification raised).
+    bool SetResourceInScope(string name, object value, ResourceScope scope = ResourceScope.Local);
+
     void RemoveSources(IAdamantiumComponent component);
     
     Object this[string name] { get; }

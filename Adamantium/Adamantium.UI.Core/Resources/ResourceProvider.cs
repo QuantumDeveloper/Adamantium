@@ -95,6 +95,25 @@ public class ResourceProvider
         return null;
     }
 
+    /// <summary>Replaces the VALUE of an existing keyed resource in whichever loaded dictionary currently RESOLVES that
+    /// key (the same last-declared-wins order as <see cref="FindResource"/>) - the runtime resource override (e.g.
+    /// cycling a palette entry live). Only that key's cache entry is evicted. Returns false when no loaded dictionary
+    /// declares the key (nothing to override); the caller then must not raise a change notification.</summary>
+    public bool SetResource(string key, object value)
+    {
+        for (int i = _orderedDictionaries.Count - 1; i >= 0; i--)
+        {
+            var info = _orderedDictionaries[i];
+            if (info.Resource.TryGetValue(key, out _))
+            {
+                info.Resource[key] = value;
+                _cache.Remove(key);
+                return true;
+            }
+        }
+        return false;
+    }
+
     // A key from dictionaries owned by EXACTLY this element. The caller (ResourceManager) walks the tree and asks each
     // ancestor in turn, so a Local resource is visible only inside the owner's subtree - never from an unrelated element.
     // Not cached: the same key can resolve to different values under different owners, so the flat _cache would leak

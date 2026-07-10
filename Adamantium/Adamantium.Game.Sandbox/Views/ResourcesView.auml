@@ -1,9 +1,10 @@
 <View xmlns="http://adamantium/ui"
       xmlns:x="http://adamantium/ui/xaml/extensions"
       xmlns:local="clr-namespace:Adamantium.Game.Sandbox">
-    <!-- Pure declarative demo of live {ObservableResource} vs resolve-once {ResourceReference}, at two levels:
-         a THEME palette key (swap Dark<->Light) and an INLINE local resource (cycled by a view-layer behavior).
-         No view-model logic, no ResourceManager, no controls in the VM. -->
+    <!-- Pure declarative demo of live {ObservableResource} vs resolve-once {ResourceReference}, at three scopes:
+         a THEME palette key (swap Dark<->Light / cycle the entry), an INLINE local resource (cycled by a view-layer
+         behavior) and a GLOBAL dictionary (survives a theme swap). No view-model logic, no controls in the VM. -->
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
     <StackPanel Orientation="Vertical" Margin="24">
 
         <TextBlock Text="ObservableResource (live) vs ResourceReference (static)" FontSize="18" Margin="0,0,0,4"/>
@@ -20,6 +21,13 @@
                 <TextBlock Text="ObservableResource — live" Margin="0,0,0,6"/>
                 <Rectangle Width="140" Height="60" CornerRadius="6" Fill="{ObservableResource SystemFillColorCritical}"/>
             </StackPanel>
+            <!-- Cycles the palette ENTRY itself (runtime resource override) - the live swatch follows, the static one
+                 keeps its resolved-once brush - so the difference shows without swapping the whole theme. -->
+            <Button Content="Cycle critical color" Width="180" Height="36" Margin="32,0,0,0" VerticalAlignment="Bottom">
+                <Button.Behaviors>
+                    <local:CycleScopedResourceBehavior Key="SystemFillColorCritical" Scope="Theme"/>
+                </Button.Behaviors>
+            </Button>
         </StackPanel>
 
         <Button Content="Toggle theme (Dark / Light)" Width="220" Height="36" Margin="0,12,0,0">
@@ -70,5 +78,30 @@
             </Button>
         </StackPanel>
 
+        <!-- GLOBAL resource: a dictionary TYPE linked at Global scope (GlobalResources.auml). It belongs to NO theme,
+             so toggling the theme above re-colours every palette swatch but leaves these untouched - the scope's whole
+             point. Cycle overrides the value at runtime (Scope=Global): live follows, static keeps; and unlike the
+             Theme-scope override above, the new value SURVIVES a theme swap. -->
+        <StackPanel Orientation="Vertical" Margin="0,28,0,0"
+                    ResourceContext.Source="{ResourceLink Source={x:Type local:GlobalResources}, Scope=Global}">
+            <TextBlock Text="Global resource (ResourceLink Scope=Global — survives a theme swap):" Margin="0,0,0,6"/>
+            <StackPanel Orientation="Horizontal">
+                <StackPanel Orientation="Vertical" Margin="0,0,32,0">
+                    <TextBlock Text="ResourceReference — static" Margin="0,0,0,6"/>
+                    <Rectangle Width="140" Height="60" CornerRadius="6" Fill="{ResourceReference GlobalAccent}"/>
+                </StackPanel>
+                <StackPanel Orientation="Vertical">
+                    <TextBlock Text="ObservableResource — live" Margin="0,0,0,6"/>
+                    <Rectangle Width="140" Height="60" CornerRadius="6" Fill="{ObservableResource GlobalAccent}"/>
+                </StackPanel>
+                <Button Content="Cycle global accent" Width="180" Height="36" Margin="32,0,0,0" VerticalAlignment="Bottom">
+                    <Button.Behaviors>
+                        <local:CycleScopedResourceBehavior Key="GlobalAccent" Scope="Global"/>
+                    </Button.Behaviors>
+                </Button>
+            </StackPanel>
+        </StackPanel>
+
     </StackPanel>
+    </ScrollViewer>
 </View>

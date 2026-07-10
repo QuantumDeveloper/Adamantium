@@ -181,6 +181,31 @@ public class ResourceManager : IResourceManager
         _resourcesDirty = true;
     }
 
+    public bool SetResourceInScope(string name, object value, ResourceScope scope = ResourceScope.Local)
+    {
+        ResourceProvider provider;
+        switch (scope)
+        {
+            case ResourceScope.Local:
+                provider = _localResources;
+                break;
+            case ResourceScope.Global:
+                provider = _globalResources;
+                break;
+            case ResourceScope.Theme:
+                provider = _themeResources;
+                break;
+            default:
+                return false;
+        }
+
+        if (!provider.SetResource(name, value)) return false;
+        // The provider already evicted just the overridden key from ITS cache; mark dirty so the coalesced
+        // ResourcesChanged fires this pass and live {ObservableResource}s re-resolve.
+        _resourcesDirty = true;
+        return true;
+    }
+
     public void RemoveSources(IAdamantiumComponent component)
     {
         if (component == null) return;
