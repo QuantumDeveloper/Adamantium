@@ -488,12 +488,13 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     {
         // Shader-object binary cache (dodges the Turing vkCreateShadersEXT NVVM flake). On a cache hit, create from the
         // driver-compiled BINARY - no NVVM, no flake. On a miss (or an incompatible binary after a driver/device change),
-        // compile from SPIR-V once and persist the binary for next launch.
+        // compile from SPIR-V once and persist the binary for next launch. The binary path goes through
+        // CreateShaderFromBinary, which honours the mandatory 16-byte pCode alignment for VK_SHADER_CODE_TYPE_BINARY_EXT.
         if (ShaderBinaryCache.TryLoad(this, shaderCreateInfo, out var binary))
         {
-            var result = LogicalDevice.CreateShadersEXT(1, ShaderBinaryCache.AsBinary(shaderCreateInfo, binary), null, out var cached);
-            if (result == Result.Success) return cached[0];
-            // else: incompatible binary -> fall through and recompile from SPIR-V (re-caches below).
+            var result = LogicalDevice.CreateShaderFromBinary(ShaderBinaryCache.AsBinary(shaderCreateInfo, binary), out var cached);
+            if (result == Result.Success) return cached;
+            // else: incompatible binary (driver/device change) -> fall through and recompile from SPIR-V (re-caches below).
         }
 
         LogicalDevice.CreateShadersEXT(1, shaderCreateInfo, null, out var shaderObject);
