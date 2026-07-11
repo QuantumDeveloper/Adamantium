@@ -14,10 +14,34 @@ namespace Adamantium.UI.Rendering;
 public class RenderCache
 {
     private readonly List<DrawCommand> _commands = new();
-    private readonly List<IRenderUnit> _renderUnits = new();
     private IDrawingContext _drawingContext;
     private IDrawingContextInternal _drawingContextInternal;
-    private readonly Dictionary<Guid, List<IRenderUnit>> _unitsByControl = new Dictionary<Guid, List<IRenderUnit>>();
+
+    // ONE logical control's contiguous run in the paint order. The retained scene is a list of GROUPS (paint order),
+    // not a flat unit list: a control whose recorded output changes - even its unit COUNT (a hover background appearing
+    // 0->1, a per-frame chart re-recording a different number of segments) - mutates only ITS group's Units list; no
+    // other group's units move. That makes a dirty control's update O(that control), never O(scene), and it is the
+    // substrate for per-group batch-slot ranges and per-group op-stream patching (the incremental-draw follow-ups).
+    private sealed class ControlGroup
+    {
+        public Guid ControlId;
+        public readonly List<IRenderUnit> Units = new();
+
+        // Recorded by the last RECORDING walk, for the spliced-patch draw path: the group's contiguous retained
+        // rect-batch slot runs, and whether EVERY drawn unit of the group landed in the rect batch (only such groups can
+        // be patched by segment surgery - anything else falls back to the full walk). Rect-only first: the huge-grid /
+        // live-chart cases are rect-batched; the other SDF collectors follow the same pattern later.
+        public readonly List<(int First, int Count)> RectRuns = new();
+        public bool PatchableRectOnly;
+        public int WalkVersion = -1;   // which recording walk last described this group (distinguishes NEW groups)
+    }
+
+    private int _walkVersion;   // bumped per recording walk
+
+    private ControlGroup _walkGroup;   // recording-walk group-boundary detector (resets each group's run records once)
+
+    private readonly List<ControlGroup> _groups = new();              // the paint order (groups in DFS paint rank)
+    private readonly Dictionary<Guid, ControlGroup> _groupById = new();   // control -> its group (the retained unit cache)
 
     // Paint-order (DFS visit) index of each component, assigned during the full walk - kept even for a component that
     // rendered 0 units. Lets a PARTIAL re-render whose draw-command COUNT changed (a hover background appearing 0->1, or
@@ -71,8 +95,8 @@ public class RenderCache
     /// (docs/RENDER_CACHE_REDESIGN.md §4a/§4i):
     /// <list type="bullet">
     /// <item>fully clean -> re-draw last frame's units (~0 CPU);</item>
-    /// <item>only moves/geometry changed (non-structural) -> re-render just the dirty components IN PLACE, keeping the
-    /// retained <c>_renderUnits</c> paint-order list;</item>
+    /// <item>only moves/geometry changed (non-structural) -> re-render just the dirty components IN PLACE, each within
+    /// its own retained <see cref="ControlGroup"/> (the paint order of groups is untouched);</item>
     /// <item>structural change (or first build, or a partial that turned out structural) -> a full tree walk.</item>
     /// </list>
     /// </summary>
@@ -87,7 +111,7 @@ public class RenderCache
         }
 
         // Non-structural change on an existing scene -> PARTIAL update: re-render only the geometry-dirty components in
-        // place. Either way _renderUnits + _unitsByControl stay retained. Drop the frame-scoped world/clip memos ONLY on
+        // place. Either way the retained groups (paint order + unit cache) stay. Drop the frame-scoped world/clip memos ONLY on
         // a MOVE (transform-dirty) - then last frame's baked transforms are stale and must be recomputed. A GEOMETRY-only
         // partial (a hover recolouring a tile) moved nothing, so the memos are still valid: keeping them lets the render
         // pass reuse cached world transforms + clips instead of recomputing them for every one of thousands of units
@@ -141,10 +165,9 @@ public class RenderCache
 
     // Re-render ONE already-cached component IN PLACE (its geometry went dirty). Returns false - "needs a full walk" -
     // only when this component has no recorded paint position yet (never in a full build). On a same-shape update the
-    // unit objects are reused via UpdateWithDrawCommand (the retained _renderUnits already references them - no change).
-    // On a COUNT change - a hover background appearing (0->1 commands) or vanishing (1->0), the mouse-move hover cliff -
-    // it rebuilds just this component's units and SPLICES them into the paint-order list at the component's recorded
-    // DFS rank, instead of forcing a full tree walk that re-renders every element.
+    // unit objects are reused via UpdateWithDrawCommand (its group already references them - no change). On a COUNT
+    // change - a hover background appearing (0->1 commands) or vanishing, a per-frame chart re-recording a different
+    // number of segments - only THIS component's group mutates; every other group keeps its units untouched.
     private bool ReRenderInPlace(IUIComponent component)
     {
         // Invisible (Collapsed/Hidden - e.g. an auto-hide ScrollBar that re-marks geometry dirty on every mouse-move):
@@ -152,7 +175,7 @@ public class RenderCache
         // SKIP it like a detached/collapsed one below, instead of forcing a full tree walk every dirty frame (the hover
         // FPS hitch). Only if it somehow still holds units fall back to a full walk to reconcile them.
         if (component.Visibility != Visibility.Visible)
-            return !_unitsByControl.TryGetValue(component.RenderId, out var stillHeld) || stillHeld.Count == 0;
+            return !_groupById.TryGetValue(component.RenderId, out var stillHeld) || stillHeld.Units.Count == 0;
 
         // Not in the live paint tree: DETACHED (no visual parent) or effectively hidden by a COLLAPSED ancestor. The full
         // walk never reaches such a component, so it has no paint rank and re-rendering it draws nothing - yet it used to
@@ -180,13 +203,13 @@ public class RenderCache
         component.Render(_drawingContext);   // NB: consumes the dirty flag (Render sets IsGeometryValid back to true)
         var drawCommands = _drawingContextInternal.GetDrawCommands();
 
-        _unitsByControl.TryGetValue(component.RenderId, out var units);
-        var oldCount = units?.Count ?? 0;
+        _groupById.TryGetValue(component.RenderId, out var group);
+        var oldCount = group?.Units.Count ?? 0;
 
-        // Fast path: same command count and every unit still matches -> update in place; the paint-order list is untouched
-        // (it already holds these exact unit objects at the right spot).
-        if (units != null && drawCommands.Count == oldCount && oldCount > 0)
+        // Fast path: same command count and every unit still matches -> update in place; nothing structural changed.
+        if (group != null && drawCommands.Count == oldCount && oldCount > 0)
         {
+            var units = group.Units;
             var allMatch = true;
             for (var i = 0; i < drawCommands.Count; i++)
             {
@@ -200,43 +223,36 @@ public class RenderCache
             }
         }
 
-        // Count (or a unit type) changed. Splice this component's units into the retained paint-order list in place.
-        // This shifts slots after the splice point, so the recorded op stream + rect-slot map are stale -> the draw phase
-        // must do a full walk, not a replay.
+        // Count (or a unit type) changed. The change stays LOCAL to this control's group - BuildUnitsFor refreshes the
+        // group's own Units list in place and no other group moves (the flat-list splice this replaced shifted every
+        // later unit). The recorded op stream + rect-slot map still reference the old unit set though, so the draw
+        // phase must re-walk this frame (per-group op patching is the planned follow-up that lifts this too).
         _partialSpliced = true;
-        if (!_orderByControl.ContainsKey(component.RenderId))
+        var isNewGroup = group == null;
+        if (isNewGroup && !_orderByControl.ContainsKey(component.RenderId))
         {
             // The component has no recorded paint rank - it was invisible/absent during the last full walk and has now
             // appeared (e.g. an auto-hide ScrollBar fading in on mouse activity). Rather than re-render the WHOLE tree,
-            // re-derive paint ranks with a cheap ORDER-ONLY walk (no Render, no unit work) so this one component can be
-            // spliced in. O(N) dictionary writes (~tens of us) vs a full render of thousands of units.
+            // re-derive paint ranks with a cheap ORDER-ONLY walk (no Render, no unit work) so this one group can be
+            // placed. O(N) dictionary writes (~tens of us) vs a full render of thousands of units.
             ReassignOrders();
             if (!_orderByControl.ContainsKey(component.RenderId))
                 return false;   // genuinely not in the tree -> let the caller do a full walk
         }
 
-        // Where the OLD block sits (contiguous). Capture BEFORE BuildUnitsFor mutates the list in place.
-        var oldStart = oldCount > 0 ? _renderUnits.IndexOf(units[0]) : -1;
-        if (oldCount > 0 && oldStart < 0) return false;   // shouldn't happen; be safe and fall back
+        group = BuildUnitsFor(component, drawCommands, _projectionMatrix);
 
-        var newUnits = BuildUnitsFor(component, drawCommands, _projectionMatrix);
-
-        if (oldStart >= 0)
+        if (isNewGroup)
         {
-            _renderUnits.RemoveRange(oldStart, oldCount);
-            _renderUnits.InsertRange(oldStart, newUnits);   // same slot -> paint order preserved
-        }
-        else if (newUnits.Count > 0)
-        {
-            // Old block was empty (a background appearing): insert by the component's DFS rank - before the first unit
-            // whose component ranks after it.
+            // First units this control ever drew (a background appearing 0->1): place its group by DFS paint rank -
+            // before the first group that ranks after it. Existing groups never move.
             var order = _orderByControl[component.RenderId];
-            var pos = _renderUnits.Count;
-            for (var i = 0; i < _renderUnits.Count; i++)
+            var pos = _groups.Count;
+            for (var i = 0; i < _groups.Count; i++)
             {
-                if (_orderByControl.GetValueOrDefault(_renderUnits[i].Component.RenderId, int.MaxValue) > order) { pos = i; break; }
+                if (_orderByControl.GetValueOrDefault(_groups[i].ControlId, int.MaxValue) > order) { pos = i; break; }
             }
-            _renderUnits.InsertRange(pos, newUnits);
+            _groups.Insert(pos, group);
         }
         return true;
     }
@@ -253,7 +269,7 @@ public class RenderCache
         // skip EVERY GPU upload - its SSBO never fills and the whole overlay (menus, tooltips, SlidePanel) renders nothing.
         LastBuildKind = RenderBuildKind.Full;
         _commands.Clear();
-        _renderUnits.Clear();
+        _groups.Clear();
         _worldCache.Clear();   // new frame: drop last frame's transform + clip memos
         _clipCache.Clear();
 
@@ -274,7 +290,7 @@ public class RenderCache
 
         // Free the units of any component dropped from the list since the last build.
         List<Guid> stale = null;
-        foreach (var id in _unitsByControl.Keys)
+        foreach (var id in _groupById.Keys)
             if (!present.Contains(id)) (stale ??= new List<Guid>()).Add(id);
         if (stale != null)
             foreach (var id in stale) RemoveAndDeferDispose(id);
@@ -288,21 +304,22 @@ public class RenderCache
     /// </summary>
     public void DisposeUnits()
     {
-        foreach (var units in _unitsByControl.Values)
+        foreach (var group in _groupById.Values)
         {
-            foreach (var unit in units)
+            foreach (var unit in group.Units)
                 unit?.Dispose();
         }
 
-        _unitsByControl.Clear();
-        _renderUnits.Clear();
+        _groupById.Clear();
+        _groups.Clear();
     }
 
     public void ProcessCommands(Matrix4x4F projectionMatrix, double renderScale)
     {
         _renderScale = renderScale;
         _projectionMatrix = projectionMatrix;
-        foreach (var unit in _renderUnits)
+        foreach (var group in _groups)
+        foreach (var unit in group.Units)
         {
             var transform = World(unit.Component);
             unit.Update(transform, projectionMatrix, renderScale);
@@ -397,7 +414,8 @@ public class RenderCache
     /// <summary>Out-of-render-pass pass: recorded before BeginRendering (shared-surface latch copies).</summary>
     public void PreRender()
     {
-        foreach (var unit in _renderUnits)
+        foreach (var group in _groups)
+        foreach (var unit in group.Units)
         {
             unit.PreRender();
         }
@@ -435,10 +453,20 @@ public class RenderCache
             && !LastBuildTransformDirty && !_partialSpliced && _rectBatch != null && TryPartialReplay(device, fullScissor))
             return;
 
+        // SPLICED partial patch: a dirty control's unit COUNT changed (hover background 0<->1, a live chart re-recording
+        // a different number of segments). Its group already re-rendered in place (build side); here the retained BATCH
+        // is patched by segment surgery - the group's old slot run is excised from its segment and its re-baked items
+        // append as a new segment spliced into the op stream at the same paint position - then the stream replays.
+        // O(dirty groups), no tree walk, no other group touched. Falls back to the full walk on anything not yet
+        // patchable this way (non-rect-batch groups, capacity, moved transforms).
+        if (device != null && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Partial
+            && !LastBuildTransformDirty && _partialSpliced && _rectBatch != null && TrySplicedPatch(device, fullScissor))
+            return;
+
         var scissorNarrowed = false;   // whether the active scissor is currently narrower than fullScissor
 
         _recording = device != null;   // a device walk records its op stream for a later clean-frame replay
-        if (_recording) { _ops.Clear(); _opsReplayable = true; _rectSlotByUnit.Clear(); }
+        if (_recording) { _ops.Clear(); _opsReplayable = true; _rectSlotByUnit.Clear(); _walkGroup = null; _walkVersion++; }
 
         // Text + item-background + instanced-fill batches: reset per frame. Device renders only - GPU-free tests skip batching.
         if (device != null)
@@ -471,8 +499,19 @@ public class RenderCache
             _batchOpen = false;
         }
 
-        foreach (var unit in _renderUnits)
+        foreach (var group in _groups)
+        foreach (var unit in group.Units)
         {
+            // Group boundary (recording walks): reset this group's spliced-patch records once per group - they are
+            // re-derived by the draw decisions below. Boundary detection instead of an outer block keeps the hot loop flat.
+            if (_recording && !ReferenceEquals(group, _walkGroup))
+            {
+                _walkGroup = group;
+                group.RectRuns.Clear();
+                group.PatchableRectOnly = true;
+                group.WalkVersion = _walkVersion;
+            }
+
             // Read the world transform ONCE (frame-memoized): the bounds-cull below evaluates it and the GPU is re-baked
             // with the very same value before drawing. Using one read for both the cull decision and the re-bake keeps
             // them from diverging (the cull approving "inside" while the GPU draws the element elsewhere = the spill).
@@ -504,7 +543,17 @@ public class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 if (_rectBatch.TryAdd(rru.RectPayload, wt, rru.FillOpacity, scissor, LogicalBounds(unit.Component, wt)))
                 {
-                    if (_recording) _rectSlotByUnit[unit] = _rectBatch.LastSlot;   // for a later fast-path partial replay
+                    if (_recording)
+                    {
+                        var slot = _rectBatch.LastSlot;
+                        _rectSlotByUnit[unit] = slot;   // for a later fast-path partial replay
+                        // Extend/open this group's contiguous slot run (for the spliced-patch segment surgery).
+                        var runs = group.RectRuns;
+                        if (runs.Count > 0 && runs[^1].First + runs[^1].Count == slot)
+                            runs[^1] = (runs[^1].First, runs[^1].Count + 1);
+                        else
+                            runs.Add((slot, 1));
+                    }
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -522,6 +571,7 @@ public class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 if (_gradientRectBatch.TryAdd(grru.RectPayload, wt, grru.FillOpacity, scissor, LogicalBounds(unit.Component, wt)))
                 {
+                    if (_recording) group.PatchableRectOnly = false;   // non-rect-batch draw -> not rect-patchable
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -535,6 +585,7 @@ public class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 if (_ellipseBatch.TryAdd(eru.EllipsePayload, wt, eru.FillOpacity, scissor, LogicalBounds(unit.Component, wt)))
                 {
+                    if (_recording) group.PatchableRectOnly = false;   // non-rect-batch draw -> not rect-patchable
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -550,6 +601,7 @@ public class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 if (_gradientEllipseBatch.TryAdd(geru.EllipsePayload, wt, geru.FillOpacity, scissor, LogicalBounds(unit.Component, wt)))
                 {
+                    if (_recording) group.PatchableRectOnly = false;   // non-rect-batch draw -> not rect-patchable
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -563,6 +615,7 @@ public class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 if (_textBatch.TryAdd(tc, wt, scissor, atlas, LogicalBounds(unit.Component, wt)))
                 {
+                    if (_recording) group.PatchableRectOnly = false;   // text-batched -> not rect-patchable
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;   // baked into the batch - drawn at the next flush
@@ -579,6 +632,7 @@ public class RenderCache
                 if (_instancedFill.TryAdd(gru, wt, scissor, LogicalBounds(unit.Component, wt)))
                 {
                     gru.FillInstanced = true;
+                    if (_recording) group.PatchableRectOnly = false;   // instanced-fill -> not rect-patchable
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;   // fill batched; fringe/stroke drawn at the flush, over the fill
@@ -595,6 +649,7 @@ public class RenderCache
                 if (_instancedFill.TryAddGradient(ggru, wt, scissor, LogicalBounds(unit.Component, wt)))
                 {
                     ggru.FillInstanced = true;
+                    if (_recording) group.PatchableRectOnly = false;   // non-rect-batch draw -> not rect-patchable
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -642,6 +697,7 @@ public class RenderCache
                 }
             }
 
+            if (_recording) group.PatchableRectOnly = false;   // a per-unit draw (or batch-rejected fallthrough) -> not rect-patchable
             unit.Render();
             if (_recording) _ops.Add(new RenderOp { Kind = RenderOpKind.Unit, Unit = unit });
         }
@@ -669,8 +725,8 @@ public class RenderCache
             // A dirty component with NO drawn units (a detached/pooled/collapsed element - e.g. a text block that
             // re-marks geometry every frame but isn't in the paint tree) contributes nothing to the frame: the op stream
             // is unchanged, so skip it and let the replay stand. This is the common hover case (nothing visible changed).
-            if (!_unitsByControl.TryGetValue(comp.RenderId, out var units)) continue;
-            foreach (var u in units)
+            if (!_groupById.TryGetValue(comp.RenderId, out var g)) continue;
+            foreach (var u in g.Units)
                 if (u is not RectangleRenderUnit rru || !_rectSlotByUnit.ContainsKey(u) || !_rectBatch.CanBatch(rru.RectPayload))
                     return false;   // a per-unit / text / instanced / no-longer-batchable dirty unit -> full walk
         }
@@ -678,8 +734,8 @@ public class RenderCache
         // from its (just-updated) payload into its retained slot. (No-units components patched nothing above.)
         foreach (var comp in _partialDirty)
         {
-            if (!_unitsByControl.TryGetValue(comp.RenderId, out var units)) continue;
-            foreach (var u in units)
+            if (!_groupById.TryGetValue(comp.RenderId, out var g)) continue;
+            foreach (var u in g.Units)
             {
                 var rru = (RectangleRenderUnit)u;
                 if (!RectBatchCollector.BakeItem(rru.RectPayload, World(u.Component), rru.FillOpacity, out var item))
@@ -689,6 +745,190 @@ public class RenderCache
         }
         ExecuteOps(device, fullScissor);
         return true;
+    }
+
+    // One dirty group's staged patch (validated + baked BEFORE any mutation, so a bail leaves the retained frame intact).
+    private struct GroupPatch
+    {
+        public ControlGroup Group;
+        public RectItem[] Items;      // re-baked instances of the group's (non-culled) units, in unit order
+        public Rect2D Scissor;        // the group's clip (all units of one component share it)
+        public bool InPlace;          // count-stable recolor -> per-slot UpdateSlot, no surgery
+    }
+
+    // Draw a SPLICED partial by per-group batch-segment surgery + op-stream splice, then replay - the O(dirty-control)
+    // path for unit-count changes (hover 0<->1 backgrounds, a live chart). Requirements per dirty group (else return
+    // false BEFORE mutating anything -> the caller full-walks): every unit rect-batchable NOW; a group with retained
+    // runs must have been rect-only on the last recording walk (its old draws are then fully described by RectRuns).
+    private readonly List<GroupPatch> _patchBuf = new();
+    private bool TrySplicedPatch(IGraphicsDevice device, Rect2D fullScissor)
+    {
+        // ---- Phase 1: validate + bake (no mutation) ----
+        _patchBuf.Clear();
+        var appendTotal = 0;
+        foreach (var comp in _partialDirty)
+        {
+            if (!_groupById.TryGetValue(comp.RenderId, out var group)) continue;   // no drawn units - contributes nothing
+
+            var runTotal = 0;
+            foreach (var r in group.RectRuns) runTotal += r.Count;
+            // A group DESCRIBED by the last recording walk must have been rect-only - otherwise it also drew per-unit /
+            // text / instanced content whose recorded ops we can't excise (stale Unit ops would even replay disposed
+            // units). A group the walk never saw (appeared since - WalkVersion stale) has nothing retained to excise and
+            // is validated purely by baking below.
+            var walked = group.WalkVersion == _walkVersion;
+            if (walked && !group.PatchableRectOnly) return false;
+
+            var items = new List<RectItem>(group.Units.Count);
+            var scissor = fullScissor;
+            var haveScissor = false;
+            foreach (var u in group.Units)
+            {
+                if (u is not RectangleRenderUnit rru || !_rectBatch.CanBatch(rru.RectPayload)) return false;
+                var wt = World(u.Component);
+                if (!haveScissor)
+                {
+                    scissor = ResolveScissor(u.Component, wt, fullScissor, out _, out var cull);
+                    haveScissor = true;
+                    if (cull) break;   // whole component off-clip: it contributes no items (units share the component)
+                }
+                if (!RectBatchCollector.BakeItem(rru.RectPayload, wt, rru.FillOpacity, out var item)) return false;
+                items.Add(item);
+            }
+
+            // Count-stable recolor (every unit already holds a retained slot): patch in place, no surgery/fragmentation.
+            var inPlace = items.Count == group.Units.Count && items.Count == runTotal && AllUnitsHaveSlots(group);
+            if (!inPlace) appendTotal += items.Count;
+            _patchBuf.Add(new GroupPatch { Group = group, Items = items.ToArray(), Scissor = scissor, InPlace = inPlace });
+        }
+
+        if (appendTotal > _rectBatch.PatchCapacityLeft) return false;   // arena full - full walk compacts it
+
+        // Every surgery group must have a findable segment for each retained run, and an op referencing it.
+        foreach (var p in _patchBuf)
+        {
+            if (p.InPlace) continue;
+            foreach (var run in p.Group.RectRuns)
+            {
+                var seg = _rectBatch.FindSegmentContaining(run.First);
+                if (seg < 0 || FindSegmentOp(seg) < 0) return false;
+            }
+        }
+
+        // ---- Phase 2: mutate (can no longer fail) ----
+        foreach (var p in _patchBuf)
+        {
+            var group = p.Group;
+            if (p.InPlace)
+            {
+                var i = 0;
+                foreach (var u in group.Units)
+                    _rectBatch.UpdateSlot(device, _rectSlotByUnit[u], p.Items[i++]);
+                continue;
+            }
+
+            // Excise the old runs: each segment shrinks to its 'before' part and the 'after' remainder becomes a new
+            // segment whose op is inserted right after the original - [before][after] keeps every other item's order.
+            // The FIRST run's position is remembered as the insertion anchor so the group's new items draw at the same
+            // paint position they had.
+            var anchorOp = -1;
+            foreach (var run in group.RectRuns)
+            {
+                var seg = _rectBatch.FindSegmentContaining(run.First);
+                var opIdx = FindSegmentOp(seg);
+                var after = _rectBatch.ExcludeRun(seg, run.First, run.Count);
+                if (after >= 0)
+                    _ops.Insert(opIdx + 1, new RenderOp { Kind = RenderOpKind.Segment, Batch = 0, SegIndex = after });
+                if (anchorOp < 0) anchorOp = opIdx;
+            }
+
+            if (anchorOp < 0 && p.Items.Length > 0)
+            {
+                // 0 -> N (first units this control ever batched): anchor at the paint position of the nearest FOLLOWING
+                // group with a retained rect run, splitting that run's segment at the run start so our new segment's op
+                // sits between "everything painted before that group" and that group - i.e. exactly at our paint rank.
+                // No such successor -> fall back to the nearest PRECEDING group's run (insert after its segment op).
+                // A mid-phase-2 bail here is SAFE: every already-patched group's surgery is self-consistent (excised
+                // runs + appended segment + spliced ops), and the caller's full walk re-records the whole frame anyway.
+                if (!TryAnchorByNeighbour(group, out anchorOp)) return false;
+            }
+
+            if (p.Items.Length > 0)
+            {
+                var newSeg = _rectBatch.AppendPatchSegment(device, p.Items, p.Scissor);
+                var newFirst = _rectBatch.RetainedCount - p.Items.Length;
+                _ops.Insert(anchorOp + 1, new RenderOp { Kind = RenderOpKind.Segment, Batch = 0, SegIndex = newSeg });
+
+                group.RectRuns.Clear();
+                group.RectRuns.Add((newFirst, p.Items.Length));
+                group.PatchableRectOnly = true;
+                var i = 0;
+                foreach (var u in group.Units) _rectSlotByUnit[u] = newFirst + i++;
+            }
+            else
+            {
+                group.RectRuns.Clear();   // re-rendered to nothing (a hover background vanishing) - exclusion was enough
+                foreach (var u in group.Units) _rectSlotByUnit.Remove(u);
+            }
+        }
+
+        ExecuteOps(device, fullScissor);
+        return true;
+    }
+
+    private bool AllUnitsHaveSlots(ControlGroup group)
+    {
+        foreach (var u in group.Units)
+            if (!_rectSlotByUnit.ContainsKey(u)) return false;
+        return true;
+    }
+
+    // The op index that draws rect-batch segment <paramref name="segIndex"/>.
+    private int FindSegmentOp(int segIndex)
+    {
+        for (var i = 0; i < _ops.Count; i++)
+            if (_ops[i].Kind == RenderOpKind.Segment && _ops[i].Batch == 0 && _ops[i].SegIndex == segIndex) return i;
+        return -1;
+    }
+
+    // Anchor a 0->N group's new segment by its paint rank relative to neighbouring groups' retained rect runs.
+    private bool TryAnchorByNeighbour(ControlGroup group, out int anchorOp)
+    {
+        anchorOp = -1;
+        var idx = _groups.IndexOf(group);
+        if (idx < 0) return false;
+
+        // Following group with a run: split its run's segment AT the run start; our op goes after the 'before' piece
+        // (and the successor's items keep drawing after us via the split-off remainder).
+        for (var g = idx + 1; g < _groups.Count; g++)
+        {
+            var runs = _groups[g].RectRuns;
+            if (runs.Count == 0) continue;
+            var seg = _rectBatch.FindSegmentContaining(runs[0].First);
+            if (seg < 0) return false;
+            var opIdx = FindSegmentOp(seg);
+            if (opIdx < 0) return false;
+            var after = _rectBatch.ExcludeRun(seg, runs[0].First, 0);   // pure split - nothing excluded
+            if (after >= 0)
+                _ops.Insert(opIdx + 1, new RenderOp { Kind = RenderOpKind.Segment, Batch = 0, SegIndex = after });
+            anchorOp = opIdx;
+            return true;
+        }
+
+        // No successor: insert after the nearest preceding group's run segment op.
+        for (var g = idx - 1; g >= 0; g--)
+        {
+            var runs = _groups[g].RectRuns;
+            if (runs.Count == 0) continue;
+            var lastRun = runs[^1];
+            var seg = _rectBatch.FindSegmentContaining(lastRun.First);
+            if (seg < 0) return false;
+            var opIdx = FindSegmentOp(seg);
+            if (opIdx < 0) return false;
+            anchorOp = opIdx;
+            return true;
+        }
+        return false;
     }
 
     // Replay a recorded frame's op stream (a Clean frame): re-issue its scissor changes, per-unit direct draws and batch
@@ -833,7 +1073,7 @@ public class RenderCache
 
     private void BuildRenderCommands(IRootVisualComponent visualRoot)
     {
-        _renderUnits.Clear();
+        _groups.Clear();
         _orderByControl.Clear();
         _lastVisualRoot = visualRoot;
         var order = 0;
@@ -849,7 +1089,7 @@ public class RenderCache
 
             // A component must render exactly once per frame. If the visual tree somehow makes one reachable twice in
             // this walk (e.g. a templated content host whose child is referenced from two places), processing it again
-            // would add its units to _renderUnits a second time -> every such element is drawn TWICE (overdraw at the
+            // would add its group to the paint order a second time -> every such element is drawn TWICE (overdraw at the
             // same spot). Guard against that here so each component (and its subtree) is built once.
             if (!visited.Add(component.RenderId)) continue;
 
@@ -909,16 +1149,18 @@ public class RenderCache
     }
 
     // Refresh a component's cached units from its freshly recorded draw commands: reuse a still-matching unit in place,
-    // replace a type-changed one, create the extra, dispose the surplus. Updates _unitsByControl but does NOT touch the
-    // paint-order list (_renderUnits) - the caller places them (full build appends; a partial patch splices by order).
-    private List<IRenderUnit> BuildUnitsFor(IUIComponent component, IReadOnlyList<IDrawCommand> drawCommands, Matrix4x4F projectionMatrix)
+    // replace a type-changed one, create the extra, dispose the surplus. Mutates the component's GROUP in place but does
+    // NOT touch the paint order (_groups) - the caller places a NEW group (full build appends; a partial patch inserts
+    // by DFS rank); an existing group already sits at its spot and its Units list is the very list refreshed here.
+    private ControlGroup BuildUnitsFor(IUIComponent component, IReadOnlyList<IDrawCommand> drawCommands, Matrix4x4F projectionMatrix)
     {
-        if (!_unitsByControl.TryGetValue(component.RenderId, out var units))
+        if (!_groupById.TryGetValue(component.RenderId, out var group))
         {
-            units = new List<IRenderUnit>();
-            _unitsByControl[component.RenderId] = units;
+            group = new ControlGroup { ControlId = component.RenderId };
+            _groupById[component.RenderId] = group;
         }
 
+        var units = group.Units;
         for (int i = 0; i < drawCommands.Count; i++)
         {
             var command = drawCommands[i];
@@ -949,7 +1191,7 @@ public class RenderCache
             units.RemoveRange(drawCommands.Count, units.Count - drawCommands.Count);
         }
 
-        return units;
+        return group;
     }
 
     private void ProcessRenderCommands(IUIComponent component, Matrix4x4F projectionMatrix, bool wasGeometryValid)
@@ -957,18 +1199,18 @@ public class RenderCache
         var drawCommands = _drawingContextInternal.GetDrawCommands();
         if (drawCommands.Count > 0)
         {
-            _renderUnits.AddRange(BuildUnitsFor(component, drawCommands, projectionMatrix));
+            _groups.Add(BuildUnitsFor(component, drawCommands, projectionMatrix));
         }
         else
         {
             // No commands this frame. Distinguish the two cases (see wasGeometryValid in BuildRenderCommands):
             //  - was clean: Render() didn't re-record -> reuse the cached units.
             //  - was dirty: the control re-rendered to nothing -> clear its stale units so they stop drawing.
-            if (_unitsByControl.TryGetValue(component.RenderId, out var units))
+            if (_groupById.TryGetValue(component.RenderId, out var group))
             {
                 if (wasGeometryValid)
                 {
-                    _renderUnits.AddRange(units);
+                    _groups.Add(group);
                 }
                 else
                 {
@@ -988,9 +1230,9 @@ public class RenderCache
     private void ReconcileDetachedControls()
     {
         List<Guid> detached = null;
-        foreach (var pair in _unitsByControl)
+        foreach (var pair in _groupById)
         {
-            var units = pair.Value;
+            var units = pair.Value.Units;
             if (units.Count == 0
                 || units[0].Component.IsAttachedToVisualTree) continue;
             (detached ??= new List<Guid>()).Add(pair.Key);
@@ -1003,13 +1245,15 @@ public class RenderCache
 
     /// <summary>
     /// Drops the cache entry and defer-disposes its units (deferred until the frame fence signals, as the GPU may
-    /// still be using them). Build-phase only (EndDraw). Idempotent.
+    /// still be using them). Build-phase only (EndDraw). Idempotent. The group is also dropped from the paint order -
+    /// on a full walk that just rebuilt _groups this is a no-op miss; on any other path it keeps order and cache in sync.
     /// </summary>
     private void RemoveAndDeferDispose(Guid renderId)
     {
-        if (!_unitsByControl.Remove(renderId, out var units)) return;
+        if (!_groupById.Remove(renderId, out var group)) return;
 
-        foreach (var unit in units)
+        foreach (var unit in group.Units)
             unit?.DeferDispose();
+        _groups.Remove(group);
     }
 }
