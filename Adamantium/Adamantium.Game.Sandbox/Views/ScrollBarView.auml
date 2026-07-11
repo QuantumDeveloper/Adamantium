@@ -1,22 +1,35 @@
 <View xmlns="http://adamantium/ui">
-    <!-- DataContext is the ScrollBarViewModel. Both bars are bound to one Offset. -->
-    <StackPanel Orientation="Vertical" Margin="24">
-        <TextBlock Text="Horizontal + vertical ScrollBar bound to one value" FontSize="18" Margin="0,0,0,16"/>
-        <StackPanel Orientation="Horizontal">
-            <ScrollBar Orientation="Vertical"
-                       Height="200"
-                       Minimum="0" Maximum="100" ViewportSize="10"
-                       Value="{Binding Offset, Mode=TwoWay}"/>
-            <StackPanel Orientation="Vertical" Margin="28,0,0,0">
-                <ScrollBar Orientation="Horizontal"
-                           Width="320"
+    <!-- DataContext is the ScrollBarViewModel. Both standalone bars are bound to one Offset; the ScrollViewer below is a
+         real physical scroll of an oversized image (its bars driven by the presenter's metrics) - the live check that the
+         thumb tracks the content after the sub-pixel-coalescing scroll work. -->
+    <StackPanel Orientation="Horizontal" Margin="24">
+        <StackPanel Orientation="Vertical">
+            <TextBlock Text="Horizontal + vertical ScrollBar bound to one value" FontSize="18" Margin="0,0,0,16"/>
+            <StackPanel Orientation="Horizontal">
+                <ScrollBar Orientation="Vertical"
+                           Height="200"
                            Minimum="0" Maximum="100" ViewportSize="10"
                            Value="{Binding Offset, Mode=TwoWay}"/>
-                <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
-                    <TextBlock Text="Offset:" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                    <TextBlock Text="{Binding Offset}" VerticalAlignment="Center" FontSize="16"/>
+                <StackPanel Orientation="Vertical" Margin="28,0,0,0">
+                    <ScrollBar Orientation="Horizontal"
+                               Width="320"
+                               Minimum="0" Maximum="100" ViewportSize="10"
+                               Value="{Binding Offset, Mode=TwoWay}"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
+                        <TextBlock Text="Offset:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                        <TextBlock Text="{Binding Offset}" VerticalAlignment="Center" FontSize="16"/>
+                    </StackPanel>
                 </StackPanel>
             </StackPanel>
+        </StackPanel>
+
+        <StackPanel Orientation="Vertical" Margin="48,0,0,0">
+            <TextBlock Text="Drag to pan (touch-style, with inertia)" FontSize="18" Margin="0,0,0,12"/>
+            <ScrollViewer Width="520" Height="320"
+                          PanningMode="Both" IsInertiaEnabled="true"
+                          HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <Image Width="1600" Height="1200" Source="Textures/luxfon.tga"/>
+            </ScrollViewer>
         </StackPanel>
     </StackPanel>
 </View>

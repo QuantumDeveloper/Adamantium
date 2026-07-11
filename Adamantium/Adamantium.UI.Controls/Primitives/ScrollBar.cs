@@ -143,10 +143,14 @@ public class ScrollBar : RangeBase
     private void OnLineDecrease(object sender, RoutedEventArgs e)
         => SetValueAndNotify(Value - SmallChange, ScrollEventType.SmallDecrement);
 
-    // Sets Value (RangeBase coerces it into range) and raises Scroll with the coerced value.
+    // Sets Value (RangeBase coerces it into range) and raises Scroll with the coerced value. SetCurrentValue, NOT a plain
+    // Value= : a thumb drag / page / line is USER INPUT, and writing Value at Local priority would permanently mask a
+    // {Binding} on Value (a bar bound TwoWay to a shared offset stopped following the source once the user touched it -
+    // two bars on one value desynced after the first drag). SetCurrentValue writes into the binding slot, so the two-way
+    // write-back still pushes to the source and the next source change refreshes this bar cleanly.
     private void SetValueAndNotify(double newValue, ScrollEventType type)
     {
-        Value = newValue;
+        SetCurrentValue(ValueProperty, newValue);
         Scroll?.Invoke(this, new ScrollEventArgs(type, Value));
     }
 }

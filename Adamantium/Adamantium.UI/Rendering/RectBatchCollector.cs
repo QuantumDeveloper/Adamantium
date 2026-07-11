@@ -105,6 +105,12 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
     // False = not bakeable this way (rotated/sheared world). Shared by TryAdd (append) AND the partial-replay UpdateSlot
     // path, which re-bakes ONE dirty tile in place (a hover recolour) without re-walking the scene.
     public static bool BakeItem(RectanglePayload p, Matrix4x4F world, double opacity, out RectItem item)
+        => BakeItem(p, world, opacity, 0, out item);
+
+    /// <summary><paramref name="transformSlot"/> = the instance's transform-table slot (0 = identity for a world-space
+    /// bake; a motion node's slot for a NODE-LOCAL bake - <paramref name="world"/> is then the transform RELATIVE to
+    /// that node and the vertex shader applies the node's matrix on top - the O(1)-scroll path).</summary>
+    public static bool BakeItem(RectanglePayload p, Matrix4x4F world, double opacity, int transformSlot, out RectItem item)
     {
         item = default;
         const float eps = 1e-4f;
@@ -127,7 +133,7 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
         item = new RectItem
         {
             Bounds = new Vector4F((float)(r.X * sx + tx), (float)(r.Y * sy + ty), (float)(r.Width * sx), (float)(r.Height * sy)),
-            Params = new Vector4F((float)(p.CornerRadius.TopLeft * sx), 0, 0, 0),
+            Params = new Vector4F((float)(p.CornerRadius.TopLeft * sx), transformSlot, 0, 0),
             Color = color,
             StrokeColor = strokeColor,
             Stroke0 = stroke0,
@@ -138,11 +144,11 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
 
     // Bake one solid rounded-rect fill into the pending segment. False only if it can't be baked (rotated/sheared world
     // or a GPU-buffer overflow this frame) - the caller then draws that rect via the per-unit path.
-    public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds)
+    public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
-        if (!BakeItem(p, world, opacity, out var item)) return false;   // rotation/shear -> per-unit
+        if (!BakeItem(p, world, opacity, transformSlot, out var item)) return false;   // rotation/shear -> per-unit
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
         return true;

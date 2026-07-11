@@ -244,7 +244,13 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         Size old = default;
         if (e.OldValue == AdamantiumProperty.UnsetValue)
             return;
-            
+
+        // A client-size change (drag-resize, maximize) re-lays-out the tree over the next few budgeted frames, and -
+        // exactly like a theme/DPI swap - parts of that settle never mark the render dirty. A Clean-frame op-replay
+        // then kept ghosts of the OLD layout (tiles at stale positions, a scrollbar stripe mid-window) until an
+        // unrelated mark forced a walk. Force full render walks until the layout settles.
+        RenderDirty.ForceStructuralUntilSettled();
+
         old.Width = (double) e.OldValue;
         old.Height = component.Height;
             
@@ -259,7 +265,9 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         if (!(adamantiumAdamantiumComponent is WindowBase component)) return;
         if (e.OldValue == AdamantiumProperty.UnsetValue)
             return;
-            
+
+        RenderDirty.ForceStructuralUntilSettled();   // see ClientWidthChangedCallBack - resize settles over frames
+
         var old = new Size(component.Width, (double)e.OldValue);
         var newSize = new Size(component.Width, (double)e.NewValue);
         var args = new SizeChangedEventArgs(old, newSize, false, true);

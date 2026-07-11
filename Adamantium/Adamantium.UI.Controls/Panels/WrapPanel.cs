@@ -29,7 +29,10 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
    }
 
    // ---- Virtualized 2D state (items host) ----
-   private const int Buffer = 1;        // extra lines on each side of the viewport
+   private const int Buffer = 2;        // extra lead lines on each side of the viewport: a row must be realized BEFORE the
+                                        // scroll reveals it. With 1 the lead was consumed by the reveal outpacing a
+                                        // 1-frame realize (a row visibly "catching up" to the scroll, esp. scrolling UP
+                                        // where the top lead is thinnest); 2 keeps a realized row ahead of the edge.
    private const int MaxCellPasses = 4; // bound the in-pass convergence of the auto-sized cell
    // Per-frame (re)bind TIME budget. A rebind is cheap (~20 us) but CREATING a container (new item + template + bindings)
    // is ~50x that, so a fixed COUNT that is fine for scroll would spend >100 ms/frame building the initial window (or a
@@ -312,6 +315,21 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
       }
    }
 
+   // The realized window is a band of ROWS starting at firstLine = max(0, floor(scrollOffset / cellScroll) - Buffer).
+   // It shifts only when that top line changes - i.e. when the scroll offset crosses a whole-row boundary. A sub-pixel
+   // scroll that stays within the current row leaves the window (and every realized container) exactly as it was, so the
+   // base can skip re-realizing it and just slide + track the thumb. Cell not measured yet (_cellScroll <= 0) -> re-realize.
+   protected override bool RealizedWindowMovesFor(Vector2 from, Vector2 to)
+   {
+      if (_cellScroll <= 0) return true;
+      var horizontal = Orientation == Orientation.Horizontal;
+      var fromScroll = horizontal ? from.Y : from.X;
+      var toScroll = horizontal ? to.Y : to.X;
+      var fromLine = Math.Max(0, (int)Math.Floor(fromScroll / _cellScroll) - Buffer);
+      var toLine = Math.Max(0, (int)Math.Floor(toScroll / _cellScroll) - Buffer);
+      return fromLine != toLine;
+   }
+
    // ---- Virtualized 2D layout (items host): uniform cell -> only the visible grid window is realized -----------
 
    protected override Size MeasureVirtualized(Size availableSize, Vector2 offset)
@@ -403,6 +421,7 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
          _measuringHorizontal = horizontal;
          _cellGrew = false;
          _onSlotBound ??= OnSlotBound;
+
          foreach (var c in Owner.ItemContainerGenerator.SetWindow(first, last, bindBudget, MinBinds, _onSlotBound))
             c.Visibility = Visibility.Collapsed;
          if (!_cellGrew) break;

@@ -302,7 +302,14 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
             var offset = _inner.Offset;
             _lastTranslatedInnerOffset = offset;   // so OnInnerMetricsChanged only re-invalidates on a REAL offset change
             if (VisualChildren.FirstOrDefault() is IMeasurableComponent inner)
+            {
+                // The element WE translate (the ItemsPresenter hosting the virtualizing panel) is the render MOTION NODE:
+                // its subtree's batched instances bake in ITS space + reference its transform-table slot, so this
+                // per-scroll-frame arrange marks ONE node (a 64-byte matrix rewrite + replay) instead of the global
+                // transform flag (which re-baked every instance in the window - the scroll full-walk).
+                if (inner is Base.UIComponent innerUi) innerUi.IsRenderMotionNode = true;
                 inner.Arrange(new Rect(-offset.X, -offset.Y, finalSize.Width, finalSize.Height));
+            }
             RaiseMetricsChanged();
             return finalSize;
         }

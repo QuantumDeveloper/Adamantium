@@ -97,9 +97,24 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
     {
         var clamped = ClampOffset(offset, _extent, _viewport);
         if (clamped == _offset) return;
+
+        // Re-realize the window ONLY when the offset actually shifts which items are on screen (crosses a cell/row
+        // boundary). A high-resolution wheel / touchpad emits a stream of SUB-PIXEL scroll deltas, and re-measuring the
+        // whole virtualized window on each one - just to land on the SAME first/last - churned the layout every frame:
+        // it re-pushed the scroll metrics (re-rendering the whole scrollbar) and re-ran SetWindow, and an occasional
+        // full render walk landing on that perpetual churn dropped a just-(re)bound cell for a frame (the "random empty
+        // cell"). Within a row the content still slides smoothly (the ScrollContentPresenter translates this panel by
+        // -offset) and the thumb still tracks (RaiseMetrics), but the realized window is left untouched.
+        var windowMoves = RealizedWindowMovesFor(_offset, clamped);
         _offset = clamped;
-        InvalidateMeasure();   // a new window must be realized/measured
+        if (windowMoves) InvalidateMeasure();   // the on-screen set changes -> realize/measure the new window
+        else RaiseMetrics();                     // same window: only the translation + the scrollbar thumb follow
     }
+
+    /// <summary>Does moving the scroll offset from <paramref name="from"/> to <paramref name="to"/> change which items
+    /// fall in the realized window (cross a cell/row boundary)? Base returns true (always re-realize - the safe default);
+    /// a uniform-cell panel overrides it so a sub-pixel move that stays within the current row skips the re-window.</summary>
+    protected virtual bool RealizedWindowMovesFor(Vector2 from, Vector2 to) => true;
 
     protected override Size MeasureOverride(Size availableSize)
     {

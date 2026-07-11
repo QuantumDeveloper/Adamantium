@@ -16,6 +16,7 @@ internal sealed class RunningAnimation : IRunningAnimation
     private readonly double _iterationCount;   // double.PositiveInfinity = loop forever
     private readonly bool _autoReverse;
     private readonly IEasingFunction _easing;
+    private readonly FillBehavior _fillBehavior;
     private readonly Action _completed;
     private double _elapsedSeconds;
 
@@ -30,13 +31,17 @@ internal sealed class RunningAnimation : IRunningAnimation
         _iterationCount = animation.IterationCount;
         _autoReverse = animation.AutoReverse;
         _easing = animation.Easing;
+        _fillBehavior = animation.FillBehavior;
         _completed = completed;
     }
 
     public bool Animates(AdamantiumComponent target, AdamantiumProperty property) =>
         ReferenceEquals(_target, target) && _property == property;
 
-    public IUIComponent DirtyTarget => _target as IUIComponent;
+    // The visual this animation drives: the target itself, or - when the target is a Transform - the element the
+    // transform moves (a Transform is not a visual, so without this every transform animation had NO dirty target and
+    // rode only the transform's own node/global marks).
+    public IUIComponent DirtyTarget => _target as IUIComponent ?? (_target as Transform)?.Owner;
 
     /// <summary>Advances by <paramref name="deltaSeconds"/>; returns true once finished (final value applied,
     /// completion callback fired). Honours Delay, IterationCount (incl. infinite) and AutoReverse (ping-pong).</summary>
@@ -55,7 +60,13 @@ internal sealed class RunningAnimation : IRunningAnimation
         var cycles = active / _durationSeconds;
         if (!double.IsPositiveInfinity(_iterationCount) && cycles >= _iterationCount)
         {
-            _target.SetValue(_property, EvalAt(_iterationCount), ValuePriority.Animation);   // hold the final value
+            // FillBehavior: HoldEnd keeps the final value applied at Animation priority (a flip stays flipped); Stop
+            // CLEARS the Animation slot so the property returns to its underlying value and to direct sets - a finished
+            // hold otherwise masked every later local write (a hover tilt that worked exactly once, then never again).
+            if (_fillBehavior == FillBehavior.Stop)
+                _target.ClearValue(_property, ValuePriority.Animation);
+            else
+                _target.SetValue(_property, EvalAt(_iterationCount), ValuePriority.Animation);   // hold the final value
             _completed?.Invoke();
             return true;
         }

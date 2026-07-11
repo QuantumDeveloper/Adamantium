@@ -24,6 +24,7 @@ public partial class GalleryViewModel
         new SlidePanelViewModel(),
         new ImageViewModel(),
         new LayoutViewModel(),
+        new TilesViewModel(),
         new InstancingViewModel(),
         new GameViewModel(),
     };

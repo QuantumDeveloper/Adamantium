@@ -14,6 +14,13 @@
 
 float4x4 Projection;
 
+// GPU-resident TRANSFORM TABLE (see Rendering/TransformTable.cs): one world matrix per MOTION NODE (a scrolled panel, an
+// animating tile), fetched by the per-instance slot index. Slot 0 is ALWAYS identity, so world-baked instances (index 0)
+// render unchanged - the migration path: content moves to node-LOCAL bounds + a real slot incrementally, and from then on
+// moving a node costs ONE 64-byte matrix write instead of re-baking its instances. Full matrices also keep ROTATED/3D
+// instances inside the batch (the old axis-aligned world bake had to reject them to per-unit draws).
+uint64_t TransformsAddress;
+
 // ---- Shared SDF fill+stroke compositing --------------------------------------------------------------------------
 // Both SDF families (rounded-rect, ellipse) share the same stroke story: given the signed distance `d` to the contour
 // (device-px, negative inside), a fill and an OPTIONAL stroke are composited in ONE pass. The stroke is a ring built
@@ -253,8 +260,8 @@ float4 InstancedFillPS(FillPSInput input) : SV_Target
 // RectItem's Vector4F layout; the quad still comes from SV_VertexID. Pixel shader is the shared RectBatchPS.
 struct RectData
 {
-    float4 Bounds;       // world-space x, y, w, h (baked on the CPU)
-    float4 Params;       // .x = corner radius (uniform); .yzw reserved
+    float4 Bounds;       // NODE-local x, y, w, h (world for slot-0 legacy bakes - identity matrix)
+    float4 Params;       // .x = corner radius (uniform); .y = transform-table slot; .zw reserved
     float4 Color;        // straight RGBA, opacity folded in
     float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
     float4 Stroke0;      // width_px, align, dashOn, dashGap
@@ -270,8 +277,13 @@ PSInput RectBatchInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_I
     PSInput o;
     float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
     float outset = max(item.Stroke0.x * (0.5 * (1.0 + item.Stroke0.y) + 0.5), 0.0) + 1.0;
-    float2 worldPos = item.Bounds.xy + corner * item.Bounds.zw + (corner * 2.0 - 1.0) * outset;
-    o.Position = mul(float4(worldPos, 0.0, 1.0), Projection);
+    // Node-local corner -> world via the instance's transform-table matrix (slot 0 = identity for legacy world bakes).
+    // The SDF inputs (Local/Half) stay in the RECT's own frame, so rounded corners + strokes are correct under rotation.
+    float4x4* transforms = (float4x4*)TransformsAddress;
+    float4x4 nodeWorld = transforms[(uint)item.Params.y];
+    float2 localPos = item.Bounds.xy + corner * item.Bounds.zw + (corner * 2.0 - 1.0) * outset;
+    float4 worldPos = mul(float4(localPos, 0.0, 1.0), nodeWorld);
+    o.Position = mul(worldPos, Projection);
     o.Half   = item.Bounds.zw * 0.5;
     o.Local  = (corner - 0.5) * item.Bounds.zw + (corner * 2.0 - 1.0) * outset;
     o.Radius = item.Params.x;
@@ -331,7 +343,8 @@ float4 EllipseBatchPS(EllipsePSInput input) : SV_Target
 // SV_VertexID; shared EllipseBatchPS.
 struct EllipseData
 {
-    float4 Bounds;       // world-space x, y, w, h
+    float4 Bounds;       // NODE-local x, y, w, h (world for slot-0 legacy bakes - identity matrix)
+    float4 Params;       // .x = transform-table slot; .yzw reserved (mirrors the CPU EllipseItem)
     float4 Color;        // straight RGBA, opacity folded in
     float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
     float4 Stroke0;      // width_px, align, dashOn, dashGap
@@ -347,8 +360,12 @@ EllipsePSInput EllipseBatchInstancedVS(uint vertexId : SV_VertexID, uint instanc
     EllipsePSInput o;
     float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
     float outset = max(item.Stroke0.x * (0.5 * (1.0 + item.Stroke0.y) + 0.5), 0.0) + 1.0;
-    float2 worldPos = item.Bounds.xy + corner * item.Bounds.zw + (corner * 2.0 - 1.0) * outset;
-    o.Position = mul(float4(worldPos, 0.0, 1.0), Projection);
+    // Node-local -> world via the transform table (slot 0 = identity), same scheme as RectBatchInstancedVS.
+    float4x4* transforms = (float4x4*)TransformsAddress;
+    float4x4 nodeWorld = transforms[(uint)item.Params.x];
+    float2 localPos = item.Bounds.xy + corner * item.Bounds.zw + (corner * 2.0 - 1.0) * outset;
+    float4 worldPos = mul(float4(localPos, 0.0, 1.0), nodeWorld);
+    o.Position = mul(worldPos, Projection);
     o.Half   = item.Bounds.zw * 0.5;
     o.Local  = (corner - 0.5) * item.Bounds.zw + (corner * 2.0 - 1.0) * outset;
     o.Color  = item.Color;
@@ -454,8 +471,13 @@ GradPSInput GradientRectInstancedVS(uint vertexId : SV_VertexID, uint instanceId
     GradPSInput o;
     float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
     float outset = max(it.Stroke0.x * (0.5 * (1.0 + it.Stroke0.y) + 0.5), 0.0) + 1.0;
-    float2 worldPos = it.Bounds.xy + corner * it.Bounds.zw + (corner * 2.0 - 1.0) * outset;
-    o.Position = mul(float4(worldPos, 0.0, 1.0), Projection);
+    // Node-local -> world via the transform table (slot in Geom1.w - Geom1.z is the shape flag; slot 0 = identity),
+    // same scheme as RectBatchInstancedVS.
+    float4x4* transforms = (float4x4*)TransformsAddress;
+    float4x4 nodeWorld = transforms[(uint)it.Geom1.w];
+    float2 localPos = it.Bounds.xy + corner * it.Bounds.zw + (corner * 2.0 - 1.0) * outset;
+    float4 worldPos = mul(float4(localPos, 0.0, 1.0), nodeWorld);
+    o.Position = mul(worldPos, Projection);
     o.Half   = it.Bounds.zw * 0.5;
     o.Local  = (corner - 0.5) * it.Bounds.zw + (corner * 2.0 - 1.0) * outset;
     o.Radius = it.Params.x;

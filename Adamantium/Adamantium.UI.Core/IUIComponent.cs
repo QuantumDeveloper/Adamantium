@@ -27,6 +27,12 @@ public interface IUIComponent : IFundamentalUIComponent
     Int32 ZIndex { get; set; }
     bool IsAttachedToVisualTree { get; }
 
+    /// <summary>A render MOTION NODE: this element's subtree translates as a unit (a transform-only-scrolled panel).
+    /// The render cache bakes its descendants' batched instances in THIS node's space and gives them its transform-table
+    /// slot, so moving the node costs one matrix write instead of re-baking the subtree (the O(1)-scroll path). Set by
+    /// the element that drives such movement (a virtualizing items host).</summary>
+    bool IsRenderMotionNode { get; }
+
     bool IsRootComponent { get; }
 
     Transform LayoutTransform { get; set; }

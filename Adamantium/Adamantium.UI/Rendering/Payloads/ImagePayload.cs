@@ -7,13 +7,17 @@ using Adamantium.UI.Core.Media.Imaging;
 
 namespace Adamantium.UI.Rendering.Payloads;
 
-public class ImagePayload(Brush filter, ImageSource image, Rect destinationRect, CornerRadius cornerRadius) : 
+public class ImagePayload(Brush filter, ImageSource image, Rect destinationRect, CornerRadius cornerRadius, Rect? sourceUv = null) :
     IEquatable<ImagePayload>, IRenderCachePolicy
 {
     public ImageSource Image { get; } = image;
     public Brush Filter { get; } = filter;
     public Rect DestinationRect { get; } = destinationRect;
     public CornerRadius CornerRadius { get; } = cornerRadius;
+
+    /// <summary>Normalised (0..1) sub-rect of the image to sample - a mosaic tile shows just its fragment of one shared
+    /// photo. Null = the whole image (the default, unchanged behaviour).</summary>
+    public Rect? SourceUv { get; } = sourceUv;
 
     public bool RequiresBufferRebuild(IRenderCachePolicy newState)
     {
@@ -23,19 +27,21 @@ public class ImagePayload(Brush filter, ImageSource image, Rect destinationRect,
         // frame (its own BitmapSource + texture) each tick, so without this the render unit keeps the first frame.
         return DestinationRect != payload.DestinationRect
                || CornerRadius != payload.CornerRadius
+               || !Nullable.Equals(SourceUv, payload.SourceUv)
                || !Equals(Image, payload.Image);
     }
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(Image, Filter, DestinationRect, CornerRadius);
+        return HashCode.Combine(Image, Filter, DestinationRect, CornerRadius, SourceUv);
     }
 
     public bool Equals(ImagePayload other)
     {
         if (other is null) return false;
         if (ReferenceEquals(this, other)) return true;
-        return Equals(Image, other.Image) && Equals(Filter, other.Filter) && DestinationRect.Equals(other.DestinationRect) && CornerRadius.Equals(other.CornerRadius);
+        return Equals(Image, other.Image) && Equals(Filter, other.Filter) && DestinationRect.Equals(other.DestinationRect)
+               && CornerRadius.Equals(other.CornerRadius) && Nullable.Equals(SourceUv, other.SourceUv);
     }
 
     public override bool Equals(object obj)

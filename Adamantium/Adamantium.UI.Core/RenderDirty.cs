@@ -57,6 +57,22 @@ public static class RenderDirty
     /// <summary>Records that something moved (world transforms must be re-baked; no re-record).</summary>
     public static void MarkTransform() => _transform = true;
 
+    // MOTION NODES that moved this frame (their subtrees translate as a unit - a scrolled panel). Unlike the global
+    // _transform flag, a node move doesn't invalidate anyone's baked geometry: instances under the node reference its
+    // transform-table slot, so the render just rewrites the node's matrix (64 bytes) and replays - THE O(1)-scroll path.
+    private static readonly HashSet<IUIComponent> NodeSet = new();
+
+    /// <summary>Records that a MOTION NODE moved (its table slot must be rewritten; nothing re-bakes/re-records).
+    /// Locked for the same parallel-arrange reason as <see cref="MarkGeometry"/>.</summary>
+    public static void MarkNodeTransform(IUIComponent node)
+    {
+        if (node == null) return;
+        lock (NodeSet) NodeSet.Add(node);
+    }
+
+    /// <summary>The moved motion nodes (valid until <see cref="Clear"/>).</summary>
+    public static IReadOnlyCollection<IUIComponent> MovedNodes => NodeSet;
+
     /// <summary>Records a structural change (add/remove/command-count change) - the paint-order list must be rebuilt.</summary>
     public static void MarkStructural() { _structural = true; TotalStructuralMarks++; }
 
@@ -75,7 +91,7 @@ public static class RenderDirty
     }
 
     /// <summary>Any dirty state at all (else the frame is fully clean).</summary>
-    public static bool HasWork => _structural || _transform || GeometrySet.Count > 0 || _forceUntilSettled || _finalForcedBuild;
+    public static bool HasWork => _structural || _transform || GeometrySet.Count > 0 || NodeSet.Count > 0 || _forceUntilSettled || _finalForcedBuild;
 
     public static bool IsStructural => _structural || _forceUntilSettled || _finalForcedBuild;
     public static bool IsTransform => _transform;
@@ -87,6 +103,7 @@ public static class RenderDirty
     public static void Clear()
     {
         GeometrySet.Clear();
+        NodeSet.Clear();
         _transform = false;
         _structural = false;
         _finalForcedBuild = false;   // the post-settle walk ran; forcing ends (_forceUntilSettled survives Clear by design)

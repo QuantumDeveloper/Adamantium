@@ -15,6 +15,10 @@ public interface IDrawingSession
     IDrawingSession DrawEllipse(Rect destinationRect, Brush brush, Double startAngle, Double sweepAngle, EllipseType ellipseType, Pen pen = null);
     IDrawingSession DrawGeometry(Brush brush, Geometry geometry, Pen pen = null);
     IDrawingSession DrawImage(ImageSource image, Brush filter, Rect destinationRect, CornerRadius corners);
+
+    /// <summary>Draws a normalised (0..1) SUB-RECT of the image into <paramref name="destinationRect"/> - a mosaic tile
+    /// shows just its fragment of one shared photo without cropping/copying the bitmap.</summary>
+    IDrawingSession DrawImage(ImageSource image, Brush filter, Rect destinationRect, CornerRadius corners, Rect sourceUv);
     IDrawingSession DrawText(TextRenderingParameters renderingParameters, 
         Size desiredSize, 
         TextLayout textLayout,

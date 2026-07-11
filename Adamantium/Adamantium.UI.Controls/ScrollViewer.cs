@@ -187,12 +187,36 @@ public class ScrollViewer : ContentControl
 
     // Content metrics changed (resize, scroll): push them onto the bars (Maximum/ViewportSize/Value) and re-evaluate
     // Auto visibility. Guarded so setting Value here doesn't bounce back through OnBarValueChanged into the presenter.
+    private Size _lastPushedExtent = new(-1, -1);
+    private Size _lastPushedViewport;
+    private Vector2 _lastPushedOffset;
+
     private void OnScrollMetricsChanged(object sender, EventArgs e)
     {
         if (_presenter == null) return;
         var extent = _presenter.Extent;
         var viewport = _presenter.Viewport;
         var offset = _presenter.Offset;
+
+        // Coalesce the SUB-PIXEL scroll stream. A high-resolution wheel / touchpad pushes metrics every frame with the
+        // offset creeping by a fraction of a pixel; each push re-writes both bars' Value, which re-arranges the whole
+        // scrollbar template - a per-frame render churn that kept the scene in constant partials (and let the odd full
+        // walk catch a virtualization row-transition mid-flight = the row that "blinks"). The thumb travel for such a
+        // tiny offset move is invisible (its length maps the whole extent onto the trough), so skip the push until the
+        // thumb would actually move a visible amount, or the extent/viewport themselves change (resize / count change).
+        if (extent == _lastPushedExtent && viewport == _lastPushedViewport)
+        {
+            // "Visible" is 0.5 DEVICE pixels: the thumb travel is in logical px, so the imperceptibility floor scales
+            // with the display's DPI (0.5 logical px is a coarser skip on a hi-DPI panel where it maps to more device px).
+            var dpi = (RootVisual as WindowBase)?.DpiScale ?? new Vector2(1, 1);
+            var span = new Vector2((float)Math.Max(1, extent.Width - viewport.Width), (float)Math.Max(1, extent.Height - viewport.Height));
+            var thumbMoveX = Math.Abs(offset.X - _lastPushedOffset.X) * viewport.Width / span.X * dpi.X;
+            var thumbMoveY = Math.Abs(offset.Y - _lastPushedOffset.Y) * viewport.Height / span.Y * dpi.Y;
+            if (thumbMoveX < 0.5 && thumbMoveY < 0.5) return;
+        }
+        _lastPushedExtent = extent;
+        _lastPushedViewport = viewport;
+        _lastPushedOffset = offset;
 
         _syncingBars = true;
         if (_verticalBar != null)
