@@ -13,8 +13,11 @@ namespace Adamantium.UI.Rendering;
 [StructLayout(LayoutKind.Sequential)]
 public struct EllipseItem
 {
-    /// <summary>World-space bounding box: x, y, w, h.</summary>
+    /// <summary>Node-local bounding box: x, y, w, h (world for slot-0 legacy bakes - the identity matrix).</summary>
     public Vector4F Bounds;
+
+    /// <summary>.x = transform-table slot (0 = identity); .yzw reserved. Mirrors the shader's EllipseData.Params.</summary>
+    public Vector4F Params;
 
     /// <summary>Straight (non-premultiplied) fill colour, element/brush opacity already folded into .w.</summary>
     public Vector4F Color;

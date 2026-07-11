@@ -669,11 +669,27 @@ public class ImageRenderUnit : RenderUnit<ImagePayload>
         // empty -> the component's VertexBuffer is null -> UIRenderComponent.Render early-returns and the image is
         // never drawn (this is why images never appeared while text/solid shapes did).
         rectangleGeometry.ProcessGeometry(GeometryType.Solid);
+        RemapSourceUv(rectangleGeometry.Mesh, Payload.SourceUv);
         if (Payload.Image is BitmapSource bitmapImage)
         {
+            // Null when the image's async decode hasn't produced pixels yet - the unit draws nothing this frame and
+            // UpdateWithDrawCommand retries on the next re-render (Render() itself is null-tolerant).
             GeometryRenderer = CreateImageRenderer(rectangleGeometry.Mesh, bitmapImage);
-            GeometryRenderer.RenderData = DrawCommand.RenderData;
+            if (GeometryRenderer != null) GeometryRenderer.RenderData = DrawCommand.RenderData;
         }
+    }
+
+    // A mosaic tile samples just its normalised sub-rect of the shared photo: squeeze the quad's 0..1 UVs into it.
+    private static void RemapSourceUv(Adamantium.Graphics.Core.Models.Mesh mesh, Rect? sourceUv)
+    {
+        if (sourceUv is not { } src || mesh?.UV0 == null || mesh.UV0.Length == 0) return;
+        var uvs = new Vector2F[mesh.UV0.Length];
+        for (var i = 0; i < uvs.Length; i++)
+        {
+            var uv = mesh.UV0[i];
+            uvs[i] = new Vector2F((float)(src.X + uv.X * src.Width), (float)(src.Y + uv.Y * src.Height));
+        }
+        mesh.SetUVs(0, uvs);
     }
 
     // BitmapSource (not just BitmapImage) so SharedSurfaceImage / RenderTargetImage also render. A live shared
@@ -682,6 +698,7 @@ public class ImageRenderUnit : RenderUnit<ImagePayload>
     private ImageRenderComponent CreateImageRenderer(Adamantium.Graphics.Core.Models.Mesh mesh, BitmapSource image)
     {
         var texture = image.GetOrCreateTexture(ResourceFactory);
+        if (texture == null) return null;   // decode still pending - no texture yet, draw nothing until a re-render
         var component = new ImageRenderComponent(GraphicsDevice, UIBasicEffect, mesh, texture, BufferManager)
         {
             Sampler = GraphicsDevice.SamplerStates.LinearClampToEdge
@@ -705,11 +722,20 @@ public class ImageRenderUnit : RenderUnit<ImagePayload>
         if (Payload.RequiresBufferRebuild(inputPayload))
         {
             rectangleGeometry.ProcessGeometry(GeometryType.Both);
+            RemapSourceUv(rectangleGeometry.Mesh, inputPayload.SourceUv);
             GeometryRenderer?.DeferDispose();
             if (inputPayload.Image is BitmapSource bitmapImage)
             {
                 GeometryRenderer = CreateImageRenderer(rectangleGeometry.Mesh, bitmapImage);
             }
+        }
+        else if (GeometryRenderer == null && inputPayload.Image is BitmapSource pendingImage)
+        {
+            // The unit was built while the image's async decode was still running (no texture -> no renderer).
+            // The pixels are usually in by the time the tile re-renders - build the renderer now.
+            rectangleGeometry.ProcessGeometry(GeometryType.Both);
+            RemapSourceUv(rectangleGeometry.Mesh, inputPayload.SourceUv);
+            GeometryRenderer = CreateImageRenderer(rectangleGeometry.Mesh, pendingImage);
         }
 
         DrawCommand = drawCommand;

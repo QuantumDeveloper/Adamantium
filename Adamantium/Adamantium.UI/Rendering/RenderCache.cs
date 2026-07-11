@@ -123,6 +123,8 @@ public class RenderCache
             {
                 _worldCache.Clear();
                 _clipCache.Clear();
+                _relWorldCache.Clear();
+                _nodeCache.Clear();
             }
 
             // Snapshot the dirty set: ReRenderInPlace re-renders each component, and a component's Render can mark MORE
@@ -143,9 +145,12 @@ public class RenderCache
             {
                 LastBuildKind = RenderBuildKind.Partial;   // no full walk (only the dirty components' unit contents)
                 LastBuildTransformDirty = RenderDirty.IsTransform;   // geometry-only partial -> nothing moved -> proc can be skipped
-                // Remember which components changed so the draw phase can patch just their slots + replay (below).
+                // Remember which components changed so the draw phase can patch just their slots + replay (below), and
+                // which MOTION NODES moved so it can rewrite their table matrices (the O(1)-scroll path).
                 _partialDirty.Clear();
                 _partialDirty.AddRange(_geometryDirtyBuffer);
+                _movedNodesBuf.Clear();
+                _movedNodesBuf.AddRange(RenderDirty.MovedNodes);
                 RenderDirty.Clear();
                 return;
             }
@@ -158,6 +163,8 @@ public class RenderCache
         _commands.Clear();
         _worldCache.Clear();
         _clipCache.Clear();
+        _relWorldCache.Clear();
+        _nodeCache.Clear();
         BuildRenderCommands(visualRoot);
         _built = true;
         RenderDirty.Clear();
@@ -198,6 +205,12 @@ public class RenderCache
             while (top.VisualParent != null) top = top.VisualParent;
             if (!ReferenceEquals(top, _lastVisualRoot)) return true;
         }
+
+        // Marked dirty EXTERNALLY (an animation heartbeat / duplicate mark) while its own geometry is still VALID:
+        // Render() below no-ops on the flag and records ZERO commands, which the count-change path would read as
+        // "now draws nothing" and DELETE the retained units (the mass tile vanish on ease-back completion). Nothing
+        // about its recorded geometry changed - keep the retained units as-is.
+        if (component.IsGeometryValid) return true;
 
         _drawingContextInternal.Clear();
         component.Render(_drawingContext);   // NB: consumes the dirty flag (Render sets IsGeometryValid back to true)
@@ -272,6 +285,8 @@ public class RenderCache
         _groups.Clear();
         _worldCache.Clear();   // new frame: drop last frame's transform + clip memos
         _clipCache.Clear();
+        _relWorldCache.Clear();
+        _nodeCache.Clear();
 
         var present = new HashSet<Guid>();
         if (components != null)
@@ -345,6 +360,84 @@ public class RenderCache
         return m;
     }
 
+    // --- Motion-node memos (the O(1)-scroll path) --------------------------------------------------------------------
+    // NodeOf: the nearest IsRenderMotionNode ancestor (or null). RelWorld: the component's transform RELATIVE to that
+    // node (identity AT the node) - what a node-local bake uses; the shader applies the node's table matrix on top.
+    // Cleared together with _worldCache (same lifetime: structure/transform changes invalidate both).
+    private readonly Dictionary<IUIComponent, IUIComponent> _nodeCache = new();
+    private readonly Dictionary<IUIComponent, Matrix4x4F> _relWorldCache = new();
+    private readonly Dictionary<IUIComponent, int> _nodeRefreshed = new();   // node -> walk version its slot was refreshed
+    // Per RECORDING walk: node -> "every drawn unit under it is in a node-aware batch (rect/ellipse with its slot)".
+    // A moved node with ANY non-aware content (world-baked text, per-unit draws) can't take the slot-write fast path -
+    // those retained draws would stay at the old position - so the frame falls back to the full walk.
+    private readonly Dictionary<Guid, bool> _nodeAllAware = new();
+    private readonly List<IUIComponent> _movedNodesBuf = new();   // nodes captured from RenderDirty for the draw phase
+
+    private IUIComponent NodeOf(IUIComponent c)
+    {
+        if (c == null) return null;
+        if (_nodeCache.TryGetValue(c, out var n)) return n;
+        n = c.IsRenderMotionNode ? c : NodeOf(c.VisualParent);
+        _nodeCache[c] = n;
+        return n;
+    }
+
+    private Matrix4x4F RelWorld(IUIComponent c)
+    {
+        if (_relWorldCache.TryGetValue(c, out var m)) return m;
+        m = c.IsRenderMotionNode
+            ? Matrix4x4F.Identity
+            : (c.VisualParent is { } p ? c.LocalTransform * RelWorld(p) : c.LocalTransform);
+        _relWorldCache[c] = m;
+        return m;
+    }
+
+    // Resolve a unit's bake transform + transform-table slot: node-local + the node's slot when under a motion node
+    // (refreshing the node's matrix once per walk), else world + slot 0 (identity).
+    private Matrix4x4F ResolveBake(IGraphicsDevice device, IUIComponent component, Matrix4x4F world, out int slot)
+    {
+        var node = NodeOf(component);
+        if (node == null) { slot = 0; return world; }
+        slot = _transformTable.AcquireSlot(node.RenderId);
+        if (!_nodeRefreshed.TryGetValue(node, out var v) || v != _walkVersion)
+        {
+            _nodeRefreshed[node] = _walkVersion;
+            _transformTable.SetMatrix(device, slot, World(node));
+        }
+        _nodeAllAware.TryAdd(node.RenderId, true);
+        return RelWorld(component);
+    }
+
+    // A unit under a motion node drew through a path its slot matrix can't move (world-baked text, per-unit, gradient
+    // for now) -> the node loses the slot-write fast path this frame set (recorded per walk).
+    private void MarkNodeNotAware(IUIComponent component)
+    {
+        var node = NodeOf(component);
+        if (node != null) _nodeAllAware[node.RenderId] = false;
+    }
+
+    // Apply the moved nodes' new matrices (64 bytes each) before a replay-based draw; stale position memos drop and are
+    // rebuilt lazily O(dirty). Returns false when ANY moved node has non-aware retained content - the caller full-walks.
+    private bool RefreshMovedNodes(IGraphicsDevice device)
+    {
+        if (_movedNodesBuf.Count == 0) return true;
+        foreach (var node in _movedNodesBuf)
+            if (!_nodeAllAware.GetValueOrDefault(node.RenderId, false))
+                return false;
+        // Positions moved - drop the WORLD memos (rebuilt lazily). NOT the clip memo: a clip is the ClipToBounds
+        // ancestors' viewport (a scroll viewport, a panel), which a node moving INSIDE it never changes; the spliced-patch
+        // bake that follows reads CumulativeClip, and recomputing it from live ancestor Bounds mid-relayout produced a
+        // transiently-wrong viewport that CULLED on-screen tiles for one frame (the hover "empty cell"). A move that DOES
+        // change a viewport (resize/maximize) is structural -> a full walk, which clears every memo in BuildFromVisualTree.
+        _worldCache.Clear();
+        _relWorldCache.Clear();
+        foreach (var node in _movedNodesBuf)
+            if (_transformTable.TryGetSlot(node.RenderId, out var slot))
+                _transformTable.SetMatrix(device, slot, World(node));
+        _movedNodesBuf.Clear();
+        return true;
+    }
+
     // Frame-scoped clip memo. A unit's scissor is the intersection of every ClipToBounds ancestor's world-space viewport -
     // a value that depends ONLY on the ancestor chain, not the unit, so all units under the same clipping ancestor (e.g.
     // every item in one ScrollViewer) share the SAME clip. The old code recomputed that whole walk per unit (180 tiles ->
@@ -376,6 +469,12 @@ public class RenderCache
     // share one clip GROUP (_batchScissor): a scissor (or text-atlas) change flushes both together, preserving order.
     private RectBatchCollector _rectBatch;
     private EllipseBatchCollector _ellipseBatch;   // SDF family, same fill layer as rects (below text)
+
+    // GPU-resident transform table (one world matrix per MOTION NODE; slot 0 = identity for legacy world-space bakes).
+    // The SDF vertex shaders fetch each instance's matrix by its slot index, so moving a node costs ONE matrix write
+    // instead of re-baking its instances - and rotated/3D instances stay batched. Owned per cache (the popup overlay
+    // cache gets its own), initialised in the Render device block alongside the collectors.
+    private TransformTable _transformTable;
     private GradientRectCollector _gradientRectBatch;   // SDF family: rounded rects with a linear/radial GRADIENT fill
     private GradientEllipseCollector _gradientEllipseBatch;   // SDF family: ellipses with a linear/radial GRADIENT fill
     private Rect2D _batchScissor;
@@ -466,7 +565,22 @@ public class RenderCache
         var scissorNarrowed = false;   // whether the active scissor is currently narrower than fullScissor
 
         _recording = device != null;   // a device walk records its op stream for a later clean-frame replay
-        if (_recording) { _ops.Clear(); _opsReplayable = true; _rectSlotByUnit.Clear(); _walkGroup = null; _walkVersion++; }
+        if (_recording)
+        {
+            _ops.Clear(); _opsReplayable = true; _rectSlotByUnit.Clear(); _walkGroup = null; _walkVersion++;
+            _nodeAllAware.Clear();
+            _movedNodesBuf.Clear();   // a full walk re-bakes fresh node matrices - pending node moves are subsumed
+            // ...but "subsumed" is only true if this walk composes CURRENT transforms. A partial build drops the
+            // world memos only on a global-transform frame; when the fast path BAILS on a moved node (non-aware content -
+            // e.g. a tile that just face-swapped to an image), it bails BEFORE its own memo flush, and this fall-through
+            // walk then re-baked the moving subtree at LAST frame's memoized position - a flipping tile froze at the 90°
+            // swap angle until any global transform change (a scroll) happened to flush the memo. Clear the WORLD memos
+            // (positions) - but NOT the clip memo: a clip is the ClipToBounds ancestors' VIEWPORT rect (a scroll viewport,
+            // a panel), which a node's own move never changes, and recomputing it from live ancestor Bounds mid-relayout
+            // yielded a transiently-wrong viewport that CULLED on-screen tiles for a frame (the hover "empty cell").
+            _worldCache.Clear();
+            _relWorldCache.Clear();
+        }
 
         // Text + item-background + instanced-fill batches: reset per frame. Device renders only - GPU-free tests skip batching.
         if (device != null)
@@ -481,6 +595,22 @@ public class RenderCache
             _ellipseBatch.BeginFrame(device);
             _gradientRectBatch.BeginFrame(device);
             _gradientEllipseBatch.BeginFrame(device);
+            // Transform table: identity at slot 0 (legacy world-baked instances), (re)sized at this fence-safe point;
+            // the SDF collectors read the address per draw (BeginFrame may have reallocated the buffer).
+            if (_transformTable == null)
+            {
+                _transformTable = new TransformTable();
+                _transformTable.EnsureResources(device);
+                _transformTable.SetMatrix(device, _transformTable.AcquireSlot(Guid.Empty), Matrix4x4F.Identity);
+            }
+            else
+            {
+                _transformTable.EnsureResources(device);
+            }
+            _rectBatch.TransformsAddress = _transformTable.DeviceAddress;
+            _ellipseBatch.TransformsAddress = _transformTable.DeviceAddress;
+            _gradientRectBatch.TransformsAddress = _transformTable.DeviceAddress;
+            _gradientEllipseBatch.TransformsAddress = _transformTable.DeviceAddress;
             var sceneClean = LastBuildKind == RenderBuildKind.Clean;
             _textBatch.SceneClean = sceneClean;
             _rectBatch.SceneClean = sceneClean;
@@ -525,7 +655,16 @@ public class RenderCache
                 // The unit's owner is entirely outside its clip (a virtualized item just off the viewport, content
                 // sliding out, etc.): nothing of it is visible, so don't draw it and don't feed it to a batch. The
                 // per-surviving-unit scissor is set below.
-                if (cull) continue;
+                if (cull)
+                {
+                    // A culled unit draws nothing, so its motion node stays PATCHABLE: rewriting the node's matrix
+                    // can't desync retained draws that don't exist. Without this, tilting off-viewport tiles (the tilt
+                    // FIELD moves every tile, including scrolled-out ones) left their nodes un-aware -> every mouse
+                    // frame bailed to a full walk instead of the slot-write fast path.
+                    if (_recording && NodeOf(unit.Component) is { } culledNode)
+                        _nodeAllAware.TryAdd(culledNode.RenderId, true);
+                    continue;
+                }
             }
 
             // Bake AND draw with the same transform the cull just approved: refresh RenderData ONCE here (the batches
@@ -541,7 +680,8 @@ public class RenderCache
             {
                 if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
-                if (_rectBatch.TryAdd(rru.RectPayload, wt, rru.FillOpacity, scissor, LogicalBounds(unit.Component, wt)))
+                var bakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Rect);
+                if (_rectBatch.TryAdd(rru.RectPayload, bakeWorld, rru.FillOpacity, scissor, LogicalBounds(unit.Component, wt), slot4Rect))
                 {
                     if (_recording)
                     {
@@ -569,9 +709,10 @@ public class RenderCache
                 // pass (the pixel shader evaluates the gradient). Shares the clip group with the other batches.
                 if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
-                if (_gradientRectBatch.TryAdd(grru.RectPayload, wt, grru.FillOpacity, scissor, LogicalBounds(unit.Component, wt)))
+                var gradBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Grad);
+                if (_gradientRectBatch.TryAdd(grru.RectPayload, gradBakeWorld, grru.FillOpacity, scissor, LogicalBounds(unit.Component, wt), slot4Grad))
                 {
-                    if (_recording) group.PatchableRectOnly = false;   // non-rect-batch draw -> not rect-patchable
+                    if (_recording) group.PatchableRectOnly = false;   // gradient: node-aware, but not rect-splice-patchable
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -583,7 +724,8 @@ public class RenderCache
             {
                 if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
-                if (_ellipseBatch.TryAdd(eru.EllipsePayload, wt, eru.FillOpacity, scissor, LogicalBounds(unit.Component, wt)))
+                var bakeWorld = ResolveBake(device, unit.Component, wt, out var slot4El);
+                if (_ellipseBatch.TryAdd(eru.EllipsePayload, bakeWorld, eru.FillOpacity, scissor, LogicalBounds(unit.Component, wt), slot4El))
                 {
                     if (_recording) group.PatchableRectOnly = false;   // non-rect-batch draw -> not rect-patchable
                     _batchScissor = scissor;
@@ -599,9 +741,10 @@ public class RenderCache
                 // A full ellipse with a LINEAR/RADIAL gradient fill: gradient sibling of the solid ellipse SDF batch.
                 if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
-                if (_gradientEllipseBatch.TryAdd(geru.EllipsePayload, wt, geru.FillOpacity, scissor, LogicalBounds(unit.Component, wt)))
+                var gradElBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4GradEl);
+                if (_gradientEllipseBatch.TryAdd(geru.EllipsePayload, gradElBakeWorld, geru.FillOpacity, scissor, LogicalBounds(unit.Component, wt), slot4GradEl))
                 {
-                    if (_recording) group.PatchableRectOnly = false;   // non-rect-batch draw -> not rect-patchable
+                    if (_recording) group.PatchableRectOnly = false;   // gradient: node-aware, but not rect-splice-patchable
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -615,7 +758,7 @@ public class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 if (_textBatch.TryAdd(tc, wt, scissor, atlas, LogicalBounds(unit.Component, wt)))
                 {
-                    if (_recording) group.PatchableRectOnly = false;   // text-batched -> not rect-patchable
+                    if (_recording) { group.PatchableRectOnly = false; MarkNodeNotAware(unit.Component); }   // text: world-baked glyphs
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;   // baked into the batch - drawn at the next flush
@@ -632,7 +775,7 @@ public class RenderCache
                 if (_instancedFill.TryAdd(gru, wt, scissor, LogicalBounds(unit.Component, wt)))
                 {
                     gru.FillInstanced = true;
-                    if (_recording) group.PatchableRectOnly = false;   // instanced-fill -> not rect-patchable
+                    if (_recording) { group.PatchableRectOnly = false; MarkNodeNotAware(unit.Component); }   // instanced fill: world-baked
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;   // fill batched; fringe/stroke drawn at the flush, over the fill
@@ -649,7 +792,7 @@ public class RenderCache
                 if (_instancedFill.TryAddGradient(ggru, wt, scissor, LogicalBounds(unit.Component, wt)))
                 {
                     ggru.FillInstanced = true;
-                    if (_recording) group.PatchableRectOnly = false;   // non-rect-batch draw -> not rect-patchable
+                    if (_recording) { group.PatchableRectOnly = false; MarkNodeNotAware(unit.Component); }   // instanced gradient: world-baked
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -697,7 +840,7 @@ public class RenderCache
                 }
             }
 
-            if (_recording) group.PatchableRectOnly = false;   // a per-unit draw (or batch-rejected fallthrough) -> not rect-patchable
+            if (_recording) { group.PatchableRectOnly = false; MarkNodeNotAware(unit.Component); }   // per-unit draw: world-baked RenderData
             unit.Render();
             if (_recording) _ops.Add(new RenderOp { Kind = RenderOpKind.Unit, Unit = unit });
         }
@@ -706,7 +849,10 @@ public class RenderCache
         if (device != null) FlushBatches(device, fullScissor, ref scissorNarrowed);
         if (scissorNarrowed) { device.SetScissors(fullScissor); RecordScissor(fullScissor); }
 
-        if (_recording) { _opsRecorded = true; _recording = false; }
+        if (_recording)
+        {
+            _opsRecorded = true; _recording = false;
+        }
     }
 
     private void RecordScissor(Rect2D scissor)
@@ -720,6 +866,10 @@ public class RenderCache
     // Validate fully BEFORE patching so a rejected frame leaves no half-applied slots the fallback wouldn't overwrite.
     private bool TryPartialReplay(IGraphicsDevice device, Rect2D fullScissor)
     {
+        // Moved motion nodes first: rewrite their table matrices (64B each) so the replayed segments draw the scrolled
+        // subtrees at their new position. A moved node with non-node-aware retained content bails to the full walk.
+        if (!RefreshMovedNodes(device)) return false;
+
         foreach (var comp in _partialDirty)
         {
             // A dirty component with NO drawn units (a detached/pooled/collapsed element - e.g. a text block that
@@ -738,7 +888,8 @@ public class RenderCache
             foreach (var u in g.Units)
             {
                 var rru = (RectangleRenderUnit)u;
-                if (!RectBatchCollector.BakeItem(rru.RectPayload, World(u.Component), rru.FillOpacity, out var item))
+                var bakeWorld = ResolveBake(device, u.Component, World(u.Component), out var slot);
+                if (!RectBatchCollector.BakeItem(rru.RectPayload, bakeWorld, rru.FillOpacity, slot, out var item))
                     return false;   // became non-bakeable (rotated); the full walk re-bakes everything anyway
                 _rectBatch.UpdateSlot(device, _rectSlotByUnit[u], item);
             }
@@ -760,9 +911,24 @@ public class RenderCache
     // path for unit-count changes (hover 0<->1 backgrounds, a live chart). Requirements per dirty group (else return
     // false BEFORE mutating anything -> the caller full-walks): every unit rect-batchable NOW; a group with retained
     // runs must have been rect-only on the last recording walk (its old draws are then fully described by RectRuns).
+    // A spliced patch APPENDS the re-baked group at the arena's end (abandoning its old slots) and INSERTS segment ops
+    // into the retained stream - neither is reclaimed until a full walk resets Count/_ops at BeginFrame. A sustained
+    // burst (hovering across a list, every item's hover-background toggling = a count-change splice) therefore grows the
+    // arena and the op stream without bound (measured: ops 30 -> 1300+), and replaying a 1300-op stream every frame is
+    // both slow and increasingly fragile (a stale/duplicated segment op mis-draws a cell for a frame). Cap the op stream:
+    // once it grows past this, the splice yields to a full walk - its designed fallback - which recompacts the arena and
+    // re-records a clean, minimal stream. The fast path still serves normal short bursts (a few hovers).
+    private const int MaxRetainedOps = 256;
+
     private readonly List<GroupPatch> _patchBuf = new();
     private bool TrySplicedPatch(IGraphicsDevice device, Rect2D fullScissor)
     {
+        // Moved motion nodes first (same as TryPartialReplay): rewrite their matrices, bail on non-aware content.
+        if (!RefreshMovedNodes(device)) return false;
+
+        // Op stream grown too long from accumulated splices -> recompact with a full walk before it mis-replays.
+        if (_ops.Count > MaxRetainedOps) return false;
+
         // ---- Phase 1: validate + bake (no mutation) ----
         _patchBuf.Clear();
         var appendTotal = 0;
@@ -770,13 +936,20 @@ public class RenderCache
         {
             if (!_groupById.TryGetValue(comp.RenderId, out var group)) continue;   // no drawn units - contributes nothing
 
+            // A group's RectRuns are valid ONLY relative to the arena the LAST recording walk (or a splice that ran under
+            // it) built. When a group's WalkVersion is stale, the last full walk did NOT visit it (it was recycled /
+            // scrolled off / re-appeared since) and its slots have been REASSIGNED to whatever the walk recorded in their
+            // place. Its RectRuns now point at OTHER groups' slots, so excising them (phase 2) would remove a live
+            // neighbour's slot from its segment - it draws blank for a frame until a full walk recompacts (the hover
+            // "blink": a stale run at [102+1] excising group 464954's slot 102). A stale group has nothing of its own to
+            // excise: drop its runs and let it re-append fresh. (A splice re-append below re-stamps WalkVersion, so a
+            // group that re-appended this cycle is NOT treated as stale on the next splice.)
+            var walked = group.WalkVersion == _walkVersion;
+            if (!walked) group.RectRuns.Clear();
             var runTotal = 0;
             foreach (var r in group.RectRuns) runTotal += r.Count;
             // A group DESCRIBED by the last recording walk must have been rect-only - otherwise it also drew per-unit /
-            // text / instanced content whose recorded ops we can't excise (stale Unit ops would even replay disposed
-            // units). A group the walk never saw (appeared since - WalkVersion stale) has nothing retained to excise and
-            // is validated purely by baking below.
-            var walked = group.WalkVersion == _walkVersion;
+            // text / instanced content whose recorded ops we can't excise (stale Unit ops would even replay disposed units).
             if (walked && !group.PatchableRectOnly) return false;
 
             var items = new List<RectItem>(group.Units.Count);
@@ -792,7 +965,8 @@ public class RenderCache
                     haveScissor = true;
                     if (cull) break;   // whole component off-clip: it contributes no items (units share the component)
                 }
-                if (!RectBatchCollector.BakeItem(rru.RectPayload, wt, rru.FillOpacity, out var item)) return false;
+                var bakeWorld = ResolveBake(device, u.Component, wt, out var slot);
+                if (!RectBatchCollector.BakeItem(rru.RectPayload, bakeWorld, rru.FillOpacity, slot, out var item)) return false;
                 items.Add(item);
             }
 
@@ -862,6 +1036,7 @@ public class RenderCache
                 group.RectRuns.Clear();
                 group.RectRuns.Add((newFirst, p.Items.Length));
                 group.PatchableRectOnly = true;
+                group.WalkVersion = _walkVersion;   // its runs now describe THIS arena - not stale on the next splice
                 var i = 0;
                 foreach (var u in group.Units) _rectSlotByUnit[u] = newFirst + i++;
             }
@@ -1016,6 +1191,29 @@ public class RenderCache
         {
             clipped = false;
             return fullScissor;
+        }
+
+        // A PERSPECTIVE world (a 3D-rotated tile: M34/M14/M24 carry the w term) cannot be bounds-tested by the affine
+        // AABB below - TransformToAABB does no w-divide, so the box comes out garbage and the tilted tile was culled
+        // (it VANISHED mid-flip). Perspective content is rare and pixel-clipped by the scissor anyway: skip the cull.
+        if (worldTransform.M34 != 0 || worldTransform.M14 != 0 || worldTransform.M24 != 0)
+        {
+            clipped = true;
+            return ToFramebufferScissor(logical, fullScissor);
+        }
+
+        // A unit under a render MOTION NODE (a scrolled panel's item) is drawn through the node's transform-table matrix,
+        // which the O(1)-scroll replay REWRITES every frame WITHOUT re-recording the op stream. So its record-time world
+        // is NOT where later frames draw it: as the node scrolls, an off-viewport BUFFER row (realized ahead so it can
+        // slide in seamlessly) translates INTO view under the very same recorded op. Culling it here (its current world
+        // is still below the fold) drops it from the recorded stream, so the replay leaves it blank until a full walk
+        // re-records - the row "materialising" a frame late as it scrolls in. Don't cull motion-node units: the scissor
+        // still clips them to the viewport, and the realized window is bounded (viewport + a couple of buffer rows), so
+        // recording the few off-screen ones is cheap and the replay can slide them in already-drawn.
+        if (NodeOf(component) != null)
+        {
+            clipped = true;
+            return ToFramebufferScissor(logical, fullScissor);
         }
 
         // Is the unit's own owner fully outside the clip on any axis? Then none of it shows -> let the caller cull it.

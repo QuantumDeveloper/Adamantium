@@ -81,6 +81,11 @@ public unsafe class BitmapSource : ImageSource
 
       if (Texture == null)
       {
+         // Async URI decode still in flight (or failed): no pixels yet. Hand back null - the caller skips drawing and
+         // retries on a later re-render - instead of passing a null byte[] into texture creation (an NRE that killed
+         // the render thread when a flip revealed a photo before its background decode completed).
+         if (_pixels == null) return null;
+
          var textureDescription = new TextureDescription
          {
             Width = PixelWidth,

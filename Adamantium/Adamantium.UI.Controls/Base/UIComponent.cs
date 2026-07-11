@@ -23,7 +23,16 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         // Transform object's inner values without re-assigning this property, so it is covered separately by the render
         // cache's "no active animation" guard instead.
         AdamantiumProperty.Register(nameof(RenderTransform), typeof(Transform), typeof(UIComponent),
-            new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
+            new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender, OnRenderTransformChanged));
+
+    // Tell the transform WHO it moves: a transform tick on a MOTION-NODE owner then marks only that node (one table-slot
+    // matrix rewrite + replay - the O(1) tilt/flip path) instead of the global re-bake-everything transform flag.
+    private static void OnRenderTransformChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is not UIComponent owner) return;
+        if (e.OldValue is Transform old && ReferenceEquals(old.Owner, owner)) old.Owner = null;
+        if (e.NewValue is Transform t) t.Owner = owner;
+    }
     
     public static readonly AdamantiumProperty LayoutTransformProperty =
         AdamantiumProperty.Register(nameof(LayoutTransform), typeof(Transform), typeof(UIComponent));
@@ -307,6 +316,10 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     // Position + size of this element in its parent's space. A MOVE (position change, same size) does NOT touch
     // IsGeometryValid, but it DOES change where the element draws (its world transform), so it must bump the render
     // revision too - otherwise the clean-frame fast path would skip a frame in which a tile just moved.
+    /// <summary>See <see cref="IUIComponent.IsRenderMotionNode"/>. Settable by the element that drives subtree-as-a-unit
+    /// movement (a virtualizing items host under transform-only scroll).</summary>
+    public bool IsRenderMotionNode { get; protected internal set; }
+
     public Rect Bounds
     {
         get => _bounds;
@@ -314,7 +327,11 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         {
             if (_bounds == value) return;
             _bounds = value;
-            RenderDirty.MarkTransform();   // a move: same recorded geometry, only the world transform changes -> re-bake
+            // A MOTION NODE moving is the granular case: its subtree's instances reference its transform-table slot, so
+            // the render rewrites ONE matrix and replays - no global transform invalidation, no O(N) re-bake (the
+            // transform-only scroll). Everything else keeps the conservative global mark.
+            if (IsRenderMotionNode) RenderDirty.MarkNodeTransform(this);
+            else RenderDirty.MarkTransform();   // a move: same recorded geometry, only the world transform changes -> re-bake
         }
     }
 

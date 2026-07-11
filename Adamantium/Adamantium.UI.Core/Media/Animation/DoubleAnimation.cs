@@ -25,4 +25,9 @@ public sealed class DoubleAnimation
 
     /// <summary>Easing curve; null means linear.</summary>
     public IEasingFunction Easing { get; set; }
+
+    /// <summary>What the finished animation leaves behind: <see cref="FillBehavior.HoldEnd"/> (default) keeps the final
+    /// value applied at Animation priority; <see cref="FillBehavior.Stop"/> clears it, releasing the property back to
+    /// its underlying value and to direct sets (an ease-back tilt must not mask later hover writes).</summary>
+    public FillBehavior FillBehavior { get; set; } = FillBehavior.HoldEnd;
 }

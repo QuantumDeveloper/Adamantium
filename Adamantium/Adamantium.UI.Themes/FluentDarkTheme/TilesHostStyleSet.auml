@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions"
+          xmlns:controls="http://adamantium/ui">
+
+    <!-- TilesHost: a 3D flip-tile board. As an ItemsControl subclass it needs its OWN template (selectors match the
+         exact type, not the base), so it gets the same Border>ScrollViewer>ItemsPresenter host as ItemsControl -
+         CanContentScroll=true lets a virtualizing items panel drive it when the board is big. The default ItemsPanel
+         (a vertical virtualizing StackPanel) is usually replaced with a WrapPanel for the tiled layout. -->
+    <Style Selector="TilesHost">
+        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+    </Style>
+
+    <Style Selector="TilesHost">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TilesHost">
+                    <controls:Border Background="{TemplateBinding Background}">
+                        <controls:ScrollViewer CanContentScroll="True"
+                                               HorizontalScrollBarVisibility="Disabled"
+                                               VerticalScrollBarVisibility="Auto">
+                            <controls:ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </controls:ScrollViewer>
+                    </controls:Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

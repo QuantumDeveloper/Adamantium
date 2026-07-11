@@ -38,7 +38,7 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
     // Bake one solid ellipse fill (bounds -> world, colour straight with opacity folded in) into the pending segment.
     // False only if it can't be baked (rotated/sheared world or a GPU-buffer overflow this frame) - the caller then draws
     // that ellipse via the per-unit path.
-    public bool TryAdd(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds)
+    public bool TryAdd(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0)
     {
         const float eps = 1e-4f;
         if (Math.Abs(world.M12) > eps || Math.Abs(world.M21) > eps) return false;   // rotation/shear -> per-unit
@@ -59,7 +59,10 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
         var r = p.DestinationRect;
         Items[Count++] = new EllipseItem
         {
+            // NODE-local when transformSlot != 0 (world is then the transform RELATIVE to the motion node; the vertex
+            // shader applies the node's table matrix on top - the O(1)-scroll path). Slot 0 = identity = world bake.
             Bounds = new Vector4F((float)(r.X * sx + tx), (float)(r.Y * sy + ty), (float)(r.Width * sx), (float)(r.Height * sy)),
+            Params = new Vector4F(transformSlot, 0, 0, 0),
             Color = color,
             StrokeColor = strokeColor,
             Stroke0 = stroke0,

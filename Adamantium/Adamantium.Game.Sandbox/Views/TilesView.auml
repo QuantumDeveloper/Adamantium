@@ -1,0 +1,33 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions">
+    <!-- Tiles 3D: the flip-tile mosaic. TilesHost + FlipTile are engine controls now (Adamantium.UI.Controls, themed by
+         Tiles*StyleSet). TilesHost owns the board mechanics: the tilt field (tiles lean toward the cursor), the diagonal
+         flip wave, and the ONE shared photo (decoded once, texture shared) whose gap-true UV fragments it hands to each
+         tile from their arranged bounds. Tiles stay in the instanced SDF/image draw paths while rotating - rotation only
+         rewrites each tile's transform-table matrix. -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+        <StackPanel Orientation="Vertical" Margin="24" HorizontalAlignment="Center">
+
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                <TextBlock Text="3D flip tiles — hover to tilt, click to flip a tile" FontSize="16" VerticalAlignment="Center"/>
+                <Button Content="Flip all" Command="{Binding FlipAllCommand}" Width="120" Height="34" Margin="24,0,0,0"/>
+            </StackPanel>
+
+            <TilesHost ItemsSource="{Binding Tiles}" Width="1092" HorizontalAlignment="Center"
+                       Photo="Textures/luxfon.tga"
+                       IsFlipped="{Binding AllFlipped}">
+                <TilesHost.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" ItemWidth="91" ItemHeight="91"/>
+                    </ItemsPanelTemplate>
+                </TilesHost.ItemsPanel>
+                <TilesHost.ItemTemplate>
+                    <DataTemplate>
+                        <FlipTile Margin="3" FrontBrush="{Binding Color}"/>
+                    </DataTemplate>
+                </TilesHost.ItemTemplate>
+            </TilesHost>
+
+        </StackPanel>
+    </ScrollViewer>
+</View>

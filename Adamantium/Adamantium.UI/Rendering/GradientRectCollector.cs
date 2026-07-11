@@ -36,12 +36,12 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
 
     // Bake one gradient rounded-rect fill. False only if it can't be baked (rotated/sheared world or a GPU-buffer
     // overflow this frame) - the caller draws it per-unit.
-    public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds)
+    public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0)
     {
         if (p.Brush is not GradientBrush g) return false;
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
-        if (!BakeGradientItem(g, p.DestinationRect, p.CornerRadius.TopLeft, p.Pen, world, opacity, 0f, out var item)) return false;
+        if (!BakeGradientItem(g, p.DestinationRect, p.CornerRadius.TopLeft, p.Pen, world, opacity, 0f, transformSlot, out var item)) return false;
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
         return true;
@@ -51,7 +51,7 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
     // gradient geometry + stops are RELATIVE to the rect (0..1), so one brush paints any size. False on a rotated/sheared
     // world (the axis-aligned instance can't hold it). shape (Geom1.z) selects the shader SDF: 0 rounded-rect, 1 ellipse.
     internal static bool BakeGradientItem(GradientBrush g, Rect dest, double cornerRadius, Pen pen, Matrix4x4F world,
-        double opacity, float shape, out GradientRectItem item)
+        double opacity, float shape, int transformSlot, out GradientRectItem item)
     {
         item = default;
         const float eps = 1e-4f;
@@ -72,7 +72,8 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
         var type = GradientBake.PackGeometry(g, out var geom0, out var geom1);
         item.Geom0 = geom0;
         item.Geom1 = geom1;
-        item.Geom1.Z = shape;   // shader shape branch: 0 rounded-rect, 1 ellipse (Geom1.z is otherwise spare)
+        item.Geom1.Z = shape;          // shader shape branch: 0 rounded-rect, 1 ellipse (Geom1.z is otherwise spare)
+        item.Geom1.W = transformSlot;  // transform-table slot (0 = identity world bake; node-local otherwise)
 
         RectBatchCollector.BakeStroke(pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1);
         item.StrokeColor = strokeColor;

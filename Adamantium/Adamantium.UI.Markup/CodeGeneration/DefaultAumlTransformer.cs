@@ -114,6 +114,28 @@ public class DefaultAumlTransformer : IAumlTransformer
             }
         }
 
+        // The xml-namespace -> assembly registry only holds URIs registered via [XmlnsDefinition]. A property element
+        // on a custom-namespace type (<local:TilesHost.ItemsPanel>) carries the raw clr-namespace declaration instead -
+        // resolve that directly by CLR namespace (honouring an explicit ;assembly= part) so property elements work on
+        // app-assembly controls, not only on framework types.
+        IResolvedAssembly ResolveXmlDefinitionContainer(string xmlNamespace)
+        {
+            const string clrPrefix = "clr-namespace:";
+            if (!xmlNamespace.StartsWith(clrPrefix, StringComparison.Ordinal))
+                return typeResolver.GetResolvedAssemblyByXmlDefinition(xmlNamespace);
+
+            var ns = xmlNamespace.Substring(clrPrefix.Length);
+            var semi = ns.IndexOf(';');
+            if (semi >= 0)
+            {
+                var assemblyName = ns.Substring(semi + 1).Replace("assembly=", string.Empty).Trim();
+                ns = ns.Substring(0, semi);
+                var byAssembly = typeResolver.ResolveAssembly(assemblyName);
+                if (byAssembly != null) return byAssembly;
+            }
+            return typeResolver.FindAssemblyByNamespace(ns);
+        }
+
         IAumlAstTypeReference ProcessTypeReference(IAumlAstTypeReference typeReference, IAumlLineInfo lineInfo)
         {
             if (typeReference == null || typeReference.IsResolved)
@@ -126,7 +148,7 @@ public class DefaultAumlTransformer : IAumlTransformer
                     return ResolveByNameOnly(typeReference, lineInfo);
                 }
 
-                var typeContainer = typeResolver.GetResolvedAssemblyByXmlDefinition(typeReference.Namespace);
+                var typeContainer = ResolveXmlDefinitionContainer(typeReference.Namespace);
 
                 if (typeContainer == null)
                 {
@@ -192,7 +214,7 @@ public class DefaultAumlTransformer : IAumlTransformer
                     return ResolveByNameOnly(typeReference, lineInfo);
                 }
 
-                var typeContainer = typeResolver.GetResolvedAssemblyByXmlDefinition(typeReference.Namespace);
+                var typeContainer = ResolveXmlDefinitionContainer(typeReference.Namespace);
 
                 if (typeContainer == null)
                 {

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions"
+          xmlns:controls="http://adamantium/ui">
+
+    <!-- FlipTile: custom-rendered (draws its front/back in OnRender, no ControlTemplate), so the theme can only seed
+         its properties. FrontBrush is the tile face shown until it flips - a subtle control-fill layer over the board's
+         card background, the WinUI tile look. A tile item that binds FrontBrush (e.g. to its own colour) overrides this
+         default, since a Style setter sits below a {Binding} in priority. -->
+    <Style Selector="FlipTile">
+        <Setter Property="FrontBrush" Value="{ResourceReference ControlFillColorDefault}"/>
+    </Style>
+
+</StyleSet>
