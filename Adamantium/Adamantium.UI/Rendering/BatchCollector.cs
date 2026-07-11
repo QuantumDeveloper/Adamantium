@@ -163,10 +163,73 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     public void DrawRecordedSegment(IGraphicsDevice device, int index, Rect2D fullScissor, Matrix4x4F projection)
     {
         var s = _segments[index];
+        if (s.Count == 0) return;   // fully excluded by a spliced patch (see ExcludeRun) - nothing left to draw
         device.SetScissors(s.Scissor);
         BindSegment(index);
         DrawSegment(device, _gpu, s.Count, s.First, projection);
         device.SetScissors(fullScissor);
+    }
+
+    // --- Spliced-patch surgery (per-control render-cache patching) -------------------------------------------------
+    // A control whose batched unit COUNT changed can't patch its retained slots in place (later slots would shift).
+    // Instead the caller excises the control's OLD run from whatever segment holds it and APPENDS its re-baked items as
+    // a NEW segment at the retained frame's end - no other slot moves; the recorded op stream is spliced accordingly.
+    // Abandoned slots stay allocated but unreferenced; the next full walk compacts naturally (BeginFrame resets Count),
+    // and AppendPatchSegment's capacity precheck caps how much waste can accumulate between walks (a per-frame chart).
+
+    /// <summary>The recorded segment whose retained range contains <paramref name="slot"/>, or -1. Zero-count (fully
+    /// excluded) segments never match.</summary>
+    public int FindSegmentContaining(int slot)
+    {
+        for (var i = 0; i < _segments.Count; i++)
+        {
+            var s = _segments[i];
+            if (s.Count > 0 && slot >= s.First && slot < s.First + s.Count) return i;
+        }
+        return -1;
+    }
+
+    public Rect2D GetSegmentScissor(int index) => _segments[index].Scissor;
+
+    /// <summary>Shrinks segment <paramref name="segmentIndex"/> to end BEFORE <paramref name="first"/> and registers the
+    /// remainder AFTER [first, first+count) as a NEW segment (same scissor), returning its index (-1 when nothing
+    /// remains after). With count = 0 this is a pure SPLIT at <paramref name="first"/> (an op-order insertion point).
+    /// NOTE: only for collectors with no per-segment state (the SDF family) - the split does not re-run
+    /// OnSegmentRecorded, so a stashing collector (the text batch's atlas) must not be patched this way.</summary>
+    public int ExcludeRun(int segmentIndex, int first, int count)
+    {
+        var s = _segments[segmentIndex];
+        var before = first - (int)s.First;
+        var afterCount = (int)s.Count - before - count;
+        _segments[segmentIndex] = new Segment { Scissor = s.Scissor, Count = (uint)Math.Max(0, before), First = s.First };
+        if (afterCount <= 0) return -1;
+        var idx = _segments.Count;
+        _segments.Add(new Segment { Scissor = s.Scissor, Count = (uint)afterCount, First = (uint)(first + count) });
+        return idx;
+    }
+
+    /// <summary>Free retained capacity for patch appends this frame (capacity only grows at the next BeginFrame).</summary>
+    public int PatchCapacityLeft => _gpuCapacity - Count;
+
+    /// <summary>Retained slot count (the next patch append starts here).</summary>
+    public int RetainedCount => Count;
+
+    /// <summary>Appends a spliced control's re-baked items into the RETAINED frame data (no BeginFrame ran): writes them
+    /// after the last used slot, uploads exactly those bytes, mirrors them for the next incremental-upload diff, and
+    /// registers a new segment over the range. The caller pre-checks <see cref="PatchCapacityLeft"/>. Returns the new
+    /// segment's index.</summary>
+    public int AppendPatchSegment(IGraphicsDevice device, ReadOnlySpan<TItem> items, Rect2D scissor)
+    {
+        var first = Count;
+        EnsureCpuCapacity(first + items.Length);
+        items.CopyTo(Items.AsSpan(first));
+        Count = first + items.Length;
+        _gpu.SetData(Items.AsSpan(first, items.Length), (uint)(first * Stride));
+        if (_prevItems == null || _prevItems.Length < Items.Length) Array.Resize(ref _prevItems, Items.Length);
+        items.CopyTo(_prevItems.AsSpan(first));
+        var idx = _segments.Count;
+        _segments.Add(new Segment { Scissor = scissor, Count = (uint)items.Length, First = (uint)first });
+        return idx;
     }
 
     /// <summary>
