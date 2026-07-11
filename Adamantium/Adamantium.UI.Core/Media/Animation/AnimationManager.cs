@@ -47,14 +47,15 @@ public static class AnimationManager
             // cleared, and - being gone from Active - nothing would clear it again (a stuck offset). Active is small,
             // so the linear Contains check is negligible.
             if (!Active.Contains(animation)) continue;
-            // A property animation re-renders every tick. It usually animates an AffectsRender/AffectsMeasure property,
-            // which already marks that ONE component dirty (partial rebuild) via its own callback; a plain Transform's
-            // inner value now self-marks the cheap Transform path (see Transform.UpdateTransform). So the heartbeat only
-            // needs the Transform-level safety net here - NOT MarkStructural, which forced a full-window paint-order
-            // rebuild every animating frame (the tab-drag / indicator-slide lag, felt on ANY tab regardless of content).
-            // A DelegateTicker (scroll inertia, the diagnostics overlay) is NOT marked: it dirties the scene only through
-            // its effects (a moved scroll offset re-arranges children; the overlay rewrites its TextBlock ~4x/sec).
-            if (animation is not DelegateTicker) RenderDirty.MarkTransform();
+            // A property animation re-renders every tick. Its property write usually marks precisely on its own
+            // (AffectsRender -> MarkGeometry on that one component; a Transform's inner value self-marks the Transform
+            // path; a layout-affecting property re-arranges and the moved components' Bounds setters mark). The heartbeat
+            // keeps ONE safety net - the animation's TARGET re-renders this tick - but marks it PER COMPONENT (geometry),
+            // NOT the global Transform flag: the global flag disabled every O(dirty) partial render path (in-place replay
+            // + spliced patch) for the whole duration of ANY animation, so e.g. an auto-hide scrollbar's fade-out
+            // full-walked + re-baked a 60k-unit scene every frame (~25 FPS for seconds). A DelegateTicker (scroll
+            // inertia, the diagnostics overlay) has no target and dirties the scene only through its effects.
+            if (animation.DirtyTarget is { } dirtyTarget) RenderDirty.MarkGeometry(dirtyTarget);
             if (animation.Advance(deltaSeconds))
                 Active.Remove(animation);
         }
@@ -94,5 +95,6 @@ public static class AnimationManager
         public DelegateTicker(Func<double, bool> advance) => _advance = advance;
         public bool Advance(double deltaSeconds) => _advance(deltaSeconds);
         public bool Animates(AdamantiumComponent target, AdamantiumProperty property) => false;
+        public IUIComponent DirtyTarget => null;
     }
 }

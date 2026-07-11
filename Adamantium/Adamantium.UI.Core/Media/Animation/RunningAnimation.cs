@@ -36,6 +36,8 @@ internal sealed class RunningAnimation : IRunningAnimation
     public bool Animates(AdamantiumComponent target, AdamantiumProperty property) =>
         ReferenceEquals(_target, target) && _property == property;
 
+    public IUIComponent DirtyTarget => _target as IUIComponent;
+
     /// <summary>Advances by <paramref name="deltaSeconds"/>; returns true once finished (final value applied,
     /// completion callback fired). Honours Delay, IterationCount (incl. infinite) and AutoReverse (ping-pong).</summary>
     public bool Advance(double deltaSeconds)
