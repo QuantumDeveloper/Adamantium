@@ -46,6 +46,8 @@ internal sealed class RunningKeyFrameAnimation : IRunningAnimation
     public bool Animates(AdamantiumComponent target, AdamantiumProperty property) =>
         ReferenceEquals(_target, target) && _tracks.Any(t => t.Property == property);
 
+    public IUIComponent DirtyTarget => _target as IUIComponent;
+
     public bool Advance(double deltaSeconds)
     {
         _elapsedSeconds += deltaSeconds;
