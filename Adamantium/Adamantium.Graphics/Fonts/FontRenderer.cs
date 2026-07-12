@@ -67,6 +67,8 @@ public class FontRenderer : GraphicsResource
     private EffectParameter effectOutlineWidth;
     private EffectParameter effectSdfBlendLo;
     private EffectParameter effectSdfBlendHi;
+    private EffectParameter effectGlyphInstances;   // BDA address of the per-instance GlyphItem storage buffer (instanced batch)
+    private EffectParameter effectTransforms;       // BDA address of the transform table the glyph VS indexes by slot
 
     private Vector2F currentScreenSize;
     private static readonly Vector2F[] UVCornerCoords = [Vector2F.Zero, Vector2F.UnitX, Vector2F.UnitY, Vector2F.One];
@@ -98,6 +100,8 @@ public class FontRenderer : GraphicsResource
         effectOutlineWidth = fontEffect.OutlineWidth;
         effectSdfBlendLo = fontEffect.SdfBlendLo;
         effectSdfBlendHi = fontEffect.SdfBlendHi;
+        effectGlyphInstances = fontEffect.GlyphInstancesAddress;
+        effectTransforms = fontEffect.TransformsAddress;
     }
 
     public void DrawLayout(TextLayout textLayout, Color foreground, Color stroke)
@@ -297,6 +301,40 @@ public class FontRenderer : GraphicsResource
         // firstInstance offsets the per-instance FontItem fetch to THIS segment's slice of the shared buffer (its data
         // was uploaded at the matching byte offset), so several segments share one buffer without overwriting.
         GraphicsDevice.Draw(4, glyphCount, 0, firstInstance);   // 4 strip verts x glyphCount glyph instances
+    }
+
+    // STORAGE-INSTANCED text batch: per-instance GlyphItem read from a BDA storage buffer by SV_InstanceID, and each
+    // glyph's NODE-LOCAL rect transformed to world on the GPU via the transform table at its slot (slot 0 = identity).
+    // Mirrors the SDF rect/ellipse fills (SdfBatchCollector) - no per-instance vertex buffer, no CPU per-glyph world bake,
+    // and a scrolling block moves by one table matrix write instead of re-baking N glyphs. instancesAddress is pre-offset
+    // to THIS segment's slice (drawn at base instance 0). State/depth/blend match the vertex-buffer DrawBatch above.
+    public void DrawBatch(SamplerState samplerState, FontAtlas atlas, ulong instancesAddress, ulong transformsAddress,
+        uint glyphCount, Matrix4x4F projection)
+    {
+        if (glyphCount == 0) return;
+
+        GraphicsDevice.ColorBlendEnabled = true;
+        GraphicsDevice.ColorBlendEquation = ColorBlendEquations.Premultiplied;
+        GraphicsDevice.PrimitiveRestartEnable = true;
+        GraphicsDevice.DepthTestEnabled = true;
+        GraphicsDevice.DepthWriteEnable = true;
+        GraphicsDevice.DepthCompareFunction = CompareOp.Always;
+
+        effectSampler.SetResource(samplerState);
+        effectTexture.SetResource(atlas.Atlas);
+        effectMatrixTransform.SetValue(projection);
+        effectUVCornerCoords.SetValue(UVCornerCoords);
+        effectFontWeight.SetValue(FontWeight);
+        effectPixelRange.SetValue(atlas.PixelRange);
+        effectAtlasSize.SetValue(new Vector2F(atlas.Atlas.Width, atlas.Atlas.Height));
+        effectSdfBlendLo.SetValue(SdfBlendLo);
+        effectSdfBlendHi.SetValue(SdfBlendHi);
+        effectGlyphInstances.SetValue(instancesAddress);
+        effectTransforms.SetValue(transformsAddress);
+        GraphicsDevice.VertexType = null;
+        GraphicsDevice.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
+        fontEffect.FontBatchRenderMsdfBatchInstancedPass.Apply();
+        GraphicsDevice.Draw(4, glyphCount, 0, 0);   // 4 strip verts x glyphCount instances; address already at this segment
     }
 
     public void RestoreState(bool outerPassActive = true)

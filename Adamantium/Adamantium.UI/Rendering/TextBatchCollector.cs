@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Fonts;
@@ -10,14 +12,20 @@ using Adamantium.Vulkan.Core;
 
 namespace Adamantium.UI.Rendering;
 
-// Text glyph batch (docs/TEXT_GLYPH_BATCH_PLAN.md §9 Stage 2): collects same-clip + same-atlas visible text blocks -
-// their glyphs baked to WORLD space on the CPU - into ONE instanced draw per segment (FontRenderer.DrawBatch reads the
-// foreground from each glyph's per-instance colour, so blocks of different colours share the draw). Segment/buffer/
-// overlap machinery is in BatchCollector; this adds glyph baking + the atlas-bound draw. Rendered ABOVE the rect batch.
-internal sealed class TextBatchCollector : BatchCollector<FontItem>
+// Text glyph batch (docs/TEXT_GLYPH_BATCH_PLAN.md §9 Stage 2): collects same-clip + same-atlas visible text blocks into
+// ONE STORAGE-INSTANCED draw per segment. Each glyph is a per-instance GlyphItem (NODE-LOCAL rect + atlas UV + transform
+// slot + color) in a BDA storage buffer; the glyph VS transforms it to world on the GPU via the transform table at its
+// slot (FontEffect.fx pass RenderMsdfBatchInstanced), so there is NO per-glyph CPU world bake and a scrolling block moves
+// by one table matrix write (node-aware). Foreground is per-instance, so many colors share the draw. Segment/buffer/
+// overlap machinery is in BatchCollector; this adds glyph packing + the atlas-bound draw. Rendered ABOVE the rect batch.
+internal sealed class TextBatchCollector : BatchCollector<GlyphItem>
 {
     private FontAtlas _atlas;            // the pending segment's atlas (one bind per draw)
     private FontRenderer _fontRenderer;
+
+    /// <summary>Device address of the owning cache's transform table - the glyph VS fetches each instance's node matrix
+    /// from it by the instance's slot (set by RenderCache every frame; slot 0 is identity for world-baked glyphs).</summary>
+    public ulong TransformsAddress { get; set; }
 
     // Per-segment atlas + renderer, parallel to the base segment list, so the clean-frame op replay can re-bind each
     // recorded segment's atlas (DrawSegment reads _atlas/_fontRenderer, which otherwise hold only the LAST segment's).
@@ -40,10 +48,6 @@ internal sealed class TextBatchCollector : BatchCollector<FontItem>
         _fontRenderer = s.Renderer;
     }
 
-    // The glyph batch still binds its instances as a per-instance VERTEX buffer (FontRenderer.DrawBatch + the MSDF glyph
-    // shader read vertex attributes), unlike the SDF fills which are storage-instanced. Opt out of the storage default.
-    protected override bool UsesStorageBuffer => false;
-
     // Whether this block can batch at all (and its atlas). Canonical MSDF only - the batch pixel shader is the MSDF
     // variant; outline / gradient-AA / empty / non-solid-foreground text (and UseTextBatch=off) fall back to the
     // per-block direct draw. The clip-group check lives in RenderCache; the atlas check is SameAtlas below.
@@ -63,10 +67,12 @@ internal sealed class TextBatchCollector : BatchCollector<FontItem>
     // Still the pending segment's atlas? (One draw binds one atlas; a change flushes both batches - see RenderCache.)
     public bool SameAtlas(FontAtlas atlas) => !Active || _atlas == atlas;
 
-    // Bake one block's glyphs (positions -> world, foreground -> per-instance colour) into the pending segment. False
-    // only if it can't be baked - a rotated/sheared world (the axis-aligned FontItem rect can't hold it) or a
-    // GPU-buffer overflow this frame - and the caller then renders that block via the per-block direct draw.
-    public bool TryAdd(TextRenderComponent tc, Matrix4x4F world, Rect2D scissor, FontAtlas atlas, Rect logicalBounds)
+    // Pack one block's glyphs into the pending segment: each glyph's LOCAL rect folded by the node-RELATIVE scale/translate
+    // (the axis-aligned rect can hold that), its transform SLOT, its atlas UV, and the block's foreground as a per-instance
+    // colour. NO world matrix is applied here - the glyph VS applies the node matrix (from the transform table at the slot)
+    // on the GPU. False (no write) for a rotated/sheared RELATIVE transform (the axis-aligned rect can't hold it) or a
+    // buffer overflow this frame -> the caller renders that block via the per-block direct draw. Mirrors RectBatchCollector.
+    public bool TryAdd(TextRenderComponent tc, Matrix4x4F relWorld, int transformSlot, Rect2D scissor, FontAtlas atlas, Rect logicalBounds)
     {
         var run = tc.GlyphRun;                        // FROZEN snapshot - the applier never reads the live TextLayout here
         var n = run.Count;
@@ -74,13 +80,27 @@ internal sealed class TextBatchCollector : BatchCollector<FontItem>
         EnsureCpuCapacity(Count + n);
         if (Count + n > GpuCapacity) return false;   // won't fit this frame's GPU buffer -> direct
 
+        const float eps = 1e-4f;
+        if (Math.Abs(relWorld.M12) > eps || Math.Abs(relWorld.M21) > eps) return false;   // rotated relative xform -> direct
+
         var area = tc.RenderingParameters.TextArea;
         var color = ((SolidColorBrush)tc.Foreground).Color.ToVector4();
         color.W *= (float)tc.RenderData.Opacity;      // fold the element's opacity into the glyph alpha
 
-        // Writes n glyphs into Items and advances Count; returns false (no write) for a rotated/sheared world.
-        if (!run.BakeWorld(Items, ref Count, world, new Vector2F((float)area.X, (float)area.Y), color))
-            return false;
+        float sx = relWorld.M11, sy = relWorld.M22, tx = relWorld.M41, ty = relWorld.M42;
+        float ax = (float)area.X, ay = (float)area.Y;
+        var glyphs = run.Glyphs;
+        for (var i = 0; i < n; i++)
+        {
+            var d = glyphs[i].ArrangeRect;   // local x, y, w, h
+            Items[Count++] = new GlyphItem
+            {
+                LocalRect = new Vector4F((d.X + ax) * sx + tx, (d.Y + ay) * sy + ty, d.Z * sx, d.W * sy),
+                Source = glyphs[i].Source,
+                Params = new Vector4F(transformSlot, glyphs[i].Layer, glyphs[i].Depth, 0),
+                Color = color
+            };
+        }
 
         _atlas = atlas;
         _fontRenderer = tc.FontRenderer;
@@ -88,6 +108,10 @@ internal sealed class TextBatchCollector : BatchCollector<FontItem>
         return true;
     }
 
-    protected override void DrawSegment(IGraphicsDevice device, Buffer<FontItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
-        => _fontRenderer.DrawBatch(device.SamplerStates.LinearFont, _atlas, buffer, count, projection, firstInstance);
+    protected override void DrawSegment(IGraphicsDevice device, Buffer<GlyphItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
+    {
+        var stride = (ulong)Marshal.SizeOf<GlyphItem>();
+        _fontRenderer.DrawBatch(device.SamplerStates.LinearFont, _atlas,
+            buffer.GetDeviceAddress() + firstInstance * stride, TransformsAddress, count, projection);
+    }
 }
