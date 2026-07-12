@@ -120,6 +120,15 @@ public class RenderCache
     /// </summary>
     public void RecordFrame(IRootVisualComponent visualRoot)
     {
+        RecordFrameCore(visualRoot);
+        // Step 3 (docs/RENDER_THREAD_PLAN.md): freeze the layout snapshot HERE, at the END of the DEVICE-FREE record, on the
+        // update thread - so the applier (the render thread in 3.3) reads ONLY the frozen packet + snapshot, never a live
+        // component. (The rare partial->full fallback still re-captures inside ApplyFrame until Step 3b hoists it too.)
+        CaptureSnapshot();
+    }
+
+    private void RecordFrameCore(IRootVisualComponent visualRoot)
+    {
         _pendingVisualRoot = visualRoot;   // the applier's partial->full fallback re-records from it (tree still quiescent)
 
         // Fully clean: nothing changed since last build -> the applier re-draws the retained units as-is. Keep the
@@ -226,12 +235,10 @@ public class RenderCache
                     if (!ApplyReRender(draw.Component, draw.Commands)) { fellBack = true; break; }
                 }
                 if (!fellBack)
-                {
-                    CaptureSnapshot();   // freeze the snapshot the draw pass replays this frame (incl. the moved nodes)
-                    break;
-                }
+                    break;   // snapshot already frozen at the end of RecordFrame (Step 3); nothing live to read here
                 // A recorded partial draw had no paint rank -> re-record + apply a full walk. Inline-safe: the tree hasn't
-                // changed since RECORD (single-threaded); Phase 3.3 removes this by moving the decision into RecordFrame.
+                // changed since RECORD (single-threaded); Step 3b moves this decision into RecordFrame. Until then this path
+                // re-records from the live tree, so it must RE-capture the snapshot here (RecordFullFrame cleared it).
                 RecordFullFrame(_pendingVisualRoot);
                 ApplyFullWalk(_packet);
                 CaptureSnapshot();
@@ -241,8 +248,7 @@ public class RenderCache
 
             case RenderBuildKind.Full:
                 ApplyFullWalk(_packet);   // GPU: rebuild the paint-order groups from the packet
-                CaptureSnapshot();
-                _built = true;
+                _built = true;            // snapshot already frozen at the end of RecordFrame (Step 3)
                 break;
         }
 
@@ -490,9 +496,16 @@ public class RenderCache
     // mutates the tree. Memoised + the per-component ancestor early-out (ContainsKey) keep it O(distinct components).
     private void CaptureSnapshot()
     {
+        // Retained units (Clean / the unchanged part of a Partial): last frame's groups still hold them at record time.
         foreach (var group in _groups)
         foreach (var unit in group.Units)
             for (var c = unit.Component; c != null && !_snap.ContainsKey(c); c = c.VisualParent)
+                Snap(c);
+        // THIS frame's recorded draws (every component of a Full walk; the dirty/newly-spliced ones of a Partial): the
+        // groups above are still PRE-apply here (Step 3 captures before ApplyFrame builds them), so the packet is what
+        // carries the new/changed component set. Memoised, so the overlap with the groups above is free.
+        foreach (var draw in _packet.Draws)
+            for (var c = draw.Component; c != null && !_snap.ContainsKey(c); c = c.VisualParent)
                 Snap(c);
         // A moved motion node changed its transform THIS frame, so its cached snapshot is STALE - force-refresh it. The
         // ContainsKey early-out below would otherwise keep last frame's LocalTransform, and RefreshMovedNodes (and the
