@@ -45,6 +45,14 @@ public class ItemContainerGenerator
 
     public IUIComponent ContainerFromIndex(int index) => _byIndex.GetValueOrDefault(index);
 
+    /// <summary>Any currently-realized container, or null if none. Lets the panel sample a real item (e.g. to read the
+    /// tile margin a skeleton card must mirror) without knowing which indices are realized.</summary>
+    public IUIComponent AnyRealizedContainer()
+    {
+        foreach (var container in _byIndex.Values) return container;
+        return null;
+    }
+
     public int IndexFromContainer(IUIComponent container) =>
         container != null && _indexByContainer.TryGetValue(container, out var i) ? i : -1;
 

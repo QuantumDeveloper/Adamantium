@@ -23,4 +23,45 @@
         </Setter>
     </Style>
 
+    <!-- Loading skeleton CARD (theme-authored): one is shown PER budget-deferred slot by a virtualizing panel while a big
+         cold fill / fast fling outruns the per-frame bind budget - the classic per-item skeleton look. A muted white
+         rounded card that gently BREATHES (opacity ~8%..25%), hit-transparent so clicks fall through to real tiles.
+         The breathe is a prebuilt PulseAnimation (baked Min<->Max loop) on the fill BRUSH's Opacity; it targets the
+         NON-visual SolidColorBrush by x:Name (the anim engine resolves named AdamantiumComponents) and the card re-renders
+         each frame via its brush-change subscription. Cards are pooled and reused by the panel, which toggles each card's
+         Visibility as its slot enters/leaves the pending set - so a PropertyTrigger on Visibility STARTS the pulse while
+         the card is shown (loading) and STOPS it (StopAnimationAction) the moment its real item loads and the card is
+         recycled. No C# owns the look; the panel only positions + shows/hides these. -->
+    <Style Selector="ItemsControl">
+        <Setter Property="ItemSkeletonTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <!-- No margin here: the PANEL insets the card by the REAL item's margin (read from a realized tile) so
+                         cards line up exactly with the real tiles and keep the same inter-tile gaps for any list. A faint
+                         static border outlines the card even at the pulse's low point. -->
+                    <controls:Border CornerRadius="4" BorderThickness="1" IsHitTestVisible="False">
+                        <controls:Border.Background>
+                            <SolidColorBrush x:Name="PulseBrush" Color="#FFFFFFFF" Opacity="0.05"/>
+                        </controls:Border.Background>
+                        <controls:Border.BorderBrush>
+                            <SolidColorBrush Color="#FFFFFFFF" Opacity="0.10"/>
+                        </controls:Border.BorderBrush>
+                    </controls:Border>
+                    <DataTemplate.Triggers>
+                        <PropertyTrigger Property="Visibility" Value="Visible">
+                            <PropertyTrigger.EnterActions>
+                                <RunAnimationAction TargetName="PulseBrush">
+                                    <PulseAnimation Property="Opacity" Min="0.05" Max="0.15" Duration="0:0:1.2" Easing="CubicInOut"/>
+                                </RunAnimationAction>
+                            </PropertyTrigger.EnterActions>
+                            <PropertyTrigger.ExitActions>
+                                <StopAnimationAction TargetName="PulseBrush"/>
+                            </PropertyTrigger.ExitActions>
+                        </PropertyTrigger>
+                    </DataTemplate.Triggers>
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </StyleSet>

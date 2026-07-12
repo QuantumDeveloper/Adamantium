@@ -18,7 +18,7 @@ internal sealed class RunningKeyFrameAnimation : IRunningAnimation
         public double[] Values;
     }
 
-    private readonly AnimatableUIComponent _target;
+    private readonly AdamantiumComponent _target;
     private readonly double _durationSeconds;
     private readonly double _delaySeconds;
     private readonly double _iterationCount;
@@ -28,7 +28,7 @@ internal sealed class RunningKeyFrameAnimation : IRunningAnimation
     private readonly List<Track> _tracks;
     private double _elapsedSeconds;
 
-    public RunningKeyFrameAnimation(AnimatableUIComponent target, Animation animation, Action completed)
+    public RunningKeyFrameAnimation(AdamantiumComponent target, Animation animation, Action completed)
     {
         _target = target;
         _durationSeconds = Math.Max(0.0001, animation.Duration.TotalSeconds);
@@ -45,6 +45,8 @@ internal sealed class RunningKeyFrameAnimation : IRunningAnimation
 
     public bool Animates(AdamantiumComponent target, AdamantiumProperty property) =>
         ReferenceEquals(_target, target) && _tracks.Any(t => t.Property == property);
+
+    public bool AnimatesTarget(AdamantiumComponent target) => ReferenceEquals(_target, target);
 
     public IUIComponent DirtyTarget => _target as IUIComponent;
 
@@ -121,7 +123,7 @@ internal sealed class RunningKeyFrameAnimation : IRunningAnimation
         return values[^1];
     }
 
-    private static List<Track> BuildTracks(AnimatableUIComponent target, Animation animation)
+    private static List<Track> BuildTracks(AdamantiumComponent target, Animation animation)
     {
         // Collect every (cue, value) per property name across the keyframes.
         var byProperty = new Dictionary<string, List<(double cue, double value)>>();

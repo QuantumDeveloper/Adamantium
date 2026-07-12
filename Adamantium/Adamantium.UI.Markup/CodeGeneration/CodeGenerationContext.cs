@@ -744,6 +744,22 @@ public class CodeGenerationContext
         if (member.TypeKind == ResolvedTypeKind.Enum)
             return $"{member.FullName}.{valueText}";
 
+        // Floating "specials" are not valid C# numeric literals - emit the framework constant instead (mirrors the
+        // runtime TypeCastFactory, which maps "Auto" -> NaN). Lets a markup double carry them, e.g. an animation's
+        // IterationCount="Infinity" (loop forever) or a Width="NaN".
+        if (member.SpecialType is ResolvedSpecialType.System_Double or ResolvedSpecialType.System_Single)
+        {
+            var floatType = member.SpecialType == ResolvedSpecialType.System_Double ? "double" : "float";
+            switch (valueText)
+            {
+                case "Infinity":
+                case "+Infinity": return $"{floatType}.PositiveInfinity";
+                case "-Infinity": return $"{floatType}.NegativeInfinity";
+                case "NaN":
+                case "Auto": return $"{floatType}.NaN";
+            }
+        }
+
         switch (member.SpecialType)
         {
             case ResolvedSpecialType.System_String:

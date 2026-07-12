@@ -79,6 +79,36 @@ public static class EventManager
       }
    }
 
+   /// <summary>Resolves a routed event by its markup name, so an AUML attribute can name one (e.g. an
+   /// <c>EventTrigger Event="Loaded"</c>). Accepts a bare event name (first owner that declares it wins - names like
+   /// Loaded/MouseDown are effectively unique) or an <c>Owner.Event</c> qualified form to disambiguate. Returns null if
+   /// no registered event matches (the owner type's static ctor may not have run yet - but by template-build time every
+   /// base control that declares the common events is initialised).</summary>
+   public static RoutedEvent FindRoutedEvent(String name)
+   {
+      if (String.IsNullOrEmpty(name)) return null;
+
+      String ownerName = null, eventName = name;
+      var dot = name.LastIndexOf('.');
+      if (dot >= 0)
+      {
+         ownerName = name.Substring(0, dot);
+         eventName = name.Substring(dot + 1);
+      }
+
+      lock (routedEvents)
+      {
+         foreach (var pair in routedEvents)
+         {
+            if (ownerName != null && pair.Key.Name != ownerName) continue;
+            foreach (var routedEvent in pair.Value)
+               if (routedEvent.Name == eventName) return routedEvent;
+         }
+      }
+
+      return null;
+   }
+
    public static void RegisterClassHandler(Type classType, RoutedEvent routedEvent, Delegate handler, Boolean handledEventsToo = false)
    {
       routedEvent.RegisterClassHandler(classType, handler, handledEventsToo);

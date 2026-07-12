@@ -17,8 +17,11 @@ public class RunAnimationAction : ITriggerAction
     {
         if (Animation == null) return;
 
+        // Any AdamantiumComponent, not only an AnimatableUIComponent: a template can x:Name a NON-visual component (a
+        // GradientStop inside a brush) and animate its double property (Offset) - e.g. a looping shimmer sweep. SetValue
+        // and the keyframe track resolution both live on AdamantiumComponent.
         var target = context.FindTarget(TargetName);
-        if (target is AnimatableUIComponent animTarget)
+        if (target is AdamantiumComponent animTarget)
             Animation.Apply(animTarget);
     }
 }

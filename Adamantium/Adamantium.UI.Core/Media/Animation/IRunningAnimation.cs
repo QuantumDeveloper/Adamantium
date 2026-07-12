@@ -10,6 +10,10 @@ internal interface IRunningAnimation
     /// a conflicting in-flight animation when a new one starts on the same property.</summary>
     bool Animates(AdamantiumComponent target, AdamantiumProperty property);
 
+    /// <summary>True when this animation drives ANY property of <paramref name="target"/> - used to stop every animation
+    /// on a component (e.g. a StopAnimationAction / a recycled loading card whose pulse must end).</summary>
+    bool AnimatesTarget(AdamantiumComponent target);
+
     /// <summary>The component whose rendered output this animation drives (null for a delegate ticker). The per-tick
     /// heartbeat marks exactly this component's geometry dirty - a PER-COMPONENT safety net, so an animating frame stays
     /// on the O(dirty) partial render paths instead of a global-flag full re-bake.</summary>

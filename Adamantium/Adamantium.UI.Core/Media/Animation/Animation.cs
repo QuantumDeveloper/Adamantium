@@ -31,7 +31,16 @@ public class Animation
     public List<KeyFrame> KeyFrames { get; } = new();
 
     /// <summary>Starts this animation on <paramref name="target"/>; <paramref name="completed"/> fires when it ends
-    /// (never, for an infinite animation).</summary>
-    public void Apply(AnimatableUIComponent target, Action completed = null) =>
+    /// (never, for an infinite animation). The target is any <see cref="AdamantiumComponent"/> - a UI element OR a
+    /// non-visual component such as a <c>GradientStop</c> (whose owning element repaints via its brush subscription).</summary>
+    public void Apply(AdamantiumComponent target, Action completed = null)
+    {
+        Prepare();
         AnimationManager.BeginKeyFrame(target, this, completed);
+    }
+
+    /// <summary>Hook for a prebuilt animation TYPE (e.g. <c>PulseAnimation</c>) to synthesize its <see cref="KeyFrames"/>
+    /// from friendly properties (Min/Max/...) just before it runs. The base keyframe animation authors its frames in
+    /// markup, so this is a no-op for it.</summary>
+    protected virtual void Prepare() { }
 }

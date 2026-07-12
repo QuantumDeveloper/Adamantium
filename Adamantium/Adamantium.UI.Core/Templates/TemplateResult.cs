@@ -32,7 +32,10 @@ public class TemplateResult
     
     public IUIComponent HostComponent { get; set; }
 
-    public void RegisterName(string name, IUIComponent component)
+    // Accepts any IAdamantiumComponent, not only IUIComponent: a template may x:Name a NON-visual component (e.g. a
+    // GradientStop inside a brush) so a trigger/animation can target it. The namesMap and GetComponentByName already
+    // work in IAdamantiumComponent terms; only this entry point was narrowed.
+    public void RegisterName(string name, IAdamantiumComponent component)
     {
         namesMap[name] = component;
     }
