@@ -38,6 +38,8 @@ internal sealed class RunningAnimation : IRunningAnimation
     public bool Animates(AdamantiumComponent target, AdamantiumProperty property) =>
         ReferenceEquals(_target, target) && _property == property;
 
+    public bool AnimatesTarget(AdamantiumComponent target) => ReferenceEquals(_target, target);
+
     // The visual this animation drives: the target itself, or - when the target is a Transform - the element the
     // transform moves (a Transform is not a visual, so without this every transform animation had NO dirty target and
     // rode only the transform's own node/global marks).

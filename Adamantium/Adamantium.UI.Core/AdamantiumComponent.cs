@@ -560,6 +560,11 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
         if (metadata.AffectsRender)
         {
+            // Keep this element subscribed to the CURRENT brush of a brush-valued render property, so a later mutation OF
+            // the brush itself (an animated gradient stop, a recoloured fill) re-renders it - not only replacing the whole
+            // brush. One place covers any AffectsRender brush property on any element. old != new is guaranteed above.
+            if (oldEffectiveValue is Media.Brush oldBrush) oldBrush.Changed -= OnAffectsRenderBrushChanged;
+            if (newEffectiveValue is Media.Brush newBrush) newBrush.Changed += OnAffectsRenderBrushChanged;
             element?.InvalidateRender(false);
         }
 
@@ -568,6 +573,11 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             RaisePropertyChanged(property, oldEffectiveValue, newEffectiveValue);
         }
     }
+
+    // Re-render this element when a brush it draws with mutates internally (wired in the AffectsRender path above). On a
+    // non-element (a brush setting a sub-brush) the cast is null and this is a no-op.
+    private void OnAffectsRenderBrushChanged(object sender, EventArgs e) =>
+        (this as IUIComponent)?.InvalidateRender(false);
 
     /// <summary>
     /// Throws an exception indicating that the specified property is not registered on this

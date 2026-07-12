@@ -1,7 +1,12 @@
 ﻿using System.Reflection;
+using Adamantium.Core.TypeParsing;
+using Adamantium.UI.Core.TypeParsers;
 
 namespace Adamantium.UI.Core.RoutedEvents;
 
+// [TypeParser] so a markup attribute string (EventTrigger Event="Loaded") resolves to the registered event, like Brush
+// resolves via BrushParser.
+[TypeParser(typeof(RoutedEventParser))]
 public sealed class RoutedEvent
 {
    private readonly List<ClassEventSubsription> classEventSubscriptions = new List<ClassEventSubsription>(); 

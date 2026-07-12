@@ -4,10 +4,8 @@ using System.Linq;
 using Adamantium.Mathematics;
 using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Controls.Base;
-using Adamantium.UI.Controls.Decorators;
 using Adamantium.UI.Core;
-using Adamantium.UI.Core.Media;
-using Adamantium.UI.Core.Media.Animation;
+using Adamantium.UI.Core.Templates;
 
 namespace Adamantium.UI.Controls.Panels;
 
@@ -98,6 +96,10 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
             RemoveLogicalChild(child);
         }
         Owner?.ItemContainerGenerator.Clear();
+        // The loop above also detached the skeleton cards - drop their now-dangling pool/active/set so the next fill
+        // rebuilds fresh ones (else RentSkeleton hands back a card that is no longer a visual child and never renders,
+        // which made skeletons vanish after an ItemTemplate switch / any regenerate).
+        ResetSkeletons();
         InvalidateMeasure();
     }
 
@@ -217,120 +219,179 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         foreach (var child in VisualChildren)
         {
             if (child.Visibility != Visibility.Visible) continue;
-            if (ReferenceEquals(child, _loadingOverlay)) continue;   // panel-owned loading overlay, not a generator container
+            if (_skeletonSet.Contains(child)) continue;   // panel-owned loading card, not a generator container
             if (generator.IndexFromContainer(child) >= 0) continue;   // in the realized window - keep
             child.Visibility = Visibility.Collapsed;
             generator.ReclaimDetached(child);
         }
     }
 
-    // ---- Loading overlay: ONE hit-transparent shimmer over the not-yet-realized region ----
-    // Replaces per-slot skeletons. A single overlay visual covers the BOUNDING BOX of the still-deferred slots, so its
-    // cost is O(1) per frame no matter how many tiles are pending (per-slot skeletons were O(pending) reconcile + an
-    // O(pending) render-dirty from their shimmer, which re-froze a big cold fill). It is:
-    //  - HIT-TRANSPARENT (IsHitTestVisible=false) so clicks fall through to the realized tiles beneath it;
-    //  - TRANSLUCENT, so the realized tiles at the boundary show through - a partial last row never reads as a gap
-    //    (this is why a single box is fine here, unlike an opaque skeleton, which was the objection to one rect);
-    //  - swept by a moving highlight band, faded in only after the fill has run a few frames (no flash on a quick fill)
-    //    and faded out when the fill completes.
-    private Border _loadingOverlay;
-    private GradientStop _s1, _s2, _s3;   // the moving band stops (offsets updated each frame)
-    private double _shimmerPhase;
-    private bool _overlayShown;
+    // ---- Per-slot loading skeletons: one themed ItemSkeletonTemplate card per budget-deferred slot ----
+    // A virtualizing fill can defer part of the window past the per-frame bind budget (generator.PendingIndices). Rather
+    // than a hole, each deferred slot shows a pulsing placeholder card - the classic skeleton look, per-item and clear.
+    // Cards are POOLED (reused across slots/frames, never recreated) and every card is an instanced SDF rect, so a whole
+    // screenful is cheap on the GPU. Each card breathes via the theme's PulseAnimation started on Loaded; a pooled card
+    // keeps pulsing (the tick is a trivial lerp and the engine renders continuously, so stopping it isn't worth the
+    // machinery). Skipped when the ItemsControl has no ItemSkeletonTemplate.
+    private readonly Stack<UIComponent> _skeletonPool = new();               // idle cards, ready to reuse
+    private readonly Dictionary<int, UIComponent> _activeSkeletons = new();  // slot index -> the card showing there now
+    private readonly HashSet<IUIComponent> _skeletonSet = new();             // every card built (skip in HideUnmappedContainers)
+    private readonly List<int> _recycleBuf = new();                          // scratch: active slots to recycle this frame
+    private readonly HashSet<int> _pendingSet = new();                       // scratch: this frame's pending, for O(1) lookup
+    private readonly List<(UIComponent card, Rect rect)> _skelArrangeBuf = new();   // scratch: (card, rect) for the parallel arrange pass
     private int _pendingFrames;
-    private const int OverlayDelayFrames = 6;     // ~100 ms at 60 fps before it appears - no flash on a fill that clears fast
-    private const double ShimmerStep = 0.035;     // band travel per frame (a full sweep ~1.7 s incl. off-screen tails)
-    private const double ShimmerHalfBand = 0.16;  // half-width of the bright band, in gradient-offset units
-    private static readonly Color ShimmerBase = new(0xFF, 0xFF, 0xFF, 0x14);   // faint tint over the whole region (~8%, RGBA)
-    private static readonly Color ShimmerHi = new(0xFF, 0xFF, 0xFF, 0x40);     // the moving highlight band (~25%)
+    private const int SkeletonDelayFrames = 6;   // ~100 ms at 60 fps before cards appear - no flash on a fill that clears fast
+    private const int SkeletonParallelThreshold = 64;   // fan the card arrange across cores only above this many (matches the real-tile arrange)
 
-    /// <summary>Reconciles the single loading overlay to the generator's budget-deferred slots: while any are pending it
-    /// covers their bounding box with one hit-transparent shimmer; when none are, it fades out. <paramref name="slotRect"/>
-    /// maps a slot index to its absolute grid rect - the subclass owns that geometry and calls this from ArrangeVirtualized.
-    /// O(pending) is a cheap min/max over the pending indices (no per-slot visual); the drawn cost is O(1) - one overlay.</summary>
-    protected void ReconcileLoadingOverlay(Func<int, Rect> slotRect)
+    /// <summary>Reconciles the pooled per-slot loading cards to the generator's budget-deferred slots: each pending slot
+    /// shows a themed <c>ItemSkeletonTemplate</c> card positioned at its grid rect; a slot that binds (or scrolls out)
+    /// hands its card back to the pool. <paramref name="slotRect"/> maps a slot index to its absolute grid rect - the
+    /// subclass owns that geometry and calls this from ArrangeVirtualized. O(pending): a screenful of pooled instanced cards.</summary>
+    protected void ReconcileSkeletons(Func<int, Rect> slotRect)
     {
         var pending = Owner.ItemContainerGenerator.PendingIndices;
+
         if (pending.Count == 0)
         {
             _pendingFrames = 0;
-            if (_overlayShown) { _overlayShown = false; FadeOverlay(0); }
+            if (_activeSkeletons.Count > 0) RecycleAllSkeletons();
             return;
         }
 
-        // Bounding box of the pending slots. Contiguous cold fill / a scroll's leading band both give a tight box; a rare
-        // fragmented pending over-covers slightly, but the overlay is translucent + hit-transparent so realized tiles under
-        // it stay visible and clickable.
-        double l = double.MaxValue, t = double.MaxValue, r = double.MinValue, b = double.MinValue;
+        _pendingFrames++;
+        // Don't flash cards on a fill that clears within a few frames (small list / warm cache).
+        if (_activeSkeletons.Count == 0 && _pendingFrames < SkeletonDelayFrames) return;
+
+        var template = Owner?.ItemSkeletonTemplate;
+        if (template == null) return;   // unthemed ItemsControl - no skeletons
+
+        // Recycle cards whose slot is no longer pending (it bound, or scrolled out of the window).
+        _pendingSet.Clear();
+        for (var i = 0; i < pending.Count; i++) _pendingSet.Add(pending[i]);
+        _recycleBuf.Clear();
+        foreach (var slot in _activeSkeletons.Keys)
+            if (!_pendingSet.Contains(slot)) _recycleBuf.Add(slot);
+        for (var i = 0; i < _recycleBuf.Count; i++) RecycleSkeleton(_recycleBuf[i]);
+
+        // Inset each cell rect by the REAL tile's margin (read from a realized item, never hardcoded) so a card sits
+        // exactly where its item's visual would - same footprint, same inter-tile gaps.
+        var inset = ItemMargin();
+
+        // Pass 1 (this thread): ensure a card at each pending slot and SHOW it. Renting mutates the pool/active/set + the
+        // visual tree, and toggling Visibility fires the pulse-start PropertyTrigger which mutates the shared
+        // AnimationManager - none of that is thread-safe, so it stays here. Collect (card, rect) for a parallel arrange.
+        _skelArrangeBuf.Clear();
         for (var i = 0; i < pending.Count; i++)
         {
-            var rc = slotRect(pending[i]);
-            if (rc.X < l) l = rc.X;
-            if (rc.Y < t) t = rc.Y;
-            if (rc.Right > r) r = rc.Right;
-            if (rc.Bottom > b) b = rc.Bottom;
+            var slot = pending[i];
+            if (!_activeSkeletons.TryGetValue(slot, out var card))
+            {
+                card = RentSkeleton(template);
+                if (card == null) return;   // template has no root
+                _activeSkeletons[slot] = card;
+            }
+            if (card.Visibility != Visibility.Visible) card.Visibility = Visibility.Visible;
+            var rc = slotRect(slot);
+            _skelArrangeBuf.Add((card, new Rect(
+                rc.X + inset.Left, rc.Y + inset.Top,
+                Math.Max(0, rc.Width - inset.Left - inset.Right),
+                Math.Max(0, rc.Height - inset.Top - inset.Bottom))));
         }
 
-        _pendingFrames++;
-        // Delay: don't flash the overlay on a fill that clears within a few frames (small list / warm cache).
-        if (!_overlayShown && _pendingFrames < OverlayDelayFrames) return;
-
-        EnsureOverlay();
-        AdvanceShimmer();
-        var m = (IMeasurableComponent)_loadingOverlay;
-        var box = new Rect(l, t, Math.Max(0, r - l), Math.Max(0, b - t));
-        m.Measure(new Size(box.Width, box.Height));
-        m.Arrange(box);
-        if (_loadingOverlay.Visibility != Visibility.Visible) _loadingOverlay.Visibility = Visibility.Visible;
-        if (!_overlayShown) { _overlayShown = true; FadeOverlay(1); }
+        // Pass 2: measure + arrange the cards. Each card is an independent leaf (its own geometry; the only shared write
+        // is the locked MarkGeometry), so fan them across cores when there are enough to amortise the thread overhead -
+        // same as the real-tile arrange above. Small windows stay sequential.
+        if (_skelArrangeBuf.Count >= SkeletonParallelThreshold)
+            System.Threading.Tasks.Parallel.ForEach(
+                System.Collections.Concurrent.Partitioner.Create(0, _skelArrangeBuf.Count),
+                range => { for (var i = range.Item1; i < range.Item2; i++) ArrangeSkeleton(_skelArrangeBuf[i]); });
+        else
+            for (var i = 0; i < _skelArrangeBuf.Count; i++) ArrangeSkeleton(_skelArrangeBuf[i]);
     }
 
-    private void EnsureOverlay()
+    private static void ArrangeSkeleton((UIComponent card, Rect rect) slot)
     {
-        if (_loadingOverlay != null) return;
-        _s1 = new GradientStop(ShimmerBase, 0.2);
-        _s2 = new GradientStop(ShimmerHi, 0.35);
-        _s3 = new GradientStop(ShimmerBase, 0.5);
-        var brush = new LinearGradientBrush { StartPoint = new Vector2(0, 0), EndPoint = new Vector2(1, 1) };
-        brush.GradientStops.Add(new GradientStop(ShimmerBase, 0));
-        brush.GradientStops.Add(_s1);
-        brush.GradientStops.Add(_s2);
-        brush.GradientStops.Add(_s3);
-        brush.GradientStops.Add(new GradientStop(ShimmerBase, 1));
-        _loadingOverlay = new Border
+        var m = (IMeasurableComponent)slot.card;
+        m.Measure(new Size(slot.rect.Width, slot.rect.Height));
+        m.Arrange(slot.rect);
+    }
+
+    // A card from the pool (already attached + pulsing) or a fresh one built from the theme's ItemSkeletonTemplate. The
+    // panel owns no skeleton visual or animation - the card's whole look + breathe live in the template.
+    private UIComponent RentSkeleton(DataTemplate template)
+    {
+        if (_skeletonPool.Count > 0)
         {
-            Background = brush,
-            CornerRadius = new CornerRadius(4),
-            IsHitTestVisible = false,   // clicks fall through to the realized tiles under the overlay
-            Opacity = 0
-        };
-        AddVisualChild(_loadingOverlay);
+            var reused = _skeletonPool.Pop();
+            reused.Visibility = Visibility.Visible;
+            return reused;
+        }
+        var card = template.Build(this).RootComponent as UIComponent;
+        if (card == null) return null;
+        _skeletonSet.Add(card);
+        AddVisualChild(card);
+        return card;
     }
 
-    // Sweep the bright band across the region. Run the phase past both ends (-half .. 1+half) so the band fully enters and
-    // exits BEFORE it wraps - the reset lands while the band is off the visible range, so there is no visible jump. The
-    // stop-offset writes don't auto-invalidate the brush, so force one re-record (one visual -> O(1)).
-    private void AdvanceShimmer()
+    private void RecycleSkeleton(int slot)
     {
-        _shimmerPhase += ShimmerStep;
-        if (_shimmerPhase > 1 + ShimmerHalfBand) _shimmerPhase = -ShimmerHalfBand;
-        _s1.Offset = Math.Clamp(_shimmerPhase - ShimmerHalfBand, 0, 1);
-        _s2.Offset = Math.Clamp(_shimmerPhase, 0, 1);
-        _s3.Offset = Math.Clamp(_shimmerPhase + ShimmerHalfBand, 0, 1);
-        _loadingOverlay.InvalidateRender(false);
+        if (!_activeSkeletons.Remove(slot, out var card)) return;
+        card.Visibility = Visibility.Collapsed;
+        _skeletonPool.Push(card);
     }
 
-    private void FadeOverlay(double to)
+    private void RecycleAllSkeletons()
     {
-        if (_loadingOverlay == null) return;
-        _loadingOverlay.BeginAnimation(UIComponent.OpacityProperty, new DoubleAnimation
+        foreach (var card in _activeSkeletons.Values)
         {
-            From = _loadingOverlay.Opacity,
-            To = to,
-            Duration = TimeSpan.FromSeconds(0.3),
-            FillBehavior = FillBehavior.HoldEnd
-        }, () => { _loadingOverlay.Opacity = to; if (to == 0) _loadingOverlay.Visibility = Visibility.Collapsed; });
+            card.Visibility = Visibility.Collapsed;
+            _skeletonPool.Push(card);
+        }
+        _activeSkeletons.Clear();
     }
+
+    // Drop all skeleton state - called from Revirtualize, which detaches every visual child (the cards among them), so
+    // the pool/active/set would otherwise hand back cards that are no longer in the tree. Also forgets the item margin
+    // (the ItemTemplate may have changed).
+    private void ResetSkeletons()
+    {
+        _skeletonPool.Clear();
+        _activeSkeletons.Clear();
+        _skeletonSet.Clear();
+        _pendingFrames = 0;
+        _itemMarginKnown = false;
+    }
+
+    // The margin a real item's template leaves around each tile - read ONCE from a realized item so a skeleton card
+    // lines up EXACTLY with the real tiles (never a hardcoded guess). Cached; ResetSkeletons re-reads it after a
+    // regenerate, since a new ItemTemplate can have a different margin.
+    private Thickness _itemMargin;
+    private bool _itemMarginKnown;
+
+    private Thickness ItemMargin()
+    {
+        if (_itemMarginKnown) return _itemMargin;
+        var container = Owner?.ItemContainerGenerator.AnyRealizedContainer();
+        if (container == null) return default;   // nothing realized yet - stay uncached, try again next frame
+        _itemMargin = FindItemMargin(container);
+        _itemMarginKnown = true;
+        return _itemMargin;
+    }
+
+    // The item VISUAL (the ItemTemplate's root) carries the tile margin; the container/presenter chrome around it does
+    // not. First descendant with a non-zero margin wins.
+    private static Thickness FindItemMargin(IUIComponent node)
+    {
+        if (node is IMeasurableComponent m && !IsZero(m.Margin)) return m.Margin;
+        foreach (var child in node.VisualChildren)
+        {
+            var found = FindItemMargin(child);
+            if (!IsZero(found)) return found;
+        }
+        return default;
+    }
+
+    private static bool IsZero(Thickness t) => t.Left == 0 && t.Top == 0 && t.Right == 0 && t.Bottom == 0;
 
     /// <summary>Called when the scroll axis is unbounded (no viewport) so everything has to be realized. Override to log.</summary>
     protected virtual void OnNoViewport()

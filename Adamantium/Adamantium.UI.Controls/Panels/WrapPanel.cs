@@ -486,10 +486,10 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
       else
          foreach (var index in _arrangeIndexBuf) ArrangeAt(index);
 
-      // Budget-deferred slots (generator.PendingIndices): cover their bounding box with the single hit-transparent
-      // loading shimmer (a fast fling / cold fill shows a "loading" sweep instead of a hole). Reconciled here (after the
-      // real tiles) since this is where the slot geometry lives; the panel owns the overlay's lifecycle.
-      ReconcileLoadingOverlay(i =>
+      // Budget-deferred slots (generator.PendingIndices): show a pooled per-slot loading skeleton card at each (a fast
+      // fling / cold fill shows pulsing placeholders instead of holes). Reconciled here (after the real tiles) since this
+      // is where the slot geometry lives; the panel owns the cards' lifecycle.
+      ReconcileSkeletons(i =>
       {
          var line = i / _columns;
          var col = i % _columns;

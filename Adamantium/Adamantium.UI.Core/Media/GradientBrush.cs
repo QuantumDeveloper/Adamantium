@@ -1,3 +1,6 @@
+using System.Collections.Specialized;
+using Adamantium.UI.Core.RoutedEvents;
+
 namespace Adamantium.UI.Core.Media;
 
 /// <summary>Base for the gradient brushes (<see cref="LinearGradientBrush"/>, <see cref="RadialGradientBrush"/>): a set of
@@ -9,12 +12,34 @@ public abstract class GradientBrush : Brush
     protected GradientBrush()
     {
         GradientStops = [];
+        WatchStops();
     }
 
     protected GradientBrush(GradientStopCollection stops)
     {
         GradientStops = stops ?? [];
+        WatchStops();
     }
+
+    // The stops are a collection, not brush properties, so the base Brush's own PropertyChanged->Changed bridge misses
+    // them. Raise Changed when the stop SET changes (add/remove) OR any stop's Offset/Color changes - so an ANIMATED
+    // gradient (a shimmer sweeping the offsets forever) repaints the drawing element every frame.
+    private void WatchStops()
+    {
+        foreach (var stop in GradientStops) stop.PropertyChanged += OnStopChanged;
+        GradientStops.CollectionChanged += OnStopsCollectionChanged;
+    }
+
+    private void OnStopsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems != null)
+            foreach (GradientStop stop in e.OldItems) stop.PropertyChanged -= OnStopChanged;
+        if (e.NewItems != null)
+            foreach (GradientStop stop in e.NewItems) stop.PropertyChanged += OnStopChanged;
+        RaiseChanged();
+    }
+
+    private void OnStopChanged(object sender, AdamantiumPropertyChangedEventArgs e) => RaiseChanged();
 
     public static readonly AdamantiumProperty SpreadMethodProperty = AdamantiumProperty.Register(nameof(SpreadMethod),
         typeof(GradientSpreadMethod), typeof(GradientBrush), new PropertyMetadata(GradientSpreadMethod.Pad));

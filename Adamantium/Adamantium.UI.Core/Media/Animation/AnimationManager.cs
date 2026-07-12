@@ -72,7 +72,7 @@ public static class AnimationManager
 
     /// <summary>Starts a keyframe <see cref="Animation"/> on <paramref name="target"/>, dropping any in-flight animation
     /// that drives one of the same properties.</summary>
-    internal static void BeginKeyFrame(AnimatableUIComponent target, Animation animation, Action completed)
+    internal static void BeginKeyFrame(AdamantiumComponent target, Animation animation, Action completed)
     {
         var running = new RunningKeyFrameAnimation(target, animation, completed);
         foreach (var property in running.Properties)
@@ -88,6 +88,15 @@ public static class AnimationManager
         return Active.RemoveAll(a => a.Animates(target, property)) > 0;
     }
 
+    /// <summary>Stops EVERY animation running on <paramref name="target"/> (any property), without firing completions -
+    /// the WPF <c>StopStoryboard</c> analog. Used to end a looping animation on demand (e.g. a StopAnimationAction, or a
+    /// recycled loading card whose pulse must stop once its real item has loaded). The held Animation-priority values
+    /// stay until the caller/property system releases them.</summary>
+    public static void Cancel(AdamantiumComponent target)
+    {
+        Active.RemoveAll(a => a.AnimatesTarget(target));
+    }
+
     // Wraps a delegate as a running "animation" so a non-property per-frame updater (scroll inertia) rides the heartbeat.
     private sealed class DelegateTicker : IRunningAnimation
     {
@@ -95,6 +104,7 @@ public static class AnimationManager
         public DelegateTicker(Func<double, bool> advance) => _advance = advance;
         public bool Advance(double deltaSeconds) => _advance(deltaSeconds);
         public bool Animates(AdamantiumComponent target, AdamantiumProperty property) => false;
+        public bool AnimatesTarget(AdamantiumComponent target) => false;
         public IUIComponent DirtyTarget => null;
     }
 }
