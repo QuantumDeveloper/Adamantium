@@ -102,13 +102,28 @@ public class ForwardWindowRenderer : WindowRendererBase
         _renderCache.PreRender();
     }
 
-    public override void PrepareData()
+    private double _lastRecordMs;
+
+    // DEVICE-FREE record half (Phase 3.2): walk the tree + component.Render into the packet. No GPU, so it is safe to run
+    // at loop level after the whole Update phase (before BeginDraw's fence). ApplyData realizes what this records.
+    public override void RecordData()
+    {
+        if (Window == null) return;
+        var t0 = Stopwatch.GetTimestamp();
+        _renderCache.RecordFrame(Window);
+        _lastRecordMs = Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
+    }
+
+    // GPU apply half (Phase 3.2): realize the recorded packet into units + the per-unit transform re-bake. Runs inside
+    // BeginDraw (after the fence); moves to the render thread in Phase 3.3.
+    public override void ApplyData()
     {
         if (Window == null) return;
 
         var t0 = Stopwatch.GetTimestamp();
-        _renderCache.BuildFromVisualTree(Window);
-        var buildMs = Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
+        _renderCache.ApplyFrame();
+        RuntimeStats.LastRenderBuildMs = _lastRecordMs + Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
+
         // Skip the per-unit transform re-bake (proc) when nothing MOVED: a Clean frame (nothing changed at all) or a
         // GEOMETRY-ONLY partial (a hover re-recorded some draw contents, but no transform changed). Proc walks EVERY unit
         // (O(N)) and the draw pass re-bakes each drawn unit anyway, so on a big list a hover would otherwise pay an O(N)
@@ -117,14 +132,20 @@ public class ForwardWindowRenderer : WindowRendererBase
         if (_renderCache.LastBuildKind == RenderBuildKind.Clean
             || (_renderCache.LastBuildKind == RenderBuildKind.Partial && !_renderCache.LastBuildTransformDirty))
         {
-            RuntimeStats.LastRenderBuildMs = buildMs;
             RuntimeStats.LastRenderProcMs = 0;
             return;
         }
         var t1 = Stopwatch.GetTimestamp();
         _renderCache.ProcessCommands(Window.GetProjectionMatrix(), RenderScale);
-        RuntimeStats.LastRenderBuildMs = buildMs;
         RuntimeStats.LastRenderProcMs = Stopwatch.GetElapsedTime(t1).TotalMilliseconds;
+    }
+
+    // Inline record+apply, unchanged externally: the headless designer's one-shot render and (in Phase 3.2 single-threaded)
+    // BeginDraw both go through here. Phase 3.2b hoists RecordData to the loop and leaves BeginDraw calling ApplyData only.
+    public override void PrepareData()
+    {
+        RecordData();
+        ApplyData();
     }
 
     // Headless designer: each render is a fresh tree (new RenderIds), so drop the cached units between renders instead

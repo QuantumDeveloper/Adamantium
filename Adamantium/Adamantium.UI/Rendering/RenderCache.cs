@@ -246,7 +246,10 @@ public class RenderCache
                 break;
         }
 
-        RenderDirty.Clear();
+        // Phase 3.2 Step 2b: only the DEFAULT single-threaded path (record+apply inline in BeginDraw) clears here. In the
+        // decoupled path the record runs at loop level (UIApplication.RecordRenderFrame) and the clear is hoisted there,
+        // once after ALL windows have recorded - so a second window still sees the full dirty set this frame.
+        if (RenderThreadOptions.SingleThreaded) RenderDirty.Clear();
     }
 
     // Re-render ONE already-cached component IN PLACE (its geometry went dirty). Returns false - "needs a full walk" -

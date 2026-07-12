@@ -106,6 +106,11 @@ public class WindowRenderService : UiRenderService
         base.Update(gameTime);   // processors' Update: the adorner stage builds its overlay cache from the fresh layout
     }
     
+    /// <summary>Phase 3.2 Step 2b: the DEVICE-FREE record half, hoisted to loop level (UIApplication.RecordRenderFrame) so
+    /// it runs after the whole Update phase (all layout settled) and before any GPU Draw. No presenter/device needed here;
+    /// the apply half stays in BeginDraw (ApplyData). No-op in the default single-threaded path (record stays inline).</summary>
+    public void RecordFrame() => windowRenderer?.RecordData();
+
     public override bool BeginDraw()
     {
         // Refresh the analytic-AA switch from this window before recording (PreRender reads it in the beforeRenderPass
@@ -127,7 +132,10 @@ public class WindowRenderService : UiRenderService
             // THIS frame's visual tree. It used to be built in EndDraw - one frame AFTER it was drawn - so a container
             // realized/collapsed this frame lagged the draw by a frame: an item entering the window had no unit yet (a
             // one-frame hole) and one leaving still had a stale unit (a one-frame ghost overlapping with a foreign item).
-            windowRenderer.PrepareData();
+            // Phase 3.2 Step 2b: default path records + applies inline here. The decoupled path (flag off) already
+            // recorded at loop level after the whole Update phase (RecordFrame), so here it only APPLIES the packet.
+            if (RenderThreadOptions.SingleThreaded) windowRenderer.PrepareData();
+            else windowRenderer.ApplyData();
             windowRenderer.PreRender();
             PreRenderProcessors();   // adorner stage compute (stroke expander) before the render pass
         });
