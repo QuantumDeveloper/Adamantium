@@ -460,6 +460,7 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
                     if (accumulatedFrameTime >= TimeStep)
                     {
                         Update(appTime);
+                        RecordRenderFrame();
                         ExecuteDrawSequence(appTime);
 
                         UpdateAppTime(accumulatedFrameTime);
@@ -469,8 +470,9 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
                 else
                 {
                     Update(appTime);
+                    RecordRenderFrame();
                     ExecuteDrawSequence(appTime);
-                    
+
                     UpdateAppTime(frameTime);
                 }
 
@@ -492,6 +494,20 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
             RecreateDevicesAndServices();
         }
         CycleFinished?.Invoke(this, EventArgs.Empty);
+    }
+
+    // Phase 3.2 Step 2b (flag-gated, docs/RENDER_THREAD_PLAN.md): record the DEVICE-FREE render packet for EVERY window
+    // HERE - after the whole Update phase (all layout settled) and before any GPU Draw. This is the precondition for moving
+    // the applier to a dedicated render thread (Phase 3.3): the record reads the live tree while it is quiescent; the apply
+    // (in BeginDraw) consumes the packet. The default single-threaded path skips this entirely - record stays inline in
+    // BeginDraw (byte-identical). ONE RenderDirty.Clear after ALL windows record, so a second window still sees the full
+    // dirty set this frame (in the inline path each window's ApplyFrame clears, which a second window would race).
+    private void RecordRenderFrame()
+    {
+        if (RenderThreadOptions.SingleThreaded) return;
+        foreach (var service in windowToSystem.Values)
+            service.RecordFrame();
+        RenderDirty.Clear();
     }
 
     private void ExecuteDrawSequence(AppTime appTime)

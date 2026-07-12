@@ -25,7 +25,18 @@ public abstract class WindowRendererBase : IWindowRenderer
 
     public virtual void PrepareData()
     {
-        
+
+    }
+
+    // Phase 3.2 record/apply split (docs/RENDER_THREAD_PLAN.md). Default no-ops; ForwardWindowRenderer implements them.
+    public virtual void RecordData()
+    {
+
+    }
+
+    public virtual void ApplyData()
+    {
+
     }
 
     // No-op by default: the on-screen renderer keeps its cache across frames (attachment-based reconciliation). A
