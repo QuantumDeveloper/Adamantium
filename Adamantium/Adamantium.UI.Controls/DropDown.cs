@@ -57,9 +57,6 @@ public class DropDown : Selector
     public static readonly AdamantiumProperty BackgroundPointerOverProperty = AdamantiumProperty.Register(
         nameof(BackgroundPointerOver), typeof(Brush), typeof(DropDown), new PropertyMetadata(default(Brush)));
 
-    public static readonly AdamantiumProperty FontSizeProperty = AdamantiumProperty.Register(nameof(FontSize),
-        typeof(double), typeof(DropDown), new PropertyMetadata(14.0, PropertyMetadataOptions.AffectsMeasure));
-
     private Popup _popup;
     private UIComponent _header;
     private IPopupHost _host;
@@ -154,12 +151,6 @@ public class DropDown : Selector
     {
         get => GetValue<Brush>(BackgroundPointerOverProperty);
         set => SetValue(BackgroundPointerOverProperty, value);
-    }
-
-    public double FontSize
-    {
-        get => GetValue<double>(FontSizeProperty);
-        set => SetValue(FontSizeProperty, value);
     }
 
     public override void OnApplyTemplate()

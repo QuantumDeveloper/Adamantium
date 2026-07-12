@@ -1,5 +1,4 @@
-﻿using System.Timers;
-using Adamantium.ProceduralGeometry;
+﻿using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
@@ -7,13 +6,12 @@ using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Media.Animation;
 using Adamantium.UI.Core.Media.Imaging;
 using Adamantium.UI.Core.RoutedEvents;
-using Timer = System.Timers.Timer;
 
 namespace Adamantium.UI.Controls;
 
 public class Image : InputUIComponent, IDesignTimeAnimatedMedia
 {
-   private Timer _timer;
+   private bool _runtimePlaying;
    private BitmapImage _bitmap;
    private BitmapFrame _frame;
    private BitmapFrame _oldFrame;
@@ -87,7 +85,7 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
    {
       if (a is Image img)
       {
-         img.RestartTimer(img.Delay);
+         img.InvalidateRender(false);
       }
    }
 
@@ -103,7 +101,7 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
    {
       if (a is Image img)
       {
-         img.RestartTimer((UInt32)e.NewValue);
+         img.InvalidateRender(false);
       }
    }
    
@@ -208,12 +206,14 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
 
          if (_bitmap.FrameCount > 1)
          {
-            // At runtime a real timer advances frames. In the headless designer there is no real clock, so register
-            // with the design-time clock the live previewer ticks (a static shot leaves the clock un-ticked -> frame 0).
+            // In the headless designer there is no real clock, so register with the design-time clock the live previewer
+            // ticks (a static shot leaves it un-ticked -> frame 0). At runtime, register the frame ticker with the
+            // loop-thread heartbeat (AnimationManager) - marshalled via Dispatcher.Post because this async continuation
+            // may resume on a thread-pool thread and AnimationManager, like the render loop, is single-threaded.
             if (Design.IsDesignMode)
                DesignTimeMediaClock.Register(this);
             else
-               RestartTimer(Delay);
+               UIAppContext.Current.Dispatcher.Post(StartRuntimePlayback);
          }
          else
          {
@@ -232,24 +232,44 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
       await _bitmap.DecodeFramesTillAsync(endFrame);
    }
 
-   private void RestartTimer(uint delay)
+   protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
    {
-      _timer?.Stop();
-      
-      if (_bitmap == null || _bitmap.FrameCount == 1) return;
-      
-      _timer = new Timer(TimeSpan.FromMilliseconds(delay));
-      _timer.Elapsed += TimerOnElapsed;
-      _timer.Start();
+      base.OnAttachedToVisualTree(e);
+      // Resume playback after a re-attach (tab switch, virtualization recycle): the ticker self-removed on detach. Post
+      // runs inline when already on the loop thread (attach normally runs during the loop's layout pass).
+      UIAppContext.Current.Dispatcher.Post(StartRuntimePlayback);
+   }
+
+   // Runtime frame-based playback rides the per-frame loop heartbeat (AnimationManager, on the render-loop thread),
+   // replacing a background System.Timers.Timer whose per-frame completion hopped through Dispatcher.Invoke onto the Win32
+   // MESSAGE-PUMP thread. That hop ran only when the pump woke (on input), and the dispatcher's coalescing signal woke it
+   // for just the FIRST queued image - so animations froze until the mouse moved and only ONE image advanced. It also ran
+   // AdvanceFrame (mutating _frame) off the loop thread while the render read it. Registered when an animated source loads
+   // (ProcessImageSource) and on re-attach (OnAttachedToVisualTree), both via Dispatcher.Post onto the loop thread; the
+   // ticker self-removes when the source stops being animated or the image detaches.
+   private void StartRuntimePlayback()
+   {
+      if (_runtimePlaying || Design.IsDesignMode || _bitmap is not { FrameCount: > 1 }) return;
+      _runtimePlaying = true;
+      _playbackElapsedMs = 0;
+      AnimationManager.AddTicker(RuntimeTick);
    }
 
    private ReplayDirection _replayDirection;
 
-   private void TimerOnElapsed(object sender, ElapsedEventArgs e)
+   // One heartbeat tick of runtime playback. Returns true (done -> the heartbeat drops this ticker) when the source is no
+   // longer animated or the image has left the tree; a hidden-but-attached image keeps the ticker but does not advance.
+   private bool RuntimeTick(double deltaSeconds)
    {
-      _timer.Stop();
-      AdvanceFrame();
-      UIAppContext.Current.Dispatcher.Invoke(() => { InvalidateRender(false); });
+      if (!IsAttachedToVisualTree || _bitmap is not { FrameCount: > 1 })
+      {
+         _runtimePlaying = false;
+         return true;
+      }
+      if (Visibility != Visibility.Visible) return false;
+      var keepPlaying = AdvancePlayback(deltaSeconds);
+      if (!keepPlaying) _runtimePlaying = false;
+      return !keepPlaying;
    }
 
    // Advances _frame by one step in the current ReplayDirection. Shared by the runtime timer and the design-time clock.
@@ -333,22 +353,22 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
       }
    }
 
-   private double _designTimeElapsedMs;
+   private double _playbackElapsedMs;
 
-   // Design-time playback: the live previewer ticks this with virtual time instead of the runtime timer. Accumulate the
-   // delta and advance whole frames at the configured Delay, then invalidate render directly (no dispatcher - the
-   // designer drives this synchronously on its render thread). Keeps playing while replays remain (loops forever by
-   // default); the previewer caps total captured frames.
-   public bool AdvanceDesignTime(double deltaSeconds)
+   // Advance whole frames by elapsed time and invalidate directly on the calling (loop) thread - shared by the runtime
+   // heartbeat ticker (RuntimeTick) and the design-time clock (AdvanceDesignTime). Accumulate the delta, advance whole
+   // frames at the configured Delay, then repaint. Keeps playing while replays remain (loops forever by default); the
+   // previewer caps total captured frames.
+   private bool AdvancePlayback(double deltaSeconds)
    {
       if (_bitmap is not { FrameCount: > 1 }) return false;
 
-      _designTimeElapsedMs += deltaSeconds * 1000.0;
+      _playbackElapsedMs += deltaSeconds * 1000.0;
       var delay = Math.Max(1u, Delay);
       var advanced = false;
-      while (_designTimeElapsedMs >= delay)
+      while (_playbackElapsedMs >= delay)
       {
-         _designTimeElapsedMs -= delay;
+         _playbackElapsedMs -= delay;
          AdvanceFrame();
          advanced = true;
       }
@@ -356,6 +376,10 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
       if (advanced) InvalidateRender(false);
       return NumberOfReplays == UInt64.MaxValue || _currentReplayIteration <= NumberOfReplays;
    }
+
+   // Design-time playback: the live previewer ticks this with virtual time instead of the runtime heartbeat (see
+   // IDesignTimeAnimatedMedia / DesignTimeMediaClock). Same advance logic as runtime.
+   public bool AdvanceDesignTime(double deltaSeconds) => AdvancePlayback(deltaSeconds);
 
    protected override Size MeasureOverride(Size availableSize)
    {
@@ -398,14 +422,6 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
       if (image is BitmapImage { IsLoaded: false }) return;
 
       context.ForControl(this).DrawImage(image, FilterBrush, new Rect(Bounds.Size), CornerRadius);
-   }
-
-   protected override void OnRenderCompleted()
-   {
-      if (NumberOfReplays == UInt64.MaxValue || _currentReplayIteration <= NumberOfReplays)
-      {
-         _timer?.Start();
-      }
    }
 
    private Size CalculateScaling(Stretch stretch, Size destinationSize, Size sourceSize)

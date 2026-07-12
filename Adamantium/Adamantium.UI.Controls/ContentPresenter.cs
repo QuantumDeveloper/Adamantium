@@ -49,10 +49,9 @@ public class ContentPresenter : InputUIComponent
     {
         ForegroundProperty.OverrideMetadata(typeof(ContentPresenter),
             new PropertyMetadata(null, PropertyMetadataOptions.Inherits | PropertyMetadataOptions.AffectsRender, OnTextStyleChanged));
+        FontSizeProperty.OverrideMetadata(typeof(ContentPresenter),
+            new PropertyMetadata(14.0, PropertyMetadataOptions.Inherits | PropertyMetadataOptions.AffectsMeasure, OnTextStyleChanged));
     }
-
-    public static readonly AdamantiumProperty FontSizeProperty = AdamantiumProperty.Register(nameof(FontSize),
-        typeof(Double), typeof(ContentPresenter), new PropertyMetadata(14.0, PropertyMetadataOptions.AffectsMeasure, OnTextStyleChanged));
 
     private static void OnContentPropertyChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
@@ -265,12 +264,6 @@ public class ContentPresenter : InputUIComponent
     {
         get => GetValue<Double>(TransitionDurationProperty);
         set => SetValue(TransitionDurationProperty, value);
-    }
-
-    public Double FontSize
-    {
-        get => GetValue<Double>(FontSizeProperty);
-        set => SetValue(FontSizeProperty, value);
     }
 
     // Pushes the (template-bound) text style onto the already-generated TextBlock, so a trigger changing Foreground or

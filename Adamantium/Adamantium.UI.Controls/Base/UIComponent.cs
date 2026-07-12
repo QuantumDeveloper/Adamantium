@@ -96,7 +96,7 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     // TextBlock OverrideMetadata's it with a callback that re-measures, which fires on both a direct set AND the cascade.
     public static readonly AdamantiumProperty FontFamilyProperty = AdamantiumProperty.Register(nameof(FontFamily),
         typeof(FontFamily), typeof(UIComponent),
-        new PropertyMetadata(null, PropertyMetadataOptions.Inherits));
+        new PropertyMetadata(null, PropertyMetadataOptions.Inherits | PropertyMetadataOptions.AffectsMeasure));
 
     // Foreground is INHERITED (like FontFamily / DataContext): set it on an ancestor and descendant text picks it up
     // unless it sets its own (an explicit local/style value stops the cascade; a mere default does not, so overriding the
@@ -111,6 +111,23 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     {
         get => GetValue<Brush>(ForegroundProperty);
         set => SetValue(ForegroundProperty, value);
+    }
+
+    // FontSize is INHERITED (like FontFamily / Foreground): declared ONCE here so the SAME property flows across
+    // Control / TextBlock / ContentPresenter etc. (inheritance is by property IDENTITY - separate per-control registrations
+    // never cross-inherit, which is why an unstyled templated header used to fall back to its OWN default instead of the
+    // control's size). AffectsMeasure fires on BOTH a direct set AND the inherited cascade (RunSetValueSequence runs the
+    // flags for every priority, including ValuePriority.Inherited), so text re-measures when an ancestor's FontSize flows
+    // in. Default 14; leaf types OverrideMetadata only to change the default (and re-specify Inherits | AffectsMeasure).
+    public static readonly AdamantiumProperty FontSizeProperty = AdamantiumProperty.Register(nameof(FontSize),
+        typeof(double), typeof(UIComponent),
+        new PropertyMetadata(14.0, PropertyMetadataOptions.Inherits | PropertyMetadataOptions.AffectsMeasure));
+
+    /// <summary>The inherited font size (DIPs) for text in this element and its descendants, unless one sets its own.</summary>
+    public double FontSize
+    {
+        get => GetValue<double>(FontSizeProperty);
+        set => SetValue(FontSizeProperty, value);
     }
 
     #endregion

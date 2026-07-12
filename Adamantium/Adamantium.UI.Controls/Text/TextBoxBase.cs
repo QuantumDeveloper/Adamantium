@@ -90,10 +90,6 @@ public abstract class TextBoxBase : Control
         typeof(Thickness), typeof(TextBoxBase),
         new PropertyMetadata(new Thickness(8, 4, 8, 4), PropertyMetadataOptions.AffectsMeasure));
 
-    public static readonly AdamantiumProperty FontSizeProperty = AdamantiumProperty.Register(nameof(FontSize),
-        typeof(double), typeof(TextBoxBase),
-        new PropertyMetadata(14.0, PropertyMetadataOptions.AffectsMeasure));
-
     public static readonly AdamantiumProperty CaretBrushProperty = AdamantiumProperty.Register(nameof(CaretBrush),
         typeof(Brush), typeof(TextBoxBase), new PropertyMetadata(Brushes.White, PropertyMetadataOptions.AffectsRender));
 
@@ -233,12 +229,6 @@ public abstract class TextBoxBase : Control
     {
         get => GetValue<Thickness>(PaddingProperty);
         set => SetValue(PaddingProperty, value);
-    }
-
-    public double FontSize
-    {
-        get => GetValue<double>(FontSizeProperty);
-        set => SetValue(FontSizeProperty, value);
     }
 
     public Brush CaretBrush

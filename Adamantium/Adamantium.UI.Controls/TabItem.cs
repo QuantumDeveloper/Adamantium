@@ -46,9 +46,6 @@ public class TabItem : ContentControl, ISelectable
         typeof(Thickness), typeof(TabItem),
         new PropertyMetadata(default(Thickness), PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
 
-    public static readonly AdamantiumProperty FontSizeProperty = AdamantiumProperty.Register(nameof(FontSize),
-        typeof(double), typeof(TabItem), new PropertyMetadata(13.0, PropertyMetadataOptions.AffectsMeasure));
-
     // State brushes the default template's triggers project onto the tab chrome (hover / selected). Exposed as properties
     // so ONE template serves every state - the theme just sets these. Null = no change in that state.
     public static readonly AdamantiumProperty BackgroundPointerOverProperty = AdamantiumProperty.Register(
@@ -80,6 +77,8 @@ public class TabItem : ContentControl, ISelectable
         // A tab is a keyboard-focus target (arrow-key navigation between tabs) - opt in, since the base default is now
         // false. Metadata priority, so a {Binding}/Style/Trigger can still override it.
         FocusableProperty.OverrideMetadata(typeof(TabItem), new PropertyMetadata(true));
+        FontSizeProperty.OverrideMetadata(typeof(TabItem),
+            new PropertyMetadata(13.0, PropertyMetadataOptions.Inherits | PropertyMetadataOptions.AffectsMeasure));
     }
 
     /// <summary>The tab-strip label - a string or any UI content. Distinct from <see cref="ContentControl.Content"/>,
@@ -133,12 +132,6 @@ public class TabItem : ContentControl, ISelectable
     {
         get => GetValue<Thickness>(PaddingProperty);
         set => SetValue(PaddingProperty, value);
-    }
-
-    public double FontSize
-    {
-        get => GetValue<double>(FontSizeProperty);
-        set => SetValue(FontSizeProperty, value);
     }
 
     public Brush BackgroundPointerOver
@@ -217,6 +210,7 @@ public class TabItem : ContentControl, ISelectable
         _closeButton = GetTemplateChild("PART_CloseButton") as ButtonBase;
         if (_closeButton != null) _closeButton.Click += OnCloseButtonClick;
     }
+
 
     // Owner's close config changed at runtime (e.g. ShowCloseButton toggled) -> re-sync this tab.
     private void OnOwnerPropertyChanged(object sender, AdamantiumPropertyChangedEventArgs e)
