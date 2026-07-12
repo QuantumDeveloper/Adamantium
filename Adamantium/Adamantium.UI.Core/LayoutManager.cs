@@ -343,7 +343,14 @@ public sealed class LayoutManager
         // Finer propagation: a parent's measure depends on this child only if the child's OUTWARD size changed. If it
         // did, invalidate the parent (re-measured next iteration, gate-skipping this now-clean child); if it did not,
         // the re-measure stayed contained in this subtree - no walk up to the window.
-        if (control.DesiredSize != before && node.VisualParent is IMeasurableComponent { IsMeasureValid: true } parent)
+        // EXCEPT a parent that is a MEASURE BOUNDARY (its DesiredSize can't change from a child - a virtualizing items
+        // host whose extent is count×cell, or any element with a fixed Width+Height): propagating into it here is
+        // spurious and, because this runs on the queue-drain path OUTSIDE the panel's own _inLayout mute, it re-dirties
+        // the panel every iteration and spins the pass to MaxPassIterations - the whole realize backlog draining in one
+        // pass instead of one slice per frame. Honor the boundary here too, so InvalidateMeasureNextPass is respected.
+        if (control.DesiredSize != before
+            && node.VisualParent is IMeasurableComponent { IsMeasureValid: true } parent
+            && !parent.IsMeasureBoundary)
         {
             parent.InvalidateMeasure();
         }

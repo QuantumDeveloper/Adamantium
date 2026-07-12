@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using Adamantium.Mathematics;
+using Adamantium.UI.Controls.Generators;
+using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
@@ -47,12 +49,40 @@ public class TilesHost : ItemsControl
     public double WaveDuration { get => GetValue<double>(WaveDurationProperty); set => SetValue(WaveDurationProperty, value); }
 
     private readonly List<FlipTile> _tiles = new();
+    private LayoutManager _hookedManager;
 
     public TilesHost()
     {
         MouseMove += OnHostMouseMove;
         MouseLeave += OnHostMouseLeave;
     }
+
+    // Re-assign photo fragments after each settled layout pass, so tiles realized while SCROLLING an already-flipped board
+    // get their index-based UV. A virtualizing panel realizes a slice per frame and (being a measure boundary)
+    // its measure does NOT re-invalidate this host, so a scroll-realized tile wouldn't otherwise be re-fragmented until the
+    // next flip. (Flip-all itself is covered by FlipWave assigning first; this covers scroll.) AssignFragments is O(realized)
+    // and its writes are AffectsRender, not AffectsMeasure, so it can't loop the pass.
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        if (_hookedManager == null)
+        {
+            _hookedManager = LayoutManager.For(this);
+            _hookedManager.LayoutUpdated += OnLayoutUpdated;
+        }
+    }
+
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        if (_hookedManager != null)
+        {
+            _hookedManager.LayoutUpdated -= OnLayoutUpdated;
+            _hookedManager = null;
+        }
+    }
+
+    private void OnLayoutUpdated(object sender, EventArgs e) => AssignFragments();
 
     // --- Photo + UV fragments -------------------------------------------------------------------------------------
 
@@ -74,10 +104,59 @@ public class TilesHost : ItemsControl
     {
         CollectTiles();
         if (_tiles.Count == 0) return;
+        var photo = Photo;
 
-        // The photo maps over the UNION of the tile rects (host space) - the exact tile field, independent of any
-        // panel/host padding. Each tile then samples the photo portion its VISIBLE rect covers, so image lines
-        // continue straight across the inter-tile gaps instead of jumping at every boundary.
+        // Prefer INDEX-BASED UVs on a uniform grid (WrapPanel): each tile's photo slice is a function of its ABSOLUTE item
+        // index + the grid metrics, NOT of the realized-tile bounds union. So virtualization can realize only the visible
+        // window and every realized tile still samples its correct slice of the ONE shared photo. The union approach below
+        // only sees the realized tiles, so with virtualization it would map the whole photo over each visible page (the
+        // image tiling per screenful). Falls back to the union when the panel isn't a uniform horizontal grid.
+        if (FindWrapPanel() is { Orientation: Orientation.Horizontal } wrap
+            && wrap.Columns > 0 && wrap.CellFlow > 0 && wrap.CellScroll > 0)
+            AssignFragmentsByIndex(photo, wrap);
+        else
+            AssignFragmentsByUnion(photo);
+    }
+
+    // Photo maps over the full grid: cell PITCH (incl. gap) spaces the columns/rows, each tile samples the tile-sized slot
+    // inside its cell, so image lines run straight across the inter-tile gaps - exactly the union result, reconstructed
+    // from the item index instead of measured bounds (so off-screen/virtualized tiles don't distort it).
+    private void AssignFragmentsByIndex(ImageSource photo, WrapPanel wrap)
+    {
+        var cols = wrap.Columns;
+        var cellW = wrap.CellFlow;
+        var cellH = wrap.CellScroll;
+        var count = Items.Count;
+        var rows = (count + cols - 1) / cols;
+
+        // Tile size from the item template's MARGIN, not the arranged Bounds: a tile realized THIS frame is not arranged
+        // yet (Bounds.Width == 0), and reading that gave SourceUW = 0 -> a zero-width slice -> no texture (the "flipped but
+        // blank" / "flip did nothing" symptom, and why the re-assign hook seemed to do nothing - it re-assigned zeros).
+        // The cell minus the per-tile margin IS the tile, known the moment the tile is created - no layout needed.
+        var margin = _tiles[0].Margin;
+        var tileW = cellW - margin.Left - margin.Right;
+        var tileH = cellH - margin.Top - margin.Bottom;
+        var unionW = (cols - 1) * cellW + tileW;   // grid union: col 0 .. last col
+        var unionH = (rows - 1) * cellH + tileH;   // row 0 .. last row
+        if (tileW <= 0 || tileH <= 0 || unionW <= 0 || unionH <= 0) { AssignFragmentsByUnion(photo); return; }
+
+        var generator = ItemContainerGenerator;
+        foreach (var tile in _tiles)
+        {
+            var index = IndexOfTile(tile, generator);
+            if (index < 0) continue;
+            tile.Photo = photo;
+            tile.SourceU = (index % cols) * cellW / unionW;
+            tile.SourceV = (index / cols) * cellH / unionH;
+            tile.SourceUW = tileW / unionW;
+            tile.SourceVH = tileH / unionH;
+        }
+    }
+
+    // Fallback: map the photo over the union of the CURRENTLY-realized tile rects. Correct only when every tile is realized
+    // (no item scrolling / a non-uniform panel); with virtualization the index path above is what keeps the photo whole.
+    private void AssignFragmentsByUnion(ImageSource photo)
+    {
         double l = double.MaxValue, t = double.MaxValue, r = double.MinValue, b = double.MinValue;
         var rects = new Rect[_tiles.Count];
         for (var i = 0; i < _tiles.Count; i++)
@@ -92,7 +171,6 @@ public class TilesHost : ItemsControl
         var h = b - t;
         if (w <= 0 || h <= 0) return;
 
-        var photo = Photo;
         for (var i = 0; i < _tiles.Count; i++)
         {
             var tile = _tiles[i];
@@ -101,6 +179,31 @@ public class TilesHost : ItemsControl
             tile.SourceV = (rects[i].Y - t) / h;
             tile.SourceUW = rects[i].Width / w;
             tile.SourceVH = rects[i].Height / h;
+        }
+    }
+
+    // A realized tile's absolute item index: the generator maps its ITEM CONTAINER (the ContentPresenter the tile sits in)
+    // to an index; walk up from the tile to the first ancestor the generator knows.
+    private static int IndexOfTile(FlipTile tile, ItemContainerGenerator generator)
+    {
+        for (IUIComponent p = tile; p != null; p = p.VisualParent)
+        {
+            var index = generator.IndexFromContainer(p);
+            if (index >= 0) return index;
+        }
+        return -1;
+    }
+
+    private WrapPanel FindWrapPanel()
+    {
+        return Find(this);
+
+        static WrapPanel Find(IUIComponent node)
+        {
+            if (node is WrapPanel wrap) return wrap;
+            foreach (var child in node.VisualChildren)
+                if (Find(child) is { } found) return found;
+            return null;
         }
     }
 
@@ -118,7 +221,11 @@ public class TilesHost : ItemsControl
 
     private void FlipWave(bool flipped)
     {
-        CollectTiles();
+        // Assign photo/UV to every realized tile BEFORE flipping it: a flip is a render-transform (no layout pass), so the
+        // LayoutUpdated re-assign hook does NOT fire from a flip - a tile realized since the last layout pass would flip to
+        // its back with the default fragment (no texture) until some later layout pass re-assigned it (the "click 2-3 times"
+        // symptom). Assigning here (it collects the tiles too) closes that gap. Then flip the same collected set.
+        AssignFragments();
         if (_tiles.Count == 0) return;
 
         // Diagonal wave: a tile's start delay is its (x+y) position across the board normalised into WaveDuration.

@@ -5,7 +5,7 @@
          flip wave, and the ONE shared photo (decoded once, texture shared) whose gap-true UV fragments it hands to each
          tile from their arranged bounds. Tiles stay in the instanced SDF/image draw paths while rotating - rotation only
          rewrites each tile's transform-table matrix. -->
-    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
         <StackPanel Orientation="Vertical" Margin="24" HorizontalAlignment="Center">
 
             <StackPanel Orientation="Horizontal" Margin="0,0,0,12">

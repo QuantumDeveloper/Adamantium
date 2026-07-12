@@ -7,6 +7,7 @@ using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Decorators;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Media;
+using Adamantium.UI.Core.Media.Animation;
 
 namespace Adamantium.UI.Controls.Panels;
 
@@ -38,6 +39,13 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
     // panel's measure does not depend on its children (the plan's "propagate up only where the parent depends on the
     // child" principle); the panel re-measures each realized container itself inside MeasureVirtualized.
     private bool _inLayout;
+
+    // As an items host, this panel's DesiredSize is the virtual extent (count×cell) computed in MeasureVirtualized -
+    // it does NOT depend on any realized tile's measured size. So the layout manager must NOT let a tile's queue-drained
+    // re-measure propagate an InvalidateMeasure back up into this panel: that spurious re-dirty is what span the layout
+    // pass to MaxPassIterations (the whole realize backlog draining in ONE pass instead of one slice per frame). As a
+    // plain container (no owner) the size tracks children, so defer to the base (fixed Width+Height still a boundary).
+    public override bool IsMeasureBoundary => IsItemsHost || base.IsMeasureBoundary;
 
     public override void InvalidateMeasure()
     {
@@ -209,102 +217,120 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         foreach (var child in VisualChildren)
         {
             if (child.Visibility != Visibility.Visible) continue;
-            if (_skeletons.Contains(child)) continue;   // panel-owned placeholder, not a generator container - leave it
+            if (ReferenceEquals(child, _loadingOverlay)) continue;   // panel-owned loading overlay, not a generator container
             if (generator.IndexFromContainer(child) >= 0) continue;   // in the realized window - keep
             child.Visibility = Visibility.Collapsed;
             generator.ReclaimDetached(child);
         }
     }
 
-    // ---- Skeleton placeholders for budget-deferred slots (fast-fling "loading" tiles) ----
-    private readonly Stack<IUIComponent> _skeletonPool = new();          // reusable skeleton visuals
-    private readonly Dictionary<int, IUIComponent> _skeletonBySlot = new();   // active skeletons keyed by grid slot
-    private readonly HashSet<IUIComponent> _skeletons = new();           // identity set (excluded from HideUnmappedContainers)
-    private readonly HashSet<int> _pendingSet = new();                   // reused per reconcile
-    private readonly List<int> _skelStaleBuf = new();
+    // ---- Loading overlay: ONE hit-transparent shimmer over the not-yet-realized region ----
+    // Replaces per-slot skeletons. A single overlay visual covers the BOUNDING BOX of the still-deferred slots, so its
+    // cost is O(1) per frame no matter how many tiles are pending (per-slot skeletons were O(pending) reconcile + an
+    // O(pending) render-dirty from their shimmer, which re-froze a big cold fill). It is:
+    //  - HIT-TRANSPARENT (IsHitTestVisible=false) so clicks fall through to the realized tiles beneath it;
+    //  - TRANSLUCENT, so the realized tiles at the boundary show through - a partial last row never reads as a gap
+    //    (this is why a single box is fine here, unlike an opaque skeleton, which was the objection to one rect);
+    //  - swept by a moving highlight band, faded in only after the fill has run a few frames (no flash on a quick fill)
+    //    and faded out when the fill completes.
+    private Border _loadingOverlay;
+    private GradientStop _s1, _s2, _s3;   // the moving band stops (offsets updated each frame)
+    private double _shimmerPhase;
+    private bool _overlayShown;
+    private int _pendingFrames;
+    private const int OverlayDelayFrames = 6;     // ~100 ms at 60 fps before it appears - no flash on a fill that clears fast
+    private const double ShimmerStep = 0.035;     // band travel per frame (a full sweep ~1.7 s incl. off-screen tails)
+    private const double ShimmerHalfBand = 0.16;  // half-width of the bright band, in gradient-offset units
+    private static readonly Color ShimmerBase = new(0xFF, 0xFF, 0xFF, 0x14);   // faint tint over the whole region (~8%, RGBA)
+    private static readonly Color ShimmerHi = new(0xFF, 0xFF, 0xFF, 0x40);     // the moving highlight band (~25%)
 
-    /// <summary>Reconciles skeleton placeholders to EXACTLY the generator's budget-deferred slots. A pending slot with no
-    /// real container gets a pooled (or new) skeleton arranged at its grid rect; a slot that got its real tile - or
-    /// scrolled out - has its skeleton collapsed and pooled. The subclass calls this from ArrangeVirtualized (it owns the
-    /// slot geometry, passed as <paramref name="slotRect"/>). When nothing is deferred (normal/slow scroll) both the
-    /// pending list and the active map are empty, so this is a couple of cheap no-op scans.</summary>
-    protected void ReconcileSkeletons(Func<int, Rect> slotRect)
+    /// <summary>Reconciles the single loading overlay to the generator's budget-deferred slots: while any are pending it
+    /// covers their bounding box with one hit-transparent shimmer; when none are, it fades out. <paramref name="slotRect"/>
+    /// maps a slot index to its absolute grid rect - the subclass owns that geometry and calls this from ArrangeVirtualized.
+    /// O(pending) is a cheap min/max over the pending indices (no per-slot visual); the drawn cost is O(1) - one overlay.</summary>
+    protected void ReconcileLoadingOverlay(Func<int, Rect> slotRect)
     {
         var pending = Owner.ItemContainerGenerator.PendingIndices;
-
-        // Retire skeletons whose slot is no longer pending (real tile landed, or the slot left the window).
-        if (_skeletonBySlot.Count > 0)
+        if (pending.Count == 0)
         {
-            _pendingSet.Clear();
-            for (var i = 0; i < pending.Count; i++) _pendingSet.Add(pending[i]);
-            _skelStaleBuf.Clear();
-            foreach (var slot in _skeletonBySlot.Keys)
-                if (!_pendingSet.Contains(slot)) _skelStaleBuf.Add(slot);
-            foreach (var slot in _skelStaleBuf)
-            {
-                var sk = _skeletonBySlot[slot];
-                _skeletonBySlot.Remove(slot);
-                sk.Visibility = Visibility.Collapsed;
-                _skeletonPool.Push(sk);
-            }
+            _pendingFrames = 0;
+            if (_overlayShown) { _overlayShown = false; FadeOverlay(0); }
+            return;
         }
 
-        // Advance the shimmer once per reconcile. While any slot is pending the panel re-measures every frame (the
-        // budget's next-pass), so this runs per-frame without a dedicated ticker; a frame-based step is fine for a shimmer.
-        _shimmerPhase += ShimmerStep;
-
-        // Place a skeleton at every pending slot, pulsing its opacity in a WAVE across the grid (offset by slot) so the
-        // whole area breathes like a Telegram "loading" placeholder instead of a flat block.
+        // Bounding box of the pending slots. Contiguous cold fill / a scroll's leading band both give a tight box; a rare
+        // fragmented pending over-covers slightly, but the overlay is translucent + hit-transparent so realized tiles under
+        // it stay visible and clickable.
+        double l = double.MaxValue, t = double.MaxValue, r = double.MinValue, b = double.MinValue;
         for (var i = 0; i < pending.Count; i++)
         {
-            var slot = pending[i];
-            if (!_skeletonBySlot.TryGetValue(slot, out var sk))
-            {
-                sk = _skeletonPool.Count > 0 ? _skeletonPool.Pop() : CreateSkeletonInternal();
-                _skeletonBySlot[slot] = sk;
-            }
-            if (sk.Visibility != Visibility.Visible) sk.Visibility = Visibility.Visible;
-            if (sk is UIComponent uc)
-                uc.Opacity = 0.55 + 0.45 * Math.Sin(_shimmerPhase + slot * ShimmerWave);
-            var rect = slotRect(slot);
-            var m = (IMeasurableComponent)sk;
-            if (!m.IsMeasureValid) m.Measure(new Size(rect.Width, rect.Height));
-            m.Arrange(rect);
+            var rc = slotRect(pending[i]);
+            if (rc.X < l) l = rc.X;
+            if (rc.Y < t) t = rc.Y;
+            if (rc.Right > r) r = rc.Right;
+            if (rc.Bottom > b) b = rc.Bottom;
         }
+
+        _pendingFrames++;
+        // Delay: don't flash the overlay on a fill that clears within a few frames (small list / warm cache).
+        if (!_overlayShown && _pendingFrames < OverlayDelayFrames) return;
+
+        EnsureOverlay();
+        AdvanceShimmer();
+        var m = (IMeasurableComponent)_loadingOverlay;
+        var box = new Rect(l, t, Math.Max(0, r - l), Math.Max(0, b - t));
+        m.Measure(new Size(box.Width, box.Height));
+        m.Arrange(box);
+        if (_loadingOverlay.Visibility != Visibility.Visible) _loadingOverlay.Visibility = Visibility.Visible;
+        if (!_overlayShown) { _overlayShown = true; FadeOverlay(1); }
     }
 
-    private double _shimmerPhase;
-    private const double ShimmerStep = 0.18;   // phase advance per frame (shimmer speed)
-    private const double ShimmerWave = 0.30;   // per-slot phase offset -> a travelling wave across the grid
-
-    /// <summary>The active skeleton at grid slot <paramref name="slot"/>, or null. For the panel's O(1) spatial hit-test.</summary>
-    protected IUIComponent SkeletonAt(int slot) => _skeletonBySlot.GetValueOrDefault(slot);
-
-    private IUIComponent CreateSkeletonInternal()
+    private void EnsureOverlay()
     {
-        var sk = CreateSkeleton();
-        _skeletons.Add(sk);
-        AddVisualChild(sk);
-        return sk;
+        if (_loadingOverlay != null) return;
+        _s1 = new GradientStop(ShimmerBase, 0.2);
+        _s2 = new GradientStop(ShimmerHi, 0.35);
+        _s3 = new GradientStop(ShimmerBase, 0.5);
+        var brush = new LinearGradientBrush { StartPoint = new Vector2(0, 0), EndPoint = new Vector2(1, 1) };
+        brush.GradientStops.Add(new GradientStop(ShimmerBase, 0));
+        brush.GradientStops.Add(_s1);
+        brush.GradientStops.Add(_s2);
+        brush.GradientStops.Add(_s3);
+        brush.GradientStops.Add(new GradientStop(ShimmerBase, 1));
+        _loadingOverlay = new Border
+        {
+            Background = brush,
+            CornerRadius = new CornerRadius(4),
+            IsHitTestVisible = false,   // clicks fall through to the realized tiles under the overlay
+            Opacity = 0
+        };
+        AddVisualChild(_loadingOverlay);
     }
 
-    /// <summary>Builds ONE skeleton placeholder visual: the owner's <see cref="ItemsControl.ItemSkeletonTemplate"/> if
-    /// set, else the built-in themed default (a muted rounded tile). Virtual so a panel can further customise.</summary>
-    protected virtual IUIComponent CreateSkeleton()
+    // Sweep the bright band across the region. Run the phase past both ends (-half .. 1+half) so the band fully enters and
+    // exits BEFORE it wraps - the reset lands while the band is off the visible range, so there is no visible jump. The
+    // stop-offset writes don't auto-invalidate the brush, so force one re-record (one visual -> O(1)).
+    private void AdvanceShimmer()
     {
-        var template = Owner?.ItemSkeletonTemplate;
-        if (template != null && template.Build(this)?.RootComponent is { } root)
-            return root;
-        return DefaultSkeleton();
+        _shimmerPhase += ShimmerStep;
+        if (_shimmerPhase > 1 + ShimmerHalfBand) _shimmerPhase = -ShimmerHalfBand;
+        _s1.Offset = Math.Clamp(_shimmerPhase - ShimmerHalfBand, 0, 1);
+        _s2.Offset = Math.Clamp(_shimmerPhase, 0, 1);
+        _s3.Offset = Math.Clamp(_shimmerPhase + ShimmerHalfBand, 0, 1);
+        _loadingOverlay.InvalidateRender(false);
     }
 
-    // Built-in fallback skeleton: a muted, rounded, inset tile that reads as "loading" over the surface.
-    private static IUIComponent DefaultSkeleton() => new Border
+    private void FadeOverlay(double to)
     {
-        Background = new SolidColorBrush("#22FFFFFF"),   // subtle translucent fill over the dark surface
-        CornerRadius = new CornerRadius(6),
-        Margin = new Thickness(3)
-    };
+        if (_loadingOverlay == null) return;
+        _loadingOverlay.BeginAnimation(UIComponent.OpacityProperty, new DoubleAnimation
+        {
+            From = _loadingOverlay.Opacity,
+            To = to,
+            Duration = TimeSpan.FromSeconds(0.3),
+            FillBehavior = FillBehavior.HoldEnd
+        }, () => { _loadingOverlay.Opacity = to; if (to == 0) _loadingOverlay.Visibility = Visibility.Collapsed; });
+    }
 
     /// <summary>Called when the scroll axis is unbounded (no viewport) so everything has to be realized. Override to log.</summary>
     protected virtual void OnNoViewport()

@@ -608,6 +608,12 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         }
     }
 
+    /// <summary>See <see cref="IMeasurableComponent.IsMeasureBoundary"/>. An element with BOTH Width and Height set
+    /// (not Auto/NaN) has an externally-fixed DesiredSize that no child re-measure can change, so it is a measure
+    /// boundary automatically - just like WPF. An auto-sized element (either dimension NaN) measures to fit its
+    /// children, so a child's size change DOES propagate up. A virtualizing items host overrides this further.</summary>
+    public virtual bool IsMeasureBoundary => !Double.IsNaN(Width) && !Double.IsNaN(Height);
+
     public virtual void InvalidateMeasure()
     {
         if (!IsMeasureValid) return;

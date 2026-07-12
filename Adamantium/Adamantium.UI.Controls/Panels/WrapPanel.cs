@@ -22,7 +22,7 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
       var col = (int)(flow / _cellFlow);
       if (col >= _columns) return System.Array.Empty<IUIComponent>();
       var index = (int)(scroll / _cellScroll) * _columns + col;
-      var hit = Owner.ItemContainerGenerator.ContainerFromIndex(index) ?? SkeletonAt(index);
+      var hit = Owner.ItemContainerGenerator.ContainerFromIndex(index);   // the loading overlay is hit-transparent
       if (hit == null) return System.Array.Empty<IUIComponent>();
       _hitOne[0] = hit;
       return _hitOne;
@@ -45,12 +45,12 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
    private const double FillBudgetMs = 30.0;  // slice when NOT scrolling (initial fill / a settled fling): drain the backlog fast
    private const int MinBinds = 8;            // always (re)bind at least this many/frame so the window keeps filling
 
-   // The offset the previous measure ran against - to tell an ACTIVE scroll (offset moving frame-to-frame) from a static
-   // fill (initial tab-switch, or a fling that has settled). While scrolling, a small per-frame budget keeps the app
-   // responsive and skeletons cover the deferred slots; when NOT scrolling there is no interaction to protect, so a big
-   // budget blasts through the whole visible window in a handful of frames instead of dribbling ~12 tiles/frame for 10 s.
-   // The total BUILD work (one visual per newly-realized tile) is fixed either way; a big budget just pays the per-frame
-   // O(window) overhead (skeleton reconcile + arrange + render) a dozen times instead of ~400.
+   // The offset the previous measure ran against - tells an ACTIVE scroll (offset moving frame-to-frame) from a static fill.
+   // A REALIZE budget must be a GUARANTEED slice, never "whatever the frame has left": the per-frame O(window) overhead
+   // (skeleton reconcile + bindorder + render build) can eat a 12 ms frame ceiling BEFORE the bind loop runs, leaving it
+   // ~0 -> only MinBinds/frame -> a huge cold fill dribbles ~10 tiles/frame for tens of seconds, paying the O(window)
+   // overhead hundreds of times. A fixed generous fill slice blasts the window in a handful of frames instead (the total
+   // bind work is fixed; a big slice just pays the O(window) overhead a dozen times, not ~400).
    private Vector2 _lastMeasuredOffset = new(double.NaN, double.NaN);
 
    // The last FINITE viewport extent on the scroll axis. When a measure comes in with an infinite scroll-axis viewport (a
@@ -76,6 +76,14 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
    private int _columns = 1;            // items per line
    private int _lastFirstLine;          // remembered first visible line -> probe next pass
    private int _lastItemCount = -1;     // detect data changes -> re-establish the cached cell
+
+   /// <summary>Grid metrics from the last virtualized measure (items-host mode): items per line, and the uniform cell
+   /// PITCH along the flow / scroll axes (cell size incl. the inter-cell gap). An items host built on this panel reads
+   /// them to place things by ABSOLUTE index rather than realized bounds - e.g. TilesHost computes each tile's shared-photo
+   /// UV slice from its item index + these, so the photo maps correctly with virtualization on. Valid after a measure.</summary>
+   public int Columns => _columns;
+   public double CellFlow => _cellFlow;
+   public double CellScroll => _cellScroll;
 
    public static readonly AdamantiumProperty OrientationProperty = AdamantiumProperty.Register(nameof(Orientation),
       typeof(Orientation), typeof(WrapPanel), new PropertyMetadata(Orientation.Horizontal, PropertyMetadataOptions.AffectsMeasure|PropertyMetadataOptions.AffectsArrange));
@@ -356,8 +364,9 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
       // Seed the assumed cell so we have a sane column count before windowing (explicit ItemWidth/Height win).
       SeedCell(horizontal, count);
 
-      // Adaptive (re)bind budget: small while the user is actively scrolling (offset moving) to stay responsive; large
-      // when the offset is static (initial fill / settled fling) to drain the deferred backlog in a few frames.
+      // Guaranteed (re)bind slice: small while actively scrolling (stay responsive), large on a static fill (drain the
+      // backlog in a handful of frames). NOT the frame's leftover time - see _lastMeasuredOffset's note on why leftovers
+      // starve the fill to ~10 tiles/frame.
       var scrolling = offset != _lastMeasuredOffset;
       _lastMeasuredOffset = offset;
       var bindBudget = scrolling ? BindBudgetMs : FillBudgetMs;
@@ -477,10 +486,10 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
       else
          foreach (var index in _arrangeIndexBuf) ArrangeAt(index);
 
-      // Budget-deferred slots (generator.PendingIndices): fill each with a skeleton at its grid slot so a fast fling
-      // shows a "loading" placeholder instead of a hole. Reconciled here (after the real tiles) since this is where the
-      // slot geometry lives; the panel owns the skeleton pool + lifecycle.
-      ReconcileSkeletons(i =>
+      // Budget-deferred slots (generator.PendingIndices): cover their bounding box with the single hit-transparent
+      // loading shimmer (a fast fling / cold fill shows a "loading" sweep instead of a hole). Reconciled here (after the
+      // real tiles) since this is where the slot geometry lives; the panel owns the overlay's lifecycle.
+      ReconcileLoadingOverlay(i =>
       {
          var line = i / _columns;
          var col = i % _columns;
