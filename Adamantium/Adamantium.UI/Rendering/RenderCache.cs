@@ -168,7 +168,9 @@ public class RenderCache
         _clipCache.Clear();
         _relWorldCache.Clear();
         _nodeCache.Clear();
-        BuildRenderCommands(visualRoot);
+        _packet.Reset(RenderBuildKind.Full);
+        RecordFullWalk(visualRoot, _packet);   // device-free: walk + component.Render + copy commands into the packet
+        ApplyFullWalk(_packet);                 // GPU: rebuild the paint-order groups from the packet
         CaptureSnapshot();
         _built = true;
         RenderDirty.Clear();
@@ -304,7 +306,7 @@ public class RenderCache
                 var wasGeometryValid = component.IsGeometryValid;
                 _drawingContextInternal.Clear();
                 component.Render(_drawingContext);
-                ProcessRenderCommands(component, projectionMatrix, wasGeometryValid);
+                ProcessRenderCommands(component, _drawingContextInternal.GetDrawCommands(), projectionMatrix, wasGeometryValid);
             }
         }
 
@@ -375,6 +377,11 @@ public class RenderCache
     }
 
     private readonly Dictionary<IUIComponent, LayoutSnapshot> _snap = new();
+
+    // The per-frame recorder->applier handoff (Phase 3, docs/RENDER_THREAD_PLAN.md). The device-free record pass fills it
+    // (walk + component.Render + copied draw commands); the GPU apply pass consumes it. In 3.0 both run inline on one
+    // thread so a single pooled packet suffices; 3.2 double-buffers it so the applier can run on the render thread.
+    private readonly RenderPacket _packet = new();
 
     private LayoutSnapshot Snap(IUIComponent c)
     {
@@ -1335,13 +1342,16 @@ public class RenderCache
         }
     }
 
-    private void BuildRenderCommands(IRootVisualComponent visualRoot)
+    // RECORD half of the full walk (DEVICE-FREE): DFS the visual tree, run component.Render to produce this frame's draw
+    // commands, and COPY each component's commands into the packet in paint order (the shared drawing context is reused for
+    // the next component, so the commands must be snapshotted now). No GPU here - no unit build, no buffer alloc; the
+    // applier realizes them (ApplyFullWalk). This is what lets the recorder run on the update thread (docs/RENDER_THREAD_PLAN.md).
+    private void RecordFullWalk(IRootVisualComponent visualRoot, RenderPacket packet)
     {
-        _groups.Clear();
         _orderByControl.Clear();
         _lastVisualRoot = visualRoot;
         var order = 0;
-        var projectionMatrix = visualRoot.GetProjectionMatrix();
+        packet.ProjectionMatrix = visualRoot.GetProjectionMatrix();
         var stack = new Stack<IUIComponent>();
         var visited = new HashSet<Guid>();
         stack.Push(visualRoot);
@@ -1366,12 +1376,32 @@ public class RenderCache
 
             _drawingContextInternal.Clear();
             component.Render(_drawingContext);
-            ProcessRenderCommands(component, projectionMatrix, wasGeometryValid);
+            packet.Draws.Add(new ComponentDraw(component, CopyCommands(_drawingContextInternal.GetDrawCommands()), wasGeometryValid));
 
             PushChildrenInPaintOrder(stack, component.VisualChildren);
         }
+    }
 
+    // APPLY half of the full walk (GPU / render-thread side): rebuild the paint-order groups from the recorded draws -
+    // create/update/free the retained units per component (BuildUnitsFor via ProcessRenderCommands), then reclaim any
+    // control that dropped off the tree.
+    private void ApplyFullWalk(RenderPacket packet)
+    {
+        _groups.Clear();
+        foreach (var draw in packet.Draws)
+            ProcessRenderCommands(draw.Component, draw.Commands, packet.ProjectionMatrix, draw.WasGeometryValid);
         ReconcileDetachedControls();
+    }
+
+    // Snapshot a component's just-recorded draw commands (the shared drawing context is reused for the next component).
+    // Empty -> a shared empty array (a clean control that recorded nothing, or one that now draws nothing). Allocates per
+    // NON-empty component per FULL walk (rare - structural changes only); poolable later.
+    private static IReadOnlyList<IDrawCommand> CopyCommands(IReadOnlyList<IDrawCommand> commands)
+    {
+        if (commands.Count == 0) return Array.Empty<IDrawCommand>();
+        var copy = new IDrawCommand[commands.Count];
+        for (var i = 0; i < commands.Count; i++) copy[i] = commands[i];
+        return copy;
     }
 
     // Push a component's children so the stack pops them in PAINT order (drawn first = underneath). Fast path (the norm):
@@ -1458,9 +1488,8 @@ public class RenderCache
         return group;
     }
 
-    private void ProcessRenderCommands(IUIComponent component, Matrix4x4F projectionMatrix, bool wasGeometryValid)
+    private void ProcessRenderCommands(IUIComponent component, IReadOnlyList<IDrawCommand> drawCommands, Matrix4x4F projectionMatrix, bool wasGeometryValid)
     {
-        var drawCommands = _drawingContextInternal.GetDrawCommands();
         if (drawCommands.Count > 0)
         {
             _groups.Add(BuildUnitsFor(component, drawCommands, projectionMatrix));
