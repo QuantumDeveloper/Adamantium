@@ -20,12 +20,21 @@ public sealed class LinearGradientBrush : GradientBrush
     public Vector2 StartPoint
     {
         get => GetValue<Vector2>(StartPointProperty);
-        set => SetValue(StartPointProperty, value);
+        set { if (IsFrozen) return; SetValue(StartPointProperty, value); }
     }
 
     public Vector2 EndPoint
     {
         get => GetValue<Vector2>(EndPointProperty);
-        set => SetValue(EndPointProperty, value);
+        set { if (IsFrozen) return; SetValue(EndPointProperty, value); }
     }
+
+    protected override Brush CreateFrozenCore() =>
+        AsFrozen(new LinearGradientBrush(CopyStops())
+        {
+            StartPoint = StartPoint,
+            EndPoint = EndPoint,
+            SpreadMethod = SpreadMethod,
+            Opacity = Opacity
+        });
 }

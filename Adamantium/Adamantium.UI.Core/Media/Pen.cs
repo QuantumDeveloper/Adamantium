@@ -52,6 +52,27 @@ public class Pen : IEquatable<Pen>
       DashCap = dashCap;
    }
 
+   // --- Frozen snapshot (render/compositor-thread safety) -------------------------------------------------------------
+   // A Pen is immutable-per-change (all fields set once; a NEW Pen is built on any change) EXCEPT its Brush, which is a
+   // live animatable object. ToFrozen() returns a Pen whose only difference is a FROZEN brush; the immutable scalar/dash
+   // fields are carried straight through. It is cached and keyed by the frozen-brush instance (itself cache-stable), so an
+   // unchanged brush returns the SAME frozen Pen every record -> Pen.Equals reference-short-circuits (no spurious stroke
+   // re-bake), while an animated stroke brush yields a fresh frozen Pen. A frozen brush (or none) means this Pen is already
+   // safe -> returns itself.
+   private Pen _frozen;
+   private Brush _frozenFor;
+
+   public Pen ToFrozen()
+   {
+      if (Brush is not { } b) return this;                 // no live brush to freeze; every other field is immutable
+      var frozenBrush = b.ToFrozen();
+      if (ReferenceEquals(frozenBrush, b)) return this;    // brush already frozen -> this Pen is already a frozen/safe one
+      if (_frozen != null && ReferenceEquals(_frozenFor, frozenBrush)) return _frozen;
+      _frozenFor = frozenBrush;
+      return _frozen = new Pen(frozenBrush, Thickness, DashOffset, DashStrokeArray, StartLineCap, EndLineCap,
+         PenLineJoin, TrimStart, TrimEnd, DashCap);
+   }
+
    public bool Equals(Pen other)
    {
       if (ReferenceEquals(null, other)) return false;

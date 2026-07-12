@@ -51,12 +51,12 @@ internal sealed class TextBatchCollector : BatchCollector<FontItem>
     {
         atlas = null;
         if (!FontRenderer.UseTextBatch) return false;   // off -> every block falls back to the per-block direct draw
-        var layout = tc.TextLayout;
-        if (layout == null || layout.ElementsCount == 0 || layout.FontAtlas == null) return false;
+        var run = tc.GlyphRun;                            // the FROZEN glyph snapshot (not the live, reshaped-in-place layout)
+        if (run == null || run.Count == 0 || run.Atlas == null) return false;
         var fr = tc.FontRenderer;
         if (fr == null || !fr.UseCanonicalMsdf || fr.UseOutline) return false;
         if (tc.Foreground is not SolidColorBrush) return false;
-        atlas = layout.FontAtlas;
+        atlas = run.Atlas;
         return true;
     }
 
@@ -68,8 +68,8 @@ internal sealed class TextBatchCollector : BatchCollector<FontItem>
     // GPU-buffer overflow this frame - and the caller then renders that block via the per-block direct draw.
     public bool TryAdd(TextRenderComponent tc, Matrix4x4F world, Rect2D scissor, FontAtlas atlas, Rect logicalBounds)
     {
-        var layout = tc.TextLayout;
-        var n = (int)layout.ElementsCount;
+        var run = tc.GlyphRun;                        // FROZEN snapshot - the applier never reads the live TextLayout here
+        var n = run.Count;
 
         EnsureCpuCapacity(Count + n);
         if (Count + n > GpuCapacity) return false;   // won't fit this frame's GPU buffer -> direct
@@ -79,7 +79,7 @@ internal sealed class TextBatchCollector : BatchCollector<FontItem>
         color.W *= (float)tc.RenderData.Opacity;      // fold the element's opacity into the glyph alpha
 
         // Writes n glyphs into Items and advances Count; returns false (no write) for a rotated/sheared world.
-        if (!layout.TryBakeWorldGlyphs(Items, ref Count, world, new Vector2F((float)area.X, (float)area.Y), color))
+        if (!run.BakeWorld(Items, ref Count, world, new Vector2F((float)area.X, (float)area.Y), color))
             return false;
 
         _atlas = atlas;

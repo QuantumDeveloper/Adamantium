@@ -250,6 +250,7 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
     public GeometryRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
         Payload.Geometry.ProcessGeometry(GeometryType.Both);
+        _frozenMesh = FrozenMesh.From(Payload.Geometry.Mesh, Payload.Geometry.Bounds);   // freeze the tessellated mesh for the instanced path
         GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, Payload.Geometry.Mesh, Payload.Brush, BufferManager);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
         ProcessFillFringe(Payload.Geometry, Payload.Brush);
@@ -257,28 +258,20 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
     }
 
     // Solid arbitrary geometry is instanceable: N identical Paths share one mesh + one instanced draw. A gradient/image
-    // fill (or a mesh with no indices) falls back to the per-unit body. The shape key - a fingerprint over the mesh's
-    // vertices + indices - is cached per mesh, recomputed only when the tessellation actually changes.
-    private object _fpMesh;
-    private GeometryKey _fpKey;
+    // fill (or a mesh with no vertices) falls back to the per-unit body. The instanced applier reads the FROZEN mesh
+    // snapshot (captured at record after ProcessGeometry), never the live Geometry.Mesh - so it is render-thread safe.
+    private FrozenMesh _frozenMesh;
 
     public override bool TryGetInstancedFill(out GeometryKey key, out object mesh, out Vector4F color)
     {
         key = default; mesh = null; color = default;
         if (Payload.Brush is not SolidColorBrush solid) return false;
-        var m = Payload.Geometry?.Mesh;
-        // Instanceable if the mesh has drawable vertices - an indexed OR a non-indexed triangle list. UI shape fills
-        // tessellate to a NON-indexed list, so requiring indices excluded them all; the retained renderer picks
-        // DrawIndexed vs Draw off the mesh. Only a null/empty mesh (or non-solid brush) falls back to the per-unit body.
-        if (m is not { HasPoints: true }) return false;
+        // Instanceable if the frozen mesh has drawable vertices - an indexed OR a non-indexed triangle list. UI shape
+        // fills tessellate to a NON-indexed list; the retained renderer picks DrawIndexed vs Draw off the topology.
+        if (_frozenMesh is not { HasPoints: true } fm) return false;
 
-        if (!ReferenceEquals(m, _fpMesh))
-        {
-            _fpKey = GeometryKey.ArbitraryMesh(Fingerprint(m));
-            _fpMesh = m;
-        }
-        key = _fpKey;
-        mesh = m;
+        key = fm.Key;
+        mesh = fm;
         var c = solid.Color.ToVector4();
         // same bake as the per-unit fill: colour x brush opacity x element opacity
         c.W *= (float)(solid.Opacity * (DrawCommand?.RenderData?.Opacity ?? 1.0f));
@@ -287,41 +280,21 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
     }
 
     // Gradient sibling of TryGetInstancedFill: a GRADIENT fill on arbitrary geometry batches through the gradient
-    // instanced-fill path. Returns the shared-mesh key (same fingerprint, so identical shapes still merge), the mesh, the
-    // gradient brush, and the shape's LOCAL bounds (the shader maps a fragment's local position to a 0..1 gradient uv).
+    // instanced-fill path. Returns the shared-mesh key (same fingerprint, so identical shapes still merge), the frozen
+    // mesh, the (frozen) gradient brush, and the shape's LOCAL bounds (the shader maps a fragment's local pos to a uv).
     public bool TryGetInstancedGradientFill(out GeometryKey key, out object mesh, out GradientBrush brush,
         out Rect localBounds, out double opacity)
     {
         key = default; mesh = null; brush = null; localBounds = default; opacity = 1.0;
         if (Payload.Brush is not GradientBrush g) return false;
-        var m = Payload.Geometry?.Mesh;
-        if (m is not { HasPoints: true }) return false;
+        if (_frozenMesh is not { HasPoints: true } fm) return false;
 
-        if (!ReferenceEquals(m, _fpMesh))
-        {
-            _fpKey = GeometryKey.ArbitraryMesh(Fingerprint(m));
-            _fpMesh = m;
-        }
-        key = _fpKey;
-        mesh = m;
+        key = fm.Key;
+        mesh = fm;
         brush = g;
-        localBounds = Payload.Geometry.Bounds;
+        localBounds = fm.Bounds;
         opacity = DrawCommand?.RenderData?.Opacity ?? 1.0;
         return true;
-    }
-
-    // Stable content hash of the LOCAL mesh (vertex bytes + indices): identical tessellations share a key/segment, and
-    // ANY difference - including size - yields a different key, so same-topology-different-size shapes never merge.
-    private static long Fingerprint(Mesh mesh)
-    {
-        unchecked
-        {
-            ulong h = 14695981039346656037UL;   // FNV-1a
-            foreach (var b in MemoryMarshal.AsBytes(mesh.ToUIVertices().AsSpan())) { h ^= b; h *= 1099511628211UL; }
-            var idx = mesh.Indices;
-            for (var i = 0; i < idx.Length; i++) { h ^= (uint)idx[i]; h *= 1099511628211UL; }
-            return (long)h;
-        }
     }
 
     public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
@@ -338,6 +311,7 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
         if (rebuild)
         {
             inputPayload.Geometry.ProcessGeometry(GeometryType.Both);
+            _frozenMesh = FrozenMesh.From(inputPayload.Geometry.Mesh, inputPayload.Geometry.Bounds);   // re-freeze the re-tessellated mesh
             ((GeometryRenderComponent)GeometryRenderer).UpdateGeometry(inputPayload.Geometry.Mesh);
         }
         ((GeometryRenderComponent)GeometryRenderer).Background = inputPayload.Brush;
@@ -772,8 +746,9 @@ public class TextRenderUnit : RenderUnit<TextPayload>
             Payload.Stroke,
             BufferManager);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
+        TextComponent.GlyphRun = Payload.TextLayout.SnapshotGlyphs();   // freeze the shaped glyphs for the render-thread batch bake
     }
-    
+
     public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
     {
         if (drawCommand.Payload is not TextPayload inputPayload) return;
@@ -811,6 +786,8 @@ public class TextRenderUnit : RenderUnit<TextPayload>
                     inputPayload.Stroke,
                     BufferManager);
             }
+            // Glyphs were re-shaped in place (reuse) or a new component was built - refresh the frozen snapshot either way.
+            TextComponent.GlyphRun = inputPayload.TextLayout.SnapshotGlyphs();
         }
         else if (!Equals(Payload.Background, inputPayload.Background) ||
                  !Equals(Payload.Foreground, inputPayload.Foreground) ||
