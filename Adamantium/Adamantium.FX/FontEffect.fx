@@ -62,6 +62,14 @@ float4 OutlineColor;
 float SdfBlendLo;
 float SdfBlendHi;
 
+// BDA (buffer device address) storage for the INSTANCED glyph batch (pass RenderMsdfBatchInstanced) - the SAME proven
+// pattern BatchEffect.fx uses for rect/ellipse fills. GlyphInstancesAddress -> the per-instance GlyphData buffer;
+// TransformsAddress -> the transform table the VS indexes by each glyph's slot (slot 0 = identity). This lets glyph rects
+// be uploaded ONCE in node-local space and transformed to world on the GPU, so a scrolling block moves via one matrix
+// write instead of a per-glyph CPU re-bake (and the text batch becomes node-aware). See docs/RENDER_THREAD_PLAN.md.
+uint64_t GlyphInstancesAddress;
+uint64_t TransformsAddress;
+
 // Per-glyph quad expansion, now in the VERTEX stage (corner from SV_VertexID), so the geometry shader is gone:
 // plain instanced rendering (4-vertex triangle strip x N glyphs), portable to Metal/MoltenVK and free of the
 // NVIDIA Turing GS NVVM bug.
@@ -263,6 +271,38 @@ float4 StrokedTextPS(PSInput input) : SV_Target
     }
 }
 
+// ---- Instanced glyph batch: per-instance GlyphData read from a BDA STORAGE buffer by SV_InstanceID (mirrors
+// RectBatchInstancedVS in BatchEffect.fx); the quad comes from SV_VertexID. Node-local glyph rects are transformed to
+// world on the GPU by the instance's transform-table slot (0 = identity), so a scrolling block moves via one matrix
+// write, not a per-glyph CPU re-bake, and the batch is node-aware. Reuses FontPixelShaderMsdfBatch (per-instance colour).
+struct GlyphData
+{
+    float4 LocalRect;   // node-local x, y, w, h (world for slot-0 legacy bakes)
+    float4 Source;      // atlas UV rect
+    float4 Params;      // .x = transform-table slot; .y = atlas layer (PS constant-0 today); .z = depth; .w reserved
+    float4 Color;       // straight RGBA, element/brush opacity folded into .w
+};
+
+[shader("vertex")]
+PSInput FontBatchInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
+{
+    GlyphData* items = (GlyphData*)GlyphInstancesAddress;
+    GlyphData g = items[instanceId];
+
+    PSInput o;
+    // SAME corner mapping as ExpandGlyphCorner (TextureCornerCoords[vertexId]) so the quad + UV match the direct path.
+    float2 corner = TextureCornerCoords[vertexId];
+    float2 localPos = g.LocalRect.xy + corner * g.LocalRect.zw;
+    // Node-local -> world via the instance's transform-table matrix (slot 0 = identity for legacy world bakes).
+    float4x4* transforms = (float4x4*)TransformsAddress;
+    float4x4 nodeWorld = transforms[(uint)g.Params.x];
+    float4 worldPos = mul(float4(localPos, g.Params.z, 1.0), nodeWorld);
+    o.Position = mul(worldPos, MatrixTransform);   // MatrixTransform = the (transposed-on-upload) projection
+    o.UV = g.Source.xy + corner * g.Source.zw;     // SpriteEffect == 0 for batched glyphs
+    o.Color = g.Color;
+    return o;
+}
+
 technique FontBatch
 {
     pass Render
@@ -286,6 +326,14 @@ technique FontBatch
         EffectName = "FontEffectMsdfBatch";
         Profile = 5.1;
         VertexShader = FontVertexShader;
+        PixelShader = FontPixelShaderMsdfBatch;
+    }
+
+    pass RenderMsdfBatchInstanced
+    {
+        EffectName = "FontEffectMsdfBatchInstanced";
+        Profile = 6.6;
+        VertexShader = FontBatchInstancedVS;
         PixelShader = FontPixelShaderMsdfBatch;
     }
 

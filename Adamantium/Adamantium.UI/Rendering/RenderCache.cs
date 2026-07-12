@@ -667,6 +667,7 @@ public class RenderCache
             _ellipseBatch.TransformsAddress = _transformTable.DeviceAddress;
             _gradientRectBatch.TransformsAddress = _transformTable.DeviceAddress;
             _gradientEllipseBatch.TransformsAddress = _transformTable.DeviceAddress;
+            _textBatch.TransformsAddress = _transformTable.DeviceAddress;   // glyph VS fetches the block's node matrix by slot
             var sceneClean = LastBuildKind == RenderBuildKind.Clean;
             _textBatch.SceneClean = sceneClean;
             _rectBatch.SceneClean = sceneClean;
@@ -812,14 +813,19 @@ public class RenderCache
             {
                 if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_textBatch.SameAtlas(atlas))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
-                if (_textBatch.TryAdd(tc, wt, scissor, atlas, LogicalBounds(unit.Component, wt)))
+                // Node-aware, same as the rect batch: glyphs are packed NODE-LOCAL with the node's transform-table slot, so
+                // a block under a motion node (a scroll list) rides the O(1) slot-write fast path instead of forcing a
+                // full re-bake. ResolveBake returns the node-relative transform + slot (world + slot 0 off any node).
+                var textBake = ResolveBake(device, unit.Component, wt, out var slot4Text);
+                if (_textBatch.TryAdd(tc, textBake, slot4Text, scissor, atlas, LogicalBounds(unit.Component, wt)))
                 {
-                    if (_recording) { group.PatchableRectOnly = false; MarkNodeNotAware(unit.Component); }   // text: world-baked glyphs
+                    if (_recording) group.PatchableRectOnly = false;   // text is a separate collector, not rect-splice-patchable
                     _batchScissor = scissor;
                     _batchOpen = true;
-                    continue;   // baked into the batch - drawn at the next flush
+                    continue;   // baked into the batch - drawn at the next flush (node-aware: no MarkNodeNotAware)
                 }
-                // else: rotated/sheared or overflow -> fall through to the per-block direct draw below
+                // else: rotated/sheared RELATIVE transform or overflow -> fall through to the per-block direct draw below
+                // (which re-marks the node not-aware, exactly like a rejected rect)
             }
             else if (device != null && InstancedFillCollector.Enabled && unit is GeometryRenderUnit gru && _instancedFill.CanBatch(gru))
             {
