@@ -717,7 +717,7 @@ public class TextLayout : DisposableObject
         var n = (int)ElementsCount;
         var copy = new FontItem[n];
         Array.Copy(fontItems, copy, n);
-        return new FrozenGlyphRun(copy, n, FontAtlas);
+        return new FrozenGlyphRun(copy, n, FontAtlas, FontSize);
     }
 
     private bool IsLastGlyph(int position, int count)

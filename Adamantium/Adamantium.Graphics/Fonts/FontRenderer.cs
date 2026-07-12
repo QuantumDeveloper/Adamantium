@@ -104,9 +104,9 @@ public class FontRenderer : GraphicsResource
         effectTransforms = fontEffect.TransformsAddress;
     }
 
-    public void DrawLayout(TextLayout textLayout, Color foreground, Color stroke)
+    public void DrawLayout(Buffer<FontItem> glyphs, uint count, FontAtlas atlas, float fontSize, Color foreground, Color stroke)
     {
-        DrawInternal(textLayout, foreground, stroke);
+        DrawInternal(glyphs, count, atlas, fontSize, foreground, stroke);
     }
 
     public void SetState(
@@ -148,9 +148,9 @@ public class FontRenderer : GraphicsResource
         beginCalled = true;
     }
 
-    private void DrawInternal(TextLayout layout, Color foreground, Color stroke)
+    private void DrawInternal(Buffer<FontItem> glyphs, uint count, FontAtlas atlas, float fontSize, Color foreground, Color stroke)
     {
-        if (layout.ElementsCount == 0) return;
+        if (count == 0) return;
 
         var vp = new Viewport();
         vp.Width = currentScreenSize.X;
@@ -182,22 +182,21 @@ public class FontRenderer : GraphicsResource
         GraphicsDevice.DepthWriteEnable = false;
 
         effectSampler.SetResource(assignedSamplerState);
-        effectTexture.SetResource(layout.FontAtlas.Atlas);
+        effectTexture.SetResource(atlas.Atlas);
         effectMatrixTransform.SetValue(finalMatrix);
         effectUVCornerCoords.SetValue(UVCornerCoords);
         effectForegroundColor.SetValue(foreground.ToVector4());
-        effectFontSize.SetValue(layout.FontSize);
+        effectFontSize.SetValue(fontSize);
         effectFontSizeThreshold.SetValue(FontSizeThreshold);
         effectFontWeight.SetValue(FontWeight);
-        effectPixelRange.SetValue(layout.FontAtlas.PixelRange);
-        effectAtlasSize.SetValue(new Vector2F(layout.FontAtlas.Atlas.Width, layout.FontAtlas.Atlas.Height));
+        effectPixelRange.SetValue(atlas.PixelRange);
+        effectAtlasSize.SetValue(new Vector2F(atlas.Atlas.Width, atlas.Atlas.Height));
         effectOutlineColor.SetValue(OutlineColor.ToVector4());
         effectOutlineWidth.SetValue(OutlineWidth);
         effectSdfBlendLo.SetValue(SdfBlendLo);
         effectSdfBlendHi.SetValue(SdfBlendHi);
         GraphicsDevice.VertexType = vertexType;
-        layout.EnsureVertexBuffer(GraphicsDevice);   // lazily allocate/upload the per-block buffer only for a direct draw
-        GraphicsDevice.SetVertexBuffer(layout.VertexBuffer);
+        GraphicsDevice.SetVertexBuffer(glyphs);   // the component's own buffer, uploaded from the FROZEN glyph run (no live layout)
         // Instanced quad: 4-vertex triangle strip per glyph (corners from SV_VertexID), one instance per glyph.
         GraphicsDevice.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
         if (stroke == Colors.Transparent)
@@ -215,7 +214,7 @@ public class FontRenderer : GraphicsResource
             fontEffect.FontBatchStrokedTextPass.Apply();
         }
 
-        GraphicsDevice.Draw(4, layout.ElementsCount);   // 4 strip verts x ElementsCount glyph instances
+        GraphicsDevice.Draw(4, count);   // 4 strip verts x glyph instances (composite path)
     }
 
     // Direct main-pass glyph draw (CPU pre-transform batch, Stage 1, docs/TEXT_GLYPH_BATCH_PLAN.md §9): renders the
@@ -225,9 +224,9 @@ public class FontRenderer : GraphicsResource
     // units (CompareOp.Always, test+write on) - NOT the RT path's depth-off (that target had no depth buffer).
     // Behind FontRenderer.UseDirectTextDraw. The MVP is built on the CPU (Translation(TextArea) x World x Projection)
     // because an indirect/indexed matrix in a graphics shader AVs vkCreateShadersEXT on this Turing - see the plan.
-    public void DrawLayoutDirect(SamplerState samplerState, TextLayout layout, Color foreground, Matrix4x4F mvp, float opacity)
+    public void DrawLayoutDirect(SamplerState samplerState, Buffer<FontItem> glyphs, uint count, FontAtlas atlas, float fontSize, Color foreground, Matrix4x4F mvp, float opacity)
     {
-        if (layout.ElementsCount == 0) return;
+        if (count == 0) return;
 
         GraphicsDevice.ColorBlendEnabled = true;
         // Font shaders output premultiplied color (rgb * alpha) -> premultiplied blend (same as the RT path + composite).
@@ -241,22 +240,21 @@ public class FontRenderer : GraphicsResource
         fg.W *= opacity;   // fold the element's Opacity (fade animation, dimmed container) into the glyph alpha
 
         effectSampler.SetResource(samplerState);
-        effectTexture.SetResource(layout.FontAtlas.Atlas);
+        effectTexture.SetResource(atlas.Atlas);
         effectMatrixTransform.SetValue(mvp);
         effectUVCornerCoords.SetValue(UVCornerCoords);
         effectForegroundColor.SetValue(fg);
-        effectFontSize.SetValue(layout.FontSize);
+        effectFontSize.SetValue(fontSize);
         effectFontSizeThreshold.SetValue(FontSizeThreshold);
         effectFontWeight.SetValue(FontWeight);
-        effectPixelRange.SetValue(layout.FontAtlas.PixelRange);
-        effectAtlasSize.SetValue(new Vector2F(layout.FontAtlas.Atlas.Width, layout.FontAtlas.Atlas.Height));
+        effectPixelRange.SetValue(atlas.PixelRange);
+        effectAtlasSize.SetValue(new Vector2F(atlas.Atlas.Width, atlas.Atlas.Height));
         effectOutlineColor.SetValue(OutlineColor.ToVector4());
         effectOutlineWidth.SetValue(OutlineWidth);
         effectSdfBlendLo.SetValue(SdfBlendLo);
         effectSdfBlendHi.SetValue(SdfBlendHi);
         GraphicsDevice.VertexType = vertexType;
-        layout.EnsureVertexBuffer(GraphicsDevice);   // lazily allocate/upload the per-block buffer only for a direct draw
-        GraphicsDevice.SetVertexBuffer(layout.VertexBuffer);
+        GraphicsDevice.SetVertexBuffer(glyphs);   // the component's own buffer, uploaded from the FROZEN glyph run (no live layout)
         GraphicsDevice.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
         // Direct text is never stroked (both text paths pass no stroke) - pick outline, else canonical / gradient MSDF.
         var pass = UseOutline
@@ -264,7 +262,7 @@ public class FontRenderer : GraphicsResource
             : (UseCanonicalMsdf ? fontEffect.FontBatchRenderMsdfPass : fontEffect.FontBatchRenderPass);
         pass.Apply();
 
-        GraphicsDevice.Draw(4, layout.ElementsCount);   // 4 strip verts x ElementsCount glyph instances
+        GraphicsDevice.Draw(4, count);   // 4 strip verts x glyph instances
     }
 
     // Aggregated text batch (docs/TEXT_GLYPH_BATCH_PLAN.md §9 Stage 2): draws MANY blocks' glyphs - already baked to
