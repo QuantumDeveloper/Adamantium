@@ -152,6 +152,7 @@ public class RenderCache
                 _partialDirty.AddRange(_geometryDirtyBuffer);
                 _movedNodesBuf.Clear();
                 _movedNodesBuf.AddRange(RenderDirty.MovedNodes);
+                CaptureSnapshot();   // recorder freezes the snapshot the applier replays this frame (incl. the moved nodes RefreshMovedNodes reads)
                 RenderDirty.Clear();
                 return;
             }
@@ -168,6 +169,7 @@ public class RenderCache
         _relWorldCache.Clear();
         _nodeCache.Clear();
         BuildRenderCommands(visualRoot);
+        CaptureSnapshot();
         _built = true;
         RenderDirty.Clear();
     }
@@ -285,6 +287,7 @@ public class RenderCache
         LastBuildKind = RenderBuildKind.Full;
         _commands.Clear();
         _groups.Clear();
+        _snap.Clear();         // full rebuild -> drop last frame's frozen layout snapshot (else stale overlay positions + unbounded _snap growth)
         _worldCache.Clear();   // new frame: drop last frame's transform + clip memos
         _clipCache.Clear();
         _relWorldCache.Clear();
@@ -311,6 +314,8 @@ public class RenderCache
             if (!present.Contains(id)) (stale ??= new List<Guid>()).Add(id);
         if (stale != null)
             foreach (var id in stale) RemoveAndDeferDispose(id);
+
+        CaptureSnapshot();   // freeze the overlay's layout snapshot for the applier (same recorder->applier handoff as the tree build)
     }
 
     /// <summary>
@@ -377,6 +382,23 @@ public class RenderCache
         s = new LayoutSnapshot(c.LocalTransform, c.RenderSize, c.ClipToBounds, c.IsRenderMotionNode, c.VisualParent);
         _snap[c] = s;
         return s;
+    }
+
+    // Eagerly freeze the layout snapshot of EVERY component the draw/compose pass will read - each retained unit's
+    // component and its ancestor chain (World/CumulativeClip/NodeOf recurse to the root) plus the moved motion nodes -
+    // at the END of the recorder (the build). After this the applier's Snap() lookups are all HITS, so the draw pass
+    // never dereferences a live IUIComponent: it is the recorder->applier handoff of the frozen layout state
+    // (docs/RENDER_THREAD_PLAN.md), the prerequisite for running the applier on a separate render thread while layout
+    // mutates the tree. Memoised + the per-component ancestor early-out (ContainsKey) keep it O(distinct components).
+    private void CaptureSnapshot()
+    {
+        foreach (var group in _groups)
+        foreach (var unit in group.Units)
+            for (var c = unit.Component; c != null && !_snap.ContainsKey(c); c = c.VisualParent)
+                Snap(c);
+        foreach (var node in _movedNodesBuf)
+            for (var c = node; c != null && !_snap.ContainsKey(c); c = c.VisualParent)
+                Snap(c);
     }
 
     private Matrix4x4F World(IUIComponent c)
@@ -454,12 +476,14 @@ public class RenderCache
         foreach (var node in _movedNodesBuf)
             if (!_nodeAllAware.GetValueOrDefault(node.RenderId, false))
                 return false;
-        // Positions moved - drop the WORLD memos (rebuilt lazily). NOT the clip memo: a clip is the ClipToBounds
-        // ancestors' viewport (a scroll viewport, a panel), which a node moving INSIDE it never changes; the spliced-patch
-        // bake that follows reads CumulativeClip, and recomputing it from live ancestor Bounds mid-relayout produced a
-        // transiently-wrong viewport that CULLED on-screen tiles for one frame (the hover "empty cell"). A move that DOES
-        // change a viewport (resize/maximize) is structural -> a full walk, which clears every memo in BuildFromVisualTree.
-        _snap.Clear();   // moved -> re-capture LocalTransform for the World rebuild below (clip/node memos intentionally kept, as above)
+        // Positions moved - drop the WORLD memos (rebuilt lazily from _snap). NOT _snap: the recorder already re-captured
+        // the moved nodes' fresh LocalTransform this frame (CaptureSnapshot at the end of the build), so World recomposes
+        // the new position straight from the frozen snapshot - the applier never re-reads the live node here (the whole
+        // point of the snapshot). NOT the clip memo either: a clip is the ClipToBounds ancestors' viewport (a scroll
+        // viewport, a panel), which a node moving INSIDE it never changes; the spliced-patch bake that follows reads
+        // CumulativeClip, and recomputing it from live ancestor Bounds mid-relayout produced a transiently-wrong viewport
+        // that CULLED on-screen tiles for one frame (the hover "empty cell"). A move that DOES change a viewport
+        // (resize/maximize) is structural -> a full walk, which clears every memo in BuildFromVisualTree.
         _worldCache.Clear();
         _relWorldCache.Clear();
         foreach (var node in _movedNodesBuf)
