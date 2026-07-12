@@ -48,7 +48,9 @@ public static class InputExtensions
       if (element.ClipToBounds && !inBox)
          return;
 
-      var local = p - element.ClipRectangle.Location;
+      // True arranged origin, not the (alignment-clamped) ClipRectangle.Location - see the note in Collect: overflowing
+      // Center/Right content would otherwise offset every descended hit by the overflow amount.
+      var local = p - element.Bounds.Location;
       foreach (var child in HitTestChildren(element, local))
          CollectVisuals(child, local, result);
 
@@ -95,7 +97,13 @@ public static class InputExtensions
       // NON-input container - a Border / any Decorator - is descended THROUGH and the interactive content it wraps stays
       // reachable. Filtering to IInputComponent here made anything inside a Border dead to the mouse (e.g. a ScrollBar
       // whose template root is a Border: its Track/Thumb were unhittable).
-      var local = p - element.ClipRectangle.Location;
+      //
+      // Use the TRUE arranged origin (Bounds), NOT ClipRectangle.Location: for Center/Right-aligned content WIDER than its
+      // slot, the alignment clamps ClipRectangle.Location to the visible slot edge (MeasurableUIComponent arrange) while the
+      // children are laid out against the real, overflowing Bounds origin. Subtracting the clamped clip origin shifted every
+      // child hit by the overflow - a click landed on a tile a couple of columns off in a window narrower than the board.
+      // ClipRectangle stays the broad-phase VISIBLE gate (inBox) above, so a click in the clipped-away region still misses.
+      var local = p - element.Bounds.Location;
       foreach (var child in HitTestChildren(element, local))
          Collect(child, local, result, boundsOnly);
 

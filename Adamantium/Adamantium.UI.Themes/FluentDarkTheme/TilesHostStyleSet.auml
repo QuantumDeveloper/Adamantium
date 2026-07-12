@@ -17,7 +17,7 @@
                 <ControlTemplate TargetType="TilesHost">
                     <controls:Border Background="{TemplateBinding Background}">
                         <controls:ScrollViewer CanContentScroll="True"
-                                               HorizontalScrollBarVisibility="Disabled"
+                                               HorizontalScrollBarVisibility="Auto"
                                                VerticalScrollBarVisibility="Auto">
                             <controls:ItemsPresenter x:Name="PART_ItemsPresenter"/>
                         </controls:ScrollViewer>
