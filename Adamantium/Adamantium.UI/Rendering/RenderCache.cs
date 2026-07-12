@@ -432,9 +432,18 @@ public class RenderCache
         foreach (var unit in group.Units)
             for (var c = unit.Component; c != null && !_snap.ContainsKey(c); c = c.VisualParent)
                 Snap(c);
+        // A moved motion node changed its transform THIS frame, so its cached snapshot is STALE - force-refresh it. The
+        // ContainsKey early-out below would otherwise keep last frame's LocalTransform, and RefreshMovedNodes (and the
+        // fall-through recording walk) then compose World from that stale value: a flipping/tilting tile freezes at its
+        // old angle, and its 90-degree face-swap sticks - the O(1)-path regressions Phase 2a reintroduced when it stopped
+        // clearing _snap in RefreshMovedNodes and relied on this eager capture. Only the node itself moved; its ancestors
+        // did not - so drop just the node's entry, then re-Snap it and walk the (still-valid, memoised) ancestor chain.
         foreach (var node in _movedNodesBuf)
+        {
+            _snap.Remove(node);
             for (var c = node; c != null && !_snap.ContainsKey(c); c = c.VisualParent)
                 Snap(c);
+        }
     }
 
     private Matrix4x4F World(IUIComponent c)
