@@ -504,17 +504,20 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
     // dirty set this frame (in the inline path each window's ApplyFrame clears, which a second window would race).
     private void RecordRenderFrame()
     {
-        if (RenderThreadOptions.SingleThreaded) return;
+        if (RenderThreadOptions.SingleThreaded || DisableRendering) return;
         foreach (var service in windowToSystem.Values)
             service.RecordFrame();
-        RenderDirty.Clear();
+        // The RenderDirty.Clear is hoisted to ExecuteDrawSequence (AFTER the draw), so it covers both the loop-recorded
+        // windows and any that deferred to the inline fallback (whose record runs during the draw), and fires only when the
+        // frame actually drew.
     }
 
     private void ExecuteDrawSequence(AppTime appTime)
     {
         if (DisableRendering) return;
 
-        if (BeginScene())
+        var drew = BeginScene();
+        if (drew)
         {
             try
             {
@@ -526,6 +529,11 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
                 EndScene();
             }
         }
+        // Decoupled path (flag off): the frame's record - loop-level or the inline fallback inside Draw - has now been
+        // consumed by the applier, so clear the dirty set ONCE here. Only when the frame actually drew: a skipped BeginScene
+        // must not clear a recorded-but-unapplied packet (it re-records next frame), matching the default path, which clears
+        // per window inside ApplyFrame.
+        if (!RenderThreadOptions.SingleThreaded && drew) RenderDirty.Clear();
     }
 
     /// <summary>

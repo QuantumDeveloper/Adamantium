@@ -119,6 +119,12 @@ public static class RenderDirty
     public static bool IsStructural => _structural || _forceUntilSettled || _finalForcedBuild;
     public static bool IsTransform => _transform;
 
+    /// <summary>True while a multi-frame structural state swap (resize / DPI / theme) is still settling. The Phase 3.2
+    /// decoupled render path uses this as a lightweight barrier: it records such a window INLINE (record + apply together
+    /// in BeginDraw) instead of at loop level, so the packet can't straddle the swap's per-frame relayout + presenter /
+    /// projection finalisation and desync (chrome left at the old size while dirty content re-records at the new one).</summary>
+    public static bool IsSettlingStructural => _forceUntilSettled || _finalForcedBuild;
+
     /// <summary>The geometry-dirty components to re-render this build (only valid until <see cref="Clear"/>).</summary>
     public static IReadOnlyCollection<IUIComponent> Geometry => GeometrySet;
 

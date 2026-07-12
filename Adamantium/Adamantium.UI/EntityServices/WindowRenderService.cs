@@ -106,10 +106,27 @@ public class WindowRenderService : UiRenderService
         base.Update(gameTime);   // processors' Update: the adorner stage builds its overlay cache from the fresh layout
     }
     
+    // Set by RecordFrame each decoupled frame: true = the packet was recorded at loop level (BeginDraw only APPLIES);
+    // false = record was deferred to the inline path (BeginDraw records + applies) - the resize/state-swap fallback below.
+    private bool _recordedAtLoopLevel;
+
     /// <summary>Phase 3.2 Step 2b: the DEVICE-FREE record half, hoisted to loop level (UIApplication.RecordRenderFrame) so
     /// it runs after the whole Update phase (all layout settled) and before any GPU Draw. No presenter/device needed here;
     /// the apply half stays in BeginDraw (ApplyData). No-op in the default single-threaded path (record stays inline).</summary>
-    public void RecordFrame() => windowRenderer?.RecordData();
+    public void RecordFrame()
+    {
+        // Lightweight resize barrier: while a multi-frame structural swap (resize / DPI / theme) is settling, or the
+        // renderer is awaiting a presenter resize, DEFER to the inline path so the record can't straddle the swap's
+        // per-frame relayout + presenter/projection finalisation and desync (the "chrome at old size, content at new"
+        // resize glitch). Steady state records at loop level.
+        if (windowRenderer is not { IsRendererUpToDate: true } || RenderDirty.IsSettlingStructural)
+        {
+            _recordedAtLoopLevel = false;
+            return;
+        }
+        windowRenderer.RecordData();
+        _recordedAtLoopLevel = true;
+    }
 
     public override bool BeginDraw()
     {
@@ -132,9 +149,10 @@ public class WindowRenderService : UiRenderService
             // THIS frame's visual tree. It used to be built in EndDraw - one frame AFTER it was drawn - so a container
             // realized/collapsed this frame lagged the draw by a frame: an item entering the window had no unit yet (a
             // one-frame hole) and one leaving still had a stale unit (a one-frame ghost overlapping with a foreign item).
-            // Phase 3.2 Step 2b: default path records + applies inline here. The decoupled path (flag off) already
-            // recorded at loop level after the whole Update phase (RecordFrame), so here it only APPLIES the packet.
-            if (RenderThreadOptions.SingleThreaded) windowRenderer.PrepareData();
+            // Phase 3.2 Step 2b: default path records + applies inline here. The decoupled path applies the loop-level
+            // packet - UNLESS this window deferred to inline this frame (the resize/state-swap fallback in RecordFrame),
+            // in which case it records + applies inline here too.
+            if (RenderThreadOptions.SingleThreaded || !_recordedAtLoopLevel) windowRenderer.PrepareData();
             else windowRenderer.ApplyData();
             windowRenderer.PreRender();
             PreRenderProcessors();   // adorner stage compute (stroke expander) before the render pass
