@@ -5,6 +5,7 @@ using Adamantium.Mathematics;
 using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.Core.Templates;
 
 namespace Adamantium.UI.Controls.Panels;
@@ -355,11 +356,28 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
     // (the ItemTemplate may have changed).
     private void ResetSkeletons()
     {
+        // Stop the pulses on any ACTIVE (Visible) card FIRST. Revirtualize already detached the cards, but detach does not
+        // change their Visibility, so the template's Visibility ExitAction (StopAnimationAction) never fired - their pulses
+        // would linger forever in the static AnimationManager against detached cards (and each Revirtualize during a load
+        // orphans a fresh batch, piling up to thousands = FPS collapse). RecycleAllSkeletons collapses the actives, which
+        // DOES fire the ExitAction (the trigger is attachment-independent), before we drop the references below.
+        RecycleAllSkeletons();
         _skeletonPool.Clear();
         _activeSkeletons.Clear();
         _skeletonSet.Clear();
         _pendingFrames = 0;
         _itemMarginKnown = false;
+    }
+
+    // A tab switch (or any subtree removal) detaches the panel while loading skeletons are still Visible + pulsing. Detach
+    // does NOT change their Visibility, so the template's Visibility ExitAction never fires and each active card's pulse
+    // ticks forever in the static AnimationManager against a detached card - the leak that piles up thousands of animations
+    // (the "switch tabs mid-load -> FPS never recovers" report). Collapse the actives now to fire the stop; a re-attach +
+    // re-fill re-shows them and the pulse restarts via the EnterAction.
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        if (_activeSkeletons.Count > 0) RecycleAllSkeletons();
     }
 
     // The margin a real item's template leaves around each tile - read ONCE from a realized item so a skeleton card
