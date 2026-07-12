@@ -121,6 +121,7 @@ public class RenderCache
             _partialSpliced = false;   // ReRenderInPlace sets it if it splices the paint-order list (a count change)
             if (RenderDirty.IsTransform)
             {
+                _snap.Clear();
                 _worldCache.Clear();
                 _clipCache.Clear();
                 _relWorldCache.Clear();
@@ -161,6 +162,7 @@ public class RenderCache
         LastBuildKind = RenderBuildKind.Full;
         LastBuildTransformDirty = true;   // a full walk rebuilds the paint-order list; positions must be re-baked
         _commands.Clear();
+        _snap.Clear();
         _worldCache.Clear();
         _clipCache.Clear();
         _relWorldCache.Clear();
@@ -351,11 +353,37 @@ public class RenderCache
     // Cleared at each frame's build. Only the render path uses this; WorldTransform stays live for hit-test / layout.
     private readonly Dictionary<IUIComponent, Matrix4x4F> _worldCache = new();
 
+    // FROZEN per-frame layout inputs of a component - the ONE channel through which the render/draw path reads a
+    // component's MUTABLE layout state (transform, size, clip flag, motion-node flag, parent link). Captured LAZILY from
+    // the live tree on first access and memoised; the compose helpers (World/CumulativeClip/NodeOf/RelWorld/LogicalBounds/
+    // ResolveScissor) read ONLY from here, never off the live IUIComponent. Same lifetime as _worldCache (cleared with it
+    // wherever a transform/structure change invalidates positions). This makes the draw pass a pure function of the
+    // snapshot - the prerequisite for running it on a separate render thread while layout mutates the tree (Phase 1 of
+    // docs/RENDER_THREAD_PLAN.md). RenderId stays a live read: it is an immutable identity, thread-safe to read.
+    private readonly struct LayoutSnapshot(Matrix4x4F localTransform, Size renderSize, bool clipToBounds, bool isMotionNode, IUIComponent visualParent)
+    {
+        public Matrix4x4F LocalTransform { get; } = localTransform;
+        public Size RenderSize { get; } = renderSize;
+        public bool ClipToBounds { get; } = clipToBounds;
+        public bool IsMotionNode { get; } = isMotionNode;
+        public IUIComponent VisualParent { get; } = visualParent;
+    }
+
+    private readonly Dictionary<IUIComponent, LayoutSnapshot> _snap = new();
+
+    private LayoutSnapshot Snap(IUIComponent c)
+    {
+        if (_snap.TryGetValue(c, out var s)) return s;
+        s = new LayoutSnapshot(c.LocalTransform, c.RenderSize, c.ClipToBounds, c.IsRenderMotionNode, c.VisualParent);
+        _snap[c] = s;
+        return s;
+    }
+
     private Matrix4x4F World(IUIComponent c)
     {
         if (_worldCache.TryGetValue(c, out var m)) return m;
-        var parent = c.VisualParent;
-        m = parent != null ? c.LocalTransform * World(parent) : c.LocalTransform;
+        var s = Snap(c);
+        m = s.VisualParent != null ? s.LocalTransform * World(s.VisualParent) : s.LocalTransform;
         _worldCache[c] = m;
         return m;
     }
@@ -377,7 +405,8 @@ public class RenderCache
     {
         if (c == null) return null;
         if (_nodeCache.TryGetValue(c, out var n)) return n;
-        n = c.IsRenderMotionNode ? c : NodeOf(c.VisualParent);
+        var s = Snap(c);
+        n = s.IsMotionNode ? c : NodeOf(s.VisualParent);
         _nodeCache[c] = n;
         return n;
     }
@@ -385,9 +414,10 @@ public class RenderCache
     private Matrix4x4F RelWorld(IUIComponent c)
     {
         if (_relWorldCache.TryGetValue(c, out var m)) return m;
-        m = c.IsRenderMotionNode
+        var s = Snap(c);
+        m = s.IsMotionNode
             ? Matrix4x4F.Identity
-            : (c.VisualParent is { } p ? c.LocalTransform * RelWorld(p) : c.LocalTransform);
+            : (s.VisualParent is { } p ? s.LocalTransform * RelWorld(p) : s.LocalTransform);
         _relWorldCache[c] = m;
         return m;
     }
@@ -429,6 +459,7 @@ public class RenderCache
         // bake that follows reads CumulativeClip, and recomputing it from live ancestor Bounds mid-relayout produced a
         // transiently-wrong viewport that CULLED on-screen tiles for one frame (the hover "empty cell"). A move that DOES
         // change a viewport (resize/maximize) is structural -> a full walk, which clears every memo in BuildFromVisualTree.
+        _snap.Clear();   // moved -> re-capture LocalTransform for the World rebuild below (clip/node memos intentionally kept, as above)
         _worldCache.Clear();
         _relWorldCache.Clear();
         foreach (var node in _movedNodesBuf)
@@ -449,11 +480,12 @@ public class RenderCache
     {
         if (c == null) return null;
         if (_clipCache.TryGetValue(c, out var cached)) return cached;
-        var parentClip = CumulativeClip(c.VisualParent);
+        var s = Snap(c);
+        var parentClip = CumulativeClip(s.VisualParent);
         var result = parentClip;
-        if (c.ClipToBounds)
+        if (s.ClipToBounds)
         {
-            var rect = new Rect(0, 0, c.RenderSize.Width, c.RenderSize.Height).TransformToAABB(World(c));
+            var rect = new Rect(0, 0, s.RenderSize.Width, s.RenderSize.Height).TransformToAABB(World(c));
             result = parentClip is { } p ? p.Intersect(rect) : rect;
         }
         _clipCache[c] = result;
@@ -1140,8 +1172,11 @@ public class RenderCache
 
     // A unit's own viewport (local 0,0..RenderSize) mapped into window-logical space - the same box ResolveScissor
     // clips against, reused here for the batches' paint-order overlap test.
-    private static Rect LogicalBounds(IUIComponent component, Matrix4x4F worldTransform)
-        => new Rect(0, 0, component.RenderSize.Width, component.RenderSize.Height).TransformToAABB(worldTransform);
+    private Rect LogicalBounds(IUIComponent component, Matrix4x4F worldTransform)
+    {
+        var size = Snap(component).RenderSize;
+        return new Rect(0, 0, size.Width, size.Height).TransformToAABB(worldTransform);
+    }
 
     // Flush all batches in LAYER order - item-background rects, then instanced geometry fills (+ their deferred
     // fringe/stroke), then text on top - and mark the group closed. Each Flush leaves the device on fullScissor, so the
@@ -1220,7 +1255,8 @@ public class RenderCache
         // Use the SAME world transform the caller will bake into the GPU draw, not a fresh component.WorldTransform read:
         // layout runs on another thread, so a re-read here could differ from what is actually drawn (cull says "inside"
         // while the GPU paints it outside -> the off-viewport spill).
-        var bounds = new Rect(0, 0, component.RenderSize.Width, component.RenderSize.Height).TransformToAABB(worldTransform);
+        var scissorSize = Snap(component).RenderSize;
+        var bounds = new Rect(0, 0, scissorSize.Width, scissorSize.Height).TransformToAABB(worldTransform);
         cull = bounds.Right <= logical.X || bounds.X >= logical.Right || bounds.Bottom <= logical.Y || bounds.Y >= logical.Bottom;
 
         clipped = true;
