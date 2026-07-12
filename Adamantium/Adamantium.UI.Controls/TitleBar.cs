@@ -41,9 +41,11 @@ public class TitleBar : Control
     public static readonly AdamantiumProperty ShowCloseButtonProperty = AdamantiumProperty.Register(nameof(ShowCloseButton),
         typeof(bool), typeof(TitleBar), new PropertyMetadata(true));
 
-    // Control has no FontSize (it's registered per-control here); the title text needs one, so declare it on the TitleBar.
-    public static readonly AdamantiumProperty FontSizeProperty = AdamantiumProperty.Register(nameof(FontSize),
-        typeof(double), typeof(TitleBar), new PropertyMetadata(13.0, PropertyMetadataOptions.AffectsMeasure));
+    static TitleBar()
+    {
+        FontSizeProperty.OverrideMetadata(typeof(TitleBar),
+            new PropertyMetadata(13.0, PropertyMetadataOptions.Inherits | PropertyMetadataOptions.AffectsMeasure));
+    }
 
     // Reflects the owning window's maximized state (kept in sync via its StateChanged). The theme swaps the maximize
     // button's glyph (maximize <-> restore) off this via a trigger.
@@ -74,12 +76,6 @@ public class TitleBar : Control
     {
         get => GetValue<IEnumerable>(RightWindowCommandsProperty);
         set => SetValue(RightWindowCommandsProperty, value);
-    }
-
-    public double FontSize
-    {
-        get => GetValue<double>(FontSizeProperty);
-        set => SetValue(FontSizeProperty, value);
     }
 
     /// <summary>The window title shown in the caption (usually TemplateBound to Window.Title).</summary>

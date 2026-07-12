@@ -24,6 +24,13 @@ public static class ResourceContext
 
         UIAppContext.Current.ResourceManager.AddSource(element, value.Source, value.Scope );
 
+        // A GLOBAL source is APP-WIDE: it must NOT be torn down when the declaring element unloads. A theme swap unloads
+        // and reloads the subtree, which would otherwise RemoveSources -> abandon the (last-owner) dictionary -> lose any
+        // runtime override on it (e.g. a cycled GlobalAccent) and re-create a fresh copy. Surviving a theme swap is the
+        // whole point of Global scope, so it is never lifecycle-bound to its declaring element. Local sources stay tied to
+        // their element (tree-scoped, cleaned up on unload).
+        if (value.Scope == ResourceScope.Global) return;
+
         if (element is IInputComponent inputComponent)
         {
             inputComponent.Unloaded += InputComponentOnUnloaded;

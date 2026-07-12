@@ -48,6 +48,8 @@ public class TextBlock : InputUIComponent
         ForegroundProperty.OverrideMetadata(typeof(TextBlock),
             new PropertyMetadata(Brushes.White,
                 PropertyMetadataOptions.Inherits | PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender));
+        FontSizeProperty.OverrideMetadata(typeof(TextBlock),
+            new PropertyMetadata(12.0d, PropertyMetadataOptions.Inherits | PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
     }
 
     private static void OnFontFamilyChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
@@ -55,10 +57,6 @@ public class TextBlock : InputUIComponent
         (a as TextBlock)?.InvalidateMeasure();
     }
 
-    public static readonly AdamantiumProperty FontSizeProperty = AdamantiumProperty.Register(nameof(FontSize),
-        typeof(double), typeof(TextBlock),
-        new PropertyMetadata(12.0d, PropertyMetadataOptions.AffectsMeasure|PropertyMetadataOptions.AffectsRender));
-    
     public static readonly AdamantiumProperty BackgroundProperty = AdamantiumProperty.Register(nameof(Background),
         typeof (Brush), typeof (TextBlock),
         new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.BindsTwoWayByDefault|PropertyMetadataOptions.AffectsRender));
@@ -189,12 +187,6 @@ public class TextBlock : InputUIComponent
         set => SetValue(JustifyLastLineProperty, value);
     }
 
-    public double FontSize
-    {
-        get => GetValue<double>(FontSizeProperty);
-        set => SetValue(FontSizeProperty, value);
-    }
-    
     public Brush Background
     {
         get => GetValue<Brush>(BackgroundProperty);

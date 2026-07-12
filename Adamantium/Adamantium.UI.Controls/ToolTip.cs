@@ -26,8 +26,11 @@ public class ToolTip : ContentControl
         typeof(Thickness), typeof(ToolTip),
         new PropertyMetadata(default(Thickness), PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
 
-    public static readonly AdamantiumProperty FontSizeProperty = AdamantiumProperty.Register(nameof(FontSize),
-        typeof(double), typeof(ToolTip), new PropertyMetadata(12.0, PropertyMetadataOptions.AffectsMeasure));
+    static ToolTip()
+    {
+        FontSizeProperty.OverrideMetadata(typeof(ToolTip),
+            new PropertyMetadata(12.0, PropertyMetadataOptions.Inherits | PropertyMetadataOptions.AffectsMeasure));
+    }
 
     public Brush BorderBrush
     {
@@ -51,11 +54,5 @@ public class ToolTip : ContentControl
     {
         get => GetValue<Thickness>(PaddingProperty);
         set => SetValue(PaddingProperty, value);
-    }
-
-    public double FontSize
-    {
-        get => GetValue<double>(FontSizeProperty);
-        set => SetValue(FontSizeProperty, value);
     }
 }

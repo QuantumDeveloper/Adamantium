@@ -47,12 +47,27 @@ public static class RenderDirty
     /// <summary>Records that <paramref name="component"/>'s recorded geometry changed - it will re-render.</summary>
     public static void MarkGeometry(IUIComponent component)
     {
-        // Locked: a PARALLEL arrange pass (VirtualizingPanel) calls this concurrently as each tile's size settles;
-        // HashSet is not thread-safe so a lock-free Add could corrupt it. Uncontended in the single-threaded case (the
-        // common path). The scalar counters below stay lock-free (a lost increment only mis-counts a diagnostic).
+        // Locked: writers run on MORE than the render-loop thread - a PARALLEL arrange pass (VirtualizingPanel) as each
+        // tile's size settles, AND Dispatcher operations (e.g. an Image frame-timer's InvalidateRender) which execute on
+        // the Win32 message-pump thread, NOT the render loop. HashSet is not thread-safe, so every read/clear the build
+        // does must take THIS lock too (see SnapshotGeometryInto/GeometryCount/Clear) - a lock-free Add racing the build's
+        // enumeration corrupted the set (NRE + "concurrent update" + a stuck-dirty FPS collapse). The scalar counters below
+        // stay lock-free (a lost increment only mis-counts a diagnostic).
         if (component == null) return;
         lock (GeometrySet) GeometrySet.Add(component);
     }
+
+    /// <summary>Atomically snapshot the geometry-dirty set into <paramref name="buffer"/> under the same lock
+    /// <see cref="MarkGeometry"/> writes with, so a concurrent mark (parallel arrange / a Dispatcher-thread invalidation)
+    /// can't corrupt the enumeration. The set itself is NOT cleared here (the build clears it via <see cref="Clear"/>).</summary>
+    public static void SnapshotGeometryInto(List<IUIComponent> buffer)
+    {
+        buffer.Clear();
+        lock (GeometrySet) buffer.AddRange(GeometrySet);
+    }
+
+    /// <summary>The geometry-dirty count, read under the write lock (safe against a concurrent mark).</summary>
+    public static int GeometryCount { get { lock (GeometrySet) return GeometrySet.Count; } }
 
     /// <summary>Records that something moved (world transforms must be re-baked; no re-record).</summary>
     public static void MarkTransform() => _transform = true;
@@ -72,6 +87,14 @@ public static class RenderDirty
 
     /// <summary>The moved motion nodes (valid until <see cref="Clear"/>).</summary>
     public static IReadOnlyCollection<IUIComponent> MovedNodes => NodeSet;
+
+    /// <summary>Atomically snapshot the moved-node set into <paramref name="buffer"/> under the same lock
+    /// <see cref="MarkNodeTransform"/> writes with (same race as <see cref="SnapshotGeometryInto"/>).</summary>
+    public static void SnapshotNodesInto(List<IUIComponent> buffer)
+    {
+        buffer.Clear();
+        lock (NodeSet) buffer.AddRange(NodeSet);
+    }
 
     /// <summary>Records a structural change (add/remove/command-count change) - the paint-order list must be rebuilt.</summary>
     public static void MarkStructural() { _structural = true; TotalStructuralMarks++; }
@@ -102,8 +125,10 @@ public static class RenderDirty
     /// <summary>Reset after a build has consumed the dirty state.</summary>
     public static void Clear()
     {
-        GeometrySet.Clear();
-        NodeSet.Clear();
+        // Clear the two HashSets under the SAME locks their writers (MarkGeometry/MarkNodeTransform) take - a lock-free
+        // Clear racing a concurrent Add (parallel arrange / Dispatcher-thread invalidation) corrupted the set.
+        lock (GeometrySet) GeometrySet.Clear();
+        lock (NodeSet) NodeSet.Clear();
         _transform = false;
         _structural = false;
         _finalForcedBuild = false;   // the post-settle walk ran; forcing ends (_forceUntilSettled survives Clear by design)

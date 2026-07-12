@@ -137,7 +137,10 @@ public class TabControl : Selector
         SelectionChanged += (_, _) =>
         {
             UpdateSelectedContent();
-            UpdateIndicator(animate: true);
+            // Slide the indicator for a USER selection (layout is stable). A reselection driven by a COLLECTION change
+            // (close/add) is about to reflow the strip, so a slide would head to the pre-reflow slot - defer to
+            // PlaceIndicator, which authoritatively places the bar from the next arrange pass (see _reselecting).
+            if (!_reselecting) UpdateIndicator(animate: true);
         };
         Items.CollectionChanged += OnItemsChanged;
     }
@@ -199,13 +202,32 @@ public class TabControl : Selector
         set => SetValue(ReorderEasingProperty, value);
     }
 
+    // Set while MoveItem is mid-reorder (RemoveAt + Insert of the SAME item): the reorder restores the selection itself
+    // afterwards, so OnItemsChanged must NOT re-run the selection on the intermediate remove/insert. Doing so transiently
+    // re-selected a NEIGHBOUR, which then made MoveItem's SelectedItem restore look like a real selection CHANGE and fire a
+    // spurious indicator slide toward the pre-reorder slot (the bar "jumping to the old place" on drop).
+    private bool _reordering;
+
     private void OnItemsChanged(object sender, NotifyCollectionChangedEventArgs e)
     {
+        if (_reordering) return;   // a drag-reorder move is mid-flight; MoveItem re-points the selection itself afterwards
+
         // Keep a valid tab selected as the collection mutates (WPF selects the first tab by default and never leaves the
-        // selection dangling past the end). Writing SelectedIndex drives the base selection machinery.
-        if (Items.Count == 0) SelectedIndex = -1;
-        else if (SelectedIndex < 0) SelectedIndex = 0;
-        else if (SelectedIndex >= Items.Count) SelectedIndex = Items.Count - 1;
+        // selection dangling past the end), and RE-RUN the selection rather than only clamping the index. Closing the
+        // SELECTED tab leaves SelectedIndex numerically valid but now pointing at a DIFFERENT item (e.g. index 1 was B,
+        // is now C after B is removed); clamping alone never re-set the index, so the base selection machinery never ran
+        // and SelectedItem stayed on the removed tab - the content host kept showing the closed tab's body while the
+        // indicator slid to the neighbour. SelectSingle re-derives the item at the index, updates SelectedItem + the
+        // container highlight and raises SelectionChanged (-> UpdateSelectedContent + UpdateIndicator) when it changed.
+        var index = Items.Count == 0 ? -1
+            : SelectedIndex < 0 ? 0
+            : SelectedIndex >= Items.Count ? Items.Count - 1
+            : SelectedIndex;
+        // Snap (don't slide) the indicator for this reselection: the strip is about to reflow, so a slide would target the
+        // pre-reflow slot; PlaceIndicator places the bar authoritatively from the next arrange pass.
+        _reselecting = true;
+        SelectSingle(index);
+        _reselecting = false;
         UpdateSelectedContent();
     }
 
@@ -276,7 +298,7 @@ public class TabControl : Selector
 
         SetOffset(tab, along - _grabOffset - SlotStart(tab));   // Bounds are stable during the drag -> exact follow
 
-        // The dragged tab IS the selected one; it moves by RenderTransform (no layout pass), so OnLayoutUpdated won't
+        // The dragged tab IS the selected one; it moves by RenderTransform (no layout pass), so PlaceIndicator won't
         // fire - drive the indicator here so the accent bar rides along with the tab under the cursor.
         UpdateIndicator(animate: false);
 
@@ -313,13 +335,13 @@ public class TabControl : Selector
             tab.ZIndex = 0;
             // The indicator tracked the tab under the cursor during the drag, so _lastAlong/_lastExtent hold that drop
             // position. Invalidate that cache so the post-reorder layout pass re-places the bar on the selected tab's
-            // FINAL slot instead of the OnLayoutUpdated snap short-circuiting on "along == _lastAlong".
+            // FINAL slot instead of the PlaceIndicator snap short-circuiting on "along == _lastAlong".
             _lastAlong = _lastExtent = double.NaN;
         });
 
         // Drive the indicator each frame WHILE the tab settles: it reads the tab's animating offset, so the bar slides to
         // the final slot in lockstep with the tab instead of freezing at the drop point and popping a frame after the
-        // reorder commits. The ticker self-expires at the settle duration (then OnLayoutUpdated keeps it pinned).
+        // reorder commits. The ticker self-expires at the settle duration (then PlaceIndicator keeps it pinned).
         var settleElapsed = 0.0;
         var settleDuration = ReorderAnimationDuration.TotalSeconds;
         AnimationManager.AddTicker(dt =>
@@ -411,20 +433,31 @@ public class TabControl : Selector
         if (from == to) return;
         var selected = SelectedItem;
 
-        if (ItemsSource is IList { IsReadOnly: false, IsFixedSize: false } src && to < src.Count)
+        // Suppress OnItemsChanged's reselection across the remove+insert (it would transiently select a neighbour); the
+        // restore below re-points the selection to the moved item without a spurious selection-change indicator slide.
+        _reordering = true;
+        try
         {
-            var item = src[from];
-            src.RemoveAt(from);
-            src.Insert(to, item);
+            if (ItemsSource is IList { IsReadOnly: false, IsFixedSize: false } src && to < src.Count)
+            {
+                var item = src[from];
+                src.RemoveAt(from);
+                src.Insert(to, item);
+            }
+            else
+            {
+                var item = Items[from];
+                Items.RemoveAt(from);
+                Items.Insert(to, item);
+            }
         }
-        else
-        {
-            var item = Items[from];
-            Items.RemoveAt(from);
-            Items.Insert(to, item);
-        }
+        finally { _reordering = false; }
 
-        if (selected != null) SelectedItem = selected;   // re-point SelectedIndex at the moved item's new slot
+        // Re-point SelectedIndex at the moved item's NEW slot. Assigning SelectedItem = selected is a no-op when it hasn't
+        // changed (it hasn't - the reorder kept the same item selected), so it would leave SelectedIndex stale on the item's
+        // OLD index and the indicator would sit on the old slot. SelectSingle writes the fresh index directly and, because
+        // the item is unchanged, raises no SelectionChanged (no spurious indicator slide).
+        if (selected != null) SelectSingle(IndexOfItem(selected));
     }
 
     /// <summary>Whether <paramref name="container"/> is the selected tab - by the item it hosts, so it holds for both an
@@ -443,6 +476,7 @@ public class TabControl : Selector
     private UIComponent _indicator;
     private bool _indicatorPlaced;
     private bool _animatingIndicator;
+    private bool _reselecting;   // a collection-change reselection is in flight -> snap the bar via PlaceIndicator, don't slide
     private LayoutManager _hookedManager;
     private double _lastAlong, _lastExtent;
 
@@ -457,24 +491,28 @@ public class TabControl : Selector
             _indicatorPlaced = false;
             // A fresh indicator (new template) has no animation running on it. If a selection-slide was mid-flight on the
             // OLD indicator when the template swapped, its completion callback never fires (that indicator is gone), so
-            // this flag would stay stuck true and gate OnLayoutUpdated off forever - the bar would never re-place after a
+            // this flag would stay stuck true and gate PlaceIndicator off forever - the bar would never re-place after a
             // placement change until a click. Clear it here.
             _animatingIndicator = false;
         }
     }
 
-    // Hook the layout manager on ATTACH, not in OnApplyTemplate: the manager is resolved from RootVisual (LayoutManager.
-    // For), which is set only once the control is attached to the window tree. OnApplyTemplate can run while the subtree
-    // is still detached (built during a measure pass) - there For(this) falls back to a transient local-root manager that
-    // never runs layout passes, so its LayoutUpdated never fires and the indicator never snapped to the selected tab (it
-    // moved ONLY on an explicit selection change / click). Attaching guarantees the real window manager.
+    // The indicator is placed from TWO complementary hooks, because neither alone covers every case:
+    //  - LayoutUpdated (OnLayoutSettled): fires when a layout pass fully SETTLES - the only signal that sees the FINAL
+    //    positions after a drag-REORDER, where the moved tab's container is re-arranged a frame or two AFTER the drop (and
+    //    each control's Bounds is written INSIDE ArrangeCore, AFTER ArrangeOverride returns). An arrange-time hook reads the
+    //    stale slot and strands the bar there; settle placement is exact.
+    //  - ArrangeOverride: fires every frame the control re-arranges, which a resize-DRAG does continuously WITHOUT ever
+    //    settling (budget-deferred) - so LayoutUpdated stays silent mid-drag. This keeps the bar tracking during a resize
+    //    instead of freezing until release.
+    // Both funnel into PlaceIndicator, which early-outs when the target hasn't moved, so the overlap is free.
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
         if (_hookedManager == null)
         {
             _hookedManager = LayoutManager.For(this);
-            _hookedManager.LayoutUpdated += OnLayoutUpdated;
+            _hookedManager.LayoutUpdated += OnLayoutSettled;
         }
     }
 
@@ -483,41 +521,63 @@ public class TabControl : Selector
         base.OnDetachedFromVisualTree(e);
         if (_hookedManager != null)
         {
-            _hookedManager.LayoutUpdated -= OnLayoutUpdated;
+            _hookedManager.LayoutUpdated -= OnLayoutSettled;
             _hookedManager = null;
         }
     }
 
-    private void OnLayoutUpdated(object sender, EventArgs e)
+    private void OnLayoutSettled(object sender, EventArgs e) => PlaceIndicator();
+
+    protected override Size ArrangeOverride(Size finalSize)
     {
-        // Snap (no animation) to wherever the selected tab now sits - covers first layout, a resize, and a reorder.
-        // Skipped mid-slide so it can't fight the running animation.
-        if (_indicator == null || _animatingIndicator) return;
+        var size = base.ArrangeOverride(finalSize);
+        PlaceIndicator();
+        return size;
+    }
+
+    private void PlaceIndicator()
+    {
+        // Authoritative placement: the bar must always end up on the selected tab. A pure selection slide animates the
+        // bar's transform while the tabs' Bounds stay put, so its target is unchanged - leave that slide running. But ANY
+        // layout reflow that MOVES the selected tab (a tab closed/opened/resized/reordered, the strip scrolled) changes the
+        // target, so re-place the bar even mid-slide - it can then never strand at a stale spot (the highlight failing to
+        // follow the active tab after a close). A non-animating pass just snaps to the (possibly moved) target.
+        if (_indicator == null) return;
+        if (_animatingIndicator && TryGetIndicatorTarget(out var along, out var extent, out _)
+            && along == _lastAlong && extent == _lastExtent)
+            return;
         UpdateIndicator(animate: false);
     }
 
-    private void UpdateIndicator(bool animate)
+    // The selected tab's placement in the indicator's own coordinate space: offset ALONG the strip + its EXTENT, plus
+    // whether the strip is vertical. False when there's no indicator/selection or the selected tab isn't laid out yet
+    // (PlaceIndicator re-runs once it is). Walks up to the indicator's parent, summing each node's slot offset plus any
+    // RenderTransform pan (the strip's scroll, or a tab mid drag-reorder) - robust to how the strip nests the panel.
+    private bool TryGetIndicatorTarget(out double along, out double extent, out bool vertical)
     {
-        if (_indicator == null || _indicator.VisualParent == null) return;
-        if (ItemContainerGenerator.ContainerFromIndex(SelectedIndex) is not TabItem container) return;
+        along = extent = 0;
+        vertical = TabStripPlacement is TabStripPlacement.Left or TabStripPlacement.Right;
+        if (_indicator == null || _indicator.VisualParent == null) return false;
+        if (ItemContainerGenerator.ContainerFromIndex(SelectedIndex) is not TabItem container) return false;
 
         var bounds = container.Bounds;
-        if (bounds.Width <= 0 || bounds.Height <= 0) return;   // not laid out yet; OnLayoutUpdated will place it
+        if (bounds.Width <= 0 || bounds.Height <= 0) return false;   // not laid out yet; PlaceIndicator will place it
 
-        var vertical = TabStripPlacement is TabStripPlacement.Left or TabStripPlacement.Right;
-
-        // Selected tab's offset expressed in the indicator's own coordinate space: walk up to the shared ancestor
-        // (the indicator's parent), summing each node's slot offset plus any RenderTransform pan (e.g. the strip's
-        // scroll, or a tab mid drag-reorder). Robust to how the strip nests the panel.
         var reference = _indicator.VisualParent;
-        double along = -(vertical ? _indicator.Bounds.Y : _indicator.Bounds.X);
+        along = -(vertical ? _indicator.Bounds.Y : _indicator.Bounds.X);
         for (IUIComponent n = container; n != null && !ReferenceEquals(n, reference); n = n.VisualParent)
         {
             along += vertical ? n.Bounds.Y : n.Bounds.X;
             if (n is UIComponent uc && uc.RenderTransform is Transform pan)
                 along += vertical ? pan.TranslateY : pan.TranslateX;
         }
-        var extent = vertical ? bounds.Height : bounds.Width;
+        extent = vertical ? bounds.Height : bounds.Width;
+        return true;
+    }
+
+    private void UpdateIndicator(bool animate)
+    {
+        if (!TryGetIndicatorTarget(out var along, out var extent, out var vertical)) return;
 
         if (!animate && _indicatorPlaced && along == _lastAlong && extent == _lastExtent) return;
         _lastAlong = along;

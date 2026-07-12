@@ -27,19 +27,23 @@ public class AdornerRenderProcessor : EntityProcessor<WindowRenderService>
         _cache = new RenderCache(new DrawingContext(), new RenderUnitFactory(device, resourceFactory));
     }
 
-    public override void Update(AppTime gameTime)
+    public override void Update(AppTime gameTime) { }   // building moved to PreRender (after the fence wait) - see below
+
+    // Build the overlay HERE, inside the beforeRenderPass hook, AFTER BeginDraw's fence wait - the GPU is done with this
+    // frame slot, so (re)allocating this stage's GPU buffers can't race an in-flight submit. Building it in Update (BEFORE
+    // the fence) did GPU work in the update phase, which is a use-after-free hazard once the render thread runs concurrently
+    // with update. This mirrors PopupRenderProcessor, which moved its build here for the same reason. The overlay units come
+    // from the window's adorners, bound to the adorned elements' live WorldTransform (still valid - after this frame's layout).
+    public override void PreRender()
     {
         if (_cache == null) return;
 
         var window = AssociatedService.Window;
         var projection = window.GetProjectionMatrix();
-        // Built after the window's own layout update this frame: the overlay units come from the window's adorners and
-        // are bound to the adorned elements' live WorldTransform.
         _cache.BuildFromComponents(window.Adorners, projection);
         _cache.ProcessCommands(projection, AssociatedService.RenderScale);
+        _cache.PreRender();
     }
-
-    public override void PreRender() => _cache?.PreRender();
 
     public override void Draw(AppTime gameTime) => _cache?.Render();
 }

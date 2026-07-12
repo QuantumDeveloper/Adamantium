@@ -49,6 +49,7 @@ public class RenderCache
     // falling back to a full tree walk that re-renders every element (the hover / mouse-move FPS cliff on a big list).
     private readonly Dictionary<Guid, int> _orderByControl = new();
     private IRootVisualComponent _lastVisualRoot;             // for an on-demand order re-walk (a component appearing mid-partial)
+    private IRootVisualComponent _pendingVisualRoot;          // root RecordFrame received this frame (ApplyFrame's partial->full fallback re-records from it)
     private readonly Stack<IUIComponent> _orderStack = new(); // reused by ReassignOrders (no per-call alloc)
     private readonly HashSet<Guid> _orderVisited = new();
 
@@ -102,10 +103,30 @@ public class RenderCache
     /// </summary>
     public void BuildFromVisualTree(IRootVisualComponent visualRoot)
     {
-        // Fully clean: nothing changed since last build -> re-draw the retained units as-is. Keep the transform memo:
-        // nothing moved, so last frame's world transforms are still correct.
+        RecordFrame(visualRoot);
+        ApplyFrame();
+    }
+
+    /// <summary>
+    /// RECORD half of the frame build (DEVICE-FREE - runs on the update thread). Decides the build kind (Clean / Partial /
+    /// Full), runs component.Render, and fills <see cref="_packet"/> with the draws the applier realizes. Also captures the
+    /// RenderDirty-derived draw-phase state (moved nodes, transform-dirty flag) WHILE RenderDirty is still populated -
+    /// the applier and the loop-level RenderDirty.Clear (Phase 3.2) run later. No GPU here.
+    /// <list type="bullet">
+    /// <item>fully clean -> record nothing; the applier re-draws last frame's units;</item>
+    /// <item>non-structural -> record only the geometry-dirty components in place (packet.Kind = Partial);</item>
+    /// <item>structural / first build / a partial that turned out structural -> a full tree walk (packet.Kind = Full).</item>
+    /// </list>
+    /// </summary>
+    public void RecordFrame(IRootVisualComponent visualRoot)
+    {
+        _pendingVisualRoot = visualRoot;   // the applier's partial->full fallback re-records from it (tree still quiescent)
+
+        // Fully clean: nothing changed since last build -> the applier re-draws the retained units as-is. Keep the
+        // transform memo: nothing moved, so last frame's world transforms are still correct.
         if (_built && !RenderDirty.HasWork)
         {
+            _packet.Reset(RenderBuildKind.Clean);
             LastBuildKind = RenderBuildKind.Clean;
             return;
         }
@@ -118,7 +139,7 @@ public class RenderCache
         // (the O(N) that made a hover cost ~2x a clean frame on a big list).
         if (_built && !RenderDirty.IsStructural)
         {
-            _partialSpliced = false;   // ReRenderInPlace sets it if it splices the paint-order list (a count change)
+            _partialSpliced = false;   // ApplyReRender sets it if it splices the paint-order list (a count change)
             if (RenderDirty.IsTransform)
             {
                 _snap.Clear();
@@ -128,11 +149,12 @@ public class RenderCache
                 _nodeCache.Clear();
             }
 
-            // Snapshot the dirty set: ReRenderInPlace re-renders each component, and a component's Render can mark MORE
+            // Snapshot the dirty set: RecordReRender re-renders each component, and a component's Render can mark MORE
             // geometry dirty (e.g. an image finishing decode), ADDING to the live RenderDirty.Geometry set mid-loop and
-            // throwing "collection was modified". Copy into a reusable buffer and iterate that.
-            _geometryDirtyBuffer.Clear();
-            _geometryDirtyBuffer.AddRange(RenderDirty.Geometry);
+            // throwing "collection was modified". Copy into a reusable buffer and iterate that. The snapshot is taken under
+            // RenderDirty's write lock - marks also arrive from OTHER threads (parallel arrange, a Dispatcher-thread Image
+            // invalidation), so a lock-free copy raced them and corrupted the set.
+            RenderDirty.SnapshotGeometryInto(_geometryDirtyBuffer);
 
             _packet.Reset(RenderBuildKind.Partial);
 
@@ -144,36 +166,30 @@ public class RenderCache
                 if (RecordReRender(component, _packet) == PartialRecord.Fallback) { fellBack = true; break; }
             }
 
-            // Partial completes ONLY if nothing structural surfaced and NO new geometry was marked during the RECORD pass
-            // (the set didn't grow). If a render re-marked geometry, fall through to a full walk so that change isn't dropped.
-            if (!fellBack && !RenderDirty.IsStructural && RenderDirty.Geometry.Count == _geometryDirtyBuffer.Count)
+            // Partial stands ONLY if nothing structural surfaced and NO new geometry was marked during the RECORD pass
+            // (the set didn't grow). If a render re-marked geometry, escalate to a full walk so that change isn't dropped.
+            if (!fellBack && !RenderDirty.IsStructural && RenderDirty.GeometryCount == _geometryDirtyBuffer.Count)
             {
-                // APPLY pass (GPU): realize the recorded draws - update the units in place / splice a count change. A
-                // newly-appearing component with no paint rank still forces a full walk.
-                foreach (var draw in _packet.Draws)
-                {
-                    if (!ApplyReRender(draw.Component, draw.Commands)) { fellBack = true; break; }
-                }
-
-                if (!fellBack)
-                {
-                    LastBuildKind = RenderBuildKind.Partial;   // no full walk (only the dirty components' unit contents)
-                    LastBuildTransformDirty = RenderDirty.IsTransform;   // geometry-only partial -> nothing moved -> proc can be skipped
-                    // Remember which components changed so the draw phase can patch just their slots + replay (below), and
-                    // which MOTION NODES moved so it can rewrite their table matrices (the O(1)-scroll path).
-                    _partialDirty.Clear();
-                    _partialDirty.AddRange(_geometryDirtyBuffer);
-                    _movedNodesBuf.Clear();
-                    _movedNodesBuf.AddRange(RenderDirty.MovedNodes);
-                    CaptureSnapshot();   // recorder freezes the snapshot the applier replays this frame (incl. the moved nodes RefreshMovedNodes reads)
-                    RenderDirty.Clear();
-                    return;
-                }
+                LastBuildKind = RenderBuildKind.Partial;   // no full walk (only the dirty components' unit contents)
+                LastBuildTransformDirty = RenderDirty.IsTransform;   // geometry-only partial -> nothing moved -> proc can be skipped
+                // Remember which components changed so the draw phase can patch just their slots + replay, and which
+                // MOTION NODES moved so it can rewrite their table matrices (the O(1)-scroll path). Captured HERE, while
+                // RenderDirty is still populated - the applier consumes _movedNodesBuf, but RenderDirty is cleared after
+                // the whole record phase (Phase 3.2 hoists the clear to the loop level).
+                _partialDirty.Clear();
+                _partialDirty.AddRange(_geometryDirtyBuffer);
+                RenderDirty.SnapshotNodesInto(_movedNodesBuf);   // under the write lock (MarkNodeTransform runs on other threads too)
+                return;   // packet.Kind == Partial -> ApplyFrame runs the partial apply (which may itself fall back to full)
             }
-            // a structural change or a new invalidation surfaced during the partial pass -> fall through to a full walk
+            // a structural change or a new invalidation surfaced during the partial pass -> escalate to a full walk
         }
 
-        // Full walk: first build, a structural change, or a partial that surfaced one.
+        RecordFullFrame(visualRoot);
+    }
+
+    // RECORD a full walk (DEVICE-FREE): first build, a structural change, or a partial that surfaced one. Fills the packet.
+    private void RecordFullFrame(IRootVisualComponent visualRoot)
+    {
         LastBuildKind = RenderBuildKind.Full;
         LastBuildTransformDirty = true;   // a full walk rebuilds the paint-order list; positions must be re-baked
         _commands.Clear();
@@ -184,9 +200,52 @@ public class RenderCache
         _nodeCache.Clear();
         _packet.Reset(RenderBuildKind.Full);
         RecordFullWalk(visualRoot, _packet);   // device-free: walk + component.Render + copy commands into the packet
-        ApplyFullWalk(_packet);                 // GPU: rebuild the paint-order groups from the packet
-        CaptureSnapshot();
-        _built = true;
+    }
+
+    /// <summary>
+    /// APPLY half of the frame build (GPU - the render-thread side in Phase 3.3). Consumes the packet the recorder filled:
+    /// Clean re-draws the retained units; Partial updates the dirty groups in place (splicing count changes), and if a
+    /// newly-appearing component has no paint rank it re-records + applies a full walk (inline-safe: the tree is quiescent
+    /// between RECORD and APPLY); Full rebuilds the paint-order groups. Freezes the layout snapshot the draw pass replays,
+    /// then clears RenderDirty (Phase 3.2 hoists this clear to the loop level so it runs once after all windows record).
+    /// </summary>
+    public void ApplyFrame()
+    {
+        switch (_packet.Kind)
+        {
+            case RenderBuildKind.Clean:
+                break;   // re-draw the retained units as-is (nothing to realize)
+
+            case RenderBuildKind.Partial:
+            {
+                // APPLY pass (GPU): realize the recorded draws - update the units in place / splice a count change. A
+                // newly-appearing component with no paint rank forces a full walk.
+                var fellBack = false;
+                foreach (var draw in _packet.Draws)
+                {
+                    if (!ApplyReRender(draw.Component, draw.Commands)) { fellBack = true; break; }
+                }
+                if (!fellBack)
+                {
+                    CaptureSnapshot();   // freeze the snapshot the draw pass replays this frame (incl. the moved nodes)
+                    break;
+                }
+                // A recorded partial draw had no paint rank -> re-record + apply a full walk. Inline-safe: the tree hasn't
+                // changed since RECORD (single-threaded); Phase 3.3 removes this by moving the decision into RecordFrame.
+                RecordFullFrame(_pendingVisualRoot);
+                ApplyFullWalk(_packet);
+                CaptureSnapshot();
+                _built = true;
+                break;
+            }
+
+            case RenderBuildKind.Full:
+                ApplyFullWalk(_packet);   // GPU: rebuild the paint-order groups from the packet
+                CaptureSnapshot();
+                _built = true;
+                break;
+        }
+
         RenderDirty.Clear();
     }
 

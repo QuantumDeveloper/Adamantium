@@ -31,9 +31,6 @@ public abstract class ButtonBase : ContentControl
         new PropertyMetadata(default(Thickness),
             PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
 
-    public static readonly AdamantiumProperty FontSizeProperty = AdamantiumProperty.Register(nameof(FontSize),
-        typeof(double), typeof(ButtonBase), new PropertyMetadata(14.0, PropertyMetadataOptions.AffectsMeasure));
-
     // State brushes the default template's triggers project onto the chrome for hover/press/disabled. Exposing them as
     // properties is what lets ONE template serve every button variant: the Accent style just overrides these brushes
     // (via {ThemeResource}), no second template. Set by the theme; null means "no change in that state".
@@ -105,12 +102,6 @@ public abstract class ButtonBase : ContentControl
     {
         get => GetValue<Thickness>(PaddingProperty);
         set => SetValue(PaddingProperty, value);
-    }
-
-    public double FontSize
-    {
-        get => GetValue<double>(FontSizeProperty);
-        set => SetValue(FontSizeProperty, value);
     }
 
     public Brush BackgroundPointerOver
