@@ -296,11 +296,33 @@ public class TextRenderComponent : ImageRenderComponent
 
     public Brush Stroke { get; set; }
 
-    // The frozen glyph snapshot the text BATCH bakes from (set by TextRenderUnit after each TextLayout.Update). Decouples
-    // the batch bake from the live, reshaped-in-place TextLayout so it is render-thread safe. Null only transiently before
-    // the first snapshot. The DIRECT/composite fallback (RenderDirect/PreRender) still reads the live layout - the one
-    // residual live text read, closed in the threading phase (see docs/RENDER_THREAD_PLAN.md).
-    public FrozenGlyphRun GlyphRun { get; set; }
+    // The frozen glyph snapshot BOTH text paths bake from (set by TextRenderUnit after each TextLayout.Update): the batch
+    // packs it into the shared SSBO, the direct/composite fallback uploads it into this component's own vertex buffer
+    // (EnsureGlyphVtx). Neither reads the live, reshaped-in-place TextLayout at draw, so the whole text draw path is a pure
+    // function of the frozen snapshot - render-thread safe (docs/RENDER_THREAD_PLAN.md). Null only before the first snapshot.
+    private FrozenGlyphRun _glyphRun;
+    public FrozenGlyphRun GlyphRun
+    {
+        get => _glyphRun;
+        set { _glyphRun = value; _glyphVtxDirty = true; }
+    }
+
+    // Per-block vertex buffer for the DIRECT/composite draw, uploaded from the FROZEN glyph run (never the live layout).
+    // Lazily allocated (only if a block ever falls to the direct draw - batched text never touches it), reused + re-uploaded
+    // when the run changes. Mirrors the old TextLayout.EnsureVertexBuffer/VertexBuffer that the direct path used to read.
+    private Buffer<FontItem> _glyphVtx;
+    private bool _glyphVtxDirty;
+
+    private Buffer<FontItem> EnsureGlyphVtx()
+    {
+        _glyphVtx ??= ToDispose(Adamantium.Graphics.Buffer.Vertex.New<FontItem>(GraphicsDevice, 4096, Adamantium.Graphics.BufferMemoryUsage.UploadFromCpuToGpu));
+        if (_glyphVtxDirty)
+        {
+            _glyphVtx.SetData(GlyphRun.Glyphs, 0, (uint)GlyphRun.Count, 0);
+            _glyphVtxDirty = false;
+        }
+        return _glyphVtx;
+    }
 
     private bool _textRendered = false;
 
@@ -340,9 +362,11 @@ public class TextRenderComponent : ImageRenderComponent
         if (_textRendered)
             return;
 
+        if (GlyphRun == null) return;
+
         // Inset the text by the effect padding inside the (padded) target so edge glyphs' outline/glow have room. The
         // composite quad was grown by the same pad with its origin shifted -pad (see RenderUnit), cancelling this inset.
-        var pad = TextLayout.EffectPadding;
+        var pad = GlyphRun.EffectPadding;
         var location = new Vector3F(RenderingParameters.TextArea.X + pad, RenderingParameters.TextArea.Y + pad, 5);
         var foreground = ((SolidColorBrush)Foreground).Color;
         var stroke = Colors.Transparent;
@@ -350,7 +374,7 @@ public class TextRenderComponent : ImageRenderComponent
         // Rasterize the (logical-size) layout RenderScale x larger into the target; the composite minifies it = SSAA.
         FontRenderer.RenderScale = TextSupersample;
         FontRenderer.SetState(GraphicsDevice.SamplerStates.LinearFont, location, _renderTarget, outerPassActive: false);
-        FontRenderer.DrawLayout(TextLayout, foreground, stroke);
+        FontRenderer.DrawLayout(EnsureGlyphVtx(), (uint)GlyphRun.Count, GlyphRun.Atlas, GlyphRun.FontSize, foreground, stroke);
         FontRenderer.RestoreState(outerPassActive: false);
         GraphicsDevice.ClearColor = previousColor;
         _textRendered = true;
@@ -381,6 +405,7 @@ public class TextRenderComponent : ImageRenderComponent
     // target - the MSDF pixel shader self-anti-aliases from screen-space derivatives.
     private void RenderDirect()
     {
+        if (GlyphRun == null) return;
         var textArea = RenderingParameters.TextArea;
         var mvp = Matrix4x4F.Translation(textArea.X, textArea.Y, 5)
                   * RenderData.TransformMatrix
@@ -389,7 +414,10 @@ public class TextRenderComponent : ImageRenderComponent
         FontRenderer.RenderScale = 1f;
         FontRenderer.DrawLayoutDirect(
             GraphicsDevice.SamplerStates.LinearFont,
-            TextLayout,
+            EnsureGlyphVtx(),
+            (uint)GlyphRun.Count,
+            GlyphRun.Atlas,
+            GlyphRun.FontSize,
             foreground,
             mvp,
             RenderData.Opacity);
