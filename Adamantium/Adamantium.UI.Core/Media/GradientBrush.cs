@@ -1,4 +1,5 @@
 using System.Collections.Specialized;
+using System.Linq;
 using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Core.Media;
@@ -53,6 +54,10 @@ public abstract class GradientBrush : Brush
     public GradientSpreadMethod SpreadMethod
     {
         get => GetValue<GradientSpreadMethod>(SpreadMethodProperty);
-        set => SetValue(SpreadMethodProperty, value);
+        set { if (IsFrozen) return; SetValue(SpreadMethodProperty, value); }
     }
+
+    // A deep copy of the stops as NEW GradientStop instances, so a frozen gradient never aliases the live, animatable stop
+    // objects (freezing must SNAPSHOT the stop colours/offsets). Used by each concrete brush's CreateFrozenCore.
+    protected GradientStopCollection CopyStops() => [..GradientStops.Select(s => new GradientStop(s.Color, s.Offset))];
 }

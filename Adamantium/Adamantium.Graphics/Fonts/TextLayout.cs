@@ -709,6 +709,17 @@ public class TextLayout : DisposableObject
         return true;
     }
 
+    /// <summary>An immutable snapshot of the currently-shaped glyphs (call AFTER <see cref="Update"/>), so the render
+    /// thread bakes text from a frozen copy instead of reading this layout while it is reshaped in place. The atlas is
+    /// shared by reference (its tiles are append-only and stable). See <see cref="FrozenGlyphRun"/>.</summary>
+    public FrozenGlyphRun SnapshotGlyphs()
+    {
+        var n = (int)ElementsCount;
+        var copy = new FontItem[n];
+        Array.Copy(fontItems, copy, n);
+        return new FrozenGlyphRun(copy, n, FontAtlas);
+    }
+
     private bool IsLastGlyph(int position, int count)
     {
         return !(position < count - 1);

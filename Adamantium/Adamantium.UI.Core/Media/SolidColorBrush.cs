@@ -30,8 +30,10 @@ public sealed class SolidColorBrush: Brush
    public Color Color
    {
       get => GetValue<Color>(ColorProperty);
-      set => SetValue(ColorProperty, value);
+      set { if (IsFrozen) return; SetValue(ColorProperty, value); }
    }
+
+   protected override Brush CreateFrozenCore() => AsFrozen(new SolidColorBrush(Color, Opacity));
 
    private Color GetColorFromString(string color)
    {

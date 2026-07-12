@@ -27,25 +27,36 @@ public sealed class RadialGradientBrush : GradientBrush
     public Vector2 Center
     {
         get => GetValue<Vector2>(CenterProperty);
-        set => SetValue(CenterProperty, value);
+        set { if (IsFrozen) return; SetValue(CenterProperty, value); }
     }
 
     /// <summary>Where offset 0 sits (relative). Defaults to the centre; move it for an off-centre "spotlight".</summary>
     public Vector2 GradientOrigin
     {
         get => GetValue<Vector2>(GradientOriginProperty);
-        set => SetValue(GradientOriginProperty, value);
+        set { if (IsFrozen) return; SetValue(GradientOriginProperty, value); }
     }
 
     public double RadiusX
     {
         get => GetValue<double>(RadiusXProperty);
-        set => SetValue(RadiusXProperty, value);
+        set { if (IsFrozen) return; SetValue(RadiusXProperty, value); }
     }
 
     public double RadiusY
     {
         get => GetValue<double>(RadiusYProperty);
-        set => SetValue(RadiusYProperty, value);
+        set { if (IsFrozen) return; SetValue(RadiusYProperty, value); }
     }
+
+    protected override Brush CreateFrozenCore() =>
+        AsFrozen(new RadialGradientBrush(CopyStops())
+        {
+            Center = Center,
+            GradientOrigin = GradientOrigin,
+            RadiusX = RadiusX,
+            RadiusY = RadiusY,
+            SpreadMethod = SpreadMethod,
+            Opacity = Opacity
+        });
 }

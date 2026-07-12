@@ -170,7 +170,9 @@ public class GeometryRenderComponent : UIRenderComponent
             var fill = solidColor.Color.ToVector4();
             fill.W *= (float)solidColor.Opacity;   // fold the brush's own Opacity into the colour alpha
             UIBasicEffect.FillColor.SetValue(fill);
-            if (solidColor == Brushes.Transparent)
+            // Fully transparent fill -> force zero opacity. Value check (not `== Brushes.Transparent`) so a FROZEN clone of
+            // Transparent - a different instance from the shared static - is still recognised (payload brushes are frozen).
+            if (solidColor.Color.A == 0)
             {
                 UIBasicEffect.Opacity.SetValue(0f);
             }
@@ -291,8 +293,14 @@ public class TextRenderComponent : ImageRenderComponent
     public TextLayout TextLayout { get; }
     public TextRenderingParameters RenderingParameters { get; }
     public Brush Foreground { get; set; }
-    
+
     public Brush Stroke { get; set; }
+
+    // The frozen glyph snapshot the text BATCH bakes from (set by TextRenderUnit after each TextLayout.Update). Decouples
+    // the batch bake from the live, reshaped-in-place TextLayout so it is render-thread safe. Null only transiently before
+    // the first snapshot. The DIRECT/composite fallback (RenderDirect/PreRender) still reads the live layout - the one
+    // residual live text read, closed in the threading phase (see docs/RENDER_THREAD_PLAN.md).
+    public FrozenGlyphRun GlyphRun { get; set; }
 
     private bool _textRendered = false;
 

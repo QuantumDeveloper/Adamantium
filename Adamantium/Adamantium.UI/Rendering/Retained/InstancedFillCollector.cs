@@ -174,7 +174,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     public bool TryAdd(GeometryRenderUnit unit, Matrix4x4F world, Rect2D scissor, Rect logicalBounds)
     {
         if (!unit.TryGetInstancedFill(out var key, out var meshObj, out var color)) return false;
-        if (meshObj is not Mesh mesh) return false;
+        if (meshObj is not FrozenMesh mesh) return false;
         var seg = GetOrCreate(key, mesh);
         if (seg == null) return false;
 
@@ -213,7 +213,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     public bool TryAddGradient(GeometryRenderUnit unit, Matrix4x4F world, Rect2D scissor, Rect logicalBounds)
     {
         if (!unit.TryGetInstancedGradientFill(out var key, out var meshObj, out var brush, out var localBounds, out var opacity)) return false;
-        if (meshObj is not Mesh mesh) return false;
+        if (meshObj is not FrozenMesh mesh) return false;
         var seg = GetOrCreate(key, mesh);
         if (seg == null) return false;
 
@@ -389,11 +389,11 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     }
 
     // Build (once) the immutable vtx/idx buffers for a key's shared local mesh. Returns null until it has a drawable mesh.
-    private KeySegment GetOrCreate(GeometryKey key, Mesh mesh)
+    private KeySegment GetOrCreate(GeometryKey key, FrozenMesh mesh)
     {
         if (_keys.TryGetValue(key, out var seg) && seg.MeshUploaded) return seg;
 
-        var vertices = mesh.ToUIVertices();
+        var vertices = mesh.Vertices;
         if (vertices.Length == 0) return null;
         var indices = mesh.Indices;
         var indexed = indices is { Length: > 0 };
@@ -413,7 +413,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             seg.IndexCount = (uint)indices.Length;
         }
 
-        seg.Topology = mesh.MeshTopology;
+        seg.Topology = mesh.Topology;
         seg.MeshUploaded = true;
         _keys[key] = seg;
         return seg;
