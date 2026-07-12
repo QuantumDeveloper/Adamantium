@@ -134,27 +134,41 @@ public class RenderCache
             _geometryDirtyBuffer.Clear();
             _geometryDirtyBuffer.AddRange(RenderDirty.Geometry);
 
+            _packet.Reset(RenderBuildKind.Partial);
+
+            // RECORD pass (DEVICE-FREE): skip/record each dirty component. component.Render can mark MORE geometry dirty,
+            // which the count check below detects; a component that needs a full walk (Fallback) stops the pass.
             var fellBack = false;
             foreach (var component in _geometryDirtyBuffer)
             {
-                if (!ReRenderInPlace(component)) { fellBack = true; break; }
+                if (RecordReRender(component, _packet) == PartialRecord.Fallback) { fellBack = true; break; }
             }
 
-            // Partial completes ONLY if nothing structural surfaced and NO new geometry was marked during the pass (the
-            // set didn't grow). If a render re-marked geometry, fall through to a full walk so that change isn't dropped.
+            // Partial completes ONLY if nothing structural surfaced and NO new geometry was marked during the RECORD pass
+            // (the set didn't grow). If a render re-marked geometry, fall through to a full walk so that change isn't dropped.
             if (!fellBack && !RenderDirty.IsStructural && RenderDirty.Geometry.Count == _geometryDirtyBuffer.Count)
             {
-                LastBuildKind = RenderBuildKind.Partial;   // no full walk (only the dirty components' unit contents)
-                LastBuildTransformDirty = RenderDirty.IsTransform;   // geometry-only partial -> nothing moved -> proc can be skipped
-                // Remember which components changed so the draw phase can patch just their slots + replay (below), and
-                // which MOTION NODES moved so it can rewrite their table matrices (the O(1)-scroll path).
-                _partialDirty.Clear();
-                _partialDirty.AddRange(_geometryDirtyBuffer);
-                _movedNodesBuf.Clear();
-                _movedNodesBuf.AddRange(RenderDirty.MovedNodes);
-                CaptureSnapshot();   // recorder freezes the snapshot the applier replays this frame (incl. the moved nodes RefreshMovedNodes reads)
-                RenderDirty.Clear();
-                return;
+                // APPLY pass (GPU): realize the recorded draws - update the units in place / splice a count change. A
+                // newly-appearing component with no paint rank still forces a full walk.
+                foreach (var draw in _packet.Draws)
+                {
+                    if (!ApplyReRender(draw.Component, draw.Commands)) { fellBack = true; break; }
+                }
+
+                if (!fellBack)
+                {
+                    LastBuildKind = RenderBuildKind.Partial;   // no full walk (only the dirty components' unit contents)
+                    LastBuildTransformDirty = RenderDirty.IsTransform;   // geometry-only partial -> nothing moved -> proc can be skipped
+                    // Remember which components changed so the draw phase can patch just their slots + replay (below), and
+                    // which MOTION NODES moved so it can rewrite their table matrices (the O(1)-scroll path).
+                    _partialDirty.Clear();
+                    _partialDirty.AddRange(_geometryDirtyBuffer);
+                    _movedNodesBuf.Clear();
+                    _movedNodesBuf.AddRange(RenderDirty.MovedNodes);
+                    CaptureSnapshot();   // recorder freezes the snapshot the applier replays this frame (incl. the moved nodes RefreshMovedNodes reads)
+                    RenderDirty.Clear();
+                    return;
+                }
             }
             // a structural change or a new invalidation surfaced during the partial pass -> fall through to a full walk
         }
@@ -181,23 +195,31 @@ public class RenderCache
     // unit objects are reused via UpdateWithDrawCommand (its group already references them - no change). On a COUNT
     // change - a hover background appearing (0->1 commands) or vanishing, a per-frame chart re-recording a different
     // number of segments - only THIS component's group mutates; every other group keeps its units untouched.
-    private bool ReRenderInPlace(IUIComponent component)
+    // The record and apply decision for one dirty component: Skip = reuse its cached units as-is (nothing recorded);
+    // Fallback = the caller must do a full walk; Recorded = its commands were captured into the packet for the applier.
+    private enum PartialRecord { Skip, Fallback, Recorded }
+
+    // RECORD half of a partial re-render for ONE geometry-dirty component (DEVICE-FREE): the skip/fallback decisions +
+    // component.Render, copying the recorded commands into the packet. No GPU - the applier (ApplyReRender) realizes them.
+    private PartialRecord RecordReRender(IUIComponent component, RenderPacket packet)
     {
         // Invisible (Collapsed/Hidden - e.g. an auto-hide ScrollBar that re-marks geometry dirty on every mouse-move):
         // it draws nothing. If it holds no units (the norm - going invisible was STRUCTURAL and already removed them),
         // SKIP it like a detached/collapsed one below, instead of forcing a full tree walk every dirty frame (the hover
         // FPS hitch). Only if it somehow still holds units fall back to a full walk to reconcile them.
         if (component.Visibility != Visibility.Visible)
-            return !_groupById.TryGetValue(component.RenderId, out var stillHeld) || stillHeld.Units.Count == 0;
+            return !_groupById.TryGetValue(component.RenderId, out var stillHeld) || stillHeld.Units.Count == 0
+                ? PartialRecord.Skip
+                : PartialRecord.Fallback;
 
         // Not in the live paint tree: DETACHED (no visual parent) or effectively hidden by a COLLAPSED ancestor. The full
         // walk never reaches such a component, so it has no paint rank and re-rendering it draws nothing - yet it used to
         // force a FULL tree rebuild EVERY frame it was geometry-dirty (a detached/pooled text block, a text block inside a
         // collapsed panel, an auto-hide scrollbar's parts). Skip it: it holds no units (a real detach/collapse is
         // STRUCTURAL and already removed them via a full walk), so there is nothing to draw or reclaim here.
-        if (!component.IsAttachedToVisualTree) return true;
+        if (!component.IsAttachedToVisualTree) return PartialRecord.Skip;
         for (var a = component.VisualParent; a != null; a = a.VisualParent)
-            if (a.Visibility != Visibility.Visible) return true;
+            if (a.Visibility != Visibility.Visible) return PartialRecord.Skip;
 
         // A geometry-dirty component from a FOREIGN visual tree - a popup/menu/tooltip subtree (a PopupRoot), drawn by
         // the popup stage's OWN cache, never by this one. Skip it WITHOUT rendering: Render() below would consume its
@@ -209,19 +231,26 @@ public class RenderCache
         {
             var top = component;
             while (top.VisualParent != null) top = top.VisualParent;
-            if (!ReferenceEquals(top, _lastVisualRoot)) return true;
+            if (!ReferenceEquals(top, _lastVisualRoot)) return PartialRecord.Skip;
         }
 
         // Marked dirty EXTERNALLY (an animation heartbeat / duplicate mark) while its own geometry is still VALID:
         // Render() below no-ops on the flag and records ZERO commands, which the count-change path would read as
         // "now draws nothing" and DELETE the retained units (the mass tile vanish on ease-back completion). Nothing
         // about its recorded geometry changed - keep the retained units as-is.
-        if (component.IsGeometryValid) return true;
+        if (component.IsGeometryValid) return PartialRecord.Skip;
 
         _drawingContextInternal.Clear();
         component.Render(_drawingContext);   // NB: consumes the dirty flag (Render sets IsGeometryValid back to true)
-        var drawCommands = _drawingContextInternal.GetDrawCommands();
+        packet.Draws.Add(new ComponentDraw(component, CopyCommands(_drawingContextInternal.GetDrawCommands()), false));
+        return PartialRecord.Recorded;
+    }
 
+    // APPLY half (GPU / render-thread side): realize ONE recorded partial draw - update the group's units in place (same
+    // count + type) or splice in the count/type change. Returns false only when a newly-appearing component has no paint
+    // rank (-> the caller does a full walk). wasGeometryValid is not used here (RecordReRender already skipped the clean).
+    private bool ApplyReRender(IUIComponent component, IReadOnlyList<IDrawCommand> drawCommands)
+    {
         _groupById.TryGetValue(component.RenderId, out var group);
         var oldCount = group?.Units.Count ?? 0;
 
