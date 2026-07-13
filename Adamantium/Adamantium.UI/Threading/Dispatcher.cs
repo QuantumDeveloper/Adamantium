@@ -18,12 +18,6 @@ public sealed class Dispatcher : IDispatcher
     private DispatcherOperationExecutor executor;
     private Thread uiThread;
 
-    // Work marshalled from other threads (window input on the OS message thread) to run on the UI loop thread. Drained
-    // at the start of each Update, before layout - so event handling and the tree mutations it triggers never race the
-    // measure/arrange/render that also runs on the loop thread.
-    private readonly Channel<Action> loopQueue =
-        Channel.CreateUnbounded<Action>(new UnboundedChannelOptions { SingleReader = true });
-        
     private static object collectionLocker = new object();
     private static Dictionary<DispatcherContext, Dispatcher> dispatchers;
         
@@ -155,6 +149,9 @@ public sealed class Dispatcher : IDispatcher
     /// layout). Window input arrives on the OS message thread; routing it through here keeps the event handling - and
     /// the tree mutations it triggers - on the same thread as layout/render, instead of racing them. Called already on
     /// the loop thread it runs inline.
+    ///
+    /// The queue is <see cref="Core.LoopSignal"/> - the same pipe the loop sleeps on. So every mouse move, key, and window
+    /// event is BOTH the work and the wake: posting it is what pulls the loop out of an idle sleep.
     /// </summary>
     public void Post(Action action)
     {
@@ -165,16 +162,9 @@ public sealed class Dispatcher : IDispatcher
             action();
             return;
         }
-        loopQueue.Writer.TryWrite(action);
+        Core.LoopSignal.Post(action);
     }
 
     /// <summary>Runs every queued action in order. MUST be called only from the UI loop thread (start of Update).</summary>
-    public void DrainPending()
-    {
-        while (loopQueue.Reader.TryRead(out var action))
-        {
-            try { action(); }
-            catch (Exception ex) { Console.WriteLine(ex); }
-        }
-    }
+    public void DrainPending() => Core.LoopSignal.Drain();
 }

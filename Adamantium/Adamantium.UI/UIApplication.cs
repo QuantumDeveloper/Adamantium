@@ -478,6 +478,10 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         {
             try
             {
+                // Nothing to do -> this BLOCKS on the loop pipe until something wants a frame. Everything below therefore runs
+                // only because there is work: the frame does not begin until the loop is woken.
+                WaitForWork();
+
                 var frameTime = preciseTimer.GetElapsedTime();
                 if (IsFixedTimeStep)
                 {
@@ -512,6 +516,43 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         }
     }
 
+    /// <summary>Cap on how often the loop UPDATES while something is actually moving (an animation, an inertial scroll).
+    /// Independent of the presented frame rate, which the render thread owns - that is the whole point of the split.</summary>
+    public static uint UpdateRateHz { get; set; } = 120;
+
+    /// <summary>Longest the loop will ever block on an empty pipe. Purely a safety net: every source that needs a frame writes
+    /// to the pipe (see <see cref="LoopSignal"/>), so this only bounds the damage of one nobody thought of - a late frame
+    /// rather than a frozen window.</summary>
+    private const int IdleWakeMs = 250;
+
+    private long _loopFrameStart;
+
+    // The loop is BOTH paced and event-driven, and it needs both.
+    //
+    // PACE first: never run more often than UpdateRateHz. Waking on the pipe alone is not enough, because the loop feeds the
+    // pipe ITSELF: the animation heartbeat marks its target's geometry dirty every tick, and a dirty mark is (rightly) a wake.
+    // With only the pipe to gate on, a running animation meant the token was already queued by the frame that had just
+    // finished - the loop never blocked at all, spun at ~400 000 empty frames a second, and published a packet to the render
+    // thread on every one of them, drowning it.
+    //
+    // THEN block on the pipe, but only when there is genuinely nothing to do: nothing already dirty, and nothing animating.
+    // Input, window events, layout invalidations, queued bindings and render-dirty marks all land in that one pipe, so an idle
+    // or minimized window wakes for exactly nothing and the thread costs zero. Animations are the one thing that is TIME-driven
+    // rather than event-driven - nothing "happens" to wake them, they simply need the next frame - so while one runs, the pace
+    // above is what schedules the loop.
+    private void WaitForWork()
+    {
+        var target = 1000.0 / Math.Max(1, UpdateRateHz);
+        var elapsed = Stopwatch.GetElapsedTime(_loopFrameStart).TotalMilliseconds;
+        var remaining = target - elapsed;
+        if (remaining >= 1.0) Thread.Sleep((int)remaining);
+
+        if (!RenderDirty.HasWork && !AnimationManager.HasActiveAnimations)
+            LoopSignal.Wait(IdleWakeMs, cancellationTokenSource.Token);
+
+        _loopFrameStart = Stopwatch.GetTimestamp();
+    }
+
     private void OnCycleFinishedInternal()
     {
         CheckExitConditions();
@@ -541,14 +582,19 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         // point of the split; without this cap the loop would instead race ahead publishing packets the render can't consume.
         if (threaded && Volatile.Read(ref _framesInFlight) >= MaxFramesInFlight) return;
 
+        // EVERY window must have actually recorded before the dirty set may be cleared. A window whose renderer is not up yet
+        // (at startup it never is, until the swapchain exists) records NOTHING - and clearing regardless threw away marks that
+        // were never recorded. Nothing re-marks an already-clean component, so whatever the layout pass had built by then was
+        // simply never drawn: that is why the first tab's content came up blank while every later tab was fine.
+        var recordedAll = true;
         foreach (var service in windowToSystem.Values)
-            service.RecordFrame();
-        _recordedThisFrame = true;
+            recordedAll &= service.RecordFrame();
+        _recordedThisFrame = recordedAll;
 
         // Threaded: clear the dirty set HERE, on the LOOP thread, right after the record snapshotted it into the packets. The
         // applier (the render thread) consumes only those packets, never RenderDirty - it must not touch it at all, or it would
-        // race the next Update's marks.
-        if (threaded) RenderDirty.Clear();
+        // race the next Update's marks. Marks NOT recorded stay pending and fold into the next frame's packet.
+        if (threaded && recordedAll) RenderDirty.Clear();
     }
 
     private bool _recordedThisFrame;

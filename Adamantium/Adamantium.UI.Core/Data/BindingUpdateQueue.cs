@@ -31,6 +31,7 @@ public static class BindingUpdateQueue
     public static void Enqueue(BindingExpressionBase expression)
     {
         lock (Sync) Dirty.Add(expression);
+        LoopSignal.Request();   // a value is waiting to be pushed to its target - the loop owes a frame (see LoopSignal)
     }
 
     /// <summary>Drops a (e.g. closed) expression so a dead binding is never applied.</summary>
