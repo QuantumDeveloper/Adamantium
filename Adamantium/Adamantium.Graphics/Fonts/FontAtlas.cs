@@ -92,24 +92,26 @@ namespace Adamantium.Graphics.Fonts
             };
 
             Atlas = Texture.New(GraphicsDevice, description, "Dynamic Font Atlas");
-
-            Prewarm();
         }
 
-        // The characters a UI is overwhelmingly made of. Rasterized ONCE, in ONE bulk call, when the atlas is born.
-        private const string PrewarmCharset =
-            " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
-
-        // Rasterizing a glyph is MSDF work - measured at ~23 ms each (Debug). The atlas grows LAZILY, one Update(text) per text
-        // block, so a cold fill introduced roughly one new character per block and paid that ~23 ms serially, ~50 times: 1.1 s
-        // of a 1.9 s 4K-viewport fill, and by far its single biggest cost. The generator already parallelises across glyphs
-        // (TextureAtlasGenerator.GenerateTextureForGlyphs) - it was just never given more than one at a time. Handing it the
-        // whole base charset up front turns ~50 serial single-glyph rasterizations into ONE parallel batch, and every text
-        // block that follows finds its glyphs already there. Anything outside this set still grows the atlas lazily, exactly
-        // as before - the cost simply stops landing in the middle of a fill.
-        private void Prewarm()
+        /// <summary>
+        /// Rasterize every character of <paramref name="text"/> this atlas does not have yet - in ONE batch.
+        ///
+        /// The atlas grows LAZILY, one <see cref="Update"/> per text block, and that is deliberate: a UI must not pay for
+        /// glyphs it never shows. But a lazy path hands the generator only the characters ONE block introduced, and
+        /// rasterizing a glyph is MSDF work - ~23 ms in Debug. A cold fill realizes ~50 new text blocks, each contributing
+        /// about one new character, so ~50 glyphs were rasterized one after another, on a single core: 1.1 s of a 1.9 s 4K
+        /// viewport fill, and by far its biggest single cost.
+        ///
+        /// The generator ALREADY parallelises across glyphs (TextureAtlasGenerator.GenerateTextureForGlyphs) - it was simply
+        /// never given more than one at a time. So the fix is not to abandon laziness (prewarming a charset up front just moves
+        /// the same cost into startup, and pays for glyphs nobody asked for) - it is to let a caller that is about to build
+        /// MANY blocks pool their characters and warm them together. Nothing is rasterized that the UI does not use; the work
+        /// simply stops being serial.
+        /// </summary>
+        public void Warm(string text)
         {
-            ProcessGlyphs(Font.TranslateIntoGlyphs(PrewarmCharset));
+            if (!string.IsNullOrEmpty(text)) Update(text);
         }
 
         private Glyph[] GetNotProcessedGlyphs(IEnumerable<Glyph> glyphs)

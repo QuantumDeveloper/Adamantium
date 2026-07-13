@@ -590,6 +590,14 @@ public class TextLayout : DisposableObject
         }
     }
 
+    /// <summary>This block's atlas (created on first use). Public so a CALLER that is about to build many text blocks at once
+    /// can warm them all in ONE batch - see <see cref="FontAtlas.Warm"/>: rasterizing a glyph is MSDF work (~23 ms in Debug),
+    /// and the generator parallelises across glyphs, but the per-block path can only ever hand it the handful of characters
+    /// that ONE block introduced. Fifty new blocks in a frame then rasterize ~fifty glyphs one after another, on one core.</summary>
+    public FontAtlas EnsureAtlas(IGraphicsDevice graphicsDevice) =>
+        FontAtlas ??= FontAtlasStore.GetOrCreateFrom(graphicsDevice, Typeface,
+            FontParameters.Default(sortingVariant: GlyphSortingVariant.ByIndex));
+
     public void Update(IGraphicsDevice graphicsDevice)
     {
         // Nothing to upload until ProcessText has shaped the text into _wordData. A render unit can be built for a text
@@ -598,8 +606,7 @@ public class TextLayout : DisposableObject
         // (_textUpdated stays set) once ProcessText has run.
         if (!_textUpdated || _wordData == null) return;
 
-        FontAtlas ??= FontAtlasStore.GetOrCreateFrom(graphicsDevice, Typeface, FontParameters.Default(sortingVariant:GlyphSortingVariant.ByIndex));
-        FontAtlas.Update(Text+".");
+        EnsureAtlas(graphicsDevice).Update(Text + ".");
         ElementsCount = 0;
         // NOTE: the per-block GPU VertexBuffer is NOT created here. It's only needed by the DIRECT draw path
         // (rotated/sheared text); the common batched path bakes fontItems into the shared aggregate buffer via

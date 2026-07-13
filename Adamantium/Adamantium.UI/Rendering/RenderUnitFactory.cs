@@ -13,6 +13,8 @@ public class RenderUnitFactory : IRenderUnitFactory
     private Dictionary<Type, Func<IDrawCommand, IRenderUnit>> _registeredFactories;
     private readonly RenderUnitContext _context;
 
+    public IGraphicsDevice GraphicsDevice => _context.GraphicsDevice;
+
     public RenderUnitFactory(IGraphicsDevice graphicsDevice, IResourceFactory resourceFactory)
     {
         // The shared services every unit needs, in one object. One buffer manager shared by every unit this factory
