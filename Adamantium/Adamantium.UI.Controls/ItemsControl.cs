@@ -37,6 +37,14 @@ public class ItemsControl : Control, IContainer
     public static readonly AdamantiumProperty ItemSkeletonTemplateProperty = AdamantiumProperty.Register(nameof(ItemSkeletonTemplate),
         typeof(DataTemplate), typeof(ItemsControl), new PropertyMetadata(null));
 
+    /// <summary>True while the items host is showing loading SKELETON cards - i.e. a virtualized fill (or a fast fling) has
+    /// deferred part of the realized window past the per-frame bind budget. Maintained by the panel
+    /// (<see cref="Panels.VirtualizingPanel"/>); read-only to markup. This is the LIST-level loading state a theme keys the
+    /// skeleton shimmer off: one trigger per list runs/stops the pulse on the shared skeleton brush, so a screenful of
+    /// cards costs ONE animation instead of one per card.</summary>
+    public static readonly AdamantiumProperty IsLoadingItemsProperty = AdamantiumProperty.RegisterReadOnly(nameof(IsLoadingItems),
+        typeof(bool), typeof(ItemsControl), new PropertyMetadata(false));
+
     public static readonly AdamantiumProperty ItemContainerStyleProperty = AdamantiumProperty.Register(nameof(ItemContainerStyle),
         typeof(Style), typeof(ItemsControl), new PropertyMetadata(null, OnRegenerateContainers));
 
@@ -76,6 +84,13 @@ public class ItemsControl : Control, IContainer
     {
         get => GetValue<DataTemplate>(ItemSkeletonTemplateProperty);
         set => SetValue(ItemSkeletonTemplateProperty, value);
+    }
+
+    /// <summary>Whether loading skeleton cards are on screen right now (see <see cref="IsLoadingItemsProperty"/>).</summary>
+    public bool IsLoadingItems
+    {
+        get => GetValue<bool>(IsLoadingItemsProperty);
+        internal set => SetValue(IsLoadingItemsProperty, value);
     }
 
     /// <summary>Picks the <see cref="DataTemplate"/> per item (when no <see cref="ItemTemplate"/> is set).</summary>

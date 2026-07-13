@@ -74,10 +74,20 @@ internal abstract class TriggerActivatorBase : ITriggerActivator
         // callback can re-enter this activator (RemoveSetter/ApplySetter) and mutate _applied - iterating it live throws
         // "Collection was modified". This is what broke a runtime theme swap on the first triggered control it hit.
         (IFundamentalUIComponent Target, Action Teardown)[] teardowns = [.. _applied.Values];
+        var wasConditionMet = _conditionMet;
         _applied.Clear();
         _conditionMet = false;
         foreach (var applied in teardowns)
             applied.Teardown();
+
+        // Deactivated while the condition still HELD (a theme/template swap - the state never crossed back), so the exit
+        // edge never came and the ExitActions never ran. An enter-action that left something RUNNING must still be undone
+        // here, or a looping animation (a loading pulse) keeps ticking against the discarded brush/part for the rest of
+        // the session - one orphan per swap. Only the undoable ones: re-running the ExitActions wholesale would instead
+        // START their animations (an auto-hide scrollbar fades OUT from its ExitActions) on parts already thrown away.
+        if (!wasConditionMet || _trigger.EnterActions == null) return;
+        foreach (var action in _trigger.EnterActions)
+            (action as IUndoableTriggerAction)?.Undo(Context);
     }
 
     private void InvokeActions(IEnumerable<ITriggerAction> actions)
