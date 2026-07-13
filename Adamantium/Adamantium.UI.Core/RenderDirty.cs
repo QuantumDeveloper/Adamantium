@@ -129,8 +129,47 @@ public static class RenderDirty
         lock (NodeSet) buffer.AddRange(NodeSet);
     }
 
-    /// <summary>Records a structural change (add/remove/command-count change) - the paint-order list must be rebuilt.</summary>
-    public static void MarkStructural() { _structural = true; TotalStructuralMarks++; }
+    // WHICH components entered or left the drawn set this frame (a visual child added/removed, a Visibility toggle). Recorded
+    // like MarkTransform's movers, and for the same reason: knowing the identities is what will let the recorder splice just
+    // those components instead of re-recording the whole tree. Today NOTHING reads this - the recorder still does the full walk
+    // it always did - so this step is pure bookkeeping and cannot change behaviour. It only makes the next one possible.
+    private static readonly HashSet<IUIComponent> StructuralSet = new();
+
+    // A structural change nobody could name (a caller with no component to hand). The incremental path can then know nothing
+    // about what changed, so it must not be taken at all.
+    private static bool _structuralUnknown;
+
+    /// <summary>Records a structural change (add/remove/visibility) of <paramref name="component"/> - it entered or left the
+    /// drawn set, so the paint-order list must be rebuilt. Pass null ONLY when the change genuinely cannot be attributed to a
+    /// component (see <see cref="IsStructuralUnknown"/>).</summary>
+    public static void MarkStructural(IUIComponent component = null)
+    {
+        _structural = true;
+        TotalStructuralMarks++;
+        if (component == null) { _structuralUnknown = true; return; }
+        lock (StructuralSet) StructuralSet.Add(component);   // locked: marks arrive from the parallel arrange too
+    }
+
+    /// <summary>Atomically snapshot the structurally-changed components (same lock/race as <see cref="SnapshotGeometryInto"/>).</summary>
+    public static void SnapshotStructuralInto(List<IUIComponent> buffer)
+    {
+        buffer.Clear();
+        lock (StructuralSet) buffer.AddRange(StructuralSet);
+    }
+
+    /// <summary>How many components are structurally marked, read under the write lock.</summary>
+    public static int StructuralCount { get { lock (StructuralSet) return StructuralSet.Count; } }
+
+    /// <summary>True when the recorder cannot know WHAT entered or left the drawn set, and so must re-walk the whole tree.
+    /// Two ways that happens:
+    /// <list type="bullet">
+    /// <item>a structural change nobody could name (<see cref="MarkStructural"/> with no component);</item>
+    /// <item>a multi-frame state SWAP is settling (<see cref="ForceStructuralUntilSettled"/> - a theme swap, a DPI change).
+    /// That is the whole point of that flag: such a cascade re-styles, re-resolves keyed resources and re-layouts over several
+    /// passes, and SOME of its writes never route through a RenderDirty mark at all. An incremental record would splice
+    /// nothing and leave every retained unit stale - the window would keep drawing the pre-swap scene.</item>
+    /// </list></summary>
+    public static bool IsStructuralUnknown => _structuralUnknown || _forceUntilSettled || _finalForcedBuild;
 
     /// <summary>Force full structural rebuilds until the layout signals it has fully settled (see
     /// <see cref="_forceUntilSettled"/>). Call when starting a multi-frame state swap (theme, DPI).</summary>
@@ -169,9 +208,11 @@ public static class RenderDirty
         lock (GeometrySet) GeometrySet.Clear();
         lock (NodeSet) NodeSet.Clear();
         lock (MovedSet) MovedSet.Clear();
+        lock (StructuralSet) StructuralSet.Clear();
         _transform = false;
         _transformUnknown = false;
         _structural = false;
+        _structuralUnknown = false;
         _finalForcedBuild = false;   // the post-settle walk ran; forcing ends (_forceUntilSettled survives Clear by design)
     }
 }

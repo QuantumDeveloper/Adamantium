@@ -57,7 +57,7 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     private static void OnVisibilityChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
     {
         if (e.OldValue != AdamantiumProperty.UnsetValue && !Equals(e.OldValue, e.NewValue))
-            RenderDirty.MarkStructural();
+            RenderDirty.MarkStructural(d as IUIComponent);
     }
       
     public static readonly AdamantiumProperty IsHitTestVisibleProperty =
@@ -440,19 +440,20 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     protected void AddVisualChild(IUIComponent child)
     {
         VisualChildrenCollection.Add(child);
-        RenderDirty.MarkStructural();   // new content -> paint-order list must be rebuilt
+        RenderDirty.MarkStructural(child);   // new content -> paint-order list must be rebuilt (and WHICH content, for the splice)
     }
     
     protected void RemoveVisualChild(IUIComponent child)
     {
         VisualChildrenCollection.Remove(child);
-        RenderDirty.MarkStructural();   // removed content -> paint-order list must be rebuilt
+        RenderDirty.MarkStructural(child);   // removed content -> paint-order list must be rebuilt (and WHICH content, for the splice)
     }
 
     protected void RemoveVisualChildren()
     {
+        // Name each one BEFORE the collection drops them - afterwards there is nothing left to name.
+        foreach (var child in VisualChildrenCollection) RenderDirty.MarkStructural(child);
         VisualChildrenCollection.Clear();
-        RenderDirty.MarkStructural();
     }
 
     /// <summary>
