@@ -59,6 +59,8 @@ public class RenderCache
     private IRootVisualComponent _lastVisualRoot;             // for an on-demand order re-walk (a component appearing mid-partial)
     private readonly Stack<IUIComponent> _orderStack = new(); // reused by ReassignOrders (no per-call alloc)
     private readonly HashSet<Guid> _orderVisited = new();
+    private readonly Stack<IUIComponent> _walkStack = new();      // reused by RecordFullWalk (it ran on every structural frame)
+    private readonly HashSet<IUIComponent> _walkVisited = new();
     private bool _forceFullNextFrame;                         // the applier hit a state only a full RECORD can fix (see ApplyPacket)
 
     // RECORDER-side mirror of "which components hold retained units" - the applier's _groupById, but derived purely from the
@@ -242,14 +244,36 @@ public class RenderCache
         _packet.ProjectionMatrix = projection;
         _packet.IsTransformDirty = true;       // the paint order is rebuilt; every position must be re-baked
         _packet.ClearMemos = true;             // applier-owned - it drops them itself (see RenderPacket.ClearMemos)
-        _packet.SnapReset = true;              // ...and so must the applier's snapshot replica: this packet carries the scene
 
-        // Recorder-owned: drop the frozen snapshot. The packet below carries EVERY drawn component, so CaptureSnapshot
-        // re-freezes the whole scene from it (no walk of the applier's retained groups needed).
-        _snap.Clear();
+        // A full walk rebuilds the PAINT ORDER. The frozen layout snapshot has nothing to do with paint order - it is a
+        // per-component freeze of transform/size/clip - so dropping it here re-froze all ~9000 components on every structural
+        // frame: a matrix compose plus two dictionary writes plus a delta entry, each, for components that had not changed at
+        // all. It was the single biggest part of the walk.
+        //
+        // Keep it, and re-freeze only what actually changed. That is knowable: every mutation that can invalidate an entry
+        // NAMES its component - geometry (RenderSize/clip), a move (LocalTransform), a motion node, and a structural change
+        // (VisualParent). Anything the marks CANNOT name - an unattributed move, or a settling theme/DPI swap, whose cascade
+        // deliberately writes outside the mark system - still drops the whole thing, exactly as before.
+        var reFreezeEverything = RenderDirty.IsStructuralUnknown || RenderDirty.IsTransformUnknown;
+        if (reFreezeEverything)
+        {
+            _snap.Clear();
+            _packet.SnapReset = true;   // ...and so must the applier's replica
+        }
         _snapFullCapture = false;
+
+        // What changed, for CaptureSnapshot to re-freeze. Read HERE, while RenderDirty is still populated (it is cleared after
+        // the whole record phase, and the applier must never touch it).
+        RenderDirty.SnapshotGeometryInto(_geometryDirtyBuffer);
+        RenderDirty.SnapshotStructuralInto(_structuralBuf);
+        RenderDirty.SnapshotMovedInto(_movedBuf);
+        RenderDirty.SnapshotNodesInto(_movedNodesCapture);
+
         RecordFullWalk(visualRoot, _packet);   // device-free: walk + component.Render + copy commands into the packet
     }
+
+    private readonly List<IUIComponent> _structuralBuf = new();      // components that entered/left the drawn set this frame
+    private readonly List<IUIComponent> _movedNodesCapture = new();  // moved motion nodes, for the snapshot re-freeze on a FULL frame
 
     /// <summary>
     /// APPLY half of the frame build (GPU - the render-thread side in Phase 3.3). Consumes the packet the recorder filled:
@@ -689,7 +713,26 @@ public class RenderCache
             _snapFullCapture = false;
         }
 
-        // Re-recorded this frame (every component of a Full walk; the dirty/newly-spliced ones of a Partial).
+        if (_packet.Kind == RenderBuildKind.Full)
+        {
+            // A FULL walk re-records the whole scene, but that does NOT mean the whole scene's LAYOUT changed - the walk exists
+            // to rebuild the paint ORDER. So freeze only what a mark says actually changed, plus components seen for the first
+            // time (Snap fills those lazily and publishes them). Re-freezing all ~9000 every structural frame - a matrix compose
+            // and two dictionary writes each, for components that had not moved or resized - was the biggest single cost of the
+            // walk. Anything the marks cannot name (an unattributed move, a settling theme/DPI swap) cleared the snapshot back in
+            // RecordFullFrame, so every entry below is genuinely new and this loop re-freezes the scene exactly as it used to.
+            foreach (var draw in _packet.Draws)
+                for (var c = draw.Component; c != null && !_snap.ContainsKey(c); c = c.VisualParent)
+                    Snap(c);
+
+            foreach (var component in _geometryDirtyBuffer) RefreshSnapshot(component);   // size / clip may have changed
+            foreach (var component in _structuralBuf) RefreshSnapshot(component);         // VisualParent may have changed
+            foreach (var node in _movedNodesCapture) RefreshSnapshot(node);
+            foreach (var moved in _movedBuf) RefreshSnapshot(moved);
+            return;
+        }
+
+        // Re-recorded this frame (the dirty/newly-spliced components of a Partial).
         foreach (var draw in _packet.Draws) RefreshSnapshot(draw.Component);
         // Moved this frame. A moved MOTION NODE whose entry is kept stale is the classic O(1)-path regression: World() then
         // composes the node from LAST frame's LocalTransform, so a tilting tile never moves and a flipping one sticks at the
@@ -1671,8 +1714,14 @@ public class RenderCache
         _lastVisualRoot = visualRoot;
         var order = 0;
         packet.ProjectionMatrix = visualRoot.GetProjectionMatrix();
-        var stack = new Stack<IUIComponent>();
-        var visited = new HashSet<Guid>();
+        // Reused, not re-allocated per frame: a full walk runs on EVERY structural frame (a scrolling grid realizes containers
+        // constantly), and these grew to one entry per component in the scene - a fresh HashSet rehashing its way up to ~9000
+        // entries, every frame. Keyed by the COMPONENT, not its RenderId: hashing a Guid is several times the cost of a
+        // reference hash, and the identity is the same either way.
+        var stack = _walkStack;
+        var visited = _walkVisited;
+        stack.Clear();
+        visited.Clear();
         stack.Push(visualRoot);
         while (stack.Count > 0)
         {
@@ -1684,7 +1733,7 @@ public class RenderCache
             // this walk (e.g. a templated content host whose child is referenced from two places), processing it again
             // would add its group to the paint order a second time -> every such element is drawn TWICE (overdraw at the
             // same spot). Guard against that here so each component (and its subtree) is built once.
-            if (!visited.Add(component.RenderId)) continue;
+            if (!visited.Add(component)) continue;
 
             _orderByControl[component.RenderId] = order++;   // paint-order rank (for the incremental partial-patch)
 
