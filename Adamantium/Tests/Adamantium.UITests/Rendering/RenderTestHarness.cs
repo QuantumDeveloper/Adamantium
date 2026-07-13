@@ -96,6 +96,9 @@ internal sealed class FakeRenderUnitFactory : IRenderUnitFactory
 {
     public List<FakeRenderUnit> Created { get; } = new();
 
+    // GPU-free: this factory builds no device resources, so there is no device (and nothing to warm a font atlas on).
+    public Adamantium.Graphics.Core.IGraphicsDevice GraphicsDevice => null;
+
     public void RegisterFactory<T>(Func<IDrawCommand, IRenderUnit> factory) { }
 
     public IRenderUnit CreateRenderUnitFromCommand(IDrawCommand command)

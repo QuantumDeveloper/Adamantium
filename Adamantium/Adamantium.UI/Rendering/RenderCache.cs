@@ -6,6 +6,7 @@ using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Rendering.Payloads;
 using Adamantium.UI.Rendering.Retained;
 using Adamantium.UI.Rendering.RenderUnits;
 using Adamantium.Vulkan.Core;
@@ -287,11 +288,45 @@ public class RenderCache
         _partialSpliced = false;
     }
 
+    private readonly System.Text.StringBuilder _glyphWarmBuf = new();
+    private readonly HashSet<Adamantium.Graphics.Fonts.FontAtlas> _warmAtlases = new();
+
+    // Warm the font atlases for every text block this packet is about to realize - all of them, in ONE batch per atlas.
+    //
+    // Rasterizing a glyph is MSDF work (~23 ms in Debug), and the generator parallelises across glyphs - but a text unit built
+    // one at a time can only ever hand it the characters ITS block introduced. A cold fill realizes ~50 new blocks, each
+    // bringing about one new character, so those glyphs were rasterized serially, on one core: 1.1 s of a 1.9 s 4K fill, its
+    // single biggest cost. Here the whole packet's characters are pooled first, so the generator gets them together and
+    // spreads them across the cores it already knows how to use. Laziness is untouched - only glyphs the UI actually shows
+    // are ever rasterized (prewarming a fixed charset instead just moves the same cost into startup and pays for glyphs
+    // nobody asked for).
+    private void WarmTextAtlases(RenderPacket packet)
+    {
+        var device = _renderUnitFactory.GraphicsDevice;
+        if (device == null || packet.Draws.Count == 0) return;
+
+        _warmAtlases.Clear();
+        _glyphWarmBuf.Clear();
+        foreach (var draw in packet.Draws)
+        foreach (var command in draw.Commands)
+        {
+            if (command.Payload is not TextPayload { TextLayout: { } layout } || string.IsNullOrEmpty(layout.Text)) continue;
+            _warmAtlases.Add(layout.EnsureAtlas(device));
+            _glyphWarmBuf.Append(layout.Text);
+        }
+        if (_warmAtlases.Count == 0) return;
+
+        var text = _glyphWarmBuf.ToString();
+        foreach (var atlas in _warmAtlases) atlas.Warm(text);
+    }
+
     // Realize ONE packet. The per-frame results the DRAW pass reads (LastBuildKind, LastBuildTransformDirty, _partialDirty,
     // _movedNodesBuf) are MERGED across the packets drained this frame: a Full supersedes everything recorded before it, and
     // two Partials union their dirty sets - exactly what one record of the combined interval would have produced.
     private void ApplyPacket(RenderPacket packet)
     {
+        WarmTextAtlases(packet);   // one batched glyph rasterization for the whole packet, before any unit is built
+
         // The paint-order ranks, if the recorder re-derived them (a fresh, immutable map - see RenderPacket.Orders).
         if (packet.Orders != null) _applyOrder = packet.Orders;
         _projectionMatrix = packet.ProjectionMatrix;
