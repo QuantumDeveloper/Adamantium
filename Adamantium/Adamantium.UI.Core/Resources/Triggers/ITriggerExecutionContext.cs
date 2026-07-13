@@ -11,6 +11,17 @@ public interface ITriggerExecutionContext
 
 }
 
+internal static class TriggerTargetResolver
+{
+    /// <summary>Last resort for <see cref="ITriggerExecutionContext.FindTarget"/>: a KEYED RESOURCE (resolved tree-scoped
+    /// from the host: Local -> Theme -> Global). A named part is per-host, but some targets are deliberately SHARED - the
+    /// loading-skeleton pulse runs on ONE theme brush that every skeleton card paints with, so animating it costs one
+    /// animation instead of one per card. Only an AdamantiumComponent resource (a Brush) can be a target; anything else
+    /// (a colour, a double) resolves to null exactly as an unknown name does.</summary>
+    public static IAdamantiumComponent FindKeyedTarget(this ITriggerExecutionContext context, string key)
+        => context.Theme?.GetResource(context.HostComponent, key) as IAdamantiumComponent;
+}
+
 internal class StyleTriggerExecutionContext : ITriggerExecutionContext
 {
     public StyleTriggerExecutionContext(IFundamentalUIComponent host, ITheme theme)
@@ -30,7 +41,8 @@ internal class StyleTriggerExecutionContext : ITriggerExecutionContext
         // their own <Style> instead of only inside ControlTemplate.Triggers. Resolved lazily against the host's current
         // template: a state trigger only needs the part when it fires, by which point the template (applied by another
         // style's Template setter) exists, regardless of the order the styles were attached.
-        return (HostComponent as ITemplatedUIComponent)?.GetTemplateChild(targetName);
+        return (HostComponent as ITemplatedUIComponent)?.GetTemplateChild(targetName)
+               ?? this.FindKeyedTarget(targetName);
     }
 }
 
@@ -54,8 +66,8 @@ internal class TemplateTriggerExecutionContext : ITriggerExecutionContext
         {
             return HostComponent;
         }
-        
-        
-        return _templateResult.GetComponentByName(targetName);
+
+
+        return _templateResult.GetComponentByName(targetName) ?? this.FindKeyedTarget(targetName);
     }
 }

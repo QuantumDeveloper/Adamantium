@@ -38,4 +38,8 @@
     <SolidColorBrush x:Key="SystemFillColorCaution" Color="#9D5D00"/>
     <SolidColorBrush x:Key="SystemFillColorCritical" Color="#C42B1C"/>
 
+    <!-- Loading skeleton fill (see the Dark palette for why it is ONE shared brush). Light inverts it: a dark wash over the
+         light surface, at the same Opacity range the shared PulseAnimation breathes through. -->
+    <SolidColorBrush x:Key="SkeletonPulseFill" Color="#000000" Opacity="0.05"/>
+
 </ResourceDictionary>

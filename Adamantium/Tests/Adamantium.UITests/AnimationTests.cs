@@ -212,6 +212,53 @@ public class AnimationTests
         Assert.That(((CubicEasing)cubicOut).Mode, Is.EqualTo(EasingMode.Out));
     }
 
+    [Test]
+    public void SharedAnimationTarget_RunsOnce_AndStopsOnlyWhenTheLastHostReleases()
+    {
+        // The loading-skeleton pulse: EVERY loading list animates the SAME keyed theme brush (that is what makes a
+        // screenful of cards cost one animation, not one per card). So two hosts running the same animation on it must
+        // collapse to ONE, and the first host to stop must not kill the pulse the other still wants.
+        AnimationManager.Reset();
+        var sharedBrush = new SolidColorBrush(Colors.White);
+        var run = new RunAnimationAction { TargetName = "SkeletonPulseFill", Animation = PulseOpacity() };
+        var stop = new StopAnimationAction { TargetName = "SkeletonPulseFill" };
+        var listA = new KeyedTargetContext(new Border(), sharedBrush);
+        var listB = new KeyedTargetContext(new Border(), sharedBrush);
+
+        run.Invoke(listA);
+        run.Invoke(listB);
+        Assert.That(AnimationManager.ActiveCount, Is.EqualTo(1), "one animation on the shared target, not one per host");
+
+        stop.Invoke(listA);
+        Assert.That(AnimationManager.ActiveCount, Is.EqualTo(1), "the other host still wants it - keep pulsing");
+
+        stop.Invoke(listB);
+        Assert.That(AnimationManager.ActiveCount, Is.EqualTo(0), "last host released -> the pulse stops");
+    }
+
+    [Test]
+    public void TriggerDeactivatedWhileActive_StopsTheAnimationItStarted()
+    {
+        // A theme/template swap deactivates a trigger whose condition still HOLDS, so its exit edge never comes. A
+        // LOOPING animation started by the enter action would then tick forever against a brush nobody paints with.
+        AnimationManager.Reset();
+        var sharedBrush = new SolidColorBrush(Colors.White);
+        var host = new Border();
+
+        var trigger = new PropertyTrigger { Property = "Width", Value = 200.0 };
+        trigger.EnterActions.Add(new RunAnimationAction { TargetName = "SkeletonPulseFill", Animation = PulseOpacity() });
+        var activator = trigger.Apply(new KeyedTargetContext(host, sharedBrush));
+
+        host.Width = 200;   // condition met -> the looping pulse starts
+        Assert.That(AnimationManager.ActiveCount, Is.EqualTo(1));
+
+        activator.Deactivate();
+        Assert.That(AnimationManager.ActiveCount, Is.EqualTo(0), "teardown must not leave a looping animation behind");
+    }
+
+    private static PulseAnimation PulseOpacity() =>
+        new() { Property = "Opacity", Min = 0.05, Max = 0.15, Duration = TimeSpan.FromSeconds(1) };
+
     private static KeyFrame KeyFrameWith(string property, double cue, double value)
     {
         var keyFrame = new KeyFrame { Cue = cue };
@@ -227,6 +274,22 @@ public class AnimationTests
         public IFundamentalUIComponent HostComponent => _host;
         public ITheme Theme => null;
         public IAdamantiumComponent FindTarget(string targetName) => _host;
+    }
+
+    // A named target that is NOT a part of the host - what the real context resolves from the theme's keyed resources
+    // (a shared brush). Each context is one HOST animating that same shared target.
+    private sealed class KeyedTargetContext : ITriggerExecutionContext
+    {
+        private readonly IAdamantiumComponent _target;
+        public KeyedTargetContext(IFundamentalUIComponent host, IAdamantiumComponent target)
+        {
+            HostComponent = host;
+            _target = target;
+        }
+        public IFundamentalUIComponent HostComponent { get; }
+        public ITheme Theme => null;
+        public IAdamantiumComponent FindTarget(string targetName) =>
+            string.IsNullOrEmpty(targetName) ? HostComponent : _target;
     }
 
     [Test]

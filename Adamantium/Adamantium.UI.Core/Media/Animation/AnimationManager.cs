@@ -15,6 +15,34 @@ public static class AnimationManager
 {
     private static readonly List<IRunningAnimation> Active = new();
 
+    // Membership mirror of Active, for the O(1) "was this cancelled mid-tick?" check. Tick used List.Contains, which is
+    // a LINEAR scan - so a scene with N running animations cost O(N^2) comparisons PER FRAME (measured: 4606 pulsing
+    // loading cards -> ~21M comparisons -> ~143 ms/frame, the bulk of the 60k-grid stall). Every mutation of Active goes
+    // through the two helpers below so the two stay in lock-step.
+    private static readonly HashSet<IRunningAnimation> ActiveSet = new();
+
+    // Reused tick snapshot (Active.ToArray() allocated a fresh array every frame; see the iteration note in Tick).
+    private static readonly List<IRunningAnimation> TickBuffer = new();
+
+    private static void Add(IRunningAnimation animation)
+    {
+        Active.Add(animation);
+        ActiveSet.Add(animation);
+    }
+
+    private static void Remove(IRunningAnimation animation)
+    {
+        if (ActiveSet.Remove(animation)) Active.Remove(animation);
+    }
+
+    /// <summary>Removes every matching animation (one compaction pass); returns how many went.</summary>
+    private static int RemoveWhere(Predicate<IRunningAnimation> match) => Active.RemoveAll(a =>
+    {
+        if (!match(a)) return false;
+        ActiveSet.Remove(a);
+        return true;
+    });
+
     /// <summary>True while any animation is in flight - the live designer polls this to decide whether to keep ticking.</summary>
     public static bool HasActiveAnimations => Active.Count > 0;
 
@@ -24,12 +52,17 @@ public static class AnimationManager
     /// <summary>Drops every running animation without firing completion callbacks. The live designer calls this when it
     /// builds a fresh preview tree, so animations bound to the previous (discarded) tree don't linger in this shared
     /// static manager and get advanced against dead controls on the next tick.</summary>
-    public static void Reset() => Active.Clear();
+    public static void Reset()
+    {
+        Active.Clear();
+        ActiveSet.Clear();
+        Holders.Clear();
+    }
 
     /// <summary>Registers a custom per-frame ticker driven by the same heartbeat as animations: <paramref name="advance"/>
     /// is called each frame with the frame delta and returns true when it's done (then it's dropped). Used for
     /// physics-style updates that aren't a property animation - e.g. scroll inertia.</summary>
-    public static void AddTicker(Func<double, bool> advance) => Active.Add(new DelegateTicker(advance));
+    public static void AddTicker(Func<double, bool> advance) => Add(new DelegateTicker(advance));
 
     /// <summary>Advances every running animation by <paramref name="deltaSeconds"/>. Called once per frame.</summary>
     public static void Tick(double deltaSeconds)
@@ -40,13 +73,15 @@ public static class AnimationManager
         // drag settling then committing the reorder + clearing transforms), which mutates Active. Iterating Active
         // directly would corrupt the loop (skip/re-advance/out-of-range). A finished animation is removed via Remove
         // (a no-op if a callback already cancelled it); animations started during a callback are advanced next tick.
-        foreach (var animation in Active.ToArray())
+        TickBuffer.Clear();
+        TickBuffer.AddRange(Active);
+        foreach (var animation in TickBuffer)
         {
             // An earlier animation's completion callback may have CANCELLED this one (removed it from Active). Don't
             // advance a cancelled animation: its Advance would re-write the Animation-priority value the cancel just
-            // cleared, and - being gone from Active - nothing would clear it again (a stuck offset). Active is small,
-            // so the linear Contains check is negligible.
-            if (!Active.Contains(animation)) continue;
+            // cleared, and - being gone from Active - nothing would clear it again (a stuck offset). O(1) via the set
+            // mirror: this ran on EVERY animation of every frame, so a linear scan made the tick quadratic.
+            if (!ActiveSet.Contains(animation)) continue;
             // A property animation re-renders every tick. Its property write usually marks precisely on its own
             // (AffectsRender -> MarkGeometry on that one component; a Transform's inner value self-marks the Transform
             // path; a layout-affecting property re-arranges and the moved components' Bounds setters mark). The heartbeat
@@ -57,17 +92,17 @@ public static class AnimationManager
             // inertia, the diagnostics overlay) has no target and dirties the scene only through its effects.
             if (animation.DirtyTarget is { } dirtyTarget) RenderDirty.MarkGeometry(dirtyTarget);
             if (animation.Advance(deltaSeconds))
-                Active.Remove(animation);
+                Remove(animation);
         }
     }
 
     internal static void Begin(AdamantiumComponent target, AdamantiumProperty property, DoubleAnimation animation, Action completed)
     {
         // Re-animating the same property restarts from the new animation - drop any in-flight one first.
-        Active.RemoveAll(a => a.Animates(target, property));
+        RemoveWhere(a => a.Animates(target, property));
         var running = new RunningAnimation(target, property, animation, completed);
         running.Advance(0);   // apply the From value immediately so there is no one-frame flash before the first tick
-        Active.Add(running);
+        Add(running);
     }
 
     /// <summary>Starts a keyframe <see cref="Animation"/> on <paramref name="target"/>, dropping any in-flight animation
@@ -76,16 +111,16 @@ public static class AnimationManager
     {
         var running = new RunningKeyFrameAnimation(target, animation, completed);
         foreach (var property in running.Properties)
-            Active.RemoveAll(a => a.Animates(target, property));
+            RemoveWhere(a => a.Animates(target, property));
         running.Advance(0);   // apply the start values immediately so there is no one-frame flash
-        Active.Add(running);
+        Add(running);
     }
 
     /// <summary>Stops the animation (if any) running on <paramref name="property"/> of <paramref name="target"/> without
     /// firing its completion callback. Returns true if one was running. The caller releases the held animation value.</summary>
     internal static bool Cancel(AdamantiumComponent target, AdamantiumProperty property)
     {
-        return Active.RemoveAll(a => a.Animates(target, property)) > 0;
+        return RemoveWhere(a => a.Animates(target, property)) > 0;
     }
 
     /// <summary>Stops EVERY animation running on <paramref name="target"/> (any property), without firing completions -
@@ -94,7 +129,42 @@ public static class AnimationManager
     /// stay until the caller/property system releases them.</summary>
     public static void Cancel(AdamantiumComponent target)
     {
-        Active.RemoveAll(a => a.AnimatesTarget(target));
+        RemoveWhere(a => a.AnimatesTarget(target));
+    }
+
+    // --- Shared-target ownership -------------------------------------------------------------------------------------
+    // An animation TARGET can be shared by many trigger hosts: the loading-skeleton pulse runs on ONE theme brush
+    // ({ResourceReference SkeletonPulseFill}) that EVERY loading list animates, so a naive Stop from the first list to
+    // finish would freeze the pulse of the others still loading. RunAnimationAction retains its host on the target and
+    // StopAnimationAction releases it; the target's animations are cancelled only when the LAST host lets go. The holder
+    // is the trigger's HOST (not the action, which is shared by every host of one style) and the set makes a repeated
+    // Retain by the same host idempotent - a theme is free to re-Run on a target it already animates (the auto-hide
+    // scrollbar re-Runs a fade-out from its ExitActions) without inflating a count. A single-host target - the norm -
+    // goes {host} -> {} -> cancel, exactly as before.
+    private static readonly Dictionary<AdamantiumComponent, HashSet<object>> Holders = new();
+
+    /// <summary>Records that <paramref name="holder"/> wants an animation running on <paramref name="target"/>.</summary>
+    public static void Retain(AdamantiumComponent target, object holder)
+    {
+        if (target == null || holder == null) return;
+        if (!Holders.TryGetValue(target, out var holders)) 
+            Holders[target] = holders = new HashSet<object>();
+        holders.Add(holder);
+    }
+
+    /// <summary>Releases <paramref name="holder"/>'s claim on <paramref name="target"/> and stops the target's animations
+    /// once nobody holds it any more. A release with no recorded holder still cancels (a Stop that was never preceded by
+    /// a Run behaves exactly as <see cref="Cancel(AdamantiumComponent)"/>).</summary>
+    public static void Release(AdamantiumComponent target, object holder)
+    {
+        if (target == null) return;
+        if (Holders.TryGetValue(target, out var holders) && holder != null)
+        {
+            holders.Remove(holder);
+            if (holders.Count > 0) return;   // another host still wants it - keep it running
+            Holders.Remove(target);
+        }
+        Cancel(target);
     }
 
     // Wraps a delegate as a running "animation" so a non-property per-frame updater (scroll inertia) rides the heartbeat.

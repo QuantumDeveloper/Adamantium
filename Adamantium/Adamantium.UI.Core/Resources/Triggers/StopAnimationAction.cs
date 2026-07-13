@@ -15,7 +15,10 @@ public class StopAnimationAction : ITriggerAction
 
     public void Invoke(ITriggerExecutionContext context)
     {
+        // Release this HOST's claim (RunAnimationAction took it): a target shared by several hosts - a keyed theme brush
+        // pulsed by every loading list - stops only once the last of them lets go. A single-host target stops right here,
+        // as before.
         if (context.FindTarget(TargetName) is AdamantiumComponent target)
-            AnimationManager.Cancel(target);
+            AnimationManager.Release(target, context.HostComponent);
     }
 }

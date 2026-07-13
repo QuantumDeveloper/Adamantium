@@ -576,8 +576,18 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
     // Re-render this element when a brush it draws with mutates internally (wired in the AffectsRender path above). On a
     // non-element (a brush setting a sub-brush) the cast is null and this is a no-op.
-    private void OnAffectsRenderBrushChanged(object sender, EventArgs e) =>
-        (this as IUIComponent)?.InvalidateRender(false);
+    //
+    // NOT for an element that isn't drawn right now. A brush can be SHARED by thousands of elements (a keyed theme brush -
+    // the loading-skeleton pulse animates ONE brush that every card paints with), so its Changed fans out to all of them,
+    // pooled/Collapsed cards included. Marking those is worse than wasted: a non-visible component that still holds
+    // retained units makes the render cache's partial pass FALL BACK to a full tree walk (RenderCache.RecordReRender), so
+    // an animated shared brush would re-walk the whole scene every frame. Nothing is lost - Visibility is AffectsRender
+    // (and structural), so a card coming back invalidates its render then.
+    private void OnAffectsRenderBrushChanged(object sender, EventArgs e)
+    {
+        if (this is not IUIComponent element || element.Visibility != Visibility.Visible) return;
+        element.InvalidateRender(false);
+    }
 
     /// <summary>
     /// Throws an exception indicating that the specified property is not registered on this

@@ -39,4 +39,10 @@
     <SolidColorBrush x:Key="SystemFillColorCaution" Color="#FCE100"/>
     <SolidColorBrush x:Key="SystemFillColorCritical" Color="#FF99A4"/>
 
+    <!-- Loading skeleton fill. ONE brush for EVERY loading card of every list (ItemsControlStyleSet's ItemSkeletonTemplate
+         paints with it) - deliberately shared, because that is what makes a screenful of cards cost ONE pulse animation
+         instead of one per card. Its Opacity is what breathes (the PulseAnimation in ItemsControlStyleSet drives it
+         between the rest value here and its Max); the colour stays put. -->
+    <SolidColorBrush x:Key="SkeletonPulseFill" Color="#FFFFFF" Opacity="0.05"/>
+
 </ResourceDictionary>

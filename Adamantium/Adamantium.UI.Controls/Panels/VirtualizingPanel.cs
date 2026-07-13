@@ -231,9 +231,10 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
     // A virtualizing fill can defer part of the window past the per-frame bind budget (generator.PendingIndices). Rather
     // than a hole, each deferred slot shows a pulsing placeholder card - the classic skeleton look, per-item and clear.
     // Cards are POOLED (reused across slots/frames, never recreated) and every card is an instanced SDF rect, so a whole
-    // screenful is cheap on the GPU. Each card breathes via the theme's PulseAnimation started on Loaded; a pooled card
-    // keeps pulsing (the tick is a trivial lerp and the engine renders continuously, so stopping it isn't worth the
-    // machinery). Skipped when the ItemsControl has no ItemSkeletonTemplate.
+    // screenful is cheap on the GPU. The breathe is theme-authored and SHARED: every card paints with the ONE keyed
+    // skeleton brush, whose Opacity a single PulseAnimation drives while this list reports IsLoadingItems (see
+    // SyncLoadingState) - a screenful of cards costs one animation, not one per card. Skipped when the ItemsControl has
+    // no ItemSkeletonTemplate.
     private readonly Stack<UIComponent> _skeletonPool = new();               // idle cards, ready to reuse
     private readonly Dictionary<int, UIComponent> _activeSkeletons = new();  // slot index -> the card showing there now
     private readonly HashSet<IUIComponent> _skeletonSet = new();             // every card built (skip in HideUnmappedContainers)
@@ -279,8 +280,8 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         var inset = ItemMargin();
 
         // Pass 1 (this thread): ensure a card at each pending slot and SHOW it. Renting mutates the pool/active/set + the
-        // visual tree, and toggling Visibility fires the pulse-start PropertyTrigger which mutates the shared
-        // AnimationManager - none of that is thread-safe, so it stays here. Collect (card, rect) for a parallel arrange.
+        // visual tree, and SyncLoadingState below fires the list's pulse trigger (which mutates the shared
+        // AnimationManager) - none of that is thread-safe, so it stays here. Collect (card, rect) for a parallel arrange.
         _skelArrangeBuf.Clear();
         for (var i = 0; i < pending.Count; i++)
         {
@@ -299,6 +300,8 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
                 Math.Max(0, rc.Height - inset.Top - inset.Bottom))));
         }
 
+        SyncLoadingState();
+
         // Pass 2: measure + arrange the cards. Each card is an independent leaf (its own geometry; the only shared write
         // is the locked MarkGeometry), so fan them across cores when there are enough to amortise the thread overhead -
         // same as the real-tile arrange above. Small windows stay sequential.
@@ -308,6 +311,15 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
                 range => { for (var i = range.Item1; i < range.Item2; i++) ArrangeSkeleton(_skelArrangeBuf[i]); });
         else
             for (var i = 0; i < _skelArrangeBuf.Count; i++) ArrangeSkeleton(_skelArrangeBuf[i]);
+    }
+
+    // The LIST-level loading state (ItemsControl.IsLoadingItems): true exactly while cards are on screen. The theme keys
+    // the skeleton shimmer off it - ONE trigger per list starts/stops the pulse on the shared skeleton brush - so a
+    // screenful of cards costs one animation, not one per card (which is also one property write + one brush-changed
+    // fan-out per card per frame). The panel owns the STATE, the theme owns the look.
+    private void SyncLoadingState()
+    {
+        if (Owner is { } owner) owner.IsLoadingItems = _activeSkeletons.Count > 0;
     }
 
     private static void ArrangeSkeleton((UIComponent card, Rect rect) slot)
@@ -349,6 +361,7 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
             _skeletonPool.Push(card);
         }
         _activeSkeletons.Clear();
+        SyncLoadingState();   // no cards on screen -> the list is no longer loading -> the theme stops the shared pulse
     }
 
     // Drop all skeleton state - called from Revirtualize, which detaches every visual child (the cards among them), so
@@ -356,11 +369,9 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
     // (the ItemTemplate may have changed).
     private void ResetSkeletons()
     {
-        // Stop the pulses on any ACTIVE (Visible) card FIRST. Revirtualize already detached the cards, but detach does not
-        // change their Visibility, so the template's Visibility ExitAction (StopAnimationAction) never fired - their pulses
-        // would linger forever in the static AnimationManager against detached cards (and each Revirtualize during a load
-        // orphans a fresh batch, piling up to thousands = FPS collapse). RecycleAllSkeletons collapses the actives, which
-        // DOES fire the ExitAction (the trigger is attachment-independent), before we drop the references below.
+        // Clear the ACTIVE cards FIRST: that is what drops IsLoadingItems (SyncLoadingState) and so fires the theme's
+        // ExitAction, which stops the shared pulse in the static AnimationManager. Dropping the references below without
+        // it would leave the list reporting "loading" forever and the pulse ticking with no card on screen.
         RecycleAllSkeletons();
         _skeletonPool.Clear();
         _activeSkeletons.Clear();
@@ -369,11 +380,11 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         _itemMarginKnown = false;
     }
 
-    // A tab switch (or any subtree removal) detaches the panel while loading skeletons are still Visible + pulsing. Detach
-    // does NOT change their Visibility, so the template's Visibility ExitAction never fires and each active card's pulse
-    // ticks forever in the static AnimationManager against a detached card - the leak that piles up thousands of animations
-    // (the "switch tabs mid-load -> FPS never recovers" report). Collapse the actives now to fire the stop; a re-attach +
-    // re-fill re-shows them and the pulse restarts via the EnterAction.
+    // A tab switch (or any subtree removal) detaches the panel while loading skeletons are still on screen. Detach alone
+    // changes nothing about the list's loading state, so the theme's ExitAction would never fire and the shared pulse
+    // would keep ticking in the static AnimationManager for a list nobody sees (the "switch tabs mid-load -> FPS never
+    // recovers" report). Recycle the actives now to fire the stop; a re-attach + re-fill re-shows them and the pulse
+    // restarts via the EnterAction.
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
