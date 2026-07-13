@@ -8,7 +8,22 @@ namespace Adamantium.UI.Rendering;
 /// </summary>
 public static class RenderThreadOptions
 {
+    // A/B without a rebuild: ADAMANTIUM_RENDER_THREAD=1 runs the app with the decoupled record + dedicated render thread,
+    // anything else keeps the default inline path. The two modes must be interchangeable at any moment, so having one
+    // switch to flip is how the rollout stays honest - and how a regression is bisected to the thread rather than guessed at.
+    static RenderThreadOptions()
+    {
+        if (System.Environment.GetEnvironmentVariable("ADAMANTIUM_RENDER_THREAD") != "1") return;
+        SingleThreaded = false;
+        RenderThreadEnabled = true;
+    }
+
     public static bool SingleThreaded = true;
+
+    /// <summary>The dedicated render thread, once one is running (null otherwise). The RECORD half must NEVER run on it: it
+    /// reads the live visual tree, which the loop is concurrently mutating, and it would race the loop's own record on the
+    /// same cache. BeginDraw checks this before falling back to its inline record path (see WindowRenderService).</summary>
+    public static System.Threading.Thread RenderThread;
 
     /// <summary>Phase 3.3: run the APPLY + Render + Present half (ExecuteDrawSequence) on a dedicated render thread while
     /// the loop thread does Update + Record. Requires the decoupled record path (implies <see cref="SingleThreaded"/> =

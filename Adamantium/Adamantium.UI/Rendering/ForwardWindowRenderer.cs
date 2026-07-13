@@ -136,7 +136,9 @@ public class ForwardWindowRenderer : WindowRendererBase
             return;
         }
         var t1 = Stopwatch.GetTimestamp();
-        _renderCache.ProcessCommands(Window.GetProjectionMatrix(), RenderScale);
+        // The PACKET's projection, not a fresh Window.GetProjectionMatrix(): this half may run on the render thread, where
+        // reading the live window races the loop's resize. The recorder captured it with the rest of the frame.
+        _renderCache.ProcessCommands(_renderCache.AppliedProjection, RenderScale);
         RuntimeStats.LastRenderProcMs = Stopwatch.GetElapsedTime(t1).TotalMilliseconds;
     }
 

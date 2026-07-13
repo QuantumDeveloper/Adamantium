@@ -10,6 +10,7 @@ using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
 using Adamantium.ECS;
 using Adamantium.Graphics.Core;
+using Adamantium.UI.Core.Diagnostics;
 using Adamantium.UI.AggregatorEvents;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Dispatcher;
@@ -54,16 +55,21 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
     private Thread applicationLoopThread;
     private CancellationTokenSource cancellationTokenSource;
 
-    // Phase 3.3b render thread (RenderThreadOptions.RenderThreadEnabled). The loop thread does Update + Record and hands the
-    // recorded frame to renderThread through a bounded FULL/FREE channel pair, then returns WITHOUT waiting - so it runs the
-    // NEXT frame's Update concurrently with the render thread applying + presenting this one (the anti-freeze overlap).
-    //   _renderFull  loop -> render : "this frame is recorded, apply + present it" (carries the frame's AppTime).
-    //   _renderFree  render -> loop : "I have consumed the packet, you may overwrite it" (backpressure). Seeded with ONE
-    //                token, so exactly one packet is ever in flight - the single RenderCache packet is never overwritten
-    //                while the render thread is still reading it, and the loop stays at most ~1 frame ahead.
+    // Phase 3.3 render thread (RenderThreadOptions.RenderThreadEnabled). The loop thread does Update + Record and hands the
+    // recorded frame over WITHOUT waiting for it, so the next Update overlaps the render thread's apply + present.
+    //
+    // The frames themselves travel as DOUBLE-BUFFERED packets inside each window's RenderCache (a queue of deltas the applier
+    // drains); this channel is only the WAKE-UP. It is bounded to ONE token and written with TryWrite, so a loop that gets
+    // ahead by several frames does not pile up signals - the render thread wakes once and drains every packet published since.
+    //
+    // No backpressure token any more: the loop never blocks on the render (that lock-step was the 3.3 scaffold's flaw - the
+    // loop ran at the render's pace, which is precisely the freeze it is meant to remove). Instead it stops RECORDING once
+    // MaxFramesInFlight frames are unrendered - the marks simply stay in RenderDirty and fold into the next record - so the
+    // loop keeps updating, animating and handling input at full speed while the render catches up.
     private Thread renderThread;
-    private readonly Channel<AppTime> _renderFull = Channel.CreateBounded<AppTime>(1);
-    private readonly Channel<bool> _renderFree = Channel.CreateBounded<bool>(1);
+    private int _framesInFlight;
+    private AppTime _renderAppTime;   // the newest recorded frame's time; the render thread draws with the latest
+    private const int MaxFramesInFlight = 2;
 
     static UIApplication()
     {
@@ -408,8 +414,10 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         OnStartupInternal();
         if (RenderThreadOptions.RenderThreadEnabled)
         {
-            _renderFree.Writer.TryWrite(true);   // seed the single in-flight token so the first record may proceed
             renderThread = new Thread(RenderThread) { IsBackground = true, Name = "AdamantiumRenderThread" };
+            // Publish it BEFORE starting: BeginDraw checks it to refuse the inline RECORD on this thread (see
+            // WindowRenderService - the record reads the live tree and would race the loop's own record).
+            RenderThreadOptions.RenderThread = renderThread;
             renderThread.Start();
         }
         applicationLoopThread.Start();
@@ -523,28 +531,27 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
     private void RecordRenderFrame()
     {
         if (RenderThreadOptions.SingleThreaded || DisableRendering) return;
+        _recordedThisFrame = false;
 
         var threaded = RenderThreadOptions.RenderThreadEnabled && renderThread != null;
-        if (threaded)
-        {
-            // Backpressure: block until the render thread has consumed (applied + presented) the PREVIOUS packet before we
-            // overwrite the single RenderCache packet with this frame's record. The loop's Update already ran concurrently
-            // with that render frame; this caps the loop to ~1 frame ahead.
-            try { BlockingRead(_renderFree.Reader); }
-            catch (OperationCanceledException) { return; }
-        }
+
+        // The render is MaxFramesInFlight frames behind: skip the record instead of blocking the loop on it. Nothing is lost -
+        // RenderDirty is not cleared below, so this frame's marks stay pending and the next record folds them in (its packet is
+        // simply a slightly bigger delta). The loop keeps running Update, animations and input at full speed, which is the whole
+        // point of the split; without this cap the loop would instead race ahead publishing packets the render can't consume.
+        if (threaded && Volatile.Read(ref _framesInFlight) >= MaxFramesInFlight) return;
 
         foreach (var service in windowToSystem.Values)
             service.RecordFrame();
+        _recordedThisFrame = true;
 
-        // Threaded STEADY state clears the dirty set HERE, on the LOOP thread, right after the record snapshotted it - the
-        // applier (render thread) consumes the frozen buffers, never RenderDirty, so the render thread must not touch it
-        // (it would race the next Update's marks). NOT while a swap is settling: then RecordFrame deferred to the inline
-        // path (DispatchRenderFrame's barrier), which consumes + clears RenderDirty itself - clearing here would wipe the
-        // marks before that inline record reads them.
-        if (threaded && !RenderDirty.IsSettlingStructural)
-            RenderDirty.Clear();
+        // Threaded: clear the dirty set HERE, on the LOOP thread, right after the record snapshotted it into the packets. The
+        // applier (the render thread) consumes only those packets, never RenderDirty - it must not touch it at all, or it would
+        // race the next Update's marks.
+        if (threaded) RenderDirty.Clear();
     }
+
+    private bool _recordedThisFrame;
 
     // Returns whether the frame actually drew (BeginScene passed). RenderDirty.Clear is NOT done here - this method runs on
     // the render thread in the threaded-steady path, and the render thread must never touch RenderDirty (it would race the
@@ -565,6 +572,7 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
             finally
             {
                 EndScene();
+                RuntimeStats.PresentedFrames++;   // the honest frame rate once the render runs on its own thread
             }
         }
         return drew;
@@ -587,42 +595,41 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
             return;
         }
 
-        // Render thread ON, but a structural swap (resize / DPI / theme) is settling: STOP-THE-WORLD barrier. The render
-        // thread is idle here (RecordRenderFrame drained it via the free token) and RecordFrame deferred to the inline path,
-        // so run the whole frame INLINE on this loop thread - keeping the live-tree read off the render thread while Update
-        // mutates it - clear on this thread, and return the free token ourselves (no packet was handed off).
-        if (RenderDirty.IsSettlingStructural)
-        {
-            var drewBarrier = ExecuteDrawSequence(appTime);
-            if (drewBarrier) RenderDirty.Clear();
-            _renderFree.Writer.TryWrite(true);
-            return;
-        }
-
-        // Steady state: publish and return immediately (overlap). TryWrite always succeeds - RecordRenderFrame took the
-        // single free token, so the render thread has consumed the previous packet and _renderFull is empty.
-        _renderFull.Writer.TryWrite(appTime);
+        // Threaded: the loop NEVER draws. The device belongs to the render thread alone - no second frame path, so nothing to
+        // synchronise, no barrier, no rendezvous. (The 3.3 scaffold ran settling swap frames INLINE on this thread, which is
+        // why it needed to park the render thread first; that inline path was also the deadlock and the "two writers" race.
+        // What it was really compensating for - a packet drawn against a stale projection while the presenter resizes - is now
+        // carried BY the packet: the recorder captures the projection with the frame, and the applier uses that, never the
+        // live window.)
+        //
+        // The record is already published into the window caches' packet queues, so there is nothing to hand over and nothing
+        // to wait for. The render thread runs at ITS OWN pace and picks the packets up on its next frame.
+        if (!_recordedThisFrame) return;
+        _renderAppTime = appTime;
+        Interlocked.Increment(ref _framesInFlight);
     }
 
+    // The render thread's own frame loop. It does NOT wait for the update loop: it draws and presents at its own pace, taking
+    // whatever the loop has published by then - packets if there are any, otherwise nothing, in which case the applier finds an
+    // empty queue, classifies the frame Clean and REPLAYS the retained op stream (~1 ms even for a 60k-unit scene). That is what
+    // makes the presented frame rate independent of Update: a 6-fps layout+record loop no longer means a 6-fps window, it just
+    // means the content it shows advances 6 times a second while the compositor keeps presenting at its own rate.
+    //
+    // (This is the piece the 3.3 scaffold was missing: it woke the render thread once per published frame, so the render was
+    // literally paced by the loop it was supposed to be decoupled from.)
     private void RenderThread()
     {
         while (!cancellationTokenSource.IsCancellationRequested)
         {
-            AppTime appTime;
-            try { appTime = BlockingRead(_renderFull.Reader); }   // wait for the loop to publish a recorded frame
-            catch (OperationCanceledException) { break; }         // shutdown
+            Interlocked.Exchange(ref _framesInFlight, 0);   // whatever was published is about to be drained by the apply
             try
             {
-                ExecuteDrawSequence(appTime);
+                ExecuteDrawSequence(_renderAppTime);
             }
             catch (Exception ex)
             {
                 Console.WriteLine(ex);
                 UnhandledException?.Invoke(this, new UnhandledExceptionEventArgs(ex));
-            }
-            finally
-            {
-                _renderFree.Writer.TryWrite(true);   // packet consumed -> the loop may overwrite it with the next frame
             }
         }
     }

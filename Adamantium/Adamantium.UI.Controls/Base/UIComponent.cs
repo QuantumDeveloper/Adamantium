@@ -348,7 +348,7 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
             // the render rewrites ONE matrix and replays - no global transform invalidation, no O(N) re-bake (the
             // transform-only scroll). Everything else keeps the conservative global mark.
             if (IsRenderMotionNode) RenderDirty.MarkNodeTransform(this);
-            else RenderDirty.MarkTransform();   // a move: same recorded geometry, only the world transform changes -> re-bake
+            else RenderDirty.MarkTransform(this);   // a move: same recorded geometry, only THIS element's world transform changes -> re-bake
         }
     }
 

@@ -69,8 +69,41 @@ public static class RenderDirty
     /// <summary>The geometry-dirty count, read under the write lock (safe against a concurrent mark).</summary>
     public static int GeometryCount { get { lock (GeometrySet) return GeometrySet.Count; } }
 
-    /// <summary>Records that something moved (world transforms must be re-baked; no re-record).</summary>
-    public static void MarkTransform() => _transform = true;
+    // WHICH components moved this frame (a Bounds move, a RenderTransform tick). The global <see cref="_transform"/> flag
+    // above says "something moved" - enough to drop the derived world/clip memos - but the render's FROZEN layout snapshot
+    // needs identities: a component's snapshot entry (its LocalTransform) is stale exactly when the component itself moved,
+    // and nothing else's is (a descendant's LOCAL transform is unchanged by an ancestor's move - only the composed WORLD
+    // transform is, and that is a memo). Recording the movers lets the recorder refresh O(moved) snapshot entries instead
+    // of dropping the whole snapshot and re-capturing it from the RENDER-side retained groups every scroll frame - which is
+    // both O(scene) and a cross-thread read of render-owned state (docs/RENDER_THREAD_PLAN.md Phase 3.3).
+    private static readonly HashSet<IUIComponent> MovedSet = new();
+
+    // A move whose COMPONENT we can't name (a Transform ticking while it is not assigned as anyone's RenderTransform, so
+    // Transform.Owner is null). Then the incremental refresh above cannot know what went stale, and the recorder falls back
+    // to re-capturing the whole snapshot for that frame. Correctness over cleverness: an unnameable mover is rare (an
+    // orphaned/re-assigned transform), and the fallback is exactly the pre-incremental behaviour.
+    private static bool _transformUnknown;
+
+    /// <summary>Records that <paramref name="component"/> MOVED (world transforms must be re-baked; no re-record). Pass the
+    /// component that moved - null only when the mover genuinely has no owner (see <see cref="IsTransformUnknown"/>).</summary>
+    public static void MarkTransform(IUIComponent component)
+    {
+        _transform = true;
+        if (component == null) { _transformUnknown = true; return; }
+        lock (MovedSet) MovedSet.Add(component);   // locked: movers arrive from the parallel arrange too (see MarkGeometry)
+    }
+
+    /// <summary>Atomically snapshot the moved components into <paramref name="buffer"/> (same lock/race as
+    /// <see cref="SnapshotGeometryInto"/>).</summary>
+    public static void SnapshotMovedInto(List<IUIComponent> buffer)
+    {
+        buffer.Clear();
+        lock (MovedSet) buffer.AddRange(MovedSet);
+    }
+
+    /// <summary>True when something moved that <see cref="MarkTransform"/> could not name - the frozen layout snapshot
+    /// can't be refreshed incrementally this frame and must be re-captured wholesale.</summary>
+    public static bool IsTransformUnknown => _transformUnknown;
 
     // MOTION NODES that moved this frame (their subtrees translate as a unit - a scrolled panel). Unlike the global
     // _transform flag, a node move doesn't invalidate anyone's baked geometry: instances under the node reference its
@@ -131,11 +164,13 @@ public static class RenderDirty
     /// <summary>Reset after a build has consumed the dirty state.</summary>
     public static void Clear()
     {
-        // Clear the two HashSets under the SAME locks their writers (MarkGeometry/MarkNodeTransform) take - a lock-free
-        // Clear racing a concurrent Add (parallel arrange / Dispatcher-thread invalidation) corrupted the set.
+        // Clear the HashSets under the SAME locks their writers (MarkGeometry/MarkNodeTransform/MarkTransform) take - a
+        // lock-free Clear racing a concurrent Add (parallel arrange / Dispatcher-thread invalidation) corrupted the set.
         lock (GeometrySet) GeometrySet.Clear();
         lock (NodeSet) NodeSet.Clear();
+        lock (MovedSet) MovedSet.Clear();
         _transform = false;
+        _transformUnknown = false;
         _structural = false;
         _finalForcedBuild = false;   // the post-settle walk ran; forcing ends (_forceUntilSettled survives Clear by design)
     }

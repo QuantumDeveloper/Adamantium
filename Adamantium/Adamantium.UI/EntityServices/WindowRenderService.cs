@@ -115,11 +115,12 @@ public class WindowRenderService : UiRenderService
     /// the apply half stays in BeginDraw (ApplyData). No-op in the default single-threaded path (record stays inline).</summary>
     public void RecordFrame()
     {
-        // Lightweight resize barrier: while a multi-frame structural swap (resize / DPI / theme) is settling, or the
-        // renderer is awaiting a presenter resize, DEFER to the inline path so the record can't straddle the swap's
-        // per-frame relayout + presenter/projection finalisation and desync (the "chrome at old size, content at new"
-        // resize glitch). Steady state records at loop level.
-        if (windowRenderer is not { IsRendererUpToDate: true } || RenderDirty.IsSettlingStructural)
+        // The renderer is awaiting a presenter resize - there is nothing coherent to record against yet, so skip this frame
+        // (the render thread simply replays what it has). The SETTLING-swap case no longer defers: it used to hand the frame
+        // to an inline record+draw on the loop thread, and that path is gone - the device belongs to the render thread alone.
+        // What the deferral was protecting against (a packet drawn against a projection the swap has since changed) is now
+        // carried by the packet itself: the recorder captures the projection WITH the frame.
+        if (windowRenderer is not { IsRendererUpToDate: true })
         {
             _recordedAtLoopLevel = false;
             return;
@@ -149,10 +150,20 @@ public class WindowRenderService : UiRenderService
             // THIS frame's visual tree. It used to be built in EndDraw - one frame AFTER it was drawn - so a container
             // realized/collapsed this frame lagged the draw by a frame: an item entering the window had no unit yet (a
             // one-frame hole) and one leaving still had a stale unit (a one-frame ghost overlapping with a foreign item).
-            // Phase 3.2 Step 2b: default path records + applies inline here. The decoupled path applies the loop-level
-            // packet - UNLESS this window deferred to inline this frame (the resize/state-swap fallback in RecordFrame),
-            // in which case it records + applies inline here too.
-            if (RenderThreadOptions.SingleThreaded || !_recordedAtLoopLevel) windowRenderer.PrepareData();
+            // Default path records + applies inline here. The decoupled path applies the loop-level packet - UNLESS this
+            // window deferred to inline this frame (the resize/state-swap fallback in RecordFrame), in which case it records
+            // + applies inline here too.
+            //
+            // The RECORD may only ever run on the LOOP thread. BeginDraw runs on the render thread once one exists, and there
+            // the inline fallback would read the live visual tree AND race the loop's own record on the same cache: two
+            // threads inside RecordFrame, one nulling the packet it just published while the other still writes to it
+            // (a NullReferenceException in CaptureSnapshot - thrown INSIDE GraphicsDevice.BeginDraw's beforeRenderPass, which
+            // left the command buffer open and hung the device on the next frame's fence). The render thread therefore only
+            // ever APPLIES: with no packet published yet it simply finds an empty queue, classifies the frame Clean and
+            // replays - and the loop, which is the thread that defers to inline, still records inline on its own frames
+            // (the swap barrier parks the render thread first, so those never overlap).
+            var onRenderThread = Thread.CurrentThread == RenderThreadOptions.RenderThread;
+            if (RenderThreadOptions.SingleThreaded || (!_recordedAtLoopLevel && !onRenderThread)) windowRenderer.PrepareData();
             else windowRenderer.ApplyData();
             windowRenderer.PreRender();
             PreRenderProcessors();   // adorner stage compute (stroke expander) before the render pass
