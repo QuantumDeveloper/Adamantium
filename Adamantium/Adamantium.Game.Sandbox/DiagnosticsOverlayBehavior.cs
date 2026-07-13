@@ -27,7 +27,7 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
 {
     private const double RefreshSeconds = 0.25;   // rewrite the text ~4x/sec - readable, and cheap (no per-frame raster)
 
-    private long _lastMeasure, _lastArrange, _lastBindings;
+    private long _lastMeasure, _lastArrange, _lastBindings, _lastPresented;
     private double _windowElapsed, _windowMaxLayoutMs;
     private double _sumLayout, _sumBuild, _sumProc, _sumDraw, _sumProcs;   // per-frame sums -> averages over the window
     private int _windowFrames;
@@ -64,7 +64,13 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
         var measure = MeasurableUIComponent.TotalMeasureCalls;
         var arrange = MeasurableUIComponent.TotalArrangeCalls;
         var bindings = RuntimeStats.BindingUpdatesApplied;
-        var fps = _windowFrames / _windowElapsed;
+        var fps = _windowFrames / _windowElapsed;   // the LOOP's rate: Update + record
+
+        // ...and the PRESENTED rate, which with a render thread is a different number entirely - the compositor keeps
+        // presenting while a heavy Update crawls. Equal to the loop's rate in the default inline path.
+        var presented = RuntimeStats.PresentedFrames;
+        var renderFps = (presented - _lastPresented) / _windowElapsed;
+        _lastPresented = presented;
 
 
         // Frame breakdown (averages over the window, so they sum to ~frame time). "other" = the residual the render
@@ -77,8 +83,8 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
         var other = Math.Max(0, frameMs - avgLayout - avgBuild - avgProc - avgDraw - avgProcs);
 
         target.Text =
-            $"FPS   {fps,5:F0}     frame {frameMs,5:F1} ms\n" +
-            $"layout  {avgLayout,5:F2} (max {_windowMaxLayoutMs,4:F1}){(_windowDeferred ? " [DEFERRED]" : "")}\n" +
+            $"render {renderFps,5:F0} fps     loop {fps,5:F0} fps\n" +
+            $"frame {frameMs,5:F1} ms   layout {avgLayout,5:F2} (max {_windowMaxLayoutMs,4:F1}){(_windowDeferred ? " [DEFERRED]" : "")}\n" +
             $"build/proc/draw  {avgBuild,4:F1} / {avgProc,4:F1} / {avgDraw,4:F1} ms\n" +
             $"processors {avgProcs,4:F1}    other {other,4:F1} ms\n" +
             $"measure/arrange  {measure - _lastMeasure} / {arrange - _lastArrange}\n" +

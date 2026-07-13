@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Graphics.Core;
@@ -47,11 +48,38 @@ public class RenderCache
     // rendered 0 units. Lets a PARTIAL re-render whose draw-command COUNT changed (a hover background appearing 0->1, or
     // vanishing) splice that ONE component's units into the retained paint-order list at the right spot, instead of
     // falling back to a full tree walk that re-renders every element (the hover / mouse-move FPS cliff on a big list).
-    private readonly Dictionary<Guid, int> _orderByControl = new();
+    // RECORDER-owned (derived from walking the LIVE tree). The applier needs the ranks too - to splice a new group at its
+    // paint position - but must never read this one: in the decoupled path the recorder rebuilds it (a full walk) while the
+    // applier is still drawing the previous frame. So each rebuild PUBLISHES a fresh immutable dictionary on the packet and
+    // the applier keeps its own reference (_applyOrder). Rare (full walk / a component appearing mid-partial), so the copy
+    // costs nothing per frame.
+    private Dictionary<Guid, int> _orderByControl = new();
+    private IReadOnlyDictionary<Guid, int> _applyOrder = new Dictionary<Guid, int>();   // APPLIER-owned view of the above
     private IRootVisualComponent _lastVisualRoot;             // for an on-demand order re-walk (a component appearing mid-partial)
-    private IRootVisualComponent _pendingVisualRoot;          // root RecordFrame received this frame (ApplyFrame's partial->full fallback re-records from it)
     private readonly Stack<IUIComponent> _orderStack = new(); // reused by ReassignOrders (no per-call alloc)
     private readonly HashSet<Guid> _orderVisited = new();
+    private bool _forceFullNextFrame;                         // the applier hit a state only a full RECORD can fix (see ApplyPacket)
+
+    // RECORDER-side mirror of "which components hold retained units" - the applier's _groupById, but derived purely from the
+    // recorder's OWN decisions: a component's recorded command COUNT is exactly the unit count the applier will hold for it,
+    // and a dirty component that records nothing has its units dropped (ProcessRenderCommands). The recorder needs this to
+    // decide Skip vs Fallback for a component that is no longer drawn - and it must NOT read _groupById for it: that
+    // dictionary is applier-owned and mutated while the recorder runs (the render thread realizes frame N-1 while the loop
+    // records frame N), so a plain Dictionary read there is a data race, not just a stale value.
+    private readonly Dictionary<Guid, (IUIComponent Component, int Units)> _recordedUnits = new();
+    private readonly List<Guid> _staleUnitIds = new();   // scratch: detached controls to drop from the mirror
+
+    // Mirror one recorded draw. Empty commands from a CLEAN control mean "reuse the cached units" (mirror unchanged); from a
+    // DIRTY one they mean "it now draws nothing" and the applier frees them - exactly the wasGeometryValid split the applier
+    // makes in ProcessRenderCommands.
+    private void MirrorUnits(IUIComponent component, int commandCount, bool wasGeometryValid)
+    {
+        if (commandCount > 0) _recordedUnits[component.RenderId] = (component, commandCount);
+        else if (!wasGeometryValid) _recordedUnits.Remove(component.RenderId);
+    }
+
+    private bool HoldsUnits(IUIComponent component) =>
+        _recordedUnits.TryGetValue(component.RenderId, out var entry) && entry.Units > 0;
 
     private readonly IRenderUnitFactory _renderUnitFactory;
 
@@ -120,25 +148,26 @@ public class RenderCache
     /// </summary>
     public void RecordFrame(IRootVisualComponent visualRoot)
     {
+        _packet = RentPacket();
         RecordFrameCore(visualRoot);
-        // Step 3 (docs/RENDER_THREAD_PLAN.md): freeze the layout snapshot HERE, at the END of the DEVICE-FREE record, on the
-        // update thread - so the applier (the render thread in 3.3) reads ONLY the frozen packet + snapshot, never a live
-        // component. (The rare partial->full fallback still re-captures inside ApplyFrame until Step 3b hoists it too.)
+        // Freeze the layout snapshot HERE, at the END of the DEVICE-FREE record, on the update thread - so the applier (the
+        // render thread) reads ONLY the frozen packet: its draws, its layout delta. Never a live component.
         CaptureSnapshot();
+        _published.Enqueue(_packet);   // hand it over; the applier drains the queue (see ApplyFrame)
+        _packet = null;
     }
 
     private void RecordFrameCore(IRootVisualComponent visualRoot)
     {
-        _pendingVisualRoot = visualRoot;   // the applier's partial->full fallback re-records from it (tree still quiescent)
+        _movedBuf.Clear();   // filled only by a PARTIAL (a Full re-freezes everything from its packet anyway)
+        _packet.Reset(RenderBuildKind.Clean);
+        // The projection is a LIVE read of the root visual, so it is taken HERE (recorder thread) and travels ON the packet -
+        // the applier must not reach back into the window for it.
+        _packet.ProjectionMatrix = visualRoot.GetProjectionMatrix();
 
         // Fully clean: nothing changed since last build -> the applier re-draws the retained units as-is. Keep the
         // transform memo: nothing moved, so last frame's world transforms are still correct.
-        if (_built && !RenderDirty.HasWork)
-        {
-            _packet.Reset(RenderBuildKind.Clean);
-            LastBuildKind = RenderBuildKind.Clean;
-            return;
-        }
+        if (_built && !RenderDirty.HasWork) return;
 
         // Non-structural change on an existing scene -> PARTIAL update: re-render only the geometry-dirty components in
         // place. Either way the retained groups (paint order + unit cache) stay. Drop the frame-scoped world/clip memos ONLY on
@@ -146,16 +175,23 @@ public class RenderCache
         // partial (a hover recolouring a tile) moved nothing, so the memos are still valid: keeping them lets the render
         // pass reuse cached world transforms + clips instead of recomputing them for every one of thousands of units
         // (the O(N) that made a hover cost ~2x a clean frame on a big list).
-        if (_built && !RenderDirty.IsStructural)
+        // An UNNAMEABLE move (an unowned Transform ticking - RenderDirty couldn't record which component it moves) leaves the
+        // recorder unable to tell which snapshot entries went stale, so it escalates to a FULL record: that re-records every
+        // component and so re-freezes the whole snapshot from its own packet. (Re-deriving the snapshot from the retained
+        // GROUPS instead would be a read of applier-owned state from the recorder's thread - the very thing the split exists
+        // to remove.) Rare by construction, and strictly the pre-incremental behaviour.
+        if (_built && !RenderDirty.IsStructural && !RenderDirty.IsTransformUnknown && !_forceFullNextFrame)
         {
-            _partialSpliced = false;   // ApplyReRender sets it if it splices the paint-order list (a count change)
+            _packet.Kind = RenderBuildKind.Partial;
             if (RenderDirty.IsTransform)
             {
-                _snap.Clear();
-                _worldCache.Clear();
-                _clipCache.Clear();
-                _relWorldCache.Clear();
-                _nodeCache.Clear();
+                // The frozen snapshot is refreshed INCREMENTALLY: RenderDirty.MarkTransform records WHICH components moved,
+                // and CaptureSnapshot re-freezes exactly those entries (an ancestor's move leaves every descendant's LOCAL
+                // transform untouched - only the composed WORLD transform changes, and that is a memo, dropped by the
+                // applier). Dropping the whole snapshot here instead - as this did - forced a re-capture of EVERY retained
+                // unit on every scroll frame: O(scene) per frame, AND a read of the render-owned group list from the update
+                // thread, which is exactly what blocked the render-thread handoff.
+                _packet.ClearMemos = true;   // APPLIER-owned - it drops them itself (see RenderPacket.ClearMemos)
             }
 
             // Snapshot the dirty set: RecordReRender re-renders each component, and a component's Render can mark MORE
@@ -164,8 +200,6 @@ public class RenderCache
             // RenderDirty's write lock - marks also arrive from OTHER threads (parallel arrange, a Dispatcher-thread Image
             // invalidation), so a lock-free copy raced them and corrupted the set.
             RenderDirty.SnapshotGeometryInto(_geometryDirtyBuffer);
-
-            _packet.Reset(RenderBuildKind.Partial);
 
             // RECORD pass (DEVICE-FREE): skip/record each dirty component. component.Render can mark MORE geometry dirty,
             // which the count check below detects; a component that needs a full walk (Fallback) stops the pass.
@@ -179,16 +213,16 @@ public class RenderCache
             // (the set didn't grow). If a render re-marked geometry, escalate to a full walk so that change isn't dropped.
             if (!fellBack && !RenderDirty.IsStructural && RenderDirty.GeometryCount == _geometryDirtyBuffer.Count)
             {
-                LastBuildKind = RenderBuildKind.Partial;   // no full walk (only the dirty components' unit contents)
-                LastBuildTransformDirty = RenderDirty.IsTransform;   // geometry-only partial -> nothing moved -> proc can be skipped
-                // Remember which components changed so the draw phase can patch just their slots + replay, and which
-                // MOTION NODES moved so it can rewrite their table matrices (the O(1)-scroll path). Captured HERE, while
-                // RenderDirty is still populated - the applier consumes _movedNodesBuf, but RenderDirty is cleared after
-                // the whole record phase (Phase 3.2 hoists the clear to the loop level).
-                _partialDirty.Clear();
-                _partialDirty.AddRange(_geometryDirtyBuffer);
-                RenderDirty.SnapshotNodesInto(_movedNodesBuf);   // under the write lock (MarkNodeTransform runs on other threads too)
-                return;   // packet.Kind == Partial -> ApplyFrame runs the partial apply (which may itself fall back to full)
+                // Geometry-only partial -> nothing moved -> the applier can skip the per-unit transform re-bake (proc).
+                _packet.IsTransformDirty = RenderDirty.IsTransform;
+                // Which components changed (so the draw phase patches just their slots + replays) and which MOTION NODES
+                // moved (so it rewrites their table matrices - the O(1)-scroll path). Read HERE, while RenderDirty is still
+                // populated: it is cleared after the whole record phase, and the applier - which may be the render thread -
+                // must never touch it. Both travel ON the packet.
+                _packet.PartialDirty.AddRange(_geometryDirtyBuffer);
+                RenderDirty.SnapshotNodesInto(_packet.MovedNodes);   // under the write lock (MarkNodeTransform runs on other threads too)
+                RenderDirty.SnapshotMovedInto(_movedBuf);            // the MOVED components - CaptureSnapshot re-freezes just these
+                return;   // packet.Kind == Partial -> ApplyFrame runs the partial apply
             }
             // a structural change or a new invalidation surfaced during the partial pass -> escalate to a full walk
         }
@@ -199,15 +233,20 @@ public class RenderCache
     // RECORD a full walk (DEVICE-FREE): first build, a structural change, or a partial that surfaced one. Fills the packet.
     private void RecordFullFrame(IRootVisualComponent visualRoot)
     {
-        LastBuildKind = RenderBuildKind.Full;
-        LastBuildTransformDirty = true;   // a full walk rebuilds the paint-order list; positions must be re-baked
         _commands.Clear();
+        _forceFullNextFrame = false;      // this IS that full walk
+
+        var projection = _packet.ProjectionMatrix;
+        _packet.Reset(RenderBuildKind.Full);   // a full walk SUPERSEDES anything a partial had already recorded into it
+        _packet.ProjectionMatrix = projection;
+        _packet.IsTransformDirty = true;       // the paint order is rebuilt; every position must be re-baked
+        _packet.ClearMemos = true;             // applier-owned - it drops them itself (see RenderPacket.ClearMemos)
+        _packet.SnapReset = true;              // ...and so must the applier's snapshot replica: this packet carries the scene
+
+        // Recorder-owned: drop the frozen snapshot. The packet below carries EVERY drawn component, so CaptureSnapshot
+        // re-freezes the whole scene from it (no walk of the applier's retained groups needed).
         _snap.Clear();
-        _worldCache.Clear();
-        _clipCache.Clear();
-        _relWorldCache.Clear();
-        _nodeCache.Clear();
-        _packet.Reset(RenderBuildKind.Full);
+        _snapFullCapture = false;
         RecordFullWalk(visualRoot, _packet);   // device-free: walk + component.Render + copy commands into the packet
     }
 
@@ -220,42 +259,100 @@ public class RenderCache
     /// </summary>
     public void ApplyFrame()
     {
-        switch (_packet.Kind)
+        BeginApplyFrame();
+        var drew = false;
+        while (_published.TryDequeue(out var packet))
+        {
+            ApplyPacket(packet);
+            packet.Reset(RenderBuildKind.Clean);
+            _spare.Add(packet);   // back to the pool for the recorder
+            drew = true;
+        }
+
+        // Phase 3.2 Step 2b: only the DEFAULT single-threaded path (record+apply inline in BeginDraw) clears here. In the
+        // decoupled path the record runs at loop level (UIApplication.RecordRenderFrame) and the clear is hoisted there,
+        // once after ALL windows have recorded - so a second window still sees the full dirty set this frame.
+        if (drew && RenderThreadOptions.SingleThreaded) RenderDirty.Clear();
+    }
+
+    /// <summary>Starts a fresh DRAW frame's merged apply state. The per-frame results (build kind, dirty set, moved nodes)
+    /// accumulate across every packet applied for THIS draw, and the draw consumes them - so they must be empty when it
+    /// begins, not left over from the previous one.</summary>
+    private void BeginApplyFrame()
+    {
+        LastBuildKind = RenderBuildKind.Clean;
+        LastBuildTransformDirty = false;
+        _partialDirty.Clear();
+        _movedNodesBuf.Clear();
+        _partialSpliced = false;
+    }
+
+    // Realize ONE packet. The per-frame results the DRAW pass reads (LastBuildKind, LastBuildTransformDirty, _partialDirty,
+    // _movedNodesBuf) are MERGED across the packets drained this frame: a Full supersedes everything recorded before it, and
+    // two Partials union their dirty sets - exactly what one record of the combined interval would have produced.
+    private void ApplyPacket(RenderPacket packet)
+    {
+        // The paint-order ranks, if the recorder re-derived them (a fresh, immutable map - see RenderPacket.Orders).
+        if (packet.Orders != null) _applyOrder = packet.Orders;
+        _projectionMatrix = packet.ProjectionMatrix;
+
+        // The applier's OWN derived memos (composed world/clip/node transforms), dropped here rather than by the recorder:
+        // they are applier-resident state, and the recorder runs on the loop thread while the applier reads them. The
+        // recorder only says WHEN they went stale.
+        if (packet.ClearMemos)
+        {
+            _worldCache.Clear();
+            _clipCache.Clear();
+            _relWorldCache.Clear();
+            _nodeCache.Clear();
+        }
+
+        // Fold this packet's layout delta into the applier's private snapshot replica - the only thing the draw pass reads
+        // for a component's transform/size/clip. A full walk resets it and then carries the whole scene.
+        if (packet.SnapReset) _applySnap.Clear();
+        foreach (var entry in packet.SnapDelta) _applySnap[entry.Key] = entry.Value;
+
+        switch (packet.Kind)
         {
             case RenderBuildKind.Clean:
                 break;   // re-draw the retained units as-is (nothing to realize)
 
             case RenderBuildKind.Partial:
             {
-                // APPLY pass (GPU): realize the recorded draws - update the units in place / splice a count change. A
-                // newly-appearing component with no paint rank forces a full walk.
-                var fellBack = false;
-                foreach (var draw in _packet.Draws)
+                // APPLY pass (GPU): realize the recorded draws - update the units in place / splice a count change.
+                foreach (var draw in packet.Draws)
                 {
-                    if (!ApplyReRender(draw.Component, draw.Commands)) { fellBack = true; break; }
+                    if (ApplyReRender(draw.Component, draw.Commands)) continue;
+
+                    // A recorded partial draw with no paint rank. Unreachable by construction: RecordReRender re-derives
+                    // the ranks (a device-free order-only walk) and escalates to a FULL record when a component still has
+                    // none, so every draw that reaches here has a place. Kept as a safety net that reads NOTHING live -
+                    // the applier may be the render thread, so re-recording the tree from HERE (what this used to do)
+                    // would race the loop's mutations. Instead ask the RECORDER for a full walk next frame.
+                    _forceFullNextFrame = true;
+                    break;
                 }
-                if (!fellBack)
-                    break;   // snapshot already frozen at the end of RecordFrame (Step 3); nothing live to read here
-                // A recorded partial draw had no paint rank -> re-record + apply a full walk. Inline-safe: the tree hasn't
-                // changed since RECORD (single-threaded); Step 3b moves this decision into RecordFrame. Until then this path
-                // re-records from the live tree, so it must RE-capture the snapshot here (RecordFullFrame cleared it).
-                RecordFullFrame(_pendingVisualRoot);
-                ApplyFullWalk(_packet);
-                CaptureSnapshot();
-                _built = true;
+
+                if (LastBuildKind != RenderBuildKind.Full) LastBuildKind = RenderBuildKind.Partial;
+                LastBuildTransformDirty |= packet.IsTransformDirty;
+                _partialDirty.AddRange(packet.PartialDirty);
+                _movedNodesBuf.AddRange(packet.MovedNodes);
                 break;
             }
 
             case RenderBuildKind.Full:
-                ApplyFullWalk(_packet);   // GPU: rebuild the paint-order groups from the packet
-                _built = true;            // snapshot already frozen at the end of RecordFrame (Step 3)
+                ApplyFullWalk(packet);   // GPU: rebuild the paint-order groups from the packet
+                _built = true;
+                // A full walk re-records the WHOLE scene, so anything an earlier packet of this same drain marked dirty is
+                // already covered by it - and its unit set is gone (the groups were rebuilt), which would make those stale
+                // entries mis-patch the batch. Drop them.
+                LastBuildKind = RenderBuildKind.Full;
+                LastBuildTransformDirty = true;
+                _partialDirty.Clear();
+                _movedNodesBuf.Clear();
+                _partialSpliced = false;
                 break;
         }
-
-        // Phase 3.2 Step 2b: only the DEFAULT single-threaded path (record+apply inline in BeginDraw) clears here. In the
-        // decoupled path the record runs at loop level (UIApplication.RecordRenderFrame) and the clear is hoisted there,
-        // once after ALL windows have recorded - so a second window still sees the full dirty set this frame.
-        if (RenderThreadOptions.SingleThreaded) RenderDirty.Clear();
     }
 
     // Re-render ONE already-cached component IN PLACE (its geometry went dirty). Returns false - "needs a full walk" -
@@ -276,9 +373,7 @@ public class RenderCache
         // SKIP it like a detached/collapsed one below, instead of forcing a full tree walk every dirty frame (the hover
         // FPS hitch). Only if it somehow still holds units fall back to a full walk to reconcile them.
         if (component.Visibility != Visibility.Visible)
-            return !_groupById.TryGetValue(component.RenderId, out var stillHeld) || stillHeld.Units.Count == 0
-                ? PartialRecord.Skip
-                : PartialRecord.Fallback;
+            return HoldsUnits(component) ? PartialRecord.Fallback : PartialRecord.Skip;
 
         // Not in the live paint tree: DETACHED (no visual parent) or effectively hidden by a COLLAPSED ancestor. The full
         // walk never reaches such a component, so it has no paint rank and re-rendering it draws nothing - yet it used to
@@ -308,9 +403,21 @@ public class RenderCache
         // about its recorded geometry changed - keep the retained units as-is.
         if (component.IsGeometryValid) return PartialRecord.Skip;
 
+        // Holds no units yet AND has no paint rank: it was invisible/absent during the last full walk and has just appeared
+        // (an auto-hide ScrollBar fading in), so the applier would have nowhere to splice its units. Re-derive the ranks with
+        // a cheap ORDER-ONLY walk (no Render, no unit work) - and do it HERE, on the record side: the walk reads the LIVE
+        // tree, which the applier (the render thread) must never touch. Genuinely not in the tree -> a full record.
+        if (!HoldsUnits(component) && !_orderByControl.ContainsKey(component.RenderId))
+        {
+            ReassignOrders();
+            if (!_orderByControl.ContainsKey(component.RenderId)) return PartialRecord.Fallback;
+        }
+
         _drawingContextInternal.Clear();
         component.Render(_drawingContext);   // NB: consumes the dirty flag (Render sets IsGeometryValid back to true)
-        packet.Draws.Add(new ComponentDraw(component, CopyCommands(_drawingContextInternal.GetDrawCommands()), false));
+        var commands = CopyCommands(_drawingContextInternal.GetDrawCommands());
+        packet.Draws.Add(new ComponentDraw(component, commands, false));
+        MirrorUnits(component, commands.Count, false);   // it WAS dirty: no commands now means "draws nothing" -> units freed
         return PartialRecord.Recorded;
     }
 
@@ -345,16 +452,11 @@ public class RenderCache
         // phase must re-walk this frame (per-group op patching is the planned follow-up that lifts this too).
         _partialSpliced = true;
         var isNewGroup = group == null;
-        if (isNewGroup && !_orderByControl.ContainsKey(component.RenderId))
-        {
-            // The component has no recorded paint rank - it was invisible/absent during the last full walk and has now
-            // appeared (e.g. an auto-hide ScrollBar fading in on mouse activity). Rather than re-render the WHOLE tree,
-            // re-derive paint ranks with a cheap ORDER-ONLY walk (no Render, no unit work) so this one group can be
-            // placed. O(N) dictionary writes (~tens of us) vs a full render of thousands of units.
-            ReassignOrders();
-            if (!_orderByControl.ContainsKey(component.RenderId))
-                return false;   // genuinely not in the tree -> let the caller do a full walk
-        }
+        // A brand-new group with no paint rank can't be placed. The RECORDER already re-derives the ranks (an order-only walk
+        // in RecordReRender) and escalates to a full record when a component still has none, so this is unreachable - and
+        // re-walking the LIVE tree from here, as it used to, is precisely what the applier (the render thread) must not do.
+        // Report it instead; ApplyPacket asks the recorder for a full walk next frame.
+        if (isNewGroup && !_applyOrder.ContainsKey(component.RenderId)) return false;
 
         group = BuildUnitsFor(component, drawCommands, _projectionMatrix);
 
@@ -362,11 +464,11 @@ public class RenderCache
         {
             // First units this control ever drew (a background appearing 0->1): place its group by DFS paint rank -
             // before the first group that ranks after it. Existing groups never move.
-            var order = _orderByControl[component.RenderId];
+            var order = _applyOrder[component.RenderId];
             var pos = _groups.Count;
             for (var i = 0; i < _groups.Count; i++)
             {
-                if (_orderByControl.GetValueOrDefault(_groups[i].ControlId, int.MaxValue) > order) { pos = i; break; }
+                if (_applyOrder.GetValueOrDefault(_groups[i].ControlId, int.MaxValue) > order) { pos = i; break; }
             }
             _groups.Insert(pos, group);
         }
@@ -392,6 +494,13 @@ public class RenderCache
         _relWorldCache.Clear();
         _nodeCache.Clear();
 
+        // This build FUSES record and apply (an overlay cache renders a flat list straight into its groups - it never crosses
+        // the render-thread seam), but the snapshot still flows through a packet, because that is the only thing that fills the
+        // applier's replica. Rent one, capture into it, fold it in, hand it back.
+        _packet = RentPacket();
+        _packet.Reset(RenderBuildKind.Full);
+        _packet.SnapReset = true;
+
         var present = new HashSet<Guid>();
         if (components != null)
         {
@@ -414,7 +523,16 @@ public class RenderCache
         if (stale != null)
             foreach (var id in stale) RemoveAndDeferDispose(id);
 
-        CaptureSnapshot();   // freeze the overlay's layout snapshot for the applier (same recorder->applier handoff as the tree build)
+        // Freeze the overlay's layout snapshot. Its draws never went through a packet, so the capture reads the just-built
+        // GROUPS (safe here, and only here: this cache's recorder and applier are the same thread).
+        _snapFullCapture = true;
+        CaptureSnapshot();
+
+        _applySnap.Clear();
+        foreach (var entry in _packet.SnapDelta) _applySnap[entry.Key] = entry.Value;
+        _packet.Reset(RenderBuildKind.Clean);
+        _spare.Add(_packet);
+        _packet = null;
     }
 
     /// <summary>
@@ -433,7 +551,16 @@ public class RenderCache
 
         _groupById.Clear();
         _groups.Clear();
+        _recordedUnits.Clear();   // the recorder's mirror of the above
+        // The designer builds a brand-new tree per render (fresh RenderIds), so the frozen layout of the old one - both the
+        // recorder's map and the applier's replica - is dead weight that would otherwise grow unboundedly.
+        _snap.Clear();
+        _applySnap.Clear();
     }
+
+    /// <summary>The projection of the last packet the applier realized - captured by the RECORDER from the root visual. The
+    /// applier must use this rather than re-reading the live window, which it may not touch (it can be the render thread).</summary>
+    public Matrix4x4F AppliedProjection => _projectionMatrix;
 
     public void ProcessCommands(Matrix4x4F projectionMatrix, double renderScale)
     {
@@ -457,34 +584,46 @@ public class RenderCache
     // Cleared at each frame's build. Only the render path uses this; WorldTransform stays live for hit-test / layout.
     private readonly Dictionary<IUIComponent, Matrix4x4F> _worldCache = new();
 
-    // FROZEN per-frame layout inputs of a component - the ONE channel through which the render/draw path reads a
-    // component's MUTABLE layout state (transform, size, clip flag, motion-node flag, parent link). Captured LAZILY from
-    // the live tree on first access and memoised; the compose helpers (World/CumulativeClip/NodeOf/RelWorld/LogicalBounds/
-    // ResolveScissor) read ONLY from here, never off the live IUIComponent. Same lifetime as _worldCache (cleared with it
-    // wherever a transform/structure change invalidates positions). This makes the draw pass a pure function of the
-    // snapshot - the prerequisite for running it on a separate render thread while layout mutates the tree (Phase 1 of
-    // docs/RENDER_THREAD_PLAN.md). RenderId stays a live read: it is an immutable identity, thread-safe to read.
-    private readonly struct LayoutSnapshot(Matrix4x4F localTransform, Size renderSize, bool clipToBounds, bool isMotionNode, IUIComponent visualParent)
-    {
-        public Matrix4x4F LocalTransform { get; } = localTransform;
-        public Size RenderSize { get; } = renderSize;
-        public bool ClipToBounds { get; } = clipToBounds;
-        public bool IsMotionNode { get; } = isMotionNode;
-        public IUIComponent VisualParent { get; } = visualParent;
-    }
-
+    // RECORDER-owned frozen layout state (see LayoutSnapshot): the authority, mutated on the update thread. The APPLIER never
+    // reads it - it folds each packet's SnapDelta into its own replica (_applySnap) instead, so the two threads share no
+    // mutable map. Persistent across frames and refreshed incrementally (CaptureSnapshot).
     private readonly Dictionary<IUIComponent, LayoutSnapshot> _snap = new();
 
-    // The per-frame recorder->applier handoff (Phase 3, docs/RENDER_THREAD_PLAN.md). The device-free record pass fills it
-    // (walk + component.Render + copied draw commands); the GPU apply pass consumes it. In 3.0 both run inline on one
-    // thread so a single pooled packet suffices; 3.2 double-buffers it so the applier can run on the render thread.
-    private readonly RenderPacket _packet = new();
+    // APPLIER-owned replica, built ONLY from the deltas of packets it has consumed - what the draw pass actually reads.
+    private readonly Dictionary<IUIComponent, LayoutSnapshot> _applySnap = new();
 
+    // --- The recorder -> applier seam (Phase 3.3, docs/RENDER_THREAD_PLAN.md) --------------------------------------------
+    // DOUBLE-BUFFERED: the recorder fills one packet while the applier consumes another, so the loop no longer waits for the
+    // GPU frame (the 3.3 scaffold had ONE packet + a free token, which lock-stepped the loop to the render's pace - no
+    // anti-freeze at all). Packets are DELTAS, so a queued one may never be DROPPED (a Partial carries only that frame's
+    // dirty components - skipping it loses them for good). The applier therefore drains EVERY queued packet in order and
+    // draws ONCE afterwards: stale frames are collapsed at the DRAW, never at the delta.
+    private readonly ConcurrentQueue<RenderPacket> _published = new();   // recorded, awaiting the applier
+    private readonly ConcurrentBag<RenderPacket> _spare = new();         // consumed, back for reuse
+    private RenderPacket _packet;                                        // the one being recorded right now
+
+    private RenderPacket RentPacket() => _spare.TryTake(out var packet) ? packet : new RenderPacket();
+
+    // Record one component's frozen layout into the recorder's map AND into this frame's delta (the applier's replica is
+    // built from nothing else). Memoised: an unchanged component is captured once and never re-sent.
     private LayoutSnapshot Snap(IUIComponent c)
     {
         if (_snap.TryGetValue(c, out var s)) return s;
         s = new LayoutSnapshot(c.LocalTransform, c.RenderSize, c.ClipToBounds, c.IsRenderMotionNode, c.VisualParent);
         _snap[c] = s;
+        _packet.SnapDelta.Add(new KeyValuePair<IUIComponent, LayoutSnapshot>(c, s));
+        return s;
+    }
+
+    // APPLIER's view of a component's frozen layout: its private replica, folded from the packets' deltas. A miss means the
+    // recorder never froze that component - which cannot happen for anything the applier draws - so it falls back to the live
+    // component, exactly as the pre-split code did. That fallback is the ONE live read left on this side; it is unreachable in
+    // the recorded paths.
+    private LayoutSnapshot ApplySnap(IUIComponent c)
+    {
+        if (_applySnap.TryGetValue(c, out var s)) return s;
+        s = new LayoutSnapshot(c.LocalTransform, c.RenderSize, c.ClipToBounds, c.IsRenderMotionNode, c.VisualParent);
+        _applySnap[c] = s;
         return s;
     }
 
@@ -494,37 +633,59 @@ public class RenderCache
     // never dereferences a live IUIComponent: it is the recorder->applier handoff of the frozen layout state
     // (docs/RENDER_THREAD_PLAN.md), the prerequisite for running the applier on a separate render thread while layout
     // mutates the tree. Memoised + the per-component ancestor early-out (ContainsKey) keep it O(distinct components).
+    // INCREMENTAL (O(changed), not O(scene)): the snapshot PERSISTS across frames, and only what actually changed this frame is
+    // re-frozen - the components the packet re-recorded (their size/clip may differ), the motion nodes that moved, and the
+    // components that moved (RenderDirty names them). Nothing else can be stale: an ancestor moving does not change a
+    // descendant's LOCAL transform, only the composed WORLD one - and that is a derived memo, dropped separately. A Full walk
+    // drops the snapshot and its packet carries every component, so it re-freezes everything by construction.
+    //
+    // This is what lets the record run off the render thread: the previous version re-derived the snapshot by walking `_groups`
+    // - the RENDER-side retained unit list - every frame, which is both O(scene) and a cross-thread read of render-owned state.
+    // The group walk survives ONLY for the flat adorner build (BuildFromComponents), which has no packet and whose recorder and
+    // applier always run together inline on the loop thread.
     private void CaptureSnapshot()
     {
-        // Retained units (Clean / the unchanged part of a Partial): last frame's groups still hold them at record time.
-        foreach (var group in _groups)
-        foreach (var unit in group.Units)
-            for (var c = unit.Component; c != null && !_snap.ContainsKey(c); c = c.VisualParent)
-                Snap(c);
-        // THIS frame's recorded draws (every component of a Full walk; the dirty/newly-spliced ones of a Partial): the
-        // groups above are still PRE-apply here (Step 3 captures before ApplyFrame builds them), so the packet is what
-        // carries the new/changed component set. Memoised, so the overlap with the groups above is free.
-        foreach (var draw in _packet.Draws)
-            for (var c = draw.Component; c != null && !_snap.ContainsKey(c); c = c.VisualParent)
-                Snap(c);
-        // A moved motion node changed its transform THIS frame, so its cached snapshot is STALE - force-refresh it. The
-        // ContainsKey early-out below would otherwise keep last frame's LocalTransform, and RefreshMovedNodes (and the
-        // fall-through recording walk) then compose World from that stale value: a flipping/tilting tile freezes at its
-        // old angle, and its 90-degree face-swap sticks - the O(1)-path regressions Phase 2a reintroduced when it stopped
-        // clearing _snap in RefreshMovedNodes and relied on this eager capture. Only the node itself moved; its ancestors
-        // did not - so drop just the node's entry, then re-Snap it and walk the (still-valid, memoised) ancestor chain.
-        foreach (var node in _movedNodesBuf)
+        if (_snapFullCapture)
         {
-            _snap.Remove(node);
-            for (var c = node; c != null && !_snap.ContainsKey(c); c = c.VisualParent)
-                Snap(c);
+            foreach (var group in _groups)
+            foreach (var unit in group.Units)
+                for (var c = unit.Component; c != null && !_snap.ContainsKey(c); c = c.VisualParent)
+                    Snap(c);
+            _snapFullCapture = false;
         }
+
+        // Re-recorded this frame (every component of a Full walk; the dirty/newly-spliced ones of a Partial).
+        foreach (var draw in _packet.Draws) RefreshSnapshot(draw.Component);
+        // Moved this frame. A moved MOTION NODE whose entry is kept stale is the classic O(1)-path regression: World() then
+        // composes the node from LAST frame's LocalTransform, so a tilting tile never moves and a flipping one sticks at the
+        // angle it had when its 90-degree face-swap re-recorded it (the swap is geometry - it rides the packet's draws - but
+        // the ANGLE lives only here). Read the nodes off THIS frame's packet: _movedNodesBuf is the APPLIER's copy of them.
+        foreach (var node in _packet.MovedNodes) RefreshSnapshot(node);
+        foreach (var moved in _movedBuf) RefreshSnapshot(moved);
+    }
+
+    // Re-freeze ONE component's entry (it changed this frame, so the memoised ContainsKey early-out must NOT keep the old one),
+    // then walk its ancestor chain lazily - those didn't change unless they are themselves in one of the changed sets, where
+    // their own RefreshSnapshot handles them.
+    private void RefreshSnapshot(IUIComponent component)
+    {
+        if (component == null) return;
+        var snapshot = new LayoutSnapshot(component.LocalTransform, component.RenderSize, component.ClipToBounds,
+            component.IsRenderMotionNode, component.VisualParent);
+        _snap[component] = snapshot;
+        // ...AND publish it. The delta is the ONLY thing the applier's replica is built from, so a re-freeze that updates the
+        // recorder's map alone leaves the applier composing this component from its PREVIOUS transform: a tilting tile never
+        // moves and a flipping one draws its new face at the old angle. (Snap() below publishes on its own - it only writes
+        // when the entry is new - but this force-refresh overwrites an existing one, so it must publish explicitly.)
+        _packet.SnapDelta.Add(new KeyValuePair<IUIComponent, LayoutSnapshot>(component, snapshot));
+        for (var c = component.VisualParent; c != null && !_snap.ContainsKey(c); c = c.VisualParent)
+            Snap(c);
     }
 
     private Matrix4x4F World(IUIComponent c)
     {
         if (_worldCache.TryGetValue(c, out var m)) return m;
-        var s = Snap(c);
+        var s = ApplySnap(c);
         m = s.VisualParent != null ? s.LocalTransform * World(s.VisualParent) : s.LocalTransform;
         _worldCache[c] = m;
         return m;
@@ -541,13 +702,18 @@ public class RenderCache
     // A moved node with ANY non-aware content (world-baked text, per-unit draws) can't take the slot-write fast path -
     // those retained draws would stay at the old position - so the frame falls back to the full walk.
     private readonly Dictionary<Guid, bool> _nodeAllAware = new();
-    private readonly List<IUIComponent> _movedNodesBuf = new();   // nodes captured from RenderDirty for the draw phase
+    // APPLIER-owned: the moved nodes of the packets drained for THIS draw (the draw rewrites their table matrices, then clears
+    // it). The RECORDER must not read it - it takes the frame's moved nodes off RenderDirty into packet.MovedNodes.
+    private readonly List<IUIComponent> _movedNodesBuf = new();
+    // RECORDER-owned: the components that MOVED this frame - CaptureSnapshot re-freezes exactly their snapshot entries.
+    private readonly List<IUIComponent> _movedBuf = new();
+    private bool _snapFullCapture;   // adorner build only: re-capture the snapshot from the retained units
 
     private IUIComponent NodeOf(IUIComponent c)
     {
         if (c == null) return null;
         if (_nodeCache.TryGetValue(c, out var n)) return n;
-        var s = Snap(c);
+        var s = ApplySnap(c);
         n = s.IsMotionNode ? c : NodeOf(s.VisualParent);
         _nodeCache[c] = n;
         return n;
@@ -556,7 +722,7 @@ public class RenderCache
     private Matrix4x4F RelWorld(IUIComponent c)
     {
         if (_relWorldCache.TryGetValue(c, out var m)) return m;
-        var s = Snap(c);
+        var s = ApplySnap(c);
         m = s.IsMotionNode
             ? Matrix4x4F.Identity
             : (s.VisualParent is { } p ? s.LocalTransform * RelWorld(p) : s.LocalTransform);
@@ -624,7 +790,7 @@ public class RenderCache
     {
         if (c == null) return null;
         if (_clipCache.TryGetValue(c, out var cached)) return cached;
-        var s = Snap(c);
+        var s = ApplySnap(c);
         var parentClip = CumulativeClip(s.VisualParent);
         var result = parentClip;
         if (s.ClipToBounds)
@@ -1324,7 +1490,7 @@ public class RenderCache
     // clips against, reused here for the batches' paint-order overlap test.
     private Rect LogicalBounds(IUIComponent component, Matrix4x4F worldTransform)
     {
-        var size = Snap(component).RenderSize;
+        var size = ApplySnap(component).RenderSize;
         return new Rect(0, 0, size.Width, size.Height).TransformToAABB(worldTransform);
     }
 
@@ -1405,7 +1571,7 @@ public class RenderCache
         // Use the SAME world transform the caller will bake into the GPU draw, not a fresh component.WorldTransform read:
         // layout runs on another thread, so a re-read here could differ from what is actually drawn (cull says "inside"
         // while the GPU paints it outside -> the off-viewport spill).
-        var scissorSize = Snap(component).RenderSize;
+        var scissorSize = ApplySnap(component).RenderSize;
         var bounds = new Rect(0, 0, scissorSize.Width, scissorSize.Height).TransformToAABB(worldTransform);
         cull = bounds.Right <= logical.X || bounds.X >= logical.Right || bounds.Bottom <= logical.Y || bounds.Y >= logical.Bottom;
 
@@ -1440,7 +1606,9 @@ public class RenderCache
     private void ReassignOrders()
     {
         if (_lastVisualRoot == null) return;
-        _orderByControl.Clear();
+        // Fresh map + publish, for the same reason as RecordFullWalk: the applier holds the previous one by reference.
+        _orderByControl = new Dictionary<Guid, int>(_orderByControl.Count);
+        _packet.Orders = _orderByControl;
         _orderStack.Clear();
         _orderVisited.Clear();
         var order = 0;
@@ -1461,7 +1629,10 @@ public class RenderCache
     // applier realizes them (ApplyFullWalk). This is what lets the recorder run on the update thread (docs/RENDER_THREAD_PLAN.md).
     private void RecordFullWalk(IRootVisualComponent visualRoot, RenderPacket packet)
     {
-        _orderByControl.Clear();
+        // A FRESH map, never a Clear() of the published one: the applier still holds the previous map by reference (it may be
+        // drawing the previous frame on the render thread), so mutating it in place would pull the ranks out from under it.
+        _orderByControl = new Dictionary<Guid, int>(_orderByControl.Count);
+        packet.Orders = _orderByControl;   // publish this walk's ranks to the applier
         _lastVisualRoot = visualRoot;
         var order = 0;
         packet.ProjectionMatrix = visualRoot.GetProjectionMatrix();
@@ -1489,10 +1660,19 @@ public class RenderCache
 
             _drawingContextInternal.Clear();
             component.Render(_drawingContext);
-            packet.Draws.Add(new ComponentDraw(component, CopyCommands(_drawingContextInternal.GetDrawCommands()), wasGeometryValid));
+            var commands = CopyCommands(_drawingContextInternal.GetDrawCommands());
+            packet.Draws.Add(new ComponentDraw(component, commands, wasGeometryValid));
+            MirrorUnits(component, commands.Count, wasGeometryValid);
 
             PushChildrenInPaintOrder(stack, component.VisualChildren);
         }
+
+        // Mirror the applier's ReconcileDetachedControls: it frees the units of every control no longer in the tree, so the
+        // recorder's own view of "who holds units" must drop them too (this walk never visits them - they aren't in the tree).
+        _staleUnitIds.Clear();
+        foreach (var (id, entry) in _recordedUnits)
+            if (!entry.Component.IsAttachedToVisualTree) _staleUnitIds.Add(id);
+        foreach (var id in _staleUnitIds) _recordedUnits.Remove(id);
     }
 
     // APPLY half of the full walk (GPU / render-thread side): rebuild the paint-order groups from the recorded draws -

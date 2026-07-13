@@ -28,6 +28,11 @@ public static class RuntimeStats
     /// <summary>Overlay stages (adorner + popup) draw.</summary>
     public static double LastProcessorsMs;
 
+    /// <summary>Cumulative count of frames actually PRESENTED. With a dedicated render thread this is the only honest frame
+    /// rate: the loop's own rate measures Update + record, and the two are deliberately decoupled - a heavy Update must not
+    /// drag the presented frame rate down with it (that is the entire point of the split). Sample by delta.</summary>
+    public static long PresentedFrames;
+
     /// <summary>Cumulative count of binding target writes - every time a <c>{Binding}</c> pushes a value to its target:
     /// the initial connect, a DataContext re-resolve (e.g. a recycled list container rebinding on scroll), AND a batched
     /// source-property change. Sample by delta to see how many landed this frame (idle ~0; spikes on scroll rebinds and

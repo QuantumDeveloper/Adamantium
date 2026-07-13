@@ -123,8 +123,11 @@ public class Transform : AnimatableUIComponent
         // replay); otherwise the conservative global Transform mark re-bakes world transforms as before. Transform's
         // inner properties carry no AffectsRender, so without this they'd self-mark nothing and the animation heartbeat
         // had to fall back to MarkStructural every tick (a full-window walk = the tab-drag lag).
+        // Owner is null only when this transform isn't assigned as anyone's RenderTransform (so it moves nothing yet) -
+        // MarkTransform then records an UNNAMEABLE move and the recorder re-captures the whole layout snapshot for that
+        // frame rather than silently keeping a stale entry.
         if (Owner is { IsRenderMotionNode: true } node) RenderDirty.MarkNodeTransform(node);
-        else RenderDirty.MarkTransform();
+        else RenderDirty.MarkTransform(Owner);
     }
 
     private Matrix4x4 CalculateFinalTransform()
