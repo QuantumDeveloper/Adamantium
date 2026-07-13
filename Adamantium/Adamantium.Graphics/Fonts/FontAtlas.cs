@@ -92,6 +92,24 @@ namespace Adamantium.Graphics.Fonts
             };
 
             Atlas = Texture.New(GraphicsDevice, description, "Dynamic Font Atlas");
+
+            Prewarm();
+        }
+
+        // The characters a UI is overwhelmingly made of. Rasterized ONCE, in ONE bulk call, when the atlas is born.
+        private const string PrewarmCharset =
+            " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+
+        // Rasterizing a glyph is MSDF work - measured at ~23 ms each (Debug). The atlas grows LAZILY, one Update(text) per text
+        // block, so a cold fill introduced roughly one new character per block and paid that ~23 ms serially, ~50 times: 1.1 s
+        // of a 1.9 s 4K-viewport fill, and by far its single biggest cost. The generator already parallelises across glyphs
+        // (TextureAtlasGenerator.GenerateTextureForGlyphs) - it was just never given more than one at a time. Handing it the
+        // whole base charset up front turns ~50 serial single-glyph rasterizations into ONE parallel batch, and every text
+        // block that follows finds its glyphs already there. Anything outside this set still grows the atlas lazily, exactly
+        // as before - the cost simply stops landing in the middle of a fill.
+        private void Prewarm()
+        {
+            ProcessGlyphs(Font.TranslateIntoGlyphs(PrewarmCharset));
         }
 
         private Glyph[] GetNotProcessedGlyphs(IEnumerable<Glyph> glyphs)

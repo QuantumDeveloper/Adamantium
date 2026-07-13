@@ -275,19 +275,26 @@ public class TextRenderComponent : ImageRenderComponent
         RenderingParameters = renderingParameters;
         Foreground = foreground;
         Stroke = stroke;
-        // Supersampled target: TextSupersample x the logical text size. Must scale together with
-        // FontRenderer.RenderScale (set in Render) — RT and rasterization scale have to match or the glyphs
-        // and the target disagree (the earlier "crumpled" SSAA was exactly this mismatch).
-        // No MSAA: the glyphs are MSDF-textured quads, so their edge anti-aliasing comes from the font pixel shader
-        // (screenPxRange median) - NOT from coverage sampling. MSAA would only AA the quad's axis-aligned borders, i.e.
-        // nothing useful, while costing 4x sample memory + a resolve on every text (re)rasterization. Single-sample.
-        _renderTarget = ToDispose(device.CreateRenderTarget((uint)(mesh.Bounds.Width * TextSupersample),
-            (uint)(mesh.Bounds.Height * TextSupersample),
-            MSAALevel.None,
-            SurfaceFormat.R8G8B8A8.UNorm,
-            name: "TextRenderer"));
+        _rtWidth = (uint)(mesh.Bounds.Width * TextSupersample);
+        _rtHeight = (uint)(mesh.Bounds.Height * TextSupersample);
         Sampler = GraphicsDevice.SamplerStates.LinearFont;
     }
+
+    private readonly uint _rtWidth, _rtHeight;
+
+    // The block's PRIVATE text target, allocated ONLY for the path that actually uses it - PreRender rasterizes the glyphs
+    // into it and Render composites it. Neither of the two live paths does: batched text goes into the shared glyph SSBO, and
+    // FontRenderer.UseDirectTextDraw (the default) draws the glyphs straight into the main pass. Allocating it up front, in the
+    // ctor, made EVERY text block pay a Vulkan render-target creation it would never read - measured at ~28 ms per block, which
+    // was 1.3 s of the 1.9 s it took to fill a 4K viewport, and by far the single biggest cost in the whole fill. Same reasoning
+    // that already makes the per-block glyph vertex buffer (EnsureGlyphVtx) and a batchable rect's whole body lazy.
+    //
+    // Supersampled: TextSupersample x the logical text size, and it must scale together with FontRenderer.RenderScale (set in
+    // PreRender) - RT and rasterization scale have to match or the glyphs and the target disagree (the "crumpled" SSAA bug).
+    // No MSAA: the glyphs are MSDF-textured quads, so their edge AA comes from the font pixel shader (screenPxRange median),
+    // not from coverage sampling - MSAA would only AA the quad's own axis-aligned borders while costing 4x sample memory.
+    private IRenderTarget EnsureRenderTarget() => _renderTarget ??= ToDispose(GraphicsDevice.CreateRenderTarget(
+        _rtWidth, _rtHeight, MSAALevel.None, SurfaceFormat.R8G8B8A8.UNorm, name: "TextRenderer"));
     
     public FontRenderer FontRenderer { get; }
     public TextLayout TextLayout { get; }
@@ -373,7 +380,7 @@ public class TextRenderComponent : ImageRenderComponent
         var previousColor = GraphicsDevice.ClearColor;
         // Rasterize the (logical-size) layout RenderScale x larger into the target; the composite minifies it = SSAA.
         FontRenderer.RenderScale = TextSupersample;
-        FontRenderer.SetState(GraphicsDevice.SamplerStates.LinearFont, location, _renderTarget, outerPassActive: false);
+        FontRenderer.SetState(GraphicsDevice.SamplerStates.LinearFont, location, EnsureRenderTarget(), outerPassActive: false);
         FontRenderer.DrawLayout(EnsureGlyphVtx(), (uint)GlyphRun.Count, GlyphRun.Atlas, GlyphRun.FontSize, foreground, stroke);
         FontRenderer.RestoreState(outerPassActive: false);
         GraphicsDevice.ClearColor = previousColor;
@@ -388,8 +395,8 @@ public class TextRenderComponent : ImageRenderComponent
             return;
         }
 
-        // The glyphs were rasterized into _renderTarget in PreRender (before the main pass); here we only composite it.
-        Texture = _renderTarget.ResolveTexture;
+        // The glyphs were rasterized into the private target in PreRender (before the main pass); here we only composite it.
+        Texture = EnsureRenderTarget().ResolveTexture;
         Sampler = GraphicsDevice.SamplerStates.LinearClampToEdge;
         // The text target holds premultiplied color (the font shaders output rgb*alpha, rendered with a premultiplied
         // blend), so composite it with a premultiplied blend too - a straight AlphaBlend would darken the edges (rim).
