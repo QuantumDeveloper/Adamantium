@@ -55,6 +55,7 @@ public static class RenderDirty
         // stay lock-free (a lost increment only mis-counts a diagnostic).
         if (component == null) return;
         lock (GeometrySet) GeometrySet.Add(component);
+        LoopSignal.Request();   // the scene changed - the loop owes a frame
     }
 
     /// <summary>Atomically snapshot the geometry-dirty set into <paramref name="buffer"/> under the same lock
@@ -89,6 +90,7 @@ public static class RenderDirty
     public static void MarkTransform(IUIComponent component)
     {
         _transform = true;
+        LoopSignal.Request();
         if (component == null) { _transformUnknown = true; return; }
         lock (MovedSet) MovedSet.Add(component);   // locked: movers arrive from the parallel arrange too (see MarkGeometry)
     }
@@ -114,6 +116,7 @@ public static class RenderDirty
     /// Locked for the same parallel-arrange reason as <see cref="MarkGeometry"/>.</summary>
     public static void MarkNodeTransform(IUIComponent node)
     {
+        LoopSignal.Request();
         if (node == null) return;
         lock (NodeSet) NodeSet.Add(node);
     }
@@ -145,6 +148,7 @@ public static class RenderDirty
     public static void MarkStructural(IUIComponent component = null)
     {
         _structural = true;
+        LoopSignal.Request();
         TotalStructuralMarks++;
         if (component == null) { _structuralUnknown = true; return; }
         lock (StructuralSet) StructuralSet.Add(component);   // locked: marks arrive from the parallel arrange too
@@ -173,7 +177,7 @@ public static class RenderDirty
 
     /// <summary>Force full structural rebuilds until the layout signals it has fully settled (see
     /// <see cref="_forceUntilSettled"/>). Call when starting a multi-frame state swap (theme, DPI).</summary>
-    public static void ForceStructuralUntilSettled() => _forceUntilSettled = true;
+    public static void ForceStructuralUntilSettled() { _forceUntilSettled = true; LoopSignal.Request(); }
 
     /// <summary>Called by the layout manager after a pass that found NO work (every queue empty) - the settle signal for
     /// <see cref="ForceStructuralUntilSettled"/>. The current frame's build stays forced (the final walk, which follows

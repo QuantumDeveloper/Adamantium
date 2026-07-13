@@ -113,20 +113,26 @@ public class WindowRenderService : UiRenderService
     /// <summary>Phase 3.2 Step 2b: the DEVICE-FREE record half, hoisted to loop level (UIApplication.RecordRenderFrame) so
     /// it runs after the whole Update phase (all layout settled) and before any GPU Draw. No presenter/device needed here;
     /// the apply half stays in BeginDraw (ApplyData). No-op in the default single-threaded path (record stays inline).</summary>
-    public void RecordFrame()
+    /// <summary>Records this window's packet. Returns FALSE when it could not - the caller must then NOT clear RenderDirty,
+    /// or the marks it never recorded are lost for good.</summary>
+    public bool RecordFrame()
     {
-        // The renderer is awaiting a presenter resize - there is nothing coherent to record against yet, so skip this frame
-        // (the render thread simply replays what it has). The SETTLING-swap case no longer defers: it used to hand the frame
-        // to an inline record+draw on the loop thread, and that path is gone - the device belongs to the render thread alone.
-        // What the deferral was protecting against (a packet drawn against a projection the swap has since changed) is now
-        // carried by the packet itself: the recorder captures the projection WITH the frame.
+        // The renderer is awaiting a presenter resize (and at startup it always is, until the swapchain exists) - there is
+        // nothing coherent to record against yet, so skip this frame; the render thread simply replays what it has.
+        //
+        // Reporting that back MATTERS. The caller used to clear RenderDirty regardless, so everything the layout pass marked
+        // while the renderer was still coming up was wiped WITHOUT ever being recorded - and nothing re-marks a component that
+        // is already clean. That is why the first tab's content, which is built during exactly that startup window, was simply
+        // never drawn: its marks were thrown away before the first real record. Later tabs are built once the renderer is up,
+        // so they were fine, which is what made it look like a tab bug rather than a lost-invalidation bug.
         if (windowRenderer is not { IsRendererUpToDate: true })
         {
             _recordedAtLoopLevel = false;
-            return;
+            return false;
         }
         windowRenderer.RecordData();
         _recordedAtLoopLevel = true;
+        return true;
     }
 
     public override bool BeginDraw()

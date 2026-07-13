@@ -41,6 +41,21 @@ namespace Adamantium.ECS
         
         public IReadOnlyCollection<EntityService> Services => services.AsReadOnly();
 
+        // The per-frame phases (Update, Draw, Present) iterate THIS immutable snapshot, not the live collection under a lock.
+        //
+        // They used to hold `syncObject` for their whole body - and Draw's body is an entire GPU frame: BeginDraw's fence wait,
+        // the draw, submit, present. Once Draw moved to the render thread that lock became a hard lock-step: the loop thread
+        // entering Update BLOCKED until the render thread had finished presenting. Measured on the 60k grid: 60-280 ms of a
+        // 200 ms loop frame was the loop standing still on this lock - more than layout and the render record combined, and
+        // invisible to every phase timer, because waiting is not work. It is exactly the backpressure the render-thread split
+        // exists to remove, hidden one layer down.
+        //
+        // The collection itself only ever changes in SyncServices (adds/removes are queued and applied there), so a snapshot
+        // published on each change is all the iterators need - and they need no lock at all.
+        private volatile EntityService[] _snapshot = [];
+
+        private void RepublishSnapshot() => _snapshot = [.. services];
+
         public Action FrameEnded;
         
         internal void InitializeResources()
@@ -126,46 +141,39 @@ namespace Adamantium.ECS
             }
         }
 
+        // No lock: iterate the published snapshot. Update runs on the loop thread and Draw/Present on the render thread, and
+        // sharing one lock made the loop wait out the whole GPU frame (see _snapshot).
         public void Update(AppTime gameTime)
         {
-            lock (syncObject)
+            foreach (var handler in _snapshot)
             {
-                foreach (var handler in Services)
-                {
-                    handler.Update(gameTime);
-                }
+                handler.Update(gameTime);
             }
         }
 
         public void Draw(AppTime gameTime)
         {
-            lock (syncObject)
+            foreach (var service in _snapshot)
             {
-                foreach (var service in Services)
-                {
-                    if (!service.IsRenderingService) continue;
+                if (!service.IsRenderingService) continue;
 
-                    if (!service.BeginDraw()) continue;
-                    
-                    OnDrawStarted?.Invoke(service, gameTime);
-                    service.Draw(gameTime);
-                    service.EndDraw();
-                    OnDrawFinished?.Invoke(service, gameTime);
-                    service.Submit();
-                }
+                if (!service.BeginDraw()) continue;
+
+                OnDrawStarted?.Invoke(service, gameTime);
+                service.Draw(gameTime);
+                service.EndDraw();
+                OnDrawFinished?.Invoke(service, gameTime);
+                service.Submit();
             }
         }
 
         public void Present()
         {
-            lock (syncObject)
+            foreach (var service in _snapshot)
             {
-                foreach (var service in Services)
+                if (service.CanDisplayContent)
                 {
-                    if (service.CanDisplayContent)
-                    {
-                        service.Present();
-                    }
+                    service.Present();
                 }
             }
             OnFrameEnded();
@@ -207,6 +215,8 @@ namespace Adamantium.ECS
 
                     servicesToAdd.Clear();
                 }
+
+                RepublishSnapshot();   // the ONLY place the service set changes - so the only place the iterators' view moves
             }
         }
 

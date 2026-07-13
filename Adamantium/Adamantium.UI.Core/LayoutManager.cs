@@ -88,10 +88,19 @@ public sealed class LayoutManager
         return GetOrCreate(top);
     }
 
-    public void InvalidateStyle(IUIComponent node) => _toStyle.Enqueue(node);
+    // Every invalidation means the loop owes another layout pass - so it must not be asleep. Layout is NOT covered by the
+    // render-dirty marks (a measure/arrange is not a render mark), so without this the loop only woke on its 250 ms safety
+    // timeout: a tab's content, which is built and laid out over several passes, then crawled in at four passes a second and
+    // looked simply blank. See LoopSignal.
+    public void InvalidateStyle(IUIComponent node)
+    {
+        _toStyle.Enqueue(node);
+        LoopSignal.Request();
+    }
 
     public void InvalidateMeasure(IUIComponent node)
     {
+        LoopSignal.Request();
         // Parallel-rebind window (a virtualizing panel is preparing+measuring its tiles across threads): a rebind's
         // synchronous binding writes flip AffectsMeasure props -> InvalidateMeasure, which would concurrently mutate this
         // root's DirtyQueue (PriorityQueue + HashSet, NOT thread-safe). COLLECT lock-free and REPLAY sequentially when the
@@ -105,6 +114,7 @@ public sealed class LayoutManager
 
     public void InvalidateArrange(IUIComponent node)
     {
+        LoopSignal.Request();
         if (_deferInvalidations) { DeferredArrange.Enqueue(node); return; }
         _toArrange.Enqueue(node);
     }
@@ -133,7 +143,13 @@ public sealed class LayoutManager
     /// virtualizing panel that realized only a slice of a large window this frame and wants to continue next frame (so a
     /// big realize burst is spread over frames instead of hanging one). Safe to call mid-pass: it does not touch this
     /// pass's queues.</summary>
-    public void InvalidateMeasureNextPass(IUIComponent node) => _toMeasureNextPass.Add(node);
+    // A budget-deferred continuation (a virtualizing panel realizing its window in slices). Nothing will EVENT the loop back -
+    // the work is already known - so it must signal, or the fill stalls until the safety timeout.
+    public void InvalidateMeasureNextPass(IUIComponent node)
+    {
+        _toMeasureNextPass.Add(node);
+        LoopSignal.Request();
+    }
 
     /// <summary>Raised once at the end of a layout pass that actually did work (queues drained), i.e. when layout has
     /// settled for this frame. Not raised on a clean frame - so a consumer (e.g. the render cache) can rebuild on this
