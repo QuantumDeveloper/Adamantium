@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using Adamantium.Core;
 using Adamantium.Core.Collections;
@@ -52,6 +53,17 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
     private bool firstWindowAdded;
     private Thread applicationLoopThread;
     private CancellationTokenSource cancellationTokenSource;
+
+    // Phase 3.3b render thread (RenderThreadOptions.RenderThreadEnabled). The loop thread does Update + Record and hands the
+    // recorded frame to renderThread through a bounded FULL/FREE channel pair, then returns WITHOUT waiting - so it runs the
+    // NEXT frame's Update concurrently with the render thread applying + presenting this one (the anti-freeze overlap).
+    //   _renderFull  loop -> render : "this frame is recorded, apply + present it" (carries the frame's AppTime).
+    //   _renderFree  render -> loop : "I have consumed the packet, you may overwrite it" (backpressure). Seeded with ONE
+    //                token, so exactly one packet is ever in flight - the single RenderCache packet is never overwritten
+    //                while the render thread is still reading it, and the loop stays at most ~1 frame ahead.
+    private Thread renderThread;
+    private readonly Channel<AppTime> _renderFull = Channel.CreateBounded<AppTime>(1);
+    private readonly Channel<bool> _renderFree = Channel.CreateBounded<bool>(1);
 
     static UIApplication()
     {
@@ -394,6 +406,12 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
 
         Initialize();
         OnStartupInternal();
+        if (RenderThreadOptions.RenderThreadEnabled)
+        {
+            _renderFree.Writer.TryWrite(true);   // seed the single in-flight token so the first record may proceed
+            renderThread = new Thread(RenderThread) { IsBackground = true, Name = "AdamantiumRenderThread" };
+            renderThread.Start();
+        }
         applicationLoopThread.Start();
         Dispatcher.Run(cancellationTokenSource.Token);
     }
@@ -461,7 +479,7 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
                     {
                         Update(appTime);
                         RecordRenderFrame();
-                        ExecuteDrawSequence(appTime);
+                        DispatchRenderFrame(appTime);
 
                         UpdateAppTime(accumulatedFrameTime);
                         accumulatedFrameTime = 0;
@@ -471,7 +489,7 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
                 {
                     Update(appTime);
                     RecordRenderFrame();
-                    ExecuteDrawSequence(appTime);
+                    DispatchRenderFrame(appTime);
 
                     UpdateAppTime(frameTime);
                 }
@@ -505,16 +523,36 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
     private void RecordRenderFrame()
     {
         if (RenderThreadOptions.SingleThreaded || DisableRendering) return;
+
+        var threaded = RenderThreadOptions.RenderThreadEnabled && renderThread != null;
+        if (threaded)
+        {
+            // Backpressure: block until the render thread has consumed (applied + presented) the PREVIOUS packet before we
+            // overwrite the single RenderCache packet with this frame's record. The loop's Update already ran concurrently
+            // with that render frame; this caps the loop to ~1 frame ahead.
+            try { BlockingRead(_renderFree.Reader); }
+            catch (OperationCanceledException) { return; }
+        }
+
         foreach (var service in windowToSystem.Values)
             service.RecordFrame();
-        // The RenderDirty.Clear is hoisted to ExecuteDrawSequence (AFTER the draw), so it covers both the loop-recorded
-        // windows and any that deferred to the inline fallback (whose record runs during the draw), and fires only when the
-        // frame actually drew.
+
+        // Threaded STEADY state clears the dirty set HERE, on the LOOP thread, right after the record snapshotted it - the
+        // applier (render thread) consumes the frozen buffers, never RenderDirty, so the render thread must not touch it
+        // (it would race the next Update's marks). NOT while a swap is settling: then RecordFrame deferred to the inline
+        // path (DispatchRenderFrame's barrier), which consumes + clears RenderDirty itself - clearing here would wipe the
+        // marks before that inline record reads them.
+        if (threaded && !RenderDirty.IsSettlingStructural)
+            RenderDirty.Clear();
     }
 
-    private void ExecuteDrawSequence(AppTime appTime)
+    // Returns whether the frame actually drew (BeginScene passed). RenderDirty.Clear is NOT done here - this method runs on
+    // the render thread in the threaded-steady path, and the render thread must never touch RenderDirty (it would race the
+    // loop's Update marks). The LOOP-thread callers clear instead: RecordRenderFrame (threaded steady) or DispatchRenderFrame
+    // (inline decoupled / the threaded resize barrier).
+    private bool ExecuteDrawSequence(AppTime appTime)
     {
-        if (DisableRendering) return;
+        if (DisableRendering) return false;
 
         var drew = BeginScene();
         if (drew)
@@ -529,11 +567,71 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
                 EndScene();
             }
         }
-        // Decoupled path (flag off): the frame's record - loop-level or the inline fallback inside Draw - has now been
-        // consumed by the applier, so clear the dirty set ONCE here. Only when the frame actually drew: a skipped BeginScene
-        // must not clear a recorded-but-unapplied packet (it re-records next frame), matching the default path, which clears
-        // per window inside ApplyFrame.
-        if (!RenderThreadOptions.SingleThreaded && drew) RenderDirty.Clear();
+        return drew;
+    }
+
+    // Phase 3.3b: run the GPU frame either inline (default / decoupled-single-thread) or on the dedicated render thread.
+    // Threaded, this PUBLISHES the recorded frame and returns without waiting - the loop overlaps the next Update with this
+    // frame's apply + present. No render thread was spawned unless the flag was set at startup, so RenderThreadEnabled
+    // without renderThread falls back to inline.
+    private void DispatchRenderFrame(AppTime appTime)
+    {
+        var threaded = RenderThreadOptions.RenderThreadEnabled && renderThread != null;
+
+        // Render thread OFF: run inline on this (loop) thread. The decoupled-inline path clears RenderDirty here (its record
+        // ran inline - loop-level or the BeginDraw fallback); the single-threaded default leaves the clear to ApplyFrame.
+        if (!threaded)
+        {
+            var drewInline = ExecuteDrawSequence(appTime);
+            if (!RenderThreadOptions.SingleThreaded && drewInline) RenderDirty.Clear();
+            return;
+        }
+
+        // Render thread ON, but a structural swap (resize / DPI / theme) is settling: STOP-THE-WORLD barrier. The render
+        // thread is idle here (RecordRenderFrame drained it via the free token) and RecordFrame deferred to the inline path,
+        // so run the whole frame INLINE on this loop thread - keeping the live-tree read off the render thread while Update
+        // mutates it - clear on this thread, and return the free token ourselves (no packet was handed off).
+        if (RenderDirty.IsSettlingStructural)
+        {
+            var drewBarrier = ExecuteDrawSequence(appTime);
+            if (drewBarrier) RenderDirty.Clear();
+            _renderFree.Writer.TryWrite(true);
+            return;
+        }
+
+        // Steady state: publish and return immediately (overlap). TryWrite always succeeds - RecordRenderFrame took the
+        // single free token, so the render thread has consumed the previous packet and _renderFull is empty.
+        _renderFull.Writer.TryWrite(appTime);
+    }
+
+    private void RenderThread()
+    {
+        while (!cancellationTokenSource.IsCancellationRequested)
+        {
+            AppTime appTime;
+            try { appTime = BlockingRead(_renderFull.Reader); }   // wait for the loop to publish a recorded frame
+            catch (OperationCanceledException) { break; }         // shutdown
+            try
+            {
+                ExecuteDrawSequence(appTime);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+                UnhandledException?.Invoke(this, new UnhandledExceptionEventArgs(ex));
+            }
+            finally
+            {
+                _renderFree.Writer.TryWrite(true);   // packet consumed -> the loop may overwrite it with the next frame
+            }
+        }
+    }
+
+    // Block the calling thread until an item arrives (or shutdown cancels the token, which throws OperationCanceledException).
+    private T BlockingRead<T>(ChannelReader<T> reader)
+    {
+        var pending = reader.ReadAsync(cancellationTokenSource.Token);
+        return pending.IsCompletedSuccessfully ? pending.Result : pending.AsTask().GetAwaiter().GetResult();
     }
 
     /// <summary>
@@ -643,7 +741,7 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
     public void ShutDown()
     {
         ShuttingDown?.Invoke(this, EventArgs.Empty);
-        cancellationTokenSource.Cancel();
+        cancellationTokenSource.Cancel();   // the render thread's BlockingRead observes this (OperationCanceled) and exits
         ContentUnloading?.Invoke(this, EventArgs.Empty);
         FreeResources();
         Stopped?.Invoke(this, EventArgs.Empty);

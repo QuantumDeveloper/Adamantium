@@ -9,4 +9,10 @@ namespace Adamantium.UI.Rendering;
 public static class RenderThreadOptions
 {
     public static bool SingleThreaded = true;
+
+    /// <summary>Phase 3.3: run the APPLY + Render + Present half (ExecuteDrawSequence) on a dedicated render thread while
+    /// the loop thread does Update + Record. Requires the decoupled record path (implies <see cref="SingleThreaded"/> =
+    /// false - the record must already run at loop level). Off by default; the render thread is only spawned when this is
+    /// set at startup. 3.3a hands off serialized (loop waits for the render frame); 3.3b relaxes it to overlapped.</summary>
+    public static bool RenderThreadEnabled = false;
 }
