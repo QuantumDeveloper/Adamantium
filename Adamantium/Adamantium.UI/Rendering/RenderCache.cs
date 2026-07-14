@@ -182,7 +182,6 @@ public class RenderCache
         // Freeze the layout snapshot HERE, at the END of the DEVICE-FREE record, on the update thread - so the applier (the
         // render thread) reads ONLY the frozen packet: its draws, its layout delta. Never a live component.
         CaptureSnapshot();
-
         _published.Enqueue(_packet);   // hand it over; the applier drains the queue (see ApplyFrame)
         _packet = null;
     }
@@ -267,8 +266,7 @@ public class RenderCache
         {
             _packet.Reset(RenderBuildKind.Structural);
             _packet.ProjectionMatrix = visualRoot.GetProjectionMatrix();
-            if (RecordStructuralFrame(visualRoot, _packet)) return;
-            // refused -> everything it recorded into the packet is superseded by the full walk (which Resets it)
+            if (RecordStructuralFrame(visualRoot, _packet)) return;            // refused -> everything it recorded into the packet is superseded by the full walk (which Resets it)
         }
 
         RecordFullFrame(visualRoot);
@@ -381,7 +379,6 @@ public class RenderCache
 
             return false;
         }
-
         if (!PlanStructuralChange())
         {
             // Ran out of rank SPACE, not out of information: every insert into the same gap halves it, and a panel that
@@ -435,6 +432,7 @@ public class RenderCache
         RenderDirty.SnapshotMovedInto(_movedBuf);
         return true;
     }
+
     // The PLAN (read-only): who gets which rank, and who is freed. Fails - without touching anything - when the change is not
     // locally decidable.
     private bool _needRenumber;
@@ -526,14 +524,22 @@ public class RenderCache
             if (component == null || IsDrawn(component)) continue;
             PlanRemoval(component);
         }
+
         return true;
     }
 
     // Rank every component of every NEW subtree under one parent: strictly between the ranked neighbours that surround them,
     // so no existing component is renumbered and no existing group moves.
+    //
+    // The neighbours are found from TWO index maps built in ONE pass over the children, NOT by re-scanning the sibling list per
+    // run. That re-scan is what made a fill quadratic: a virtualizing panel holds thousands of children, and its new tiles do
+    // not arrive as one block - the recycled skeleton cards showing and hiding between them break the additions into many runs.
+    // Each run then walked all ~4800 siblings looking for a rank to anchor against: O(children x runs), and the record grew to
+    // 167 ms of a 225 ms frame - the splice paying back everything the full walk used to cost.
     private bool PlanNewChildren(IUIComponent parent)
     {
         ChildrenInPaintOrder(parent, _childBuf);
+        BuildNeighbourMaps(parent);
 
         for (var i = 0; i < _childBuf.Count; i++)
         {
@@ -543,24 +549,17 @@ public class RenderCache
             var j = i;
             while (j + 1 < _childBuf.Count && _placeRoots.Contains(_childBuf[j + 1])) j++;
 
-            // The rank immediately BEFORE the run: the previous sibling's last painted descendant, or the parent itself.
+            // The rank immediately BEFORE the run: the last thing PAINTED before it. Walk back over the hidden siblings (the
+            // map does that in one hop) to the nearest visible one that HAS a rank - which includes a tile an earlier run of
+            // this same plan has just been given - and take the last rank inside its subtree. Nothing before it: the parent.
             long prev;
-            if (i == 0) prev = RankOf(parent);
-            else if (!TryLastRankOfSubtree(_childBuf[i - 1], out prev))
-            {
-                // The sibling this run must come AFTER is drawn, yet holds no rank. That means it entered the drawn set
-                // without a mark naming it - the splice cannot place anything against it.
+            if (!TryRankBefore(i, parent, out prev)) return false;
 
-                return false;
-            }
-
-            // ...and immediately AFTER it: the next painted sibling, or whatever follows the parent's whole subtree.
-            long next;
-            if (j + 1 < _childBuf.Count)
-            {
-                if (!TryFirstRankAfter(_childBuf, j + 1, out next)) next = SuccessorRank(parent);
-            }
-            else next = SuccessorRank(parent);
+            // ...and immediately AFTER it: the nearest visible sibling that is not itself being placed (a later run has no rank
+            // yet - a later run will simply squeeze between our last rank and this same anchor), else whatever follows the
+            // parent's whole subtree.
+            var after = _nextAnchor[j];
+            var next = after >= 0 ? RankOf(_childBuf[after]) : SuccessorRank(parent);
 
             // The run's subtrees in paint order - that is the sequence of ranks to hand out.
             _subtreeBuf.Clear();
@@ -596,18 +595,53 @@ public class RenderCache
         return true;
     }
 
-    // The rank of the first PAINTED sibling at or after index `from` (invisible siblings hold no rank and cannot bound a run).
-    private bool TryFirstRankAfter(List<IUIComponent> siblings, int from, out long rank)
+    // ONE pass over the parent's children, giving every position its two anchors:
+    //   _prevVisible[i] - the nearest PAINTED sibling before i (hidden ones draw nothing, so they cannot bound anything);
+    //   _nextAnchor[i]  - the nearest painted sibling after i that already HOLDS a rank and is not itself being placed.
+    // Both are what a run needs, and looking them up per run is then O(1) instead of a walk of the whole sibling list.
+    private void BuildNeighbourMaps(IUIComponent parent)
     {
-        for (var i = from; i < siblings.Count; i++)
+        var count = _childBuf.Count;
+        _prevVisible.Clear();
+        _nextAnchor.Clear();
+        for (var i = 0; i < count; i++) { _prevVisible.Add(-1); _nextAnchor.Add(-1); }
+
+        var lastVisible = -1;
+        for (var i = 0; i < count; i++)
         {
-            if (siblings[i].Visibility != Visibility.Visible) continue;
-            if (_placeRoots.Contains(siblings[i])) continue;   // also new - it is ranked by its own run, AFTER this one
-            if (TryPlannedRank(siblings[i], out rank)) return true;
+            _prevVisible[i] = lastVisible;
+            if (_childBuf[i].Visibility == Visibility.Visible) lastVisible = i;
         }
-        rank = long.MaxValue;
-        return false;
+
+        var nextAnchored = -1;
+        for (var i = count - 1; i >= 0; i--)
+        {
+            _nextAnchor[i] = nextAnchored;
+            var child = _childBuf[i];
+            if (child.Visibility == Visibility.Visible && !_placeRoots.Contains(child) && HasRank(child)) nextAnchored = i;
+        }
     }
+
+    // The rank the run starting at `i` must come AFTER: the last rank inside the subtree of the nearest PAINTED sibling before
+    // it that holds a rank (committed, or planned by an earlier run of this same plan). Nothing painted before it -> the parent
+    // itself bounds the run. Fails when a painted sibling holds no rank at all: it entered the drawn set with nothing naming it,
+    // and the splice has nothing to place against.
+    private bool TryRankBefore(int i, IUIComponent parent, out long rank)
+    {
+        rank = 0;
+        var at = _prevVisible[i];
+        if (at < 0)
+        {
+            rank = RankOf(parent);   // nothing is painted before it: the parent bounds the run
+            return true;
+        }
+
+        if (!HasPlannedRank(_childBuf[at])) return false;   // painted, but unnamed - not locally decidable
+        return TryLastRankOfSubtree(_childBuf[at], out rank);
+    }
+
+    private readonly List<int> _prevVisible = new();
+    private readonly List<int> _nextAnchor = new();
 
     // Everything under a component that left the DRAWN set. Two very different fates, and conflating them is a bug either way:
     //
@@ -695,37 +729,13 @@ public class RenderCache
 
     // The LAST rank inside a component's painted subtree (its deepest last-painted descendant) - the rank a sibling appended
     // after it must come after. Fails if the subtree is not ranked (nothing to interpolate against).
+    // The LAST rank inside a painted, ranked component's subtree - its deepest last-painted descendant. Whatever comes after it
+    // must rank after that, not merely after the component itself.
     private bool TryLastRankOfSubtree(IUIComponent component, out long rank)
     {
-        rank = 0;
-        var parent = component.VisualParent;
-        var anchor = component;
+        if (!TryPlannedRank(component, out rank)) return false;
 
-        // An invisible sibling draws nothing and holds no rank, so it cannot bound the run - step back to the last one that
-        // does. ITERATIVELY, over the sibling list read once: a virtualizing panel parks THOUSANDS of collapsed containers in
-        // a row (that is what recycling is), and walking them by recursion overflowed the stack outright.
-        if (component.Visibility != Visibility.Visible)
-        {
-            if (parent == null) return false;
-
-            ChildrenInPaintOrder(parent, _childBuf2);
-            var at = _childBuf2.IndexOf(component);
-            if (at < 0) return false;
-
-            anchor = null;
-            for (var i = at - 1; i >= 0; i--)
-            {
-                if (_childBuf2[i].Visibility != Visibility.Visible) continue;
-                anchor = _childBuf2[i];
-                break;
-            }
-            if (anchor == null) return TryPlannedRank(parent, out rank);   // nothing painted before it: the parent bounds the run
-        }
-
-        if (!TryPlannedRank(anchor, out rank)) return false;
-
-        // ...and down to its deepest painted descendant - the last rank inside its subtree.
-        var last = anchor;
+        var last = component;
         while (true)
         {
             ChildrenInPaintOrder(last, _childBuf2);

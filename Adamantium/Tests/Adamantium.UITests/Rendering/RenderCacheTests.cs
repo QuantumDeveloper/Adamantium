@@ -493,6 +493,41 @@ public class RenderCacheTests
         });
     }
 
+    // Clearing a component's children must DETACH them, not merely forget them. A child left pointing at its old parent while
+    // absent from that parent's children is unreachable by any downward walk - yet it still reports itself attached and visible,
+    // so it stays dirty forever: the splice refuses every frame (it cannot place what it cannot find) and the fallback full walk
+    // does not draw it either. A templated control dropping its old template root does exactly this.
+    [Test]
+    public void ClearedChildren_AreDetached_NotOrphaned()
+    {
+        var host = AddControl(); DrawsRectangle(host);
+        var old = new TestControl(); DrawsRectangle(old, Brushes.Blue);
+        host.Add(old);
+        RenderFrame();
+        Assert.That(_cache.PaintOrder, Does.Contain(old.RenderId));
+
+        host.ClearChildren();   // what a templated control does when it drops its template
+        var replacement = new TestControl(); DrawsRectangle(replacement, Brushes.Green);
+        host.Add(replacement);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(old.VisualParent, Is.Null, "a cleared child must not keep pointing at its old parent");
+            Assert.That(old.IsAttachedToVisualTree, Is.False, "...and it must not still call itself attached");
+        });
+
+        old.Invalidate();   // the orphan, still dirty, used to force a whole-tree re-record on EVERY frame
+        RenderFrame();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Structural),
+                "a dirty component that left the tree must not drag the frame into a full walk");
+            Assert.That(_cache.PaintOrder, Does.Not.Contain(old.RenderId));
+        });
+        AssertPaintOrderMatchesFullWalk("after the children were cleared and replaced");
+    }
+
     // Hiding a control in the SAME frame that runs out of rank space. The renumber hands fresh ranks to what is DRAWN, so the
     // control being hidden gets none - and if "did it leave the paint order" is answered by asking for a rank, it is then
     // silently skipped: the applier is never told to drop it, and it keeps painting, frozen at its last slot on top of real

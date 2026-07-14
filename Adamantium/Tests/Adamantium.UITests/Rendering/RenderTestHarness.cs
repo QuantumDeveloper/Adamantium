@@ -52,6 +52,9 @@ internal sealed class TestControl : UIComponent
     public void Add(IUIComponent child) => AddVisualChild(child);
     public void Remove(IUIComponent child) => RemoveVisualChild(child);
 
+    /// <summary>Drops every visual child - what a templated control does when it replaces its template.</summary>
+    public void ClearChildren() => RemoveVisualChildren();
+
     /// <summary>Mark dirty so the next Render() actually re-runs OnRender (mirrors a property change).</summary>
     public void Invalidate() => InvalidateRender(false);
 
