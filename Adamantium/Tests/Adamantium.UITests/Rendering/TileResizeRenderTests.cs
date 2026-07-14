@@ -89,7 +89,7 @@ public class TileResizeRenderTests
                 stale.Add($"{Name(component)}: drawn at size {frozen.RenderSize}, laid out at {component.RenderSize}");
             else if (frozen.LocalTransform != component.LocalTransform)
                 stale.Add($"{Name(component)}: drawn at a stale position (transform differs from the laid-out one)");
-            else if (!ReferenceEquals(frozen.VisualParent, component.VisualParent))
+            else if (!ReferenceEquals(frozen.RenderParent, component.RenderParent))
                 stale.Add($"{Name(component)}: drawn under a stale parent - its whole composed position is wrong");
         }
 

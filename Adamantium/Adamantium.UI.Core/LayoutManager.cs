@@ -162,6 +162,23 @@ public sealed class LayoutManager
     /// signal instead of every frame.</summary>
     public event EventHandler LayoutUpdated;
 
+    /// <summary>Raised after a pass that found NO work at all: every queue was empty AND nothing re-dirtied itself, so
+    /// this tree has fully SETTLED.</summary>
+    /// <remarks>
+    /// This is the honest "the cascade I started has finished" signal, and it is NOT <see cref="LayoutUpdated"/>: that one
+    /// fires after a pass that DID work, which mid-cascade is just one of several passes. A theme swap (re-style →
+    /// re-template → re-measure → re-arrange) drains over several passes, and each of them looks "settled" in the
+    /// LayoutUpdated sense; only a workless pass proves nothing is left. The render side already relies on exactly this
+    /// (RenderDirty.ForceStructuralUntilSettled) - this exposes the same fact instead of inventing a second one.
+    ///
+    /// Static because a settle concerns whoever started the cascade, not one root: with several windows the starter waits
+    /// until each of their managers reports this (see <see cref="IsSettled"/>).
+    /// </remarks>
+    public static event Action<LayoutManager> Quiescent;
+
+    /// <summary>True when this root owes no layout work at all (nothing queued, nothing deferred to the next pass).</summary>
+    public bool IsSettled => _toStyle.IsEmpty && _toMeasure.IsEmpty && _toArrange.IsEmpty && _toMeasureNextPass.Count == 0;
+
     /// <summary>
     /// Runs one layout pass: drain the style queue (apply themes - this can change templates, so it must precede
     /// measure), then the measure queue, then the arrange queue, ancestors-first within each. Re-dirtying during the
@@ -243,7 +260,11 @@ public sealed class LayoutManager
         // RenderDirty.ForceStructuralUntilSettled (theme/DPI): every settle write flows through this pass (binding flush,
         // style/measure/arrange drains, the resource flush below), so a workless pass means the cascade is done - and the
         // frame's render build, which runs AFTER this, still does one final forced walk to pick up the tail.
-        if (!didWork) RenderDirty.NotifyLayoutQuiescent();
+        if (!didWork)
+        {
+            RenderDirty.NotifyLayoutQuiescent();
+            Quiescent?.Invoke(this);
+        }
 
         RuntimeStats.LastLayoutPassMs = _passStopwatch.Elapsed.TotalMilliseconds;
         RuntimeStats.LastPassBudgetDeferred = !settled;

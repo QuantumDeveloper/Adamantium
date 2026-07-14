@@ -40,10 +40,12 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
    // defers the rest to skeletons + the next pass. Time-based self-tunes INSTANTLY to per-op cost: few EXPENSIVE
    // creates/frame (UI stays live, skeletons show progress) but many CHEAP rebinds/frame (fast scroll) - with no
    // count-estimate to mis-size on a cheap->expensive regime change (the multi-monitor DPI-resize freeze).
-   private const double BindBudgetMs = 6.0;   // frame-time slice for (re)binds WHILE SCROLLING (headroom under a 16 ms frame)
+   // Settable (not const) so a test can PIN the slice: a time budget is by nature machine-dependent, so a test that wants
+   // to assert the slicing itself pins it to zero and gets the guaranteed MinBinds floor - a deterministic slice.
+   internal static double BindBudgetMs = 6.0;   // frame-time slice for (re)binds WHILE SCROLLING (headroom under a 16 ms frame)
    private const int ParallelArrangeThreshold = 64;   // arrange tiles across cores only above this many realized (else thread overhead > win)
-   private const double FillBudgetMs = 30.0;  // slice when NOT scrolling (initial fill / a settled fling): drain the backlog fast
-   private const int MinBinds = 8;            // always (re)bind at least this many/frame so the window keeps filling
+   internal static double FillBudgetMs = 30.0;  // slice when NOT scrolling (initial fill / a settled fling): drain the backlog fast
+   internal const int MinBinds = 8;            // always (re)bind at least this many/frame so the window keeps filling
 
    // The offset the previous measure ran against - tells an ACTIVE scroll (offset moving frame-to-frame) from a static fill.
    // A REALIZE budget must be a GUARANTEED slice, never "whatever the frame has left": the per-frame O(window) overhead

@@ -40,15 +40,29 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
     // that ellipse via the per-unit path.
     public bool TryAdd(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0)
     {
+        EnsureCpuCapacity(Count + 1);
+        if (Count + 1 > GpuCapacity) return false;
+        if (!BakeItem(p, world, opacity, transformSlot, out var item)) return false;   // rotation/shear -> per-unit
+        Items[Count++] = item;
+        MarkPending(scissor, logicalBounds);
+        return true;
+    }
+
+    // Bake one solid ellipse into an instance record, WITHOUT appending it. Shared by TryAdd (append) and the paint
+    // fast-path (re-bake an existing slot in place - see RenderCache.TryPartialReplay), exactly as the rect batch does.
+    // False = not bakeable this way (rotated/sheared world); the caller draws it per-unit.
+    public static bool BakeItem(EllipsePayload p, Matrix4x4F world, double opacity, int transformSlot, out EllipseItem item)
+    {
+        item = default;
         const float eps = 1e-4f;
         if (Math.Abs(world.M12) > eps || Math.Abs(world.M21) > eps) return false;   // rotation/shear -> per-unit
 
-        EnsureCpuCapacity(Count + 1);
-        if (Count + 1 > GpuCapacity) return false;
-
-        var solid = (SolidColorBrush)p.Brush;
-        var color = solid.Color.ToVector4();
-        color.W *= (float)(opacity * solid.Opacity);
+        var color = Vector4F.Zero;
+        if (p.Brush is SolidColorBrush solid)
+        {
+            color = solid.Color.ToVector4();
+            color.W *= (float)(opacity * solid.Opacity);
+        }
 
         // Stroke (optional): the full pen baked to the instance (colour + device-px width, dash on/gap, offset, trim),
         // CENTRE-aligned. Solid/dashed/trimmed all draw analytically in the SDF shader, so a stroked ellipse stays in the
@@ -57,7 +71,7 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
         RectBatchCollector.BakeStroke(p.Pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1);
 
         var r = p.DestinationRect;
-        Items[Count++] = new EllipseItem
+        item = new EllipseItem
         {
             // NODE-local when transformSlot != 0 (world is then the transform RELATIVE to the motion node; the vertex
             // shader applies the node's table matrix on top - the O(1)-scroll path). Slot 0 = identity = world bake.
@@ -68,7 +82,6 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
             Stroke0 = stroke0,
             Stroke1 = stroke1
         };
-        MarkPending(scissor, logicalBounds);
         return true;
     }
 }

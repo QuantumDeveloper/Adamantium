@@ -14,11 +14,14 @@ public sealed class GradientStop : AdamantiumComponent
         Offset = offset;
     }
 
+    // PAINT: a stop is pure colour placement - the shimmer sweeps its band by animating Offset alone, and nothing about the
+    // element it paints changes (see Brush.Opacity). A stop is not itself a Brush, so its change reaches the drawing element
+    // through the owning GradientBrush (GradientBrush.OnStopChanged -> RaiseChanged); the flag CLASSIFIES the change.
     public static readonly AdamantiumProperty ColorProperty = AdamantiumProperty.Register(nameof(Color),
-        typeof(Color), typeof(GradientStop), new PropertyMetadata(Colors.Transparent));
+        typeof(Color), typeof(GradientStop), new PropertyMetadata(Colors.Transparent, PropertyMetadataOptions.AffectsPaint));
 
     public static readonly AdamantiumProperty OffsetProperty = AdamantiumProperty.Register(nameof(Offset),
-        typeof(double), typeof(GradientStop), new PropertyMetadata(0.0));
+        typeof(double), typeof(GradientStop), new PropertyMetadata(0.0, PropertyMetadataOptions.AffectsPaint));
 
     public Color Color
     {

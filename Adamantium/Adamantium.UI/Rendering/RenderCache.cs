@@ -103,6 +103,10 @@ public class RenderCache
     // (no per-frame allocation), same pattern as LayoutManager's promote buffer.
     private readonly List<IUIComponent> _geometryDirtyBuffer = new();
 
+    // The PAINT-dirty components of this frame: same shape, new colour. They are never re-rendered - they only ride the
+    // packet's patch list so the draw pass re-bakes the units they already have (see RenderDirty.MarkPaint).
+    private readonly List<IUIComponent> _paintDirtyBuffer = new();
+
     // Draw-phase partial replay: a geometry-only partial re-renders the dirty components IN PLACE (build side), but the
     // DRAW used to re-walk EVERY unit to re-bake the batches (the O(N) 14ms at 4K - the hover FPS drop). Instead, a batched
     // rect records its slot during the full walk (_rectSlotByUnit); a fast-path partial then patches only the dirty tiles'
@@ -110,6 +114,16 @@ public class RenderCache
     // a tile that stopped being batchable) falls back to the full walk, so replay is a pure speedup, never a correctness risk.
     private readonly List<IUIComponent> _partialDirty = new();               // dirty components of the last fast-path partial
     private readonly Dictionary<IRenderUnit, int> _rectSlotByUnit = new();   // batched rect unit -> its slot in _rectBatch
+
+    // The same, for the OTHER SDF batches (ellipse, gradient rect, gradient ellipse). The rect map is kept separate because
+    // the SPLICE path owns it (it renumbers rect slots); these only ever serve the paint fast-path.
+    //
+    // Without them a PAINT-only change to anything that isn't a solid rect - a spinning ring, a sweeping shimmer, a pulsing
+    // ellipse - failed the patch check and fell through to a FULL TREE WALK, every tick, for a colour that moved. That is
+    // the whole cost of an animated brush: measured at 25 ms/frame on the tile grid (19 fps) while the same frame patched
+    // as O(dirty) costs microseconds.
+    private enum SdfSlotKind { Ellipse, GradientRect, GradientEllipse }
+    private readonly Dictionary<IRenderUnit, (SdfSlotKind Kind, int Slot)> _sdfSlotByUnit = new();
     private bool _partialSpliced;                                            // last partial mutated the paint-order list -> ops/slots stale
 
     // Last render scale seen in ProcessCommands; maps a unit's window-logical clip rect to framebuffer-pixel scissor.
@@ -250,6 +264,15 @@ public class RenderCache
                 // populated: it is cleared after the whole record phase, and the applier - which may be the render thread -
                 // must never touch it. Both travel ON the packet.
                 _packet.PartialDirty.AddRange(_geometryDirtyBuffer);
+
+                // PAINT-dirty components ride the very same list - and that is the whole trick. They were NOT re-rendered:
+                // their draw commands and units are untouched, and the commands hold their brush BY REFERENCE, so the draw
+                // pass's slot patch re-bakes their GPU data straight from the (now different) brush. A recolour therefore
+                // costs a re-bake of what already exists, not a re-record of the element that owns it: no OnRender, no fresh
+                // commands, no unit reconciliation, and - since nothing moved or resized - no snapshot refresh either.
+                RenderDirty.SnapshotPaintInto(_paintDirtyBuffer);
+                _packet.PartialDirty.AddRange(_paintDirtyBuffer);
+
                 RenderDirty.SnapshotNodesInto(_packet.MovedNodes);   // under the write lock (MarkNodeTransform runs on other threads too)
                 RenderDirty.SnapshotMovedInto(_movedBuf);            // the MOVED components - CaptureSnapshot re-freezes just these
 
@@ -1309,7 +1332,7 @@ public class RenderCache
     private LayoutSnapshot Snap(IUIComponent c)
     {
         if (_snap.TryGetValue(c, out var s)) return s;
-        s = new LayoutSnapshot(c.LocalTransform, c.RenderSize, c.ClipToBounds, c.IsRenderMotionNode, c.VisualParent);
+        s = new LayoutSnapshot(c.LocalTransform, c.RenderSize, c.ClipToBounds, c.IsRenderMotionNode, c.RenderParent);
         _snap[c] = s;
         _packet.SnapDelta.Add(new KeyValuePair<IUIComponent, LayoutSnapshot>(c, s));
         return s;
@@ -1322,7 +1345,7 @@ public class RenderCache
     private LayoutSnapshot ApplySnap(IUIComponent c)
     {
         if (_applySnap.TryGetValue(c, out var s)) return s;
-        s = new LayoutSnapshot(c.LocalTransform, c.RenderSize, c.ClipToBounds, c.IsRenderMotionNode, c.VisualParent);
+        s = new LayoutSnapshot(c.LocalTransform, c.RenderSize, c.ClipToBounds, c.IsRenderMotionNode, c.RenderParent);
         _applySnap[c] = s;
         return s;
     }
@@ -1349,7 +1372,7 @@ public class RenderCache
         {
             foreach (var group in _groups)
             foreach (var unit in group.Units)
-                for (var c = unit.Component; c != null && !_snap.ContainsKey(c); c = c.VisualParent)
+                for (var c = unit.Component; c != null && !_snap.ContainsKey(c); c = c.RenderParent)
                     Snap(c);
             _snapFullCapture = false;
         }
@@ -1363,7 +1386,7 @@ public class RenderCache
             // walk. Anything the marks cannot name (an unattributed move, a settling theme/DPI swap) cleared the snapshot back in
             // RecordFullFrame, so every entry below is genuinely new and this loop re-freezes the scene exactly as it used to.
             foreach (var draw in _packet.Draws)
-                for (var c = draw.Component; c != null && !_snap.ContainsKey(c); c = c.VisualParent)
+                for (var c = draw.Component; c != null && !_snap.ContainsKey(c); c = c.RenderParent)
                     Snap(c);
 
             foreach (var component in _geometryDirtyBuffer) RefreshSnapshot(component);   // size / clip may have changed
@@ -1409,14 +1432,14 @@ public class RenderCache
     {
         if (component == null) return;
         var snapshot = new LayoutSnapshot(component.LocalTransform, component.RenderSize, component.ClipToBounds,
-            component.IsRenderMotionNode, component.VisualParent);
+            component.IsRenderMotionNode, component.RenderParent);
         _snap[component] = snapshot;
         // ...AND publish it. The delta is the ONLY thing the applier's replica is built from, so a re-freeze that updates the
         // recorder's map alone leaves the applier composing this component from its PREVIOUS transform: a tilting tile never
         // moves and a flipping one draws its new face at the old angle. (Snap() below publishes on its own - it only writes
         // when the entry is new - but this force-refresh overwrites an existing one, so it must publish explicitly.)
         _packet.SnapDelta.Add(new KeyValuePair<IUIComponent, LayoutSnapshot>(component, snapshot));
-        for (var c = component.VisualParent; c != null && !_snap.ContainsKey(c); c = c.VisualParent)
+        for (var c = component.RenderParent; c != null && !_snap.ContainsKey(c); c = c.RenderParent)
             Snap(c);
     }
 
@@ -1424,7 +1447,7 @@ public class RenderCache
     {
         if (_worldCache.TryGetValue(c, out var m)) return m;
         var s = ApplySnap(c);
-        m = s.VisualParent != null ? s.LocalTransform * World(s.VisualParent) : s.LocalTransform;
+        m = s.RenderParent != null ? s.LocalTransform * World(s.RenderParent) : s.LocalTransform;
         _worldCache[c] = m;
         return m;
     }
@@ -1452,7 +1475,7 @@ public class RenderCache
         if (c == null) return null;
         if (_nodeCache.TryGetValue(c, out var n)) return n;
         var s = ApplySnap(c);
-        n = s.IsMotionNode ? c : NodeOf(s.VisualParent);
+        n = s.IsMotionNode ? c : NodeOf(s.RenderParent);
         _nodeCache[c] = n;
         return n;
     }
@@ -1463,7 +1486,7 @@ public class RenderCache
         var s = ApplySnap(c);
         m = s.IsMotionNode
             ? Matrix4x4F.Identity
-            : (s.VisualParent is { } p ? s.LocalTransform * RelWorld(p) : s.LocalTransform);
+            : (s.RenderParent is { } p ? s.LocalTransform * RelWorld(p) : s.LocalTransform);
         _relWorldCache[c] = m;
         return m;
     }
@@ -1529,7 +1552,7 @@ public class RenderCache
         if (c == null) return null;
         if (_clipCache.TryGetValue(c, out var cached)) return cached;
         var s = ApplySnap(c);
-        var parentClip = CumulativeClip(s.VisualParent);
+        var parentClip = CumulativeClip(s.RenderParent);
         var result = parentClip;
         if (s.ClipToBounds)
         {
@@ -1647,7 +1670,7 @@ public class RenderCache
         _recording = device != null;   // a device walk records its op stream for a later clean-frame replay
         if (_recording)
         {
-            _ops.Clear(); _opsReplayable = true; _rectSlotByUnit.Clear(); _walkGroup = null; _walkVersion++;
+            _ops.Clear(); _opsReplayable = true; _rectSlotByUnit.Clear(); _sdfSlotByUnit.Clear(); _walkGroup = null; _walkVersion++;
             _nodeAllAware.Clear();
             _movedNodesBuf.Clear();   // a full walk re-bakes fresh node matrices - pending node moves are subsumed
             // ...but "subsumed" is only true if this walk composes CURRENT transforms. A partial build drops the
@@ -1793,7 +1816,11 @@ public class RenderCache
                 var gradBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Grad);
                 if (_gradientRectBatch.TryAdd(grru.RectPayload, gradBakeWorld, grru.FillOpacity, scissor, LogicalBounds(unit.Component, wt), slot4Grad))
                 {
-                    if (_recording) group.PatchableRectOnly = false;   // gradient: node-aware, but not rect-splice-patchable
+                    if (_recording)
+                    {
+                        group.PatchableRectOnly = false;   // gradient: node-aware, but not rect-splice-patchable
+                        _sdfSlotByUnit[unit] = (SdfSlotKind.GradientRect, _gradientRectBatch.LastSlot);   // ...but PAINT-patchable
+                    }
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -1808,7 +1835,11 @@ public class RenderCache
                 var bakeWorld = ResolveBake(device, unit.Component, wt, out var slot4El);
                 if (_ellipseBatch.TryAdd(eru.EllipsePayload, bakeWorld, eru.FillOpacity, scissor, LogicalBounds(unit.Component, wt), slot4El))
                 {
-                    if (_recording) group.PatchableRectOnly = false;   // non-rect-batch draw -> not rect-patchable
+                    if (_recording)
+                    {
+                        group.PatchableRectOnly = false;   // non-rect-batch draw -> not rect-splice-patchable
+                        _sdfSlotByUnit[unit] = (SdfSlotKind.Ellipse, _ellipseBatch.LastSlot);   // ...but PAINT-patchable
+                    }
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -1825,7 +1856,11 @@ public class RenderCache
                 var gradElBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4GradEl);
                 if (_gradientEllipseBatch.TryAdd(geru.EllipsePayload, gradElBakeWorld, geru.FillOpacity, scissor, LogicalBounds(unit.Component, wt), slot4GradEl))
                 {
-                    if (_recording) group.PatchableRectOnly = false;   // gradient: node-aware, but not rect-splice-patchable
+                    if (_recording)
+                    {
+                        group.PatchableRectOnly = false;   // gradient: node-aware, but not rect-splice-patchable
+                        _sdfSlotByUnit[unit] = (SdfSlotKind.GradientEllipse, _gradientEllipseBatch.LastSlot);   // ...but PAINT-patchable
+                    }
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -1963,7 +1998,7 @@ public class RenderCache
             // is unchanged, so skip it and let the replay stand. This is the common hover case (nothing visible changed).
             if (!_groupById.TryGetValue(comp.RenderId, out var g)) continue;
             foreach (var u in g.Units)
-                if (u is not RectangleRenderUnit rru || !_rectSlotByUnit.ContainsKey(u) || !_rectBatch.CanBatch(rru.RectPayload))
+                if (!IsSlotPatchable(u))
                     return false;   // a per-unit / text / instanced / no-longer-batchable dirty unit -> full walk
         }
         // Nothing moved on a geometry-only partial, so the cached world transform is still valid; re-bake each dirty tile
@@ -1973,14 +2008,64 @@ public class RenderCache
             if (!_groupById.TryGetValue(comp.RenderId, out var g)) continue;
             foreach (var u in g.Units)
             {
-                var rru = (RectangleRenderUnit)u;
                 var bakeWorld = ResolveBake(device, u.Component, World(u.Component), out var slot);
-                if (!RectBatchCollector.BakeItem(rru.RectPayload, bakeWorld, rru.FillOpacity, slot, out var item))
+                if (!PatchSlot(device, u, bakeWorld, slot))
                     return false;   // became non-bakeable (rotated); the full walk re-bakes everything anyway
-                _rectBatch.UpdateSlot(device, _rectSlotByUnit[u], item);
             }
         }
         ExecuteOps(device, fullScissor);
+        return true;
+    }
+
+    // Does this unit's GPU data live in ONE retained SDF-batch slot we can rewrite in place? That is the whole precondition
+    // for repainting without re-walking the tree. Anything else (text, per-unit geometry, an instanced fill) keeps its bytes
+    // elsewhere, so the caller full-walks.
+    private bool IsSlotPatchable(IRenderUnit u)
+    {
+        if (u is RectangleRenderUnit rru)
+        {
+            if (_rectSlotByUnit.ContainsKey(u)) return _rectBatch.CanBatch(rru.RectPayload);
+            if (_sdfSlotByUnit.TryGetValue(u, out var gr) && gr.Kind == SdfSlotKind.GradientRect)
+                return _gradientRectBatch.CanBatch(rru.RectPayload);
+            return false;
+        }
+
+        if (u is EllipseRenderUnit eru && _sdfSlotByUnit.TryGetValue(u, out var e))
+            return e.Kind == SdfSlotKind.Ellipse
+                ? _ellipseBatch.CanBatch(eru.EllipsePayload)
+                : _gradientEllipseBatch.CanBatch(eru.EllipsePayload);
+
+        return false;
+    }
+
+    // Re-bake one unit from its (live) payload straight into the slot it already occupies. Validated by IsSlotPatchable.
+    private bool PatchSlot(IGraphicsDevice device, IRenderUnit u, Matrix4x4F bakeWorld, int transformSlot)
+    {
+        if (u is RectangleRenderUnit rru)
+        {
+            if (_rectSlotByUnit.TryGetValue(u, out var rectSlot))
+            {
+                if (!RectBatchCollector.BakeItem(rru.RectPayload, bakeWorld, rru.FillOpacity, transformSlot, out var item)) return false;
+                _rectBatch.UpdateSlot(device, rectSlot, item);
+                return true;
+            }
+
+            if (!GradientRectCollector.BakeItem(rru.RectPayload, bakeWorld, rru.FillOpacity, transformSlot, out var gradItem)) return false;
+            _gradientRectBatch.UpdateSlot(device, _sdfSlotByUnit[u].Slot, gradItem);
+            return true;
+        }
+
+        var eru = (EllipseRenderUnit)u;
+        var entry = _sdfSlotByUnit[u];
+        if (entry.Kind == SdfSlotKind.Ellipse)
+        {
+            if (!EllipseBatchCollector.BakeItem(eru.EllipsePayload, bakeWorld, eru.FillOpacity, transformSlot, out var item)) return false;
+            _ellipseBatch.UpdateSlot(device, entry.Slot, item);
+            return true;
+        }
+
+        if (!GradientEllipseCollector.BakeItem(eru.EllipsePayload, bakeWorld, eru.FillOpacity, transformSlot, out var gradEllipse)) return false;
+        _gradientEllipseBatch.UpdateSlot(device, entry.Slot, gradEllipse);
         return true;
     }
 

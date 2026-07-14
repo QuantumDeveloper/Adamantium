@@ -60,7 +60,7 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent
     private void ApplyTemplate()
     {
         if (Template == null) return;
-      
+
         templateResult = Template.Build(this);
         if (templateResult != null)
         {

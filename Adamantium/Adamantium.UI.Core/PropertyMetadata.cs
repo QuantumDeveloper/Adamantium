@@ -19,6 +19,11 @@ public class PropertyMetadata
    public bool AffectsMeasure { get; set; }
    public bool AffectsArrange { get; set; }
    public bool AffectsRender { get; set; }
+
+   /// <summary>See <see cref="PropertyMetadataOptions.AffectsPaint"/>: this property only re-COLOURS, so it re-bakes
+   /// instead of re-recording - and its animation can run on the compositor.</summary>
+   public bool AffectsPaint { get; set; }
+
    public bool AffectsParentMeasure { get; set; }
    public bool AffectsParentArrange { get; set; }
 
@@ -109,6 +114,10 @@ public class PropertyMetadata
       if ((flags & PropertyMetadataOptions.AffectsRender) > 0)
       {
          AffectsRender = true;
+      }
+      if ((flags & PropertyMetadataOptions.AffectsPaint) > 0)
+      {
+         AffectsPaint = true;
       }
       if ((flags & PropertyMetadataOptions.AffectsParentMeasure) > 0)
       {

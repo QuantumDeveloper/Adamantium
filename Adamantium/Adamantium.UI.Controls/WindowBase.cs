@@ -6,6 +6,7 @@ using Adamantium.UI.Core.Controls;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
+using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.Win32;
 
@@ -144,6 +145,18 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     // theme can trigger on it (accent title bar / border when active, dimmed when not), AffectsRender to repaint the swap.
     public static readonly AdamantiumProperty IsActiveProperty = AdamantiumProperty.Register(nameof(IsActive),
         typeof(bool), typeof(WindowBase), new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
+
+    // True while a theme swap's cascade is still draining (see IThemeManager.IsThemeChanging). Mirrored onto the window as
+    // an AdamantiumProperty for one reason: it is what a THEME triggers on to raise its own busy overlay in the window
+    // template. The engine owns the STATE; what is shown - and whether anything is shown at all - is the theme's call.
+    public static readonly AdamantiumProperty IsThemeChangingProperty = AdamantiumProperty.Register(nameof(IsThemeChanging),
+        typeof(bool), typeof(WindowBase), new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
+
+    public bool IsThemeChanging
+    {
+        get => GetValue<bool>(IsThemeChangingProperty);
+        private set => SetValue(IsThemeChangingProperty, value);
+    }
 
     // A plain .NET event (not a routed one): the platform worker keeps a thread-safe ResizeMode snapshot for the hit-test
     // and refreshes it here when the mode changes at runtime (e.g. toggling grip-resize on).
@@ -404,7 +417,19 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         ApplyViewModel();
         WindowWorkerService = UIAppContext.PlatformService.GetWindowWorker(context);
         WindowWorkerService.SetWindow(this);
+
+        var themes = UIAppContext.Current?.ThemeManager;
+        if (themes != null)
+        {
+            themes.ThemeChanging += OnThemeChanging;
+            themes.ThemeChanged += OnThemeChanged;
+            IsThemeChanging = themes.IsThemeChanging;   // a window opened mid-swap already shows the busy state
+        }
     }
+
+    private void OnThemeChanging(object sender, ThemeChangedEventArgs e) => IsThemeChanging = true;
+
+    private void OnThemeChanged(object sender, ThemeChangedEventArgs e) => IsThemeChanging = false;
 
     protected virtual void InitializeComponent()
     {
@@ -504,6 +529,13 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         Closing?.Invoke(this, closingArgs);
         if (!closingArgs.Cancel)
         {
+            // The theme manager outlives every window, so a closed one that stayed subscribed would be kept alive by it.
+            var themes = UIAppContext.Current?.ThemeManager;
+            if (themes != null)
+            {
+                themes.ThemeChanging -= OnThemeChanging;
+                themes.ThemeChanged -= OnThemeChanged;
+            }
             Closed?.Invoke(this, EventArgs.Empty);
         }
     }
@@ -526,7 +558,7 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
             // frames - and, like a theme swap, parts of that settle through paths that never mark the render dirty. A
             // Clean-frame op-replay then keeps showing the OLD-scale content (shrunken in the corner) until an unrelated
             // mark (a mouse move's hover) forces a walk. Force full render walks until the layout settles.
-            RenderDirty.ForceStructuralUntilSettled();
+            VisualTreeNotifications.RaiseStateSwapStarted();
             DpiChanged?.Invoke(this, EventArgs.Empty);
         }
     }

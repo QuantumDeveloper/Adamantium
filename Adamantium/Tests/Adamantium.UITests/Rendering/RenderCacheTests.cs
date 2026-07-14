@@ -493,6 +493,45 @@ public class RenderCacheTests
         });
     }
 
+    // A brush MUTATED INTERNALLY (an animation moving its Opacity, a theme fade, a pulsing placeholder) changes nothing about
+    // what an element draws: same commands, same kinds, same geometry - and the recorded command holds THAT SAME brush by
+    // reference, so the GPU data is baked from it anyway. So the element must NOT be re-rendered; the renderer only re-bakes
+    // the units it already has.
+    //
+    // This is what makes an animated SHARED brush affordable. It is routinely shared by thousands of elements (a keyed theme
+    // brush - every loading skeleton paints with ONE pulsing brush), so its change reaches all of them on every tick. Treating
+    // that as geometry re-ran OnRender for each: measured at ~470 cards per frame, half of a tile fill's throughput, for one
+    // number.
+    [Test]
+    public void BrushMutation_RepaintsWithoutReRecordingTheElement()
+    {
+        // ONE brush, painting several elements - exactly how a keyed theme brush (and the skeleton pulse) is used.
+        var brush = new SolidColorBrush(Colors.Red);
+        var a = new Border { Width = 20, Height = 20, Background = brush };
+        var b = new Border { Width = 20, Height = 20, Background = brush };
+        _root.Add(a);
+        _root.Add(b);
+        a.Arrange(new Rect(0, 0, 20, 20));
+        b.Arrange(new Rect(0, 20, 20, 20));
+        RenderFrame();
+
+        var units = _factory.Created.Count;
+        Assert.That(units, Is.GreaterThan(0), "the borders drew something to begin with");
+        foreach (var unit in _factory.Created) Assume.That(unit.UpdateWithCommandCount, Is.EqualTo(0));
+
+        brush.Opacity = 0.5;   // what the pulse animation does, on every tick
+        RenderFrame();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Partial),
+                "a repaint is a partial frame - the paint order is untouched");
+            Assert.That(_factory.Created.Count, Is.EqualTo(units), "a repaint must not build a single new unit");
+            Assert.That(_factory.Created.Sum(u => u.UpdateWithCommandCount), Is.Zero,
+                "...and must not re-record the elements either: no element was asked for its draw commands again");
+        });
+    }
+
     // Clearing a component's children must DETACH them, not merely forget them. A child left pointing at its old parent while
     // absent from that parent's children is unreachable by any downward walk - yet it still reports itself attached and visible,
     // so it stays dirty forever: the splice refuses every frame (it cannot place what it cannot find) and the fallback full walk

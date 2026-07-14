@@ -18,11 +18,14 @@ internal readonly struct LayoutSnapshot(
     Size renderSize,
     bool clipToBounds,
     bool isMotionNode,
-    IUIComponent visualParent)
+    IUIComponent renderParent)
 {
     public Matrix4x4F LocalTransform { get; } = localTransform;
     public Size RenderSize { get; } = renderSize;
     public bool ClipToBounds { get; } = clipToBounds;
     public bool IsMotionNode { get; } = isMotionNode;
-    public IUIComponent VisualParent { get; } = visualParent;
+
+    /// <summary>The component this one is composed ON TOP OF - <see cref="IUIComponent.RenderParent"/>, i.e. the visual
+    /// parent for everything but an adorner (which draws in its adorned element's space, not in the visual tree).</summary>
+    public IUIComponent RenderParent { get; } = renderParent;
 }

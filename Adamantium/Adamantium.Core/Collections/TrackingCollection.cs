@@ -1,3 +1,4 @@
+using System;
 ﻿using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -119,16 +120,30 @@ namespace Adamantium.Core.Collections
             NotifyReplace(oldItem, newItem, index);
         }
 
-        protected override void OnClear(T[] items)
-        {
-            // Clearing an already-empty collection removed nothing, so raise no notification at all (a bare Reset here
-            // still reached handlers - e.g. LogicalChildren, which threw "Reset not supported" - for a no-op change).
-            if (items is not { Length: > 0 }) return;
+        private List<T> _clearing;   // the items a Clear() is about to drop - kept only while it is being reported
 
-            // A Clear() IS a bulk removal, so report the removed items as a Remove rather than a bare Reset. Downstream
-            // mirror collections need to know WHAT left to unwind per-item state - e.g. a control's LogicalChildren must
-            // clear each removed child's Parent, which an itemless Reset cannot convey.
-            NotifyRemove(items, 0);
+        // A Clear() IS a bulk removal, so it is reported as a Remove, with the items: a downstream mirror needs to know WHAT
+        // left to unwind its per-item state (a visual child's parent link, a logical child's Parent), and an itemless Reset
+        // cannot convey that. They must be captured HERE, before the array is wiped - by the time the clear is done they are
+        // gone.
+        //
+        // And captured ONLY when somebody is listening: with no subscriber there is nothing to report, and a Clear() of an
+        // unobserved collection must not allocate a thing. With one, the copy is not extra - the event carries the list.
+        protected override void OnClearing(ArraySegment<T> items)
+        {
+            if (CollectionChanged == null || items.Count == 0) return;
+
+            _clearing = new List<T>(items.Count);
+            foreach (var item in items) _clearing.Add(item);
+        }
+
+        protected override void OnCleared()
+        {
+            if (_clearing == null) return;
+
+            var removed = _clearing;
+            _clearing = null;
+            NotifyRemove(removed, 0);
         }
     }
 }

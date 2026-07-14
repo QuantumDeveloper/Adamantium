@@ -71,6 +71,47 @@ public class LayoutManagerTests
         return (root, leaf);
     }
 
+    // The settle signal a multi-pass cascade (a theme swap) reports completion on. It must fire ONLY on a pass that found
+    // nothing left to do - NOT on a pass that merely drained its queues, because mid-cascade every pass looks like that
+    // (re-styling re-templates, which re-measures, which re-arranges...). Getting this wrong would announce "theme
+    // applied" while the tree is still rebuilding - exactly the moment a busy indicator must NOT be taken down.
+    [Test]
+    public void Quiescent_FiresOnlyOnAPassThatFoundNothingToDo()
+    {
+        var leaf = new Border { Width = 50, Height = 50 };
+        var root = new TestWindowRoot { Width = 200, Height = 200, ClientWidth = 200, ClientHeight = 200 };
+        root.Children.Add(leaf);
+
+        var settles = 0;
+        void OnQuiescent(LayoutManager manager) => settles++;
+        LayoutManager.Quiescent += OnQuiescent;
+        try
+        {
+            WindowExtension.UpdateTree(root);   // lays the tree out: this pass DID work
+            Assert.Multiple(() =>
+            {
+                Assert.That(settles, Is.EqualTo(0), "a pass that did work is not a settle");
+                Assert.That(LayoutManager.For(root).IsSettled, Is.True, "...though it left nothing queued");
+            });
+
+            WindowExtension.UpdateTree(root);   // nothing dirty -> workless pass
+            Assert.That(settles, Is.EqualTo(1), "a workless pass IS the settle");
+
+            leaf.Width = 80;
+            Assert.That(LayoutManager.For(root).IsSettled, Is.False, "an invalidated tree owes layout work");
+
+            WindowExtension.UpdateTree(root);   // re-lays it out: work again
+            Assert.That(settles, Is.EqualTo(1), "still not settled - the cascade was doing work");
+
+            WindowExtension.UpdateTree(root);
+            Assert.That(settles, Is.EqualTo(2), "settled once the work ran out");
+        }
+        finally
+        {
+            LayoutManager.Quiescent -= OnQuiescent;
+        }
+    }
+
     [Test]
     public void CleanFrame_TriggersNoMeasureOrArrange()
     {
@@ -145,6 +186,45 @@ public class LayoutManagerTests
         Assert.That(child.RenderSize.Width, Is.EqualTo(200).Within(0.5),
             "child must land at the parent's NEW slot (arrange re-measures inline), not freeze at the old size");
         Assert.That(child.RenderSize.Height, Is.EqualTo(200).Within(0.5));
+    }
+
+    // Root-cause regression for "a theme swap leaves the window EMPTY until a resize".
+    //
+    // The dirty FLAGS live on the element, but the dirty QUEUES belong to a visual ROOT - and a DETACHED element has no
+    // root, so an invalidation raised while it is detached is enqueued where no layout pass will ever look. Re-attaching
+    // does not by itself undo that, and the loss is invisible whenever the re-attached subtree's own root stays
+    // measure-VALID: the parent's cascade short-circuits at it (same constraint) and never reaches the dirty node below.
+    //
+    // That is precisely a theme swap: re-templating the window detaches its whole content subtree, everything in it is
+    // re-styled (and re-templated) WHILE detached, and every invalidation that follows is dropped. A resize "fixed" it
+    // only because a new constraint fails every Measure gate and brute-forces the whole tree.
+    [Test]
+    public void InvalidatedWhileDetached_IsRelaidOut_WhenReattached()
+    {
+        var leaf = new Border { Width = 50, Height = 50 };
+        // Fixed size, so re-hosting it re-measures it with the SAME constraint -> its measure gate short-circuits and the
+        // cascade stops HERE. Anything dirty below it is reached only if the lost invalidation was actually repaired.
+        var subtree = new Border { Width = 100, Height = 100, Child = leaf };
+        var host = new Border { Child = subtree };
+        var root = new TestWindowRoot { Width = 200, Height = 200, ClientWidth = 200, ClientHeight = 200 };
+        root.Children.Add(host);
+        WindowExtension.UpdateTree(root);
+        Assert.That(leaf.RenderSize.Width, Is.EqualTo(50).Within(0.5), "baseline");
+
+        host.Child = null;                     // the template teardown detaches the whole content subtree
+        Assert.That(leaf.IsAttachedToVisualTree, Is.False, "the detach must reach the whole subtree");
+
+        leaf.Width = 80;                       // invalidated while DETACHED -> enqueued into no queue a pass will drain
+        host.Child = subtree;                  // re-hosted into the new template
+
+        WindowExtension.UpdateTree(root);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(leaf.IsMeasureValid, Is.True, "a re-attached element must not stay measure-dirty forever");
+            Assert.That(leaf.RenderSize.Width, Is.EqualTo(80).Within(0.5),
+                "layout work raised while detached must be re-registered on re-attach, not lost");
+        });
     }
 
     // InvalidateMeasureNextPass defers a re-measure to the NEXT pass (a virtualizing panel spreading a big realize burst

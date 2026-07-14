@@ -151,52 +151,69 @@ public class ItemsControlTests
     {
         // 600 tiles, tiny 10px cells, 300x300 viewport => 30 cols x 20 lines: the ENTIRE set is on-screen at once, so the
         // natural window is all 600. Realizing 600 containers in one measure is the resize-freeze burst; the panel must
-        // instead realize at most RealizeCap (128) NEW containers per pass and finish over the next passes - while
-        // reporting the FULL extent immediately (so the scrollbar is correct and the not-yet-realized tail fills in).
-        var items = Enumerable.Range(0, 600).Cast<object>().ToList();
-        var ic = new ItemsControl
+        // instead SLICE the fill across passes - while reporting the FULL extent immediately (so the scrollbar is correct
+        // and the not-yet-realized tail fills in).
+        //
+        // The slice is a TIME budget, NOT a count (WrapPanel.BindBudgetMs / FillBudgetMs): a fixed count is fine for cheap
+        // scroll rebinds but spends >100 ms in one frame when every slot has to CREATE a container. So "at most N per pass"
+        // is not a contract the panel makes, and asserting it would only measure how fast this machine is. Pin the budget to
+        // ZERO instead: the bind loop then binds exactly its guaranteed MinBinds floor per pass, and the slicing is exact.
+        var savedFill = WrapPanel.FillBudgetMs;
+        var savedBind = WrapPanel.BindBudgetMs;
+        WrapPanel.FillBudgetMs = 0;
+        WrapPanel.BindBudgetMs = 0;
+        try
         {
-            ItemsSource = items,
-            ItemsPanel = new ItemsPanelTemplate(() => new TemplateResult
+            var slice = WrapPanel.MinBinds;
+            var items = Enumerable.Range(0, 600).Cast<object>().ToList();
+            var ic = new ItemsControl
             {
-                RootComponent = new WrapPanel { Orientation = Orientation.Horizontal, ItemWidth = 10, ItemHeight = 10 }
-            })
-        };
-        ic.Template = ItemsPresenterTemplate();
-        var gen = ic.ItemContainerGenerator;
+                ItemsSource = items,
+                ItemsPanel = new ItemsPanelTemplate(() => new TemplateResult
+                {
+                    RootComponent = new WrapPanel { Orientation = Orientation.Horizontal, ItemWidth = 10, ItemHeight = 10 }
+                })
+            };
+            ic.Template = ItemsPresenterTemplate();
+            var gen = ic.ItemContainerGenerator;
 
-        ic.Measure(new Size(300, 300));
-        ic.Arrange(new Rect(0, 0, 300, 300));
-        var panel = ic.ItemsHostPanel;
-        var scroll = (IScrollableContent)panel;
+            ic.Measure(new Size(300, 300));
+            ic.Arrange(new Rect(0, 0, 300, 300));
+            var panel = ic.ItemsHostPanel;
+            var scroll = (IScrollableContent)panel;
 
-        var firstRealized = gen.RealizedCount;
-        Assert.Multiple(() =>
-        {
-            // ~one capped slice, NOT all 600 (a little slack for the +/-Buffer line).
-            Assert.That(firstRealized, Is.GreaterThan(0));
-            Assert.That(firstRealized, Is.LessThanOrEqualTo(128 + 30), "first pass realizes one capped slice, not all 600");
-            // Extent reflects the full set from the first pass (formula-based): ceil(600/30)=20 lines * 10px.
-            Assert.That(scroll.Extent.Height, Is.EqualTo(20 * 10).Within(1), "extent covers all 600 while only a slice is realized");
-        });
+            var firstRealized = gen.RealizedCount;
+            Assert.Multiple(() =>
+            {
+                Assert.That(firstRealized, Is.GreaterThan(0));
+                Assert.That(firstRealized, Is.LessThanOrEqualTo(slice), "first pass realizes ONE bind slice, not all 600");
+                // Extent reflects the full set from the first pass (formula-based): ceil(600/30)=20 lines * 10px.
+                Assert.That(scroll.Extent.Height, Is.EqualTo(20 * 10).Within(1), "extent covers all 600 while only a slice is realized");
+            });
 
-        // Simulate the following frames: each re-measure realizes the next capped slice until the whole visible set exists.
-        var prev = firstRealized;
-        var passes = 0;
-        while (gen.RealizedCount < 600 && passes < 20)
-        {
-            panel.Measure(new Size(300, 300), true);
-            panel.Arrange(new Rect(0, 0, 300, 300), true);
-            Assert.That(gen.RealizedCount - prev, Is.LessThanOrEqualTo(128), "a pass grows the window by at most RealizeCap");
-            prev = gen.RealizedCount;
-            passes++;
+            // Simulate the following frames: each re-measure realizes the next slice until the whole visible set exists.
+            var prev = firstRealized;
+            var passes = 0;
+            while (gen.RealizedCount < 600 && passes < 200)
+            {
+                panel.Measure(new Size(300, 300), true);
+                panel.Arrange(new Rect(0, 0, 300, 300), true);
+                Assert.That(gen.RealizedCount - prev, Is.LessThanOrEqualTo(slice), "a pass grows the window by at most one bind slice");
+                prev = gen.RealizedCount;
+                passes++;
+            }
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(gen.RealizedCount, Is.EqualTo(600), "the full on-screen set is realized after enough passes");
+                Assert.That(passes, Is.GreaterThanOrEqualTo(600 / slice - 1), "600 tiles at one slice per pass => actually spread over passes");
+            });
         }
-
-        Assert.Multiple(() =>
+        finally
         {
-            Assert.That(gen.RealizedCount, Is.EqualTo(600), "the full on-screen set is realized after enough passes");
-            Assert.That(passes, Is.GreaterThanOrEqualTo(4), "600 tiles / 128-cap => realized over several passes (actually spread)");
-        });
+            WrapPanel.FillBudgetMs = savedFill;
+            WrapPanel.BindBudgetMs = savedBind;
+        }
     }
 
     [Test]

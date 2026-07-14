@@ -12,6 +12,12 @@
     <SolidColorBrush x:Key="CardBackgroundFillColorDefault" Color="#2D2D2D"/>
     <SolidColorBrush x:Key="LayerFillColorDefault" Color="#4C3A3A3A"/>
 
+    <!-- The tile face. Its OWN token, not ControlFillColorDefault: that one is a control fill designed to sit over the
+         window's solid base, and every button/checkbox/toggle uses it there correctly - but a tile sits on the CARD
+         surface, and on the light palette the same brush is white-on-white (invisible tiles). Both palettes state it as a
+         subtle overlay ON THE CARD: a light veil over a dark card here, a dark one over a white card in the light palette. -->
+    <SolidColorBrush x:Key="TileFillColorDefault" Color="#0FFFFFFF"/>
+
     <!-- Control fills (translucent whites layered over the background) -->
     <SolidColorBrush x:Key="ControlFillColorDefault" Color="#0FFFFFFF"/>
     <SolidColorBrush x:Key="ControlFillColorSecondary" Color="#15FFFFFF"/>

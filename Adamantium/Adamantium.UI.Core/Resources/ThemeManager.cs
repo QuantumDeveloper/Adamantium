@@ -22,6 +22,16 @@ public class ThemeManager : IThemeManager
         _resourceManager = UIAppContext.Current.ResourceManager;
     }
 
+    public event EventHandler<ThemeChangedEventArgs> ThemeChanging;
+    public event EventHandler<ThemeChangedEventArgs> ThemeChanged;
+
+    public bool IsThemeChanging { get; private set; }
+
+    // The windows whose cascade this swap is waiting on, and the args to report when they have all settled. Non-null only
+    // while a swap is in flight.
+    private List<IUIComponent> _swapping;
+    private ThemeChangedEventArgs _swapArgs;
+
     public void SetTheme(ITheme theme)
     {
         if (CurrentTheme == theme) return;
@@ -30,13 +40,21 @@ public class ThemeManager : IThemeManager
         // incoming one's. A theme does NOT register its palette at construction (see ResourceContext.SetSource) - only
         // the theme that is CURRENT has its palette live in the Theme provider, so N themes cost nothing until chosen.
         // This is the single owner of the "exactly one palette live" invariant.
+        var oldTheme = CurrentTheme;
         if (CurrentTheme != null) _resourceManager.RemoveSources(CurrentTheme);
         CurrentTheme = theme;
         ActivateThemeSources(theme);
 
+        // Announce the swap BEFORE the cascade so a busy indicator is already up when the tree starts churning.
+        _swapArgs = new ThemeChangedEventArgs(oldTheme, theme);
+        IsThemeChanging = true;
+        ThemeChanging?.Invoke(this, _swapArgs);
+
         var windows = UIAppContext.Current.Windows;
+        _swapping = [];
         foreach (var window in windows)
         {
+            if (window is IUIComponent visual) _swapping.Add(visual);
             window.InvalidateStyles();
         }
 
@@ -44,6 +62,32 @@ public class ThemeManager : IThemeManager
         // all mark the render dirty, so force full render walks until the layout signals the cascade has fully drained -
         // otherwise re-styled controls stay blank until an unrelated mark (a mouse-over) forces a rebuild.
         RenderDirty.ForceStructuralUntilSettled();
+
+        // ...and the swap is only DONE when that same cascade has drained. Listen for a workless layout pass rather than
+        // declaring victory here: SetTheme merely QUEUES the re-style; the templates, measures and arranges it triggers run
+        // over the next several passes (that is why a theme swap visibly takes time at all).
+        if (_swapping.Count == 0) CompleteSwap();
+        else LayoutManager.Quiescent += OnLayoutQuiescent;
+    }
+
+    private void OnLayoutQuiescent(LayoutManager manager)
+    {
+        // One window going quiet does not mean the swap is over - every window the swap touched must owe no layout work.
+        if (_swapping == null) return;
+        foreach (var window in _swapping)
+            if (!LayoutManager.For(window).IsSettled) return;
+
+        CompleteSwap();
+    }
+
+    private void CompleteSwap()
+    {
+        LayoutManager.Quiescent -= OnLayoutQuiescent;
+        var args = _swapArgs;
+        _swapping = null;
+        _swapArgs = null;
+        IsThemeChanging = false;
+        ThemeChanged?.Invoke(this, args);
     }
 
     // (Re)register the theme's linked palette into the resource manager. The ResourceLink authored as ResourceContext.Source

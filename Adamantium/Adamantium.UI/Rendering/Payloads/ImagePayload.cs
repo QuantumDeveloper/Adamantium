@@ -10,8 +10,11 @@ namespace Adamantium.UI.Rendering.Payloads;
 public class ImagePayload(Brush filter, ImageSource image, Rect destinationRect, CornerRadius cornerRadius, Rect? sourceUv = null) :
     IEquatable<ImagePayload>, IRenderCachePolicy
 {
+    // The LIVE brush, read through its immutable snapshot - see RectanglePayload.
+    private readonly Brush _filter = filter?.ForRendering();
+
     public ImageSource Image { get; } = image;
-    public Brush Filter { get; } = filter;
+    public Brush Filter => _filter?.Snapshot;
     public Rect DestinationRect { get; } = destinationRect;
     public CornerRadius CornerRadius { get; } = cornerRadius;
 

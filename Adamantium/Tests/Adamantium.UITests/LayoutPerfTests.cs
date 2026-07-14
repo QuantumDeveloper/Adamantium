@@ -159,13 +159,48 @@ public class LayoutPerfTests
     [Test]
     public void Scroll_RecyclingRingInvariants()
     {
+        // This is about the RING (does a scroll step reuse containers in place?), not about the per-frame bind budget. With
+        // the real time budget in play a loaded machine can spend its 6 ms mid-window and DEFER the rest of the slots - the
+        // ring then reads short by exactly the deferred slots, and the test fails on how busy the box was rather than on
+        // anything the panel did wrong. Bind the whole window every pass so what is asserted below is the ring itself; the
+        // budget's own slicing behaviour is covered by VirtualizingWrapPanel_HugeWindow_RealizesInCappedSlices...
+        var savedBind = WrapPanel.BindBudgetMs;
+        var savedFill = WrapPanel.FillBudgetMs;
+        WrapPanel.BindBudgetMs = double.MaxValue;
+        WrapPanel.FillBudgetMs = double.MaxValue;
+        try
+        {
+            RunRecyclingRingInvariants();
+        }
+        finally
+        {
+            WrapPanel.BindBudgetMs = savedBind;
+            WrapPanel.FillBudgetMs = savedFill;
+        }
+    }
+
+    private void RunRecyclingRingInvariants()
+    {
         var (root, ic, panel) = BuildTiles(6000, 24);
         Settle(root, ic);
-        // Warm up with a few FRACTIONAL (sub-cell) scroll steps: real inertia scrolls by fractional pixels, so the offset
-        // sits mid-cell where floor(top)/ceil(bottom) diverge - the exact condition my earlier whole-cell (y+=24) steps
-        // land ON the boundary and hid. Warm past the initial 1250->1300 fill first, then lock the invariants.
+        // Warm up with FRACTIONAL (sub-cell) scroll steps: real inertia scrolls by fractional pixels, so the offset sits
+        // mid-cell where floor(top)/ceil(bottom) diverge - the exact condition my earlier whole-cell (y+=24) steps land ON
+        // the boundary and hid. A mid-cell offset also reveals one more PARTIAL row than a whole-cell one, so the working
+        // set legitimately expands ONCE, with the attach marks that go with it, before it reaches its steady size. The
+        // contract below is about the STEADY state, so warm up until the ring stops growing rather than for a fixed number
+        // of steps (a fixed count locked the baseline mid-expansion and then flagged the expansion itself as a violation).
         double y = 500;
-        for (var i = 0; i < 5; i++) { y += 7; panel.SetOffset(new Vector2(0, (float)y)); WindowExtension.UpdateTree(root); }
+        var stable = 0;
+        var previous = -1;
+        for (var i = 0; i < 40 && stable < 3; i++)
+        {
+            y += 7;
+            panel.SetOffset(new Vector2(0, (float)y));
+            WindowExtension.UpdateTree(root);
+            var count = ic.ItemContainerGenerator.RealizedCount;
+            stable = count == previous ? stable + 1 : 0;
+            previous = count;
+        }
         var baseline = ic.ItemContainerGenerator.RealizedCount;
         var rowStride = baseline / 6;                         // generous O(one row) bound
         TestContext.WriteLine($"=== Recycling-ring invariants (6000 @24, fractional scroll, ring={baseline}) ===");

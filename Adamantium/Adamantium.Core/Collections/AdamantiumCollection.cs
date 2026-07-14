@@ -134,12 +134,19 @@ namespace Adamantium.Core.Collections
         {
             lock (SyncRoot)
             {
-                if (currentIndex > 0)
-                {
-                    OnClearing(items);
-                    ClearItems();
-                    OnClear(items);
-                }
+                if (currentIndex == 0) return;
+
+                // OnClearing sees exactly the items that are about to leave, while they are still HERE - a window onto the
+                // live storage, no copy, and nothing beyond them. Whoever must remember them takes their own snapshot there
+                // (only a collection with listeners does); everyone else pays nothing at all.
+                //
+                // This used to hand the backing array to OnClear, which runs AFTER it has been zeroed - so a listener could
+                // learn that "something" was cleared but never WHAT. Everything a removal has to unwind per item (a visual
+                // child's parent link, a mirror collection's state, a behaviour's attachment) was then silently skipped, and
+                // the item lived on believing it still belonged here.
+                OnClearing(new ArraySegment<T>(items, 0, currentIndex));
+                ClearItems();
+                OnCleared();
             }
         }
 
@@ -409,9 +416,12 @@ namespace Adamantium.Core.Collections
 
         protected virtual void OnRemoveItem(int index, T item) { }
         
-        protected virtual void OnClearing(T[] items) { }
+        /// <summary>About to be cleared: <paramref name="items"/> is exactly the elements that are leaving, still in place.
+        /// It is a window onto the live storage and does not outlive this call - copy anything that must.</summary>
+        protected virtual void OnClearing(ArraySegment<T> items) { }
 
-        protected virtual void OnClear(T[] items) { }
+        /// <summary>Cleared. The items are gone; whatever was needed of them was taken in <see cref="OnClearing"/>.</summary>
+        protected virtual void OnCleared() { }
 
         /// <summary>
         /// Removes the item at the specified index.

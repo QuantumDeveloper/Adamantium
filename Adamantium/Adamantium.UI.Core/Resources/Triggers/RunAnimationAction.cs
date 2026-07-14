@@ -5,7 +5,7 @@ namespace Adamantium.UI.Core.Resources.Triggers;
 /// component by default, or a named element/part via <see cref="TargetName"/> (a template trigger reaches its parts).
 /// The WPF <c>BeginStoryboard</c> analog.
 /// </summary>
-public class RunAnimationAction : IUndoableTriggerAction
+public class RunAnimationAction : IUndoableTriggerAction, ITargetedTriggerAction
 {
     [Content]
     public Media.Animation.Animation Animation { get; set; }
@@ -32,9 +32,11 @@ public class RunAnimationAction : IUndoableTriggerAction
     /// <summary>The trigger is going away while it still held (a theme/template swap): drop this host's claim, which
     /// stops the animation unless another host still wants the target. Without it a LOOPING animation - a loading pulse -
     /// would tick forever against the discarded theme brush, one orphan per swap.</summary>
-    public void Undo(ITriggerExecutionContext context)
+    public void Undo(ITriggerExecutionContext context, IAdamantiumComponent target)
     {
-        if (context.FindTarget(TargetName) is AdamantiumComponent animTarget)
+        // The target the action was STARTED on (the activator kept it), not a fresh FindTarget: on a template rebuild the
+        // name now resolves to the NEW part, so releasing that would leave the animation running on the discarded one.
+        if (target is AdamantiumComponent animTarget)
             Media.Animation.AnimationManager.Release(animTarget, context.HostComponent);
     }
 }

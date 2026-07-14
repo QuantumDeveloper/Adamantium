@@ -27,21 +27,37 @@ internal abstract class TriggerActivatorBase : ITriggerActivator
         Context = context;
         _trigger = trigger;
 
-        if (trigger.Setters != null)
-        {
-            foreach (var setter in trigger.Setters)
-            {
-                if (!string.IsNullOrEmpty(setter.TargetName))
-                {
-                    TargetsTemplateParts = true;
-                    break;
-                }
-            }
-        }
+        TargetsTemplateParts = ReachesTemplateParts(trigger);
     }
 
-    // A setter with a TargetName reaches a template PART; one with none touches the host's own property. Fixed for the
-    // trigger's lifetime - the setters don't change - so it's computed once.
+    // Does this trigger reach into the TEMPLATE - through a setter that names a part, OR through an ACTION that does?
+    //
+    // Actions count, and forgetting them was a real bug: a trigger whose only reach is a RunAnimationAction (a loading
+    // indicator's spin/pulse lives entirely in its enter/exit actions - it has no setters at all) was classified as
+    // template-INDEPENDENT, so a template rebuild never re-pointed it. The animation then kept running on the parts of the
+    // discarded template while the rendered ones - the ones on screen - sat frozen. And a control gets re-templated
+    // routinely: a class-selected look means both the base style and the class style write Template.
+    private static bool ReachesTemplateParts(TriggerBase trigger)
+    {
+        if (trigger.Setters != null)
+            foreach (var setter in trigger.Setters)
+                if (!string.IsNullOrEmpty(setter.TargetName))
+                    return true;
+
+        return NamesAPart(trigger.EnterActions) || NamesAPart(trigger.ExitActions);
+    }
+
+    private static bool NamesAPart(List<ITriggerAction> actions)
+    {
+        if (actions == null) return false;
+        foreach (var action in actions)
+            if (action is ITargetedTriggerAction { TargetName: { Length: > 0 } })
+                return true;
+        return false;
+    }
+
+    // A setter or action that names a part reaches the template; one that names nothing touches the host itself. Fixed for
+    // the trigger's lifetime - neither its setters nor its actions change - so it is computed once.
     public bool TargetsTemplateParts { get; }
 
     public abstract void Activate();
@@ -85,15 +101,31 @@ internal abstract class TriggerActivatorBase : ITriggerActivator
         // here, or a looping animation (a loading pulse) keeps ticking against the discarded brush/part for the rest of
         // the session - one orphan per swap. Only the undoable ones: re-running the ExitActions wholesale would instead
         // START their animations (an auto-hide scrollbar fades OUT from its ExitActions) on parts already thrown away.
+        var invoked = _actionTargets;
+        _actionTargets = null;
         if (!wasConditionMet || _trigger.EnterActions == null) return;
         foreach (var action in _trigger.EnterActions)
-            (action as IUndoableTriggerAction)?.Undo(Context);
+            if (action is IUndoableTriggerAction undoable)
+                undoable.Undo(Context, invoked != null && invoked.TryGetValue(action, out var t) ? t : null);
     }
+
+    // What each invoked action actually acted ON. Resolved at INVOKE time and kept, for the same reason the setters' targets
+    // are (see _applied): by teardown the template may have been rebuilt, and re-resolving the name would hand back the NEW
+    // part - so the action would be undone on something it never touched, and whatever it left running on the OLD part
+    // (a looping animation) would tick on forever.
+    private Dictionary<ITriggerAction, IAdamantiumComponent> _actionTargets;
 
     private void InvokeActions(IEnumerable<ITriggerAction> actions)
     {
         foreach (var action in actions)
+        {
+            if (action is ITargetedTriggerAction targeted)
+            {
+                _actionTargets ??= new Dictionary<ITriggerAction, IAdamantiumComponent>();
+                _actionTargets[action] = Context.FindTarget(targeted.TargetName);
+            }
             action.Invoke(Context);
+        }
     }
 
     // A trigger setter's Value is the same family of markers a style setter resolves (see Setter.Apply): a

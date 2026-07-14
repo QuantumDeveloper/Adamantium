@@ -118,6 +118,15 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     /// <summary>A pending (not-yet-flushed) clip group exists.</summary>
     public bool Active => _pendingKeys.Count > 0;
 
+    // --- test observability -------------------------------------------------------------------------------------------
+    // The whole point of this collector is that identical geometry COLLAPSES into one shared mesh + one instanced draw,
+    // and that a full instance buffer falls back per-unit instead of dropping a shape. Neither is visible from the public
+    // surface (both live in the per-key segments), so expose just enough to assert them.
+    internal int SegmentCount => _keys.Count;
+    internal int PendingKeyCount => _pendingKeys.Count;
+    internal int InstanceCountOf(GeometryKey key) => _keys.TryGetValue(key, out var seg) ? seg.Count : 0;
+    internal int GpuCapacityOf(GeometryKey key) => _keys.TryGetValue(key, out var seg) ? seg.GpuCapacity : 0;
+
     /// <summary>Reset per-frame accumulation. Grows each key's instance buffer here (the safe point: the render runs after
     /// the frame fence, so last frame's GPU reads are done); a new key allocates lazily on its first add.</summary>
     public void BeginFrame()

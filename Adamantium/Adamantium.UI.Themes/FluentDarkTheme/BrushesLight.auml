@@ -12,6 +12,11 @@
     <SolidColorBrush x:Key="CardBackgroundFillColorDefault" Color="#FFFFFF"/>
     <SolidColorBrush x:Key="LayerFillColorDefault" Color="#80FFFFFF"/>
 
+    <!-- The tile face - see Brushes.auml. Mirrors the dark palette's veil, inverted: a subtle DARK overlay over the white
+         card. (ControlFillColorDefault below is a 70%-white control fill: right over the grey window base, invisible on a
+         white card - which is exactly why a tile must not borrow it.) -->
+    <SolidColorBrush x:Key="TileFillColorDefault" Color="#0F000000"/>
+
     <!-- Control fills (subtle dark translucent over the light background) -->
     <SolidColorBrush x:Key="ControlFillColorDefault" Color="#B3FFFFFF"/>
     <SolidColorBrush x:Key="ControlFillColorSecondary" Color="#80F9F9F9"/>
@@ -24,8 +29,12 @@
     <SolidColorBrush x:Key="SubtleFillColorTertiary" Color="#06000000"/>
 
     <!-- Control strokes -->
-    <SolidColorBrush x:Key="ControlStrokeColorDefault" Color="#0F000000"/>
-    <SolidColorBrush x:Key="ControlStrokeColorSecondary" Color="#29000000"/>
+    <!-- Control outlines. WinUI's light values (6% / 16% black) are deliberately faint because WinUI leans on SHADOWS and
+         a layered surface stack to separate a control from what it sits on. This engine draws no shadows, so the stroke is
+         the ONLY thing separating a near-white control from a near-white surface - at 6% it separates nothing, and the
+         light theme reads as unfinished. Carry the contrast here instead. -->
+    <SolidColorBrush x:Key="ControlStrokeColorDefault" Color="#33000000"/>
+    <SolidColorBrush x:Key="ControlStrokeColorSecondary" Color="#52000000"/>
 
     <!-- Text (dark on light) -->
     <SolidColorBrush x:Key="TextFillColorPrimary" Color="#E4000000"/>

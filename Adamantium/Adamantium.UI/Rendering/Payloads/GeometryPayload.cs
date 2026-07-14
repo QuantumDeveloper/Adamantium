@@ -6,7 +6,10 @@ namespace Adamantium.UI.Rendering.Payloads;
 
 public class GeometryPayload(Brush brush, Geometry geometry, Pen pen = null) : IEquatable<GeometryPayload>, IRenderCachePolicy
 {
-    public Brush Brush { get; } = brush;
+    // The LIVE brush, read through its immutable snapshot - see RectanglePayload.
+    private readonly Brush _brush = brush?.ForRendering();
+
+    public Brush Brush => _brush?.Snapshot;
 
     public Geometry Geometry { get; } = geometry;
 

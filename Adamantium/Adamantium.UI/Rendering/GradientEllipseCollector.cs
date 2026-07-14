@@ -29,13 +29,20 @@ internal sealed class GradientEllipseCollector : SdfBatchCollector<GradientRectI
 
     public bool TryAdd(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0)
     {
-        if (p.Brush is not GradientBrush g) return false;
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
-        // cornerRadius = 0 (unused by the ellipse branch); shape = 1 selects the ellipse SDF in the shared gradient shader.
-        if (!GradientRectCollector.BakeGradientItem(g, p.DestinationRect, 0.0, p.Pen, world, opacity, 1f, transformSlot, out var item)) return false;
+        if (!BakeItem(p, world, opacity, transformSlot, out var item)) return false;
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
         return true;
+    }
+
+    // Bake one gradient ellipse WITHOUT appending it - see GradientRectCollector.BakeItem (the paint fast-path).
+    public static bool BakeItem(EllipsePayload p, Matrix4x4F world, double opacity, int transformSlot, out GradientRectItem item)
+    {
+        item = default;
+        if (p.Brush is not GradientBrush g) return false;
+        // cornerRadius = 0 (unused by the ellipse branch); shape = 1 selects the ellipse SDF in the shared gradient shader.
+        return GradientRectCollector.BakeGradientItem(g, p.DestinationRect, 0.0, p.Pen, world, opacity, 1f, transformSlot, out item);
     }
 }
