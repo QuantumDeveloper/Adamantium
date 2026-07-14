@@ -58,9 +58,12 @@ public abstract class Panel: InputUIComponent, IContainer
             break;
 
          case NotifyCollectionChangedAction.Reset:
-            // A Reset carries no items, so the collection's own handler cannot name what left - only we still can, and only
-            // BEFORE they are dropped. Everything else (add/remove/replace) is named by VisualChildrenCollectionChanged.
+            // A Reset carries no items, so the collection's own handler can neither name nor detach what left - only we still
+            // can, and only BEFORE they are dropped. A child left with its VisualParent still pointing here, but absent from
+            // the children, is unreachable by any downward walk while still reporting itself attached: see
+            // UIComponent.RemoveVisualChildren. Everything else (add/remove/replace) is handled by the collection itself.
             foreach (var child in VisualChildrenCollection) RenderDirty.MarkStructural(child);
+            DetachVisualChildren();
             LogicalChildrenCollection.Clear();
             VisualChildrenCollection.Clear();
             break;

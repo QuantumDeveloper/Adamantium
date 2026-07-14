@@ -41,7 +41,12 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     // change re-orders how the parent composites its children (the render walk re-sorts siblings by ZIndex, mirroring the
     // hit-test's ZSort). Default 0 keeps natural document order.
     public static readonly AdamantiumProperty ZIndexProperty = AdamantiumProperty.Register(nameof(ZIndex),
-        typeof(Int32), typeof(UIComponent), new PropertyMetadata(0, PropertyMetadataOptions.AffectsRender));
+        typeof(Int32), typeof(UIComponent), new PropertyMetadata(0, PropertyMetadataOptions.AffectsRender, OnZIndexChanged));
+
+    private static void OnZIndexChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is UIComponent component) component._zIndex = e.NewValue is int z ? z : 0;
+    }
 
     public static readonly AdamantiumProperty VisibilityProperty = AdamantiumProperty.Register(nameof(Visibility),
         typeof(Visibility), typeof(UIComponent),
@@ -65,6 +70,8 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     // and that is a no-op change once the old value is read as the default it really was.
     private static void OnVisibilityChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
     {
+        if (d is UIComponent component && e.NewValue is Visibility visibility) component._visibility = visibility;
+
         var oldValue = e.OldValue == AdamantiumProperty.UnsetValue
             ? VisibilityProperty.GetDefaultMetadata(d.GetType()).DefaultValue
             : e.OldValue;
@@ -155,9 +162,20 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
     //public Vector2 Location { get; internal set; }
 
+    private Visibility _visibility = Visibility.Visible;
+
+    /// <summary>Whether this component is drawn, and whether it takes part in layout.</summary>
+    /// <remarks>
+    /// The GETTER reads a plain field, not the property store. This is the single hottest property in the engine - deriving
+    /// the paint order, hit-testing, and every subtree walk ask it about EVERY component they touch, several times each - and
+    /// one read through the property system takes a lock, resolves the value's priority stack, and BOXES the enum. On a 4800
+    /// tile grid that was tens of milliseconds per frame of pure overhead, entirely independent of what had actually changed.
+    /// The field is kept current by the property's own changed callback, so bindings, styles and triggers all still drive it
+    /// through SetValue exactly as before.
+    /// </remarks>
     public Visibility Visibility
     {
-        get => GetValue<Visibility>(VisibilityProperty);
+        get => _visibility;
         set => SetValue(VisibilityProperty, value);
     }
 
@@ -431,9 +449,19 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     /// </summary>
     public bool IsRootComponent => ReferenceEquals(RootVisual, this);
 
+    private int _zIndex;
+
+    /// <summary>Paint/hit-test order among siblings (higher = drawn later, hit first).</summary>
+    /// <remarks>
+    /// The GETTER reads a plain field, not the property store. Deriving the paint order asks EVERY child of EVERY component
+    /// for its ZIndex, on every walk - and one read through the property system takes a lock, resolves the value's priority
+    /// stack, and BOXES the int. At ~4800 children that was ~16 ms per pass, an overhead that did not depend on how much had
+    /// actually changed. The field is kept current by the property's own changed callback, so bindings, styles and triggers
+    /// all still work through SetValue exactly as before.
+    /// </remarks>
     public Int32 ZIndex
     {
-        get => GetValue<Int32>(ZIndexProperty);
+        get => _zIndex;
         set => SetValue(ZIndexProperty, value);
     }
 
@@ -499,10 +527,30 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         VisualChildrenCollection.Remove(child);
     }
 
+    /// <summary>Detaches every visual child (clears its VisualParent) WITHOUT touching the collection - for the callers that
+    /// have to Clear() it themselves, since a Reset carries no items for the collection's handler to act on.</summary>
+    protected void DetachVisualChildren()
+    {
+        foreach (var child in VisualChildrenCollection)
+            (child as UIComponent)?.SetVisualParent(null);
+    }
+
     protected void RemoveVisualChildren()
     {
-        // A Reset carries no items, so this is the last moment anything can name them (see VisualChildrenCollectionChanged).
-        foreach (var child in VisualChildrenCollection) RenderDirty.MarkStructural(child);
+        // Clear() raises a RESET, and a reset carries no items - so the collection's own handler cannot see who left, and can
+        // neither name them nor detach them. This is the last moment anything can, so do BOTH here.
+        //
+        // Leaving them attached is not a leak, it is a corruption: the child still points at this component as its VisualParent
+        // while being absent from its children. Nothing walking DOWN the tree can reach it any more - not the render walk, not
+        // the splice - yet it still reports itself attached and visible, so it stays dirty forever. The recorder then refuses
+        // every frame (it cannot place what it cannot find) and falls back to re-recording all ~19 000 components, which does
+        // not draw it either. A templated control dropping its old template root (a rebound list container) span exactly that
+        // loop: 164 whole-tree re-records in one fill, for a component nobody could ever draw.
+        foreach (var child in VisualChildrenCollection)
+        {
+            RenderDirty.MarkStructural(child);
+            (child as UIComponent)?.SetVisualParent(null);
+        }
         VisualChildrenCollection.Clear();
     }
 
