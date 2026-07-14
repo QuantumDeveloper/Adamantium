@@ -15,7 +15,10 @@ public class EllipsePayload(
     Pen pen)
     : IEquatable<EllipsePayload>, IRenderCachePolicy
 {
-    public Brush Brush { get; } = brush;
+    // The LIVE brush, read through its immutable snapshot - see RectanglePayload.
+    private readonly Brush _brush = brush?.ForRendering();
+
+    public Brush Brush => _brush?.Snapshot;
 
     public Rect DestinationRect { get; } = destinationRect;
 

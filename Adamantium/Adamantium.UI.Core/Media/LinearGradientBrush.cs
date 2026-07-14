@@ -11,11 +11,12 @@ public sealed class LinearGradientBrush : GradientBrush
 
     public LinearGradientBrush(GradientStopCollection stops) : base(stops) { }
 
+    // PAINT: the axis is RELATIVE to the filled bounds, so turning it re-colours the same pixels (see Brush.Opacity).
     public static readonly AdamantiumProperty StartPointProperty = AdamantiumProperty.Register(nameof(StartPoint),
-        typeof(Vector2), typeof(LinearGradientBrush), new PropertyMetadata(new Vector2(0, 0)));
+        typeof(Vector2), typeof(LinearGradientBrush), new PropertyMetadata(new Vector2(0, 0), PropertyMetadataOptions.AffectsPaint));
 
     public static readonly AdamantiumProperty EndPointProperty = AdamantiumProperty.Register(nameof(EndPoint),
-        typeof(Vector2), typeof(LinearGradientBrush), new PropertyMetadata(new Vector2(1, 1)));
+        typeof(Vector2), typeof(LinearGradientBrush), new PropertyMetadata(new Vector2(1, 1), PropertyMetadataOptions.AffectsPaint));
 
     public Vector2 StartPoint
     {

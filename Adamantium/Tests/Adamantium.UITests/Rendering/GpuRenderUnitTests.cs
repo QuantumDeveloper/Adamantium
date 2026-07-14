@@ -29,7 +29,6 @@ namespace Adamantium.UITests.Rendering;
 [Category("Gpu")]
 public class GpuRenderUnitTests
 {
-    private MainGraphicsDevice _main;
     private IGraphicsDevice _device;
     private UIBasicEffect _effect;
     private readonly StubResourceFactory _resourceFactory = new();
@@ -37,22 +36,31 @@ public class GpuRenderUnitTests
     private static readonly Rect BoxA = new Rect(0, 0, 10, 10);
     private static readonly Rect BoxB = new Rect(0, 0, 40, 40);
 
+    // The device is shared with every other GPU fixture (see GpuTestDevice) - a second one in the same process is a fatal
+    // test-host crash.
     [OneTimeSetUp]
     public void CreateDevice()
     {
-        _main = MainGraphicsDevice.Create(new GraphicsDeviceFactory(), 3, "UITests", true);
-        _device = _main.CreateRenderDevice();
+        _device = GpuTestDevice.Device;
         _effect = new UIBasicEffect(_device);
-    }
-
-    [OneTimeTearDown]
-    public void DisposeDevice()
-    {
-        _main?.Dispose();
     }
 
     private static RectanglePayload Rect(Brush brush, Rect box, Pen pen) =>
         new RectanglePayload(brush, box, new CornerRadius(0), pen);
+
+    // A rect the SDF batch will NOT take, so the unit builds its own per-unit machinery (geometry + fringe + stroke).
+    //
+    // A batchable rect (solid fill, batchable pen, UNIFORM corners) is drawn entirely - fill AND stroke - by the
+    // instanced SDF batch, so it deliberately builds ZERO renderers and no GPU buffers (RectangleRenderUnit's ctor).
+    // Every test below is about the per-unit renderers themselves (a pen builds a stroke, a resize follows the geometry,
+    // a uniform-only pen change repoints instead of reallocating, disposal frees the buffers, a per-draw blend equation
+    // is honoured) - so it must hand the unit a rect the batch rejects, or there is nothing to assert on. NON-UNIFORM
+    // corners is the smallest such knob that keeps the pen solid (a GPU stroke needs a solid pen) and the corner
+    // topology identical across sizes (so a same-topology resize can still update in place).
+    private static readonly CornerRadius Unbatchable = new(0, 2, 0, 2);
+
+    private static RectanglePayload Unbatched(Brush brush, Rect box, Pen pen) =>
+        new RectanglePayload(brush, box, Unbatchable, pen);
 
     private static IDrawCommand Command(object payload, float opacity = 1f)
     {
@@ -74,10 +82,10 @@ public class GpuRenderUnitTests
     [Test]
     public void Pen_Added_BuildsStroke()
     {
-        var unit = NewRectUnit(Rect(Brushes.Red, BoxA, pen: null));
+        var unit = NewRectUnit(Unbatched(Brushes.Red, BoxA, pen: null));
         Assert.That(unit.StrokeRenderer, Is.Null, "no pen -> no stroke");
 
-        unit.UpdateWithDrawCommand(Command(Rect(Brushes.Red, BoxA, new Pen(Brushes.Black, 2))));
+        unit.UpdateWithDrawCommand(Command(Unbatched(Brushes.Red, BoxA, new Pen(Brushes.Black, 2))));
         Assert.That(unit.StrokeRenderer, Is.Not.Null, "pen added must build a stroke (the #7 fix)");
     }
 
@@ -85,12 +93,12 @@ public class GpuRenderUnitTests
     public void Resize_WithPen_RebuildsStroke_ToFollowGeometry()
     {
         var pen = new Pen(Brushes.Black, 2);
-        var unit = NewRectUnit(Rect(Brushes.Red, BoxA, pen));
+        var unit = NewRectUnit(Unbatched(Brushes.Red, BoxA, pen));
         var strokeBefore = unit.StrokeRenderer;
         Assert.That(strokeBefore, Is.Not.Null);
 
         // Resize (geometry rebuild) with the same pen: the stroke wraps the geometry, so it must be rebuilt.
-        unit.UpdateWithDrawCommand(Command(Rect(Brushes.Red, BoxB, pen)));
+        unit.UpdateWithDrawCommand(Command(Unbatched(Brushes.Red, BoxB, pen)));
         Assert.That(unit.StrokeRenderer, Is.Not.Null);
         Assert.That(unit.StrokeRenderer, Is.Not.SameAs(strokeBefore), "stroke must follow the new geometry");
     }
@@ -100,18 +108,18 @@ public class GpuRenderUnitTests
     {
         // Real StrokeEffect -> the GPU stroke path (GpuStrokeRenderComponent), where TryRepoint lives.
         var strokeEffect = new StrokeEffect(_device);
-        var unit = new RectangleRenderUnit(Command(Rect(Brushes.Red, BoxB, new Pen(Brushes.Black, 2))),
+        var unit = new RectangleRenderUnit(Command(Unbatched(Brushes.Red, BoxB, new Pen(Brushes.Black, 2))),
             Ctx((UIBasicEffect)_effect.Clone(), strokeEffect));
         var stroke = unit.StrokeRenderer;
         Assert.That(stroke, Is.InstanceOf<GpuStrokeRenderComponent>(), "solid pen + StrokeEffect -> GPU stroke");
 
         // Thickness is a GPU uniform; buffer sizes don't change -> the SAME component is repointed, no per-frame realloc
         // (the stroke-animation optimisation: dash offset / thickness / colour / trim all take this path).
-        unit.UpdateWithDrawCommand(Command(Rect(Brushes.Red, BoxB, new Pen(Brushes.Black, 7))));
+        unit.UpdateWithDrawCommand(Command(Unbatched(Brushes.Red, BoxB, new Pen(Brushes.Black, 7))));
         Assert.That(unit.StrokeRenderer, Is.SameAs(stroke), "thickness-only pen change must repoint, not rebuild");
 
         // A join change resizes the corner fans -> the buffer sizes differ, so it must rebuild (new component).
-        unit.UpdateWithDrawCommand(Command(Rect(Brushes.Red, BoxB, new Pen(Brushes.Black, 7, penLineJoin: PenLineJoin.Round))));
+        unit.UpdateWithDrawCommand(Command(Unbatched(Brushes.Red, BoxB, new Pen(Brushes.Black, 7, penLineJoin: PenLineJoin.Round))));
         Assert.That(unit.StrokeRenderer, Is.Not.SameAs(stroke), "join change resizes buffers -> must rebuild");
     }
 
@@ -122,12 +130,12 @@ public class GpuRenderUnitTests
         // rewrites the stroke's points into the reused buffers (TryUpdateGeometry) instead of building a new component
         // (and a new allocation) every frame - the resize/animation fast path the buffer-reuse work added.
         var strokeEffect = new StrokeEffect(_device);
-        var unit = new RectangleRenderUnit(Command(Rect(Brushes.Red, BoxA, new Pen(Brushes.Black, 2))),
+        var unit = new RectangleRenderUnit(Command(Unbatched(Brushes.Red, BoxA, new Pen(Brushes.Black, 2))),
             Ctx((UIBasicEffect)_effect.Clone(), strokeEffect));
         var stroke = unit.StrokeRenderer;
         Assert.That(stroke, Is.InstanceOf<GpuStrokeRenderComponent>(), "solid pen + StrokeEffect -> GPU stroke");
 
-        unit.UpdateWithDrawCommand(Command(Rect(Brushes.Red, BoxB, new Pen(Brushes.Black, 2))));
+        unit.UpdateWithDrawCommand(Command(Unbatched(Brushes.Red, BoxB, new Pen(Brushes.Black, 2))));
         Assert.That(unit.StrokeRenderer, Is.SameAs(stroke), "same-topology resize updates the GPU stroke in place");
     }
 
@@ -373,10 +381,11 @@ public class GpuRenderUnitTests
         var prms = new PresentationParameters(PresenterType.RenderTarget, 64, 64, IntPtr.Zero);
         using var presenter = GraphicsPresenter.Create(_device, prms, "blend_test");
 
-        var left = new RectangleRenderUnit(Command(Rect(Brushes.White, new Rect(4, 20, 24, 24), null), 0.5f),
+        // Unbatched: the blend equation lives on the unit's OWN GeometryRenderer, which a batched rect does not have.
+        var left = new RectangleRenderUnit(Command(Unbatched(Brushes.White, new Rect(4, 20, 24, 24), null), 0.5f),
             Ctx(_effect));
         left.GeometryRenderer.ColorBlendEquation = ColorBlendEquations.AlphaBlend;
-        var right = new RectangleRenderUnit(Command(Rect(Brushes.White, new Rect(36, 20, 24, 24), null), 0.5f),
+        var right = new RectangleRenderUnit(Command(Unbatched(Brushes.White, new Rect(36, 20, 24, 24), null), 0.5f),
             Ctx(_effect));
         right.GeometryRenderer.ColorBlendEquation = ColorBlendEquations.Premultiplied;
 
@@ -451,16 +460,49 @@ public class GpuRenderUnitTests
     public void RenderUnit_Dispose_FreesItsRenderers()
     {
         var device = (GraphicsDevice)_device;
-        var before = device.RegisteredResourceCount;
 
+        var prms = new PresentationParameters(PresenterType.RenderTarget, 64, 64, IntPtr.Zero);
+        using var presenter = GraphicsPresenter.Create(_device, prms, "dispose_test");
+        var before = device.RegisteredResourceCount;   // taken AFTER the presenter, so only the unit's resources count
+
+        // Unbatched: only a unit that owns renderers has buffers to leak (a batched rect allocates none by design).
         var unit = new RectangleRenderUnit(
-            Command(Rect(Brushes.Red, new Rect(0, 0, 32, 32), new Pen(Brushes.Black, 2))),
+            Command(Unbatched(Brushes.Red, new Rect(0, 0, 32, 32), new Pen(Brushes.Black, 2))),
             Ctx(_effect));
-        Assert.That(device.RegisteredResourceCount, Is.GreaterThan(before), "unit creates geometry + stroke buffers");
+
+        // The renderers allocate their GPU buffers LAZILY, on the first INDIVIDUAL draw (UIRenderComponent.Render rents
+        // its ring slot there), so constructing the unit allocates nothing - it must actually be drawn once before there
+        // is anything to leak.
+        DrawOnce(presenter, unit);
+        Assert.That(device.RegisteredResourceCount, Is.GreaterThan(before), "drawing the unit allocates its geometry + stroke buffers");
 
         unit.Dispose();
         Assert.That(device.RegisteredResourceCount, Is.EqualTo(before),
             "disposing a unit must dispose its renderers' buffers (they leaked on every rebuild/resize)");
+    }
+
+    // One full individual draw of a single unit into an off-screen presenter (the shortest path that forces the lazy
+    // per-unit buffer allocation).
+    private void DrawOnce(GraphicsPresenter presenter, IRenderUnit unit)
+    {
+        var proj = Matrix4x4F.OrthoOffCenter(0, 64, 0, 64, 0, 100000);
+        unit.Update(Matrix4x4F.Identity, proj, 1.0);
+
+        _device.ClearColor = Colors.Black;
+        _device.SetRenderTargets(presenter.RenderTarget);
+        _device.SetDepthBuffer(presenter.DepthBuffer);
+        _device.MSAALevel = presenter.MSAALevel;
+        _device.Presenter = presenter;
+        Assert.That(_device.BeginDraw(), Is.True);
+        _device.SetViewports(new Viewport { Width = 64, Height = 64, MinDepth = 0, MaxDepth = 1 });
+        _device.SetScissors(new Rect2D { Offset = new Offset2D(), Extent = new Extent2D { Width = 64, Height = 64 } });
+        unit.PreRender();
+        unit.Render();
+        _device.EndDraw();
+        _device.Submit();
+        presenter.Present();
+        _device.FrameEnded();
+        _device.DeviceWaitIdle();
     }
 
     // Leak regression: an MSAA RenderTarget owns a resolve texture (a ToDispose'd child). Texture.Dispose did

@@ -23,6 +23,13 @@ public interface IUIComponent : IFundamentalUIComponent
     Rect ClipRectangle { get; }
     Vector2 ClipPosition { get; set; }
     IUIComponent VisualParent { get; }
+
+    /// <summary>The component in whose coordinate space this one is DRAWN - normally the visual parent. An adorner is not
+    /// in the visual tree at all (its VisualParent is null) yet draws in its adorned element's space, so it reports that
+    /// element here. Both the live <see cref="WorldTransform"/> and the renderer's frozen composition go through this, so
+    /// there is one answer to "whose space am I in", not two that can drift apart.</summary>
+    IUIComponent RenderParent { get; }
+
     IRootVisualComponent RootVisual { get; }
     Int32 ZIndex { get; set; }
     bool IsAttachedToVisualTree { get; }
@@ -50,6 +57,11 @@ public interface IUIComponent : IFundamentalUIComponent
     IReadOnlyCollection<IUIComponent> VisualChildren { get; }
 
     void InvalidateRender(bool invalidateChildren);
+
+    /// <summary>Only this element's PAINT changed - same shape, same draw commands, a new colour/brush/opacity. It is NOT
+    /// re-rendered: the renderer re-bakes the GPU data of the units it already holds (see
+    /// <see cref="PropertyMetadataOptions.AffectsPaint"/>).</summary>
+    void InvalidatePaint();
 
     /// <summary>
     /// Narrow-phase hit test: is <paramref name="localPoint"/> (in this element's local coordinates) actually on the

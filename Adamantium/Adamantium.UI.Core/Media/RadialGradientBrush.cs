@@ -11,17 +11,19 @@ public sealed class RadialGradientBrush : GradientBrush
 
     public RadialGradientBrush(GradientStopCollection stops) : base(stops) { }
 
+    // PAINT, every one of them: a gradient's geometry is RELATIVE to the filled bounds, so moving the centre or the radius
+    // re-colours the same pixels - it never changes the element's shape or its layout (see Brush.Opacity).
     public static readonly AdamantiumProperty CenterProperty = AdamantiumProperty.Register(nameof(Center),
-        typeof(Vector2), typeof(RadialGradientBrush), new PropertyMetadata(new Vector2(0.5f, 0.5f)));
+        typeof(Vector2), typeof(RadialGradientBrush), new PropertyMetadata(new Vector2(0.5f, 0.5f), PropertyMetadataOptions.AffectsPaint));
 
     public static readonly AdamantiumProperty GradientOriginProperty = AdamantiumProperty.Register(nameof(GradientOrigin),
-        typeof(Vector2), typeof(RadialGradientBrush), new PropertyMetadata(new Vector2(0.5f, 0.5f)));
+        typeof(Vector2), typeof(RadialGradientBrush), new PropertyMetadata(new Vector2(0.5f, 0.5f), PropertyMetadataOptions.AffectsPaint));
 
     public static readonly AdamantiumProperty RadiusXProperty = AdamantiumProperty.Register(nameof(RadiusX),
-        typeof(double), typeof(RadialGradientBrush), new PropertyMetadata(0.5));
+        typeof(double), typeof(RadialGradientBrush), new PropertyMetadata(0.5, PropertyMetadataOptions.AffectsPaint));
 
     public static readonly AdamantiumProperty RadiusYProperty = AdamantiumProperty.Register(nameof(RadiusY),
-        typeof(double), typeof(RadialGradientBrush), new PropertyMetadata(0.5));
+        typeof(double), typeof(RadialGradientBrush), new PropertyMetadata(0.5, PropertyMetadataOptions.AffectsPaint));
 
     /// <summary>The ellipse centre (relative). The stops lay out from <see cref="GradientOrigin"/> to this ellipse's edge.</summary>
     public Vector2 Center

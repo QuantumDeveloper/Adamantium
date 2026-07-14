@@ -77,7 +77,7 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
             : e.OldValue;
 
         if (!Equals(oldValue, e.NewValue))
-            RenderDirty.MarkStructural(d as IUIComponent);
+            VisualTreeNotifications.RaiseVisibilityChanged(d as IUIComponent);
     }
       
     public static readonly AdamantiumProperty IsHitTestVisibleProperty =
@@ -249,7 +249,7 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         protected set
         {
             _isGeometryValid = value;
-            if (!value) RenderDirty.MarkGeometry(this);   // stale geometry -> this component re-renders (partial rebuild)
+            if (!value) VisualTreeNotifications.RaiseContentInvalidated(this);   // what it draws is stale -> it re-renders
         }
     }
 
@@ -262,11 +262,16 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
             {
                 previousRenderSize = renderSize;
                 sizeChanged = true;
-                RenderDirty.MarkGeometry(this);   // a resize changes the recorded geometry -> re-render
+                VisualTreeNotifications.RaiseContentInvalidated(this);   // a resize changes what it draws
             }
             renderSize = value;
         }
     }
+
+    /// <summary>Only the paint changed - do NOT touch IsGeometryValid. That flag is what makes the recorder re-run OnRender
+    /// and rebuild this element's draw commands, and none of that is needed for a new colour: the commands are the same, the
+    /// units are the same, and the GPU data they bake from the brush is all that is stale.</summary>
+    public void InvalidatePaint() => VisualTreeNotifications.RaisePaintInvalidated(this);
 
     public void InvalidateRender(bool invalidateChildren)
     {
@@ -350,49 +355,32 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     // forgotten - and a forgotten one is silent: the old full-walk rebuild re-derived the drawn set from the tree anyway, so
     // an unnamed change cost nothing and left no trace. Now it costs a whole-tree re-record, so the collection names them
     // itself and no caller can forget.
+    // The visual tree's OWN plumbing, and the only place that knows a child entered or left it. Attaching/detaching the child
+    // and telling the renderer that the drawn set changed are two halves of the same fact, so they live together, here - once.
+    // No control ever writes either of them: a control adds a child, and everything that follows is the tree's business.
     private void VisualChildrenCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
     {
-        switch (e.Action)
+        Detach(e.OldItems);
+        Attach(e.NewItems);
+    }
+
+    private void Attach(System.Collections.IList visuals)
+    {
+        if (visuals == null) return;
+        foreach (UIComponent visual in visuals)
         {
-            case NotifyCollectionChangedAction.Add:
-                foreach (UIComponent visual in e.NewItems)
-                {
-                    visual.SetVisualParent(this);
-                    RenderDirty.MarkStructural(visual);
-                }
-                break;
+            visual.SetVisualParent(this);
+            VisualTreeNotifications.RaiseAttached(visual);
+        }
+    }
 
-            case NotifyCollectionChangedAction.Remove:
-                foreach (UIComponent visual in e.OldItems)
-                {
-                    visual.SetVisualParent(null);
-                    RenderDirty.MarkStructural(visual);
-                }
-                break;
-
-            case NotifyCollectionChangedAction.Replace:
-                foreach (UIComponent visual in e.OldItems)
-                {
-                    visual.SetVisualParent(null);
-                    RenderDirty.MarkStructural(visual);
-                }
-                foreach (UIComponent visual in e.NewItems)
-                {
-                    visual.SetVisualParent(this);
-                    RenderDirty.MarkStructural(visual);
-                }
-                break;
-
-            case NotifyCollectionChangedAction.Reset:
-                // The items are already gone from the collection - the event carries them, and they are the only way to name
-                // what left.
-                if (e.OldItems == null) break;
-                foreach (UIComponent visual in e.OldItems)
-                {
-                    visual.SetVisualParent(null);
-                    RenderDirty.MarkStructural(visual);
-                }
-                break;
+    private static void Detach(System.Collections.IList visuals)
+    {
+        if (visuals == null) return;
+        foreach (UIComponent visual in visuals)
+        {
+            visual.SetVisualParent(null);
+            VisualTreeNotifications.RaiseDetached(visual);
         }
     }
 
@@ -415,8 +403,8 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
             // A MOTION NODE moving is the granular case: its subtree's instances reference its transform-table slot, so
             // the render rewrites ONE matrix and replays - no global transform invalidation, no O(N) re-bake (the
             // transform-only scroll). Everything else keeps the conservative global mark.
-            if (IsRenderMotionNode) RenderDirty.MarkNodeTransform(this);
-            else RenderDirty.MarkTransform(this);   // a move: same recorded geometry, only THIS element's world transform changes -> re-bake
+            if (IsRenderMotionNode) VisualTreeNotifications.RaiseSubtreeMoved(this);
+            else VisualTreeNotifications.RaiseMoved(this);   // a move: same content, new place
         }
     }
 
@@ -440,7 +428,11 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     public Vector2 ClipPosition { get; set; }
 
     public IUIComponent VisualParent { get; private set; }
-    
+
+    /// <summary>See <see cref="IUIComponent.RenderParent"/>. Virtual so an Adorner - which lives outside the visual tree -
+    /// can name the element whose space it draws in.</summary>
+    public virtual IUIComponent RenderParent => VisualParent;
+
     public IRootVisualComponent RootVisual { get; private set; }
 
     /// <summary>
@@ -477,6 +469,38 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         set => SetValue(LayoutTransformProperty, value);
     }
     
+    /// <summary>The point the <see cref="RenderTransform"/> is applied AROUND, as a fraction of this element's own size:
+    /// (0,0) = top-left (the default), (0.5,0.5) = centre, (1,1) = bottom-right. Rotation and scale both honour it.</summary>
+    /// <remarks>
+    /// This belongs to the ELEMENT, not to the Transform, because it is the only one of the two that knows the size. A
+    /// Transform can only name an ABSOLUTE centre (RotationCenterX/Y, in pixels), which a TEMPLATE cannot know: it is
+    /// written once and then used at whatever size the control is given, so a hardcoded centre is right at exactly one
+    /// size and visibly wrong at every other (a spinner's arc orbiting a point off its own centre). Stating the origin as a
+    /// FRACTION makes it size-independent. Same seam as WPF's RenderTransformOrigin - which is likewise on the element,
+    /// alongside the transform's own absolute centre.
+    ///
+    /// It also fixes SCALE, which had no centre at all (the transform scales about zero): a scale animation grew its
+    /// element out of its top-left corner instead of its middle.
+    /// </remarks>
+    public static readonly AdamantiumProperty RenderTransformOriginProperty = AdamantiumProperty.Register(
+        nameof(RenderTransformOrigin), typeof(Vector2), typeof(UIComponent),
+        new PropertyMetadata(default(Vector2), RenderTransformOriginChanged));
+
+    public Vector2 RenderTransformOrigin
+    {
+        get => GetValue<Vector2>(RenderTransformOriginProperty);
+        set => SetValue(RenderTransformOriginProperty, value);
+    }
+
+    // Moving the origin MOVES the element (its composed transform changes) without changing a thing it draws - the same
+    // fact a Transform reports when one of its own values changes, so it is announced the same way.
+    private static void RenderTransformOriginChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is not UIComponent component) return;
+        if (component.IsRenderMotionNode) VisualTreeNotifications.RaiseSubtreeMoved(component);
+        else VisualTreeNotifications.RaiseMoved(component);
+    }
+
     /// <summary>This element's transform in its PARENT's coordinate space: the render transform (local space, may be
     /// animating) followed by the layout offset that positions it inside its parent. The parent-relative part of
     /// <see cref="WorldTransform"/>, exposed so a frame-scoped consumer (the render pass) can compose world transforms
@@ -489,20 +513,32 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
             var renderTransform = RenderTransform;
             if (renderTransform != null)
             {
-                localTransform = (Matrix4x4F)renderTransform.Matrix * localTransform;
+                var matrix = (Matrix4x4F)renderTransform.Matrix;
+
+                // Apply the transform AROUND the render-transform origin: move that point to the local origin, transform,
+                // move it back. Resolved from the element's CURRENT size, so the same template stays centred at any size.
+                var origin = RenderTransformOrigin;
+                if (origin.X != 0 || origin.Y != 0)
+                {
+                    var ox = (float)(origin.X * RenderSize.Width);
+                    var oy = (float)(origin.Y * RenderSize.Height);
+                    matrix = Matrix4x4F.Translation(-ox, -oy, 0) * matrix * Matrix4x4F.Translation(ox, oy, 0);
+                }
+
+                localTransform = matrix * localTransform;
             }
             return localTransform;
         }
     }
 
-    // Virtual so an Adorner can return its adorned element's transform (it draws in that element's coordinate space).
     public virtual Matrix4x4F WorldTransform
     {
-        // Compose up the visual tree. Computed live each call (not cached): RenderTransform animates per-frame, and an
-        // animated ancestor must carry its whole subtree - a persistent dirty-flag cache would freeze descendants
-        // mid-flight. Hot callers that read it repeatedly within ONE frame (the render pass) memoize it frame-scoped
-        // instead (RenderCache), where the transforms are already stable (layout + animation applied before render).
-        get => VisualParent != null ? LocalTransform * VisualParent.WorldTransform : LocalTransform;
+        // Compose up the RENDER parent chain (= the visual tree for everything but an adorner, which draws in its adorned
+        // element's space). Computed live each call (not cached): RenderTransform animates per-frame, and an animated
+        // ancestor must carry its whole subtree - a persistent dirty-flag cache would freeze descendants mid-flight. Hot
+        // callers that read it repeatedly within ONE frame (the render pass) memoize it frame-scoped instead (RenderCache),
+        // composing over the SAME RenderParent chain - so the frozen path cannot disagree with this one.
+        get => RenderParent != null ? LocalTransform * RenderParent.WorldTransform : LocalTransform;
     }
 
 
@@ -527,30 +563,8 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         VisualChildrenCollection.Remove(child);
     }
 
-    /// <summary>Detaches every visual child (clears its VisualParent) WITHOUT touching the collection - for the callers that
-    /// have to Clear() it themselves, since a Reset carries no items for the collection's handler to act on.</summary>
-    protected void DetachVisualChildren()
-    {
-        foreach (var child in VisualChildrenCollection)
-            (child as UIComponent)?.SetVisualParent(null);
-    }
-
     protected void RemoveVisualChildren()
     {
-        // Clear() raises a RESET, and a reset carries no items - so the collection's own handler cannot see who left, and can
-        // neither name them nor detach them. This is the last moment anything can, so do BOTH here.
-        //
-        // Leaving them attached is not a leak, it is a corruption: the child still points at this component as its VisualParent
-        // while being absent from its children. Nothing walking DOWN the tree can reach it any more - not the render walk, not
-        // the splice - yet it still reports itself attached and visible, so it stays dirty forever. The recorder then refuses
-        // every frame (it cannot place what it cannot find) and falls back to re-recording all ~19 000 components, which does
-        // not draw it either. A templated control dropping its old template root (a rebound list container) span exactly that
-        // loop: 164 whole-tree re-records in one fill, for a component nobody could ever draw.
-        foreach (var child in VisualChildrenCollection)
-        {
-            RenderDirty.MarkStructural(child);
-            (child as UIComponent)?.SetVisualParent(null);
-        }
         VisualChildrenCollection.Clear();
     }
 

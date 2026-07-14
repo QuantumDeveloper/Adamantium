@@ -20,6 +20,7 @@
         <StyleInclude Source="{x:Type fluentDark:ToggleSwitchStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:SliderStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ProgressBarStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:BusyIndicatorStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ItemsControlStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ListBoxStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ListBoxItemStyleSet}"/>

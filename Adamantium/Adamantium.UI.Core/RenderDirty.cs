@@ -70,6 +70,41 @@ public static class RenderDirty
     /// <summary>The geometry-dirty count, read under the write lock (safe against a concurrent mark).</summary>
     public static int GeometryCount { get { lock (GeometrySet) return GeometrySet.Count; } }
 
+    // PAINT-dirty: the component draws the SAME thing, in the same shape, with a different colour/brush/opacity (a hover, a
+    // selection, a theme fade, an animated brush). Its recorded draw commands are unchanged and so are its units - only the
+    // GPU data those units bake from the brush is stale. So it is NOT geometry-dirty: the recorder must not re-render it, and
+    // the applier only re-bakes what it already holds.
+    //
+    // The distinction is what makes an animated SHARED brush affordable. Everything painting with it changes at once (the
+    // pulsing skeleton cards: ~470 of them), and treating that as geometry meant re-running OnRender, rebuilding every draw
+    // command, re-reconciling every unit and re-publishing every frozen layout entry - for one number that moved.
+    private static readonly HashSet<IUIComponent> PaintSet = new();
+
+    /// <summary>Records that only <paramref name="component"/>'s PAINT changed - same shape, same commands, new colour.</summary>
+    public static void MarkPaint(IUIComponent component)
+    {
+        if (component == null) return;
+        lock (PaintSet) PaintSet.Add(component);
+        LoopSignal.Request();
+    }
+
+    /// <summary>Atomically snapshot the paint-dirty set (same locking discipline as <see cref="SnapshotGeometryInto"/>).</summary>
+    public static void SnapshotPaintInto(List<IUIComponent> buffer)
+    {
+        buffer.Clear();
+        lock (PaintSet) buffer.AddRange(PaintSet);
+    }
+
+    public static int PaintCount { get { lock (PaintSet) return PaintSet.Count; } }
+
+    // NOTE on what is deliberately NOT here: assigning a DIFFERENT brush to a property (a hover, a selection, a focus ring)
+    // still goes through the ordinary geometry path and re-records that element. It could be made cheaper - the recorded
+    // command holds the old brush by reference, and both brushes are known at the change, so the renderer could swap the
+    // reference inside the payloads it already holds. It is not worth it: that is an O(1) event (one row, one button), and
+    // buying it would mean the render cache reaching into the media types to mutate them - coupling the control layer to the
+    // renderer's internals for no measurable gain. The O(N) case - one SHARED brush animating under thousands of elements -
+    // is the one that mattered, and it needs none of that (the object is the same; only its value moved).
+
     // WHICH components moved this frame (a Bounds move, a RenderTransform tick). The global <see cref="_transform"/> flag
     // above says "something moved" - enough to drop the derived world/clip memos - but the render's FROZEN layout snapshot
     // needs identities: a component's snapshot entry (its LocalTransform) is stale exactly when the component itself moved,
@@ -190,7 +225,8 @@ public static class RenderDirty
     }
 
     /// <summary>Any dirty state at all (else the frame is fully clean).</summary>
-    public static bool HasWork => _structural || _transform || GeometrySet.Count > 0 || NodeSet.Count > 0 || _forceUntilSettled || _finalForcedBuild;
+    public static bool HasWork => _structural || _transform || GeometrySet.Count > 0 || PaintSet.Count > 0
+                                  || NodeSet.Count > 0 || _forceUntilSettled || _finalForcedBuild;
 
     public static bool IsStructural => _structural || _forceUntilSettled || _finalForcedBuild;
     public static bool IsTransform => _transform;
@@ -210,6 +246,7 @@ public static class RenderDirty
         // Clear the HashSets under the SAME locks their writers (MarkGeometry/MarkNodeTransform/MarkTransform) take - a
         // lock-free Clear racing a concurrent Add (parallel arrange / Dispatcher-thread invalidation) corrupted the set.
         lock (GeometrySet) GeometrySet.Clear();
+        lock (PaintSet) PaintSet.Clear();
         lock (NodeSet) NodeSet.Clear();
         lock (MovedSet) MovedSet.Clear();
         lock (StructuralSet) StructuralSet.Clear();

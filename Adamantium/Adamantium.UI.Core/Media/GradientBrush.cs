@@ -42,8 +42,9 @@ public abstract class GradientBrush : Brush
 
     private void OnStopChanged(object sender, AdamantiumPropertyChangedEventArgs e) => RaiseChanged();
 
+    // PAINT: how the gradient extends past its ends is evaluated per-fragment; the shape is untouched (see Brush.Opacity).
     public static readonly AdamantiumProperty SpreadMethodProperty = AdamantiumProperty.Register(nameof(SpreadMethod),
-        typeof(GradientSpreadMethod), typeof(GradientBrush), new PropertyMetadata(GradientSpreadMethod.Pad));
+        typeof(GradientSpreadMethod), typeof(GradientBrush), new PropertyMetadata(GradientSpreadMethod.Pad, PropertyMetadataOptions.AffectsPaint));
 
     /// <summary>The colour stops, ordered by the author; the renderer reads them sorted by <see cref="GradientStop.Offset"/>.
     /// A collection (not an AdamantiumProperty) so it is never a shared mutable default across instances. [Content] so AUML

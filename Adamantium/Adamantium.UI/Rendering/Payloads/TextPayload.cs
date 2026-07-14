@@ -23,9 +23,15 @@ public class TextPayload(
     // recycled container is rebound to another item, even one whose text is the same length (same DesiredSize). Without
     // this, such a rebind never rebuilt the glyph buffer -> the GPU kept drawing the previous item's text (jumbled list).
     public string Text { get; } = textLayout?.Text;
-    public Brush Foreground { get; } = foreground;
-    public Brush Background { get; } = background;
-    public Brush Stroke { get; } = stroke;
+
+    // The LIVE brushes, read through their immutable snapshots - see RectanglePayload.
+    private readonly Brush _foreground = foreground?.ForRendering();
+    private readonly Brush _background = background?.ForRendering();
+    private readonly Brush _stroke = stroke?.ForRendering();
+
+    public Brush Foreground => _foreground?.Snapshot;
+    public Brush Background => _background?.Snapshot;
+    public Brush Stroke => _stroke?.Snapshot;
 
     public override int GetHashCode()
     {

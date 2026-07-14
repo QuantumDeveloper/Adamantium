@@ -51,7 +51,7 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
 
    IDrawingSession IDrawingSession.DrawLine(Vector2 start, Vector2 end, Pen pen)
    {
-      var payload = new LinePayload(start, end, pen?.ToFrozen());
+      var payload = new LinePayload(start, end, pen);
       CreateCommand(payload);
       return this;
    }
@@ -71,11 +71,14 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
       if (!brush.IsVisible() && pen == null)
          return this;
 
+      // The payload keeps the LIVE brush/pen and reads their immutable snapshots (Brush.Snapshot): a brush is animatable,
+      // and a paint change repaints by RE-BAKING this payload rather than re-recording the element - so a payload holding a
+      // snapshot taken here would pin the colour forever.
       var payload = new RectanglePayload(
-      brush?.ToFrozen(),
+      brush,
       destinationRect,
       corners,
-      pen?.ToFrozen());
+      pen);
       CreateCommand(payload);
 
       return this;
@@ -89,12 +92,12 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
       Pen pen)
    {
       var payload = new EllipsePayload(
-         brush?.ToFrozen(),
+         brush,
          destinationRect,
          startAngle,
          sweepAngle,
          ellipseType,
-         pen?.ToFrozen()
+         pen
       );
       CreateCommand(payload);
       return this;
@@ -104,21 +107,21 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
    {
       // Same invisible-draw skip as DrawRectangle: a transparent/null fill with no stroke records nothing.
       if (!brush.IsVisible() && pen == null) return this;
-      var payload = new GeometryPayload(brush?.ToFrozen(), geometry, pen?.ToFrozen());
+      var payload = new GeometryPayload(brush, geometry, pen);
       CreateCommand(payload);
       return this;
    }
 
    IDrawingSession IDrawingSession.DrawImage(ImageSource image, Brush filter, Rect destinationRect, CornerRadius corners)
    {
-      var payload = new ImagePayload(filter?.ToFrozen(), image, destinationRect, corners);
+      var payload = new ImagePayload(filter, image, destinationRect, corners);
       CreateCommand(payload);
       return this;
    }
 
    IDrawingSession IDrawingSession.DrawImage(ImageSource image, Brush filter, Rect destinationRect, CornerRadius corners, Rect sourceUv)
    {
-      var payload = new ImagePayload(filter?.ToFrozen(), image, destinationRect, corners, sourceUv);
+      var payload = new ImagePayload(filter, image, destinationRect, corners, sourceUv);
       CreateCommand(payload);
       return this;
    }
@@ -134,8 +137,8 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
       // (default Brushes.Transparent), so each list item's text was creating an invisible fill unit + fringe on top of
       // the (now batched) glyphs - a big slice of a long list's cost. The glyph draw itself is always recorded below.
       if (background.IsVisible())
-         CreateCommand(new RectanglePayload(background?.ToFrozen(), new Rect(desiredSize), CornerRadius.Empty, null));
-      var payload = new TextPayload(renderingParameters, desiredSize, textLayout, foreground?.ToFrozen(), background?.ToFrozen(), stroke?.ToFrozen());
+         CreateCommand(new RectanglePayload(background, new Rect(desiredSize), CornerRadius.Empty, null));
+      var payload = new TextPayload(renderingParameters, desiredSize, textLayout, foreground, background, stroke);
       CreateCommand(payload);
       return this;
    }

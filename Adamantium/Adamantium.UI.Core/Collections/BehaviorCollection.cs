@@ -29,12 +29,13 @@ public class BehaviorCollection : TrackingCollection<Behavior>
         base.OnSet(index, oldItem, newItem);
     }
 
-    protected override void OnClear(Behavior[] items)
+    // Detach them while they are still HERE - after the clear they are gone and nothing can be detached from anything.
+    protected override void OnClearing(System.ArraySegment<Behavior> items)
     {
-        foreach (var item in items)
+        foreach (var behavior in items)
         {
-            item.DetachFrom(_adamantiumComponent);
+            behavior.DetachFrom(_adamantiumComponent);
         }
-        base.OnClear(items);
+        base.OnClearing(items);
     }
 }

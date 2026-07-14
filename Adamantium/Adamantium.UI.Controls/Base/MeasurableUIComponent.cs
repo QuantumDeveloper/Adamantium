@@ -674,4 +674,31 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         }
     }
 
+    /// <summary>Re-registers layout work that was raised while this element was DETACHED, with the manager that now owns
+    /// it.</summary>
+    /// <remarks>
+    /// The dirty FLAGS live on the element and survive a detach, but the dirty QUEUES belong to a visual root, and
+    /// <see cref="LayoutManager.For"/> resolves them through <see cref="UIComponent.RootVisual"/> - which a detached
+    /// element does not have. So an invalidation raised while detached is enqueued nowhere the layout pass will ever
+    /// look, and re-attaching alone does not undo that: the element stays measure/arrange-invalid forever while its
+    /// (clean) new ancestors short-circuit the measure cascade above it and never reach it.
+    ///
+    /// That is exactly a theme swap: re-templating the window detaches its whole content subtree, every element in it is
+    /// then re-styled - and re-templated - while detached, and the invalidations that follow are lost. The window came
+    /// back EMPTY until a resize, whose new constraint fails every Measure gate and so re-walks the tree by brute force.
+    /// (WPF has the same seam and closes it the same way, in PropagateResumeLayout.)
+    ///
+    /// Only an element that owns a cached constraint/slot re-registers ITSELF - the same condition
+    /// <see cref="InvalidateMeasure"/> uses to decide it can re-measure alone. One that has never been laid out has no
+    /// constraint to re-measure with; it is measured by the parent that hosts it, as it always was.
+    /// </remarks>
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+
+        if (!IsMeasureValid && _previousMeasure != null) 
+            LayoutManager.For(this).InvalidateMeasure(this);
+        else if (!IsArrangeValid && _previousArrange != null) 
+            LayoutManager.For(this).InvalidateArrange(this);
+    }
 }

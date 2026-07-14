@@ -567,6 +567,13 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             if (newEffectiveValue is Media.Brush newBrush) newBrush.Changed += OnAffectsRenderBrushChanged;
             element?.InvalidateRender(false);
         }
+        // Paint-only: same shape, same draw commands, a different colour. Re-bake what is already recorded instead of
+        // re-recording the element. Checked as an ELSE of AffectsRender - a property declaring both would mean "the shape
+        // changed AND only the colour changed", which is a contradiction; the stronger (geometry) claim wins.
+        else if (metadata.AffectsPaint)
+        {
+            element?.InvalidatePaint();
+        }
 
         if (raiseValueChangedEvent)
         {
@@ -583,10 +590,24 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     // retained units makes the render cache's partial pass FALL BACK to a full tree walk (RenderCache.RecordReRender), so
     // an animated shared brush would re-walk the whole scene every frame. Nothing is lost - Visibility is AffectsRender
     // (and structural), so a card coming back invalidates its render then.
+    // A brush MUTATED INTERNALLY (an animation moving its Opacity, a recoloured fill, a gradient stop moving). The element
+    // draws exactly what it drew before: same commands, same kinds, same geometry - the payload holds THIS SAME brush object
+    // by reference and re-reads its snapshot when the GPU data is baked (see Brush.Snapshot). So this is PAINT, not
+    // geometry: re-bake what exists, do not re-record the element.
+    //
+    // The distinction is the whole point. A brush is routinely SHARED by thousands of elements (a keyed theme brush; the
+    // loading skeletons all paint with one pulsing brush), so its Changed fans out to every one of them on every tick.
+    // Marking geometry meant each of them re-ran OnRender, rebuilt its draw commands, re-reconciled its units and
+    // re-published its frozen layout - measured on the tile fill at ~470 cards per frame, half the fill's throughput, for one
+    // number that moved.
+    //
+    // NOTE the asymmetry with an ordinary SET of a brush property (handled in the AffectsRender path above): assigning a
+    // DIFFERENT brush object leaves the recorded command pointing at the OLD one, so that genuinely needs a re-record until
+    // payloads reference brushes by identity rather than by object.
     private void OnAffectsRenderBrushChanged(object sender, EventArgs e)
     {
-        if (this is not IUIComponent element || element.Visibility != Visibility.Visible) return;
-        element.InvalidateRender(false);
+        if (this is not IUIComponent { Visibility: Visibility.Visible } element) return;
+        element.InvalidatePaint();
     }
 
     /// <summary>

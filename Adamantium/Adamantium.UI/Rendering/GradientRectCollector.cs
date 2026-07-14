@@ -38,13 +38,21 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
     // overflow this frame) - the caller draws it per-unit.
     public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0)
     {
-        if (p.Brush is not GradientBrush g) return false;
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
-        if (!BakeGradientItem(g, p.DestinationRect, p.CornerRadius.TopLeft, p.Pen, world, opacity, 0f, transformSlot, out var item)) return false;
+        if (!BakeItem(p, world, opacity, transformSlot, out var item)) return false;
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
         return true;
+    }
+
+    // Bake one gradient rounded-rect WITHOUT appending it - the paint fast-path re-bakes an existing slot in place (a
+    // sweeping shimmer moves its stops every tick and nothing else about the element changes). See RectBatchCollector.BakeItem.
+    public static bool BakeItem(RectanglePayload p, Matrix4x4F world, double opacity, int transformSlot, out GradientRectItem item)
+    {
+        item = default;
+        if (p.Brush is not GradientBrush g) return false;
+        return BakeGradientItem(g, p.DestinationRect, p.CornerRadius.TopLeft, p.Pen, world, opacity, 0f, transformSlot, out item);
     }
 
     // Bake a gradient fill into an instance record (shared by the rect + ellipse gradient batches). Position -> world;

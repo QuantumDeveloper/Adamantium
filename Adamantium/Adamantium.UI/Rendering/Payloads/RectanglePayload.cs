@@ -9,7 +9,12 @@ namespace Adamantium.UI.Rendering.Payloads;
 public class RectanglePayload(Brush brush, Rect destinationRect, CornerRadius cornerRadius, Pen pen)
     : IEquatable<RectanglePayload>, IRenderCachePolicy
 {
-    public Brush Brush { get; } = brush;
+    // The LIVE brush, dereferenced to its immutable snapshot on every read (see Brush.Snapshot). Holding the snapshot
+    // itself would pin the appearance the brush had at RECORD time, so an animated brush - which is repainted by re-baking
+    // this very payload, not by re-recording the element - would never change on screen.
+    private readonly Brush _brush = brush?.ForRendering();
+
+    public Brush Brush => _brush?.Snapshot;
     public Rect DestinationRect { get; } = destinationRect;
     public CornerRadius CornerRadius { get; } = cornerRadius;
     public Pen Pen { get; } = pen;

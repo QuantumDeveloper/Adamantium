@@ -20,10 +20,11 @@ public class UITrackingCollection<T> : TrackingCollection<T> where T : Adamantiu
         item.ComponentUpdated += OnComponentUpdated;
     }
 
-    protected override void OnClearing(T[] items)
+    // Unsubscribe while they are still HERE - after the clear there is nothing left to unsubscribe from.
+    protected override void OnClearing(System.ArraySegment<T> items)
     {
         base.OnClearing(items);
-        foreach (var component in this)
+        foreach (var component in items)
         {
             component.ComponentUpdated -= OnComponentUpdated;
         }
