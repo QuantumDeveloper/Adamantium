@@ -245,11 +245,18 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         if (e.OldValue == AdamantiumProperty.UnsetValue)
             return;
 
-        // A client-size change (drag-resize, maximize) re-lays-out the tree over the next few budgeted frames, and -
-        // exactly like a theme/DPI swap - parts of that settle never mark the render dirty. A Clean-frame op-replay
-        // then kept ghosts of the OLD layout (tiles at stale positions, a scrollbar stripe mid-window) until an
-        // unrelated mark forced a walk. Force full render walks until the layout settles.
-        RenderDirty.ForceStructuralUntilSettled();
+        // NO forced full walks here any more. A client-size change (drag-resize, maximize) used to demand a whole-tree
+        // re-record on every frame until the layout settled, because "parts of that settle never mark the render dirty" -
+        // ghosts of the old layout survived otherwise (tiles at stale positions, a scrollbar stripe mid-window).
+        //
+        // Those unmarked writes have since been found and fixed: a control leaving the drawn set through the DEFAULT value of
+        // Visibility named nobody (the auto-hide scrollbar, and every recycled container - see UIComponent.OnVisibilityChanged),
+        // and Panel's Children collection changed the visual children without naming them either. The settle marks honestly now,
+        // and the resize is just structure changing - so it SPLICES (see ViewportResize_Splices_AndKeepsDrawnGeometryFresh).
+        //
+        // This matters exactly where it hurts: a maximize to 4K realizes thousands of tiles over many frames, and the forced
+        // walk re-recorded all ~20 000 components on every one of them - 100-200 ms per frame of the heaviest thing the app
+        // does. Theme and DPI swaps still force (they rebuild templates through paths no mark can name).
 
         old.Width = (double) e.OldValue;
         old.Height = component.Height;
@@ -266,7 +273,7 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         if (e.OldValue == AdamantiumProperty.UnsetValue)
             return;
 
-        RenderDirty.ForceStructuralUntilSettled();   // see ClientWidthChangedCallBack - resize settles over frames
+        // No forced full walks - see ClientWidthChangedCallBack: the resize settle marks honestly now, so it splices.
 
         var old = new Size(component.Width, (double)e.OldValue);
         var newSize = new Size(component.Width, (double)e.NewValue);

@@ -11,6 +11,12 @@ public enum RenderBuildKind
     /// paint-order list was untouched - no full tree walk.</summary>
     Partial,
 
-    /// <summary>A full tree walk rebuilt the paint-order list (first build, or a structural change).</summary>
+    /// <summary>Content ENTERED or LEFT the drawn set (a virtualizing panel realizing tiles, a control collapsing) and the
+    /// change could be attributed to named components, so the paint order was SPLICED: only the added subtrees were
+    /// recorded, only the removed ones freed. O(changed), no tree walk.</summary>
+    Structural,
+
+    /// <summary>A full tree walk rebuilt the paint-order list: the first build, or a change nothing could attribute to a
+    /// component (a theme/DPI swap, an unowned transform) - the fallback that always re-derives everything.</summary>
     Full
 }

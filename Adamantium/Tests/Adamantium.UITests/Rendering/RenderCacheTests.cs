@@ -303,22 +303,342 @@ public class RenderCacheTests
     }
 
     [Test]
-    public void StructuralChange_IsFullWalk()
+    public void StructuralChange_IsSpliced_NotAFullWalk()
     {
         var a = AddControl(); DrawsRectangle(a);
         RenderFrame();
         RenderFrame();
         Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Clean));
 
+        var aRenders = a.OnRenderCount;
         var b = AddControl(); DrawsRectangle(b);   // adding content changes the paint-order list
         RenderFrame();
-        Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Full), "adding content forces a full walk");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Structural), "added content is SPLICED into the paint order");
+            Assert.That(a.OnRenderCount, Is.EqualTo(aRenders), "the existing content must NOT be re-recorded - that is the whole point");
+            Assert.That(_factory.Created.Select(u => u.Component), Does.Contain(b), "the new control's unit was built");
+        });
+        AssertPaintOrderMatchesFullWalk("appending a sibling");
     }
 
-    // A change that alters a control's draw-command COUNT can't be patched in place (units would be added) - the partial
-    // pass must detect it and fall back to a full walk, re-rendering the control correctly (not losing its new content).
+    // -------- the structural splice: the paint order it maintains must be EXACTLY the one a full walk derives --------
+    //
+    // Drawing in the wrong order is drawing the wrong picture, so every case is held against the same reference: build the
+    // SAME tree in a fresh cache (whose first build is always a full walk) and compare. That is the invariant; the rest -
+    // which frame kind ran, how many units were created - is just how it was achieved.
+
+    private void AssertPaintOrderMatchesFullWalk(string because)
+    {
+        var reference = new RenderCache(new DrawingContext(), new FakeRenderUnitFactory());
+        _root.InvalidateRender(true);   // a fresh cache records only what is DIRTY - make the whole tree record again
+        reference.BuildFromVisualTree(_root);
+        Assert.That(_cache.PaintOrder, Is.EqualTo(reference.PaintOrder).AsCollection, because);
+    }
+
     [Test]
-    public void CommandCountChange_FallsBackToFullWalk()
+    public void Splice_InsertInTheMiddle_KeepsPaintOrder()
+    {
+        var a = AddControl(); DrawsRectangle(a);
+        var c = AddControl(); DrawsRectangle(c);
+        RenderFrame();
+
+        var b = new TestControl(); DrawsRectangle(b);
+        _root.Insert(1, b);   // between a and c - the case dense ranks cannot express without renumbering
+        RenderFrame();
+
+        Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Structural));
+        AssertPaintOrderMatchesFullWalk("inserting between two existing siblings");
+    }
+
+    [Test]
+    public void Splice_InsertAtTheFront_KeepsPaintOrder()
+    {
+        var b = AddControl(); DrawsRectangle(b);
+        RenderFrame();
+
+        var a = new TestControl(); DrawsRectangle(a);
+        _root.Insert(0, a);   // before everything: its rank must land between the ROOT's and b's
+        RenderFrame();
+
+        Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Structural));
+        AssertPaintOrderMatchesFullWalk("inserting before the first sibling");
+    }
+
+    [Test]
+    public void Splice_AddsWholeSubtree_InPaintOrder()
+    {
+        var a = AddControl(); DrawsRectangle(a);
+        RenderFrame();
+
+        // A realized container: a subtree assembled BEFORE it is attached (exactly how a list container arrives).
+        var container = new TestControl(); DrawsRectangle(container, Brushes.Green);
+        var child1 = new TestControl(); DrawsRectangle(child1, Brushes.Blue);
+        var child2 = new TestControl(); DrawsRectangle(child2, Brushes.Yellow);
+        container.Add(child1);
+        container.Add(child2);
+        _root.Add(container);
+        RenderFrame();
+
+        Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Structural));
+        AssertPaintOrderMatchesFullWalk("a whole subtree spliced in at once");
+    }
+
+    [Test]
+    public void Splice_Removal_FreesUnits_AndKeepsPaintOrder()
+    {
+        var a = AddControl(); DrawsRectangle(a);
+        var b = AddControl(); DrawsRectangle(b);
+        var c = AddControl(); DrawsRectangle(c);
+        RenderFrame();
+        var bUnit = _factory.Created.First(u => u.Component == b);
+
+        _root.Remove(b);
+        RenderFrame();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Structural));
+            Assert.That(bUnit.DeferDisposeCount, Is.GreaterThan(0), "the removed control's units were freed");
+            Assert.That(_cache.PaintOrder, Does.Not.Contain(b.RenderId));
+        });
+        AssertPaintOrderMatchesFullWalk("after removing a middle sibling");
+    }
+
+    [Test]
+    public void Splice_Recycled_Container_MovedToTheEnd_KeepsPaintOrder()
+    {
+        var a = AddControl(); DrawsRectangle(a);
+        var b = AddControl(); DrawsRectangle(b);
+        var c = AddControl(); DrawsRectangle(c);
+        RenderFrame();
+
+        // What a virtualizing panel does to a container that scrolled off one end and back on at the other: same object,
+        // new position. Its units must survive AND its group must move in the paint order.
+        _root.Remove(a);
+        _root.Add(a);
+        RenderFrame();
+
+        Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Structural));
+        AssertPaintOrderMatchesFullWalk("a recycled container re-added at the end");
+    }
+
+    [Test]
+    public void Splice_HiddenThenShown_KeepsPaintOrder()
+    {
+        var a = AddControl(); DrawsRectangle(a);
+        var b = AddControl(); DrawsRectangle(b);
+        var c = AddControl(); DrawsRectangle(c);
+        RenderFrame();
+
+        b.Visibility = Visibility.Collapsed;   // leaves the drawn set
+        RenderFrame();
+        Assert.That(_cache.PaintOrder, Does.Not.Contain(b.RenderId), "a hidden control draws nothing");
+
+        b.Visibility = Visibility.Visible;     // ...and comes back, at its old place
+        b.Invalidate();
+        RenderFrame();
+        AssertPaintOrderMatchesFullWalk("a control hidden and shown again");
+    }
+
+    // Hiding a PARENT takes its whole subtree out of the drawn set, even though the children are still Visible and still
+    // attached - they simply have a hidden ancestor. This is how the virtualizer recycles a tile (it collapses the container,
+    // not the content), so the splice must free the content's units too, or they keep drawing at their old slots: the gaps and
+    // overlapping tiles that appear while the size slider is dragged.
+    [Test]
+    public void Splice_CollapsedParent_FreesItsWholeSubtree()
+    {
+        var host = AddControl(); DrawsRectangle(host);
+        var content = new TestControl(); DrawsRectangle(content, Brushes.Blue);
+        host.Add(content);
+        RenderFrame();
+        Assert.That(_cache.PaintOrder, Does.Contain(content.RenderId), "the content draws while its host is visible");
+
+        host.Visibility = Visibility.Collapsed;   // the container is recycled - only the HOST is named by the mark
+        RenderFrame();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(_cache.PaintOrder, Does.Not.Contain(host.RenderId), "the hidden host stops drawing");
+            Assert.That(_cache.PaintOrder, Does.Not.Contain(content.RenderId),
+                "...and so does everything under it - a still-Visible child of a hidden parent is NOT drawn");
+        });
+        AssertPaintOrderMatchesFullWalk("after collapsing a parent");
+    }
+
+    // A component can change SIZE without its recorded CONTENT going stale: RenderSize marks it dirty, but leaves
+    // IsGeometryValid true (it draws the same thing, just at a new size), so the record rightly skips re-recording it. Its
+    // frozen layout must still be re-frozen - the draw pass reads the picture's geometry from there, so a stale entry paints
+    // the component at its previous size. On a grid of tiles that is exactly what the size slider produces: gaps when the
+    // cells grow, overlaps when they shrink.
+    [Test]
+    public void ResizedButNotReRecorded_Component_IsDrawnAtItsNewSize()
+    {
+        var c = AddControl(); DrawsRectangle(c);
+        c.RenderSize = new Size(50, 50);
+        RenderFrame();
+        Assert.That(_cache.AppliedSnapshot[c].RenderSize, Is.EqualTo(new Size(50, 50)));
+
+        // The cell grew: the tile is arranged bigger, but its CONTENT is unchanged - so it is never re-rendered.
+        var rendersBefore = c.OnRenderCount;
+        c.RenderSize = new Size(90, 90);
+        RenderFrame();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(c.OnRenderCount, Is.EqualTo(rendersBefore), "a pure resize does not re-record the content");
+            Assert.That(_cache.AppliedSnapshot[c].RenderSize, Is.EqualTo(new Size(90, 90)),
+                "...but the draw side MUST see the new size - otherwise it paints the tile at its old one");
+        });
+    }
+
+    // Hiding a control in the SAME frame that runs out of rank space. The renumber hands fresh ranks to what is DRAWN, so the
+    // control being hidden gets none - and if "did it leave the paint order" is answered by asking for a rank, it is then
+    // silently skipped: the applier is never told to drop it, and it keeps painting, frozen at its last slot on top of real
+    // content. (That is the stuck skeleton card: a recycled placeholder that never went away.)
+    [Test]
+    public void Splice_HiddenDuringARenumber_StopsPainting()
+    {
+        var a = AddControl(); DrawsRectangle(a);
+        var victim = AddControl(); DrawsRectangle(victim, Brushes.Blue);
+        var z = AddControl(); DrawsRectangle(z);
+        RenderFrame();
+
+        // Burn the rank gap between a and its follower, so the next insert forces a renumber.
+        for (var i = 0; i < 40; i++)
+        {
+            var filler = new TestControl(); DrawsRectangle(filler);
+            _root.Insert(1, filler);
+            RenderFrame();
+        }
+
+        // ONE frame: another insert (which exhausts the gap -> renumber) AND the victim leaves the drawn set.
+        var last = new TestControl(); DrawsRectangle(last);
+        _root.Insert(1, last);
+        victim.Visibility = Visibility.Collapsed;
+        RenderFrame();
+
+        Assert.That(_cache.PaintOrder, Does.Not.Contain(victim.RenderId),
+            "a control hidden while the ranks were being renumbered must still leave the paint order");
+        AssertPaintOrderMatchesFullWalk("hidden during a renumber");
+    }
+
+    // Content can enter the tree through paths that never call AddVisualChild - a Decorator (a Border) putting its Child in
+    // goes straight to the visual-children collection. Such a component used to appear with nobody naming it, so the splice
+    // had nowhere to place it and every frame of a list fill fell back to re-recording the whole tree. The COLLECTION names
+    // them now, so no path can be forgotten.
+    [Test]
+    public void Splice_ContentAddedThroughDecoratorChild_IsNamed_AndSplices()
+    {
+        var host = AddControl(); DrawsRectangle(host);
+        RenderFrame();
+        RenderFrame();
+        Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Clean));
+
+        // A Border's Child never goes through AddVisualChild - it is set straight on the visual-children collection.
+        var border = new Border { Width = 20, Height = 20, Background = Brushes.Blue };
+        var inner = new Border { Width = 10, Height = 10, Background = Brushes.Green };
+        border.Child = inner;
+        _root.Add(border);
+        RenderFrame();
+
+        Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Structural),
+            "content that arrived through Decorator.Child must still be placeable - no full walk");
+        AssertPaintOrderMatchesFullWalk("a Border whose Child was set, not AddVisualChild'd");
+    }
+
+    // A virtualizing panel parks THOUSANDS of collapsed containers in a row - that is what recycling is. Placing new content
+    // after them means stepping back over every one of them to find the last thing that actually paints, and doing that by
+    // recursion overflowed the stack and took the whole app down.
+    [Test]
+    public void Splice_ThousandsOfHiddenSiblings_DoesNotOverflow()
+    {
+        var anchor = AddControl(); DrawsRectangle(anchor);
+        for (var i = 0; i < 5000; i++)
+        {
+            var hidden = AddControl();
+            DrawsRectangle(hidden);
+            hidden.Visibility = Visibility.Collapsed;
+        }
+        RenderFrame();
+
+        var tail = new TestControl(); DrawsRectangle(tail, Brushes.Blue);
+        _root.Add(tail);   // its rank must be interpolated past 5000 collapsed siblings
+        Assert.DoesNotThrow(RenderFrame);
+
+        Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Structural));
+        AssertPaintOrderMatchesFullWalk("new content after thousands of recycled (hidden) containers");
+    }
+
+    // Several runs of new content under ONE parent, separated by hidden (recycled) siblings - what a virtualizing panel looks
+    // like mid-scroll. Ranking the second run means looking back past the hidden one, straight into a tile the FIRST run was
+    // just given a rank: the plan has to see itself, or it refuses to place a tile against its own work and the frame falls
+    // back to re-recording the entire tree (the biggest remaining source of full walks on a 4K fill).
+    [Test]
+    public void Splice_SeveralNewRunsSeparatedByHiddenSiblings_StillSplices()
+    {
+        var a = AddControl(); DrawsRectangle(a);
+        var hidden1 = AddControl(); DrawsRectangle(hidden1);
+        var b = AddControl(); DrawsRectangle(b);
+        var hidden2 = AddControl(); DrawsRectangle(hidden2);
+        var c = AddControl(); DrawsRectangle(c);
+        RenderFrame();
+
+        hidden1.Visibility = Visibility.Collapsed;
+        hidden2.Visibility = Visibility.Collapsed;
+        RenderFrame();
+
+        // Two separate runs of brand-new tiles, each landing next to a hidden sibling.
+        var new1 = new TestControl(); DrawsRectangle(new1, Brushes.Blue);
+        var new2 = new TestControl(); DrawsRectangle(new2, Brushes.Green);
+        _root.Insert(1, new1);   // between a and hidden1
+        _root.Insert(4, new2);   // between b and hidden2
+        RenderFrame();
+
+        Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Structural),
+            "new content on both sides of hidden siblings must still splice - not fall back to a full walk");
+        AssertPaintOrderMatchesFullWalk("two new runs separated by hidden siblings");
+    }
+
+    // The rank space between two neighbours is finite: every insert into the SAME gap halves it, so a panel realizing tiles
+    // into one spot eventually runs out. That must cost a RENUMBER - an order-only walk plus a re-sort - and never a re-record
+    // of the whole tree: the numbers changed, not the content. (It used to fall back to a full walk, which on a 4K fill is
+    // 100-200 ms of re-recording ~20 000 components to achieve some fresh integers.)
+    [Test]
+    public void Splice_ExhaustedRankGap_Renumbers_WithoutReRecordingTheTree()
+    {
+        var a = AddControl(); DrawsRectangle(a);
+        var z = AddControl(); DrawsRectangle(z);
+        RenderFrame();
+
+        for (var i = 0; i < 60; i++)
+        {
+            var mid = new TestControl(); DrawsRectangle(mid);
+            _root.Insert(1, mid);   // always into the same shrinking gap between a and its follower
+
+            // Measured across the FRAME only: the paint-order check below builds a reference cache, and to do that it has to
+            // dirty the whole tree - which would otherwise look like the engine re-rendering it.
+            var rendersBefore = a.OnRenderCount + z.OnRenderCount;
+            RenderFrame();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Structural),
+                    $"insert #{i}: an exhausted rank gap must renumber, not re-record the tree");
+                Assert.That(a.OnRenderCount + z.OnRenderCount, Is.EqualTo(rendersBefore),
+                    $"insert #{i}: the untouched controls were asked to re-render - renumbering moves numbers, not content");
+            });
+        }
+
+        AssertPaintOrderMatchesFullWalk("after 60 inserts into an ever-tighter gap (with renumbers along the way)");
+    }
+
+    // A change that alters a control's draw-command COUNT adds units - which the partial pass used to hand to a full walk.
+    // It no longer needs to: the count change stays LOCAL to that control's group (BuildUnitsFor refreshes its unit list in
+    // place; no other group moves), so it is applied as a PARTIAL. What matters is that the new content is not lost.
+    [Test]
+    public void CommandCountChange_IsAppliedInPlace()
     {
         var c = AddControl();
         c.RenderAction = s => s.DrawRectangle(Brushes.Red, Box);
@@ -329,7 +649,7 @@ public class RenderCacheTests
         c.Invalidate();
         RenderFrame();
 
-        Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Full), "a command-count change falls back to a full walk");
-        Assert.That(_factory.Created.Count, Is.EqualTo(2), "the new second unit was created by the fallback walk");
+        Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Partial), "a count change is spliced into that one group - no tree walk");
+        Assert.That(_factory.Created.Count, Is.EqualTo(2), "the control's new second unit was created");
     }
 }

@@ -24,6 +24,14 @@ internal sealed class TestRoot : UIComponent, IRootVisualComponent
     public void Add(IUIComponent child) => AddVisualChild(child);
     public void Remove(IUIComponent child) => RemoveVisualChild(child);
 
+    /// <summary>Adds a child AT a position - what a virtualizing panel does when content scrolls in at the top, and the case
+    /// a dense paint-order rank cannot express without renumbering everything after it.</summary>
+    public void Insert(int index, IUIComponent child)
+    {
+        VisualChildrenCollection.Insert(index, child);
+        RenderDirty.MarkStructural(child);
+    }
+
     public double Left { get; set; }
     public double Top { get; set; }
     public string Title { get; set; }

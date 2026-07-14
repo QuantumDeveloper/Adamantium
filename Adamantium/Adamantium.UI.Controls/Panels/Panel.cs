@@ -58,6 +58,9 @@ public abstract class Panel: InputUIComponent, IContainer
             break;
 
          case NotifyCollectionChangedAction.Reset:
+            // A Reset carries no items, so the collection's own handler cannot name what left - only we still can, and only
+            // BEFORE they are dropped. Everything else (add/remove/replace) is named by VisualChildrenCollectionChanged.
+            foreach (var child in VisualChildrenCollection) RenderDirty.MarkStructural(child);
             LogicalChildrenCollection.Clear();
             VisualChildrenCollection.Clear();
             break;
