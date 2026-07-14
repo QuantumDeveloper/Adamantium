@@ -51,12 +51,25 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
             PropertyMetadataOptions.AffectsRender,
             OnVisibilityChanged));
 
-    // A show/hide changes the DRAWN set (a unit enters/leaves the paint-order list), so it is a STRUCTURAL change for
-    // the render cache - a partial in-place re-render can't add/remove a unit. Force a full walk. Skip the constructor's
-    // default-value SEED (UnsetValue -> Visible, fired for every control ever created) and any no-op set.
+    // A show/hide changes the DRAWN set (a unit enters/leaves the paint order), so it is a STRUCTURAL change for the render
+    // cache, which NAMES the component so the change can be spliced instead of re-derived by walking the whole tree.
+    //
+    // UnsetValue means the property was never assigned - but the component's EFFECTIVE visibility was still the default
+    // (Visible), so a control going straight from that default to Collapsed really did leave the drawn set. Treating that as
+    // "there is no old value, skip it" is why a pooled container - collapsed for the FIRST time in its life, which is exactly
+    // what recycling does to it - named nobody: the render cache never learned it was gone and kept drawing its tile at the
+    // old slot (the gaps and overlapping tiles while the size slider is dragged). The old full-walk rebuild hid this, because
+    // it re-derived the drawn set from the tree every frame and never needed the mark to be right.
+    //
+    // What the guard is actually for is the constructor's SEED (UnsetValue -> Visible, fired for every control ever created),
+    // and that is a no-op change once the old value is read as the default it really was.
     private static void OnVisibilityChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
     {
-        if (e.OldValue != AdamantiumProperty.UnsetValue && !Equals(e.OldValue, e.NewValue))
+        var oldValue = e.OldValue == AdamantiumProperty.UnsetValue
+            ? VisibilityProperty.GetDefaultMetadata(d.GetType()).DefaultValue
+            : e.OldValue;
+
+        if (!Equals(oldValue, e.NewValue))
             RenderDirty.MarkStructural(d as IUIComponent);
     }
       
@@ -308,6 +321,17 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         return new Size(Math.Max(size.Width, 0), Math.Max(size.Height, 0));
     }
 
+    // EVERY change to the visual children lands here - and every one of them changes the DRAWN set, so every one of them must
+    // NAME the components that entered or left it. That is what lets the render cache splice the paint order (O(changed))
+    // instead of re-deriving it by walking the whole tree (O(scene), which on a 4K fill meant re-recording ~20 000 components
+    // on every frame of the fill).
+    //
+    // The marks live HERE, at the collection, and not at the callers, because there is no single caller: AddVisualChild does
+    // it, but so do Decorator.Child (a Border putting its content in - the case that kept the fill in full-walk mode), Panel's
+    // Children reconciliation, Slider's tooltip, TabStripScroller's child swap. Marking at each site is a rule that gets
+    // forgotten - and a forgotten one is silent: the old full-walk rebuild re-derived the drawn set from the tree anyway, so
+    // an unnamed change cost nothing and left no trace. Now it costs a whole-tree re-record, so the collection names them
+    // itself and no caller can forget.
     private void VisualChildrenCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
     {
         switch (e.Action)
@@ -316,6 +340,7 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
                 foreach (UIComponent visual in e.NewItems)
                 {
                     visual.SetVisualParent(this);
+                    RenderDirty.MarkStructural(visual);
                 }
                 break;
 
@@ -323,6 +348,31 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
                 foreach (UIComponent visual in e.OldItems)
                 {
                     visual.SetVisualParent(null);
+                    RenderDirty.MarkStructural(visual);
+                }
+                break;
+
+            case NotifyCollectionChangedAction.Replace:
+                foreach (UIComponent visual in e.OldItems)
+                {
+                    visual.SetVisualParent(null);
+                    RenderDirty.MarkStructural(visual);
+                }
+                foreach (UIComponent visual in e.NewItems)
+                {
+                    visual.SetVisualParent(this);
+                    RenderDirty.MarkStructural(visual);
+                }
+                break;
+
+            case NotifyCollectionChangedAction.Reset:
+                // The items are already gone from the collection - the event carries them, and they are the only way to name
+                // what left.
+                if (e.OldItems == null) break;
+                foreach (UIComponent visual in e.OldItems)
+                {
+                    visual.SetVisualParent(null);
+                    RenderDirty.MarkStructural(visual);
                 }
                 break;
         }
@@ -437,21 +487,21 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
     protected TrackingCollection<IUIComponent> VisualChildrenCollection { get; private set; }
 
+    // Add/Remove need no mark of their own: the collection names every component that enters or leaves it
+    // (VisualChildrenCollectionChanged), so no caller - here or anywhere else - can forget to.
     protected void AddVisualChild(IUIComponent child)
     {
         VisualChildrenCollection.Add(child);
-        RenderDirty.MarkStructural(child);   // new content -> paint-order list must be rebuilt (and WHICH content, for the splice)
     }
-    
+
     protected void RemoveVisualChild(IUIComponent child)
     {
         VisualChildrenCollection.Remove(child);
-        RenderDirty.MarkStructural(child);   // removed content -> paint-order list must be rebuilt (and WHICH content, for the splice)
     }
 
     protected void RemoveVisualChildren()
     {
-        // Name each one BEFORE the collection drops them - afterwards there is nothing left to name.
+        // A Reset carries no items, so this is the last moment anything can name them (see VisualChildrenCollectionChanged).
         foreach (var child in VisualChildrenCollection) RenderDirty.MarkStructural(child);
         VisualChildrenCollection.Clear();
     }

@@ -237,6 +237,10 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
     // no ItemSkeletonTemplate.
     private readonly Stack<UIComponent> _skeletonPool = new();               // idle cards, ready to reuse
     private readonly Dictionary<int, UIComponent> _activeSkeletons = new();  // slot index -> the card showing there now
+
+    /// <summary>How many skeleton cards are on screen right now (one is reconciled per PENDING slot, every
+    /// frame - a cost that scales with the un-filled window, not with what the frame admits).</summary>
+    protected int ActiveSkeletonCount => _activeSkeletons.Count;
     private readonly HashSet<IUIComponent> _skeletonSet = new();             // every card built (skip in HideUnmappedContainers)
     private readonly List<int> _recycleBuf = new();                          // scratch: active slots to recycle this frame
     private readonly HashSet<int> _pendingSet = new();                       // scratch: this frame's pending, for O(1) lookup

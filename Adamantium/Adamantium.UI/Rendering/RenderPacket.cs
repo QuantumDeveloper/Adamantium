@@ -57,11 +57,20 @@ internal sealed class RenderPacket
     /// <summary>Frame projection captured at record (from the root visual).</summary>
     public Matrix4x4F ProjectionMatrix;
 
-    /// <summary>The paint-order rank of every component, PUBLISHED whenever the recorder re-derived it (a full walk, or the
-    /// order-only re-walk that places a component appearing mid-partial); null = unchanged, keep the last one. The applier
-    /// needs the ranks to splice a new group at its paint position, but the map is RECORDER-owned (it comes from walking the
-    /// live tree), so it is handed over as a fresh immutable dictionary instead of being read across the seam.</summary>
-    public IReadOnlyDictionary<Guid, int> Orders;
+    /// <summary>Structural only: components DETACHED from the tree - the applier frees their retained units. A Full walk needs
+    /// no such list: it rebuilds the paint order from scratch and reclaims whatever it did not visit.</summary>
+    public readonly List<IUIComponent> Removed = new();
+
+    /// <summary>Structural only: components that left the PAINT ORDER but are still in the tree (hidden, or under something
+    /// hidden). They stop drawing - and that is all: their units are KEPT, so showing them again costs a re-insert, not a
+    /// rebuild. This is what a recycled list container is (the virtualizer collapses it and shows it again a few rows later),
+    /// so freeing here would churn GPU buffers on every scroll step.</summary>
+    public readonly List<IUIComponent> Undrawn = new();
+
+    /// <summary>Structural only: components that KEEP their units but MOVED in the paint order (a recycled container re-added
+    /// at a different position) - the applier re-sorts their groups to the new rank. A component that is re-recorded carries
+    /// its rank on its <see cref="ComponentDraw"/> instead; this list is for the ones with nothing new to draw.</summary>
+    public readonly List<KeyValuePair<IUIComponent, long>> Reranks = new();
 
     /// <summary>Reset for reuse (the packet is pooled per cache; a Clean frame produces an empty one).</summary>
     public void Reset(RenderBuildKind kind)
@@ -71,19 +80,26 @@ internal sealed class RenderPacket
         MovedNodes.Clear();
         PartialDirty.Clear();
         SnapDelta.Clear();
+        Removed.Clear();
+        Undrawn.Clear();
+        Reranks.Clear();
         SnapReset = false;
         IsTransformDirty = false;
         ClearMemos = false;
-        Orders = null;
     }
 }
 
 /// <summary>One component's recorded contribution: its identity + the draw commands its <c>Render</c> produced this
 /// frame (empty = "reuse cached units" when it was clean, or "clear stale units" when it was dirty - disambiguated by
-/// <see cref="WasGeometryValid"/>, exactly as the fused walk did).</summary>
-internal readonly struct ComponentDraw(IUIComponent component, IReadOnlyList<IDrawCommand> commands, bool wasGeometryValid)
+/// <see cref="WasGeometryValid"/>, exactly as the fused walk did) + its PAINT RANK, which is how the applier places the
+/// group without ever reading the recorder's rank map across the seam.</summary>
+internal readonly struct ComponentDraw(IUIComponent component, IReadOnlyList<IDrawCommand> commands, bool wasGeometryValid,
+    long order)
 {
     public IUIComponent Component { get; } = component;
     public IReadOnlyList<IDrawCommand> Commands { get; } = commands;
     public bool WasGeometryValid { get; } = wasGeometryValid;
+
+    /// <summary>The component's paint rank (_groups is sorted by it).</summary>
+    public long Order { get; } = order;
 }

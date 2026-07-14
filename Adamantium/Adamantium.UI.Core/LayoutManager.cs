@@ -33,11 +33,17 @@ public sealed class LayoutManager
     // outer drain loop bails after this many iterations rather than spinning forever.
     private const int MaxPassIterations = 100;
 
-    // F1 layout time-budgeting: max wall-time one ExecuteLayoutPass may spend before deferring the rest to the next
-    // frame. Default 8 ms - high enough that a normal frame finishes well within it, low enough to keep a pathological
-    // frame (binding storm / view switch) responsive; deferred subtrees keep their last Bounds and render in place
-    // until they catch up. Set to null to disable (always finish the pass in one go).
-    public static TimeSpan? FrameBudget = TimeSpan.FromMilliseconds(8);
+    // F1 layout time-budgeting: max wall-time one ExecuteLayoutPass may spend before deferring the rest to the next frame.
+    // Deferred subtrees keep their last Bounds and render in place until they catch up - and THAT is the problem: an element
+    // whose arrange was pushed to the next pass sits at its PREVIOUS rect while its neighbours have already moved to the new
+    // one, which on a grid of tiles is a frame containing tiles of two different sizes (gaps where the cell grew, overlaps
+    // where it shrank). A budget that buys milliseconds by publishing a torn frame is not a budget, it is a bug.
+    //
+    // NULL (disabled) while this is under investigation: a layout pass now always finishes in one go, so what is drawn is
+    // always internally consistent. What the budget was protecting against - a pathological pass hanging the loop - is now
+    // covered elsewhere: the compositor presents at its own pace (a slow Update no longer freezes the picture) and the
+    // panel's own intake budget bounds how much new content one pass admits.
+    public static TimeSpan? FrameBudget = null;
 
     private readonly IUIComponent _root;
     private readonly DirtyQueue _toStyle = new();

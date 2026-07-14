@@ -27,6 +27,17 @@ public class RenderCache
     private sealed class ControlGroup
     {
         public Guid ControlId;
+
+        // The group's PAINT RANK - _groups is kept sorted by it. Carried on the group (not looked up in a shared map) so
+        // the applier can place a spliced group with a comparison instead of a dictionary the recorder would have to
+        // republish across the seam every structural frame.
+        public long Order;
+
+        // Is this group currently IN the paint order (_groups)? A hidden control keeps its group and its units but leaves the
+        // order, so "has a group" and "is drawn" are different questions - and re-showing it must re-insert it even when it
+        // lands back on the very same rank it had.
+        public bool InOrder;
+
         public readonly List<IRenderUnit> Units = new();
 
         // Recorded by the last RECORDING walk, for the spliced-patch draw path: the group's contiguous retained
@@ -45,20 +56,21 @@ public class RenderCache
     private readonly List<ControlGroup> _groups = new();              // the paint order (groups in DFS paint rank)
     private readonly Dictionary<Guid, ControlGroup> _groupById = new();   // control -> its group (the retained unit cache)
 
-    // Paint-order (DFS visit) index of each component, assigned during the full walk - kept even for a component that
-    // rendered 0 units. Lets a PARTIAL re-render whose draw-command COUNT changed (a hover background appearing 0->1, or
-    // vanishing) splice that ONE component's units into the retained paint-order list at the right spot, instead of
-    // falling back to a full tree walk that re-renders every element (the hover / mouse-move FPS cliff on a big list).
-    // RECORDER-owned (derived from walking the LIVE tree). The applier needs the ranks too - to splice a new group at its
-    // paint position - but must never read this one: in the decoupled path the recorder rebuilds it (a full walk) while the
-    // applier is still drawing the previous frame. So each rebuild PUBLISHES a fresh immutable dictionary on the packet and
-    // the applier keeps its own reference (_applyOrder). Rare (full walk / a component appearing mid-partial), so the copy
-    // costs nothing per frame.
-    private Dictionary<Guid, int> _orderByControl = new();
-    private IReadOnlyDictionary<Guid, int> _applyOrder = new Dictionary<Guid, int>();   // APPLIER-owned view of the above
-    private IRootVisualComponent _lastVisualRoot;             // for an on-demand order re-walk (a component appearing mid-partial)
-    private readonly Stack<IUIComponent> _orderStack = new(); // reused by ReassignOrders (no per-call alloc)
-    private readonly HashSet<Guid> _orderVisited = new();
+    // The paint-order RANK of each drawn component - the sort key of _groups. SPARSE: a full walk numbers components
+    // 0, GAP, 2*GAP..., so a component added later takes a rank strictly BETWEEN its neighbours' and NOBODY is renumbered.
+    // That is what makes a structural change O(changed) instead of O(scene): the paint order is a sorted list, and adding
+    // a tile is a local insert, not a re-walk of the tree (which, on the 4K fill, meant visiting 19 646 components to
+    // re-record 16 dirty ones - 28 ms of a 100 ms loop frame, every frame).
+    //
+    // RECORDER-owned (derived from the LIVE tree). The applier never reads it: the rank of anything that changed travels
+    // ON the packet (ComponentDraw.Order / RenderPacket.Reranks) and is stored on the applier's own ControlGroup.
+    private readonly Dictionary<Guid, long> _orderByControl = new();
+
+    // Room for ~30 successive inserts into the SAME gap before it is used up (each insert halves it). A scene of 100 000
+    // components then spans 2^30 * 100 000 = 2^47 - a rounding error in a 63-bit space, so there is no reason to be stingy:
+    // an exhausted gap costs a full walk to renumber, which is the very thing this exists to avoid.
+    private const long OrderGap = 1L << 30;
+    private IRootVisualComponent _lastVisualRoot;             // the tree these ranks describe
     private readonly Stack<IUIComponent> _walkStack = new();      // reused by RecordFullWalk (it ran on every structural frame)
     private readonly HashSet<IUIComponent> _walkVisited = new();
     private bool _forceFullNextFrame;                         // the applier hit a state only a full RECORD can fix (see ApplyPacket)
@@ -114,6 +126,20 @@ public class RenderCache
     /// (only a <see cref="RenderBuildKind.Clean"/> frame skips the transform re-bake).</summary>
     public RenderBuildKind LastBuildKind { get; private set; }
 
+    /// <summary>The retained PAINT ORDER: the controls that hold units, in the sequence the draw pass walks them. The
+    /// structural splice maintains this incrementally, so tests hold it against what a full walk of the same tree produces -
+    /// the one invariant that matters (drawing in the wrong order is drawing the wrong picture).</summary>
+    internal IReadOnlyList<Guid> PaintOrder => _groups.Select(g => g.ControlId).ToArray();
+
+    /// <summary>What the DRAW pass actually believes about each component's layout - the applier's frozen replica. The picture
+    /// is only right if this agrees with the live tree: a stale entry draws a tile at the size or place it had LAST time, which
+    /// is exactly what gaps and overlaps are. Tests assert the agreement.</summary>
+    internal IReadOnlyDictionary<IUIComponent, LayoutSnapshot> AppliedSnapshot => _applySnap;
+
+    /// <summary>The components the draw pass will actually draw (those holding retained units).</summary>
+    internal IEnumerable<IUIComponent> DrawnComponents =>
+        _groups.SelectMany(g => g.Units).Select(u => u.Component).Distinct();
+
     /// <summary>Did the last build actually MOVE anything (transform-dirty / a full re-layout)? A geometry-only partial
     /// re-records draw contents but nothing moved, so the per-unit transform re-bake (proc) is redundant - the draw pass
     /// re-bakes each drawn unit anyway - and can be skipped, which is the difference between a cheap and an O(N) frame
@@ -156,6 +182,7 @@ public class RenderCache
         // Freeze the layout snapshot HERE, at the END of the DEVICE-FREE record, on the update thread - so the applier (the
         // render thread) reads ONLY the frozen packet: its draws, its layout delta. Never a live component.
         CaptureSnapshot();
+
         _published.Enqueue(_packet);   // hand it over; the applier drains the queue (see ApplyFrame)
         _packet = null;
     }
@@ -169,8 +196,9 @@ public class RenderCache
         _packet.ProjectionMatrix = visualRoot.GetProjectionMatrix();
 
         // Fully clean: nothing changed since last build -> the applier re-draws the retained units as-is. Keep the
-        // transform memo: nothing moved, so last frame's world transforms are still correct.
-        if (_built && !RenderDirty.HasWork) return;
+        // transform memo: nothing moved, so last frame's world transforms are still correct. (Unless a previous frame asked
+        // for a full walk it could not do itself - that debt is paid before anything is called clean.)
+        if (_built && !RenderDirty.HasWork && !_forceFullNextFrame) return;
 
         // Non-structural change on an existing scene -> PARTIAL update: re-render only the geometry-dirty components in
         // place. Either way the retained groups (paint order + unit cache) stay. Drop the frame-scoped world/clip memos ONLY on
@@ -225,9 +253,22 @@ public class RenderCache
                 _packet.PartialDirty.AddRange(_geometryDirtyBuffer);
                 RenderDirty.SnapshotNodesInto(_packet.MovedNodes);   // under the write lock (MarkNodeTransform runs on other threads too)
                 RenderDirty.SnapshotMovedInto(_movedBuf);            // the MOVED components - CaptureSnapshot re-freezes just these
+
                 return;   // packet.Kind == Partial -> ApplyFrame runs the partial apply
             }
-            // a structural change or a new invalidation surfaced during the partial pass -> escalate to a full walk
+            // a structural change or a new invalidation surfaced during the partial pass -> escalate below
+        }
+
+        // STRUCTURAL: content entered or left the drawn set, and every change NAMES its component - so the paint order can be
+        // spliced (O(changed)) instead of re-derived by walking the whole tree (O(scene), and the tree is the big number: on
+        // the 4K fill it walked 19 646 components to re-record 16 dirty ones). Refuses on anything it cannot place locally, and
+        // the full walk below is then the self-healing fallback (it renumbers with fresh gaps).
+        if (_built && !RenderDirty.IsStructuralUnknown && !RenderDirty.IsTransformUnknown && !_forceFullNextFrame)
+        {
+            _packet.Reset(RenderBuildKind.Structural);
+            _packet.ProjectionMatrix = visualRoot.GetProjectionMatrix();
+            if (RecordStructuralFrame(visualRoot, _packet)) return;
+            // refused -> everything it recorded into the packet is superseded by the full walk (which Resets it)
         }
 
         RecordFullFrame(visualRoot);
@@ -275,6 +316,492 @@ public class RenderCache
     private readonly List<IUIComponent> _structuralBuf = new();      // components that entered/left the drawn set this frame
     private readonly List<IUIComponent> _movedNodesCapture = new();  // moved motion nodes, for the snapshot re-freeze on a FULL frame
 
+    // --- The STRUCTURAL record: a paint-order SPLICE instead of a tree walk -------------------------------------------------
+    //
+    // Content entering or leaving the drawn set used to force a full walk: every component in the scene re-visited, re-asked
+    // for its draw commands, its rank rewritten. Measured on the 4K fill: 19 646 components walked to re-record 16 dirty ones,
+    // 28 ms of a 100 ms loop frame, EVERY frame - the marginal cost of one new tile was a re-record of the whole scene, which
+    // is also why a frame budget could never work here (bounding the intake cannot help when one item costs as much as a
+    // thousand).
+    //
+    // It is avoidable, because the marks NAME the components that entered/left (RenderDirty.MarkStructural) and the paint
+    // order is a SORTED LIST: a new subtree only needs a rank between its neighbours', and sparse ranks (OrderGap) leave room
+    // for exactly that. So this records only the added subtrees, frees only the removed ones, and hands the applier a splice.
+    // O(changed).
+    //
+    // It REFUSES (-> the caller does a full walk) whenever anything is not locally decidable: an unattributed structural change
+    // (a theme/DPI swap - IsStructuralUnknown), a neighbour with no rank to interpolate against, or a rank gap too small to
+    // subdivide. The full walk renumbers with fresh gaps, so a refusal is always self-healing.
+    private readonly HashSet<IUIComponent> _placeRoots = new();       // outermost unranked (=new) drawn components to place
+    private readonly HashSet<IUIComponent> _structRecorded = new();   // recorded by THIS structural pass (the dirty pass skips them)
+    private readonly Dictionary<IUIComponent, List<IUIComponent>> _addsByParent = new();
+    private readonly List<IUIComponent> _childBuf = new();            // one parent's children, in paint order
+    private readonly List<IUIComponent> _subtreeBuf = new();          // one added subtree, in paint order
+    private readonly Stack<IUIComponent> _subtreeStack = new();
+
+    private bool HasRank(IUIComponent component) => _orderByControl.ContainsKey(component.RenderId);
+    private long RankOf(IUIComponent component) => _orderByControl[component.RenderId];
+
+    // The rank a component has, or the one THIS plan is about to give it. The plan must see itself: a panel gets several runs
+    // of new tiles separated by recycled (hidden) containers, and ranking a later run means looking back past those - straight
+    // into a tile an EARLIER run of the same plan has just been given a rank. Those ranks are not in _orderByControl yet (the
+    // commit writes them), so without this the plan refuses to place a tile against a tile it planned itself, and the frame
+    // falls back to re-recording the entire tree. It was the single biggest remaining source of full walks on a 4K fill.
+    private bool TryPlannedRank(IUIComponent component, out long rank) =>
+        _plannedRanks.TryGetValue(component, out rank) || _orderByControl.TryGetValue(component.RenderId, out rank);
+
+    private bool HasPlannedRank(IUIComponent component) => TryPlannedRank(component, out _);
+
+    private readonly Dictionary<IUIComponent, long> _plannedRanks = new();
+
+    // Is this component actually DRAWN by this cache right now: attached, visible, with no hidden ancestor, and rooted in OUR
+    // tree (a popup/tooltip lives in a foreign root drawn by its own cache).
+    private bool IsDrawn(IUIComponent component)
+    {
+        if (component.Visibility != Visibility.Visible || !component.IsAttachedToVisualTree) return false;
+        var c = component;
+        while (c.VisualParent != null)
+        {
+            c = c.VisualParent;
+            if (c.Visibility != Visibility.Visible) return false;
+        }
+        return ReferenceEquals(c, _lastVisualRoot);
+    }
+
+    // PLAN, then COMMIT - and the split is not cosmetic. A refusal must leave the recorder EXACTLY as it found it, because
+    // the fallback (a full walk) re-derives the scene from the components' own dirty flags: anything this pass had already
+    // rendered would look CLEAN to that walk, be recorded as "reuse the cached units", and - for a component whose units were
+    // never built, i.e. every new tile - simply never be drawn again. So nothing is rendered, no rank is written and no unit
+    // is mirrored until the whole frame is known to be placeable.
+    private bool RecordStructuralFrame(IRootVisualComponent visualRoot, RenderPacket packet)
+    {
+        // The ranks describe the tree of the last full walk. A different root (or none yet) - nothing to splice into.
+        if (!ReferenceEquals(_lastVisualRoot, visualRoot) || !HasRank(visualRoot))
+        {
+
+            return false;
+        }
+
+        if (!PlanStructuralChange())
+        {
+            // Ran out of rank SPACE, not out of information: every insert into the same gap halves it, and a panel that
+            // realizes hundreds of tiles into one spot uses up even a 2^30 gap. Renumbering is all that is needed - and
+            // renumbering is CHEAP: the paint order is just numbers, so it costs an order-only walk (no Render, no units, no
+            // draw commands) plus a re-sort of the groups. Re-recording the whole tree to achieve it - the old fallback -
+            // cost 100-200 ms on a 4K fill, for nothing.
+            if (!_needRenumber) return false;
+
+            RenumberOrder(visualRoot, packet);
+            if (!PlanStructuralChange()) return false;
+        }
+
+        // The geometry-dirty components come along for the ride (exactly as a Partial frame). Pre-validate them against the
+        // PLAN - a dirty component the partial path cannot place is a refusal, and it must be found before anything renders.
+        RenderDirty.SnapshotGeometryInto(_geometryDirtyBuffer);
+        foreach (var component in _geometryDirtyBuffer)
+        {
+            if (_plannedSet.Contains(component) || _removedSet.Contains(component)) continue;
+            if (ClassifyReRender(component) == PartialRecord.Fallback) return false;
+        }
+
+        // ---- COMMIT: from here nothing can refuse. ----
+        _structRecorded.Clear();
+        foreach (var (component, rank) in _plannedList) RankAndRecord(component, rank, packet);
+        foreach (var component in _removedList) FreeComponent(component, packet, detached: true);
+        foreach (var component in _undrawnList) FreeComponent(component, packet, detached: false);
+
+        foreach (var component in _geometryDirtyBuffer)
+        {
+            if (_structRecorded.Contains(component) || _removedSet.Contains(component)) continue;
+            RecordReRender(component, packet);   // pre-validated above: it cannot fall back now
+        }
+
+        // A component's Render can mark MORE geometry dirty (an image finishing its decode). Those marks are cleared with the
+        // rest once the record ends, so a component that arrived mid-pass would be lost - and it stays dirty forever, since
+        // nothing re-marks it. Record whatever is placeable now; anything else forces a full walk NEXT frame, and the request
+        // for that frame is what keeps it from being dropped (the loop only runs when something asks - see LoopSignal).
+        if (RenderDirty.GeometryCount != _geometryDirtyBuffer.Count)
+        {
+            _forceFullNextFrame = true;
+            Core.LoopSignal.Request();
+        }
+
+        // A splice changes WHICH units exist and where they sit in the paint order, so the applier must re-bake every unit's
+        // transform and re-walk the draw (no op-stream replay). That cost lands on the render thread - which is the whole
+        // point of moving the record off the loop.
+        packet.IsTransformDirty = true;
+        packet.ClearMemos = true;
+        RenderDirty.SnapshotNodesInto(packet.MovedNodes);
+        RenderDirty.SnapshotMovedInto(_movedBuf);
+        return true;
+    }
+    // The PLAN (read-only): who gets which rank, and who is freed. Fails - without touching anything - when the change is not
+    // locally decidable.
+    private bool _needRenumber;
+
+    // Re-derive the paint order with FRESH GAPS - and nothing else. No Render, no draw commands, no unit work: the components
+    // and their contents are untouched, only their NUMBERS change, so every group simply moves to its new place in the sorted
+    // order (the applier re-sorts on the Reranks below). That is the whole cost of running out of rank space - a walk and a
+    // sort - instead of the whole-tree re-record it used to trigger.
+    private void RenumberOrder(IRootVisualComponent visualRoot, RenderPacket packet)
+    {
+        _orderByControl.Clear();
+
+        var stack = _walkStack;
+        var visited = _walkVisited;
+        stack.Clear();
+        visited.Clear();
+        stack.Push(visualRoot);
+        long order = 0;
+
+        while (stack.Count > 0)
+        {
+            var component = stack.Pop();
+            if (component.Visibility != Visibility.Visible) continue;
+            if (!visited.Add(component)) continue;
+
+            _orderByControl[component.RenderId] = order;
+            // Only a component that actually DRAWS has a group to move; the rest just need the number.
+            if (HoldsUnits(component)) packet.Reranks.Add(new KeyValuePair<IUIComponent, long>(component, order));
+            order += OrderGap;
+
+            PushChildrenInPaintOrder(stack, component.VisualChildren);
+        }
+
+        _needRenumber = false;
+    }
+
+    private bool PlanStructuralChange()
+    {
+        _needRenumber = false;
+        RenderDirty.SnapshotStructuralInto(_structuralBuf);
+        _placeRoots.Clear();
+        _addsByParent.Clear();
+        _plannedList.Clear();
+        _plannedSet.Clear();
+        _plannedRanks.Clear();
+        _removedList.Clear();
+        _undrawnList.Clear();
+        _removedSet.Clear();
+
+        // 1. Classify by CURRENT state, not by what happened: a container removed and re-added in the same frame (a recycled
+        //    tile) is an ADD, and its stale rank is simply re-derived.
+        foreach (var component in _structuralBuf)
+        {
+            if (component == null || !IsDrawn(component)) continue;
+
+            // Climb to the OUTERMOST component with no rank. A new subtree is assembled BEFORE it is attached, so every
+            // component in it is marked - and they all resolve to the same root here, which is what makes the run contiguous.
+            var top = component;
+            while (top.VisualParent != null && !HasRank(top.VisualParent)) top = top.VisualParent;
+            if (top.VisualParent == null) continue;   // the visual root itself - it never moves
+
+            _placeRoots.Add(top);
+        }
+
+        // 2. Group by parent: a run of new siblings shares one rank gap, so they must be ranked together.
+        foreach (var component in _placeRoots)
+        {
+            var parent = component.VisualParent;
+            if (!HasRank(parent))   // the climb should have made this impossible - refuse rather than guess
+            {
+
+                return false;
+            }
+            if (!_addsByParent.TryGetValue(parent, out var list))
+            {
+                list = new List<IUIComponent>();
+                _addsByParent[parent] = list;
+            }
+            list.Add(component);
+        }
+
+        foreach (var (parent, _) in _addsByParent)
+            if (!PlanNewChildren(parent)) return false;
+
+        // 3. What LEFT the drawn set. The subtree is still intact (a detach does not tear it apart), so it can be walked -
+        //    and anything inside it that actually MOVED was planned above and is skipped.
+        foreach (var component in _structuralBuf)
+        {
+            if (component == null || IsDrawn(component)) continue;
+            PlanRemoval(component);
+        }
+        return true;
+    }
+
+    // Rank every component of every NEW subtree under one parent: strictly between the ranked neighbours that surround them,
+    // so no existing component is renumbered and no existing group moves.
+    private bool PlanNewChildren(IUIComponent parent)
+    {
+        ChildrenInPaintOrder(parent, _childBuf);
+
+        for (var i = 0; i < _childBuf.Count; i++)
+        {
+            if (!_placeRoots.Contains(_childBuf[i])) continue;
+
+            // The contiguous RUN of new children starting here: one gap serves them all.
+            var j = i;
+            while (j + 1 < _childBuf.Count && _placeRoots.Contains(_childBuf[j + 1])) j++;
+
+            // The rank immediately BEFORE the run: the previous sibling's last painted descendant, or the parent itself.
+            long prev;
+            if (i == 0) prev = RankOf(parent);
+            else if (!TryLastRankOfSubtree(_childBuf[i - 1], out prev))
+            {
+                // The sibling this run must come AFTER is drawn, yet holds no rank. That means it entered the drawn set
+                // without a mark naming it - the splice cannot place anything against it.
+
+                return false;
+            }
+
+            // ...and immediately AFTER it: the next painted sibling, or whatever follows the parent's whole subtree.
+            long next;
+            if (j + 1 < _childBuf.Count)
+            {
+                if (!TryFirstRankAfter(_childBuf, j + 1, out next)) next = SuccessorRank(parent);
+            }
+            else next = SuccessorRank(parent);
+
+            // The run's subtrees in paint order - that is the sequence of ranks to hand out.
+            _subtreeBuf.Clear();
+            for (var k = i; k <= j; k++) CollectSubtreeInPaintOrder(_childBuf[k], _subtreeBuf);
+
+            var needed = _subtreeBuf.Count;
+            if (needed == 0) { i = j; continue; }
+
+            long step;
+            if (next == long.MaxValue) step = OrderGap;   // appending at the end: there is always room
+            else
+            {
+                step = (next - prev) / (needed + 1);
+                if (step < 1)
+                {
+
+                    _needRenumber = true;   // not a refusal - just a renumber, and then this plan runs again with room to spare
+                    return false;
+                }
+            }
+
+            var cursor = prev;
+            foreach (var component in _subtreeBuf)
+            {
+                cursor += step;
+                _plannedList.Add((component, cursor));
+                _plannedSet.Add(component);
+                _plannedRanks[component] = cursor;   // ...so a LATER run of this same plan can place itself against it
+            }
+
+            i = j;
+        }
+        return true;
+    }
+
+    // The rank of the first PAINTED sibling at or after index `from` (invisible siblings hold no rank and cannot bound a run).
+    private bool TryFirstRankAfter(List<IUIComponent> siblings, int from, out long rank)
+    {
+        for (var i = from; i < siblings.Count; i++)
+        {
+            if (siblings[i].Visibility != Visibility.Visible) continue;
+            if (_placeRoots.Contains(siblings[i])) continue;   // also new - it is ranked by its own run, AFTER this one
+            if (TryPlannedRank(siblings[i], out rank)) return true;
+        }
+        rank = long.MaxValue;
+        return false;
+    }
+
+    // Everything under a component that left the DRAWN set. Two very different fates, and conflating them is a bug either way:
+    //
+    //  - DETACHED from the tree: it is gone. Free its units.
+    //  - HIDDEN (or under something hidden): it is still there and will very likely be back - that is precisely what a
+    //    recycled list container is. It leaves the paint order, but KEEPS its units, so showing it again is a re-insert
+    //    rather than a rebuild of its GPU buffers. Freeing here would churn every container on every scroll step.
+    //
+    // Either way its RANK goes (it is not in the paint order any more) and its frozen layout goes (it will be re-frozen when
+    // it comes back) - otherwise both maps grow forever on a recycling list.
+    private void PlanRemoval(IUIComponent component)
+    {
+        _subtreeStack.Clear();
+        _subtreeStack.Push(component);
+        while (_subtreeStack.Count > 0)
+        {
+            var c = _subtreeStack.Pop();
+            if (_plannedSet.Contains(c)) continue;   // it did not leave - it MOVED, and was planned above
+
+            // Is the applier holding anything for this component? The RANK cannot answer that - it answers "in what order is
+            // it painted", and it is dropped the moment a component leaves the drawn set (or a renumber skips it, which it does
+            // for anything already hidden). Asking the rank meant a component whose rank was gone but whose GROUP still existed
+            // was silently skipped: the applier was never told to take it out of the paint order, so it kept painting - frozen
+            // at its last slot, on top of real content. That is the stuck skeleton card.
+            //
+            // The mirror of the applier's groups (_recordedUnits) is what actually knows. Ask it.
+            var known = HoldsUnits(c) || HasRank(c);
+            if (known && _removedSet.Add(c))
+            {
+                if (c.IsAttachedToVisualTree) _undrawnList.Add(c);   // hidden: keep the units
+                else _removedList.Add(c);                            // detached: free them
+            }
+
+            // Descend regardless of the child's own visibility: the whole subtree stops being drawn with its root.
+            foreach (var child in c.VisualChildren) _subtreeStack.Push(child);
+        }
+    }
+
+    private readonly List<(IUIComponent Component, long Rank)> _plannedList = new();
+    private readonly HashSet<IUIComponent> _plannedSet = new();
+    private readonly List<IUIComponent> _removedList = new();    // DETACHED: free the units
+    private readonly List<IUIComponent> _undrawnList = new();    // HIDDEN: keep the units, just stop drawing
+    private readonly HashSet<IUIComponent> _removedSet = new();  // either fate - "left the paint order"
+
+    // Give one component its new rank, and hand the applier whatever it needs: a re-record when the component draws something
+    // new (the normal case - a freshly realized tile has never rendered), or just the rank when it kept its units and only
+    // moved in the order (a recycled container re-added at another index).
+    private void RankAndRecord(IUIComponent component, long rank, RenderPacket packet)
+    {
+        _orderByControl[component.RenderId] = rank;
+        _structRecorded.Add(component);
+
+        if (component.IsGeometryValid && HoldsUnits(component))
+        {
+            packet.Reranks.Add(new KeyValuePair<IUIComponent, long>(component, rank));
+            return;
+        }
+
+        var wasGeometryValid = component.IsGeometryValid;
+        _drawingContextInternal.Clear();
+        component.Render(_drawingContext);
+        var commands = CopyCommands(_drawingContextInternal.GetDrawCommands());
+        packet.Draws.Add(new ComponentDraw(component, commands, wasGeometryValid, rank));
+        MirrorUnits(component, commands.Count, wasGeometryValid);
+    }
+
+    // COMMIT half of a planned removal. Both fates drop the RANK (it is out of the paint order) and the frozen layout (it is
+    // re-frozen when it returns). They differ in the units: a DETACHED component's are freed, a HIDDEN one's are kept - and so
+    // is its mirror entry, because it still holds them and a re-show must reuse rather than rebuild them.
+    private void FreeComponent(IUIComponent component, RenderPacket packet, bool detached)
+    {
+        _orderByControl.Remove(component.RenderId);
+        _snap.Remove(component);
+
+        if (detached)
+        {
+            _recordedUnits.Remove(component.RenderId);
+            packet.Removed.Add(component);
+        }
+        else
+        {
+            packet.Undrawn.Add(component);
+        }
+    }
+
+    // The LAST rank inside a component's painted subtree (its deepest last-painted descendant) - the rank a sibling appended
+    // after it must come after. Fails if the subtree is not ranked (nothing to interpolate against).
+    private bool TryLastRankOfSubtree(IUIComponent component, out long rank)
+    {
+        rank = 0;
+        var parent = component.VisualParent;
+        var anchor = component;
+
+        // An invisible sibling draws nothing and holds no rank, so it cannot bound the run - step back to the last one that
+        // does. ITERATIVELY, over the sibling list read once: a virtualizing panel parks THOUSANDS of collapsed containers in
+        // a row (that is what recycling is), and walking them by recursion overflowed the stack outright.
+        if (component.Visibility != Visibility.Visible)
+        {
+            if (parent == null) return false;
+
+            ChildrenInPaintOrder(parent, _childBuf2);
+            var at = _childBuf2.IndexOf(component);
+            if (at < 0) return false;
+
+            anchor = null;
+            for (var i = at - 1; i >= 0; i--)
+            {
+                if (_childBuf2[i].Visibility != Visibility.Visible) continue;
+                anchor = _childBuf2[i];
+                break;
+            }
+            if (anchor == null) return TryPlannedRank(parent, out rank);   // nothing painted before it: the parent bounds the run
+        }
+
+        if (!TryPlannedRank(anchor, out rank)) return false;
+
+        // ...and down to its deepest painted descendant - the last rank inside its subtree.
+        var last = anchor;
+        while (true)
+        {
+            ChildrenInPaintOrder(last, _childBuf2);
+            IUIComponent tail = null;
+            for (var i = _childBuf2.Count - 1; i >= 0; i--)
+                if (_childBuf2[i].Visibility == Visibility.Visible && HasPlannedRank(_childBuf2[i])) { tail = _childBuf2[i]; break; }
+            if (tail == null) break;
+            last = tail;
+        }
+        return TryPlannedRank(last, out rank);
+    }
+
+    // The rank of whatever is painted immediately AFTER a component's whole subtree: its next painted sibling, else its
+    // parent's, and so on to the root. long.MaxValue = nothing follows (the run appends at the very end).
+    private long SuccessorRank(IUIComponent component)
+    {
+        for (var c = component; c?.VisualParent != null; c = c.VisualParent)
+        {
+            ChildrenInPaintOrder(c.VisualParent, _childBuf2);
+            var found = false;
+            foreach (var sibling in _childBuf2)
+            {
+                if (found && sibling.Visibility == Visibility.Visible && TryPlannedRank(sibling, out var rank)) return rank;
+                if (ReferenceEquals(sibling, c)) found = true;
+            }
+        }
+        return long.MaxValue;
+    }
+
+    private readonly List<IUIComponent> _childBuf2 = new();   // TryLastRankOfSubtree / SuccessorRank (they never nest with _childBuf)
+
+    // A component's visible subtree, in paint order (the order a full walk would visit it in). Iterative, with a reused stack:
+    // the recursive version copied each node's children into a fresh array to survive the recursion, which is an allocation
+    // per component per structural frame - and a fill collects thousands of subtrees.
+    private void CollectSubtreeInPaintOrder(IUIComponent root, List<IUIComponent> into)
+    {
+        if (root.Visibility != Visibility.Visible) return;
+
+        _collectStack.Clear();
+        _collectStack.Push(root);
+        while (_collectStack.Count > 0)
+        {
+            var component = _collectStack.Pop();
+            if (component.Visibility != Visibility.Visible) continue;
+            into.Add(component);
+
+            // Push reversed, so they pop in paint order.
+            ChildrenInPaintOrder(component, _localChildBuf);
+            for (var i = _localChildBuf.Count - 1; i >= 0; i--) _collectStack.Push(_localChildBuf[i]);
+        }
+    }
+
+    private readonly List<IUIComponent> _localChildBuf = new();
+    private readonly Stack<IUIComponent> _collectStack = new();
+
+    // A component's children in PAINT order (drawn first = underneath) - the same precedence the full walk's stack uses.
+    private static void ChildrenInPaintOrder(IUIComponent parent, List<IUIComponent> into)
+    {
+        into.Clear();
+        foreach (var child in parent.VisualChildren) into.Add(child);
+
+        var anyZ = false;
+        foreach (var child in into)
+            if (child.ZIndex != 0) { anyZ = true; break; }
+        if (!anyZ) return;
+
+        // Stable sort by ZIndex (document order within a Z), mirroring PushChildrenInPaintOrder / the hit-test's ZSort.
+        var ordered = into.Select((child, index) => (child, index))
+            .OrderBy(x => x.child.ZIndex)
+            .ThenBy(x => x.index)
+            .Select(x => x.child)
+            .ToArray();
+        into.Clear();
+        into.AddRange(ordered);
+    }
+
     /// <summary>
     /// APPLY half of the frame build (GPU - the render-thread side in Phase 3.3). Consumes the packet the recorder filled:
     /// Clean re-draws the retained units; Partial updates the dirty groups in place (splicing count changes), and if a
@@ -298,6 +825,7 @@ public class RenderCache
         // decoupled path the record runs at loop level (UIApplication.RecordRenderFrame) and the clear is hoisted there,
         // once after ALL windows have recorded - so a second window still sees the full dirty set this frame.
         if (drew && RenderThreadOptions.SingleThreaded) RenderDirty.Clear();
+
     }
 
     /// <summary>Starts a fresh DRAW frame's merged apply state. The per-frame results (build kind, dirty set, moved nodes)
@@ -351,8 +879,6 @@ public class RenderCache
     {
         WarmTextAtlases(packet);   // one batched glyph rasterization for the whole packet, before any unit is built
 
-        // The paint-order ranks, if the recorder re-derived them (a fresh, immutable map - see RenderPacket.Orders).
-        if (packet.Orders != null) _applyOrder = packet.Orders;
         _projectionMatrix = packet.ProjectionMatrix;
 
         // The applier's OWN derived memos (composed world/clip/node transforms), dropped here rather than by the recorder:
@@ -380,17 +906,7 @@ public class RenderCache
             {
                 // APPLY pass (GPU): realize the recorded draws - update the units in place / splice a count change.
                 foreach (var draw in packet.Draws)
-                {
-                    if (ApplyReRender(draw.Component, draw.Commands)) continue;
-
-                    // A recorded partial draw with no paint rank. Unreachable by construction: RecordReRender re-derives
-                    // the ranks (a device-free order-only walk) and escalates to a FULL record when a component still has
-                    // none, so every draw that reaches here has a place. Kept as a safety net that reads NOTHING live -
-                    // the applier may be the render thread, so re-recording the tree from HERE (what this used to do)
-                    // would race the loop's mutations. Instead ask the RECORDER for a full walk next frame.
-                    _forceFullNextFrame = true;
-                    break;
-                }
+                    ApplyReRender(draw.Component, draw.Commands, draw.Order);
 
                 if (LastBuildKind != RenderBuildKind.Full) LastBuildKind = RenderBuildKind.Partial;
                 LastBuildTransformDirty |= packet.IsTransformDirty;
@@ -398,6 +914,20 @@ public class RenderCache
                 _movedNodesBuf.AddRange(packet.MovedNodes);
                 break;
             }
+
+            case RenderBuildKind.Structural:
+                ApplyStructural(packet);
+                // A Full recorded LATER in this same drain supersedes it (it rebuilt every group); otherwise this is the
+                // strongest kind seen so far.
+                if (LastBuildKind != RenderBuildKind.Full) LastBuildKind = RenderBuildKind.Structural;
+                LastBuildTransformDirty = true;
+                // The unit set changed, so the retained op stream and the recorded rect slots no longer describe the scene and
+                // the draw pass must re-walk (it does: only Clean and Partial replay). Any partial slot-patch state an earlier
+                // packet of this same drain left behind is therefore moot.
+                _partialDirty.Clear();
+                _movedNodesBuf.AddRange(packet.MovedNodes);
+                _partialSpliced = false;
+                break;
 
             case RenderBuildKind.Full:
                 ApplyFullWalk(packet);   // GPU: rebuild the paint-order groups from the packet
@@ -423,28 +953,29 @@ public class RenderCache
     // Fallback = the caller must do a full walk; Recorded = its commands were captured into the packet for the applier.
     private enum PartialRecord { Skip, Fallback, Recorded }
 
-    // RECORD half of a partial re-render for ONE geometry-dirty component (DEVICE-FREE): the skip/fallback decisions +
-    // component.Render, copying the recorded commands into the packet. No GPU - the applier (ApplyReRender) realizes them.
-    private PartialRecord RecordReRender(IUIComponent component, RenderPacket packet)
+    // The DECISION for one geometry-dirty component - PURE: it reads state and renders nothing. The structural pass calls it
+    // to pre-validate the frame before it commits to anything (see RecordStructuralFrame), which only works because deciding
+    // has no side effects.
+    private PartialRecord ClassifyReRender(IUIComponent component)
     {
-        // Invisible (Collapsed/Hidden - e.g. an auto-hide ScrollBar that re-marks geometry dirty on every mouse-move):
-        // it draws nothing. If it holds no units (the norm - going invisible was STRUCTURAL and already removed them),
-        // SKIP it like a detached/collapsed one below, instead of forcing a full tree walk every dirty frame (the hover
-        // FPS hitch). Only if it somehow still holds units fall back to a full walk to reconcile them.
-        if (component.Visibility != Visibility.Visible)
-            return HoldsUnits(component) ? PartialRecord.Fallback : PartialRecord.Skip;
+        // Invisible (Collapsed/Hidden - a recycled list container, an auto-hide ScrollBar that re-marks geometry dirty on
+        // every mouse-move): it draws NOTHING, so there is nothing to record. Its units are retained for the moment it is
+        // shown again, and its dirty flag stays set until then - so it re-records at exactly the right time (the structural
+        // splice that puts it back in the paint order), not now. Falling back to a full walk here - as this did, whenever such
+        // a component still held units - meant a whole-tree re-record for every hidden container that so much as re-bound.
+        if (component.Visibility != Visibility.Visible) return PartialRecord.Skip;
 
         // Not in the live paint tree: DETACHED (no visual parent) or effectively hidden by a COLLAPSED ancestor. The full
         // walk never reaches such a component, so it has no paint rank and re-rendering it draws nothing - yet it used to
         // force a FULL tree rebuild EVERY frame it was geometry-dirty (a detached/pooled text block, a text block inside a
         // collapsed panel, an auto-hide scrollbar's parts). Skip it: it holds no units (a real detach/collapse is
-        // STRUCTURAL and already removed them via a full walk), so there is nothing to draw or reclaim here.
+        // STRUCTURAL and already removed them), so there is nothing to draw or reclaim here.
         if (!component.IsAttachedToVisualTree) return PartialRecord.Skip;
         for (var a = component.VisualParent; a != null; a = a.VisualParent)
             if (a.Visibility != Visibility.Visible) return PartialRecord.Skip;
 
         // A geometry-dirty component from a FOREIGN visual tree - a popup/menu/tooltip subtree (a PopupRoot), drawn by
-        // the popup stage's OWN cache, never by this one. Skip it WITHOUT rendering: Render() below would consume its
+        // the popup stage's OWN cache, never by this one. Skip it WITHOUT rendering: Render() would consume its
         // IsGeometryValid=false, and that flag is precisely the signal the popup stage's rebuild gate
         // (PopupRenderProcessor.OverlayChanged) polls to notice the change - the MAIN cache building first and eating it
         // starved that gate, so a menu item's hover recolour never redrew. (Tree-top walk: cheap - it only runs for the
@@ -457,33 +988,41 @@ public class RenderCache
         }
 
         // Marked dirty EXTERNALLY (an animation heartbeat / duplicate mark) while its own geometry is still VALID:
-        // Render() below no-ops on the flag and records ZERO commands, which the count-change path would read as
-        // "now draws nothing" and DELETE the retained units (the mass tile vanish on ease-back completion). Nothing
-        // about its recorded geometry changed - keep the retained units as-is.
+        // Render() would no-op on the flag and record ZERO commands, which the count-change path reads as "now draws
+        // nothing" and DELETES the retained units (the mass tile vanish on ease-back completion). Nothing about its
+        // recorded geometry changed - keep the retained units as-is.
         if (component.IsGeometryValid) return PartialRecord.Skip;
 
-        // Holds no units yet AND has no paint rank: it was invisible/absent during the last full walk and has just appeared
-        // (an auto-hide ScrollBar fading in), so the applier would have nowhere to splice its units. Re-derive the ranks with
-        // a cheap ORDER-ONLY walk (no Render, no unit work) - and do it HERE, on the record side: the walk reads the LIVE
-        // tree, which the applier (the render thread) must never touch. Genuinely not in the tree -> a full record.
-        if (!HoldsUnits(component) && !_orderByControl.ContainsKey(component.RenderId))
-        {
-            ReassignOrders();
-            if (!_orderByControl.ContainsKey(component.RenderId)) return PartialRecord.Fallback;
-        }
+        // No paint rank: it was invisible/absent when the paint order was last derived and has just appeared without a
+        // structural mark to place it by (an auto-hide ScrollBar fading in). The applier would have nowhere to splice its
+        // units, so hand the frame to a full walk, which re-derives the whole order. A component that DRAWS always has a
+        // rank (it got one from the walk or splice that recorded it), so this is the appearing-content case only.
+        if (!HasRank(component)) return PartialRecord.Fallback;
 
+        return PartialRecord.Recorded;
+    }
+
+    // RECORD half of a partial re-render for ONE geometry-dirty component (DEVICE-FREE): decide, then component.Render and
+    // copy the recorded commands into the packet. No GPU - the applier (ApplyReRender) realizes them.
+    private PartialRecord RecordReRender(IUIComponent component, RenderPacket packet)
+    {
+        var decision = ClassifyReRender(component);
+        if (decision != PartialRecord.Recorded) return decision;
+
+        var rank = RankOf(component);
         _drawingContextInternal.Clear();
         component.Render(_drawingContext);   // NB: consumes the dirty flag (Render sets IsGeometryValid back to true)
         var commands = CopyCommands(_drawingContextInternal.GetDrawCommands());
-        packet.Draws.Add(new ComponentDraw(component, commands, false));
+        packet.Draws.Add(new ComponentDraw(component, commands, false, rank));
         MirrorUnits(component, commands.Count, false);   // it WAS dirty: no commands now means "draws nothing" -> units freed
         return PartialRecord.Recorded;
     }
 
     // APPLY half (GPU / render-thread side): realize ONE recorded partial draw - update the group's units in place (same
-    // count + type) or splice in the count/type change. Returns false only when a newly-appearing component has no paint
-    // rank (-> the caller does a full walk). wasGeometryValid is not used here (RecordReRender already skipped the clean).
-    private bool ApplyReRender(IUIComponent component, IReadOnlyList<IDrawCommand> drawCommands)
+    // count + type) or splice in the count/type change. wasGeometryValid is not used here (RecordReRender already skipped
+    // the clean). <paramref name="order"/> is the component's paint rank, recorded WITH the draw - so a group appearing for
+    // the first time can be placed without the applier ever reading the recorder's rank map.
+    private void ApplyReRender(IUIComponent component, IReadOnlyList<IDrawCommand> drawCommands, long order)
     {
         _groupById.TryGetValue(component.RenderId, out var group);
         var oldCount = group?.Units.Count ?? 0;
@@ -501,7 +1040,8 @@ public class RenderCache
             if (allMatch)
             {
                 for (var i = 0; i < drawCommands.Count; i++) units[i].UpdateWithDrawCommand(drawCommands[i]);
-                return true;
+                group.Order = order;
+                return;
             }
         }
 
@@ -511,28 +1051,117 @@ public class RenderCache
         // phase must re-walk this frame (per-group op patching is the planned follow-up that lifts this too).
         _partialSpliced = true;
         var isNewGroup = group == null;
-        // A brand-new group with no paint rank can't be placed. The RECORDER already re-derives the ranks (an order-only walk
-        // in RecordReRender) and escalates to a full record when a component still has none, so this is unreachable - and
-        // re-walking the LIVE tree from here, as it used to, is precisely what the applier (the render thread) must not do.
-        // Report it instead; ApplyPacket asks the recorder for a full walk next frame.
-        if (isNewGroup && !_applyOrder.ContainsKey(component.RenderId)) return false;
 
         group = BuildUnitsFor(component, drawCommands, _projectionMatrix);
+        group.Order = order;
 
         if (isNewGroup)
         {
-            // First units this control ever drew (a background appearing 0->1): place its group by DFS paint rank -
-            // before the first group that ranks after it. Existing groups never move.
-            var order = _applyOrder[component.RenderId];
+            // First units this control ever drew (a background appearing 0->1): place its group by paint rank - before the
+            // first group that ranks after it. Existing groups never move. The rank came WITH the draw, so nothing is read
+            // across the seam (the recorder's rank map is its own).
             var pos = _groups.Count;
             for (var i = 0; i < _groups.Count; i++)
             {
-                if (_applyOrder.GetValueOrDefault(_groups[i].ControlId, int.MaxValue) > order) { pos = i; break; }
+                if (_groups[i].Order > order) { pos = i; break; }
             }
             _groups.Insert(pos, group);
+            group.InOrder = true;
         }
-        return true;
     }
+
+    // APPLY half of a STRUCTURAL frame (GPU / render-thread side): free what left, realize what arrived, and re-sort the
+    // paint order - all of it O(changed) plus one linear merge, instead of rebuilding every group from a full walk.
+    private void ApplyStructural(RenderPacket packet)
+    {
+        // 1. DETACHED: gone for good - free its units.
+        foreach (var component in packet.Removed)
+        {
+            RemoveAndDeferDispose(component.RenderId);
+            _applySnap.Remove(component);
+        }
+
+        // 2. HIDDEN: it stops DRAWING, and that is all. Its group and units survive, so showing it again (which is what the
+        //    virtualizer does to a recycled container a few rows later) re-inserts a ready group instead of rebuilding buffers.
+        foreach (var component in packet.Undrawn)
+        {
+            if (_groupById.TryGetValue(component.RenderId, out var hidden)) RemoveFromOrder(hidden);
+            _applySnap.Remove(component);
+        }
+
+        // 3. What ARRIVED (or re-recorded): build/refresh its units. Groups to place are collected for ONE merge below - a
+        //    linear scan per insert would be O(new x scene) on a fill.
+        _pendingInserts.Clear();
+        _pendingSet.Clear();
+        foreach (var draw in packet.Draws)
+        {
+            if (draw.Commands.Count == 0)
+            {
+                // Recorded nothing. Clean -> it draws what it already drew (a panel with no background); dirty -> it now
+                // draws nothing, so its stale units must go. Same disambiguation as the full walk's ProcessRenderCommands.
+                if (!draw.WasGeometryValid) RemoveAndDeferDispose(draw.Component.RenderId);
+                continue;
+            }
+
+            _groupById.TryGetValue(draw.Component.RenderId, out var existing);
+            // Does this group have to be (re)placed in the paint order? Either it is brand new, or it is coming back from
+            // hidden, or it MOVED (a recycled container re-added at another index). Note the InOrder check: a container that
+            // is shown again at the very same rank it had before still has to be re-inserted - comparing ranks alone would
+            // silently leave it out of the paint order, drawn nowhere.
+            var replace = existing == null || !existing.InOrder || existing.Order != draw.Order;
+
+            var group = BuildUnitsFor(draw.Component, draw.Commands, packet.ProjectionMatrix);
+            group.Order = draw.Order;
+
+            if (replace) QueueInsert(group);
+        }
+
+        // 4. Kept its units, but its place changed (a recycled container, one shown again, or everything at once after a
+        //    renumber): nothing to re-record - just put its group back where the tree now says it belongs.
+        foreach (var (component, order) in packet.Reranks)
+        {
+            if (!_groupById.TryGetValue(component.RenderId, out var group)) continue;
+            group.Order = order;
+            QueueInsert(group);
+        }
+
+        if (_pendingInserts.Count == 0) return;
+
+        // 4. One merge of two sorted sequences - the retained paint order and this frame's arrivals.
+        _pendingInserts.Sort(static (a, b) => a.Order.CompareTo(b.Order));
+        _mergedGroups.Clear();
+        var i2 = 0;
+        var j2 = 0;
+        while (i2 < _groups.Count && j2 < _pendingInserts.Count)
+            _mergedGroups.Add(_groups[i2].Order <= _pendingInserts[j2].Order ? _groups[i2++] : _pendingInserts[j2++]);
+        while (i2 < _groups.Count) _mergedGroups.Add(_groups[i2++]);
+        while (j2 < _pendingInserts.Count) _mergedGroups.Add(_pendingInserts[j2++]);
+
+        _groups.Clear();
+        _groups.AddRange(_mergedGroups);
+        foreach (var group in _pendingInserts) group.InOrder = true;
+    }
+
+    // Takes a group OUT of the paint order (it stops drawing) without touching its units.
+    private void RemoveFromOrder(ControlGroup group)
+    {
+        if (!group.InOrder) return;
+        _groups.Remove(group);
+        group.InOrder = false;
+    }
+
+    // Queues a group for this frame's ONE merge into the paint order. Deduped: the same group can be named twice in a packet
+    // (a renumber reranks everything, and a component that was ALSO re-recorded carries its rank on its draw) - and inserting
+    // it twice would put it in the paint order twice, drawing it twice.
+    private void QueueInsert(ControlGroup group)
+    {
+        RemoveFromOrder(group);   // no-op when it is not in the order (new, or hidden)
+        if (_pendingSet.Add(group)) _pendingInserts.Add(group);
+    }
+
+    private readonly List<ControlGroup> _pendingInserts = new();
+    private readonly HashSet<ControlGroup> _pendingSet = new();
+    private readonly List<ControlGroup> _mergedGroups = new();
 
     /// <summary>
     /// Builds units from a FLAT list of components (the adorner stage), instead of walking a visual tree. Each
@@ -546,7 +1175,7 @@ public class RenderCache
         // skip EVERY GPU upload - its SSBO never fills and the whole overlay (menus, tooltips, SlidePanel) renders nothing.
         LastBuildKind = RenderBuildKind.Full;
         _commands.Clear();
-        _groups.Clear();
+        ClearOrder();
         _snap.Clear();         // full rebuild -> drop last frame's frozen layout snapshot (else stale overlay positions + unbounded _snap growth)
         _worldCache.Clear();   // new frame: drop last frame's transform + clip memos
         _clipCache.Clear();
@@ -563,6 +1192,7 @@ public class RenderCache
         var present = new HashSet<Guid>();
         if (components != null)
         {
+            long order = 0;
             foreach (var component in components)
             {
                 if (component.Visibility != Visibility.Visible) continue;
@@ -571,7 +1201,8 @@ public class RenderCache
                 var wasGeometryValid = component.IsGeometryValid;
                 _drawingContextInternal.Clear();
                 component.Render(_drawingContext);
-                ProcessRenderCommands(component, _drawingContextInternal.GetDrawCommands(), projectionMatrix, wasGeometryValid);
+                ProcessRenderCommands(component, _drawingContextInternal.GetDrawCommands(), projectionMatrix, wasGeometryValid, order);
+                order += OrderGap;   // the flat list IS the paint order
             }
         }
 
@@ -609,7 +1240,7 @@ public class RenderCache
         }
 
         _groupById.Clear();
-        _groups.Clear();
+        ClearOrder();
         _recordedUnits.Clear();   // the recorder's mirror of the above
         // The designer builds a brand-new tree per render (fresh RenderIds), so the frozen layout of the old one - both the
         // recorder's map and the applier's replica - is dead weight that would otherwise grow unboundedly.
@@ -732,8 +1363,27 @@ public class RenderCache
             return;
         }
 
-        // Re-recorded this frame (the dirty/newly-spliced components of a Partial).
+        // Re-recorded this frame (the dirty/newly-spliced components of a Partial or a Structural).
         foreach (var draw in _packet.Draws) RefreshSnapshot(draw.Component);
+
+        // EVERY geometry-dirty component - not just the ones whose draw commands were re-recorded. A component can change
+        // SIZE without its recorded geometry going stale: RenderSize marks it dirty but leaves IsGeometryValid true (it draws
+        // the same content, at a new size), so the record SKIPS it - and if the snapshot is only re-frozen for what was
+        // recorded, that component keeps being DRAWN at its previous size. On a grid of tiles that is exactly the artefact:
+        // gaps when the cells grow, overlaps when they shrink.
+        //
+        // The full walk hid this for years: its own capture re-freezes the whole dirty buffer (see the Full branch above), so
+        // as long as every structural frame was a full walk, every resized component was re-frozen by accident.
+        //
+        // Only what is actually DRAWN: a component that left the drawn set this frame had its frozen entry dropped on purpose
+        // (it is re-frozen when it comes back), and re-adding it here would resurrect it - and publish a delta for something
+        // the applier has just freed.
+        foreach (var component in _geometryDirtyBuffer)
+            if (IsDrawn(component)) RefreshSnapshot(component);
+
+        // Structural: a component that kept its units but MOVED in the tree - its VisualParent (and so its whole composed
+        // position) changed, and nothing else would re-freeze it.
+        foreach (var rerank in _packet.Reranks) RefreshSnapshot(rerank.Key);
         // Moved this frame. A moved MOTION NODE whose entry is kept stale is the classic O(1)-path regression: World() then
         // composes the node from LAST frame's LocalTransform, so a tilting tile never moves and a flipping one sticks at the
         // angle it had when its 90-degree face-swap re-recorded it (the swap is geometry - it rides the packet's draws - but
@@ -1678,46 +2328,23 @@ public class RenderCache
         };
     }
     
-    // Re-derive every component's paint-order rank WITHOUT rendering (no Render, no unit build) - the same DFS + paint
-    // order as the full walk, just assigning _orderByControl. Used when a component appears mid-partial (needs a rank to
-    // be spliced into the retained paint-order list) so we don't have to re-render the whole tree to place one element.
-    private void ReassignOrders()
-    {
-        if (_lastVisualRoot == null) return;
-        // Fresh map + publish, for the same reason as RecordFullWalk: the applier holds the previous one by reference.
-        _orderByControl = new Dictionary<Guid, int>(_orderByControl.Count);
-        _packet.Orders = _orderByControl;
-        _orderStack.Clear();
-        _orderVisited.Clear();
-        var order = 0;
-        _orderStack.Push(_lastVisualRoot);
-        while (_orderStack.Count > 0)
-        {
-            var component = _orderStack.Pop();
-            if (component.Visibility != Visibility.Visible) continue;
-            if (!_orderVisited.Add(component.RenderId)) continue;
-            _orderByControl[component.RenderId] = order++;
-            PushChildrenInPaintOrder(_orderStack, component.VisualChildren);
-        }
-    }
-
     // RECORD half of the full walk (DEVICE-FREE): DFS the visual tree, run component.Render to produce this frame's draw
     // commands, and COPY each component's commands into the packet in paint order (the shared drawing context is reused for
     // the next component, so the commands must be snapshotted now). No GPU here - no unit build, no buffer alloc; the
     // applier realizes them (ApplyFullWalk). This is what lets the recorder run on the update thread (docs/RENDER_THREAD_PLAN.md).
     private void RecordFullWalk(IRootVisualComponent visualRoot, RenderPacket packet)
     {
-        // A FRESH map, never a Clear() of the published one: the applier still holds the previous map by reference (it may be
-        // drawing the previous frame on the render thread), so mutating it in place would pull the ranks out from under it.
-        _orderByControl = new Dictionary<Guid, int>(_orderByControl.Count);
-        packet.Orders = _orderByControl;   // publish this walk's ranks to the applier
+        // Renumber from scratch with FRESH GAPS. Safe to mutate in place (unlike the map this replaced): the ranks no longer
+        // cross the seam - each draw carries its own, and the applier stores it on the group.
+        _orderByControl.Clear();
         _lastVisualRoot = visualRoot;
-        var order = 0;
+        long order = 0;
         packet.ProjectionMatrix = visualRoot.GetProjectionMatrix();
         // Reused, not re-allocated per frame: a full walk runs on EVERY structural frame (a scrolling grid realizes containers
         // constantly), and these grew to one entry per component in the scene - a fresh HashSet rehashing its way up to ~9000
         // entries, every frame. Keyed by the COMPONENT, not its RenderId: hashing a Guid is several times the cost of a
         // reference hash, and the identity is the same either way.
+
         var stack = _walkStack;
         var visited = _walkVisited;
         stack.Clear();
@@ -1735,18 +2362,21 @@ public class RenderCache
             // same spot). Guard against that here so each component (and its subtree) is built once.
             if (!visited.Add(component)) continue;
 
-            _orderByControl[component.RenderId] = order++;   // paint-order rank (for the incremental partial-patch)
+            _orderByControl[component.RenderId] = order;   // paint-order rank, SPARSE (see OrderGap)
 
             // Capture dirtiness BEFORE Render: a clean control's Render() is a no-op (records nothing),
             // so an empty command list means "reuse the cached units". A dirty control re-records, so an
             // empty list then means "this control now draws nothing" and its stale units must be cleared.
             var wasGeometryValid = component.IsGeometryValid;
 
+
+
             _drawingContextInternal.Clear();
             component.Render(_drawingContext);
             var commands = CopyCommands(_drawingContextInternal.GetDrawCommands());
-            packet.Draws.Add(new ComponentDraw(component, commands, wasGeometryValid));
+            packet.Draws.Add(new ComponentDraw(component, commands, wasGeometryValid, order));
             MirrorUnits(component, commands.Count, wasGeometryValid);
+            order += OrderGap;
 
             PushChildrenInPaintOrder(stack, component.VisualChildren);
         }
@@ -1757,6 +2387,7 @@ public class RenderCache
         foreach (var (id, entry) in _recordedUnits)
             if (!entry.Component.IsAttachedToVisualTree) _staleUnitIds.Add(id);
         foreach (var id in _staleUnitIds) _recordedUnits.Remove(id);
+
     }
 
     // APPLY half of the full walk (GPU / render-thread side): rebuild the paint-order groups from the recorded draws -
@@ -1764,10 +2395,18 @@ public class RenderCache
     // control that dropped off the tree.
     private void ApplyFullWalk(RenderPacket packet)
     {
-        _groups.Clear();
+        ClearOrder();   // the walk re-derives the whole order; whoever it does not visit is simply not in it any more
         foreach (var draw in packet.Draws)
-            ProcessRenderCommands(draw.Component, draw.Commands, packet.ProjectionMatrix, draw.WasGeometryValid);
+            ProcessRenderCommands(draw.Component, draw.Commands, packet.ProjectionMatrix, draw.WasGeometryValid, draw.Order);
         ReconcileDetachedControls();
+    }
+
+    // Empties the paint order. Every group must learn it is out of it - a group whose InOrder stayed true would never be
+    // re-inserted by a later splice (its "already there" would be a lie) and would silently stop drawing.
+    private void ClearOrder()
+    {
+        foreach (var group in _groups) group.InOrder = false;
+        _groups.Clear();
     }
 
     // Snapshot a component's just-recorded draw commands (the shared drawing context is reused for the next component).
@@ -1865,11 +2504,14 @@ public class RenderCache
         return group;
     }
 
-    private void ProcessRenderCommands(IUIComponent component, IReadOnlyList<IDrawCommand> drawCommands, Matrix4x4F projectionMatrix, bool wasGeometryValid)
+    private void ProcessRenderCommands(IUIComponent component, IReadOnlyList<IDrawCommand> drawCommands, Matrix4x4F projectionMatrix, bool wasGeometryValid, long order)
     {
         if (drawCommands.Count > 0)
         {
-            _groups.Add(BuildUnitsFor(component, drawCommands, projectionMatrix));
+            var group = BuildUnitsFor(component, drawCommands, projectionMatrix);
+            group.Order = order;   // _groups stays sorted by rank - a later structural splice merges into it
+            _groups.Add(group);
+            group.InOrder = true;
         }
         else
         {
@@ -1880,7 +2522,9 @@ public class RenderCache
             {
                 if (wasGeometryValid)
                 {
+                    group.Order = order;
                     _groups.Add(group);
+                    group.InOrder = true;
                 }
                 else
                 {
@@ -1924,6 +2568,6 @@ public class RenderCache
 
         foreach (var unit in group.Units)
             unit?.DeferDispose();
-        _groups.Remove(group);
+        RemoveFromOrder(group);
     }
 }

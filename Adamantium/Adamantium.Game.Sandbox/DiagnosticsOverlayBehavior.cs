@@ -90,6 +90,7 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
             $"measure/arrange  {measure - _lastMeasure} / {arrange - _lastArrange}\n" +
             $"bindings {bindings - _lastBindings}    anim {AnimationManager.ActiveCount}";
 
+
         _lastMeasure = measure; _lastArrange = arrange; _lastBindings = bindings;
         _windowElapsed = 0; _windowFrames = 0; _windowMaxLayoutMs = 0; _windowDeferred = false;
         _sumLayout = _sumBuild = _sumProc = _sumDraw = _sumProcs = 0;
