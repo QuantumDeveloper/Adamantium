@@ -2005,14 +2005,33 @@ public class RenderCache
     // without the property system (see Compositor). Recompose ALL entries once (Tick), then apply each by its channel.
     private readonly List<Compositor.Entry> _compositedBuf = new();   // reused: this thread's view of the composited set
 
+    // Last snapshot + parent world seen for each composited transform owner. Lets the render thread keep applying an
+    // animation across a settling swap's per-frame snapshot re-capture, when the owner is briefly absent from _applySnap.
+    private readonly Dictionary<IUIComponent, (LayoutSnapshot Snap, Matrix4x4F ParentWorld)> _compositedFallback = new();
+
+    // Motion nodes the compositor moved THIS present. A SDF-batched instance reads its slot live in the shader, so the slot
+    // write alone moves it - but a PER-UNIT draw (a stroked arc, a non-batchable path: the spinner's ring is a 90deg arc)
+    // replays a transform BAKED into RenderData at record time and never reads the slot. ExecuteOps re-Updates such a unit
+    // from its owner's freshly-composited world so per-unit geometry follows the compositor too.
+    private readonly HashSet<IUIComponent> _compositedOwners = new();
+
     private void ApplyCompositedAnimations(IGraphicsDevice device)
     {
         if (device == null || _transformTable == null) return;
-        if (!Compositor.Tick(_compositedBuf)) return;   // recomposes matrices AND republishes paint snapshots
+        if (!Compositor.Tick(_compositedBuf))   // recomposes matrices AND republishes paint snapshots
+        {
+            if (_compositedOwners.Count > 0) _compositedOwners.Clear();
+            return;
+        }
 
+        _compositedOwners.Clear();
         foreach (var entry in _compositedBuf)
         {
-            if (entry.Channel == CompositorChannel.Transform) ApplyCompositedTransform(device, entry);
+            if (entry.Channel == CompositorChannel.Transform)
+            {
+                ApplyCompositedTransform(device, entry);
+                if (entry.Owner != null) _compositedOwners.Add(entry.Owner);
+            }
             else ApplyCompositedPaint(device, entry);
         }
     }
@@ -2026,14 +2045,31 @@ public class RenderCache
     {
         var owner = entry.Owner;
 
-        // Not in the snapshot = not drawn by THIS cache (its promotion to a motion node has not been recorded here). Nothing
-        // to move; the loop thread's mirror forces a re-record when it notices the compositor isn't applying (see
-        // Transform.UpdateTransform), after which this succeeds and MarkApplied below suppresses the mirror again.
-        if (!_applySnap.TryGetValue(owner, out var snap)) return;
+        LayoutSnapshot snap;
+        Matrix4x4F parentWorld;
+        if (_applySnap.TryGetValue(owner, out snap))
+        {
+            // Normal frame: the whole frozen snapshot is present. Remember this owner's snapshot + its parent world so the
+            // fallback below can keep animating it while the snapshot is being re-captured.
+            parentWorld = snap.RenderParent != null ? World(snap.RenderParent) : Matrix4x4F.Identity;
+            _compositedFallback[owner] = (snap, parentWorld);
+        }
+        else if (_compositedFallback.TryGetValue(owner, out var fb))
+        {
+            // A SETTLING theme/DPI swap re-captures the ENTIRE frozen snapshot every frame (SnapReset - the cascade writes
+            // outside the mark system), so between re-captures the owner is briefly absent and the animation would freeze on
+            // screen even though the render thread is still ticking it (the theme-swap spinner). The compositor already owns
+            // the LOCAL matrix; reuse the last parent world we saw for this composited owner - a busy overlay spinner's
+            // ancestors don't move mid-swap - so it keeps turning until the snapshot settles.
+            snap = fb.Snap;
+            parentWorld = fb.ParentWorld;
+        }
+        else return;   // never applied yet (its promotion to a motion node has not been recorded here). The loop mirror re-records.
 
+        var world = snap.RenderParent != null ? entry.Local * parentWorld : entry.Local;
         _applySnap[owner] = new LayoutSnapshot(entry.Local, snap.RenderSize, snap.ClipToBounds, snap.IsMotionNode, snap.RenderParent);
-        _worldCache.Remove(owner);   // its world is composed FROM the local we just replaced
-        _transformTable.SetMatrix(device, _transformTable.AcquireSlot(owner.RenderId), World(owner));
+        _worldCache[owner] = world;   // set directly: the _applySnap chain may be mid-recapture, so don't recompose off it
+        _transformTable.SetMatrix(device, _transformTable.AcquireSlot(owner.RenderId), world);
         entry.MarkApplied();   // tell the loop thread the render thread is drawing this - so its mirror stops re-baking it
     }
 
@@ -2369,6 +2405,11 @@ public class RenderCache
                     device.SetScissors(op.Scissor);
                     break;
                 case RenderOpKind.Unit:
+                    // A per-unit draw baked its full world into RenderData at record time (it doesn't read the transform
+                    // slot the way batched instances do), so a compositor-driven motion node - e.g. the theme-swap spinner's
+                    // stroked arc - would replay frozen. Re-point it at its owner's freshly-composited world before drawing.
+                    if (_compositedOwners.Count > 0 && op.Unit.Component is { } c && _compositedOwners.Contains(c))
+                        op.Unit.Update(World(c), _projectionMatrix, _renderScale);
                     op.Unit.Render();
                     break;
                 case RenderOpKind.Segment:

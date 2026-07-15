@@ -41,24 +41,71 @@ public class ThemeManager : IThemeManager
 
     private double _swapElapsed;   // seconds since the swap began, on the loop heartbeat
     private bool _cascadeSettled;  // has every swapping window's layout drained?
+    private ITheme _pendingOld;    // outgoing theme whose palette a deferred swap must still deactivate
 
     public void SetTheme(ITheme theme)
     {
         if (CurrentTheme == theme) return;
 
-        // Palette activation is SYMMETRIC and LAZY: deactivate the outgoing theme's resource sources, then activate the
-        // incoming one's. A theme does NOT register its palette at construction (see ResourceContext.SetSource) - only
-        // the theme that is CURRENT has its palette live in the Theme provider, so N themes cost nothing until chosen.
-        // This is the single owner of the "exactly one palette live" invariant.
         var oldTheme = CurrentTheme;
-        if (CurrentTheme != null) _resourceManager.RemoveSources(CurrentTheme);
         CurrentTheme = theme;
-        ActivateThemeSources(theme);
 
         // Announce the swap BEFORE the cascade so a busy indicator is already up when the tree starts churning.
         _swapArgs = new ThemeChangedEventArgs(oldTheme, theme);
+        _pendingOld = oldTheme;
         IsThemeChanging = true;
         ThemeChanging?.Invoke(this, _swapArgs);
+
+        _swapElapsed = 0;
+        _cascadeSettled = false;
+
+        // The FIRST theme application (startup) has no overlay to protect and runs before the loop is pumping tickers, so
+        // swap the palette + start the cascade synchronously.
+        if (oldTheme == null)
+        {
+            BeginContentCascade();
+            if (MinSwapSeconds > 0) AnimationManager.AddTicker(HoldTick);
+            TryFinishSwap();
+            return;
+        }
+
+        // A real swap: this frame ONLY raises the busy overlay (IsThemeChanging above) - a fixed 48x48 that needs no palette.
+        // DEFER both the palette swap AND the content re-style by one frame. Both churn the whole tree, and doing them now
+        // makes THIS a long frame; the overlay's compositor basis is captured at the START of a frame (before its own layout
+        // runs), so a long swap frame keeps the spinner at 0x0 - unrecorded, nothing to animate - for its whole duration:
+        // the frozen spinner. Next frame the overlay is already laid out (48x48), so the compositor spins it right through
+        // the churn. The opaque scrim hides the single stale-palette content frame.
+        var contentStarted = false;
+        AnimationManager.AddTicker(dt =>
+        {
+            _swapElapsed += dt;
+            if (!contentStarted)
+            {
+                contentStarted = true;
+                BeginContentCascade();
+            }
+            TryFinishSwap();
+            return _swapArgs == null;   // done once the swap has completed (its args are cleared)
+        });
+    }
+
+    private bool HoldTick(double dt)
+    {
+        _swapElapsed += dt;
+        TryFinishSwap();
+        return _swapArgs == null;
+    }
+
+    // Swap the live palette + queue the whole-tree re-style, and begin listening for its settle. Split out of SetTheme so a
+    // real swap can defer it one frame (letting the busy overlay lay out first) while the initial application runs it inline.
+    private void BeginContentCascade()
+    {
+        // Palette activation is SYMMETRIC and LAZY: deactivate the outgoing theme's resource sources, then activate the
+        // incoming one's - only the CURRENT theme's palette is live in the Theme provider, so N themes cost nothing until
+        // chosen. This is the single owner of the "exactly one palette live" invariant.
+        if (_pendingOld != null) _resourceManager.RemoveSources(_pendingOld);
+        ActivateThemeSources(CurrentTheme);
+        _pendingOld = null;
 
         var windows = UIAppContext.Current.Windows;
         _swapping = [];
@@ -68,30 +115,13 @@ public class ThemeManager : IThemeManager
             window.InvalidateStyles();
         }
 
-        // The restyle + resource re-resolution (brushes) above settles over the next few frames through paths that don't
-        // all mark the render dirty, so force full render walks until the layout signals the cascade has fully drained -
-        // otherwise re-styled controls stay blank until an unrelated mark (a mouse-over) forces a rebuild.
+        // The restyle + resource re-resolution (brushes) settles over the next few frames through paths that don't all mark
+        // the render dirty, so force full render walks until the layout signals the cascade has fully drained - otherwise
+        // re-styled controls stay blank until an unrelated mark (a mouse-over) forces a rebuild.
         RenderDirty.ForceStructuralUntilSettled();
 
-        // ...and the swap is only DONE when that same cascade has drained. Listen for a workless layout pass rather than
-        // declaring victory here: SetTheme merely QUEUES the re-style; the templates, measures and arranges it triggers run
-        // over the next several passes (that is why a theme swap visibly takes time at all).
-        _swapElapsed = 0;
-        _cascadeSettled = false;
         if (_swapping.Count == 0) _cascadeSettled = true;
         else LayoutManager.Quiescent += OnLayoutQuiescent;
-
-        // A minimum-hold demo: keep ticking the clock until the hold elapses (the cascade may settle first). The ticker is
-        // added ONLY when a hold is asked for; with no hold, completion is driven entirely by the cascade below.
-        if (MinSwapSeconds > 0)
-            AnimationManager.AddTicker(dt =>
-            {
-                _swapElapsed += dt;
-                TryFinishSwap();
-                return _swapArgs == null;   // done once the swap has completed (its args are cleared)
-            });
-
-        TryFinishSwap();
     }
 
     private void OnLayoutQuiescent(LayoutManager manager)

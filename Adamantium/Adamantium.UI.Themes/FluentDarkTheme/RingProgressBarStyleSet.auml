@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions"
+          xmlns:controls="http://adamantium/ui">
+
+    <!-- Circular progress gauge: a dim full ring under an accent arc RingProgressBar sweeps to Percentage. The control is
+         always square (MeasureOverride), so Center alignment lets arrange settle onto that square. Per the small-styles
+         convention each concern is its own <Style>. -->
+
+    <Style Selector="RingProgressBar">
+        <Setter Property="MinWidth" Value="48"/>
+        <Setter Property="MinHeight" Value="48"/>
+        <Setter Property="RingThickness" Value="5"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
+    </Style>
+
+    <Style Selector="RingProgressBar">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RingProgressBar">
+                    <controls:Grid>
+                        <controls:Ellipse Stroke="{ResourceReference ControlFillColorTertiary}"
+                                StrokeThickness="{TemplateBinding RingThickness}"
+                                Fill="Transparent"
+                                EllipseType="EdgeToEdge"/>
+                        <controls:Ellipse x:Name="PART_Indicator"
+                                Stroke="{ThemeResource AccentFillColorDefault}"
+                                StrokeThickness="{TemplateBinding RingThickness}"
+                                Fill="Transparent"
+                                EllipseType="EdgeToEdge"
+                                StartAngle="0"
+                                StopAngle="0"
+                                RenderTransformOrigin="0.5,0.5"/>
+                        <controls:TextBlock x:Name="PART_ValueText"
+                                Text="{TemplateBinding ValueText}"
+                                Visibility="Collapsed"
+                                FontSize="15"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                VerticalTextAlignment="Center"
+                                Foreground="{TemplateBinding Foreground}"/>
+                    </controls:Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Centre percentage label, opt-in via ShowValueText. -->
+    <Style Selector="RingProgressBar">
+        <PropertyTrigger Property="ShowValueText" Value="true">
+            <Setter TargetName="PART_ValueText" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>
