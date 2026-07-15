@@ -41,10 +41,8 @@ public class ContentPresenter : InputUIComponent
     public static readonly AdamantiumProperty TransitionDurationProperty = AdamantiumProperty.Register(nameof(TransitionDuration),
         typeof(Double), typeof(ContentPresenter), new PropertyMetadata(0.25));
 
-    // Text styling for string content (the auto-generated TextBlock). Foreground is the INHERITED property from
-    // UIComponent; the override keeps the render flag + the OnTextStyleChanged callback that repaints generated text, and
-    // preserves Inherits. It's also template-bound from the templated parent (e.g. a Button's Foreground) so theme states
-    // - Pressed/Disabled text colour - drive it.
+    // The generated text follows the presenter's Foreground/FontSize (template-bound from the templated control, so its
+    // theme states - accent/pressed/disabled - drive the text); the callback re-pushes them onto the already-built TextBlock.
     static ContentPresenter()
     {
         ForegroundProperty.OverrideMetadata(typeof(ContentPresenter),
@@ -266,8 +264,6 @@ public class ContentPresenter : InputUIComponent
         set => SetValue(TransitionDurationProperty, value);
     }
 
-    // Pushes the (template-bound) text style onto the already-generated TextBlock, so a trigger changing Foreground or
-    // FontSize (Pressed/Disabled states) updates the text live, not only on the next content rebuild.
     private static void OnTextStyleChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
         if (a is ContentPresenter presenter) presenter.ApplyTextStyle();

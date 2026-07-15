@@ -57,6 +57,8 @@
             <Setter TargetName="OuterRing" Property="Fill" Value="{ThemeResource AccentFillColorDefault}"/>
             <Setter TargetName="OuterRing" Property="Stroke" Value="{ThemeResource AccentFillColorDefault}"/>
             <Setter TargetName="Dot" Property="Opacity" Value="1"/>
+            <!-- Un-inherit the ToggleButton accent-label; a radio label sits on the normal background. -->
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
         </PropertyTrigger>
         <PropertyTrigger Property="IsEnabled" Value="false">
             <Setter TargetName="OuterRing" Property="Fill" Value="{ResourceReference ControlFillColorDisabled}"/>

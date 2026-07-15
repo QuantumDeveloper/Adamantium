@@ -11,6 +11,7 @@
              accent-painted bar), inactive = neutral primary text. Both overridable on the window. -->
         <Setter Property="TitleBarForeground" Value="{ThemeResource AccentForegroundColor}"/>
         <Setter Property="InactiveTitleBarForeground" Value="{ResourceReference TextFillColorPrimary}"/>
+        <Setter Property="LoadingIndicatorText" Value="Switching theme…"/>
     </Style>
 
     <Style Selector="Window">
@@ -33,6 +34,45 @@
                             <controls:ResizeGripper x:Name="PART_ResizeGripper" Grid.Row="1"
                                     HorizontalAlignment="Right" VerticalAlignment="Bottom"
                                     Width="26" Height="26" Visibility="Collapsed"/>
+                            <!-- Theme-swap busy overlay. The ENGINE owns the state (Window.IsThemeChanging, mirrored from the
+                                 ThemeManager); the THEME decides what to show. A translucent SCRIM (not opaque) - the tree
+                                 re-styling underneath shows through dimmed, so the swap reads as "working" rather than a
+                                 frozen blank; the spinner keeps its own full alpha (the scrim is a translucent BACKGROUND,
+                                 not element Opacity, so it does not fade the child). On top (drawn last). The Ring spinner
+                                 animates a RenderTransform, which the compositor plays on the RENDER thread - so it keeps
+                                 turning even while the loop thread is in the cascade. Collapsed by default; the trigger raises it. -->
+                            <controls:Border x:Name="PART_ThemeOverlay" Grid.Row="1"
+                                    Background="{ResourceReference SmokeFillColorDefault}"
+                                    Visibility="Collapsed">
+                                <controls:StackPanel Orientation="Vertical"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <!-- Template set INLINE (Local), so the theme's BusyIndicator Template setter can't
+                                         re-template it during the swap it covers. A re-templated spinner gets a brand-new
+                                         RingSpin owner the busy loop can't re-record while the cascade runs, so the
+                                         compositor has nothing to drive and it freezes. Fixed template = a stable, recorded
+                                         owner the render thread keeps spinning; the ring color stays live via {ThemeResource}. -->
+                                    <controls:BusyIndicator x:Name="PART_ThemeSpinner" IsActive="False"
+                                            Width="48" Height="48" HorizontalAlignment="Center">
+                                        <controls:BusyIndicator.Template>
+                                            <ControlTemplate TargetType="BusyIndicator">
+                                                <controls:Grid>
+                                                    <controls:Ellipse Stroke="{ResourceReference ControlFillColorTertiary}"
+                                                                      StrokeThickness="4" Fill="Transparent" EllipseType="EdgeToEdge"/>
+                                                    <controls:Ellipse Stroke="{ThemeResource AccentFillColorDefault}"
+                                                                      StrokeThickness="4" Fill="Transparent" EllipseType="EdgeToEdge"
+                                                                      StartAngle="0" StopAngle="90" RenderTransformOrigin="0.5,0.5">
+                                                        <controls:Ellipse.RenderTransform>
+                                                            <Transform x:Name="RingSpin"/>
+                                                        </controls:Ellipse.RenderTransform>
+                                                    </controls:Ellipse>
+                                                </controls:Grid>
+                                            </ControlTemplate>
+                                        </controls:BusyIndicator.Template>
+                                    </controls:BusyIndicator>
+                                    <controls:TextBlock Text="{TemplateBinding LoadingIndicatorText}" HorizontalAlignment="Center"
+                                            Margin="0,18,0,0" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                                </controls:StackPanel>
+                            </controls:Border>
                         </controls:Grid>
                     </controls:Border>
                 </ControlTemplate>
@@ -55,6 +95,11 @@
             <Setter TargetName="PART_TitleBar" Property="Background" Value="{TemplateBinding TitleBarBackground}"/>
             <Setter TargetName="PART_TitleBar" Property="Foreground" Value="{TemplateBinding TitleBarForeground}"/>
             <Setter TargetName="PART_WindowBorder" Property="BorderBrush" Value="{TemplateBinding TitleBarBackground}"/>
+        </PropertyTrigger>
+        <!-- A theme swap is in flight: raise the busy overlay and start its spinner (see the template). -->
+        <PropertyTrigger Property="IsThemeChanging" Value="true">
+            <Setter TargetName="PART_ThemeOverlay" Property="Visibility" Value="Visible"/>
+            <Setter TargetName="PART_ThemeSpinner" Property="IsActive" Value="true"/>
         </PropertyTrigger>
     </Style>
 

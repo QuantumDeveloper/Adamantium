@@ -1,4 +1,5 @@
 <ResourceDictionary xmlns:x="http://adamantium/ui/xaml/extensions"
+        xmlns:math="clr-namespace:Adamantium.Mathematics;assembly=Adamantium.Mathematics"
         xmlns="http://adamantium/ui">
 
     <!-- FluentDark static palette (WinUI dark tokens). Accent/focus are NOT here - they live on the Theme as
@@ -8,6 +9,8 @@
     <!-- Layer / background fills -->
     <SolidColorBrush x:Key="SolidBackgroundFillColorBase" Color="#202020"/>
     <SolidColorBrush x:Key="SolidBackgroundFillColorSecondary" Color="#1C1C1C"/>
+    <!-- Scrim behind a modal/busy overlay: a translucent dimmer over content (theme-independent). -->
+    <SolidColorBrush x:Key="SmokeFillColorDefault" Color="#99000000"/>
     <SolidColorBrush x:Key="SolidBackgroundFillColorTertiary" Color="#282828"/>
     <SolidColorBrush x:Key="CardBackgroundFillColorDefault" Color="#2D2D2D"/>
     <SolidColorBrush x:Key="LayerFillColorDefault" Color="#4C3A3A3A"/>
@@ -50,5 +53,11 @@
          instead of one per card. Its Opacity is what breathes (the PulseAnimation in ItemsControlStyleSet drives it
          between the rest value here and its Max); the colour stays put. -->
     <SolidColorBrush x:Key="SkeletonPulseFill" Color="#FFFFFF" Opacity="0.05"/>
+
+    <!-- Shimmer indicator. The TRACK is the card; the sliding highlight band's PEAK is a themed Color (a gradient stop now
+         takes a {ResourceReference} - see ResourceResolver.SetDeferred). Here (dark) the peak is a WHITE glare over a dark
+         card; the light palette inverts it to a DARK sweep, which is what actually reads on a light surface. -->
+    <SolidColorBrush x:Key="ShimmerTrackFill" Color="#14FFFFFF"/>
+    <math:Color x:Key="ShimmerPeakColor">#99FFFFFF</math:Color>
 
 </ResourceDictionary>

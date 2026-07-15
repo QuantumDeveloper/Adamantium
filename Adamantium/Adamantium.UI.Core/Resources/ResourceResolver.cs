@@ -22,28 +22,30 @@ public static class ResourceResolver
         return (T)resource;
     }
 
-    // A {ResourceReference} used DIRECTLY on an element property (not via a Setter/trigger). The element is not yet in
-    // the tree when its properties are assigned during construction, so a Local resource can't be tree-scoped at that
-    // moment. Resolve the Theme/Global value immediately (roots and theme references keep working with no delay), then
-    // re-resolve tree-scoped once the element attaches to the (rooted) VISUAL tree - which cascades through the whole
-    // subtree, so the full ancestor chain (incl. a Local resource's owner) is present - and a nearer Local hit wins.
-    public static void SetDeferred(IFundamentalUIComponent element, string property, string key)
+    // A {ResourceReference} used DIRECTLY on a component property (not via a Setter/trigger). The target is any
+    // AdamantiumComponent, NOT only a UI element: a resource reference is a property-system feature, so it applies to a
+    // GradientStop.Color, a Pen's brush, any animatable component - the same way WPF's Static/DynamicResource work on any
+    // DependencyObject, not just UIElements. The target is not yet in the tree when its properties are assigned during
+    // construction, so a Local resource can't be tree-scoped at that moment. Resolve the Theme/Global value immediately,
+    // then - ONLY for a target that lives in the VISUAL tree - re-resolve tree-scoped once it attaches (the cascade brings
+    // the full ancestor chain, incl. a Local resource's owner, and a nearer Local hit wins).
+    public static void SetDeferred(IAdamantiumComponent target, string property, string key)
     {
         var resourceManager = UIAppContext.Current.ResourceManager;
 
         var baseline = resourceManager.FindResource(key);
         if (baseline != null)
-            element.SetValue(property, baseline);
+            target.SetValue(property, baseline);
 
-        // Only visual elements take part in the visual tree; a non-visual target can't be tree-scoped, so the Theme/
-        // Global baseline above is all it gets.
-        if (element is IUIComponent visual)
+        // Only a visual element takes part in the visual tree; a non-visual target (a GradientStop) can't be tree-scoped,
+        // so the Theme/Global baseline above is all it gets.
+        if (target is IUIComponent visual)
         {
             visual.AttachedToVisualTreeEvent += (_, _) =>
             {
-                var scoped = resourceManager.FindResource(element, key);
+                var scoped = resourceManager.FindResource(visual, key);
                 if (scoped != null)
-                    element.SetValue(property, scoped);
+                    visual.SetValue(property, scoped);
             };
         }
     }

@@ -6,45 +6,45 @@ using Adamantium.UI.Core.Resources;
 
 namespace Adamantium.UI.Core.Media.Animation;
 
-/// <summary>One in-flight keyframe <see cref="Animation"/>. Resolves each animated property's keyframe stops to a sorted
-/// (cue, double) track once, then each frame computes the iteration position (honouring Delay/IterationCount/AutoReverse
-/// + easing) and writes each track's interpolated value at <see cref="ValuePriority.Animation"/>.</summary>
+/// <summary>One in-flight keyframe <see cref="Animation"/>. It owns only a CLOCK and a target: the timing and interpolation
+/// live in a pure <see cref="AnimationCurve"/>, so the same curve can be evaluated by the compositor on the render thread
+/// while this one keeps the property system in step on the loop thread.</summary>
 internal sealed class RunningKeyFrameAnimation : IRunningAnimation
 {
-    private sealed class Track
-    {
-        public AdamantiumProperty Property;
-        public double[] Cues;
-        public double[] Values;
-    }
-
     private readonly AdamantiumComponent _target;
-    private readonly double _durationSeconds;
-    private readonly double _delaySeconds;
-    private readonly double _iterationCount;
-    private readonly bool _autoReverse;
-    private readonly IEasingFunction _easing;
+    private readonly AnimationCurve _curve;
     private readonly Action _completed;
-    private readonly List<Track> _tracks;
     private double _elapsedSeconds;
 
-    public RunningKeyFrameAnimation(AdamantiumComponent target, Animation animation, Action completed)
+    // Set when the RENDER thread has taken this animation over. It then owns the clock, and this object's job shrinks to
+    // MIRRORING: writing the composited value into the property system so hit-testing and bindings still agree with what is
+    // on screen. It must not keep a clock of its own - two clocks on one animation is two answers to "where is it now".
+    private readonly Compositor.Entry _composited;
+
+    public RunningKeyFrameAnimation(AdamantiumComponent target, Animation animation, Action completed, double resumeElapsed = 0)
     {
         _target = target;
-        _durationSeconds = Math.Max(0.0001, animation.Duration.TotalSeconds);
-        _delaySeconds = Math.Max(0.0, animation.Delay.TotalSeconds);
-        _iterationCount = animation.IterationCount;
-        _autoReverse = animation.AutoReverse;
-        _easing = animation.Easing;
         _completed = completed;
-        _tracks = BuildTracks(target, animation);
+        _elapsedSeconds = resumeElapsed;
+        _curve = BuildCurve(target, animation);
+        _composited = Compositor.TryTakeOver(target, _curve, resumeElapsed);
     }
 
+    /// <summary>Where this animation is right now (composited: the render clock; else the local one) - what a re-templated
+    /// successor resumes from so the motion doesn't snap back to the start.</summary>
+    public double CurrentElapsed => _composited?.Elapsed ?? _elapsedSeconds;
+
+    /// <summary>True when the render thread plays this animation and the loop thread only mirrors it.</summary>
+    public bool IsComposited => _composited != null;
+
+    /// <summary>The pure curve this animation plays - what the compositor takes over when it can.</summary>
+    public AnimationCurve Curve => _curve;
+
     /// <summary>The properties this animation drives (used by the manager to drop conflicting in-flight animations).</summary>
-    public IEnumerable<AdamantiumProperty> Properties => _tracks.Select(t => t.Property);
+    public IEnumerable<AdamantiumProperty> Properties => _curve.Tracks.Select(t => t.Property);
 
     public bool Animates(AdamantiumComponent target, AdamantiumProperty property) =>
-        ReferenceEquals(_target, target) && _tracks.Any(t => t.Property == property);
+        ReferenceEquals(_target, target) && _curve.Tracks.Any(t => t.Property == property);
 
     public bool AnimatesTarget(AdamantiumComponent target) => ReferenceEquals(_target, target);
 
@@ -52,78 +52,28 @@ internal sealed class RunningKeyFrameAnimation : IRunningAnimation
 
     public bool Advance(double deltaSeconds)
     {
-        _elapsedSeconds += deltaSeconds;
-        var active = _elapsedSeconds - _delaySeconds;
+        // Composited: the render thread's clock is THE clock. Read it rather than accumulating a second one - if the loop
+        // thread was stalled for 300 ms, the animation on screen moved on by 300 ms, and anything the loop thread does with
+        // this animation must agree with what the user is looking at, not lag it.
+        _elapsedSeconds = _composited?.Elapsed ?? _elapsedSeconds + deltaSeconds;
 
-        double progress;
-        var finished = false;
-        if (active <= 0.0)
-        {
-            progress = 0.0;   // still in the delay: hold the start values
-        }
-        else
-        {
-            var cycles = active / _durationSeconds;
-            if (!double.IsPositiveInfinity(_iterationCount) && cycles >= _iterationCount)
-            {
-                progress = _iterationCount;
-                finished = true;
-            }
-            else
-            {
-                progress = cycles;
-            }
-        }
+        // Write the value into the property system UNLESS the render thread owns it AND applying it needs no property write.
+        // A TRANSFORM is mirrored so hit-testing reads the animated matrix. A PAINT brush is not: colour touches neither
+        // layout nor hit-test, and the whole point of compositing the skeleton pulse was to stop the loop thread republishing
+        // one shared brush's snapshot and marking every card that paints with it dirty, every tick. So paint stays off the
+        // loop thread entirely - the render thread applies it.
+        if (_composited is not { Channel: CompositorChannel.Paint })
+            foreach (var track in _curve.Tracks)
+                _target.SetValue(track.Property, _curve.Evaluate(track, _elapsedSeconds), ValuePriority.Animation);
 
-        var position = CyclePosition(progress);
-        foreach (var track in _tracks)
-            _target.SetValue(track.Property, Interpolate(track, position), ValuePriority.Animation);
+        if (!_curve.IsFinished(_elapsedSeconds)) return false;
 
-        if (finished)
-        {
-            _completed?.Invoke();
-            return true;
-        }
-        return false;
+        if (_composited != null) Compositor.Release(_target);
+        _completed?.Invoke();
+        return true;
     }
 
-    /// <summary>The eased position within the current iteration, 0..1. Integer boundaries are the END of the previous
-    /// iteration; with <see cref="_autoReverse"/> odd iterations run backwards.</summary>
-    private double CyclePosition(double progress)
-    {
-        var iteration = Math.Floor(progress);
-        var localT = progress - iteration;
-        if (localT == 0.0 && progress > 0.0)
-        {
-            iteration -= 1;
-            localT = 1.0;
-        }
-
-        var reversed = _autoReverse && (long)iteration % 2 == 1;
-        var pos = reversed ? 1.0 - localT : localT;
-        return _easing?.Ease(pos) ?? pos;
-    }
-
-    private static double Interpolate(Track track, double position)
-    {
-        var cues = track.Cues;
-        var values = track.Values;
-        if (position <= cues[0]) return values[0];
-        if (position >= cues[^1]) return values[^1];
-
-        for (var i = 0; i < cues.Length - 1; i++)
-        {
-            if (position <= cues[i + 1])
-            {
-                var span = cues[i + 1] - cues[i];
-                var t = span <= 0 ? 0.0 : (position - cues[i]) / span;
-                return values[i] + (values[i + 1] - values[i]) * t;
-            }
-        }
-        return values[^1];
-    }
-
-    private static List<Track> BuildTracks(AdamantiumComponent target, Animation animation)
+    private static AnimationCurve BuildCurve(AdamantiumComponent target, Animation animation)
     {
         // Collect every (cue, value) per property name across the keyframes.
         var byProperty = new Dictionary<string, List<(double cue, double value)>>();
@@ -139,21 +89,21 @@ internal sealed class RunningKeyFrameAnimation : IRunningAnimation
             }
         }
 
-        var tracks = new List<Track>();
+        var tracks = new List<AnimationCurve.Track>();
         foreach (var (name, stops) in byProperty)
         {
             var property = AdamantiumPropertyMap.FindRegistered(target.GetType(), name);
             if (property == null) continue;   // unknown / non-double property: skip (first cut interpolates doubles)
 
             var sorted = stops.OrderBy(s => s.cue).ToArray();
-            tracks.Add(new Track
-            {
-                Property = property,
-                Cues = sorted.Select(s => s.cue).ToArray(),
-                Values = sorted.Select(s => s.value).ToArray(),
-            });
+            tracks.Add(new AnimationCurve.Track(
+                property,
+                sorted.Select(s => s.cue).ToArray(),
+                sorted.Select(s => s.value).ToArray()));
         }
-        return tracks;
+
+        return new AnimationCurve([.. tracks], animation.Duration.TotalSeconds, animation.Delay.TotalSeconds,
+            animation.IterationCount, animation.AutoReverse, animation.Easing);
     }
 
     private static bool TryToDouble(object value, out double result)

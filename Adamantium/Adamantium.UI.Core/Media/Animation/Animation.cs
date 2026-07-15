@@ -33,10 +33,10 @@ public class Animation
     /// <summary>Starts this animation on <paramref name="target"/>; <paramref name="completed"/> fires when it ends
     /// (never, for an infinite animation). The target is any <see cref="AdamantiumComponent"/> - a UI element OR a
     /// non-visual component such as a <c>GradientStop</c> (whose owning element repaints via its brush subscription).</summary>
-    public void Apply(AdamantiumComponent target, Action completed = null)
+    public void Apply(AdamantiumComponent target, Action completed = null, double resumeElapsed = 0)
     {
         Prepare();
-        AnimationManager.BeginKeyFrame(target, this, completed);
+        AnimationManager.BeginKeyFrame(target, this, completed, resumeElapsed);
     }
 
     /// <summary>Hook for a prebuilt animation TYPE (e.g. <c>PulseAnimation</c>) to synthesize its <see cref="KeyFrames"/>

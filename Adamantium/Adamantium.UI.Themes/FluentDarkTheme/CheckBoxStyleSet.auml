@@ -80,6 +80,8 @@
             <Setter TargetName="Box" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
             <Setter TargetName="Box" Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
             <Setter TargetName="CheckGlyph" Property="Opacity" Value="1"/>
+            <!-- Un-inherit the ToggleButton accent-label (that is for a fully accent-filled button); a checkbox label sits on the normal background. -->
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
         </PropertyTrigger>
         <!-- Indeterminate (three-state, IsChecked=null): same accent box, but the square marker instead of the check.
              "null" parses to a null bool? (TypeCastFactory handles Nullable<T>), so the trigger matches the null state. -->

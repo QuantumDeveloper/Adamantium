@@ -51,8 +51,8 @@ public sealed class RadialGradientBrush : GradientBrush
         set { if (IsFrozen) return; SetValue(RadiusYProperty, value); }
     }
 
-    protected override Brush CreateFrozenCore() =>
-        AsFrozen(new RadialGradientBrush(CopyStops())
+    protected override Brush CreateClone() =>
+        new RadialGradientBrush(CopyStops())
         {
             Center = Center,
             GradientOrigin = GradientOrigin,
@@ -60,5 +60,5 @@ public sealed class RadialGradientBrush : GradientBrush
             RadiusY = RadiusY,
             SpreadMethod = SpreadMethod,
             Opacity = Opacity
-        });
+        };
 }

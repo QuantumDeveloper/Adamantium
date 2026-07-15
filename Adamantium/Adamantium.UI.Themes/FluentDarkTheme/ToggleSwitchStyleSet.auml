@@ -63,6 +63,8 @@
             <Setter TargetName="SwitchThumb" Property="Fill" Value="{ThemeResource AccentForegroundColor}"/>
             <Setter TargetName="SwitchThumb" Property="HorizontalAlignment" Value="Right"/>
             <Setter TargetName="SwitchThumb" Property="Margin" Value="0 0 4 0"/>
+            <!-- Un-inherit the ToggleButton accent-label; a switch label sits on the normal background. -->
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
         </PropertyTrigger>
         <PropertyTrigger Property="IsEnabled" Value="false">
             <Setter TargetName="SwitchTrack" Property="Background"

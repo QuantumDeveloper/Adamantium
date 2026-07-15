@@ -1,4 +1,5 @@
 <ResourceDictionary xmlns:x="http://adamantium/ui/xaml/extensions"
+        xmlns:math="clr-namespace:Adamantium.Mathematics;assembly=Adamantium.Mathematics"
         xmlns="http://adamantium/ui">
 
     <!-- FluentLight static palette: the SAME keys as Brushes.auml (dark), light values (WinUI light tokens). The styles
@@ -8,6 +9,8 @@
     <!-- Layer / background fills -->
     <SolidColorBrush x:Key="SolidBackgroundFillColorBase" Color="#F3F3F3"/>
     <SolidColorBrush x:Key="SolidBackgroundFillColorSecondary" Color="#EEEEEE"/>
+    <!-- Scrim behind a modal/busy overlay: a translucent dimmer over content (theme-independent). -->
+    <SolidColorBrush x:Key="SmokeFillColorDefault" Color="#99000000"/>
     <SolidColorBrush x:Key="SolidBackgroundFillColorTertiary" Color="#F9F9F9"/>
     <SolidColorBrush x:Key="CardBackgroundFillColorDefault" Color="#FFFFFF"/>
     <SolidColorBrush x:Key="LayerFillColorDefault" Color="#80FFFFFF"/>
@@ -50,5 +53,10 @@
     <!-- Loading skeleton fill (see the Dark palette for why it is ONE shared brush). Light inverts it: a dark wash over the
          light surface, at the same Opacity range the shared PulseAnimation breathes through. -->
     <SolidColorBrush x:Key="SkeletonPulseFill" Color="#000000" Opacity="0.05"/>
+
+    <!-- Shimmer (see the Dark palette). Light INVERTS the peak: a white glare vanishes on a light surface, so the sweeping
+         highlight is a translucent DARK band - a soft shadow gliding over a faint grey card, which reads clearly. -->
+    <SolidColorBrush x:Key="ShimmerTrackFill" Color="#14000000"/>
+    <math:Color x:Key="ShimmerPeakColor">#59000000</math:Color>
 
 </ResourceDictionary>

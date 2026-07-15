@@ -19,6 +19,10 @@ public interface IThemeManager : IThemeContext
     /// still draining. What a busy indicator is driven by.</summary>
     bool IsThemeChanging { get; }
 
+    /// <summary>A MINIMUM time the busy overlay stays up once a swap begins (seconds). 0 (default) = finish the moment the
+    /// cascade drains; set higher to keep the swap loader on screen long enough to see it spin.</summary>
+    double MinSwapSeconds { get; set; }
+
     void AddTheme(string name, ITheme theme);
 
     void RemoveTheme(string name);

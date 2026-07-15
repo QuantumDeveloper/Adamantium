@@ -30,12 +30,12 @@ public sealed class LinearGradientBrush : GradientBrush
         set { if (IsFrozen) return; SetValue(EndPointProperty, value); }
     }
 
-    protected override Brush CreateFrozenCore() =>
-        AsFrozen(new LinearGradientBrush(CopyStops())
+    protected override Brush CreateClone() =>
+        new LinearGradientBrush(CopyStops())
         {
             StartPoint = StartPoint,
             EndPoint = EndPoint,
             SpreadMethod = SpreadMethod,
             Opacity = Opacity
-        });
+        };
 }

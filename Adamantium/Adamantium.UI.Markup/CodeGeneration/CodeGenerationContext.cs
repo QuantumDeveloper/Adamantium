@@ -123,9 +123,24 @@ public class CodeGenerationContext
                 && CurrentTemplate == null
                 && EntityType is not (EntityType.ResourceDictionary or EntityType.StyleSet or EntityType.Theme);
             var declaration = hasBackingField ? elementName : $"var {elementName}";
+
+            // A VALUE-TYPE element that carries its value as text content (<Color x:Key="X">#33FFFFFF</Color>): a struct/enum
+            // has no properties to new()+set - its value IS the text - so PARSE the text into the type instead of constructing
+            // it empty (which silently produced a default and, as a resource, a dropped entry). This is what lets a
+            // Color/Thickness/Vector2/... be a keyed resource that {ResourceReference} then applies to a like-typed property
+            // on a UI element. (It does NOT reach a non-element target like a GradientStop.Color - {ResourceReference} resolves
+            // through SetDeferred, which needs an IFundamentalUIComponent.)
+            var valueText = typeInfo is { TypeKind: ResolvedTypeKind.Struct or ResolvedTypeKind.Enum }
+                ? element.Children.OfType<AumlAstTextNode>().FirstOrDefault()?.Text?.Trim()
+                : null;
+
             if (isTemplate)
             {
                 EmitTemplateBuilder(declaration, typeInfo.FullName, element, isResource, diagnostics);
+            }
+            else if (!string.IsNullOrEmpty(valueText))
+            {
+                TextGenerator.WriteLine($"{declaration} = {Metadata.DefaultTypeContainer.TypeParser.FullName}.Parse<{typeInfo.FullName}>({Quote(valueText)});");
             }
             else
             {
@@ -246,7 +261,18 @@ public class CodeGenerationContext
                 {
                     var templateName = GenerateNextElementName("template");
                     EmitTemplateBuilder($"var {templateName}", valueTypeName, value, isResource, diagnostics);
-                    TextGenerator.WriteLine($"{CurrentParent}.{propRef.Name} = {templateName};");
+                    // A template assigned to a PART's property inside a ControlTemplate goes to TEMPLATE priority (not the CLR
+                    // setter's LOCAL), so a theme's own Template setter/trigger can still override it - same rule as every
+                    // other templated-part property. Outside a template it stays a plain assignment.
+                    if (CurrentTemplate != null && !propRef.IsAttachedProperty && typeInfo != null && typeInfo.ImplementsInterface("IAdamantiumComponent"))
+                    {
+                        var target = isRoot ? "this" : CurrentParent;
+                        TextGenerator.WriteLine($"{target}.SetValue(\"{propRef.Name}\", {templateName}, Adamantium.UI.Core.ValuePriority.Template);");
+                    }
+                    else
+                    {
+                        TextGenerator.WriteLine($"{CurrentParent}.{propRef.Name} = {templateName};");
+                    }
                     continue;
                 }
                 else if (value is AumlAstMarkupExtensionLiteral literal)
@@ -609,7 +635,18 @@ public class CodeGenerationContext
                             continue;
                         }
                         string nestedName = ProcessNestedValue(propertyValue, diagnostics, isResource);
-                        TextGenerator.WriteLine($"{symbolName} = {nestedName};");
+                        // Same rule as the text-node branch above: a PART's property set inside a ControlTemplate lands at
+                        // TEMPLATE priority, not the CLR setter's LOCAL - so a theme trigger/style can override it. Nested
+                        // object values (e.g. <X.Template><ControlTemplate/>) used to skip this and go to Local.
+                        if (CurrentTemplate != null && !propRef.IsAttachedProperty && typeInfo.ImplementsInterface("IAdamantiumComponent"))
+                        {
+                            var target = isRoot ? "this" : CurrentParent;
+                            TextGenerator.WriteLine($"{target}.SetValue(\"{propRef.Name}\", {nestedName}, Adamantium.UI.Core.ValuePriority.Template);");
+                        }
+                        else
+                        {
+                            TextGenerator.WriteLine($"{symbolName} = {nestedName};");
+                        }
                     }
                 }
             }

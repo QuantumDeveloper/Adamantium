@@ -34,7 +34,7 @@ public sealed class SolidColorBrush: Brush
       set { if (IsFrozen) return; SetValue(ColorProperty, value); }
    }
 
-   protected override Brush CreateFrozenCore() => AsFrozen(new SolidColorBrush(Color, Opacity));
+   protected override Brush CreateClone() => new SolidColorBrush(Color, Opacity);
 
    private Color GetColorFromString(string color)
    {

@@ -30,6 +30,9 @@ public class ToggleThemeBehavior : Behavior<Button>
         var themeManager = UIAppContext.Current?.ThemeManager;
         if (themeManager == null) return;
 
+        // Hold the busy overlay up for a moment so the swap loader is visibly spinning (the demo). Real apps leave this 0.
+        themeManager.MinSwapSeconds = 1.5;
+
         var nextName = themeManager.CurrentTheme?.Name == "FluentLight" ? "FluentDark" : "FluentLight";
         var next = themeManager[nextName];
         if (next != null) themeManager.SetTheme(next);
