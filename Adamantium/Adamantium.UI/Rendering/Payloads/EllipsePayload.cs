@@ -20,6 +20,9 @@ public class EllipsePayload(
 
     public Brush Brush => _brush?.Snapshot;
 
+    // Live brush by REFERENCE ONLY, for the compositor's brush->units index - see RectanglePayload.LiveBrush.
+    internal Brush LiveBrush => _brush;
+
     public Rect DestinationRect { get; } = destinationRect;
 
     public Double StartAngle { get; } = startAngle;

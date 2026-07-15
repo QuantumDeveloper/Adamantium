@@ -1,5 +1,6 @@
 using Adamantium.Core.Collections;
 using Adamantium.Core.DependencyInjection;
+using Adamantium.UI.Core.Media.Animation;
 
 namespace Adamantium.UI.Core.Resources;
 
@@ -31,6 +32,15 @@ public class ThemeManager : IThemeManager
     // while a swap is in flight.
     private List<IUIComponent> _swapping;
     private ThemeChangedEventArgs _swapArgs;
+
+    /// <summary>A MINIMUM time the busy overlay stays up once a swap begins. 0 = finish the moment the cascade drains (the
+    /// default). A UX floor stops a fast swap from flashing the overlay for a few frames; set higher to actually SEE the
+    /// swap loader spin (the demo). Independent of the cascade: completion waits for BOTH the cascade to settle AND this to
+    /// elapse.</summary>
+    public double MinSwapSeconds { get; set; }
+
+    private double _swapElapsed;   // seconds since the swap began, on the loop heartbeat
+    private bool _cascadeSettled;  // has every swapping window's layout drained?
 
     public void SetTheme(ITheme theme)
     {
@@ -66,8 +76,22 @@ public class ThemeManager : IThemeManager
         // ...and the swap is only DONE when that same cascade has drained. Listen for a workless layout pass rather than
         // declaring victory here: SetTheme merely QUEUES the re-style; the templates, measures and arranges it triggers run
         // over the next several passes (that is why a theme swap visibly takes time at all).
-        if (_swapping.Count == 0) CompleteSwap();
+        _swapElapsed = 0;
+        _cascadeSettled = false;
+        if (_swapping.Count == 0) _cascadeSettled = true;
         else LayoutManager.Quiescent += OnLayoutQuiescent;
+
+        // A minimum-hold demo: keep ticking the clock until the hold elapses (the cascade may settle first). The ticker is
+        // added ONLY when a hold is asked for; with no hold, completion is driven entirely by the cascade below.
+        if (MinSwapSeconds > 0)
+            AnimationManager.AddTicker(dt =>
+            {
+                _swapElapsed += dt;
+                TryFinishSwap();
+                return _swapArgs == null;   // done once the swap has completed (its args are cleared)
+            });
+
+        TryFinishSwap();
     }
 
     private void OnLayoutQuiescent(LayoutManager manager)
@@ -77,6 +101,15 @@ public class ThemeManager : IThemeManager
         foreach (var window in _swapping)
             if (!LayoutManager.For(window).IsSettled) return;
 
+        _cascadeSettled = true;
+        TryFinishSwap();
+    }
+
+    // Complete only when the cascade has drained AND the minimum overlay time has elapsed.
+    private void TryFinishSwap()
+    {
+        if (_swapArgs == null) return;   // already completed
+        if (!_cascadeSettled || _swapElapsed < MinSwapSeconds) return;
         CompleteSwap();
     }
 

@@ -45,7 +45,8 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
     private static void OnZIndexChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
     {
-        if (d is UIComponent component) component._zIndex = e.NewValue is int z ? z : 0;
+        // Resolved value, not e.NewValue (a trigger exit writes UnsetValue). See OnVisibilityChanged.
+        if (d is UIComponent component) component._zIndex = component.GetValue<int>(ZIndexProperty);
     }
 
     public static readonly AdamantiumProperty VisibilityProperty = AdamantiumProperty.Register(nameof(Visibility),
@@ -70,14 +71,15 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     // and that is a no-op change once the old value is read as the default it really was.
     private static void OnVisibilityChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
     {
-        if (d is UIComponent component && e.NewValue is Visibility visibility) component._visibility = visibility;
+        if (d is not UIComponent component) return;
 
-        var oldValue = e.OldValue == AdamantiumProperty.UnsetValue
-            ? VisibilityProperty.GetDefaultMetadata(d.GetType()).DefaultValue
-            : e.OldValue;
+        // Resolved value, not e.NewValue: a trigger exit clears its slot with UnsetValue, which is not a Visibility.
+        var previous = component._visibility;
+        var effective = component.GetValue<Visibility>(VisibilityProperty);
+        component._visibility = effective;
 
-        if (!Equals(oldValue, e.NewValue))
-            VisualTreeNotifications.RaiseVisibilityChanged(d as IUIComponent);
+        if (previous != effective)
+            VisualTreeNotifications.RaiseVisibilityChanged(component);
     }
       
     public static readonly AdamantiumProperty IsHitTestVisibleProperty =
@@ -391,7 +393,7 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     // revision too - otherwise the clean-frame fast path would skip a frame in which a tile just moved.
     /// <summary>See <see cref="IUIComponent.IsRenderMotionNode"/>. Settable by the element that drives subtree-as-a-unit
     /// movement (a virtualizing items host under transform-only scroll).</summary>
-    public bool IsRenderMotionNode { get; protected internal set; }
+    public bool IsRenderMotionNode { get; set; }
 
     public Rect Bounds
     {

@@ -57,6 +57,7 @@ public static class AnimationManager
         Active.Clear();
         ActiveSet.Clear();
         Holders.Clear();
+        Compositor.Reset();
     }
 
     /// <summary>Registers a custom per-frame ticker driven by the same heartbeat as animations: <paramref name="advance"/>
@@ -67,6 +68,11 @@ public static class AnimationManager
     /// <summary>Advances every running animation by <paramref name="deltaSeconds"/>. Called once per frame.</summary>
     public static void Tick(double deltaSeconds)
     {
+        // Re-publish what the render thread composes its matrices FROM (the element's base transform, where layout put it,
+        // what size it is). Only the loop thread may read the live tree, and only it can change any of this - so while it is
+        // stalled the render thread's copy cannot go stale: no loop, no layout.
+        Compositor.RefreshBases();
+
         if (Active.Count == 0) return;
 
         // Advance a SNAPSHOT: a finishing animation's completion callback may start OR cancel animations (e.g. a tab
@@ -107,20 +113,32 @@ public static class AnimationManager
 
     /// <summary>Starts a keyframe <see cref="Animation"/> on <paramref name="target"/>, dropping any in-flight animation
     /// that drives one of the same properties.</summary>
-    internal static void BeginKeyFrame(AdamantiumComponent target, Animation animation, Action completed)
+    internal static void BeginKeyFrame(AdamantiumComponent target, Animation animation, Action completed, double resumeElapsed = 0)
     {
-        var running = new RunningKeyFrameAnimation(target, animation, completed);
+        var running = new RunningKeyFrameAnimation(target, animation, completed, resumeElapsed);
         foreach (var property in running.Properties)
             RemoveWhere(a => a.Animates(target, property));
         running.Advance(0);   // apply the start values immediately so there is no one-frame flash
         Add(running);
     }
 
+    /// <summary>The elapsed time of the animation currently running on <paramref name="target"/> (any property), or null if
+    /// none - so a re-templated trigger can hand the phase to its successor (see RunAnimationAction). Loop thread.</summary>
+    internal static double? GetElapsed(AdamantiumComponent target)
+    {
+        foreach (var a in Active)
+            if (a is RunningKeyFrameAnimation rk && rk.AnimatesTarget(target))
+                return rk.CurrentElapsed;
+        return null;
+    }
+
     /// <summary>Stops the animation (if any) running on <paramref name="property"/> of <paramref name="target"/> without
     /// firing its completion callback. Returns true if one was running. The caller releases the held animation value.</summary>
     internal static bool Cancel(AdamantiumComponent target, AdamantiumProperty property)
     {
-        return RemoveWhere(a => a.Animates(target, property)) > 0;
+        var cancelled = RemoveWhere(a => a.Animates(target, property)) > 0;
+        if (cancelled) Compositor.Release(target);   // the render thread must stop playing what the loop just stopped
+        return cancelled;
     }
 
     /// <summary>Stops EVERY animation running on <paramref name="target"/> (any property), without firing completions -
@@ -130,6 +148,7 @@ public static class AnimationManager
     public static void Cancel(AdamantiumComponent target)
     {
         RemoveWhere(a => a.AnimatesTarget(target));
+        Compositor.Release(target);
     }
 
     // --- Shared-target ownership -------------------------------------------------------------------------------------

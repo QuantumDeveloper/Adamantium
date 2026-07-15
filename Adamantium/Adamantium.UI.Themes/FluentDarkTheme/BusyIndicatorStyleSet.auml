@@ -349,24 +349,25 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="BusyIndicator">
-                    <!-- The card and the band are Grid SIBLINGS, not nested: a Border is a Decorator, so it shrinks to its
-                         CHILD - and the band has no child of its own, so nested inside the card it would measure to zero and
-                         draw nothing at all. (The ProgressBar template hits the same wall with its track and fill.) As
-                         siblings both stretch to the cell and the band overlays the card exactly.
-
-                         The band is a gradient whose STOPS move, not an element that travels: the highlight is only ever
-                         where the middle stop currently is. That is why the three stops are named - the animation walks all
-                         three across the brush together, so the band keeps its width as it goes. -->
-                    <controls:Grid>
-                        <controls:Border CornerRadius="6" Background="{ResourceReference ControlFillColorTertiary}"/>
+                    <!-- A highlight BAND that slides across the card (via a transform - so the compositor plays it on the
+                         render thread) rather than a gradient whose stops move. Its peak colour is a THEMED Color resource
+                         ({ResourceReference ShimmerPeakColor}: a white glare on dark, a dark sweep on light) - a gradient
+                         STOP now takes a resource reference just like an element property, since the resolver applies to any
+                         AdamantiumComponent, not only UI elements. The card and band are Grid SIBLINGS (a Border is a
+                         Decorator and would shrink to a child-less band), and the Grid CLIPS so the tails don't spill. -->
+                    <controls:Grid ClipToBounds="True">
+                        <controls:Border CornerRadius="6" Background="{ResourceReference ShimmerTrackFill}"/>
                         <controls:Rectangle CornerRadius="6" Stroke="Transparent">
                             <controls:Rectangle.Fill>
                                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                    <GradientStop x:Name="ShimmerLead"  Color="#00FFFFFF" Offset="0"/>
-                                    <GradientStop x:Name="ShimmerPeak"  Color="#33FFFFFF" Offset="0.25"/>
-                                    <GradientStop x:Name="ShimmerTrail" Color="#00FFFFFF" Offset="0.5"/>
+                                    <GradientStop Color="#00000000" Offset="0"/>
+                                    <GradientStop Color="{ResourceReference ShimmerPeakColor}" Offset="0.5"/>
+                                    <GradientStop Color="#00000000" Offset="1"/>
                                 </LinearGradientBrush>
                             </controls:Rectangle.Fill>
+                            <controls:Rectangle.RenderTransform>
+                                <Transform x:Name="ShimmerSlide" TranslateX="-100"/>
+                            </controls:Rectangle.RenderTransform>
                         </controls:Rectangle>
                     </controls:Grid>
                 </ControlTemplate>
@@ -374,35 +375,21 @@
         </Setter>
     </Style>
 
-    <!-- The offsets stay INSIDE [0,1] on purpose: GradientBake clamps them, so a band cannot ride in from off the card
-         (a separate bug worth fixing). The band therefore starts at the card's left edge rather than sliding in from
-         beyond it - the three stops move together, so it keeps its width the whole way across. -->
+    <!-- The band glides across and back (AutoReverse) rather than snapping to the left edge each loop. The card is 180 wide,
+         so a -100..+100 sweep carries the highlight fully off each edge (its tails fade and the Grid clips the rest), giving
+         a clean travel with no hard jump. A single transform track, which the compositor can play on the render thread. -->
     <Style Selector="BusyIndicator.Shimmer">
         <PropertyTrigger Property="IsActive" Value="True">
             <PropertyTrigger.EnterActions>
-                <RunAnimationAction TargetName="ShimmerLead">
-                    <Animation Duration="0:0:1.5" IterationCount="Infinity">
-                        <KeyFrame Cue="0"><Setter Property="Offset" Value="0"/></KeyFrame>
-                        <KeyFrame Cue="1"><Setter Property="Offset" Value="0.5"/></KeyFrame>
-                    </Animation>
-                </RunAnimationAction>
-                <RunAnimationAction TargetName="ShimmerPeak">
-                    <Animation Duration="0:0:1.5" IterationCount="Infinity">
-                        <KeyFrame Cue="0"><Setter Property="Offset" Value="0.25"/></KeyFrame>
-                        <KeyFrame Cue="1"><Setter Property="Offset" Value="0.75"/></KeyFrame>
-                    </Animation>
-                </RunAnimationAction>
-                <RunAnimationAction TargetName="ShimmerTrail">
-                    <Animation Duration="0:0:1.5" IterationCount="Infinity">
-                        <KeyFrame Cue="0"><Setter Property="Offset" Value="0.5"/></KeyFrame>
-                        <KeyFrame Cue="1"><Setter Property="Offset" Value="1.0"/></KeyFrame>
+                <RunAnimationAction TargetName="ShimmerSlide">
+                    <Animation Duration="0:0:2.0" IterationCount="Infinity" AutoReverse="True" Easing="CubicInOut">
+                        <KeyFrame Cue="0"><Setter Property="TranslateX" Value="-100"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="TranslateX" Value="100"/></KeyFrame>
                     </Animation>
                 </RunAnimationAction>
             </PropertyTrigger.EnterActions>
             <PropertyTrigger.ExitActions>
-                <StopAnimationAction TargetName="ShimmerLead"/>
-                <StopAnimationAction TargetName="ShimmerPeak"/>
-                <StopAnimationAction TargetName="ShimmerTrail"/>
+                <StopAnimationAction TargetName="ShimmerSlide"/>
             </PropertyTrigger.ExitActions>
         </PropertyTrigger>
     </Style>

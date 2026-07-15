@@ -37,14 +37,21 @@ public interface IUIComponent : IFundamentalUIComponent
     /// <summary>A render MOTION NODE: this element's subtree translates as a unit (a transform-only-scrolled panel).
     /// The render cache bakes its descendants' batched instances in THIS node's space and gives them its transform-table
     /// slot, so moving the node costs one matrix write instead of re-baking the subtree (the O(1)-scroll path). Set by
-    /// the element that drives such movement (a virtualizing items host).</summary>
-    bool IsRenderMotionNode { get; }
+    /// the element that drives such movement (a virtualizing items host) - or by the COMPOSITOR, which promotes any element
+    /// whose transform it takes over: one matrix write is precisely what the render thread can do on its own, and a
+    /// world-baked element could not be moved without a re-record, which is the loop thread's job.</summary>
+    bool IsRenderMotionNode { get; set; }
 
     bool IsRootComponent { get; }
 
     Transform LayoutTransform { get; set; }
     
     Transform RenderTransform { get; set; }
+
+    /// <summary>The point <see cref="RenderTransform"/> turns/scales about, as a FRACTION of the element's own size (0.5,0.5
+    /// = its centre). Relative, so one template stays centred at any size. Read by the compositor when it composes the
+    /// element's matrix itself.</summary>
+    Vector2 RenderTransformOrigin { get; set; }
 
     Matrix4x4F WorldTransform { get; }
 

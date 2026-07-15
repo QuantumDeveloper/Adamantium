@@ -6,6 +6,7 @@ using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Core.Media.Animation;
 using Adamantium.UI.Rendering.Payloads;
 using Adamantium.UI.Rendering.Retained;
 using Adamantium.UI.Rendering.RenderUnits;
@@ -124,6 +125,20 @@ public class RenderCache
     // as O(dirty) costs microseconds.
     private enum SdfSlotKind { Ellipse, GradientRect, GradientEllipse }
     private readonly Dictionary<IRenderUnit, (SdfSlotKind Kind, int Slot)> _sdfSlotByUnit = new();
+
+    // The units each LIVE brush paints, built during the recording walk (loop thread) - the render thread reads it to find,
+    // for a composited PAINT animation, every slot that must be re-baked when the brush's snapshot changes. Keyed by the live
+    // brush by REFERENCE (see the payloads' LiveBrush). ONE brush is routinely shared by hundreds of elements (the skeleton
+    // pulse), which is the whole reason paint has to fan out where transform did not. Same lifetime as the slot maps.
+    private readonly Dictionary<Core.Media.Brush, List<IRenderUnit>> _unitsByBrush = new();
+
+    private void IndexUnitBrush(IUIComponent _, IRenderUnit unit, Core.Media.Brush liveBrush)
+    {
+        if (liveBrush == null) return;
+        if (!_unitsByBrush.TryGetValue(liveBrush, out var list))
+            _unitsByBrush[liveBrush] = list = new List<IRenderUnit>();
+        list.Add(unit);
+    }
     private bool _partialSpliced;                                            // last partial mutated the paint-order list -> ops/slots stale
 
     // Last render scale seen in ProcessCommands; maps a unit's window-logical clip rect to framebuffer-pixel scissor.
@@ -1634,6 +1649,12 @@ public class RenderCache
     /// </summary>
     public void Render(IGraphicsDevice device, Rect2D fullScissor)
     {
+        // The animations this thread plays by itself. BEFORE the clean-frame early-out below, on purpose: a composited
+        // animation changes what the retained op stream draws (a matrix, a re-baked colour slot) - so an otherwise CLEAN
+        // frame is exactly the frame it must still be applied on. That is the whole win: the loop thread can be stalled in a
+        // theme cascade and the spinner keeps turning, the skeletons keep pulsing.
+        ApplyCompositedAnimations(device);
+
         // Clean-frame replay: nothing changed since the last recorded walk, so re-issue that walk's op stream directly
         // and skip the whole per-unit loop (the retained batch buffers still hold its bytes). Only a fully-Clean build
         // qualifies; a Partial/Full re-runs the walk below and re-records.
@@ -1670,7 +1691,7 @@ public class RenderCache
         _recording = device != null;   // a device walk records its op stream for a later clean-frame replay
         if (_recording)
         {
-            _ops.Clear(); _opsReplayable = true; _rectSlotByUnit.Clear(); _sdfSlotByUnit.Clear(); _walkGroup = null; _walkVersion++;
+            _ops.Clear(); _opsReplayable = true; _rectSlotByUnit.Clear(); _sdfSlotByUnit.Clear(); _unitsByBrush.Clear(); _walkGroup = null; _walkVersion++;
             _nodeAllAware.Clear();
             _movedNodesBuf.Clear();   // a full walk re-bakes fresh node matrices - pending node moves are subsumed
             // ...but "subsumed" is only true if this walk composes CURRENT transforms. A partial build drops the
@@ -1791,6 +1812,7 @@ public class RenderCache
                     {
                         var slot = _rectBatch.LastSlot;
                         _rectSlotByUnit[unit] = slot;   // for a later fast-path partial replay
+                        IndexUnitBrush(unit.Component, unit, rru.RectPayload.LiveBrush);   // for a composited paint re-bake
                         // Extend/open this group's contiguous slot run (for the spliced-patch segment surgery).
                         var runs = group.RectRuns;
                         if (runs.Count > 0 && runs[^1].First + runs[^1].Count == slot)
@@ -1820,6 +1842,7 @@ public class RenderCache
                     {
                         group.PatchableRectOnly = false;   // gradient: node-aware, but not rect-splice-patchable
                         _sdfSlotByUnit[unit] = (SdfSlotKind.GradientRect, _gradientRectBatch.LastSlot);   // ...but PAINT-patchable
+                        IndexUnitBrush(unit.Component, unit, grru.RectPayload.LiveBrush);
                     }
                     _batchScissor = scissor;
                     _batchOpen = true;
@@ -1839,6 +1862,7 @@ public class RenderCache
                     {
                         group.PatchableRectOnly = false;   // non-rect-batch draw -> not rect-splice-patchable
                         _sdfSlotByUnit[unit] = (SdfSlotKind.Ellipse, _ellipseBatch.LastSlot);   // ...but PAINT-patchable
+                        IndexUnitBrush(unit.Component, unit, eru.EllipsePayload.LiveBrush);
                     }
                     _batchScissor = scissor;
                     _batchOpen = true;
@@ -1860,6 +1884,7 @@ public class RenderCache
                     {
                         group.PatchableRectOnly = false;   // gradient: node-aware, but not rect-splice-patchable
                         _sdfSlotByUnit[unit] = (SdfSlotKind.GradientEllipse, _gradientEllipseBatch.LastSlot);   // ...but PAINT-patchable
+                        IndexUnitBrush(unit.Component, unit, geru.EllipsePayload.LiveBrush);
                     }
                     _batchScissor = scissor;
                     _batchOpen = true;
@@ -1973,6 +1998,60 @@ public class RenderCache
         if (_recording)
         {
             _opsRecorded = true; _recording = false;
+        }
+    }
+
+    // Play this frame's composited animations for RIGHT NOW and push the result to the GPU, without the loop thread and
+    // without the property system (see Compositor). Recompose ALL entries once (Tick), then apply each by its channel.
+    private readonly List<Compositor.Entry> _compositedBuf = new();   // reused: this thread's view of the composited set
+
+    private void ApplyCompositedAnimations(IGraphicsDevice device)
+    {
+        if (device == null || _transformTable == null) return;
+        if (!Compositor.Tick(_compositedBuf)) return;   // recomposes matrices AND republishes paint snapshots
+
+        foreach (var entry in _compositedBuf)
+        {
+            if (entry.Channel == CompositorChannel.Transform) ApplyCompositedTransform(device, entry);
+            else ApplyCompositedPaint(device, entry);
+        }
+    }
+
+    // TRANSFORM: one 64-byte matrix write moves the whole node. It lands in TWO places, both needed. The transform table is
+    // what the GPU reads - the retained instances draw in the new place. The frozen SNAPSHOT is what every compose helper
+    // here reads (World, NodeOf, ResolveScissor), so if it kept the un-animated matrix a walk that ran this frame would
+    // re-bake the element back where it was standing, and the two would fight. Overwriting LocalTransform makes the walk
+    // agree with the compositor rather than argue with it.
+    private void ApplyCompositedTransform(IGraphicsDevice device, Compositor.Entry entry)
+    {
+        var owner = entry.Owner;
+
+        // Not in the snapshot = not drawn by THIS cache (its promotion to a motion node has not been recorded here). Nothing
+        // to move; the loop thread's mirror forces a re-record when it notices the compositor isn't applying (see
+        // Transform.UpdateTransform), after which this succeeds and MarkApplied below suppresses the mirror again.
+        if (!_applySnap.TryGetValue(owner, out var snap)) return;
+
+        _applySnap[owner] = new LayoutSnapshot(entry.Local, snap.RenderSize, snap.ClipToBounds, snap.IsMotionNode, snap.RenderParent);
+        _worldCache.Remove(owner);   // its world is composed FROM the local we just replaced
+        _transformTable.SetMatrix(device, _transformTable.AcquireSlot(owner.RenderId), World(owner));
+        entry.MarkApplied();   // tell the loop thread the render thread is drawing this - so its mirror stops re-baking it
+    }
+
+    // PAINT: the brush's snapshot was already republished by Tick; here every slot that paints with it is re-baked from that
+    // snapshot. Nothing moved, so the transform is unchanged - this is the SAME per-slot re-bake the loop-driven paint patch
+    // does, run on the render thread instead. One brush fans out to all its units (the skeleton pulse), which is why paint
+    // needs the brush->units index that transform did not.
+    private void ApplyCompositedPaint(IGraphicsDevice device, Compositor.Entry entry)
+    {
+        if (!entry.PaintChanged) return;   // the baked bytes are identical to last present - nothing to do (see Entry)
+        if (entry.Target is not Core.Media.Brush brush) return;
+        if (!_unitsByBrush.TryGetValue(brush, out var units)) return;
+
+        foreach (var u in units)
+        {
+            if (!IsSlotPatchable(u)) continue;   // a unit whose bytes moved off the slot map (rare) - the next walk fixes it
+            var bakeWorld = ResolveBake(device, u.Component, World(u.Component), out var slot);
+            PatchSlot(device, u, bakeWorld, slot);
         }
     }
 

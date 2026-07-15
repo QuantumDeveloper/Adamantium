@@ -15,6 +15,10 @@ public class RectanglePayload(Brush brush, Rect destinationRect, CornerRadius co
     private readonly Brush _brush = brush?.ForRendering();
 
     public Brush Brush => _brush?.Snapshot;
+
+    // The LIVE brush by REFERENCE ONLY - never read its mutable values through this. The render cache indexes units by it so
+    // the compositor can find the slots a shared animating brush paints, and reference identity is thread-safe.
+    internal Brush LiveBrush => _brush;
     public Rect DestinationRect { get; } = destinationRect;
     public CornerRadius CornerRadius { get; } = cornerRadius;
     public Pen Pen { get; } = pen;

@@ -118,11 +118,20 @@ public class Transform : AnimatableUIComponent
     private void UpdateTransform()
     {
         Matrix = CalculateFinalTransform();
+
+        // The RENDER thread IS drawing this transform's animated matrix (see Compositor) - so re-baking it here is pure
+        // double work (the fps cost). This loop write is only the MIRROR that keeps hit-testing and bindings in step.
+        // "Recently" and not just "owns": if the compositor holds the entry but is NOT applying it - its owner isn't
+        // recorded, e.g. a spinner the theme swap just re-templated - the picture would freeze, so fall through and let the
+        // loop thread re-bake it, exactly as for an uncomposited transform.
+        if (Media.Animation.Compositor.EntryFor(this) is { AppliedRecently: true }) return;
+
         // A transform change MOVES the owning element; the recorded geometry is unchanged. When the owner is a MOTION
         // NODE its instances reference its transform-table slot, so only that node is marked (one matrix rewrite +
-        // replay); otherwise the conservative global Transform mark re-bakes world transforms as before. Transform's
-        // inner properties carry no AffectsRender, so without this they'd self-mark nothing and the animation heartbeat
-        // had to fall back to MarkStructural every tick (a full-window walk = the tab-drag lag).
+        // replay); otherwise the conservative global Transform mark re-bakes world transforms as before. Neither is a
+        // STRUCTURAL mark, so a held theme swap still reaches layout quiescence and completes. Transform's inner properties
+        // carry no AffectsRender, so without this they'd self-mark nothing and the animation heartbeat had to fall back to
+        // MarkStructural every tick (a full-window walk = the tab-drag lag).
         // Owner is null only when this transform isn't assigned as anyone's RenderTransform (so it moves nothing yet) -
         // MarkTransform then records an UNNAMEABLE move and the recorder re-captures the whole layout snapshot for that
         // frame rather than silently keeping a stale entry.
@@ -130,46 +139,23 @@ public class Transform : AnimatableUIComponent
         else RenderDirty.MarkTransform(Owner);
     }
 
-    private Matrix4x4 CalculateFinalTransform()
+    /// <summary>This transform's values as plain data - what the compositor captures so it can compose the matrix on the
+    /// render thread without touching the property system. Read on the loop thread, at handoff.</summary>
+    public TransformValues Values => new()
     {
-        // Z scale MUST be 1: the two-arg ctor left it 0, which zeroed the matrix's Z row (M33 = 0) - harmless for the
-        // flat z=0 quads' positions, but the perspective sandwich below computes its w-term THROUGH M33
-        // (M34 = M33 * -1/d), so the whole 3D depth silently collapsed to an affine tilt.
-        var scaling = new Vector3(ScaleX, ScaleY, 1);
-        var translation = new Vector3((float)TranslateX, (float)TranslateY, 0);
-        var rotationCenter = new Vector3((float)RotationCenterX, (float)RotationCenterY, 0);
-        var scalingCenter = Vector3.Zero;
-        var scalingRotation = Quaternion.Identity;
+        ScaleX = ScaleX,
+        ScaleY = ScaleY,
+        RotationAngle = RotationAngle,
+        RotationX = RotationX,
+        RotationY = RotationY,
+        Perspective = Perspective,
+        RotationCenterX = RotationCenterX,
+        RotationCenterY = RotationCenterY,
+        TranslateX = TranslateX,
+        TranslateY = TranslateY
+    };
 
-        // Z spin (the classic 2D angle) composed with the 3D X/Y rotations (pitch/yaw) - one quaternion, rotated around
-        // the same centre, so the 2D-only case is bit-identical to before (RotationX/Y = 0 -> pure UnitZ rotation).
-        var rotation = Quaternion.RotationYawPitchRoll(
-            MathHelper.DegreesToRadians(RotationY),
-            MathHelper.DegreesToRadians(RotationX),
-            MathHelper.DegreesToRadians(RotationAngle));
-
-        Matrix4x4.Transformation(
-            ref scalingCenter,
-            ref scalingRotation,
-            ref scaling,
-            ref rotationCenter,
-            ref rotation,
-            ref translation,
-            out var matrix);
-
-        // Perspective foreshortening around the rotation centre: w' = 1 - z/d, so points rotated toward the viewer
-        // (negative z) grow and away shrink - the WPF-3D-tile look. Off (affine) when Perspective is 0. Composed as
-        // T(-c) * M34(-1/d) * T(c) AFTER the affine transform: depth produced by the rotation feeds the divide.
-        var d = Perspective;
-        if (d > 0)
-        {
-            var persp = Matrix4x4.Identity;
-            persp.M34 = -1.0 / d;
-            var toCenter = Matrix4x4.Translation(-(float)RotationCenterX, -(float)RotationCenterY, 0);
-            var fromCenter = Matrix4x4.Translation((float)RotationCenterX, (float)RotationCenterY, 0);
-            matrix = matrix * toCenter * persp * fromCenter;
-        }
-
-        return matrix;
-    }
+    // The matrix arithmetic itself lives in TransformValues, so the compositor composes the SAME matrix from the SAME code -
+    // two implementations of this would be two chances to disagree about where an element is.
+    private Matrix4x4 CalculateFinalTransform() => Values.ToMatrix();
 }

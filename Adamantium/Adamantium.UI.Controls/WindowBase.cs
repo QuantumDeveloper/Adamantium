@@ -158,6 +158,17 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         private set => SetValue(IsThemeChangingProperty, value);
     }
 
+    // The caption a theme's busy overlay shows. A window property (not baked into the template) so the indicator is a
+    // GENERIC busy overlay whose text an app sets for any wait, not only the theme swap. The theme provides the default.
+    public static readonly AdamantiumProperty LoadingIndicatorTextProperty = AdamantiumProperty.Register(
+        nameof(LoadingIndicatorText), typeof(string), typeof(WindowBase), new PropertyMetadata(string.Empty));
+
+    public string LoadingIndicatorText
+    {
+        get => GetValue<string>(LoadingIndicatorTextProperty);
+        set => SetValue(LoadingIndicatorTextProperty, value);
+    }
+
     // A plain .NET event (not a routed one): the platform worker keeps a thread-safe ResizeMode snapshot for the hit-test
     // and refreshes it here when the mode changes at runtime (e.g. toggling grip-resize on).
     public event EventHandler ResizeModeChanged;

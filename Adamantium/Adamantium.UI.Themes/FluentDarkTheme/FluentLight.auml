@@ -5,9 +5,6 @@
 	   Name="FluentLight"
        ResourceContext.Source="{ResourceLink Source={x:Type fluentDark:BrushesLight}, Scope=Theme}">
 
-	<!-- Same templates as FluentDark (the StyleSets are palette-driven via {ResourceReference}); only the linked palette
-	     (BrushesLight above) and the accents below differ, so a Dark<->Light swap re-colours every control with no new
-	     templates. Switch at runtime with the arrow keys (Up = Dark, Down = Light). -->
 	<Theme.StyleIncludes>
 		<StyleInclude Source="{x:Type fluentDark:TextBlockStyleSet}"/>
 		<StyleInclude Source="{x:Type fluentDark:BorderStyleSet}"/>

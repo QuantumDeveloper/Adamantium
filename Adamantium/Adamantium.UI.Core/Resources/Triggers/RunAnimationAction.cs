@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Adamantium.UI.Core.Resources.Triggers;
 
 /// <summary>
@@ -13,6 +15,12 @@ public class RunAnimationAction : IUndoableTriggerAction, ITargetedTriggerAction
     /// <summary>Name of the element/part to animate; empty means the trigger's host component.</summary>
     public string TargetName { get; set; }
 
+    // A re-templated trigger (a theme swap rebuilds a BusyIndicator's parts) tears the OLD target's animation down and
+    // starts a fresh one on the NEW part - which would snap a spinner back to its start. Carry the phase across, keyed by
+    // (host, this action) so distinct hosts and distinct animations on one host don't collide. Written in Undo, consumed by
+    // the Deactivate->Activate that immediately follows (see ReevaluateTriggersForTemplateChange).
+    private static readonly Dictionary<(IFundamentalUIComponent Host, RunAnimationAction Action), double> ResumePhase = new();
+
     public void Invoke(ITriggerExecutionContext context)
     {
         if (Animation == null) return;
@@ -23,10 +31,12 @@ public class RunAnimationAction : IUndoableTriggerAction, ITargetedTriggerAction
         var target = context.FindTarget(TargetName);
         if (target is not AdamantiumComponent animTarget) return;
 
+        var resume = ResumePhase.Remove((context.HostComponent, this), out var phase) ? phase : 0;
+
         // Claim the target for this trigger's HOST before starting: a SHARED target (a keyed theme brush every loading
         // list pulses) must keep running until the last host stops it (see AnimationManager.Retain/Release).
         Media.Animation.AnimationManager.Retain(animTarget, context.HostComponent);
-        Animation.Apply(animTarget);
+        Animation.Apply(animTarget, resumeElapsed: resume);
     }
 
     /// <summary>The trigger is going away while it still held (a theme/template swap): drop this host's claim, which
@@ -36,7 +46,13 @@ public class RunAnimationAction : IUndoableTriggerAction, ITargetedTriggerAction
     {
         // The target the action was STARTED on (the activator kept it), not a fresh FindTarget: on a template rebuild the
         // name now resolves to the NEW part, so releasing that would leave the animation running on the discarded one.
-        if (target is AdamantiumComponent animTarget)
-            Media.Animation.AnimationManager.Release(animTarget, context.HostComponent);
+        if (target is not AdamantiumComponent animTarget) return;
+
+        // Remember where it was so the successor (a re-template re-Invokes right after) resumes the phase. Only when it was
+        // actually running (GetElapsed non-null), so a not-running teardown leaves nothing stale behind.
+        var elapsed = Media.Animation.AnimationManager.GetElapsed(animTarget);
+        if (elapsed.HasValue) ResumePhase[(context.HostComponent, this)] = elapsed.Value;
+
+        Media.Animation.AnimationManager.Release(animTarget, context.HostComponent);
     }
 }

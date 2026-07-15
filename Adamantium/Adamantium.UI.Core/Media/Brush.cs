@@ -1,5 +1,6 @@
 ﻿using System;
 using Adamantium.Core.TypeParsing;
+using Adamantium.UI.Core.Media.Animation;
 using Adamantium.UI.Core.TypeParsers;
 
 namespace Adamantium.UI.Core.Media;
@@ -27,7 +28,22 @@ public abstract class Brush: AdamantiumComponent
       // reaches the screen. Only for a brush that already has one: a clone being built inside CreateFrozenCore raises
       // this from its own initializer, and snapshotting THAT would recurse forever.
       if (_snapshot != null) _snapshot = CreateFrozenCore();
+      _baseChanged = true;   // a real change to the brush's own values - the compositor re-captures its paint base on it
       Changed?.Invoke(this, EventArgs.Empty);
+   }
+
+   // Set by RaiseChanged (a genuine property change), consumed by the compositor's per-frame RefreshBases. Lets a paint
+   // animation re-capture its base ONLY when the brush actually changed (a theme recolour) instead of every loop frame -
+   // so the render thread's dedup (see Compositor's paint tag) is not defeated by a base that is "re-captured" unchanged.
+   // Loop-thread only (RaiseChanged and RefreshBases both run there); never touched by the render thread's PublishSnapshot.
+   private bool _baseChanged = true;
+
+   /// <summary>Returns whether the brush's own values changed since the last call, and clears the flag. Loop thread.</summary>
+   public bool ConsumeBaseChange()
+   {
+      var changed = _baseChanged;
+      _baseChanged = false;
+      return changed;
    }
 
    // PAINT: a brush's own opacity changes only the colour the units are baked with - never a shape, never a layout. Every
@@ -77,9 +93,46 @@ public abstract class Brush: AdamantiumComponent
       return this;
    }
 
-   /// <summary>Build a fresh immutable clone of the current values. Subclasses copy their own properties and wrap the
-   /// result in <see cref="AsFrozen{T}"/> to lock its setters.</summary>
-   protected abstract Brush CreateFrozenCore();
+   private Brush CreateFrozenCore() => AsFrozen(CreateClone());
+
+   /// <summary>A fresh, UNFROZEN clone of this brush's current values (same runtime type). Subclasses copy their own
+   /// properties; the base freezes it. Split out from freezing so the compositor can override an animated value on the
+   /// clone BEFORE it is frozen (see <see cref="BuildAnimatedSnapshot"/>).</summary>
+   protected abstract Brush CreateClone();
+
+   // --- Composited paint (render-thread animation) ------------------------------------------------------------------
+   /// <summary>Build the animated snapshot the COMPOSITOR publishes each present: a frozen clone of this brush with the
+   /// curve's paint tracks applied. Called on the render thread FROM A FROZEN BASE (see Compositor's paint entry), so it
+   /// reads only immutable values - the live brush's own properties are never touched and stay at their base.
+   ///
+   /// General over ANY animatable brush property: the clone is UNFROZEN until <see cref="AsFrozen{T}"/>, so its setters
+   /// work, and the curve only ever produces doubles - so setting each track's value covers Opacity (the skeleton pulse),
+   /// a gradient radius, and any future double paint property with no per-property code. The AffectsPaint contract - a
+   /// re-bake of what is recorded, never a re-record - is what makes this safe for every such property.</summary>
+   public Brush BuildAnimatedSnapshot(AnimationCurve curve, double elapsed)
+   {
+      var clone = CreateClone();
+      foreach (var track in curve.Tracks)
+         clone.SetValue(track.Property, curve.Evaluate(track, elapsed));
+      return AsFrozen(clone);
+   }
+
+   /// <summary>The animated value's VISIBLE resolution for the paint dedup (see Compositor): the coarsest quantum at which
+   /// a change still cannot alter a pixel, so two instants that quantize equal need no re-bake. A colour/opacity value lands
+   /// in an 8-bit channel, so 1/256 is EXACT. A geometric value (a gradient radius, relative to the filled bounds 0..1) has
+   /// no size-independent quantum - a shared brush paints elements of every size - so 1/4096 is used: sub-pixel down to a
+   /// 4K-wide element, and a geometric paint animation is rare and usually small, so the extra re-bakes cost nothing.</summary>
+   public virtual double PaintQuantum(AdamantiumProperty property) => property == OpacityProperty ? 256.0 : 4096.0;
+
+   /// <summary>A frozen clone of this brush's CURRENT (live, base) values - what the compositor captures on the loop thread
+   /// as the base its animated snapshots are built from. Distinct from <see cref="Snapshot"/>, which the compositor itself
+   /// overwrites while it animates: the base must stay the brush's own values so a theme recolour flows through, and reading
+   /// Snapshot for it would feed the animated value back in and spiral.</summary>
+   public Brush CaptureBase() => AsFrozen(CreateClone());
+
+   /// <summary>Swap in the snapshot the render path reads. The compositor calls this from the render thread; it is a single
+   /// volatile reference write, so a reader always sees one whole, self-consistent brush. See <see cref="Snapshot"/>.</summary>
+   public void PublishSnapshot(Brush snapshot) => _snapshot = snapshot;
 
    // Stamp a freshly-constructed clone immutable. Construction (ctor + object initializer) runs with the setters OPEN;
    // this closes them afterwards (each subclass setter early-returns when IsFrozen), so the clone can never change.
