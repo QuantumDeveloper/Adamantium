@@ -1,22 +1,19 @@
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Controls.Primitives;
-using Adamantium.UI.Controls.Shapes;
 using Adamantium.UI.Core;
 
 namespace Adamantium.UI.Controls;
 
 /// <summary>
-/// Shows how far along a [<see cref="RangeBase.Minimum"/>, <see cref="RangeBase.Maximum"/>] operation is. ONE class
-/// drives BOTH the bar and the ring: the control only computes the filled <see cref="Percentage"/> and projects it onto
-/// the template's <c>PART_Indicator</c> - as a width on a linear fill, or as an arc sweep when that part is an
-/// <see cref="Ellipse"/> (the circular template). Which look you get is purely the template, selected by class
-/// (<c>&lt;ProgressBar Classes="Ring"/&gt;</c>). Mirrors WPF's ProgressBar.
+/// Shows how far along a [<see cref="RangeBase.Minimum"/>, <see cref="RangeBase.Maximum"/>] operation is as a linear bar:
+/// the control computes the filled <see cref="Percentage"/> and sizes the template's <c>PART_Indicator</c> fill to that
+/// fraction of <c>PART_Track</c>. Mirrors WPF's ProgressBar. The circular gauge is <see cref="RingProgressBar"/>.
 /// </summary>
 public class ProgressBar : RangeBase
 {
-    private MeasurableUIComponent _indicator;   // PART_Indicator - a fill (linear) or an Ellipse arc (circular)
-    private MeasurableUIComponent _track;       // PART_Track - the full extent the linear fill is a fraction of
+    private MeasurableUIComponent _indicator;   // PART_Indicator - the fill
+    private MeasurableUIComponent _track;       // PART_Track - the full extent the fill is a fraction of
 
     public static readonly AdamantiumProperty IsIndeterminateProperty = AdamantiumProperty.Register(
         nameof(IsIndeterminate), typeof(bool), typeof(ProgressBar),
@@ -62,66 +59,26 @@ public class ProgressBar : RangeBase
 
     protected override void OnValueChanged(double oldValue, double newValue) => UpdateIndicator();
 
-    // When the template opted into square sizing (SquareSizing), report a 1:1 desired size: the side is whichever of
-    // Width/Height the consumer set (both -> the smaller; neither -> MinWidth), reported on BOTH axes. So a ring sized by
-    // only Width (or only Height) stays round, and an unsized one keeps the MinWidth default instead of stretching. The
-    // theme pairs this with non-stretch alignment so arrange settles onto the square rather than re-inflating the axis
-    // the consumer left open.
-    protected override Size MeasureOverride(Size availableSize)
-    {
-        if (!GetSquareSizing(this))
-            return base.MeasureOverride(availableSize);
-
-        // Pick the square's side from whichever of Width/Height the consumer set (both -> the smaller; neither -> the
-        // MinWidth default) BEFORE measuring, then measure the template against that SQUARE. A Shape sizes its render rect
-        // to the space it is measured with, so passing the (possibly huge/unbounded) available space straight through
-        // would make the ring's Ellipses paint far larger than the control - even though the control itself reports the
-        // square. Measuring with the square keeps the parts in step with it.
-        var w = Width;
-        var h = Height;
-        double side;
-        if (!double.IsNaN(w) && !double.IsNaN(h)) side = Math.Min(w, h);
-        else if (!double.IsNaN(w)) side = w;
-        else if (!double.IsNaN(h)) side = h;
-        else side = MinWidth;
-
-        var square = new Size(side, side);
-        base.MeasureOverride(square);
-        return square;
-    }
-
     protected override Size ArrangeOverride(Size finalSize)
     {
-        // The linear bar stretches only along its Orientation: clamp the CROSS axis to the content thickness (DesiredSize)
-        // BEFORE arranging, so the template settles onto the real bar and ActualWidth/Height report the visible bar, not
-        // the whole slot (a default-Stretch bar otherwise fills the slot's height with a 6px line centred inside it). The
-        // ring (SquareSizing) is square on both axes - MeasureOverride + non-stretch alignment already handle it.
-        if (!GetSquareSizing(this))
-        {
-            finalSize = Orientation == Orientation.Horizontal
-                ? new Size(finalSize.Width, Math.Min(finalSize.Height, DesiredSize.Height))
-                : new Size(Math.Min(finalSize.Width, DesiredSize.Width), finalSize.Height);
-        }
+        // The bar stretches only along its Orientation: clamp the CROSS axis to the content thickness (DesiredSize) BEFORE
+        // arranging, so the template settles onto the real bar and ActualWidth/Height report the visible bar, not the whole
+        // slot (a default-Stretch bar otherwise fills the slot's height with a 6px line centred inside it).
+        finalSize = Orientation == Orientation.Horizontal
+            ? new Size(finalSize.Width, Math.Min(finalSize.Height, DesiredSize.Height))
+            : new Size(Math.Min(finalSize.Width, DesiredSize.Width), finalSize.Height);
 
         var size = base.ArrangeOverride(finalSize);
-        UpdateIndicator();   // PART_Track is laid out now, so the linear fill's pixel width is finally known
+        UpdateIndicator();   // PART_Track is laid out now, so the fill's pixel width is finally known
         return size;
     }
 
-    // Projects Percentage onto the indicator part. Circular: sweep the Ellipse arc 0..(fraction*360). Linear: size the
-    // fill to that fraction of the track's main axis. Determinate-only - an indeterminate bar is left to the theme.
+    // Sizes the fill to Percentage of the track's main axis. Determinate-only - an indeterminate bar is left to the theme.
     private void UpdateIndicator()
     {
         if (_indicator == null || IsIndeterminate) return;
 
         var fraction = Math.Clamp(Percentage, 0.0, 1.0);
-
-        if (_indicator is Ellipse ring)
-        {
-            ring.StartAngle = 0;
-            ring.StopAngle = fraction * 360.0;
-            return;
-        }
 
         if (Orientation == Orientation.Horizontal)
         {

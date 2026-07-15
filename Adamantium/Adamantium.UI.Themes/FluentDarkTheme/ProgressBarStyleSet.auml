@@ -3,18 +3,16 @@
           xmlns:x="http://adamantium/ui/xaml/extensions"
           xmlns:controls="http://adamantium/ui">
 
-    <!-- ONE control, two looks. Default = a linear bar: a track with a left-anchored PART_Indicator the control sizes to
-         the filled fraction. ProgressBar.Ring = a circular gauge: PART_Indicator is an Ellipse whose arc the control
-         sweeps to that fraction. Per the small-styles convention each concern is its own <Style>. -->
+    <!-- Linear progress bar: a track with a left-anchored PART_Indicator the control sizes to the filled fraction. The
+         circular gauge is a separate control, RingProgressBar (see RingProgressBarStyleSet). Per the small-styles
+         convention each concern is its own <Style>. -->
 
     <Style Selector="ProgressBar">
         <Setter Property="MinWidth" Value="120"/>
         <Setter Property="MinHeight" Value="6"/>
     </Style>
 
-    <!-- Linear template (default). -->
     <Style Selector="ProgressBar">
-        <Setter Property="SquareSizing" Value="False"/>
         <Setter Property="Template">
             <Setter.Value>
                 <!-- Track and fill are Grid SIBLINGS (not parent/child): a Decorator shrinks to its child, so a 0-wide
@@ -36,9 +34,9 @@
         </Setter>
     </Style>
 
-    <!-- Vertical orientation (linear bar): flip the horizontal track + fill to vertical. Height="Auto" (parser -> NaN)
-         clears the 6px height so VerticalAlignment=Stretch spans the full height; the fill grows from the bottom (the
-         control drives its Height like it drives Width for horizontal). The Ring (circular) is orientation-agnostic. -->
+    <!-- Vertical orientation: flip the horizontal track + fill to vertical. Height="Auto" (parser -> NaN) clears the 6px
+         height so VerticalAlignment=Stretch spans the full height; the fill grows from the bottom (the control drives its
+         Height like it drives Width for horizontal). -->
     <Style Selector="ProgressBar">
         <PropertyTrigger Property="Orientation" Value="Vertical">
             <Setter TargetName="PART_Track" Property="Width" Value="6"/>
@@ -50,38 +48,6 @@
             <Setter TargetName="PART_Indicator" Property="HorizontalAlignment" Value="Center"/>
             <Setter TargetName="PART_Indicator" Property="VerticalAlignment" Value="Bottom"/>
         </PropertyTrigger>
-    </Style>
-
-    <!-- Circular template (ProgressBar.Ring): a dim full ring under an accent arc the control sweeps.
-         SquareSizing opts the control into 1:1 sizing (the marker lives here, with the template - not on the instance and
-         not a part-name/type guess), so setting only Width OR only Height still gives a round ring. Center (non-stretch)
-         lets arrange settle onto that square instead of re-inflating the open axis. MinWidth/MinHeight are the unsized
-         default AND override the base ProgressBar's MinWidth=120. -->
-    <Style Selector="ProgressBar.Ring">
-        <Setter Property="SquareSizing" Value="True"/>
-        <Setter Property="HorizontalAlignment" Value="Center"/>
-        <Setter Property="VerticalAlignment" Value="Center"/>
-        <Setter Property="MinWidth" Value="48"/>
-        <Setter Property="MinHeight" Value="48"/>
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="ProgressBar">
-                    <controls:Grid>
-                        <controls:Ellipse Stroke="{ResourceReference ControlFillColorTertiary}"
-                                StrokeThickness="5"
-                                Fill="Transparent"
-                                EllipseType="EdgeToEdge"/>
-                        <controls:Ellipse x:Name="PART_Indicator"
-                                Stroke="{ThemeResource AccentFillColorDefault}"
-                                StrokeThickness="5"
-                                Fill="Transparent"
-                                EllipseType="EdgeToEdge"
-                                StartAngle="0"
-                                StopAngle="0"/>
-                    </controls:Grid>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
     </Style>
 
 </StyleSet>
