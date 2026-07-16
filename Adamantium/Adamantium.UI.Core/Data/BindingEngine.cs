@@ -73,4 +73,14 @@ public static class BindingEngine
         foreach (var e in map.Values) e.CloseConnection();
         map.Clear();
     }
+
+    /// <summary>Closes every binding's source subscription but KEEPS it registered - used when a virtualizing panel parks
+    /// an off-screen container: the tile drops out of any shared source's fan-out (no storm on a shared-property change)
+    /// yet is re-established for free when it is reused, because a container's DataContext change runs RefreshBindings.
+    /// Unlike <see cref="ClearBindings"/> the map is left intact so that re-establish has something to re-establish.</summary>
+    public static void DeactivateBindings(IFundamentalUIComponent target)
+    {
+        if (_bindings.TryGetValue(target, out var map))
+            foreach (var e in map.Values) e.CloseConnection();
+    }
 }

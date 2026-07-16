@@ -348,7 +348,7 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
       var count = Owner.Items.Count;
       if (count == 0)
       {
-         foreach (var c in Owner.ItemContainerGenerator.SetWindow(0, -1)) c.Visibility = Visibility.Collapsed;
+         foreach (var c in Owner.ItemContainerGenerator.SetWindow(0, -1)) ParkContainer(c);
          _lastItemCount = 0;
          return new Size();
       }
@@ -434,7 +434,7 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
          _onSlotBound ??= OnSlotBound;
 
          foreach (var c in Owner.ItemContainerGenerator.SetWindow(first, last, bindBudget, MinBinds, _onSlotBound))
-            c.Visibility = Visibility.Collapsed;
+            ParkContainer(c);   // hide + deactivate its bindings so an off-screen tile leaves any shared source's fan-out
          if (!_cellGrew) break;
       }
 
