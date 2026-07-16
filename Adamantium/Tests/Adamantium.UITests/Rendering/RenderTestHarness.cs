@@ -79,6 +79,9 @@ internal sealed class FakeRenderUnit : IRenderUnit
     public IUIComponent Component => _command.Component;
     public Type PayloadType => _command.Payload.GetType();
 
+    public float EffectiveOpacity { get; private set; } = 1f;
+    public void SetEffectiveOpacity(float opacity) => EffectiveOpacity = opacity;
+
     public int UpdateCount { get; private set; }
     public int PreRenderCount { get; private set; }
     public int RenderCount { get; private set; }

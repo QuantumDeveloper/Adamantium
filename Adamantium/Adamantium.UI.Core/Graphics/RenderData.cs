@@ -13,7 +13,9 @@ public class RenderData
         ClipRect = clipRect;
     }
 
-    public float Opacity { get; }
+    // Set at RECORD from the element's own opacity, then OVERWRITTEN at bake with the effective opacity composed from the
+    // frozen snapshot chain (so a paint-only opacity change re-bakes without a re-record). See RenderCache.EffectiveOpacity.
+    public float Opacity { get; set; }
     
     public Matrix4x4F TransformMatrix { get; set; }
     

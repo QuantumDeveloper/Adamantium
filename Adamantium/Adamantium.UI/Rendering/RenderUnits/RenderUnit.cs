@@ -192,6 +192,14 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
 
     public IUIComponent Component => DrawCommand.Component;
 
+    // Overwrites the record-time opacity with the effective alpha composed from the frozen snapshot (RenderCache), so a
+    // paint-only opacity change re-bakes the same commands with a new alpha - every consumer (batch FillOpacity, the
+    // per-unit fill/stroke/fringe) reads RenderData.Opacity, so one write covers them all.
+    public void SetEffectiveOpacity(float opacity)
+    {
+        if (DrawCommand?.RenderData is { } rd) rd.Opacity = opacity;
+    }
+
     public void Update(Matrix4x4F transform, Matrix4x4F projection, double renderScale)
     {
         // Keep ALL of the unit's renderers pointed at the CURRENT RenderData. UpdateWithDrawCommand repoints the body

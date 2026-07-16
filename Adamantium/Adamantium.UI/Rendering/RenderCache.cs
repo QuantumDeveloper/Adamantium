@@ -108,6 +108,10 @@ public class RenderCache
     // packet's patch list so the draw pass re-bakes the units they already have (see RenderDirty.MarkPaint).
     private readonly List<IUIComponent> _paintDirtyBuffer = new();
 
+    // Paint-dirty set snapshotted in CaptureSnapshot to find components whose element OPACITY changed (it lives in the
+    // snapshot, so those must re-freeze - see CaptureSnapshot). Separate from _paintDirtyBuffer, which is partial-only.
+    private readonly List<IUIComponent> _opacityCheckBuf = new();
+
     // Draw-phase partial replay: a geometry-only partial re-renders the dirty components IN PLACE (build side), but the
     // DRAW used to re-walk EVERY unit to re-bake the batches (the O(N) 14ms at 4K - the hover FPS drop). Instead, a batched
     // rect records its slot during the full walk (_rectSlotByUnit); a fast-path partial then patches only the dirty tiles'
@@ -1347,7 +1351,7 @@ public class RenderCache
     private LayoutSnapshot Snap(IUIComponent c)
     {
         if (_snap.TryGetValue(c, out var s)) return s;
-        s = new LayoutSnapshot(c.LocalTransform, c.RenderSize, c.ClipToBounds, c.IsRenderMotionNode, c.RenderParent);
+        s = new LayoutSnapshot(c.LocalTransform, c.RenderSize, c.ClipToBounds, c.IsRenderMotionNode, c.RenderParent, (float)c.Opacity, (float)c.SelfOpacity);
         _snap[c] = s;
         _packet.SnapDelta.Add(new KeyValuePair<IUIComponent, LayoutSnapshot>(c, s));
         return s;
@@ -1360,7 +1364,7 @@ public class RenderCache
     private LayoutSnapshot ApplySnap(IUIComponent c)
     {
         if (_applySnap.TryGetValue(c, out var s)) return s;
-        s = new LayoutSnapshot(c.LocalTransform, c.RenderSize, c.ClipToBounds, c.IsRenderMotionNode, c.RenderParent);
+        s = new LayoutSnapshot(c.LocalTransform, c.RenderSize, c.ClipToBounds, c.IsRenderMotionNode, c.RenderParent, (float)c.Opacity, (float)c.SelfOpacity);
         _applySnap[c] = s;
         return s;
     }
@@ -1391,6 +1395,15 @@ public class RenderCache
                     Snap(c);
             _snapFullCapture = false;
         }
+
+        // Element opacity lives IN the snapshot (unlike a brush recolour, which re-bakes from the brush BY REFERENCE), so a
+        // paint-dirty component whose opacity ACTUALLY changed must re-publish its frozen entry - on any build kind, before
+        // the branches below. Gated on a real change (field mirror vs frozen value), so the common brush-recolour paint (the
+        // skeleton pulse, ~470 cards/frame) re-freezes nothing. RenderDirty is still populated here (cleared post-record).
+        RenderDirty.SnapshotPaintInto(_opacityCheckBuf);
+        foreach (var c in _opacityCheckBuf)
+            if (IsDrawn(c) && (!_snap.TryGetValue(c, out var f) || f.Opacity != (float)c.Opacity || f.SelfOpacity != (float)c.SelfOpacity))
+                RefreshSnapshot(c);
 
         if (_packet.Kind == RenderBuildKind.Full)
         {
@@ -1447,7 +1460,7 @@ public class RenderCache
     {
         if (component == null) return;
         var snapshot = new LayoutSnapshot(component.LocalTransform, component.RenderSize, component.ClipToBounds,
-            component.IsRenderMotionNode, component.RenderParent);
+            component.IsRenderMotionNode, component.RenderParent, (float)component.Opacity, (float)component.SelfOpacity);
         _snap[component] = snapshot;
         // ...AND publish it. The delta is the ONLY thing the applier's replica is built from, so a re-freeze that updates the
         // recorder's map alone leaves the applier composing this component from its PREVIOUS transform: a tilting tile never
@@ -1465,6 +1478,26 @@ public class RenderCache
         m = s.RenderParent != null ? s.LocalTransform * World(s.RenderParent) : s.LocalTransform;
         _worldCache[c] = m;
         return m;
+    }
+
+    private readonly Dictionary<IUIComponent, float> _opacityChain = new();   // memo of OpacityChain, like _worldCache
+
+    // Effective alpha the bake folds into a unit's colour: the element's SelfOpacity times the OPACITY chain (its own
+    // Opacity times every ancestor's). Reads ONLY the frozen snapshot - no live property, so it takes no lock/box and is
+    // safe on the render thread (see hot-paths-must-not-use-property-system). Cheaper than World (scalar mul, not matrix).
+    private float EffectiveOpacity(IUIComponent c)
+    {
+        var s = ApplySnap(c);
+        return s.SelfOpacity * OpacityChain(c);
+    }
+
+    private float OpacityChain(IUIComponent c)
+    {
+        if (_opacityChain.TryGetValue(c, out var v)) return v;
+        var s = ApplySnap(c);
+        v = s.RenderParent != null ? s.Opacity * OpacityChain(s.RenderParent) : s.Opacity;
+        _opacityChain[c] = v;
+        return v;
     }
 
     // --- Motion-node memos (the O(1)-scroll path) --------------------------------------------------------------------
@@ -1704,6 +1737,7 @@ public class RenderCache
             // yielded a transiently-wrong viewport that CULLED on-screen tiles for a frame (the hover "empty cell").
             _worldCache.Clear();
             _relWorldCache.Clear();
+            _opacityChain.Clear();
         }
 
         // Text + item-background + instanced-fill batches: reset per frame. Device renders only - GPU-free tests skip batching.
@@ -1794,7 +1828,9 @@ public class RenderCache
 
             // Bake AND draw with the same transform the cull just approved: refresh RenderData ONCE here (the batches
             // read its opacity while baking; the per-unit path reuses it). Culled units returned above, so this runs
-            // only for units that will actually draw.
+            // only for units that will actually draw. Compose the effective alpha from the frozen snapshot first, so the
+            // batches (rru.FillOpacity) and the per-unit renderers bake with the current opacity.
+            unit.SetEffectiveOpacity(EffectiveOpacity(unit.Component));
             unit.Update(wt, _projectionMatrix, _renderScale);
 
             // Batches: item-background rects (lower layer) + text (upper layer), each collapsed to one instanced draw.
@@ -2067,7 +2103,7 @@ public class RenderCache
         else return;   // never applied yet (its promotion to a motion node has not been recorded here). The loop mirror re-records.
 
         var world = snap.RenderParent != null ? entry.Local * parentWorld : entry.Local;
-        _applySnap[owner] = new LayoutSnapshot(entry.Local, snap.RenderSize, snap.ClipToBounds, snap.IsMotionNode, snap.RenderParent);
+        _applySnap[owner] = new LayoutSnapshot(entry.Local, snap.RenderSize, snap.ClipToBounds, snap.IsMotionNode, snap.RenderParent, snap.Opacity, snap.SelfOpacity);
         _worldCache[owner] = world;   // set directly: the _applySnap chain may be mid-recapture, so don't recompose off it
         _transformTable.SetMatrix(device, _transformTable.AcquireSlot(owner.RenderId), world);
         entry.MarkApplied();   // tell the loop thread the render thread is drawing this - so its mirror stops re-baking it
@@ -2106,6 +2142,8 @@ public class RenderCache
         // subtrees at their new position. A moved node with non-node-aware retained content bails to the full walk.
         if (!RefreshMovedNodes(device)) return false;
 
+        _opacityChain.Clear();   // a paint-only opacity change may have re-frozen the dirty subtree's snapshot; recompose it
+
         foreach (var comp in _partialDirty)
         {
             // A dirty component with NO drawn units (a detached/pooled/collapsed element - e.g. a text block that
@@ -2123,6 +2161,7 @@ public class RenderCache
             if (!_groupById.TryGetValue(comp.RenderId, out var g)) continue;
             foreach (var u in g.Units)
             {
+                u.SetEffectiveOpacity(EffectiveOpacity(u.Component));   // a paint change may be an opacity change
                 var bakeWorld = ResolveBake(device, u.Component, World(u.Component), out var slot);
                 if (!PatchSlot(device, u, bakeWorld, slot))
                     return false;   // became non-bakeable (rotated); the full walk re-bakes everything anyway
@@ -2215,6 +2254,8 @@ public class RenderCache
         // Op stream grown too long from accumulated splices -> recompact with a full walk before it mis-replays.
         if (_ops.Count > MaxRetainedOps) return false;
 
+        _opacityChain.Clear();   // recompose from the (possibly re-frozen) snapshot, as in TryPartialReplay
+
         // ---- Phase 1: validate + bake (no mutation) ----
         _patchBuf.Clear();
         var appendTotal = 0;
@@ -2244,6 +2285,7 @@ public class RenderCache
             foreach (var u in group.Units)
             {
                 if (u is not RectangleRenderUnit rru || !_rectBatch.CanBatch(rru.RectPayload)) return false;
+                u.SetEffectiveOpacity(EffectiveOpacity(u.Component));   // a splice may ride an opacity cascade too
                 var wt = World(u.Component);
                 if (!haveScissor)
                 {

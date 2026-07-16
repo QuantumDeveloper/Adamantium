@@ -139,6 +139,21 @@
                 </Rectangle>
             </WrapPanel>
 
+            <!-- Opacity composites onto the whole subtree (the label fades with the card); SelfOpacity fades only the
+                 element's own fill, so the card dims while its label stays crisp. -->
+            <TextBlock Text="Opacity (whole subtree) vs SelfOpacity (this element only)" FontSize="18" Margin="0,20,0,10"/>
+            <WrapPanel Orientation="Horizontal">
+                <Border Width="150" Height="96" CornerRadius="14" Margin="10" Background="#3B82F6">
+                    <TextBlock Text="baseline" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <Border Width="150" Height="96" CornerRadius="14" Margin="10" Background="#3B82F6" Opacity="0.35">
+                    <TextBlock Text="Opacity 0.35" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <Border Width="150" Height="96" CornerRadius="14" Margin="10" Background="#3B82F6" SelfOpacity="0.35">
+                    <TextBlock Text="SelfOpacity 0.35" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+            </WrapPanel>
+
         </StackPanel>
     </ScrollViewer>
 </View>

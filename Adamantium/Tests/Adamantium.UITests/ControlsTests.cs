@@ -293,59 +293,56 @@ public class ControlsTests
         });
     }
 
-    // ---- SquareSizing (the attached layout marker the ProgressBar.Ring theme sets): a control opted into 1:1 sizing
-    // derives the missing dimension from the one given, so a circular ring stays round even when the consumer sets only
-    // Width or only Height. Off by default - a normal (linear) ProgressBar is never squared.
+    // ---- RingProgressBar is INTRINSICALLY square (its own MeasureOverride, no attached marker): it derives the missing
+    // dimension from the one given, so the ring stays round even when only Width or only Height is set. A linear ProgressBar
+    // is never squared.
 
     [Test]
-    public void SquareSizing_OnlyWidthSet_MeasuresSquare()
+    public void RingProgressBar_OnlyWidthSet_MeasuresSquare()
     {
-        var bar = new ProgressBar { Width = 200 };   // Height left unset
-        ProgressBar.SetSquareSizing(bar, true);
-        bar.Measure(new Size(500, 400), force: true);
-        Assert.That(bar.DesiredSize.Height, Is.EqualTo(200).Within(1), "the height follows the set width");
+        var ring = new RingProgressBar { Width = 200 };   // Height left unset
+        ring.Measure(new Size(500, 400), force: true);
+        Assert.That(ring.DesiredSize.Height, Is.EqualTo(200).Within(1), "the height follows the set width");
     }
 
     [Test]
-    public void SquareSizing_OnlyHeightSet_MeasuresSquare()
+    public void RingProgressBar_OnlyHeightSet_MeasuresSquare()
     {
-        var bar = new ProgressBar { Height = 150 };   // Width left unset
-        ProgressBar.SetSquareSizing(bar, true);
-        bar.Measure(new Size(500, 400), force: true);
-        Assert.That(bar.DesiredSize.Width, Is.EqualTo(150).Within(1), "the width follows the set height");
+        var ring = new RingProgressBar { Height = 150 };   // Width left unset
+        ring.Measure(new Size(500, 400), force: true);
+        Assert.That(ring.DesiredSize.Width, Is.EqualTo(150).Within(1), "the width follows the set height");
     }
 
     [Test]
-    public void SquareSizing_Off_OnlyWidthSet_IsNotSquared()
+    public void ProgressBar_Linear_OnlyWidthSet_IsNotSquared()
     {
-        var bar = new ProgressBar { Width = 200 };   // SquareSizing defaults off (linear bar)
+        var bar = new ProgressBar { Width = 200 };   // a linear bar is never squared
         bar.Measure(new Size(500, 400), force: true);
-        Assert.That(bar.DesiredSize.Height, Is.LessThan(200), "a non-square ProgressBar must not be forced square");
+        Assert.That(bar.DesiredSize.Height, Is.LessThan(200), "a linear ProgressBar must not be forced square");
     }
 
     [Test]
-    public void SquareSizing_Centered_ArrangesSquare_NotStretched()
+    public void RingProgressBar_Centered_ArrangesSquare_NotStretched()
     {
-        var bar = new ProgressBar
+        var ring = new RingProgressBar
         {
             Width = 200,   // Height unset
             HorizontalAlignment = HorizontalAlignment.Center,
             VerticalAlignment = VerticalAlignment.Center
         };
-        ProgressBar.SetSquareSizing(bar, true);
 
-        bar.Measure(new Size(500, 400), force: true);
-        bar.Arrange(new Rect(0, 0, 500, 400));   // a slot far bigger than the ring - the open (height) axis must NOT stretch
+        ring.Measure(new Size(500, 400), force: true);
+        ring.Arrange(new Rect(0, 0, 500, 400));   // a slot far bigger than the ring - the open (height) axis must NOT stretch
 
         Assert.Multiple(() =>
         {
-            Assert.That(bar.ActualWidth, Is.EqualTo(200).Within(1));
-            Assert.That(bar.ActualHeight, Is.EqualTo(200).Within(1), "the unset axis must settle on the square, not stretch to the slot");
+            Assert.That(ring.ActualWidth, Is.EqualTo(200).Within(1));
+            Assert.That(ring.ActualHeight, Is.EqualTo(200).Within(1), "the unset axis must settle on the square, not stretch to the slot");
         });
     }
 
     [Test]
-    public void SquareSizing_MeasuresTemplateParts_AgainstTheSquare_NotTheHugeAvailable()
+    public void RingProgressBar_MeasuresTemplateParts_AgainstTheSquare_NotTheHugeAvailable()
     {
         Ellipse part = null;
         var template = new ControlTemplate(() =>
@@ -359,23 +356,12 @@ public class ControlsTests
             return result;
         });
 
-        var bar = new ProgressBar { Template = template, Width = 200 };   // Height unset
-        ProgressBar.SetSquareSizing(bar, true);
+        var ring = new RingProgressBar { Template = template, Width = 200 };   // Height unset
 
-        bar.Measure(new Size(2000, 2000), force: true);   // a HUGE available - the part must follow the 200 square, not this
-        bar.Arrange(new Rect(0, 0, 2000, 2000));
+        ring.Measure(new Size(2000, 2000), force: true);   // a HUGE available - the part must follow the 200 square, not this
+        ring.Arrange(new Rect(0, 0, 2000, 2000));
 
         Assert.That(part.ActualWidth, Is.LessThan(300),
             $"the ring part must size to the 200 square, not the huge available (was {part.ActualWidth})");
-    }
-
-    [Test]
-    public void SquareSizing_ResolvesByName_ForDerivedControl()
-    {
-        // The ProgressBar.Ring style sets "SquareSizing" by name. The attached property lives on MeasurableUIComponent
-        // (the owner), so it must resolve via FindRegistered for the derived ProgressBar - otherwise Setter.Apply NREs on
-        // prop.PropertyType when the theme applies. This also proves it auto-registers (owner chain walk) without a touch.
-        var prop = AdamantiumPropertyMap.FindRegistered(typeof(ProgressBar), "SquareSizing");
-        Assert.That(prop, Is.Not.Null);
     }
 }
