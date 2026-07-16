@@ -123,7 +123,7 @@ public class StackPanel : VirtualizingPanel
       var count = Owner.Items.Count;
       if (count == 0)
       {
-         foreach (var c in Owner.ItemContainerGenerator.SetWindow(0, -1)) c.Visibility = Visibility.Collapsed;
+         foreach (var c in Owner.ItemContainerGenerator.SetWindow(0, -1)) ParkContainer(c);
          return new Size();
       }
 
@@ -168,7 +168,7 @@ public class StackPanel : VirtualizingPanel
 
       // Reconcile the realized set to exactly [first,last]: containers leaving the window are rebound in place to the
       // ones entering (no collapse/null churn). Only true surplus (window shrank, e.g. resize/list edge) is hidden.
-      foreach (var c in Owner.ItemContainerGenerator.SetWindow(first, last)) c.Visibility = Visibility.Collapsed;
+      foreach (var c in Owner.ItemContainerGenerator.SetWindow(first, last)) ParkContainer(c);
 
       double crossMax = 0;
       for (var i = first; i <= last; i++)

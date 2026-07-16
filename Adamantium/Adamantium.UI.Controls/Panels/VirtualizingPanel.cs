@@ -207,6 +207,22 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         return container;
     }
 
+    /// <summary>Parks an off-screen container: hide it AND deactivate every binding in its subtree so it drops out of any
+    /// shared source's fan-out (no storm on a shared-property change while it sits off screen). It stays attached and
+    /// pooled - NO detach, so no structural re-record - and is re-subscribed for free when reused, because the reuse sets
+    /// its DataContext which runs RefreshBindings. Deactivate is O(1)-per-binding (SharedSourceRegistry).</summary>
+    protected static void ParkContainer(IUIComponent container)
+    {
+        container.Visibility = Visibility.Collapsed;
+        DeactivateSubtreeBindings(container);
+    }
+
+    private static void DeactivateSubtreeBindings(IUIComponent node)
+    {
+        Adamantium.UI.Core.Data.BindingEngine.DeactivateBindings(node);
+        foreach (var child in node.VisualChildren) DeactivateSubtreeBindings(child);
+    }
+
     /// <summary>
     /// Enforces the invariant "a container is visible IFF it is in the realized window". A fast scroll can leave a
     /// container attached and still visible but no longer mapped to any index by the generator; ArrangeVirtualized only
@@ -222,7 +238,7 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
             if (child.Visibility != Visibility.Visible) continue;
             if (_skeletonSet.Contains(child)) continue;   // panel-owned loading card, not a generator container
             if (generator.IndexFromContainer(child) >= 0) continue;   // in the realized window - keep
-            child.Visibility = Visibility.Collapsed;
+            ParkContainer(child);
             generator.ReclaimDetached(child);
         }
     }

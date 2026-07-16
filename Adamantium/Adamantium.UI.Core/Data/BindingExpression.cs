@@ -114,7 +114,7 @@ public class BindingExpression : BindingExpressionBase
       if (newObserved != null)
       {
          _observed = newObserved;
-         newObserved.PropertyChanged += OnSourcePropertyChanged;
+         SharedSourceRegistry.Subscribe(newObserved, this);   // one shared subscription per source, O(1) add (see SharedSourceRegistry)
       }
       if (Mode == BindingMode.TwoWay && !IsProducer && Target != null)
          Target.PropertyChanged += OnTargetPropertyChanged;
@@ -125,7 +125,7 @@ public class BindingExpression : BindingExpressionBase
       BindingUpdateQueue.Remove(this);   // F2: a closed binding must not be applied by a later flush
       if (_observed != null)
       {
-         _observed.PropertyChanged -= OnSourcePropertyChanged;
+         SharedSourceRegistry.Unsubscribe(_observed, this);   // O(1) remove - the reason a shrunk window can release cheaply
          _observed = null;
       }
       if (Mode == BindingMode.TwoWay && !IsProducer && Target != null)
@@ -161,7 +161,8 @@ public class BindingExpression : BindingExpressionBase
       (_sourceProperty, _sourceGetter) = GetAccessor(current.GetType(), SourcePropertyName);
    }
 
-   private void OnSourcePropertyChanged(object sender, PropertyChangedEventArgs e)
+   // Called by SharedSourceRegistry (the source's single fan-out handler), not subscribed directly.
+   internal void OnSourcePropertyChanged(object sender, PropertyChangedEventArgs e)
    {
       // F2: a runtime source change is batched + coalesced (applied once per frame), not pushed synchronously.
       if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == SourcePropertyName)

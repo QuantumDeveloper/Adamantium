@@ -193,8 +193,10 @@ public class ItemContainerGenerator
             onBound?.Invoke(container);
         }
 
-        // 3. Donors not reused (the window shrank) - park them for when it grows again, and report them so the panel
-        //    hides ONLY these. During steady scroll donors == orphans, so this is empty and nothing is ever collapsed.
+        // 3. Donors not reused (the window shrank) - park them for when it grows again, and report them so the panel hides
+        //    (and deactivates the bindings of) ONLY these. During steady scroll donors == orphans, so this is empty and
+        //    nothing is ever parked. A parked container stays attached + pooled for cheap reuse; the panel's ParkContainer
+        //    deactivates its bindings so it also leaves any shared source's fan-out (no storm on a shared-property change).
         if (next >= donors.Count) return System.Array.Empty<IUIComponent>();
         _surplusBuf.Clear();   // reused; the caller iterates it synchronously before the next SetWindow
         for (; next < donors.Count; next++)
