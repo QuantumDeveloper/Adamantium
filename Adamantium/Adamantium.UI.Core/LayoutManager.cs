@@ -33,17 +33,13 @@ public sealed class LayoutManager
     // outer drain loop bails after this many iterations rather than spinning forever.
     private const int MaxPassIterations = 100;
 
-    // F1 layout time-budgeting: max wall-time one ExecuteLayoutPass may spend before deferring the rest to the next frame.
-    // Deferred subtrees keep their last Bounds and render in place until they catch up - and THAT is the problem: an element
-    // whose arrange was pushed to the next pass sits at its PREVIOUS rect while its neighbours have already moved to the new
-    // one, which on a grid of tiles is a frame containing tiles of two different sizes (gaps where the cell grew, overlaps
-    // where it shrank). A budget that buys milliseconds by publishing a torn frame is not a budget, it is a bug.
-    //
-    // NULL (disabled) while this is under investigation: a layout pass now always finishes in one go, so what is drawn is
-    // always internally consistent. What the budget was protecting against - a pathological pass hanging the loop - is now
-    // covered elsewhere: the compositor presents at its own pace (a slow Update no longer freezes the picture) and the
-    // panel's own intake budget bounds how much new content one pass admits.
-    public static TimeSpan? FrameBudget = null;
+    // No per-frame TIME budget: a layout pass always drains FULLY, so what is drawn is always internally consistent. An
+    // earlier time-budget that cut a pass mid-way and re-queued the tail published TORN frames (a grid with tiles of two
+    // sizes - a deferred arrange sat at its previous rect while neighbours had moved) - "a budget that buys milliseconds by
+    // publishing a torn frame is a bug", so it was ripped out. Two things now cover what it was for: the compositor presents
+    // at its own pace (a slow Update no longer freezes the picture), and heavy INTAKE is bounded AT THE SOURCE - a
+    // virtualizing panel realizes only the viewport + margin and slices a big realize over frames via
+    // InvalidateMeasureNextPass. A real intake-time budget is future work - see docs/TECH_DEBT.md.
 
     private readonly IUIComponent _root;
     private readonly DirtyQueue _toStyle = new();
@@ -55,11 +51,8 @@ public sealed class LayoutManager
     // spreading). Promoted into the real measure queue at the start of each pass.
     private readonly HashSet<IUIComponent> _toMeasureNextPass = new();
     private readonly List<IUIComponent> _passBuffer = new();   // reused snapshot buffer for one phase's drain
-    private readonly List<IUIComponent> _offscreenBuffer = new();   // scratch for the visible-first partition
     private readonly List<IUIComponent> _promoteBuffer = new();   // reused scratch for promoting next-pass deferrals
-    private readonly System.Diagnostics.Stopwatch _passStopwatch = new();   // reused per pass (no per-frame allocation)
-    private int _deferredStreak;   // consecutive budget-capped passes that didn't fully drain (anti-starvation)
-    private const int MaxDeferredPasses = 4;   // after this many, drop the budget for one pass to clear the backlog
+    private readonly System.Diagnostics.Stopwatch _passStopwatch = new();   // reused per pass (no per-frame allocation, RuntimeStats)
 
     public LayoutManager(IUIComponent root)
     {
@@ -149,8 +142,9 @@ public sealed class LayoutManager
     /// virtualizing panel that realized only a slice of a large window this frame and wants to continue next frame (so a
     /// big realize burst is spread over frames instead of hanging one). Safe to call mid-pass: it does not touch this
     /// pass's queues.</summary>
-    // A budget-deferred continuation (a virtualizing panel realizing its window in slices). Nothing will EVENT the loop back -
-    // the work is already known - so it must signal, or the fill stalls until the safety timeout.
+    // The panel slices its own realize across frames (bounding INTAKE at the source - the surviving replacement for the
+    // removed frame budget). Nothing will EVENT the loop back - the work is already known - so it must signal here, or the
+    // fill stalls until the safety timeout.
     public void InvalidateMeasureNextPass(IUIComponent node)
     {
         _toMeasureNextPass.Add(node);
@@ -214,21 +208,11 @@ public sealed class LayoutManager
             else if (!rootMeasurable.IsArrangeValid) _toArrange.Enqueue(_root);
         }
 
-        // F1: optional per-frame time budget. Null = unlimited (drain everything - the default, behaviour-neutral). When
-        // set, the pass processes dirty nodes until the budget is spent, then defers the rest to the next frame - a
-        // deferred subtree keeps its last Bounds and renders in place (graceful lag, not a hole).
-        // Anti-starvation: if the queues have stayed un-drained for too many budget-capped passes, drop the budget for
-        // THIS pass and drain fully - one slower frame clears the backlog instead of it growing forever.
-        var budget = FrameBudget;
-        if (budget.HasValue && _deferredStreak >= MaxDeferredPasses) budget = null;
-        _passStopwatch.Restart();   // always time the pass (used for the budget when set, and for RuntimeStats either way)
-        // Visible-first prioritisation only matters when the budget can actually defer work; skip its cost otherwise.
-        var viewport = budget.HasValue ? Viewport : null;
+        _passStopwatch.Restart();   // time the pass for RuntimeStats
 
         var didWork = false;
         var iterations = 0;
-        var withinBudget = true;
-        while (withinBudget && (!_toStyle.IsEmpty || !_toMeasure.IsEmpty || !_toArrange.IsEmpty))
+        while (!_toStyle.IsEmpty || !_toMeasure.IsEmpty || !_toArrange.IsEmpty)
         {
             if (++iterations > MaxPassIterations)
             {
@@ -237,24 +221,16 @@ public sealed class LayoutManager
             }
             didWork = true;
 
-            // Drain each queue as a SNAPSHOT (process only what's queued now), ordered style -> measure -> arrange. Work
-            // re-dirtied DURING a phase lands back in the queues and is handled on the NEXT iteration - keeping the
-            // phases ordered and letting re-entrant invalidation converge.
-            var styleOk = DrainPhase(_toStyle, ApplyTheme, budget, viewport);
-            var measureOk = styleOk && DrainPhase(_toMeasure, MeasureDirty, budget, viewport);
-            // The ARRANGE phase must RUN even when style/measure exhausted the budget - short-circuiting it here tore the
-            // frame: a virtualizing panel's measure REBINDS containers to new window slots, so until its arrange runs the
-            // rebound tiles still sit at their PREVIOUS Bounds (drawn scattered over/between the new rows) and the newly
-            // deferred slots have no skeletons (ReconcileSkeletons lives in arrange) - the fast-scroll "holes with nothing
-            // in them" + the resize overlap, self-healing a frame later when arrange finally ran. DrainPhase's own
-            // on-screen protection still applies (its visible prefix always completes; only the off-screen tail defers) and
-            // ArrangeDirty re-queues any node whose measure was itself deferred, so this can't pull deferred measure work in.
-            var arrangeOk = DrainPhase(_toArrange, ArrangeDirty, budget, viewport);
-            withinBudget = measureOk && arrangeOk;
+            // Drain each queue FULLY as a SNAPSHOT (process only what's queued now), ordered style -> measure -> arrange.
+            // Work re-dirtied DURING a phase lands back in the queues and is handled on the NEXT iteration - keeping the
+            // phases ordered and letting re-entrant invalidation converge. No time budget: the whole pass finishes in one
+            // go, so what is drawn is always internally consistent (see the FrameBudget note above).
+            DrainPhase(_toStyle, ApplyTheme);
+            DrainPhase(_toMeasure, MeasureDirty);
+            DrainPhase(_toArrange, ArrangeDirty);
         }
 
         var settled = _toStyle.IsEmpty && _toMeasure.IsEmpty && _toArrange.IsEmpty;
-        _deferredStreak = settled ? 0 : _deferredStreak + 1;
 
         // A pass that found NOTHING to do (queues empty at start, nothing promoted) is the "swap has settled" signal for
         // RenderDirty.ForceStructuralUntilSettled (theme/DPI): every settle write flows through this pass (binding flush,
@@ -279,70 +255,13 @@ public sealed class LayoutManager
         UIAppContext.Current?.ResourceManager?.FlushResourceChanges();
     }
 
-    // Drains one queue as a snapshot, ancestors-first. Returns true if it emptied the snapshot, false if it stopped on
-    // the frame budget (re-queuing the unprocessed tail for the next frame). Always processes at least one node, so a
-    // tiny/zero budget still makes forward progress. Under a budget, on-screen nodes are processed first so it's the
-    // off-screen work that gets deferred.
-    private bool DrainPhase(DirtyQueue queue, Action<IUIComponent> process, TimeSpan? budget, Rect? viewport)
+    // Drains one queue FULLY as a snapshot (process only what is queued NOW, so work re-dirtied during the phase is handled
+    // on the next pass iteration, not this drain), ancestors-first.
+    private void DrainPhase(DirtyQueue queue, Action<IUIComponent> process)
     {
         queue.DrainInto(_passBuffer);
-        var count = _passBuffer.Count;
-
-        // On-screen work is NEVER budget-deferred - only OFF-screen work (which isn't drawn this frame) may spill to the
-        // next frame. Deferring an on-screen node renders it BEFORE it is laid out: a freshly-realized container piles at
-        // the origin (the resize "garble"), and a cohesive control tears (a slider's thumb, positioned by this arrange,
-        // lags its fill which was set immediately on the value change). So partition the buffer visible-first and let the
-        // budget cut in only PAST the on-screen prefix. With no budget or no viewport, everything is protected (drain
-        // fully) - the safe default (a frame with no known client area can't tell what's visible, so it never defers).
-        var protectedCount = count;
-        if (budget.HasValue && viewport.HasValue && count > 1)
-            protectedCount = PrioritizeVisibleFirst(_passBuffer, viewport.Value);
-
-        for (var i = 0; i < count; i++)
-        {
+        for (var i = 0; i < _passBuffer.Count; i++)
             process(_passBuffer[i]);
-            if (budget.HasValue && i + 1 >= protectedCount && i + 1 < count && _passStopwatch.Elapsed >= budget.Value)
-            {
-                for (var j = i + 1; j < count; j++) queue.Enqueue(_passBuffer[j]);
-                return false;
-            }
-        }
-        return true;
-    }
-
-    // The root's on-screen area (world coords), or null if the root has no client size (e.g. an unsized test root).
-    private Rect? Viewport => _root is IRootVisualComponent r && r.ClientWidth > 0 && r.ClientHeight > 0
-        ? new Rect(0, 0, r.ClientWidth, r.ClientHeight)
-        : null;
-
-    // Stable-partition the buffer so on-screen nodes come first (each group keeps its ancestors-first depth order), so
-    // under the budget the visible work is done first and the off-screen work is what gets deferred. Returns the number
-    // of on-screen nodes now at the front - the "protected" prefix the budget must not defer.
-    private int PrioritizeVisibleFirst(List<IUIComponent> buffer, Rect viewport)
-    {
-        _offscreenBuffer.Clear();
-        var write = 0;
-        for (var read = 0; read < buffer.Count; read++)
-        {
-            if (IsOnScreen(buffer[read], viewport)) buffer[write++] = buffer[read];
-            else _offscreenBuffer.Add(buffer[read]);
-        }
-        var visibleCount = write;
-        for (var k = 0; k < _offscreenBuffer.Count; k++) buffer[write++] = _offscreenBuffer[k];
-        return visibleCount;
-    }
-
-    private static bool IsOnScreen(IUIComponent node, Rect viewport)
-    {
-        var b = node.Bounds;
-        if (b.Width <= 0 || b.Height <= 0) return true;   // unsized / brand-new -> don't deprioritise it
-        // WorldTransform ALREADY carries this node's own offset (LocalTransform = Translation(Bounds.Location)), so map a
-        // LOCAL-origin rect - using Bounds (whose Location is that same offset) double-counts it and pushes on-screen
-        // nodes off-screen, so the budget wrongly deferred VISIBLE work (a cause of the resize garble). Mirrors the render
-        // path, which transforms new Rect(0,0,RenderSize) by the world matrix.
-        var w = new Rect(0, 0, b.Width, b.Height).TransformToAABB(node.WorldTransform);
-        return w.X < viewport.X + viewport.Width && w.X + w.Width > viewport.X
-            && w.Y < viewport.Y + viewport.Height && w.Y + w.Height > viewport.Y;
     }
 
     private static void ApplyTheme(IUIComponent node)

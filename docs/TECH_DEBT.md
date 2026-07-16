@@ -1,0 +1,46 @@
+# Технический долг Adamantium.UI — что недоделано
+
+_Собрано 2026-07-16, сверено с кодом. Сюда — только проверенное-открытое или явно нестартовавшее. Прежде чем брать — всё равно сверь с кодом (заметки протухают)._
+
+Приоритеты: **P1** мешает уже сейчас · **P2** нужно для качества/перфа · **P3** будущее/дизайн.
+
+---
+
+## Opacity (после захода 2026-07-16)
+
+Сделано и запушено (`95fb2c5`): `Opacity` + новый `SelfOpacity` вынесены в снапшот, компонуются на бейке, оба `AffectsPaint` (перекрас, не ре-рекорд). Осталось:
+
+- **[P2] Вариант B — GPU per-node opacity-таблица.** Смена/анимация element-`Opacity` = перекрас слотов O(поддерева)/кадр. B = per-node альфа в BDA-буфере (зеркало `TransformTable`), шейдер множит альфу live → O(1). Правка 4 шейдеров (`BatchEffect.fx`, `FontEffect.fx`, `StrokeEffect.fx`, `FillFringeEffect.fx`) + регенерация бинарей (флейк-прон). Окупается на фейде **больших** поддеревьев. `OPACITY_MODEL_PLAN.md` §6.
+- **[P2] Композитор-канал для element-opacity.** Анимированная element-opacity тикает на loop (через дешёвый перекрас), не на рендер-потоке. `Compositor.TryTakeOver` для Paint ждёт Brush-таргет. Полный off-loop = B + канал.
+- **[P2] `LayerOpacity` / offscreen-слой.** Не сделан. Групповая `Opacity` **двоит альфу на пересечениях** детей (нет настоящего слоя). Тянет общую offscreen-инфраструктуру (та же, что для transparency в analytic AA). `OPACITY_MODEL_PLAN.md` §3.
+- **[P3] `OpacityMask`** (WPF-аналог) — вне скоупа.
+
+## Рендер / GPU
+
+- **[P3] Швы у ПОЛУПРОЗРАЧНОЙ геометрии (общий offscreen/coverage-пасс).** Заливки И штрихи сами по себе сделаны+в проде (analytic-AA fill-fringe; GPU-compute stroke). Открыто одно: при `Opacity<1` overlap двоит альфу → тёмные швы — у самопересечений заливок (analytic-AA 1c: звезда/пентаграмма) и на джойнах/самопересечениях штрихов. Fix — единый coverage/stencil (или offscreen-слой): пометить покрытие один раз → один блендед-филл; та же инфраструктура, что `LayerOpacity`. Непрозрачные — корректны. `ANALYTIC_AA_PLAN.md` §8, `line-rendering-nextgen-analysis`.
+- **[P2] Параллельный БЕЙК.** Параллельный **arrange сделан** (`WrapPanel.cs:484`, `StackPanel.cs:210`, `VirtualizingPanel.cs:313`); параллельного **bake** (запись юнитов/слотов в `RenderCache`) ещё нет. Ради 4K-лага; крукс = потокобезопасность бейка.
+
+## Раскладка
+
+- **[P3] Реальный intake-бюджет раскладки (дизайн).** Старый тайм-бюджет **вырезан 2026-07-16** (он рвал кадр: резал measure/arrange по времени и коммитил частичное состояние в живое дерево → тайлы двух размеров). Нужен настоящий: резать по **входящим** элементам (при добавлении в дерево), а не по measure/arrange. Открытый вопрос: в момент добавления стоимость add+measure+arrange **неизвестна** → count-cap неточен. Как в индустрии: (1) главное — **виртуализация** (реализуй только вьюпорт+margin, рецикл → интейк bounded размером экрана; **у нас уже есть** VirtualizingPanel + `InvalidateMeasureNextPass` slice-realize); (2) для не-виртуализируемых всплесков — time-slice по **замеренному** времени на границах юнитов + **staging-дерево** для атомарного коммита (React Fiber / Flutter — частичное состояние НЕ публикуется), которого у нас нет. `frame-budget-only-covers-binds`, `LayoutManager.cs` (FrameBudget note).
+
+## Анимация / композитор
+
+- **[P2] `DoubleAnimation` (`RunningAnimation`) не композитится** — только keyframe `Animation`. Такое же лечение (pure curve + канал). `compositor-animations-initiative`.
+- **[P3] Gradient-stop sweeps (shimmer) не композитятся** — таргет `GradientStop`, не `Brush`. Остаётся на loop (один элемент, дёшево).
+- **[P3] `Compositor.RefreshBases()`** — раз в кадр на энтри (lock + property read). Ок сейчас; пересмотреть, если композитных анимаций станет много.
+
+## Смена темы
+
+- **[P2] Scrollbar рендерится тонким/неверным после смены темы** до наведения. Пользователь отложил ранее. `scrollbar-theme-swap-bug`.
+
+## MVVM
+
+- **[P3] `ICommand.CanExecuteChanged`** — главный пробел MVVM-фреймворка (по заметке; **сверить** — мог быть закрыт). `mvvm-framework-design`.
+
+## Дизайн / будущее (не стартовало)
+
+- **[P3] Acrylic/Mica backdrop blur** — фростед-стекло за панелями/оверлеями; нужен GPU backdrop-blur-пасс. Пока оверлей = плоский scrim.
+- **[P3] Pointer / multi-touch** — абстракция Pointer над mouse-only вводом.
+- **[P3] Adamantium.Fonts** — пробелы стека: BiDi / line-break / fallback / hinting.
+- **[P3] Vision** — Unity/Unreal-уровень IDE + UI внутри 3D. `engine-vision-positioning`.
