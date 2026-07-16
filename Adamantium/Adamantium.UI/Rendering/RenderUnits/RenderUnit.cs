@@ -338,13 +338,11 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
         // thickness / colour / trim animation) on the existing GPU stroke, rebuilding only if the buffer sizes change.
         if (rebuild)
         {
-            if (!TryUpdateStroke(inputPayload.Pen, inputPayload.Geometry))
-                ProcessStrokeData(inputPayload.Pen, inputPayload.Geometry);
+            if (!TryUpdateStroke(inputPayload.Pen, inputPayload.Geometry)) ProcessStrokeData(inputPayload.Pen, inputPayload.Geometry);
         }
-        else if (!Equals(oldPen, inputPayload.Pen) &&
-                 !(StrokeRenderer is GpuStrokeRenderComponent gs && gs.TryRepoint(inputPayload.Pen)))
+        else if (!Equals(oldPen, inputPayload.Pen))
         {
-            ProcessStrokeData(inputPayload.Pen, inputPayload.Geometry);
+            if (StrokeRenderer is not GpuStrokeRenderComponent gs || !gs.TryRepoint(inputPayload.Pen)) ProcessStrokeData(inputPayload.Pen, inputPayload.Geometry);
         }
     }
 }
