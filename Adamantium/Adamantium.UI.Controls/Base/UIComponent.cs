@@ -100,16 +100,48 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
     public static readonly AdamantiumProperty OpacityProperty = AdamantiumProperty.Register(nameof(Opacity),
         typeof(Double), typeof(UIComponent),
-        new PropertyMetadata(1.0, PropertyMetadataOptions.BindsTwoWayByDefault, OnOpacityChanged));
+        new PropertyMetadata(1.0, PropertyMetadataOptions.AffectsPaint | PropertyMetadataOptions.BindsTwoWayByDefault, OnOpacityChanged));
 
-    // Opacity composites DOWN the visual tree (a descendant's effective opacity includes every ancestor's - see
-    // DrawingContext.GetEffectiveOpacity), so a change must re-render this element AND its whole subtree: the children's
-    // render units bake the effective opacity at record time and would otherwise keep the stale value (the plain
-    // AffectsRender flag only invalidates self, which is why fading a container left its grandchildren - e.g. a
-    // scrollbar's thumb - frozen at their old opacity).
+    // Opacity composites DOWN the visual tree (a descendant's effective opacity includes every ancestor's), so a change
+    // re-bakes this element AND its whole subtree. AffectsPaint (not AffectsRender): the shapes, draw commands and units are
+    // unchanged - only the alpha the slots bake with moved - so it is an O(dirty-slots) RE-BAKE, not a re-record. The
+    // effective value is composed from the frozen snapshot chain at bake time (RenderCache.EffectiveOpacity), which is what
+    // lets a paint-only change re-bake without re-recording.
     private static void OnOpacityChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
     {
-        (d as UIComponent)?.InvalidateRender(true);
+        if (d is not UIComponent component) return;
+        // Field mirror, read in the hot bake/snapshot-capture path instead of GetValue (a lock + a box - see
+        // hot-paths-must-not-use-property-system). Resolved value, NOT e.NewValue: a trigger-exit writes UnsetValue.
+        component._opacity = component.GetValue<Double>(OpacityProperty);
+        component.InvalidatePaintTree();
+    }
+
+    public static readonly AdamantiumProperty SelfOpacityProperty = AdamantiumProperty.Register(nameof(SelfOpacity),
+        typeof(Double), typeof(UIComponent),
+        new PropertyMetadata(1.0, PropertyMetadataOptions.AffectsPaint | PropertyMetadataOptions.BindsTwoWayByDefault, OnSelfOpacityChanged));
+
+    // SelfOpacity fades ONLY this element's own draws, NOT its subtree (unlike Opacity). So a change re-bakes just this
+    // element (AffectsPaint already marked it) - descendants' baked alpha never included it. Only the field mirror to keep.
+    private static void OnSelfOpacityChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is UIComponent component)
+            component._selfOpacity = component.GetValue<Double>(SelfOpacityProperty);
+    }
+
+    private double _opacity = 1.0;       // hot-path mirror of Opacity (see OnOpacityChanged)
+    private double _selfOpacity = 1.0;   // hot-path mirror of SelfOpacity
+
+    // Paint-invalidate this element and its whole subtree: Opacity composites down, so every descendant's baked alpha is
+    // stale. Mirrors InvalidateRender(true) but on the PAINT path - no IsGeometryValid touch, so nothing re-records.
+    private void InvalidatePaintTree()
+    {
+        InvalidatePaint();
+        if (VisualChildrenCollection == null) return;   // callback can fire during the base ctor, before the collection
+        foreach (var child in VisualChildrenCollection)
+        {
+            if (child is UIComponent uc) uc.InvalidatePaintTree();
+            else child.InvalidatePaint();
+        }
     }
 
     // Font family is INHERITED (like DataContext): set it on any element (a window, a panel) and every descendant's text
@@ -191,8 +223,17 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
     public Double Opacity
     {
-        get => GetValue<Double>(OpacityProperty);
+        get => _opacity;   // field mirror (hot path: composed per drawn component); the setter still goes through the store
         set => SetValue(OpacityProperty, value);
+    }
+
+    /// <summary>Opacity applied to THIS element's own rendering only - it is NOT composited onto descendants the way
+    /// <see cref="Opacity"/> is. Fades a control's own chrome (its background/border/fill) while its content stays put.
+    /// Multiplies with <see cref="Opacity"/> for this element's draws. 1.0 = opaque.</summary>
+    public Double SelfOpacity
+    {
+        get => _selfOpacity;
+        set => SetValue(SelfOpacityProperty, value);
     }
 
     public bool IsEnabled

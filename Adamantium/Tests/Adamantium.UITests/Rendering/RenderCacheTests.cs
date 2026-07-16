@@ -532,6 +532,69 @@ public class RenderCacheTests
         });
     }
 
+    // Element Opacity is AffectsPaint, not AffectsRender: it moved INTO the frozen snapshot, so a change re-bakes the same
+    // commands with a new alpha (a partial paint frame) instead of re-recording the element. Same trick as a brush recolour
+    // above, but the alpha is composed from the snapshot chain at bake time (RenderCache.EffectiveOpacity).
+    [Test]
+    public void ElementOpacity_RepaintsWithoutReRecording()
+    {
+        var a = AddControl(); DrawsRectangle(a);
+        RenderFrame();
+
+        var units = _factory.Created.Count;
+        Assert.That(units, Is.GreaterThan(0), "the control drew something to begin with");
+        foreach (var u in _factory.Created) Assume.That(u.UpdateWithCommandCount, Is.EqualTo(0));
+
+        a.Opacity = 0.5;   // AffectsPaint - a repaint, not a re-record
+        RenderFrame();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Partial),
+                "an opacity change is a paint (partial) frame - the paint order is untouched");
+            Assert.That(_factory.Created.Count, Is.EqualTo(units), "a repaint must not build a single new unit");
+            Assert.That(_factory.Created.Sum(u => u.UpdateWithCommandCount), Is.Zero,
+                "...and must not re-record the element: no draw commands were asked for again");
+        });
+    }
+
+    // Opacity composites DOWN the tree (WPF semantics): a parent's Opacity multiplies onto every descendant's baked alpha.
+    // The bake composes it from the frozen snapshot chain, so the child's unit ends up at the parent's 0.5.
+    [Test]
+    public void Opacity_CompositesDownOntoDescendants()
+    {
+        var parent = AddControl();
+        parent.Opacity = 0.5;
+        var child = new TestControl();
+        parent.Add(child);
+        DrawsRectangle(child);
+
+        RenderFrame();
+        _cache.Render();   // headless: runs the per-unit bake that composes the effective alpha
+
+        var childUnit = _factory.Created.First(u => ReferenceEquals(u.Component, child));
+        Assert.That(childUnit.EffectiveOpacity, Is.EqualTo(0.5f).Within(0.001f),
+            "the parent's Opacity must composite down onto the child's baked alpha");
+    }
+
+    // SelfOpacity fades ONLY the element's own draws - it must NOT reach descendants (that is the whole difference from Opacity).
+    [Test]
+    public void SelfOpacity_DoesNotCompositeOntoDescendants()
+    {
+        var parent = AddControl();
+        parent.SelfOpacity = 0.5;
+        var child = new TestControl();
+        parent.Add(child);
+        DrawsRectangle(child);
+
+        RenderFrame();
+        _cache.Render();
+
+        var childUnit = _factory.Created.First(u => ReferenceEquals(u.Component, child));
+        Assert.That(childUnit.EffectiveOpacity, Is.EqualTo(1f).Within(0.001f),
+            "SelfOpacity must NOT reach descendants - only the element's own draws fade");
+    }
+
     // Clearing a component's children must DETACH them, not merely forget them. A child left pointing at its old parent while
     // absent from that parent's children is unreachable by any downward walk - yet it still reports itself attached and visible,
     // so it stays dirty forever: the splice refuses every frame (it cannot place what it cannot find) and the fallback full walk

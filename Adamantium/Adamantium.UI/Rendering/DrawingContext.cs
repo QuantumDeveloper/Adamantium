@@ -156,9 +156,11 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
    // Opacity composites DOWN the visual tree (WPF semantics): a control's effective opacity is its own Opacity times
    // every ancestor's. Without this a COMPOSITE control ignores its own Opacity - e.g. a Button draws nothing itself,
    // its pixels come from its template's Border child (Opacity 1), so Button.Opacity never reached those draw commands.
+   // SelfOpacity is the NON-composited counterpart: it fades only THIS element's own draws, so it is folded in here but
+   // the ancestor walk multiplies each parent's Opacity ONLY, never their SelfOpacity - so it never reaches descendants.
    private float GetEffectiveOpacity()
    {
-      var opacity = _currentComponent.Opacity;
+      var opacity = _currentComponent.Opacity * _currentComponent.SelfOpacity;
       for (var parent = _currentComponent.VisualParent; parent != null; parent = parent.VisualParent)
          opacity *= parent.Opacity;
       return (float)opacity;

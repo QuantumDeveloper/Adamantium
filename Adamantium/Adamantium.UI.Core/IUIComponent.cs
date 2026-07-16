@@ -12,6 +12,7 @@ public interface IUIComponent : IFundamentalUIComponent
     Guid RenderId { get; }
     Boolean ClipToBounds { get; set; }
     Double Opacity { get; set; }
+    Double SelfOpacity { get; set; }
     bool IsEnabled { get; set; }
     Boolean AllowDrop { get; set; }
     Boolean IsHitTestVisible { get; set; }
