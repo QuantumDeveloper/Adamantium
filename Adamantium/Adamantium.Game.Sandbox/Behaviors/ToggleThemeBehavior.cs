@@ -3,7 +3,7 @@ using Adamantium.UI.Core;
 using Adamantium.UI.Core.Behaviors;
 using Adamantium.UI.Core.RoutedEvents;
 
-namespace Adamantium.Game.Sandbox;
+namespace Adamantium.Game.Sandbox.Behaviors;
 
 /// <summary>
 /// View-layer behavior: on click, toggles the application theme between FluentDark and FluentLight via the ThemeManager.

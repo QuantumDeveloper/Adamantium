@@ -2,6 +2,7 @@ using Adamantium.Graphics.Core;
 using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media.Imaging;
 using Adamantium.UI.Core.RoutedEvents;
 
@@ -35,6 +36,48 @@ public class RenderTargetPanel : Grid
    /// <summary>The descriptor of the currently bound source, or <c>null</c> when nothing is bound.</summary>
    public SharedSurfaceDescriptor Source { get; private set; }
 
+   public static readonly AdamantiumProperty MouseLookModeProperty = AdamantiumProperty.Register(nameof(MouseLookMode),
+      typeof(MouseLookMode), typeof(RenderTargetPanel), new PropertyMetadata(MouseLookMode.None));
+
+   /// <summary>How the panel feeds the hosted game a relative mouse delta for mouse-look (see <see cref="MouseLookMode"/>).
+   /// Default <see cref="MouseLookMode.None"/> - the cursor stays a normal pointer.</summary>
+   public MouseLookMode MouseLookMode
+   {
+      get => GetValue<MouseLookMode>(MouseLookModeProperty);
+      set => SetValue(MouseLookModeProperty, value);
+   }
+
+   public static readonly AdamantiumProperty IsMouseLookEnabledProperty = AdamantiumProperty.Register(
+      nameof(IsMouseLookEnabled), typeof(bool), typeof(RenderTargetPanel),
+      new PropertyMetadata(true, OnIsMouseLookEnabledChanged));
+
+   /// <summary>Gates mouse-look ON/OFF without changing the <see cref="MouseLookMode"/>. Bind it to app state (e.g. an
+   /// open in-game menu) so a click on the panel does NOT hide the cursor while the menu is up; setting it false while
+   /// looking immediately restores the cursor. Default <c>true</c>.</summary>
+   public bool IsMouseLookEnabled
+   {
+      get => GetValue<bool>(IsMouseLookEnabledProperty);
+      set => SetValue(IsMouseLookEnabledProperty, value);
+   }
+
+   private static void OnIsMouseLookEnabledChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+   {
+      var panel = (RenderTargetPanel)a;
+      if (!panel.IsMouseLookEnabled) panel.Disengage();   // disabled mid-look (a menu opened) -> give the cursor back
+   }
+
+   private bool _looking;    // relative mode currently engaged by THIS panel
+   private bool _leftDown;   // Drag mode: left button held on the panel
+   private bool _rightDown;  // Drag mode: right button held on the panel
+   private Vector2 _engagePoint;   // panel-relative cursor position at engage; restored (as screen) on release
+
+   public RenderTargetPanel()
+   {
+      // Esc is the always-available escape hatch out of mouse-look (frees the hidden cursor), the safety net for
+      // Continuous mode and any missed button-up.
+      KeyDown += (_, e) => { if (e.Key == Key.Escape) Disengage(); };
+   }
+
    /// <summary>
    /// Binds an externally produced surface and triggers a redraw. Any previously bound surface is released first.
    /// Pass <c>null</c> to unbind (equivalent to <see cref="ClearSource"/>).
@@ -49,7 +92,7 @@ public class RenderTargetPanel : Grid
          Source = descriptor;
          _image = new SharedSurfaceImage(descriptor);
       }
-      InvalidateRender(false);
+      InvalidateAfterSourceChange();
    }
 
    /// <summary>Unbinds the current source, if any (deferred release — see <see cref="RetireCurrentSource"/>).</summary>
@@ -57,7 +100,24 @@ public class RenderTargetPanel : Grid
    {
       if (Source == null) return;
       RetireCurrentSource();
-      InvalidateRender(false);
+      InvalidateAfterSourceChange();
+   }
+
+   /// <summary>
+   /// Marks the panel for re-record after a source swap, DEFERRED to the START of the next loop frame. The producer (the
+   /// game loop) binds the surface during the loop's DRAW phase - AFTER this frame's UI record - so an INLINE
+   /// <see cref="UIComponent.InvalidateRender"/> marks geometry too late: the frame's <c>RenderDirty.Clear</c> wipes the
+   /// mark before any record snapshots it, and the surface is bound ONCE (no per-frame retry), so the panel would stay on
+   /// its placeholder and never draw the game. Neither dispatcher facade fits: <c>Dispatcher.Post</c> runs INLINE when
+   /// already on the loop thread (same bad timing), and <c>Dispatcher.Invoke</c> runs on the message-pump thread, which
+   /// races the loop's record→clear and loses the mark. <see cref="LoopSignal.Post"/> ALWAYS queues onto the loop thread's
+   /// pre-record drain (<c>DrainPending</c>, start of Update), so the mark is set before that frame's record and cannot be
+   /// cleared first.
+   /// </summary>
+   private void InvalidateAfterSourceChange()
+   {
+      if (UIAppContext.Current != null) LoopSignal.Post(() => InvalidateRender(false));
+      else InvalidateRender(false);
    }
 
    /// <summary>
@@ -112,7 +172,89 @@ public class RenderTargetPanel : Grid
 
    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
    {
+      Disengage();   // a tab switch / tree teardown while looking must restore the cursor
       ReleaseSource();
       base.OnDetachedFromVisualTree(e);
+   }
+
+   // --- Mouse-look: engage relative mouse mode per MouseLookMode ---------------------------------------------------
+   // Engage = focus + capture the mouse + ask the window (its platform worker) to hide/centre the cursor and start
+   // feeding synthesized RawMouseMove deltas. Disengage restores everything. Drag mode brackets it with the button
+   // hold; Continuous mode brackets it with focus (click to engage, blur to release).
+
+   private void Engage()
+   {
+      if (_looking || !IsMouseLookEnabled) return;
+      _looking = true;
+      // Remember where the cursor sat ON THIS PANEL (panel-relative), so it reappears there on release instead of at the
+      // re-centre point. The panel owns this position; the worker just warps to the screen point we hand back. Computed as
+      // the EXACT inverse of PointToScreen (root-client of the screen cursor, minus the accumulated ClipRectangle offsets)
+      // so PointToScreen(_engagePoint) round-trips back to the same screen pixel - MouseDevice.GetPosition uses a different
+      // base (Bounds), so its error would accumulate a drift across engage/release cycles.
+      _engagePoint = ScreenToPanel(MouseDevice.CurrentDevice.GetScreenPosition());
+      Focus();
+      CaptureMouse();
+      (RootVisual as WindowBase)?.SetRelativeMouseMode(true, default);
+   }
+
+   private void Disengage()
+   {
+      if (!_looking) return;
+      _looking = false;
+      (RootVisual as WindowBase)?.SetRelativeMouseMode(false, this.PointToScreen(_engagePoint));
+      ReleaseMouseCapture();
+   }
+
+   // Exact inverse of this.PointToScreen (screen -> panel-relative): the screen point in root-client coords minus the
+   // ClipRectangle offsets PointToScreen accumulates, so the two compose to identity (no per-cycle drift).
+   private Vector2 ScreenToPanel(Vector2 screen)
+   {
+      var rootLocal = RootVisual.PointToClient(screen);
+      var offset = default(Mathematics.Vector2);
+      for (IUIComponent c = this; c != null && c is not IRootVisualComponent; c = c.VisualParent)
+         offset += c.ClipRectangle.Location;
+      return rootLocal - offset;
+   }
+
+   protected override void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+   {
+      base.OnMouseLeftButtonDown(sender, e);
+      _leftDown = true;
+      if (MouseLookMode == MouseLookMode.Drag) Engage();
+      else if (MouseLookMode == MouseLookMode.Continuous) Focus();
+   }
+
+   protected override void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+   {
+      base.OnMouseLeftButtonUp(sender, e);
+      _leftDown = false;
+      if (MouseLookMode == MouseLookMode.Drag && !_rightDown) Disengage();
+   }
+
+   protected override void OnMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+   {
+      base.OnMouseRightButtonDown(sender, e);
+      _rightDown = true;
+      if (MouseLookMode == MouseLookMode.Drag) Engage();
+      else if (MouseLookMode == MouseLookMode.Continuous) Focus();
+   }
+
+   protected override void OnMouseRightButtonUp(object sender, MouseButtonEventArgs e)
+   {
+      base.OnMouseRightButtonUp(sender, e);
+      _rightDown = false;
+      if (MouseLookMode == MouseLookMode.Drag && !_leftDown) Disengage();
+   }
+
+   protected override void OnGotFocus(RoutedEventArgs e)
+   {
+      base.OnGotFocus(e);
+      if (MouseLookMode == MouseLookMode.Continuous) Engage();
+   }
+
+   protected override void OnLostFocus(RoutedEventArgs e)
+   {
+      base.OnLostFocus(e);
+      if (MouseLookMode == MouseLookMode.Continuous) Disengage();
    }
 }

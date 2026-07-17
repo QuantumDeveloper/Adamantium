@@ -110,6 +110,11 @@ public class MacOSWindowWorker : AdamantiumComponent, IWindowWorkerService
     {
     }
 
+    // TODO(macOS): relative mouse mode (CGAssociateMouseAndMouseCursorPosition + hide cursor) for game mouse-look.
+    public void SetRelativeMouseMode(bool enabled, Adamantium.Mathematics.Vector2 restoreScreen)
+    {
+    }
+
     // TODO(macOS): start an AppKit window drag (NSWindow performWindowDragWithEvent:) for custom-chrome caption drag.
     // No-op until the macOS input/window pipeline lands.
     public void BeginMoveDrag()

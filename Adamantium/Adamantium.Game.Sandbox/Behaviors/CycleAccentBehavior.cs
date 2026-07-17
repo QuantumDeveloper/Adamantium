@@ -4,7 +4,7 @@ using Adamantium.UI.Core.Behaviors;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.RoutedEvents;
 
-namespace Adamantium.Game.Sandbox;
+namespace Adamantium.Game.Sandbox.Behaviors;
 
 /// <summary>
 /// View-layer behavior: on click, swaps the CURRENT theme's accent SEED (<c>Theme.AccentColor</c>). The theme derives the

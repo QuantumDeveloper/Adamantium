@@ -8,7 +8,7 @@ using Adamantium.UI.Core.Behaviors;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.EntityServices;
 
-namespace Adamantium.Game.Sandbox;
+namespace Adamantium.Game.Sandbox.Behaviors;
 
 /// <summary>
 /// Declaratively (from AUML) runs <see cref="AdamantiumGame"/> into the <see cref="RenderTargetPanel"/> it is
@@ -37,7 +37,7 @@ public class GameHostBehavior : Behavior<RenderTargetPanel>
 
         // OnAttached fires while the AUML tree is being built, before the panel is in the visual tree. Defer the
         // wiring until it is attached, by which point its window and WindowRenderService exist.
-        //panel.AttachedToVisualTreeEvent += OnPanelAttachedToVisualTree;
+        panel.AttachedToVisualTreeEvent += OnPanelAttachedToVisualTree;
     }
 
     private void AttachDesignTimeGame(RenderTargetPanel panel)
@@ -92,9 +92,28 @@ public class GameHostBehavior : Behavior<RenderTargetPanel>
         game.CreateOutputFromContext(panel, renderService.GraphicsDevice);
         _gameAttached = true;
 
-        // Bridge the live game to the tab's view-model so its menu can load models at runtime (the panel inherits the
-        // GameViewModel as its DataContext from the hosting tab).
-        if (panel.DataContext is ViewModels.GameViewModel gameViewModel)
-            gameViewModel.AttachGame(game);
+        // Bridge the live game to the tab's view-model so its menu can load models at runtime. The panel's DataContext is
+        // INHERITED from the hosting tab and is usually NOT set yet at attach time (attach fires before the inherited
+        // value propagates), so bridge now if it's already the GameViewModel, else the moment it becomes one - otherwise
+        // the menu's load commands keep seeing a null game and report "not ready".
+        BridgeToViewModel(panel, game);
+    }
+
+    private static void BridgeToViewModel(RenderTargetPanel panel, AdamantiumGame game)
+    {
+        if (panel.DataContext is ViewModels.GameViewModel vm)
+        {
+            vm.AttachGame(game);
+            return;
+        }
+
+        AdamantiumPropertyChangedEventHandler handler = null;
+        handler = (_, _) =>
+        {
+            if (panel.DataContext is not ViewModels.GameViewModel ready) return;
+            ready.AttachGame(game);
+            panel.DataContextChanged -= handler;
+        };
+        panel.DataContextChanged += handler;
     }
 }
