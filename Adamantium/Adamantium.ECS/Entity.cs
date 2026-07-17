@@ -240,29 +240,12 @@ namespace Adamantium.ECS
 
         public T GetComponent<T>() where T : class, IComponent
         {
-            try
-            {
-                return componentCollection.Get<T>();
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-                throw;
-            }
+            return componentCollection.Get<T>();
         }
 
         public T[] GetComponents<T>() where T : class, IComponent
         {
-            try
-            {
-                return componentCollection.GetAll<T>();
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-                //throw;
-            }
-            return Array.Empty<T>();
+            return componentCollection.GetAll<T>();
         }
 
         public bool ContainsComponent<T>() where T : class, IComponent

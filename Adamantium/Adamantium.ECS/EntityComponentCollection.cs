@@ -20,9 +20,10 @@ namespace Adamantium.ECS
         {
             lock (SyncRoot)
             {
-                for (int i = 0; i < Count; i++)
+                var items = ItemsSpan;
+                for (int i = 0; i < items.Length; i++)
                 {
-                    if (this[i] is T component)
+                    if (items[i] is T component)
                     {
                         return component;
                     }
@@ -40,15 +41,21 @@ namespace Adamantium.ECS
         {
             lock (SyncRoot)
             {
-                List<T> components = new List<T>();
-                for (int i = 0; i < Count; i++)
+                var items = ItemsSpan;
+                int count = 0;
+                for (int i = 0; i < items.Length; i++)
                 {
-                    if (this[i] is T component)
-                    {
-                        components.Add(component);
-                    }
+                    if (items[i] is T) count++;
                 }
-                return components.ToArray();
+                if (count == 0) return Array.Empty<T>();
+
+                var result = new T[count];
+                int next = 0;
+                for (int i = 0; i < items.Length; i++)
+                {
+                    if (items[i] is T component) result[next++] = component;
+                }
+                return result;
             }
         }
 
@@ -137,23 +144,28 @@ namespace Adamantium.ECS
 
         public bool Contains<T>() where T : class, IComponent
         {
-            for (int i = 0; i < Count; i++)
+            lock (SyncRoot)
             {
-                if (this[i] is T)
+                var items = ItemsSpan;
+                for (int i = 0; i < items.Length; i++)
                 {
-                    return true;
+                    if (items[i] is T)
+                    {
+                        return true;
+                    }
                 }
+                return false;
             }
-            return false;
         }
 
         public bool Contains(Type componentType)
         {
             lock (SyncRoot)
             {
-                for (int i = 0; i < Count; i++)
+                var items = ItemsSpan;
+                for (int i = 0; i < items.Length; i++)
                 {
-                    var type = this[i].GetType();
+                    var type = items[i].GetType();
                     if (type == componentType || type.InheritsFrom(componentType))
                     {
                         return true;

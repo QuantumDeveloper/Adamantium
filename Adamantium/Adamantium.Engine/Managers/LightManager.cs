@@ -90,15 +90,17 @@ public class LightManager : GameManagerBase
         //Task.Run(() => CreateLightsVisual());
     }
 
+    // Lights change only on add/remove, not per frame, so rebuild the typed lists only when marked dirty instead of
+    // re-running three LINQ scans + three list allocations every frame.
+    private bool _lightsDirty = true;
+
     public void Update()
     {
-        DirectionalLights.Clear();
+        if (!_lightsDirty) return;
+        _lightsDirty = false;
+
         DirectionalLights = _lights.Where(x => x.Type == LightType.Directional).ToList();
-
-        SpotLights.Clear();
         SpotLights = _lights.Where(x => x.Type == LightType.Spot).ToList();
-
-        PointLights.Clear();
         PointLights = _lights.Where(x => x.Type == LightType.Point).ToList();
     }
 
@@ -172,7 +174,8 @@ public class LightManager : GameManagerBase
         {
             lights.Add(lightComponent);
         }
-            
+        _lightsDirty = true;
+
         EntityWorld.EntityManager.AddEntity(light);
     }
 
@@ -185,6 +188,7 @@ public class LightManager : GameManagerBase
             return;
 
         lights.Remove(lightComponent);
+        _lightsDirty = true;
     }
 
     public bool Contains(Entity light)

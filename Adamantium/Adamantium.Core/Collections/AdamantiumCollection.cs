@@ -349,6 +349,11 @@ namespace Adamantium.Core.Collections
         /// <filterpriority>2</filterpriority>
         public object SyncRoot => syncObject;
 
+        /// <summary>The live items as a span over [0, <see cref="Count"/>). MUST be read under a <see cref="SyncRoot"/>
+        /// lock (the backing array is replaced on grow) - it exists for the collection's own lock-holding scan helpers,
+        /// so they can walk the storage once instead of paying the per-element lock in the indexer.</summary>
+        protected System.ReadOnlySpan<T> ItemsSpan => new System.ReadOnlySpan<T>(items, 0, currentIndex);
+
         /// <summary>
         /// Gets a value indicating whether access to the <see cref="AdamantiumCollection{T}"/> is synchronized (thread safe).
         /// </summary>
