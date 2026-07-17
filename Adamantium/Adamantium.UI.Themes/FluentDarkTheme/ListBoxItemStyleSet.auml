@@ -51,8 +51,12 @@
         </Setter>
     </Style>
 
-    <!-- Triggers (its own style). Hover, then pressed, then selected last so selection wins the shared Background slot;
-         selected also flips the text to the on-accent foreground. -->
+    <!-- Triggers (its own style). Hover, then pressed, then selected. The trigger value stack is ACTIVATION-ordered (the
+         most recently activated live trigger wins the shared Background token), so a plain hover/press over an ALREADY
+         selected row would otherwise pop the accent for the gray hover/pressed fill (the row looks deselected while the
+         cursor is on it). The two MultiTriggers below re-assert a DIMMED accent for selected+hover / selected+pressed -
+         declared LAST so they land on top while both are active, and pop cleanly back to the flat accent on release
+         (Fluent's accent PointerOver/Pressed, same tokens the accent Button uses). -->
     <Style Selector="ListBoxItem">
         <PropertyTrigger Property="IsMouseOver" Value="true">
             <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
@@ -64,6 +68,20 @@
             <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundSelected}"/>
             <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundSelected}"/>
         </PropertyTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="IsSelected" Value="true"/>
+                <Condition Property="IsMouseOver" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="ItemBorder" Property="Background" Value="{ThemeResource AccentFillColorSecondary}"/>
+        </MultiTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="IsSelected" Value="true"/>
+                <Condition Property="IsPressed" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="ItemBorder" Property="Background" Value="{ThemeResource AccentFillColorTertiary}"/>
+        </MultiTrigger>
     </Style>
 
 </StyleSet>
