@@ -18,6 +18,7 @@
         <ProjectReference Include="..\Adamantium.Fonts\Adamantium.Fonts.csproj"/>
         <ProjectReference Include="..\Adamantium.MacOS\Adamantium.MacOS.csproj"/>
         <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
+        <ProjectReference Include="..\Adamantium.Navigation\Adamantium.Navigation.csproj" />
         <ProjectReference Include="..\Adamantium.UI.Markup\Adamantium.UI.Markup.csproj"/>
     </ItemGroup>
 

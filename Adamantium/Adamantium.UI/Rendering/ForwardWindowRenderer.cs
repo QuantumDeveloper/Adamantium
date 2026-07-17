@@ -154,6 +154,14 @@ public class ForwardWindowRenderer : WindowRendererBase
     // of relying on attachment-based reconciliation. Caller must ensure the GPU is idle first (the designer waits).
     public override void ResetCache() => _renderCache.DisposeUnits();
 
+    // Free this window's GPU resources on close: the render cache's retained units (buffers) first, then the presenter
+    // (swapchain) via the base. The owning render device is disposed by WindowRenderService.UnloadContent after this.
+    public override void Dispose()
+    {
+        _renderCache.DisposeUnits();
+        base.Dispose();
+    }
+
     private void RenderComponent(IUIComponent component)
     {
         if (component.Visibility != Visibility.Visible) return;

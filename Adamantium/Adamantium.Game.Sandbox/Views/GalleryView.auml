@@ -1,7 +1,7 @@
 <View xmlns="http://adamantium/ui"
       xmlns:x="http://adamantium/ui/xaml/extensions"
       xmlns:vm="clr-namespace:Adamantium.Game.Sandbox.ViewModels"
-      xmlns:app="clr-namespace:Adamantium.Game.Sandbox"
+      xmlns:nav="clr-namespace:Adamantium.UI.Controls.Navigation;assembly=Adamantium.UI.Controls"
       xmlns:controls="clr-namespace:Adamantium.UI.Controls;assembly=Adamantium.UI.Controls"
       x:ViewModel="{x:Type vm:GalleryViewModel}">
 
@@ -19,8 +19,9 @@
         </StackPanel>
 
         <!-- Data-driven tabs: the TabControl binds to the root view-model's Tabs collection. Each tab's header comes from
-             the ItemTemplate ({Binding Header}); its body is chosen by the TabViewSelector, which maps each tab view-model
-             to its View. No per-tab wiring in markup - add a tab by adding its view-model to GalleryViewModel.Tabs. -->
+             the ItemTemplate ({Binding Header}); its body is chosen by the framework's ViewLocatorTemplateSelector, which
+             maps each tab view-model to its View. No per-tab wiring in markup - add a tab by adding its view-model to
+             GalleryViewModel.Tabs. -->
         <TabControl Grid.Row="1"
                     ItemsSource="{Binding Tabs}"
                     SelectedItem="{Binding SelectedTab, Mode=TwoWay}"
@@ -33,7 +34,7 @@
                 </DataTemplate>
             </TabControl.ItemTemplate>
             <TabControl.ContentTemplateSelector>
-                <app:TabViewSelector/>
+                <nav:ViewLocatorTemplateSelector/>
             </TabControl.ContentTemplateSelector>
         </TabControl>
     </Grid>

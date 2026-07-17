@@ -16,24 +16,22 @@ public partial class RenderCache
 
     /// <summary>APPLY half of the frame build (GPU / render thread): consumes the recorder's packets - Clean re-draws the
     /// retained units, Partial updates dirty groups in place, Structural splices count changes, Full rebuilds the
-    /// paint-order groups. Freezes the layout snapshot the draw pass replays, then clears RenderDirty.</summary>
+    /// paint-order groups. Freezes the layout snapshot the draw pass replays. (RenderDirty is cleared ONCE per frame after
+    /// every window has recorded - see below - not here.)</summary>
     public void ApplyFrame()
     {
         BeginApplyFrame();
-        var drew = false;
         while (_published.TryDequeue(out var packet))
         {
             ApplyPacket(packet);
             packet.Reset(RenderBuildKind.Clean);
             _spare.Add(packet);   // back to the pool for the recorder
-            drew = true;
         }
 
-        // Only the single-threaded path (record+apply inline in BeginDraw) clears here. The decoupled path hoists the
-        // clear to loop level (UIApplication.RecordRenderFrame), once after ALL windows record - so a second window still
-        // sees the full dirty set this frame.
-        if (drew && RenderThreadOptions.SingleThreaded) RenderDirty.Clear();
-
+        // RenderDirty (a GLOBAL set shared by every window) is NOT cleared per-window here: with two windows the first to
+        // apply would wipe the set before the second records, so the second never re-records its content. Both the
+        // single-threaded and the decoupled path now clear ONCE after ALL windows have recorded (single-threaded in
+        // UIApplication.DispatchRenderFrame after ExecuteDrawSequence; decoupled in RecordRenderFrame).
     }
 
     /// <summary>Resets the per-DRAW merged apply state - the build kind, dirty set and moved nodes accumulate across every
@@ -206,8 +204,10 @@ public partial class RenderCache
         _groupById.TryGetValue(component.RenderId, out var group);
         var oldCount = group?.Units.Count ?? 0;
 
-        // Fast path: same command count and every unit still matches -> update in place; nothing structural changed.
-        if (group != null && drawCommands.Count == oldCount && oldCount > 0)
+        // Fast path: same command count and every unit still matches -> update in place; nothing structural changed. Gate
+        // on InOrder: a group that fell OUT of the paint order (its container was hidden/parked, then rebound and re-drawn
+        // here) MUST be re-inserted, not just patched in place - so let it fall through to the re-insert below.
+        if (group is { InOrder: true } && drawCommands.Count == oldCount && oldCount > 0)
         {
             var units = group.Units;
             var allMatch = true;
@@ -228,15 +228,19 @@ public partial class RenderCache
         // no other group moves). The recorded op stream + rect-slot map still reference the old unit set, so the draw
         // phase re-walks this frame (per-group op patching is the planned follow-up).
         _partialSpliced = true;
-        var isNewGroup = group == null;
+        // (Re)insert into the paint order when the group is NEW *or* exists but has fallen OUT of the order - the same
+        // check ApplyStructural makes. Without the InOrder half, a container that was hidden (its group left the order,
+        // units kept) then rebound and re-recorded here got its units rebuilt but was never put back in _groups, so it
+        // drew NOWHERE: the "dead" selection/hover highlight on a scrolled-then-returned list row (recycled container).
+        var needsInsert = group is not { InOrder: true };
 
         group = BuildUnitsFor(component, drawCommands, _projectionMatrix);
         group.Order = order;
 
-        if (isNewGroup)
+        if (needsInsert)
         {
-            // First units this control ever drew (a background appearing 0->1): insert its group by paint rank, before the
-            // first group that ranks after it. Existing groups never move; the rank came WITH the draw.
+            // Insert by paint rank, before the first group that ranks after it. Existing groups never move; the rank came
+            // WITH the draw.
             var pos = _groups.Count;
             for (var i = 0; i < _groups.Count; i++)
             {

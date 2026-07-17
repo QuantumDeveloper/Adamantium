@@ -1,0 +1,6 @@
+<View xmlns="http://adamantium/ui">
+    <StackPanel Margin="16">
+        <TextBlock Text="Settings" FontSize="20" Margin="0,0,0,8"/>
+        <TextBlock Text="{Binding Status}"/>
+    </StackPanel>
+</View>

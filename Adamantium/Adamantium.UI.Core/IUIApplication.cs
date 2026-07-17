@@ -1,4 +1,5 @@
-﻿using Adamantium.UI.Core.Dispatcher;
+﻿using Adamantium.Navigation;
+using Adamantium.UI.Core.Dispatcher;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Resources;
 
@@ -7,11 +8,15 @@ namespace Adamantium.UI.Core;
 public interface IUIApplication
 {
     IWindow MainWindow { get; set; }
-    
+
     IWindow ActiveWindow { get; }
 
     IReadOnlyList<IWindow> Windows { get; }
-    
+
+    /// <summary>The application-wide navigation service (region/view + window navigation). A permanent member; view models
+    /// inject <see cref="INavigationService"/>, controls/adapters reach it here.</summary>
+    INavigationService Navigation { get; }
+
     IResourceManager ResourceManager { get; }
 
     IThemeManager ThemeManager { get; }

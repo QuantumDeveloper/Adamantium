@@ -79,9 +79,11 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     public Device LogicalDevice => MainDevice?.LogicalDevice;
     public GraphicsAdapter Adapter => VulkanInstance?.MainGraphicsAdapter;
 
-    private DeviceMemoryAllocator _memoryAllocator;
-    // Sub-allocates buffer memory from shared blocks so thousands of small buffers don't exhaust maxMemoryAllocationCount.
-    public DeviceMemoryAllocator MemoryAllocator => _memoryAllocator ??= new DeviceMemoryAllocator(this);
+    // The device-memory sub-allocator is SHARED (one per logical device), owned by the MAIN device. A render-device
+    // wrapper never creates its own - it references the shared one, so no window grabs its own big host-visible BAR block
+    // (that per-window block only device.Dispose freed, so a few open windows exhausted the ~214 MB BAR heap). Mirrors
+    // the shared DescriptorHeapManager.
+    public DeviceMemoryAllocator MemoryAllocator => (DeviceMemoryAllocator)MainDevice.MemoryAllocator;
     public GraphicsPresenter Presenter { get; set; }
 
     public Queue GraphicsQueue { get; private set; }
@@ -1625,20 +1627,20 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         {
             Log.Logger.Debug("Disposing render device");
             DefaultEffectPool?.Dispose();
-            
+
             for (int i = 0; i < commandBuffers.Length; i++)
             {
                 //LogicalDevice?.DestroySemaphore(RenderFinishedSemaphores[i]);
                 LogicalDevice?.DestroySemaphore(ImageAvailableSemaphores[i]);
                 LogicalDevice?.DestroyFence(InFlightFences[i]);
             }
-            
+
             LogicalDevice?.FreeCommandBuffers(GraphicsCommandPool, (uint)commandBuffers.Length, commandBuffers);
             LogicalDevice?.DestroyCommandPool(GraphicsCommandPool);
-            
+
             SamplerStates?.Dispose();
         }
-            
+
         // Snapshot: each Dispose() now calls RemoveResource, which mutates the set.
         foreach (var disposableObject in _graphicsResources.ToArray())
         {
@@ -1647,10 +1649,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             disposableObject?.Dispose();
         }
 
-        // After every buffer has returned its sub-range, free the shared memory blocks (frees VkDeviceMemory + unmaps).
-        _memoryAllocator?.Dispose();
-        _memoryAllocator = null;
-
+        // The device-memory allocator is SHARED and owned by the main device (disposed with it) - a render/resource
+        // device must not dispose it here.
         _submissionSync?.Dispose();
         _graphicsResources?.Clear();
     }

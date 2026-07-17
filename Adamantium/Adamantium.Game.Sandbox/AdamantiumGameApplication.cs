@@ -1,3 +1,6 @@
+using Adamantium.Core.DependencyInjection;
+using Adamantium.UI.Controls.Navigation;
+
 namespace Adamantium.Game.Sandbox;
 
 // Graphics debug (Vulkan validation layers) is controlled by the entry point (Program.cs: EnableGraphicsDebug).
@@ -5,4 +8,12 @@ namespace Adamantium.Game.Sandbox;
 // loaded - costing ~3/4 of the frame time. Validation is a dev tool; flip it on in Program.cs when chasing a GPU bug.
 public class AdamantiumGameApplication : GameApplication
 {
+    protected override void RegisterServices(IContainerRegistry containerRegistry)
+    {
+        base.RegisterServices(containerRegistry);
+        // Register the app's own window shell under "workspace"; the Workspace command opens the second window in it.
+        Container.Resolve<IWindowShellRegistry>().Register<WorkspaceWindow>("workspace");
+        // Shared demo setting (single instance) so the title-bar command and the Navigation-tab toggle see the same flag.
+        containerRegistry.RegisterInstance<ViewModels.WindowDemoSettings>(new ViewModels.WindowDemoSettings());
+    }
 }

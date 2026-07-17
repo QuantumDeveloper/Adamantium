@@ -144,6 +144,10 @@
         <PropertyTrigger Property="ShowIcon" Value="false">
             <Setter TargetName="PART_Icon" Property="Visibility" Value="Collapsed"/>
         </PropertyTrigger>
+        <!-- No right commands -> hide the "..." overflow button so an empty caption doesn't show an orphaned button. -->
+        <PropertyTrigger Property="HasRightWindowCommands" Value="false">
+            <Setter TargetName="PART_RightOverflowButton" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
         <!-- Maximized: hide the single-square (maximize) glyph, show the overlapping-squares (restore) glyph. A trigger
              overrides the local Opacity defaults (trigger outranks a local value), so the swap applies both ways. -->
         <PropertyTrigger Property="IsWindowMaximized" Value="true">

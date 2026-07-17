@@ -53,11 +53,8 @@ namespace Adamantium.Graphics.Core
         
         public readonly SamplerState NearestFont;
 
-        private IGraphicsDevice _device;
-        
         public SamplerStateCollection(IGraphicsDevice device)
         {
-            _device = device;
             LinearRepeat = Add(GetSamplerSate(device, nameof(LinearRepeat), Filter.Linear, SamplerAddressMode.Repeat, false));
             LinearClampToBorder = Add(GetSamplerSate(device, nameof(LinearClampToBorder), Filter.Linear,
                 SamplerAddressMode.ClampToBorder, false));
@@ -113,9 +110,13 @@ namespace Adamantium.Graphics.Core
 
         public override void Dispose()
         {
+            // Dispose each state properly (destroys its VkSampler ONCE, marks it disposed and unregisters it from the
+            // device's tracked resources). Using _device.Destroy(state) instead left the SamplerState "not disposed" and
+            // still tracked, so GraphicsDevice.Dispose's _graphicsResources sweep destroyed the same VkSampler a SECOND
+            // time - a native double-free that crashed when a render device was disposed mid-session (a window closing).
             foreach (var state in this)
             {
-                _device.Destroy(state);
+                state.Dispose();
             }
             Clear();
         }

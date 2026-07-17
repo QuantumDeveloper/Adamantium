@@ -64,7 +64,12 @@ public class TitleBar : Control
         typeof(IEnumerable), typeof(TitleBar), new PropertyMetadata(null));
 
     public static readonly AdamantiumProperty RightWindowCommandsProperty = AdamantiumProperty.Register(nameof(RightWindowCommands),
-        typeof(IEnumerable), typeof(TitleBar), new PropertyMetadata(null));
+        typeof(IEnumerable), typeof(TitleBar), new PropertyMetadata(null, OnRightWindowCommandsChanged));
+
+    // Drives the "..." overflow button's visibility: false (no right commands) hides it so an empty caption shows no
+    // orphaned overflow button. Updated whenever RightWindowCommands is (re)assigned.
+    public static readonly AdamantiumProperty HasRightWindowCommandsProperty = AdamantiumProperty.Register(
+        nameof(HasRightWindowCommands), typeof(bool), typeof(TitleBar), new PropertyMetadata(false));
 
     public IEnumerable LeftWindowCommands
     {
@@ -76,6 +81,18 @@ public class TitleBar : Control
     {
         get => GetValue<IEnumerable>(RightWindowCommandsProperty);
         set => SetValue(RightWindowCommandsProperty, value);
+    }
+
+    public bool HasRightWindowCommands
+    {
+        get => GetValue<bool>(HasRightWindowCommandsProperty);
+        private set => SetValue(HasRightWindowCommandsProperty, value);
+    }
+
+    private static void OnRightWindowCommandsChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is not TitleBar tb) return;
+        tb.HasRightWindowCommands = tb.RightWindowCommands is IEnumerable en && en.GetEnumerator().MoveNext();
     }
 
     /// <summary>The window title shown in the caption (usually TemplateBound to Window.Title).</summary>

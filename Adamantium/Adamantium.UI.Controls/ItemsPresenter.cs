@@ -84,11 +84,11 @@ public class ItemsPresenter : InputUIComponent
     {
         if (_owner == null || _panel == null) return;
 
-        // Virtualizing panel: drop the realized window and let the next measure rebuild it from the changed collection.
-        // (Incremental window patching is a Phase 5 optimisation.)
+        // Virtualizing panel: patch the realized window IN PLACE (reindex + rebind only the changed slots), so unchanged
+        // containers keep their state instead of the whole list being torn down and rebuilt on every add/remove.
         if (_panel is VirtualizingPanel virtualizing)
         {
-            virtualizing.Revirtualize();
+            virtualizing.OnItemsChanged(e);
             return;
         }
 

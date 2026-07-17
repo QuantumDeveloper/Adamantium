@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Linq;
 using Adamantium.Mathematics;
 using Adamantium.ProceduralGeometry;
@@ -102,6 +103,41 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         // which made skeletons vanish after an ItemTemplate switch / any regenerate).
         ResetSkeletons();
         InvalidateMeasure();
+    }
+
+    /// <summary>Applies a collection change to the realized window IN PLACE - no teardown. The generator reindexes its
+    /// realized set, the added/removed slots (re)bind on the next measure via <c>SetWindow</c>, and every UNCHANGED
+    /// container keeps its measured/arranged/rendered state. A full <see cref="Revirtualize"/> on every add instead
+    /// re-created every container and re-probed the item extent off a not-yet-settled fresh container, which shifted the
+    /// list on each add and left the window in a state that then mis-hit-tested on scroll (dynamic-only, never static -
+    /// because a static list never runs this path). Reset/Move/Replace still rebuild (rare; correctness over cleverness).</summary>
+    internal void OnItemsChanged(NotifyCollectionChangedEventArgs e)
+    {
+        if (Owner?.ItemContainerGenerator is not { } generator) return;
+
+        switch (e.Action)
+        {
+            case NotifyCollectionChangedAction.Add:
+                // Shift realized indices at/after the insert up; the inserted slot(s) are now an unmapped gap that the
+                // next SetWindow fills, and the shifted containers keep their (unchanged) items at their new indices.
+                generator.OnItemsInserted(e.NewStartingIndex, e.NewItems.Count);
+                InvalidateMeasure();
+                break;
+
+            case NotifyCollectionChangedAction.Remove:
+                // Recycle the removed slots' containers FIRST (unmap + pool), THEN reindex survivors down - reindexing
+                // before recycling would collide a removed key with the survivor shifting onto it. The pooled containers
+                // are re-drawn as donors by the next SetWindow, or parked by the arrange's HideUnmappedContainers.
+                for (var i = e.OldItems.Count - 1; i >= 0; i--)
+                    generator.Recycle(e.OldStartingIndex + i);
+                generator.OnItemsRemoved(e.OldStartingIndex, e.OldItems.Count);
+                InvalidateMeasure();
+                break;
+
+            default:   // Replace / Move / Reset: full rebuild.
+                Revirtualize();
+                break;
+        }
     }
 
     public void SetOffset(Vector2 offset)

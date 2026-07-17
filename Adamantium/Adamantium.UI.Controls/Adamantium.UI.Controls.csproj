@@ -19,6 +19,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Adamantium.UI.Core\Adamantium.UI.Core.csproj" />
+      <ProjectReference Include="..\Adamantium.Navigation\Adamantium.Navigation.csproj" />
     </ItemGroup>
 
     <ItemGroup>

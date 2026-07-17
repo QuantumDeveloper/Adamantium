@@ -94,7 +94,19 @@ public class WindowRenderService : UiRenderService
 
     public override void UnloadContent()
     {
-        windowRenderer?.Dispose();
+        // Free the window's GPU resources on close. Wait for the device to be idle first (nothing we free is still in
+        // flight), dispose the renderer (its cache units + swapchain), then - on the runtime path - the per-window render
+        // DEVICE this service created (_injectedDevice == null). Without disposing the device, each window open/close
+        // leaked a whole device (its dynamic buffer pools, descriptor pools, ...) and a few reopens hit
+        // ErrorOutOfDeviceMemory - which also silently stalled rendering everywhere once the GPU ran dry. The designer's
+        // SHARED injected device is owned by the session - never dispose it here.
+        GraphicsDevice?.DeviceWaitIdle();
+        windowRenderer?.Dispose();   // frees the per-window swapchain + render-cache units (returns their sub-ranges to the shared allocator)
+        // Release the render device (the shared device-memory allocator + descriptor heap are owned by the MAIN device and
+        // are NOT touched here, so this only frees the device's own small per-device objects). Skip the designer's injected
+        // shared device.
+        if (_injectedDevice == null && GraphicsDevice != null)
+            GraphicsDeviceService.MainGraphicsDevice.RemoveDevice(GraphicsDevice);
     }
 
     public override bool IsUpdateService => true;

@@ -473,6 +473,9 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     public abstract void Show();
     public abstract void Close();
     public abstract void Hide();
+
+    /// <summary>Bring this window to the foreground (restoring it if minimized). Platform-specific via the window worker.</summary>
+    public void Activate() => WindowWorkerService?.Activate();
         
     public bool IsActive
     {

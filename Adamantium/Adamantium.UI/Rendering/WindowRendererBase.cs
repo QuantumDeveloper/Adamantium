@@ -171,8 +171,10 @@ public abstract class WindowRendererBase : IWindowRenderer
         }
     }
     
-    public void Dispose()
+    public virtual void Dispose()
     {
-        
+        UnsubscribeFromEvents();
+        Presenter?.Dispose();
+        Presenter = null;
     }
 }

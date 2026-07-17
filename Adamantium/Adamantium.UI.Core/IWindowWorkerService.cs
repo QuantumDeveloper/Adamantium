@@ -10,6 +10,10 @@ public interface IWindowWorkerService
 
     public void HideWindow();
 
+    /// <summary>Bring the window to the foreground (un-minimizing it first if needed). Used to activate a newly opened
+    /// window and to focus an already-open single-instance window on a repeat request.</summary>
+    public void Activate();
+
     /// <summary>Acquire (true) or release (false) the OS-level mouse capture for this window, so a press-drag keeps
     /// receiving move/up even when the pointer leaves the window. Platform-specific (Win32 SetCapture/ReleaseCapture).
     /// The shared logic that decides WHEN to call this lives in MouseDevice.SyncOsMouseCapture, so every platform gets

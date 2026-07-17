@@ -22,7 +22,6 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     private bool isOverSizeFrame;
     private bool trackMouse;
     private bool osMouseCaptured;
-    private InputModifiers lastRawMouseModifiers;
     private Win32NativeWindowWrapper source;
 
     // PLAIN-FIELD snapshots of the window state the WndProc handlers need. The WndProc runs on the OS message (pump)
@@ -42,8 +41,6 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         // WM_DPICHANGED when the window crosses monitors; we scale the render ourselves (docs/PER_MONITOR_DPI_PLAN.md).
         try { Win32Interop.SetProcessDpiAwarenessContext(Win32Interop.DpiAwarenessContextPerMonitorAwareV2); }
         catch { /* pre-1703 OS without the API, or awareness already pinned by a manifest - ignore */ }
-
-        RawInputDevice.RegisterDevice(HIDUsagePage.Generic, HIDUsageId.Mouse, InputDeviceFlags.None);
     }
 
     public Win32WindowWorker(IUIContext uiContext)
@@ -83,7 +80,6 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         messageTable[(uint)WindowMessages.Xbuttondblclk] = HandleMouseLeftButtonDown;
 
         messageTable[(uint)WindowMessages.MouseWheel] = HandleMouseWheel;
-        messageTable[(uint)WindowMessages.Input] = HandleRawInput;
         messageTable[(uint)WindowMessages.Setcursor] = HandleSetCursor;
         messageTable[BeginMoveDragMessage] = HandleBeginMoveDrag;
     }
@@ -94,6 +90,16 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     // runs on the loop thread, so BeginMoveDrag PostMessages this; CustomWndProc then runs HandleBeginMoveDrag on the
     // owner thread. lParam carries the packed screen cursor position (LOWORD x, HIWORD y).
     private const uint BeginMoveDragMessage = (uint)WindowMessages.App + 1;
+
+    // Initial OS-window extent: prefer the explicit Width/Height; if unset, fall back to the requested CLIENT size (a
+    // window can be sized by its client area alone - e.g. one opened from a view model), then a sane default so it is
+    // never created at 0. For a custom-chrome (borderless) window the client area == the window, so this is exact.
+    private static int InitialExtent(double preferred, double clientFallback, int defaultExtent)
+    {
+        if (!double.IsNaN(preferred) && preferred > 0) return (int)preferred;
+        if (!double.IsNaN(clientFallback) && clientFallback > 0) return (int)clientFallback;
+        return defaultExtent;
+    }
 
     public void SetWindow(IWindow window)
     {
@@ -112,13 +118,13 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
             WindowStyle.Overlappedwindow | WindowStyle.Maximizebox | WindowStyle.Minimizebox |
             WindowStyle.Clipsiblings | WindowStyle.Clipchildren | WindowStyle.Sizeframe;
         source = new Win32NativeWindowWrapper(
-            classStyle, 
-            wndStyleEx, 
-            wndStyle, 
+            classStyle,
+            wndStyleEx,
+            wndStyle,
             (int)window.Left,
-            (int)window.Top, 
-            (int)window.Width, 
-            (int)window.Height, 
+            (int)window.Top,
+            InitialExtent(window.Width, window.ClientWidth, 800),
+            InitialExtent(window.Height, window.ClientHeight, 600),
             IntPtr.Zero);
         this.window.SetHandle(source.Handle);
         
@@ -209,6 +215,22 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         Win32Interop.ShowWindow(source.Handle, WindowShowStyle.Hide);
     }
 
+    public void Activate()
+    {
+        if (window == null || window.Handle == IntPtr.Zero) return;
+        var hwnd = window.Handle;
+        // Un-minimize first (Restore returns to the prior normal/maximized state); a minimized window can't be raised.
+        if (chromeState == WindowState.Minimized)
+            Win32Interop.ShowWindow(hwnd, WindowShowStyle.Restore);
+        // SetForegroundWindow ALONE only flashes the taskbar when the calling process isn't already the foreground one
+        // (the OS foreground-lock, hit at startup and when opening a window from a background app). Toggling the window
+        // topmost then back raises it above everything WITHOUT leaving it permanently on top; then take input focus.
+        var flags = SetWindowPosFlags.Nomove | SetWindowPosFlags.Nosize | SetWindowPosFlags.Showwindow;
+        Win32Interop.SetWindowPos(hwnd, new IntPtr(-1), 0, 0, 0, 0, flags);   // HWND_TOPMOST
+        Win32Interop.SetWindowPos(hwnd, new IntPtr(-2), 0, 0, 0, 0, flags);   // HWND_NOTOPMOST
+        Win32Interop.SetForegroundWindow(hwnd);
+    }
+
     public IUIContext UIContext { get; }
 
     private void WindowOnStateChanged(object sender, StateChangedEventArgs e)
@@ -243,6 +265,15 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     {
         source.RemoveHook(CustomWndProc);
         UIContext.UIApplication.RemoveWindow(window);
+        // Actually destroy the OS window. The custom-caption close raises Closed on the LOOP thread, but DestroyWindow must
+        // run on the HWND's owning (pump/UI) thread - marshal it there (fire-and-forget; non-blocking from either thread).
+        // Without this a secondary window's HWND lingered on screen with its WndProc hook already removed - a frozen,
+        // never-closing window. (The native SC_CLOSE path used to destroy inline; that is now consolidated here.)
+        if (window.Handle != IntPtr.Zero)
+        {
+            window.SetHandle(IntPtr.Zero);
+            _ = UIContext.UIApplication.ExecuteOnUIThreadAsync(() => source.Destroy());
+        }
     }
 
     /// <summary>
@@ -454,12 +485,8 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         switch (command)
         {
             case SystemCommands.CLOSE:
+                // Managed close; OnWindowClosed does the HWND teardown (RemoveHook + RemoveWindow + DestroyWindow).
                 window.Close();
-                if (window.IsClosed)
-                {
-                    source.Destroy();
-                    window.SetHandle(IntPtr.Zero);
-                }
                 break;
             case SystemCommands.MOVE:
                 Win32Interop.SetWindowPos(window.Handle, IntPtr.Zero, (int)p.X, (int)p.Y, (int)window.Width,
@@ -730,80 +757,6 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         return IntPtr.Zero;
     }
 
-    private IntPtr HandleRawInput(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
-    {
-        int outSize = 0;
-        int size = Marshal.SizeOf(typeof(RawInputData));
-
-        outSize = Win32Interop.GetRawInputData(lParam, RawInputCommand.Input, out var inputData, ref size,
-            Marshal.SizeOf(typeof(RawInputHeader)));
-        if (outSize == -1)
-        {
-            handled = false;
-            return Win32Interop.DefWindowProc(window.Handle, windowMessage, wParam, lParam);
-        }
-
-        if (inputData.Header.DeviceType == DeviceType.Mouse)
-        {
-            var position = MouseDevice.CurrentDevice.GetScreenPosition();
-            Win32Interop.GetWindowRect(window.Handle, out var wndRect);
-            WindowStyle value = Win32Interop.GetWindowStyle(window.Handle, WindowLongType.Style);
-            // TODO check can we remove IsLocked property completely
-            //if (!window.IsLocked)
-            {
-                var delta = new Vector2(inputData.Data.Mouse.LastX, inputData.Data.Mouse.LastY);
-                if (inputData.Data.Mouse.Data.ButtonFlags != RawMouseButtons.None)
-                {
-                    lastRawMouseModifiers = WindowsMouseDeviceExtension.GetRawMouseModifiers(inputData.Data.Mouse);
-                }
-
-                // Build the args synchronously (message-time screen position + modifiers), but marshal the ProcessEvent
-                // onto the loop thread - it routes into the visual tree, same as the other mouse handlers. The single
-                // FIFO queue keeps the button event ahead of the move.
-                if (inputData.Data.Mouse.Data.ButtonFlags.HasFlag(RawMouseButtons.LeftUp))
-                {
-                    var args = new RawMouseEventArgs(RawMouseEventType.RawLeftButtonUp, window,
-                        MouseDevice.CurrentDevice.GetScreenPosition(), GetKeyModifiers(lastRawMouseModifiers),
-                        MouseDevice.CurrentDevice, GetTimeStamp());
-                    DispatchInput(() => MouseDevice.CurrentDevice.ProcessEvent(args));
-                }
-                else if (inputData.Data.Mouse.Data.ButtonFlags.HasFlag(RawMouseButtons.LeftDown))
-                {
-                    var args = new RawMouseEventArgs(RawMouseEventType.RawLeftButtonDown, window,
-                        MouseDevice.CurrentDevice.GetScreenPosition(), GetKeyModifiers(lastRawMouseModifiers),
-                        MouseDevice.CurrentDevice, GetTimeStamp());
-                    DispatchInput(() => MouseDevice.CurrentDevice.ProcessEvent(args));
-                }
-                if (inputData.Data.Mouse.Data.ButtonFlags.HasFlag(RawMouseButtons.RightUp))
-                {
-                    var args = new RawMouseEventArgs(RawMouseEventType.RawRightButtonUp, window,
-                        MouseDevice.CurrentDevice.GetScreenPosition(), GetKeyModifiers(lastRawMouseModifiers),
-                        MouseDevice.CurrentDevice, GetTimeStamp());
-                    DispatchInput(() => MouseDevice.CurrentDevice.ProcessEvent(args));
-                }
-                else if (inputData.Data.Mouse.Data.ButtonFlags.HasFlag(RawMouseButtons.RightDown))
-                {
-                    var args = new RawMouseEventArgs(RawMouseEventType.RawRightButtonDown, window,
-                        MouseDevice.CurrentDevice.GetScreenPosition(), GetKeyModifiers(lastRawMouseModifiers),
-                        MouseDevice.CurrentDevice, GetTimeStamp());
-                    DispatchInput(() => MouseDevice.CurrentDevice.ProcessEvent(args));
-                }
-
-                //if (input.Data.Mouse.LastX!=0 || input.Data.Mouse.LastY!=0)
-                {
-                    var moveArgs = new RawInputMouseEventArgs(delta,
-                        RawMouseEventType.RawMouseMove, window,
-                        window.ScreenToClient(Mouse.ScreenCoordinates), GetKeyModifiers(lastRawMouseModifiers),
-                        MouseDevice.CurrentDevice, GetTimeStamp());
-                    DispatchInput(() => MouseDevice.CurrentDevice.ProcessEvent(moveArgs));
-                }
-            }
-        }
-
-        handled = true;
-        return IntPtr.Zero;
-    }
-
     private IntPtr HandleSetCursor(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
         handled = false;
@@ -837,17 +790,4 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         UIContext.UIApplication.InactivateWindow(window);
     }
 
-    private static InputModifiers GetKeyModifiers(InputModifiers mouse)
-    {
-        var modifiers = KeyboardDevice.CurrentDevice.Modifiers;
-        return modifiers | mouse;
-    }
-
-    private static InputModifiers GetKeyModifiers(RawMouse rawMouse)
-    {
-        var modifiers = WindowsMouseDeviceExtension.GetRawMouseModifiers(rawMouse);
-        var keyModifiers = KeyboardDevice.CurrentDevice.Modifiers;
-        modifiers |= keyModifiers;
-        return modifiers;
-    }
 }
