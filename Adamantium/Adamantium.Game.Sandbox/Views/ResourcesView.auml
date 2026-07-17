@@ -1,6 +1,7 @@
 <View xmlns="http://adamantium/ui"
       xmlns:x="http://adamantium/ui/xaml/extensions"
-      xmlns:local="clr-namespace:Adamantium.Game.Sandbox">
+      xmlns:local="clr-namespace:Adamantium.Game.Sandbox"
+      xmlns:behaviors="clr-namespace:Adamantium.Game.Sandbox.Behaviors">
     <!-- Pure declarative demo of live {ObservableResource} vs resolve-once {ResourceReference}, at three scopes:
          a THEME palette key (swap Dark<->Light / cycle the entry), an INLINE local resource (cycled by a view-layer
          behavior) and a GLOBAL dictionary (survives a theme swap). No view-model logic, no controls in the VM. -->
@@ -25,14 +26,14 @@
                  keeps its resolved-once brush - so the difference shows without swapping the whole theme. -->
             <Button Content="Cycle critical color" Width="180" Height="36" Margin="32,0,0,0" VerticalAlignment="Bottom">
                 <Button.Behaviors>
-                    <local:CycleScopedResourceBehavior Key="SystemFillColorCritical" Scope="Theme"/>
+                    <behaviors:CycleScopedResourceBehavior Key="SystemFillColorCritical" Scope="Theme"/>
                 </Button.Behaviors>
             </Button>
         </StackPanel>
 
         <Button Content="Toggle theme (Dark / Light)" Width="220" Height="36" Margin="0,12,0,0">
             <Button.Behaviors>
-                <local:ToggleThemeBehavior/>
+                <behaviors:ToggleThemeBehavior/>
             </Button.Behaviors>
         </Button>
 
@@ -46,7 +47,7 @@
             <RadioButton Content="Selected" IsChecked="true" Margin="0,0,16,0"/>
             <Button Content="Cycle accent" Width="140" Height="36">
                 <Button.Behaviors>
-                    <local:CycleAccentBehavior/>
+                    <behaviors:CycleAccentBehavior/>
                 </Button.Behaviors>
             </Button>
         </StackPanel>
@@ -73,7 +74,7 @@
 
             <Button Content="Cycle local accent" Width="180" Height="36" Margin="0,12,0,0">
                 <Button.Behaviors>
-                    <local:CycleResourceBehavior Key="PanelAccent"/>
+                    <behaviors:CycleResourceBehavior Key="PanelAccent"/>
                 </Button.Behaviors>
             </Button>
         </StackPanel>
@@ -96,7 +97,7 @@
                 </StackPanel>
                 <Button Content="Cycle global accent" Width="180" Height="36" Margin="32,0,0,0" VerticalAlignment="Bottom">
                     <Button.Behaviors>
-                        <local:CycleScopedResourceBehavior Key="GlobalAccent" Scope="Global"/>
+                        <behaviors:CycleScopedResourceBehavior Key="GlobalAccent" Scope="Global"/>
                     </Button.Behaviors>
                 </Button>
             </StackPanel>

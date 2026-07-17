@@ -476,6 +476,12 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
 
     /// <summary>Bring this window to the foreground (restoring it if minimized). Platform-specific via the window worker.</summary>
     public void Activate() => WindowWorkerService?.Activate();
+
+    /// <summary>Enter/leave RELATIVE mouse mode (hidden, centred cursor + synthesized raw delta) for a hosted game's
+    /// mouse-look. Driven by a <see cref="Panels.RenderTargetPanel"/> per its <c>MouseLookMode</c>; delegates to the
+    /// platform worker.</summary>
+    public void SetRelativeMouseMode(bool enabled, Adamantium.Mathematics.Vector2 restoreScreen) =>
+        WindowWorkerService?.SetRelativeMouseMode(enabled, restoreScreen);
         
     public bool IsActive
     {

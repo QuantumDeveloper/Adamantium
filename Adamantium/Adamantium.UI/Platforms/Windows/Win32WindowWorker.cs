@@ -9,7 +9,6 @@ using Adamantium.UI.Core.Input.Raw;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.Win32;
-using Adamantium.Win32.RawInput;
 
 namespace Adamantium.UI.Platforms.Windows;
 
@@ -23,6 +22,14 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     private bool trackMouse;
     private bool osMouseCaptured;
     private Win32NativeWindowWrapper source;
+
+    // RELATIVE mouse mode (game mouse-look). SetRelativeMouseMode posts RelativeModeMessage (enable in wParam, the restore
+    // screen point packed in lParam) so the cursor hide/show + capture - HWND-thread-affine - run on the PUMP thread. While
+    // active, HandleMouseMove reads the physical cursor, feeds a RawMouseMove delta and re-centres to _recenterScreen so the
+    // delta never runs out at the window edge. The cursor's SAVED position is NOT held here - the panel owns it (in its own
+    // coords) and hands the screen point back on release. See RenderTargetPanel.
+    private bool _relativeActive;
+    private NativePoint _recenterScreen;
 
     // PLAIN-FIELD snapshots of the window state the WndProc handlers need. The WndProc runs on the OS message (pump)
     // thread; reading an AdamantiumProperty there calls GetValue -> Monitor.Enter, which DEADLOCKS against the loop
@@ -82,6 +89,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         messageTable[(uint)WindowMessages.MouseWheel] = HandleMouseWheel;
         messageTable[(uint)WindowMessages.Setcursor] = HandleSetCursor;
         messageTable[BeginMoveDragMessage] = HandleBeginMoveDrag;
+        messageTable[RelativeModeMessage] = HandleRelativeModeMessage;
     }
 
     // App-private message (WM_APP range) the loop thread posts to hand a caption drag BACK to the HWND-owning thread.
@@ -90,6 +98,10 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     // runs on the loop thread, so BeginMoveDrag PostMessages this; CustomWndProc then runs HandleBeginMoveDrag on the
     // owner thread. lParam carries the packed screen cursor position (LOWORD x, HIWORD y).
     private const uint BeginMoveDragMessage = (uint)WindowMessages.App + 1;
+
+    // App-private message the loop thread posts (SetRelativeMouseMode) so the enter/exit of relative mouse mode - which
+    // hides/shows the cursor and takes/drops the OS capture, both thread-affine to the HWND owner - runs on the pump thread.
+    private const uint RelativeModeMessage = (uint)WindowMessages.App + 2;
 
     // Initial OS-window extent: prefer the explicit Width/Height; if unset, fall back to the requested CLIENT size (a
     // window can be sized by its client area alone - e.g. one opened from a view model), then a sane default so it is
@@ -642,6 +654,26 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 
     private IntPtr HandleMouseMove(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
+        // RELATIVE mouse mode (game mouse-look): synthesize a RawMouseMove delta from the physical move and re-centre the
+        // cursor, so the game gets unbounded relative motion (the cursor never reaches the window edge). The normal
+        // MouseMove is suppressed while looking - the cursor is hidden and pinned to the centre.
+        if (_relativeActive)
+        {
+            Win32Interop.GetCursorPos(out var cur);
+            var dx = cur.X - _recenterScreen.X;
+            var dy = cur.Y - _recenterScreen.Y;
+            if (dx != 0 || dy != 0)
+            {
+                Win32Interop.SetCursorPos(_recenterScreen.X, _recenterScreen.Y);
+                var rawArgs = new RawInputMouseEventArgs(new Vector2(dx, dy), RawMouseEventType.RawMouseMove, window,
+                    ToLogical(Messages.PointFromLParam(lParam)),
+                    WindowsMouseDeviceExtension.GetKeyModifiers(windowMessage, wParam), MouseDevice.CurrentDevice, GetTimeStamp());
+                DispatchInput(() => MouseDevice.CurrentDevice.ProcessEvent(rawArgs));
+            }
+            handled = true;
+            return IntPtr.Zero;
+        }
+
         if (!trackMouse)
         {
             var tm = new TRACKMOUSEEVENT
@@ -704,6 +736,53 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     {
         if (capture) Win32Interop.SetCapture(window.Handle);
         else Win32Interop.ReleaseCapture();
+    }
+
+    // Called on the LOOP thread (from RenderTargetPanel via the window). Posts the enter/exit to the pump thread (cursor
+    // hide/show + capture are HWND-thread-affine): enable in wParam; on disable the panel's RESTORE screen point packed
+    // into lParam (two 32-bit ints in the 64-bit value), so the worker warps the cursor back without storing any position.
+    public void SetRelativeMouseMode(bool enabled, Vector2 restoreScreen)
+    {
+        if (window == null || window.Handle == IntPtr.Zero) return;
+        var wp = enabled ? (IntPtr)1 : IntPtr.Zero;
+        var lp = enabled ? IntPtr.Zero
+            : (IntPtr)(((long)(int)restoreScreen.X << 32) | (uint)(int)restoreScreen.Y);
+        Messages.PostMessage(window.Handle, RelativeModeMessage, wp, lp);
+    }
+
+    // Pump thread. Enter: hide the cursor, hold OS capture (moves keep arriving even at the window edge) and centre it;
+    // HandleMouseMove then feeds the delta and re-centres. Exit: warp the cursor to the panel's restore point (where it
+    // vanished, in screen coords), show it, and drop the capture unless a button drag still owns it.
+    private IntPtr HandleRelativeModeMessage(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
+    {
+        handled = true;
+        if (window == null || window.Handle == IntPtr.Zero) return IntPtr.Zero;
+        var enable = wParam != IntPtr.Zero;
+        if (enable && !_relativeActive)
+        {
+            _relativeActive = true;
+            Win32Interop.SetCapture(window.Handle);
+            Win32Interop.ShowCursor(false);
+            _recenterScreen = ClientCentreScreen();
+            Win32Interop.SetCursorPos(_recenterScreen.X, _recenterScreen.Y);
+        }
+        else if (!enable && _relativeActive)
+        {
+            _relativeActive = false;
+            var lp = (long)lParam;
+            Win32Interop.SetCursorPos((int)(lp >> 32), (int)lp);
+            Win32Interop.ShowCursor(true);
+            if (!osMouseCaptured) Win32Interop.ReleaseCapture();
+        }
+        return IntPtr.Zero;
+    }
+
+    private NativePoint ClientCentreScreen()
+    {
+        Win32Interop.GetClientRect(window.Handle, out var rc);
+        var centre = new NativePoint((rc.Right - rc.Left) / 2, (rc.Bottom - rc.Top) / 2);
+        Win32Interop.ClientToScreen(window.Handle, ref centre);
+        return centre;
     }
 
     // Caption drag: hand the window to the OS modal move loop (which also does Aero Snap + maximized restore-drag). This

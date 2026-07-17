@@ -20,8 +20,12 @@ public partial class GameViewModel : TabPageViewModel
         Status = "Game ready";
     }
 
-    [Bindable, Affects(nameof(MenuButtonText))] private bool _isMenuVisible = true;
+    [Bindable, Affects(nameof(MenuButtonText), nameof(MouseLookEnabled))] private bool _isMenuVisible = true;
     public string MenuButtonText => IsMenuVisible ? "Hide menu" : "Show menu";
+
+    /// <summary>Mouse-look is allowed only while the menu is HIDDEN - so a click on the panel with the menu up doesn't
+    /// grab and hide the cursor. Bound to the panel's IsMouseLookEnabled.</summary>
+    public bool MouseLookEnabled => !IsMenuVisible;
 
     [Command] private void ToggleMenu() => IsMenuVisible = !IsMenuVisible;
 

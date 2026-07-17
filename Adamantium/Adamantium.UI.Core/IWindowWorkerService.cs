@@ -20,6 +20,13 @@ public interface IWindowWorkerService
     /// the same behaviour.</summary>
     public void SetMouseCapture(bool capture);
 
+    /// <summary>Enter (true) or leave (false) RELATIVE mouse mode: the OS cursor is hidden and held centred, and each
+    /// physical move is turned into a synthesized <c>RawMouseMove</c> delta (unbounded even at the window edge) for a
+    /// hosted game's mouse-look. Replaces OS raw input. On leave, <paramref name="restoreScreen"/> is where the caller
+    /// (the panel) wants the cursor to reappear, in SCREEN coordinates - so it comes back where it vanished, not at the
+    /// re-centre. Driven by <c>RenderTargetPanel</c> per its <c>MouseLookMode</c>; no-op on platforms without it.</summary>
+    public void SetRelativeMouseMode(bool enabled, Adamantium.Mathematics.Vector2 restoreScreen);
+
     /// <summary>Start an OS-driven move of the window from the current cursor (custom-chrome caption drag). Runs the
     /// native modal move loop, so Aero Snap and snap-to-edges work. Call from a title bar's mouse-down. No-op on
     /// platforms without a native move loop.</summary>

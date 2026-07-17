@@ -5,7 +5,7 @@ using Adamantium.UI.Core.Behaviors;
 using Adamantium.UI.Core.Diagnostics;
 using Adamantium.UI.Core.Media.Animation;
 
-namespace Adamantium.Game.Sandbox;
+namespace Adamantium.Game.Sandbox.Behaviors;
 
 /// <summary>
 /// Attaches to a <see cref="TextBlock"/> and rewrites its text a few times a second with live engine diagnostics, so the

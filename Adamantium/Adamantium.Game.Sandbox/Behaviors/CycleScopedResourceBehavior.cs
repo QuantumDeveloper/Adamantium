@@ -6,7 +6,7 @@ using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.RoutedEvents;
 
-namespace Adamantium.Game.Sandbox;
+namespace Adamantium.Game.Sandbox.Behaviors;
 
 /// <summary>
 /// View-layer behavior (NOT a view-model): on the button's click it overrides a keyed brush in the given resource SCOPE

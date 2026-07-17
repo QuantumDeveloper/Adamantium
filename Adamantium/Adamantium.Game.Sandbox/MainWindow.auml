@@ -5,6 +5,7 @@
 		xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters"
 		xmlns:vm="clr-namespace:Adamantium.Game.Sandbox.ViewModels"
 		xmlns:views="clr-namespace:Adamantium.Game.Sandbox.Views"
+		xmlns:behaviors="clr-namespace:Adamantium.Game.Sandbox.Behaviors"
         x:ViewModel="{x:Type vm:MainViewModel}"
         x:CreateInDesignTime="False"
         Title="Adamantium Window"
@@ -44,7 +45,7 @@
                 Visibility="{Binding DiagnosticsOpen, Converter={conv:BoolToVisibilityConverter}}">
             <TextBlock FontSize="13" Foreground="LightGreen" TextWrapping="WrapBySymbols" Text="diagnostics…">
                 <TextBlock.Behaviors>
-                    <local:DiagnosticsOverlayBehavior/>
+                    <behaviors:DiagnosticsOverlayBehavior/>
                 </TextBlock.Behaviors>
             </TextBlock>
         </Border>
@@ -58,7 +59,7 @@
                        TextWrapping="WrapBySymbols"
                        Text="diagnostics…">
                 <TextBlock.Behaviors>
-                    <local:DiagnosticsOverlayBehavior/>
+                    <behaviors:DiagnosticsOverlayBehavior/>
                 </TextBlock.Behaviors>
             </TextBlock>
         </SlidePanel>
