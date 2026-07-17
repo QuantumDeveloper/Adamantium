@@ -28,8 +28,12 @@ public class Window : WindowBase
         }
         else
         {
+            var firstDisplay = ShouldDisplayWindow;   // this Show is the deferred FIRST display of the window
             ShouldDisplayWindow = false;
             WindowWorkerService.ShowWindow(State);
+            // Pull the window to the foreground when it first appears (ShowWindow alone doesn't steal focus from the
+            // launching foreground window). Applies to the main window (OnStartup) and any window opened from a VM.
+            if (firstDisplay) Activate();
         }
     }
         

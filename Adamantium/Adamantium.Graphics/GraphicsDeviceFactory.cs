@@ -13,4 +13,9 @@ public class GraphicsDeviceFactory : IGraphicsDeviceFactory
     {
         return new DescriptorHeapManager(device);
     }
+
+    public IDeviceMemoryAllocator CreateMemoryAllocator(IGraphicsDevice device)
+    {
+        return new DeviceMemoryAllocator(device);
+    }
 }

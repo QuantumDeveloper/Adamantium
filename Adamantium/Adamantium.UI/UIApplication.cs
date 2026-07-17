@@ -21,6 +21,9 @@ using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.EntityServices;
 using Adamantium.UI.Events;
+using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.Navigation;
+using Adamantium.UI.Navigation;
 using Adamantium.UI.Platforms.MacOS;
 using Adamantium.UI.Platforms.Windows;
 using Adamantium.UI.Rendering;
@@ -191,6 +194,8 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
     public IThemeManager ThemeManager { get; private set; }
     public IDispatcher Dispatcher { get; private set; }
     public IUIContext UIContext { get; private set; }
+
+    public Adamantium.Navigation.INavigationService Navigation { get; private set; }
 
     public void AddWindow(IWindow window)
     {
@@ -381,6 +386,37 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
     protected virtual void RegisterServices(IContainerRegistry containerRegistry)
     {
         containerRegistry.RegisterSingleton<IThemeManager>(ThemeManager);
+        RegisterNavigationServices(containerRegistry);
+    }
+
+    // Batteries-included navigation (docs/NAVIGATION_PLAN.md). Each default is guarded, so an app can register its own
+    // (view locator / nav service / window shell / region adapters) BEFORE calling base and win.
+    private void RegisterNavigationServices(IContainerRegistry containerRegistry)
+    {
+        if (!containerRegistry.IsRegistered<IDependencyResolver>())
+            containerRegistry.RegisterInstance<IDependencyResolver>(Container);
+        if (!containerRegistry.IsRegistered<IViewLocator>())
+            containerRegistry.RegisterSingleton<IViewLocator, ViewLocator>();
+        if (!containerRegistry.IsRegistered<IWindowShellRegistry>())
+            containerRegistry.RegisterSingleton<IWindowShellRegistry, WindowShellRegistry>();
+        if (!containerRegistry.IsRegistered<Adamantium.Navigation.IRegionManager>())
+            containerRegistry.RegisterSingleton<Adamantium.Navigation.IRegionManager, Adamantium.Navigation.RegionManager>();
+        if (!containerRegistry.IsRegistered<Adamantium.Navigation.IWindowNavigationBackend>())
+            containerRegistry.RegisterSingleton<Adamantium.Navigation.IWindowNavigationBackend, WindowNavigationBackend>();
+        if (!containerRegistry.IsRegistered<Adamantium.Navigation.INavigationService>())
+            containerRegistry.RegisterSingleton<Adamantium.Navigation.INavigationService, Adamantium.Navigation.NavigationService>();
+
+        if (!containerRegistry.IsRegistered<RegionAdapterMappings>())
+        {
+            var viewLocator = Container.Resolve<IViewLocator>();
+            var mappings = new RegionAdapterMappings();
+            mappings.Register<ContentControl>(new ContentControlRegionAdapter(viewLocator));
+            mappings.Register<Selector>(new SelectorRegionAdapter(viewLocator));
+            mappings.Register<ItemsControl>(new ItemsControlRegionAdapter(viewLocator));
+            containerRegistry.RegisterInstance<RegionAdapterMappings>(mappings);
+        }
+
+        Navigation = Container.Resolve<Adamantium.Navigation.INavigationService>();
     }
     
     protected virtual void OnWindowCreated(IWindow wnd)
@@ -632,12 +668,13 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
     {
         var threaded = RenderThreadOptions.RenderThreadEnabled && renderThread != null;
 
-        // Render thread OFF: run inline on this (loop) thread. The decoupled-inline path clears RenderDirty here (its record
-        // ran inline - loop-level or the BeginDraw fallback); the single-threaded default leaves the clear to ApplyFrame.
+        // Render thread OFF: run inline on this (loop) thread. Clear RenderDirty ONCE here, after ExecuteDrawSequence has
+        // recorded+applied EVERY window - not per-window in ApplyFrame, which (RenderDirty being one global set) let the
+        // first window wipe it before a second window recorded, leaving the second window's content never re-recorded.
         if (!threaded)
         {
             var drewInline = ExecuteDrawSequence(appTime);
-            if (!RenderThreadOptions.SingleThreaded && drewInline) RenderDirty.Clear();
+            if (drewInline) RenderDirty.Clear();
             return;
         }
 

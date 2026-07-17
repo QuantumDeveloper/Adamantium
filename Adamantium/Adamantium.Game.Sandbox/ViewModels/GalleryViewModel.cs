@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Adamantium.Core.DependencyInjection;
 using Adamantium.MVVM;
 using Adamantium.UI.Controls;
 
@@ -38,8 +39,11 @@ public partial class GalleryViewModel
     // Drives the TabControl.ContentTransition from a DropDown (enum-bound) so the tab-content slide mode switches live.
     [Bindable] private ContentTransition _slideMode = ContentTransition.SlideLeft;
 
-    public GalleryViewModel()
+    public GalleryViewModel(IDependencyResolver resolver)
     {
+        // The Navigation tab owns a region and needs INavigationService - resolve it through DI (which injects the service)
+        // rather than newing it here. It's the default tab so the demo opens on it.
+        Tabs.Insert(0, resolver.Resolve<NavigationDemoViewModel>());
         SelectedTab = Tabs[0];
     }
 }

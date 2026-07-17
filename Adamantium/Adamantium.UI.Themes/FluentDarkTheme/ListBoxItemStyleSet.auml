@@ -20,7 +20,9 @@
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="CornerRadius" Value="4"/>
         <Setter Property="Padding" Value="10 6"/>
-        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <!-- Stretch so item content fills the row (Fluent/WinUI default): a templated View/card spans the full width, and
+             plain text still reads left (a TextBlock left-aligns its text inside the stretched presenter). -->
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
 

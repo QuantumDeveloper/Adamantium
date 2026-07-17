@@ -5,6 +5,9 @@
 
     <!-- Caption/border colours: theme defaults the user can override on the window (accent when focused, neutral when not). -->
     <Style Selector="Window">
+        <!-- Default window background so any window (incl. a code-created custom shell) is themed, not the black clear
+             colour. An explicit Background on the window instance (e.g. MainWindow) overrides this. -->
+        <Setter Property="Background" Value="{ResourceReference SolidBackgroundFillColorBase}"/>
         <Setter Property="TitleBarBackground" Value="{ThemeResource AccentFillColorDefault}"/>
         <Setter Property="InactiveTitleBarBackground" Value="{ResourceReference SolidBackgroundFillColorBase}"/>
         <!-- Caption foreground: active = the theme's on-accent contrast colour (so title text + button glyphs read on the

@@ -41,6 +41,12 @@ namespace Adamantium.Graphics.Core
         // One shared heap per logical device, used by every render-device wrapper (they share one VkDevice).
         public IDescriptorHeapManager DescriptorHeapManager { get; private set; }
 
+        // One shared device-memory allocator per logical device (same reason as the heap). Render devices reach it via
+        // this and sub-allocate from its blocks, so no render device grabs its own big host-visible BAR block. Created
+        // lazily on first use (once ResourceLoaderDevice exists) but OWNED here - a render device never creates one.
+        private IDeviceMemoryAllocator _memoryAllocator;
+        public IDeviceMemoryAllocator MemoryAllocator => _memoryAllocator ??= _graphicsDeviceFactory.CreateMemoryAllocator(ResourceLoaderDevice);
+
         public Device LogicalDevice { get; private set; }
 
         public uint AvailableQueuesCount { get; private set; }
@@ -441,6 +447,11 @@ namespace Adamantium.Graphics.Core
             ResourceLoaderDevice?.Dispose();
             ResourceLoaderDevice = null;
             DescriptorHeapManager = null;
+
+            // After every device's buffers have returned their sub-ranges, free the shared blocks (uses the still-alive
+            // shared LogicalDevice). Before the logical device itself is destroyed.
+            _memoryAllocator?.Dispose();
+            _memoryAllocator = null;
 
             LogicalDevice?.Dispose();
             LogicalDevice = null;

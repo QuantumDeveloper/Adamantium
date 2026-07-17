@@ -489,6 +489,9 @@ public class TabControl : Selector
         {
             _indicator.IsHitTestVisible = false;   // a thin overlay bar must never eat a tab click
             _indicatorPlaced = false;
+            // Start hidden when there's nothing selected, so an empty strip shows no stray 1px accent bar (UpdateIndicator
+            // makes it visible once a tab is selected + placed).
+            if (Items.Count == 0 || SelectedIndex < 0) _indicator.Visibility = Visibility.Collapsed;
             // A fresh indicator (new template) has no animation running on it. If a selection-slide was mid-flight on the
             // OLD indicator when the template swapped, its completion callback never fires (that indicator is gone), so
             // this flag would stay stuck true and gate PlaceIndicator off forever - the bar would never re-place after a
@@ -577,7 +580,19 @@ public class TabControl : Selector
 
     private void UpdateIndicator(bool animate)
     {
+        // No selected tab (an empty TabControl, or a deselected strip): hide the bar. Otherwise its default 1px template
+        // rectangle lingers as a stray accent pixel in the strip's corner (it is only ever positioned/sized via its
+        // RenderTransform, which UpdateIndicator skips when there's nothing to underline). Reset _indicatorPlaced so it
+        // SNAPS (not slides from a stale spot) when a tab is next selected.
+        if (_indicator != null && (Items.Count == 0 || SelectedIndex < 0))
+        {
+            _indicator.Visibility = Visibility.Collapsed;
+            _indicatorPlaced = false;
+            return;
+        }
+
         if (!TryGetIndicatorTarget(out var along, out var extent, out var vertical)) return;
+        if (_indicator != null) _indicator.Visibility = Visibility.Visible;
 
         if (!animate && _indicatorPlaced && along == _lastAlong && extent == _lastExtent) return;
         _lastAlong = along;

@@ -1,0 +1,8 @@
+<Window x:Namespace="Adamantium.Game.Sandbox"
+        xmlns="http://adamantium/ui"
+        xmlns:x="http://adamantium/ui/xaml/extensions"
+        x:CreateInDesignTime="False"
+        Title="Workspace"
+        Width="900"
+        Height="600">
+</Window>

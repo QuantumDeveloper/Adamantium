@@ -19,19 +19,19 @@ namespace Adamantium.Graphics;
 /// the buffer wherever it is bound (its bind offset included). Images are NOT routed here (buffer-image granularity, and
 /// they are few + large); this is buffers only.
 /// </summary>
-public sealed class DeviceMemoryAllocator : IDisposable
+public sealed class DeviceMemoryAllocator : IDeviceMemoryAllocator
 {
     // 64 MB blocks in a big VRAM heap, but never more than heapSize/8 so the tiny (~214 MB) host-visible BAR window still
     // fits several blocks. A single allocation larger than the block size gets its own exact-size dedicated block.
     private const ulong DefaultBlockSize = 64UL * 1024 * 1024;
     private const ulong MinBlockSize = 4UL * 1024 * 1024;
 
-    private readonly GraphicsDevice _device;
+    private readonly IGraphicsDevice _device;
     private readonly object _lock = new();
     private readonly Dictionary<int, List<Block>> _groups = new();   // key = GroupKey(memoryTypeIndex, deviceAddress)
     private readonly ulong[] _heapSizeByType;   // heap byte size behind each memory-type index (block-size cap)
 
-    public DeviceMemoryAllocator(GraphicsDevice device)
+    public DeviceMemoryAllocator(IGraphicsDevice device)
     {
         _device = device;
         var memProps = device.Adapter.Adapter.GetPhysicalDeviceMemoryProperties();

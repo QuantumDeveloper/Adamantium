@@ -1,0 +1,22 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:nav="clr-namespace:Adamantium.UI.Controls.Navigation;assembly=Adamantium.UI.Controls">
+    <!-- Second window's content. The TabControl carries no ItemsSource/SelectedItem of its own: nav:RegionManager.RegionName
+         binds it to the named "workspace" region, so the manager alone opens/activates/closes tabs. The buttons drive the
+         region through the VM. -->
+    <Grid RowDefinitions="Auto,*" Margin="16">
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+            <TextBlock Text="A TabControl driven purely by the navigation manager" VerticalAlignment="Center" Margin="0,0,16,0"/>
+            <Button Content="Open Doc"   Command="{Binding OpenDocCommand}"   Width="100" Height="32" Margin="0,0,8,0"/>
+            <Button Content="Open Chart" Command="{Binding OpenChartCommand}" Width="100" Height="32" Margin="0,0,8,0"/>
+            <Button Content="Close tab"  Command="{Binding CloseTabCommand}"  Width="90"  Height="32"/>
+        </StackPanel>
+
+        <TabControl Grid.Row="1" nav:RegionManager.RegionName="workspace">
+            <TabControl.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding Title}" VerticalTextAlignment="Center"/>
+                </DataTemplate>
+            </TabControl.ItemTemplate>
+        </TabControl>
+    </Grid>
+</View>

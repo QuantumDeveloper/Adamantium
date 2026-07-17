@@ -1,6 +1,8 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Adamantium.MVVM;
+using Adamantium.Navigation;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Core;
 using Adamantium.Win32;
@@ -10,6 +12,21 @@ namespace Adamantium.Game.Sandbox.ViewModels;
 [ViewModel]
 public partial class MainViewModel
 {
+    private readonly INavigationService _navigation;
+    private readonly WindowDemoSettings _settings;
+
+    public MainViewModel(INavigationService navigation, WindowDemoSettings settings)
+    {
+        _navigation = navigation;
+        _settings = settings;
+    }
+
+    // Opens the SECOND window entirely from the view model: name the "workspace" shell (a custom WorkspaceWindow) and the
+    // framework creates it and loads WorkspaceShellViewModel's view - this VM never touches a Window type. The
+    // single-instance mode follows the shared setting (toggled from the Navigation tab).
+    [Command] private Task OpenWorkspace() =>
+        _navigation.OpenWindowAsync<WorkspaceShellViewModel>(windowShell: "workspace", singleInstance: !_settings.AllowDuplicateWindows);
+
     [Command]
     private void ShowMessage()
     {
@@ -56,6 +73,7 @@ public partial class MainViewModel
         new WindowCommand { IconData = "M0,3 L5,3 L6,1 L13,1 L13,13 L0,13 Z",      Label = "Open", ToolTip = "Open",      Command = RunActionCommand, CommandParameter = "Open" },
         new WindowCommand { IconData = "M7,1 L7,9 M3,5 L7,9 L11,5 M1,13 L13,13",   Label = "Save", ToolTip = "Save",      Command = RunActionCommand, CommandParameter = "Save" },
         new WindowCommand { IconData = "M5,2 L1,7 L5,12 M1,7 L13,7",               Label = "Undo", ToolTip = "Undo",      Command = RunActionCommand, CommandParameter = "Undo" },
+        new WindowCommand { IconData = "M1,2 L13,2 L13,12 L1,12 Z M1,5 L13,5",     Label = "Workspace", ToolTip = "Open workspace window", Command = OpenWorkspaceCommand },
         new WindowCommand { IconData = "M7,0 L14,7 L7,14 L0,7 Z",                  Label = "Help", ToolTip = "Help",      Command = RunActionCommand, CommandParameter = "Help" },
     };
 

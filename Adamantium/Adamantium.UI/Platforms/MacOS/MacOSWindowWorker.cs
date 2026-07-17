@@ -96,6 +96,11 @@ public class MacOSWindowWorker : AdamantiumComponent, IWindowWorkerService
         throw new NotImplementedException();
     }
 
+    // TODO(macOS): NSApplication.activate + [NSWindow makeKeyAndOrderFront:]. No-op until the macOS window pipeline lands.
+    public void Activate()
+    {
+    }
+
     // OS-level mouse capture so a press-drag keeps tracking once the pointer leaves the window (the shared "when" is in
     // MouseDevice.SyncOsMouseCapture - already wired here so macOS won't re-hit the Win32 capture bug once its mouse
     // input is implemented). TODO(macOS): NSWindow has no SetCapture; route drag tracking via the window's tracking
