@@ -188,7 +188,7 @@ public class PointLightTool : LightToolBase
             Tool.TraverseByLayer(
                 current =>
                 {
-                    current.Transform.CalculateFinalTransform(camera, Vector3F.Zero);
+                    current.Transform.CalculateFinalTransform(camera, Vector3F.Zero, Matrix4x4F.Identity);
                 });
         }
     }
@@ -206,11 +206,11 @@ public class PointLightTool : LightToolBase
         var upPos = position + ((scale.X / 2 - 0.5f * toolScale) * rot.Up);
         var downPos = position + ((scale.X / 2 - 0.5f * toolScale) * rot.Down);
 
-        anchorRight.Transform.SetPosition(rightPos);
-        anchorForward.Transform.SetPosition(forwardPos);
-        anchorLeft.Transform.SetPosition(leftPos);
-        anchorBackward.Transform.SetPosition(backwardPos);
-        anchorUp.Transform.SetPosition(upPos);
-        anchorDown.Transform.SetPosition(downPos);
+        anchorRight.Transform.Position = rightPos;
+        anchorForward.Transform.Position = forwardPos;
+        anchorLeft.Transform.Position = leftPos;
+        anchorBackward.Transform.Position = backwardPos;
+        anchorUp.Transform.Position = upPos;
+        anchorDown.Transform.Position = downPos;
     }
 }

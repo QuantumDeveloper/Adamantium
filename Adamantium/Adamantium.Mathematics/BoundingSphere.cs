@@ -58,6 +58,22 @@ namespace Adamantium.Mathematics
       }
 
       /// <summary>
+      /// Transform the sphere by a full affine matrix (e.g. a composed hierarchical world transform): the centre goes
+      /// through the matrix as a point and the radius scales by the LARGEST axis scale, so scale and translation from the
+      /// whole parent chain apply. The max axis length keeps the sphere conservative under non-uniform scale.
+      /// </summary>
+      public BoundingSphere Transform(Matrix4x4F matrix)
+      {
+         var center = Vector3F.TransformCoordinate(Center, matrix);
+         var scale = matrix.Right.Length();
+         var up = matrix.Up.Length();
+         var forward = matrix.Forward.Length();
+         if (up > scale) scale = up;
+         if (forward > scale) scale = forward;
+         return new BoundingSphere(center, Radius * scale);
+      }
+
+      /// <summary>
       /// Determines if there is an intersection between the current object and a <see cref="Ray"/>.
       /// </summary>
       /// <param name="ray">The ray to test.</param>

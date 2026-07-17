@@ -81,11 +81,11 @@ public static class ShapesGenerator
             var collider = primitive.GetComponent<Collider>();
             var size = Vector3F.Average(collider.Bounds.Size);
             var pos = primitive.GetPositionForNewObject(camera, size);
-            primitive.Transform.SetPosition(pos);
+            primitive.Transform.Position = pos;
         }
         else if (initialPosition != null && camera != null)
         {
-            primitive.Transform.SetPosition(initialPosition.Value);
+            primitive.Transform.Position = initialPosition.Value;
         }
         entityWorld.EntityManager.AddEntity(primitive);
         return primitive;

@@ -81,7 +81,7 @@ public class PivotTool: ToolBase
         {
             Tool.IsEnabled = true;
             UpdateToolTransform(targetEntity, cameraManager, false, true, false);
-            Tool.Transform.SetRotation(targetEntity.Transform.PivotRotation);
+            Tool.Transform.Rotation = targetEntity.Transform.PivotRotation;
             Tool.TraverseByLayer(
                 current =>
                 {
@@ -172,7 +172,7 @@ public class PivotTool: ToolBase
                 camera.Up,
                 camera.Forward);
             var rot = MathHelper.GetRotationFromMatrix(billboardMatrix);
-            current.Transform.SetRotation(rot);
+            current.Transform.Rotation = rot;
         }
     }
 
@@ -228,7 +228,7 @@ public class PivotTool: ToolBase
             true);
 
         center = entityToTransform.GetCenterAbsolute();
-        Tool.Transform.SetPosition(center);
+        Tool.Transform.Position = center;
 
         lastCoordinates = rayPlaneInterPoint;
     }
@@ -316,7 +316,7 @@ public class PivotTool: ToolBase
             Tool.TraverseInDepth(
                 current =>
                 {
-                    current.Transform.CalculateFinalTransform(camera, Vector3F.Zero);
+                    current.Transform.CalculateFinalTransform(camera, Vector3F.Zero, Matrix4x4F.Identity);
                 });
         }
     }

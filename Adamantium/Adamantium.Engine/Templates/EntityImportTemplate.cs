@@ -125,7 +125,7 @@ public class EntityImportTemplate : IEntityTemplate
             CalculateBoundBoxes(owner);
             var collider = owner.GetComponent<Collider>();
             //owner.Transform.SetPosition(owner.GetPositionForNewObject(camera, Vector3F.Max(collider.Bounds.Size)));
-            owner.Transform.SetPosition(initialPosition);
+            owner.Transform.Position = initialPosition;
             return Task.FromResult(owner);
         }
         catch (Exception exception)

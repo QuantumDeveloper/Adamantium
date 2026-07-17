@@ -144,7 +144,7 @@ public class LightManager : GameManagerBase
                 break;
         }
             
-        light.Transform.SetPosition(light.GetPositionForNewObject(camera, diameter));
+        light.Transform.Position = light.GetPositionForNewObject(camera, diameter);
         AddLight(light);
         return light;
     }
