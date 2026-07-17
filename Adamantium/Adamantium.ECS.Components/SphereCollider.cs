@@ -42,7 +42,9 @@ namespace Adamantium.ECS.Components
 
       public override void UpdateForCamera(CameraBase camera)
       {
-         var bb = sphere.Transform(Vector3F.Max(Owner.Transform.Scale), Owner.Transform.GetMetadata(camera).RelativePosition);
+         // Same fix as BoxCollider: transform the LOCAL sphere by the composed world matrix (what the mesh is drawn with)
+         // so hierarchical (child) entities cull against their real world position, not their local offset.
+         var bb = sphere.Transform(Owner.Transform.GetMetadata(camera).WorldMatrixF);
          if (!ColliderData.ContainsKey(camera))
          {
             ColliderData.Add(camera, bb);

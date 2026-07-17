@@ -135,7 +135,7 @@ public abstract class ToolBase
         {
             foreach (var activeCamera in cameraManager.ActiveCameras)
             {
-                current.Transform.CalculateFinalTransform(activeCamera, Vector3F.Zero);
+                current.Transform.CalculateFinalTransform(activeCamera, Vector3F.Zero, Matrix4x4F.Identity);
             }
         }, true);
     }
@@ -224,7 +224,7 @@ public abstract class ToolBase
             Tool.TraverseInDepth(
                 current =>
                 {
-                    current.Transform.CalculateFinalTransform(camera, Vector3F.Zero);
+                    current.Transform.CalculateFinalTransform(camera, Vector3F.Zero, Matrix4x4F.Identity);
                 });
         }
     }

@@ -203,7 +203,7 @@ public class SpotLightTool : LightToolBase
             Tool.TraverseByLayer(
                 current =>
                 {
-                    current.Transform.CalculateFinalTransform(camera, Vector3F.Zero);
+                    current.Transform.CalculateFinalTransform(camera, Vector3F.Zero, Matrix4x4F.Identity);
                 });
         }
     }
@@ -220,10 +220,10 @@ public class SpotLightTool : LightToolBase
         var leftPos = newPos2 + ((scale.X / 2 - 0.5f * toolScale) * rot.Left);
         var backwardPos = newPos2 + ((scale.X / 2 - 0.5f * toolScale) * rot.Backward);
 
-        anchorCenter.Transform.SetPosition(newPos2);
-        anchorRight.Transform.SetPosition(rightPos);
-        anchorForward.Transform.SetPosition(forwardPos);
-        anchorLeft.Transform.SetPosition(leftPos);
-        anchorBackward.Transform.SetPosition(backwardPos);
+        anchorCenter.Transform.Position = newPos2;
+        anchorRight.Transform.Position = rightPos;
+        anchorForward.Transform.Position = forwardPos;
+        anchorLeft.Transform.Position = leftPos;
+        anchorBackward.Transform.Position = backwardPos;
     }
 }

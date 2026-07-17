@@ -200,7 +200,7 @@ public class RotationTool: ToolBase
                 camera.Up,
                 camera.Forward);
             var rot = MathHelper.GetRotationFromMatrix(billboardMatrix);
-            current.Transform.SetRotation(rot);
+            current.Transform.Rotation = rot;
         }
     }
 

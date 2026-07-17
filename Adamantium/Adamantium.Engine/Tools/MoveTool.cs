@@ -193,7 +193,7 @@ public class MoveTool: ToolBase
             }
         }
         var center = entityToTransform.GetCenterAbsolute();
-        Tool.Transform.SetPosition(center);
+        Tool.Transform.Position = center;
 
         previousCoordinates = rayPlaneInterPoint;
     }

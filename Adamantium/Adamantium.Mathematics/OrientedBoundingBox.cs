@@ -158,6 +158,36 @@ namespace Adamantium.Mathematics
                                             Orientation * rotation);
         }
 
+        /// <summary>
+        /// Transform the box by a full affine matrix (e.g. a composed hierarchical world transform). The centre goes
+        /// through the matrix as a point and each oriented half-extent axis through its linear part, so scale and rotation
+        /// from the WHOLE parent chain apply - unlike the scale/rotation/translation overloads, which only take a single
+        /// node's local TRS. Reads the box axes with the same Right/Up/Forward accessors <see cref="GetCorners()"/> uses,
+        /// so the transformed corners coincide with the local corners run through <paramref name="matrix"/>. Exact for
+        /// similarity transforms; a shear is folded back to the nearest oriented box.
+        /// </summary>
+        public OrientedBoundingBox Transform(Matrix4x4F matrix)
+        {
+            var orientation = Matrix4x4F.RotationQuaternion(Orientation);
+            var axisX = Vector3F.TransformNormal(orientation.Right * HalfExtent.X, matrix);
+            var axisY = Vector3F.TransformNormal(orientation.Up * HalfExtent.Y, matrix);
+            var axisZ = Vector3F.TransformNormal(orientation.Forward * HalfExtent.Z, matrix);
+
+            var newHalfExtent = new Vector3F(axisX.Length(), axisY.Length(), axisZ.Length());
+            var newCenter = Vector3F.TransformCoordinate(Center, matrix);
+
+            axisX.Normalize();
+            axisY.Normalize();
+            axisZ.Normalize();
+
+            var basis = Matrix4x4F.Identity;
+            basis.Right = axisX;
+            basis.Up = axisY;
+            basis.Forward = axisZ;
+
+            return new OrientedBoundingBox(newCenter, newHalfExtent, QuaternionF.RotationMatrix(basis));
+        }
+
         #endregion
 
         #region IEquatable implementation

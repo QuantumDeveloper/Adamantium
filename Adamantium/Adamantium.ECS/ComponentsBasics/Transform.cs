@@ -224,20 +224,6 @@ namespace Adamantium.ECS.ComponentsBasics
             }
         }
 
-        public void SetScalingRotation(QuaternionF rotation)
-        {
-            lock (this)
-            {
-                if (Owner == null && IsEnabled)
-                {
-                    PivotRotation = rotation;
-                    return;
-                }
-
-                Traverse(entity => SetScalingRotation(entity, rotation));
-            }
-        }
-
         public void Translate(Vector3 direction, Vector3 distance)
         {
             lock (this)
@@ -280,34 +266,6 @@ namespace Adamantium.ECS.ComponentsBasics
                 }
 
                 Traverse(entity => TranslatePivot(entity, distanceVector));
-            }
-        }
-
-        public void SetPosition(Vector3 newPosition)
-        {
-            lock (this)
-            {
-                if (Owner == null && IsEnabled)
-                {
-                    Position = newPosition;
-                    return;
-                }
-
-                Traverse(entity => SetPosition(entity, newPosition));
-            }
-        }
-
-        public void SetPivot(Vector3 pivotPosition)
-        {
-            lock (this)
-            {
-                if (Owner == null && IsEnabled)
-                {
-                    Pivot = pivotPosition;
-                    return;
-                }
-
-                Traverse(entity => SetPivot(entity, pivotPosition));
             }
         }
 
@@ -498,7 +456,7 @@ namespace Adamantium.ECS.ComponentsBasics
         {
             var rotMatr = camera.RotationMatrix;
             var quat = QuaternionF.RotationLookAtLH(rotMatr.Forward, rotMatr.Up);
-            Owner.Transform.SetRotation(quat);
+            Owner.Transform.Rotation = quat;
         }
 
         ///<summary>
@@ -508,29 +466,7 @@ namespace Adamantium.ECS.ComponentsBasics
         {
             var rotMatr = camera.RotationMatrix;
             var quat = QuaternionF.RotationLookAtLH(rotMatr.Backward, rotMatr.Up);
-            Owner.Transform.SetRotation(quat);
-        }
-
-        public void SetRotation(QuaternionF rotation)
-        {
-            if (Owner == null && IsEnabled)
-            {
-                Rotation = rotation;
-                return;
-            }
-
-            Traverse(entity => SetRotation(entity, rotation));
-        }
-
-        public void SetPivotRotation(QuaternionF rotation)
-        {
-            if (Owner == null && IsEnabled)
-            {
-                PivotRotation = rotation;
-                return;
-            }
-
-            Traverse(entity => SetPivotRotation(entity, rotation));
+            Owner.Transform.Rotation = quat;
         }
 
         public void SetScaleFactor(float factor)
@@ -666,14 +602,6 @@ namespace Adamantium.ECS.ComponentsBasics
             }
         }
 
-        private void SetScalingRotation(Entity entity, QuaternionF rotation)
-        {
-            if (entity.Transform.IsEnabled)
-            {
-                entity.Transform.PivotRotation = rotation;
-            }
-        }
-
         private void TranslatePivot(Entity entity, Vector3 distance)
         {
             if (entity.Transform.IsEnabled)
@@ -706,23 +634,37 @@ namespace Adamantium.ECS.ComponentsBasics
             }
         }
 
-        public Matrix4x4F CalculateFinalTransform(CameraBase camera, Vector3F pivotCorrection)
+        public Matrix4x4F CalculateFinalTransform(CameraBase camera, Vector3F pivotCorrection, Matrix4x4F parentWorld)
         {
             var scaling = Scale;
-            var relativePosition = GetRelativePosition(camera.Owner.Transform.Position);
+            // LOCAL position (relative to the parent), NOT camera-relative: the camera shift is applied once, at the end,
+            // to the composed world - otherwise it would be subtracted once per level of the hierarchy.
+            var localPosition = (Vector3F)Position;
             var finalPivot = (Vector3F)pivot + pivotCorrection;
             var scalingCenter = finalPivot;
-            
-            Matrix4x4F.Transformation(ref scalingCenter, ref pivotRotation, ref scaling, ref finalPivot, ref rotation, ref relativePosition, out var matrix);
+
+            Matrix4x4F.Transformation(ref scalingCenter, ref pivotRotation, ref scaling, ref finalPivot, ref rotation, ref localPosition, out var localMatrix);
+
+            // THE hierarchical fix: compose through the parent (row-vector convention -> local * parent). The parent's
+            // absolute world was computed earlier this frame (TransformService walks the tree top-down), so a parent
+            // transform now flows into its children. For a root, parentWorld is identity and this leaves the matrix as-is.
+            var absoluteWorld = localMatrix * parentWorld;
+
+            // Camera-relative render matrix: the view matrix is rotation-only (the camera sits at the origin), so shift
+            // the composed world by the camera's own position. The game's Free camera is always at zero -> a no-op there;
+            // this only matters for the moving tool/third-person cameras.
+            var cameraPosition = (Vector3F)camera.Owner.Transform.Position;
+            var renderWorld = absoluteWorld * Matrix4x4F.Translation(-cameraPosition);
 
             var metadata = GetMetadata(camera);
-            metadata.RelativePosition = relativePosition;
+            metadata.AbsoluteWorld = absoluteWorld;
+            metadata.RelativePosition = GetRelativePosition(camera.Owner.Transform.Position);
             metadata.Pivot = finalPivot;
-            metadata.WorldMatrixF = matrix;
-            metadata.WorldMatrix = (Matrix4x4)matrix;
+            metadata.WorldMatrixF = renderWorld;
+            metadata.WorldMatrix = (Matrix4x4)renderWorld;
             metadata.Rotation = Rotation;
             metadata.Scale = Scale;
-            return matrix;
+            return renderWorld;
         }
 
         public override void CloneValues(IComponent component)

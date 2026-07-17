@@ -221,7 +221,7 @@ public class ToolsManager : GameManagerBase
             {
                 foreach (var activeCamera in cameraManager.ActiveCameras)
                 {
-                    current.Transform.CalculateFinalTransform(activeCamera, Vector3F.Zero);
+                    current.Transform.CalculateFinalTransform(activeCamera, Vector3F.Zero, Matrix4x4F.Identity);
                 }
             });
 

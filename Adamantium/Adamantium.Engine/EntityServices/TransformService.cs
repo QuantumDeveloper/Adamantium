@@ -5,6 +5,7 @@ using Adamantium.Engine.Services;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
+using Adamantium.Mathematics;
 using Adamantium.Win32;
 
 namespace Adamantium.Engine.EntityServices;
@@ -65,7 +66,12 @@ public class TransformService : EntityService
                     continue;
                 }
 
-                current.Transform.CalculateFinalTransform(camera, generalCenter);
+                // The owner's world for THIS camera, computed already (the walk is top-down); identity for a root. This is
+                // what makes the transform hierarchy real - the child composes onto the parent instead of standing alone.
+                var parentWorld = current.Owner?.Transform != null
+                    ? current.Owner.Transform.GetMetadata(camera).AbsoluteWorld
+                    : Matrix4x4F.Identity;
+                current.Transform.CalculateFinalTransform(camera, generalCenter, parentWorld);
 
                 for (int i = 0; i < colliders.Length; ++i)
                 {

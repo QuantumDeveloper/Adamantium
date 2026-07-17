@@ -35,7 +35,11 @@ namespace Adamantium.ECS.Components
 
         public override void UpdateForCamera(CameraBase camera)
         {
-            var bb = obb.Transform(Owner.Transform.Scale, Owner.Transform.Rotation, Owner.Transform.GetMetadata(camera).RelativePosition);
+            // Transform the LOCAL box by the entity's composed world matrix - the exact same matrix the mesh is drawn with
+            // - so the culling bounds follow the transform hierarchy. Using the node's own Scale/Rotation/local position
+            // instead left a child's bounds at its local offset while the mesh drew at its composed world position, so the
+            // frustum test culled parts that were actually on screen (they vanished as the camera moved in).
+            var bb = obb.Transform(Owner.Transform.GetMetadata(camera).WorldMatrixF);
 
             ColliderData[camera] = bb;
         }

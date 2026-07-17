@@ -145,7 +145,7 @@ public class ScaleTool : ToolBase
 
                 selectedTool.Owner.Transform.ScaleFactor = new Vector3F(toolScale * _scale.X, 1, 1);
                 var scaleDelta =  CalculateManipulatorPosition(_scale.X, sign.X, selectedTool.Transform.BaseScale.X, rightPos, matrix.Right);
-                selectedTool.Transform.SetPosition(scaleDelta);
+                selectedTool.Transform.Position = scaleDelta;
             }
         }
         else if (selectedTool == upManipulator)
@@ -168,7 +168,7 @@ public class ScaleTool : ToolBase
 
                 selectedTool.Owner.Transform.ScaleFactor = new Vector3F(1, toolScale * _scale.Y, 1);
                 var scaleDelta = CalculateManipulatorPosition(_scale.Y, sign.Y, selectedTool.Transform.BaseScale.Y, upPos, matrix.Up);
-                selectedTool.Transform.SetPosition(scaleDelta);
+                selectedTool.Transform.Position = scaleDelta;
             }
         }
         else if (selectedTool == forwardManipulator)
@@ -190,7 +190,7 @@ public class ScaleTool : ToolBase
                     });
                 selectedTool.Owner.Transform.ScaleFactor = toolScale * new Vector3F(1, 1, _scale.Z);
                 var scaleDelta = CalculateManipulatorPosition(_scale.Z, sign.Z, selectedTool.Transform.BaseScale.Z, forwardPos, matrix.Backward);
-                selectedTool.Transform.SetPosition(scaleDelta);
+                selectedTool.Transform.Position = scaleDelta;
             }
         }
         else if (selectedTool == rightForwardManipulator)
@@ -223,9 +223,9 @@ public class ScaleTool : ToolBase
                 var rightForwardX = CalculateManipulatorPosition(averageScale, sign.X, rightForwardManipulator.Transform.BaseScale.X, matrix.Right);
                 var rightForwardZ = CalculateManipulatorPosition(averageScale, sign.Z, rightForwardManipulator.Transform.BaseScale.Z, matrix.Backward);
                     
-                rightManipulator.Transform.SetPosition(scaleDeltaX);
-                forwardManipulator.Transform.SetPosition(scaleDeltaZ);
-                selectedTool.Transform.SetPosition(rightForwardX + rightForwardZ + rightForwardPos);
+                rightManipulator.Transform.Position = scaleDeltaX;
+                forwardManipulator.Transform.Position = scaleDeltaZ;
+                selectedTool.Transform.Position = rightForwardX + rightForwardZ + rightForwardPos;
             }
         }
         else if (selectedTool == upForwardManipulator)
@@ -258,9 +258,9 @@ public class ScaleTool : ToolBase
                 var upForwardY = CalculateManipulatorPosition(averageScale, sign.Y, upForwardManipulator.Transform.BaseScale.Y, matrix.Up);
                 var upForwardZ = CalculateManipulatorPosition(averageScale, sign.Z, upForwardManipulator.Transform.BaseScale.Z, matrix.Backward);
                     
-                upManipulator.Transform.SetPosition(scaleDeltaY);
-                forwardManipulator.Transform.SetPosition(scaleDeltaZ);
-                selectedTool.Transform.SetPosition(upForwardY + upForwardZ + upForwardPos);
+                upManipulator.Transform.Position = scaleDeltaY;
+                forwardManipulator.Transform.Position = scaleDeltaZ;
+                selectedTool.Transform.Position = upForwardY + upForwardZ + upForwardPos;
             }
         }
         else if (selectedTool == rightUpManipulator)
@@ -294,10 +294,10 @@ public class ScaleTool : ToolBase
                 var rightUpX = CalculateManipulatorPosition(averageScale, sign.X, rightUpManipulator.Transform.BaseScale.X, matrix.Right);
                 var rightUpY = CalculateManipulatorPosition(averageScale, sign.Y, rightUpManipulator.Transform.BaseScale.Y, matrix.Up);
 
-                rightManipulator.Transform.SetPosition(scaleDeltaX);
-                upManipulator.Transform.SetPosition(scaleDeltaY);
+                rightManipulator.Transform.Position = scaleDeltaX;
+                upManipulator.Transform.Position = scaleDeltaY;
 
-                selectedTool.Transform.SetPosition(rightUpX + rightUpY + rightUpPos);
+                selectedTool.Transform.Position = rightUpX + rightUpY + rightUpPos;
             }
         }
         else if (selectedTool == centralManipulator)
@@ -328,9 +328,9 @@ public class ScaleTool : ToolBase
                 upManipulator.Transform.Position = scaleDeltaY + upPos;
                 forwardManipulator.Transform.Position = scaleDeltaZ + forwardPos;
 
-                rightForwardManipulator.Transform.SetPosition(scaleDeltaX + scaleDeltaZ + rightForwardPos);
-                upForwardManipulator.Transform.SetPosition(scaleDeltaY + scaleDeltaZ + upForwardPos);
-                rightUpManipulator.Transform.SetPosition(scaleDeltaX + scaleDeltaY + rightUpPos);
+                rightForwardManipulator.Transform.Position = scaleDeltaX + scaleDeltaZ + rightForwardPos;
+                upForwardManipulator.Transform.Position = scaleDeltaY + scaleDeltaZ + upForwardPos;
+                rightUpManipulator.Transform.Position = scaleDeltaX + scaleDeltaY + rightUpPos;
             }
         }
     }
@@ -381,13 +381,13 @@ public class ScaleTool : ToolBase
         var rightForwardPosition = CalculateManipulatorPositionEx(scale.Z, upManipulator.Transform.BaseScale.Y, rightDelta, matrix.Backward);
         var upForwardPosition = CalculateManipulatorPositionEx(scale.Z, upManipulator.Transform.BaseScale.Y, upDelta, matrix.Backward);
 
-        rightManipulator.Transform.SetPosition(rightDelta);
-        upManipulator.Transform.SetPosition(upDelta);
-        forwardManipulator.Transform.SetPosition(forwardDelta);
+        rightManipulator.Transform.Position = rightDelta;
+        upManipulator.Transform.Position = upDelta;
+        forwardManipulator.Transform.Position = forwardDelta;
 
-        rightUpManipulator.Transform.SetPosition(rightUpPosition);
-        rightForwardManipulator.Transform.SetPosition(rightForwardPosition);
-        upForwardManipulator.Transform.SetPosition(upForwardPosition);
+        rightUpManipulator.Transform.Position = rightUpPosition;
+        rightForwardManipulator.Transform.Position = rightForwardPosition;
+        upForwardManipulator.Transform.Position = upForwardPosition;
 
         if (scale.X < 0)
         {
