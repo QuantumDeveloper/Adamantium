@@ -58,7 +58,10 @@ public class TransformService : EntityService
         var generalCenter = entity.GetLocalCenter();
         entity.TraverseInDepth(current =>
         {
-            var colliders = current.GetComponents<Collider>();
+            var transform = current.Transform;
+            var dirty = transform.IsWorldDirty;
+            Collider[] colliders = null;
+
             foreach (var camera in cameraManager.ActiveCameras)
             {
                 if (camera.Owner == current)
@@ -66,27 +69,50 @@ public class TransformService : EntityService
                     continue;
                 }
 
-                // The owner's world for THIS camera, computed already (the walk is top-down); identity for a root. This is
-                // what makes the transform hierarchy real - the child composes onto the parent instead of standing alone.
+                var metadata = transform.GetMetadata(camera);
+                // Recompute this (node, camera) ONLY when an input to its world matrix changed: the node's own transform
+                // (dirty - also set below when its PARENT moved), the CAMERA position (the world is camera-relative; note a
+                // rotating camera does NOT move, so mouse-look costs nothing), the shared pivot, or a first-ever compute.
+                // A static scene therefore skips the whole matrix + collider pass instead of rebuilding it every frame.
+                if (!dirty && metadata.Computed
+                    && metadata.LastCameraPosition == camera.Owner.Transform.Position
+                    && metadata.LastPivotCorrection == generalCenter)
+                {
+                    continue;
+                }
+
+                // The owner's world for THIS camera, computed already (the walk is top-down); identity for a root.
                 var parentWorld = current.Owner?.Transform != null
                     ? current.Owner.Transform.GetMetadata(camera).AbsoluteWorld
                     : Matrix4x4F.Identity;
-                current.Transform.CalculateFinalTransform(camera, generalCenter, parentWorld);
+                transform.CalculateFinalTransform(camera, generalCenter, parentWorld);
 
+                // Collider bounds ride the same world matrix, so refresh them exactly when it was recomputed (fetch the
+                // list lazily so a fully-static node allocates nothing).
+                colliders ??= current.GetComponents<Collider>();
                 for (int i = 0; i < colliders.Length; ++i)
                 {
-                    colliders[i].ClearData();
-                    for (int j = 0; j < colliders.Length; ++j)
+                    colliders[i].UpdateForCamera(camera);
+                }
+            }
+
+            transform.IsWorldDirty = false;
+            // A moved node changes its children's parent-world, so dirty them for this same top-down pass (a camera move
+            // needs no propagation - every node detects that independently above).
+            if (dirty)
+            {
+                for (int i = 0; i < current.Dependencies.Count; ++i)
+                {
+                    var childTransform = current.Dependencies[i].Transform;
+                    if (childTransform != null)
                     {
-                        colliders[j].UpdateForCamera(camera);
+                        childTransform.IsWorldDirty = true;
                     }
                 }
             }
 
-            var animation = current.GetComponent<AnimationComponent>();
-            var controller = current.GetComponent<AnimationController>();
-            animation?.Update(gameTime);
-            controller?.Update(gameTime);
+            current.GetComponent<AnimationComponent>()?.Update(gameTime);
+            current.GetComponent<AnimationController>()?.Update(gameTime);
         });
     }
 }

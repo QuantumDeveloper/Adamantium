@@ -80,6 +80,7 @@ namespace Adamantium.ECS.ComponentsBasics
                 if (SetProperty(ref pivot, value))
                 {
                     pivot = value - Position;
+                    IsWorldDirty = true;
                 }
             }
         }
@@ -87,7 +88,13 @@ namespace Adamantium.ECS.ComponentsBasics
         public QuaternionF PivotRotation
         {
             get => pivotRotation;
-            set => SetProperty(ref pivotRotation, value);
+            set
+            {
+                if (SetProperty(ref pivotRotation, value))
+                {
+                    IsWorldDirty = true;
+                }
+            }
         }
 
         public Vector3 InitialPosition
@@ -99,13 +106,25 @@ namespace Adamantium.ECS.ComponentsBasics
         public Vector3 Position
         {
             get => position;
-            set => SetProperty(ref position, value);
+            set
+            {
+                if (SetProperty(ref position, value))
+                {
+                    IsWorldDirty = true;
+                }
+            }
         }
 
         public QuaternionF Rotation
         {
             get => rotation;
-            set => SetProperty(ref rotation, value);
+            set
+            {
+                if (SetProperty(ref rotation, value))
+                {
+                    IsWorldDirty = true;
+                }
+            }
         }
 
         public Vector3F BaseScale
@@ -115,6 +134,7 @@ namespace Adamantium.ECS.ComponentsBasics
             {
                 if (SetProperty(ref baseScale, value))
                 {
+                    IsWorldDirty = true;
                     RaisePropertyChanged(nameof(Scale));
                 }
             }
@@ -127,12 +147,18 @@ namespace Adamantium.ECS.ComponentsBasics
             {
                 if (SetProperty(ref scaleFactor, value))
                 {
+                    IsWorldDirty = true;
                     RaisePropertyChanged(nameof(Scale));
                 }
             }
         }
 
         public Vector3F Scale => baseScale * scaleFactor;
+
+        /// <summary>Set by the world-matrix input setters (position/rotation/scale/pivot). TransformService recomputes the
+        /// cached world matrix only for entities whose flag is set (or whose camera/parent moved), so a static subtree
+        /// costs nothing. Starts true so the first frame computes.</summary>
+        public bool IsWorldDirty { get; set; } = true;
 
         public void Move(Vector3 direction, Double distance)
         {
@@ -664,6 +690,10 @@ namespace Adamantium.ECS.ComponentsBasics
             metadata.WorldMatrix = (Matrix4x4)renderWorld;
             metadata.Rotation = Rotation;
             metadata.Scale = Scale;
+            // Record the inputs so TransformService can skip this (camera, node) next frame if none of them changed.
+            metadata.LastCameraPosition = camera.Owner.Transform.Position;
+            metadata.LastPivotCorrection = pivotCorrection;
+            metadata.Computed = true;
             return renderWorld;
         }
 
