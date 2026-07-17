@@ -27,6 +27,11 @@ public class ForwardRenderingProcessor : RenderingProcessor
     
     public override void Draw(AppTime gameTime)
     {
+        // Resolve the active camera ONCE per frame, not once per entity in the traversal below - it is invariant for the
+        // whole draw and GetActive takes a lock + dictionary lookup.
+        ActiveCamera = CameraManager.GetActive(Window);
+        if (ActiveCamera == null) return;
+
         foreach (var entity in Entities)
         {
             OnDraw(entity, gameTime);
@@ -47,8 +52,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
 
     private void DrawEntity(Entity entity, AppTime gameTime)
     {
-        ActiveCamera = CameraManager.GetActive(Window);
-        if (!entity.Visible || ActiveCamera == null)
+        if (!entity.Visible)
         {
             return;
         }
@@ -96,9 +100,9 @@ public class ForwardRenderingProcessor : RenderingProcessor
 
         if (renderers.Length <= 0) return;
 
+        var material = entity.GetComponent<Material>();
         foreach (var component in renderers)
         {
-            var material = entity.GetComponent<Material>();
             var wvp = transformation.WorldMatrixF * ActiveCamera.ViewMatrix * ActiveCamera.ProjectionMatrix;
             //var orthoProj = Matrix4x4F.OrthoOffCenter(0, Window.Width, 0, Window.Height, 1f, 100000f);
             //var wvp = transformation.WorldMatrixF * ActiveCamera.UiProjection;
