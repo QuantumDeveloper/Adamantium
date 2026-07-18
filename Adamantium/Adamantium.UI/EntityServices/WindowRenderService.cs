@@ -149,11 +149,25 @@ public class WindowRenderService : UiRenderService
 
     public override bool BeginDraw()
     {
+        // The service may have been unloaded (its window closed, or the app is shutting down) yet linger in the draw list
+        // for a frame until its removal propagates - renderer and presenter are already gone. Skip the frame instead of
+        // dereferencing a null presenter below (an NRE the render thread would swallow and log on every teardown).
+        if (windowRenderer?.Presenter == null) return false;
+
         // Refresh the analytic-AA switch from this window before recording (PreRender reads it in the beforeRenderPass
         // hook). Windows render serially, so this app-global flag is correct per window.
         Rendering.RenderUnits.AnalyticAa.Enabled = Window?.AnalyticAntialiasing ?? true;
         // Backdrop = the window's Background (theme-owned), read each frame so a theme swap / runtime change reflects it.
         GraphicsDevice.ClearColor = (Window?.Background as SolidColorBrush)?.Color ?? Colors.Black;
+        // A resize is pending (the loop thread cleared IsRendererUpToDate on a size/DPI/MSAA change): recreate the presenter
+        // NOW, before this frame draws, so the render thread never records/submits/presents against the STALE swapchain.
+        // ResizePresenter waits for device idle and runs on THIS (render) thread, so it is serialized with our own
+        // Submit/Present - it used to run only in FrameEnded, AFTER the frame had already been drawn against the old one.
+        if (windowRenderer.Presenter != null && !windowRenderer.IsRendererUpToDate)
+        {
+            windowRenderer.ResizePresenter((uint)(Window.ClientWidth * RenderScale), (uint)(Window.ClientHeight * RenderScale));
+        }
+
         GraphicsDevice.SetRenderTargets(windowRenderer.Presenter.RenderTarget);
         GraphicsDevice.SetDepthBuffer(windowRenderer.Presenter.DepthBuffer);
         GraphicsDevice.MSAALevel = windowRenderer.Presenter.MSAALevel;

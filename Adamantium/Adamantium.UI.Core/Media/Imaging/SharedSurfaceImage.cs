@@ -32,4 +32,14 @@ public sealed class SharedSurfaceImage : BitmapSource
 
         return Texture ??= factory.ImportSharedSurface(_descriptor);
     }
+
+    // The imported surface's GPU lifetime is owned by the ImageRenderComponent that samples it - it frees the import
+    // through the render device's fence-gated deferred-dispose when the compositor switches off it (a producer resize
+    // hands over a new surface). So this source must NOT dispose the texture: freeing it on the panel's / GC finalizer
+    // thread would race the render thread still replaying an op that samples it, or double-free what the component
+    // already released. Drop the reference only.
+    protected override void ReleaseUnmanagedResources()
+    {
+        Texture = null;
+    }
 }
