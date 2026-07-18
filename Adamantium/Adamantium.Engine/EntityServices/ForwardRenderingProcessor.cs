@@ -69,7 +69,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
                 if (collider.DisplayCollider)
                 {
                     var transform = entity.Transform.GetMetadata(ActiveCamera);
-                    var wvp = transform.WorldMatrixF * ActiveCamera.ViewMatrix * ActiveCamera.ProjectionMatrix;
+                    var wvp = transform.WorldMatrixF * ActiveCamera.ViewProjectionMatrix;
                     BasicEffect.Wvp.SetValue(wvp);
                     BasicEffect.MeshColor.SetValue(Colors.White.ToVector3());
                     BasicEffect.BasicColoredPass.Apply();
@@ -86,8 +86,9 @@ public class ForwardRenderingProcessor : RenderingProcessor
         var controller = entity.GetComponent<AnimationController>();
         if (controller != null && controller.FinalMatrices.Count > 0)
         {
-            var arr = controller.FinalMatrices.Values.ToArray();
-            //BasicEffect.Parameters["Bones"].SetValue(arr);
+            // Skinning is WIP; upload the bones here once the pass is wired (do NOT materialise the array every frame
+            // until it is actually consumed).
+            //BasicEffect.Parameters["Bones"].SetValue(controller.FinalMatrices.Values.ToArray());
         }
 
         var renderers = entity.GetComponents<MeshRendererBase>();
@@ -103,7 +104,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
         var material = entity.GetComponent<Material>();
         foreach (var component in renderers)
         {
-            var wvp = transformation.WorldMatrixF * ActiveCamera.ViewMatrix * ActiveCamera.ProjectionMatrix;
+            var wvp = transformation.WorldMatrixF * ActiveCamera.ViewProjectionMatrix;
             //var orthoProj = Matrix4x4F.OrthoOffCenter(0, Window.Width, 0, Window.Height, 1f, 100000f);
             //var wvp = transformation.WorldMatrixF * ActiveCamera.UiProjection;
             //var wvp = transformation.WorldMatrix * Matrix4x4F.Scaling(1, -1, 1) * Matrix4x4F.Scaling(2.0f / Window.Width, 2.0f/Window.Height, 1.0f / (100000f - 1f));

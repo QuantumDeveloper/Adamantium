@@ -165,13 +165,10 @@ namespace Adamantium.ECS.ComponentsBasics
             lock (this)
             {
                 var distanceVector = Vector3.Multiply(direction, distance);
-                if (Owner == null && IsEnabled)
+                if (IsEnabled)
                 {
                     Position = distanceVector;
-                    return;
                 }
-
-                Traverse(entity => Move(entity, distanceVector));
             }
         }
 
@@ -180,13 +177,10 @@ namespace Adamantium.ECS.ComponentsBasics
             lock (this)
             {
                 var distanceVector = Vector3.Multiply(direction, distance);
-                if (Owner == null && IsEnabled)
+                if (IsEnabled)
                 {
                     Position = distanceVector;
-                    return;
                 }
-
-                Traverse(entity => Move(entity, distanceVector));
             }
         }
 
@@ -195,13 +189,10 @@ namespace Adamantium.ECS.ComponentsBasics
             lock (this)
             {
                 var distanceVector = Vector3.Multiply(direction, distance);
-                if (Owner == null && IsEnabled)
+                if (IsEnabled)
                 {
                     Position += distanceVector;
-                    return;
                 }
-
-                Traverse(entity => Translate(entity, distanceVector));
             }
         }
 
@@ -210,13 +201,10 @@ namespace Adamantium.ECS.ComponentsBasics
             lock (this)
             {
                 var distanceVector = Vector3.Multiply((Vector3)GetRotationMatrixF().Right, distance);
-                if (Owner == null && IsEnabled)
+                if (IsEnabled)
                 {
                     Position += distanceVector;
-                    return;
                 }
-
-                Traverse(entity => Translate(entity, distanceVector));
             }
         }
 
@@ -225,13 +213,10 @@ namespace Adamantium.ECS.ComponentsBasics
             lock (this)
             {
                 var distanceVector = Vector3.Multiply((Vector3)GetRotationMatrixF().Up, distance);
-                if (Owner == null && IsEnabled)
+                if (IsEnabled)
                 {
                     Position += distanceVector;
-                    return;
                 }
-
-                Traverse(entity => Translate(entity, distanceVector));
             }
         }
 
@@ -240,13 +225,10 @@ namespace Adamantium.ECS.ComponentsBasics
             lock (this)
             {
                 var distanceVector = Vector3.Multiply((Vector3)GetRotationMatrixF().Forward, distance);
-                if (Owner == null && IsEnabled)
+                if (IsEnabled)
                 {
                     Position += distanceVector;
-                    return;
                 }
-
-                Traverse(entity => Translate(entity, distanceVector));
             }
         }
 
@@ -255,13 +237,10 @@ namespace Adamantium.ECS.ComponentsBasics
             lock (this)
             {
                 var distanceVector = Vector3.Multiply(direction, distance);
-                if (Owner == null && IsEnabled)
+                if (IsEnabled)
                 {
                     Position += distanceVector;
-                    return;
                 }
-
-                Traverse(entity => Translate(entity, distanceVector));
             }
         }
 
@@ -270,13 +249,10 @@ namespace Adamantium.ECS.ComponentsBasics
             lock (this)
             {
                 var distanceVector = Vector3.Multiply(direction, distance);
-                if (Owner == null && IsEnabled)
+                if (IsEnabled)
                 {
                     Pivot += distanceVector;
-                    return;
                 }
-
-                Traverse(entity => TranslatePivot(entity, distanceVector));
             }
         }
 
@@ -285,13 +261,10 @@ namespace Adamantium.ECS.ComponentsBasics
             lock (this)
             {
                 var distanceVector = Vector3.Multiply(direction, distance);
-                if (Owner == null && IsEnabled)
+                if (IsEnabled)
                 {
                     Pivot += distanceVector;
-                    return;
                 }
-
-                Traverse(entity => TranslatePivot(entity, distanceVector));
             }
         }
 
@@ -326,153 +299,114 @@ namespace Adamantium.ECS.ComponentsBasics
 
         public void ResetPosition()
         {
-            if (Owner == null && IsEnabled)
+            if (IsEnabled)
             {
                 Position = InitialPosition;
-                return;
             }
-
-            Traverse(entity => SetPosition(entity, InitialPosition));
         }
 
         public void ResetScale()
         {
-            if (Owner == null && IsEnabled)
+            if (IsEnabled)
             {
                 ScaleFactor = Vector3F.One;
-                return;
             }
-
-            Traverse(entity => SetScaleFactor(entity, Vector3F.One));
         }
 
         public void ResetRotation()
         {
-            if (Owner == null && IsEnabled)
+            if (IsEnabled)
             {
                 Rotation = QuaternionF.Identity;
-                return;
             }
-
-            Traverse(entity => SetRotation(entity, QuaternionF.Identity));
         }
 
         public void ResetPivotPosition()
         {
-            if (Owner == null && IsEnabled)
+            if (IsEnabled)
             {
                 Pivot = Position;
-                return;
             }
-
-            Traverse(entity => SetPivot(entity, entity.Transform.Position));
         }
 
         public void ResetPivotRotation()
         {
-            if (Owner == null && IsEnabled)
+            if (IsEnabled)
             {
                 PivotRotation = QuaternionF.Identity;
-                return;
             }
-
-            Traverse(entity => SetPivotRotation(entity, QuaternionF.Identity));
         }
 
         public void Rotate(Vector3F axis, float angle, RotationUnits units = RotationUnits.Radians)
         {
             angle = EnsureAngle(angle, units);
-            if (Owner == null && IsEnabled)
+            if (IsEnabled)
             {
                 Rotation = QuaternionF.Multiply(QuaternionF.RotationAxis(axis, angle), Rotation);
-                return;
             }
-
-            Traverse(entity => Rotate(entity, axis, angle));
         }
 
         public void RotateRight(float angle, RotationUnits units = RotationUnits.Radians)
         {
             angle = EnsureAngle(angle, units);
-            if (Owner == null && IsEnabled)
+            if (IsEnabled)
             {
                 Rotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetRotationMatrixF().Right, angle), Rotation);
-                return;
             }
-
-            Traverse(entity => Rotate(entity, Owner.Transform.GetRotationMatrixF().Right, angle));
         }
 
         public void RotateUp(float angle, RotationUnits units = RotationUnits.Radians)
         {
             angle = EnsureAngle(angle, units);
-            if (Owner == null && IsEnabled)
+            if (IsEnabled)
             {
                 Rotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetRotationMatrixF().Up, angle), Rotation);
-                return;
             }
-
-            Traverse(entity => Rotate(entity, Owner.Transform.GetRotationMatrixF().Up, angle));
         }
 
         public void RotateForward(float angle, RotationUnits units = RotationUnits.Radians)
         {
             angle = EnsureAngle(angle, units);
-            if (Owner == null && IsEnabled)
+            if (IsEnabled)
             {
                 Rotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetRotationMatrixF().Forward, angle), Rotation);
-                return;
             }
-
-            Traverse(entity => Rotate(entity, Owner.Transform.GetRotationMatrixF().Forward, angle));
         }
 
         public void RotatePivot(Vector3F axis, float angle, RotationUnits units = RotationUnits.Radians)
         {
             angle = EnsureAngle(angle, units);
-            if (Owner == null && IsEnabled)
+            if (IsEnabled)
             {
                 PivotRotation = QuaternionF.Multiply(QuaternionF.RotationAxis(axis, angle), PivotRotation);
-                return;
             }
-
-            Traverse(entity => RotatePivot(entity, axis, angle));
         }
 
         public void RotatePivotRight(float angle, RotationUnits units = RotationUnits.Radians)
         {
             angle = EnsureAngle(angle, units);
-            if (Owner == null && IsEnabled)
+            if (IsEnabled)
             {
                 PivotRotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetPivotRotationMatrixF().Right, angle), PivotRotation);
-                return;
             }
-
-            Traverse(entity => RotatePivot(entity, Owner.Transform.GetPivotRotationMatrixF().Right, angle));
         }
 
         public void RotatePivotUp(float angle, RotationUnits units = RotationUnits.Radians)
         {
             angle = EnsureAngle(angle, units);
-            if (Owner == null && IsEnabled)
+            if (IsEnabled)
             {
                 PivotRotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetPivotRotationMatrixF().Up, angle), PivotRotation);
-                return;
             }
-
-            Traverse(entity => RotatePivot(entity, Owner.Transform.GetPivotRotationMatrixF().Up, angle));
         }
 
         public void RotatePivotForward(float angle, RotationUnits units = RotationUnits.Radians)
         {
             angle = EnsureAngle(angle, units);
-            if (Owner == null && IsEnabled)
+            if (IsEnabled)
             {
                 PivotRotation = QuaternionF.Multiply(QuaternionF.RotationAxis(GetPivotRotationMatrixF().Forward, angle), PivotRotation);
-                return;
             }
-
-            Traverse(entity => RotatePivot(entity, Owner.Transform.GetPivotRotationMatrixF().Forward, angle));
         }
 
         ///<summary>
@@ -502,24 +436,18 @@ namespace Adamantium.ECS.ComponentsBasics
 
         public void SetScaleFactor(Vector3F factor)
         {
-            if (Owner == null && IsEnabled)
+            if (IsEnabled)
             {
                 ScaleFactor = factor;
-                return;
             }
-
-            Traverse(entity => SetScaleFactor(entity, factor));
         }
 
         public void SetBaseScale(Vector3F scale)
         {
-            if (Owner == null && IsEnabled)
+            if (IsEnabled)
             {
                 BaseScale = scale;
-                return;
             }
-
-            Traverse(entity => SetBaseScale(entity, scale));
         }
 
         public void SetBaseScale(float scale)
@@ -535,13 +463,10 @@ namespace Adamantium.ECS.ComponentsBasics
 
         public void DivideScale(Vector3F scale)
         {
-            if (Owner == null && IsEnabled)
+            if (IsEnabled)
             {
                 ScaleFactor /= scale;
-                return;
             }
-
-            Traverse(entity => DivideScale(entity, scale));
         }
 
         public void MultiplyScale(float scale)
@@ -551,112 +476,9 @@ namespace Adamantium.ECS.ComponentsBasics
 
         public void MultiplyScale(Vector3F scale)
         {
-            if (Owner == null && IsEnabled)
+            if (IsEnabled)
             {
                 ScaleFactor *= scale;
-                return;
-            }
-
-            Traverse(entity => MultiplyScale(entity, scale));
-        }
-
-        private void MultiplyScale(Entity entity, Vector3F scale)
-        {
-            entity.Transform.ScaleFactor *= scale;
-        }
-
-        private void DivideScale(Entity entity, Vector3F scale)
-        {
-            entity.Transform.ScaleFactor /= scale;
-        }
-
-        private void SetBaseScale(Entity entity, Vector3F scale)
-        {
-            if (entity.Transform.IsEnabled)
-            {
-                entity.Transform.BaseScale = scale;
-            }
-        }
-
-        private void SetScaleFactor(Entity entity, Vector3F scale)
-        {
-            if (entity.Transform.IsEnabled)
-            {
-                entity.Transform.ScaleFactor = scale;
-            }
-        }
-
-        private void SetRotation(Entity entity, QuaternionF rotation)
-        {
-            if (entity.Transform.IsEnabled)
-            {
-                entity.Transform.Rotation = rotation;
-            }
-        }
-
-        private void Rotate(Entity entity, Vector3F axis, float angle)
-        {
-            if (entity.Transform.IsEnabled)
-            {
-                var transform = entity.Transform;
-                transform.Rotation = QuaternionF.Multiply(QuaternionF.RotationAxis(axis, angle), transform.Rotation);
-            }
-        }
-
-        private void RotatePivot(Entity entity, Vector3F axis, float angle)
-        {
-            if (entity.Transform.IsEnabled)
-            {
-                var transform = entity.Transform;
-                transform.PivotRotation = QuaternionF.Multiply(QuaternionF.RotationAxis(axis, angle), transform.PivotRotation);
-            }
-        }
-
-        private void Move(Entity entity, Vector3 distance)
-        {
-            if (entity.Transform.IsEnabled)
-            {
-                entity.Transform.Position = distance;
-            }
-        }
-
-        private void Translate(Entity entity, Vector3 distance)
-        {
-            if (entity.Transform.IsEnabled)
-            {
-                entity.Transform.Position += distance;
-            }
-        }
-
-        private void TranslatePivot(Entity entity, Vector3 distance)
-        {
-            if (entity.Transform.IsEnabled)
-            {
-                entity.Transform.Pivot += distance;
-            }
-        }
-
-        private void SetPivot(Entity entity, Vector3 position)
-        {
-            if (entity.Transform.IsEnabled)
-            {
-                entity.Transform.Pivot = position;
-            }
-        }
-
-        private void SetPosition(Entity entity, Vector3 newPosition)
-        {
-            if (entity.Transform != null && entity.Transform.IsEnabled)
-            {
-                entity.Transform.Position = newPosition;
-            }
-        }
-
-        private void SetPivotRotation(Entity entity, QuaternionF rotation)
-        {
-            if (entity.Transform.IsEnabled)
-            {
-                entity.Transform.PivotRotation = rotation;
             }
         }
 
