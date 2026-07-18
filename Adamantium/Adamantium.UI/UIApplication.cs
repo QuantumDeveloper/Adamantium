@@ -70,6 +70,11 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
     // MaxFramesInFlight frames are unrendered - the marks simply stay in RenderDirty and fold into the next record - so the
     // loop keeps updating, animating and handling input at full speed while the render catches up.
     private Thread renderThread;
+    // Serializes a whole render frame against window teardown / app shutdown. The render thread holds it around each
+    // ExecuteDrawSequence; OnWindowRemoved / ShutDown take it so a device is never disposed while a frame is in flight.
+    private readonly object _renderGate = new object();
+    // OnExplicitShutDown makes ShutDown a public call that can arrive from any thread at any time - guard re-entry.
+    private volatile bool _isShuttingDown;
     private int _framesInFlight;
     private AppTime _renderAppTime;   // the newest recorded frame's time; the render thread draws with the latest
     private const int MaxFramesInFlight = 2;
@@ -320,10 +325,18 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
     {
         if (!windowToSystem.TryGetValue(window, out var service)) return;
 
-        service.UnloadContent();
-        windowToSystem.Remove(window);
-        windowsCollection.Remove(window);
-        EntityWorld.RemoveService(service);
+        // Park the render thread at a frame boundary while this window's GPU resources are torn down: it draws EVERY window
+        // on ONE thread, so disposing a window's device/swapchain from here (loop or pump thread) while it submits would AV.
+        // The gate lets the current frame finish, holds the next off until the teardown + service removal are done, then the
+        // render thread resumes and keeps drawing the OTHER windows. This is NOT a shutdown - the thread lives on. (App
+        // shutdown - last/main window per ShutDownMode, or an explicit ShutDown - stops the thread instead; see ShutDown.)
+        lock (_renderGate)
+        {
+            service.UnloadContent();
+            windowToSystem.Remove(window);
+            windowsCollection.Remove(window);
+            EntityWorld.RemoveService(service);
+        }
         EntityWorld.ForceUpdate();
 
         if (window == MainWindow)
@@ -704,15 +717,23 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
     {
         while (!cancellationTokenSource.IsCancellationRequested)
         {
-            Interlocked.Exchange(ref _framesInFlight, 0);   // whatever was published is about to be drained by the apply
-            try
+            // Serialize the whole frame against window teardown / shutdown. A window being removed (or ShutDown) takes this
+            // gate, so it waits for the in-flight frame to finish and then holds the next off while it disposes the device -
+            // the render thread never runs mid-teardown (0xC0000005 in EndCommandBuffer/Submit otherwise). Re-check the token
+            // INSIDE the gate: ShutDown flags cancellation then joins, so no new frame may start once shutdown has begun.
+            lock (_renderGate)
             {
-                ExecuteDrawSequence(_renderAppTime);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex);
-                UnhandledException?.Invoke(this, new UnhandledExceptionEventArgs(ex));
+                if (cancellationTokenSource.IsCancellationRequested) break;
+                Interlocked.Exchange(ref _framesInFlight, 0);   // whatever was published is about to be drained by the apply
+                try
+                {
+                    ExecuteDrawSequence(_renderAppTime);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex);
+                    UnhandledException?.Invoke(this, new UnhandledExceptionEventArgs(ex));
+                }
             }
         }
     }
@@ -830,10 +851,31 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
 
     public void ShutDown()
     {
+        // Idempotent: with OnExplicitShutDown this is a public call that can arrive from any thread, any time (even twice).
+        if (_isShuttingDown) return;
+        _isShuttingDown = true;
+
         ShuttingDown?.Invoke(this, EventArgs.Empty);
-        cancellationTokenSource.Cancel();   // the render thread's BlockingRead observes this (OperationCanceled) and exits
-        ContentUnloading?.Invoke(this, EventArgs.Empty);
-        FreeResources();
+
+        // Park the render thread the SAME way a window teardown does - via the gate, NOT a Join. Flag cancellation so the loop
+        // won't begin another frame, then take the gate: it blocks until the in-flight frame finishes and holds the next off,
+        // so the device is torn down with rendering provably parked (the 0xC0000005 in EndCommandBuffer/Submit is exactly a
+        // teardown racing an in-flight frame). No Join: the render thread is a background thread; once it re-takes the gate it
+        // sees the cancelled token and exits on its own. Joining the shared render thread would be wrong and is redundant here.
+        cancellationTokenSource.Cancel();
+        lock (_renderGate)
+        {
+            ContentUnloading?.Invoke(this, EventArgs.Empty);
+            // Tear down any windows still open. OnMainWindowClosed / OnLastWindowClosed already removed theirs; OnExplicitShutDown
+            // can shut down with live windows, whose services must be unloaded before the device service is freed.
+            foreach (var service in new List<WindowRenderService>(windowToSystem.Values))
+            {
+                service.UnloadContent();
+            }
+            windowToSystem.Clear();
+            FreeResources();
+        }
+
         Stopped?.Invoke(this, EventArgs.Empty);
     }
 
