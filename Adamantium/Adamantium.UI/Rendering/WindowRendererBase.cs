@@ -63,7 +63,16 @@ public abstract class WindowRendererBase : IWindowRenderer
     protected IWindow Window { get; set; }
 
     public IDrawingContext DrawingContext { get; }
-    public bool IsRendererUpToDate { get; protected set; }
+
+    private volatile bool _isRendererUpToDate;
+    // Cleared on the LOOP thread (a size/DPI/MSAA change) and set on the RENDER thread (after ResizePresenter);
+    // volatile so the render thread promptly observes a pending resize instead of a cached value.
+    public bool IsRendererUpToDate
+    {
+        get => _isRendererUpToDate;
+        protected set => _isRendererUpToDate = value;
+    }
+
     public bool FirstFrameProcessed { get; private set; }
 
     // Render resolution multiplier (1 = on-screen 1:1). The presenter + viewport are sized ClientSize x RenderScale,

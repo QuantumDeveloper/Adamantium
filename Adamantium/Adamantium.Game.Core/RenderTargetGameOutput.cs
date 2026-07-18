@@ -98,8 +98,10 @@ public class RenderTargetGameOutput : AdamantiumGameOutputBase
         // Retire the current surface for one frame instead of destroying it now. The consumer samples it and has
         // likely already queued this surface's produce/consume semaphores into its pending submit (PreRender runs in
         // BeginDraw; the submit happens at the end of the draw phase). Destroying the semaphores/image mid-frame would
-        // invalidate that submit (vkQueueSubmit Invalid VkSemaphore) and lose the device. The retired surface (and the
-        // panel's retired import) are freed next frame in DrainRetiredSurface, after a wait-idle proves the submit ran.
+        // invalidate that submit (vkQueueSubmit Invalid VkSemaphore) and lose the device. The retired surface is freed
+        // next frame in DrainRetiredSurface, after a wait-idle proves the submit ran. The consumer's IMPORT of it is a
+        // separate object (its own VkImage/semaphores, OS-refcounted memory) owned by the render component that samples
+        // it - freed independently there - so freeing this producer surface never touches the consumer's copy.
         // (DrainRetiredSurface ran at the top of this CopyOutput, so _retiredSurface is null here under normal resize.)
         _retiredSurface = _sharedSurface;
         _sharedSurface = SharedSurface.CreateExportable(device, width, height, _format);
@@ -110,9 +112,9 @@ public class RenderTargetGameOutput : AdamantiumGameOutputBase
     }
 
     /// <summary>
-    /// Frees the surface retired by the previous resize, one frame later: the consumer has since rebuilt its render
-    /// units onto the new surface, and the wait-idle here proves the submit that referenced the retired surface's
-    /// semaphores has completed - so destroying them (and the panel's matching retired import) is safe.
+    /// Frees the PRODUCER surface retired by the previous resize, one frame later: the wait-idle here proves this
+    /// device's submit that referenced its semaphores has completed. The consumer's import is a separate object owned
+    /// by the render component that samples it (freed there, fence-gated), so it is not touched from here.
     /// </summary>
     private void DrainRetiredSurface(IGraphicsDevice device)
     {
@@ -120,15 +122,13 @@ public class RenderTargetGameOutput : AdamantiumGameOutputBase
         device.DeviceWaitIdle();
         _retiredSurface.Dispose();
         _retiredSurface = null;
-        nativeWindow.DisposeRetiredSource();
     }
 
     private void ReleaseSurface()
     {
-        // Full teardown (context switch): the panel's import is retired by ClearSource, then dropped immediately
-        // since nothing samples it anymore. Free the producer's current AND retired surfaces too.
+        // Full teardown (context switch): drop the panel's source (its import is freed by the render component when the
+        // pipeline drops the panel's units). Free the producer's current AND retired surfaces too.
         nativeWindow?.ClearSource();
-        nativeWindow?.DisposeRetiredSource();
         _sharedSurface?.Dispose();
         _sharedSurface = null;
         _retiredSurface?.Dispose();

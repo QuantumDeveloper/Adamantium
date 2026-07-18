@@ -19,9 +19,6 @@ namespace Adamantium.UI.Controls.Panels;
 public class RenderTargetPanel : Grid
 {
    private SharedSurfaceImage _image;
-   // The previous source, kept alive for one extra frame after a swap (see RetireCurrentSource). Disposed by the
-   // producer via DisposeRetiredSource once the GPU is idle and the compositor's submit referencing it is done.
-   private SharedSurfaceImage _retiredImage;
 
    static RenderTargetPanel()
    {
@@ -86,7 +83,7 @@ public class RenderTargetPanel : Grid
    {
       if (ReferenceEquals(Source, descriptor)) return;
 
-      RetireCurrentSource();
+      DropCurrentSource();
       if (descriptor != null)
       {
          Source = descriptor;
@@ -95,11 +92,11 @@ public class RenderTargetPanel : Grid
       InvalidateAfterSourceChange();
    }
 
-   /// <summary>Unbinds the current source, if any (deferred release — see <see cref="RetireCurrentSource"/>).</summary>
+   /// <summary>Unbinds the current source, if any (see <see cref="DropCurrentSource"/>).</summary>
    public void ClearSource()
    {
       if (Source == null) return;
-      RetireCurrentSource();
+      DropCurrentSource();
       InvalidateAfterSourceChange();
    }
 
@@ -121,36 +118,24 @@ public class RenderTargetPanel : Grid
    }
 
    /// <summary>
-   /// Defers disposal of the imported surface by one frame instead of freeing it now. The compositor samples this
-   /// surface and may have already queued its produce/consume semaphores into a submit that hasn't run yet
-   /// (PreRender queues them in BeginDraw; the submit happens at the end of the draw phase). Destroying the import
-   /// here would invalidate those handles (vkQueueSubmit Invalid VkSemaphore). The producer drains the retired image
-   /// next frame via <see cref="DisposeRetiredSource"/>, after a wait-idle that proves the submit is complete.
+   /// Drops the current source WITHOUT freeing its imported surface. The GPU import's lifetime belongs to the
+   /// ImageRenderComponent that samples it: it frees the import through the render device's fence-gated deferred-dispose
+   /// once the compositor switches off it (the producer resize hands over a NEW surface, the pipeline rebuilds the
+   /// panel's op onto it and releases the old component then). Freeing it here would race the render thread, which may
+   /// still be replaying an op that samples the old import - the resize-crash (vkQueueSubmit against a freed surface).
    /// </summary>
-   private void RetireCurrentSource()
+   private void DropCurrentSource()
    {
-      _retiredImage?.Dispose(); // a prior retired image (not yet drained) is two frames old - safe to drop now
-      _retiredImage = _image;
       _image = null;
       Source = null;
    }
 
-   /// <summary>Disposes the surface retired by the previous source swap. The producer calls this one frame later,
-   /// with the GPU idle, so the compositor's submit that referenced it has finished.</summary>
-   public void DisposeRetiredSource()
-   {
-      _retiredImage?.Dispose();
-      _retiredImage = null;
-   }
-
-   /// <summary>Frees both the current and the retired imported surface immediately. Detach only (the visual tree is
-   /// being torn down, so nothing samples them anymore).</summary>
+   /// <summary>Drops the source on detach. The imported surface is freed by its render component when the pipeline
+   /// removes this panel's units (ReconcileDetachedControls, on the render thread) - never disposed here, off the
+   /// render thread, where it could race a compositor submit still in flight.</summary>
    private void ReleaseSource()
    {
-      _image?.Dispose();
       _image = null;
-      _retiredImage?.Dispose();
-      _retiredImage = null;
       Source = null;
    }
 
