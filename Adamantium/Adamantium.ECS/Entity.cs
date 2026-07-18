@@ -4,6 +4,7 @@ using Adamantium.Core;
 using Adamantium.Core.Collections;
 using Adamantium.ECS.ComponentsBasics;
 using Adamantium.Graphics.Core;
+using Microsoft.Extensions.ObjectPool;
 using IComponent = Adamantium.ECS.ComponentsBasics.IComponent;
 
 namespace Adamantium.ECS
@@ -295,32 +296,56 @@ namespace Adamantium.ECS
 
         public event EventHandler<EntityComponentEventArgs> ComponentsChanged;
 
+        // Rent a scratch Stack/Queue from a shared pool instead of allocating one per traversal (that was GC churn). The
+        // pool hands each caller its own instance - so reentrant AND concurrent traversals are safe - and the policy clears
+        // it on Return, keeping no Entity references alive in the pool.
+        private static readonly ObjectPool<Stack<Entity>> StackPool =
+            new DefaultObjectPool<Stack<Entity>>(new CollectionPoolPolicy<Stack<Entity>>(s => s.Clear()));
+        private static readonly ObjectPool<Queue<Entity>> QueuePool =
+            new DefaultObjectPool<Queue<Entity>>(new CollectionPoolPolicy<Queue<Entity>>(q => q.Clear()));
+
+        private sealed class CollectionPoolPolicy<T> : PooledObjectPolicy<T> where T : class, new()
+        {
+            private readonly Action<T> _clear;
+            public CollectionPoolPolicy(Action<T> clear) => _clear = clear;
+            public override T Create() => new();
+            public override bool Return(T obj) { _clear(obj); return true; }
+        }
+
         public void TraverseInDepth(Action<Entity> action, bool ignoreDisabled = false)
         {
-            var stack = new Stack<Entity>();
-            stack.Push(this);
-            while (stack.Count > 0)
+            var stack = StackPool.Get();
+            try
             {
-                Entity current = stack.Pop();
-                if (ignoreDisabled && !current.IsEnabled) continue;
-                action(current);
-
-                foreach (var t in current.Dependencies)
+                stack.Push(this);
+                while (stack.Count > 0)
                 {
-                    stack.Push(t);
+                    Entity current = stack.Pop();
+                    if (ignoreDisabled && !current.IsEnabled) continue;
+                    action(current);
+
+                    foreach (var t in current.Dependencies)
+                    {
+                        stack.Push(t);
+                    }
                 }
+            }
+            finally
+            {
+                StackPool.Return(stack);
             }
         }
 
         public void TraverseByLayer(Action<Entity> action, bool ignoreDisabled = false)
         {
-            var queue = new Queue<Entity>();
-            queue.Enqueue(this);
-            while (queue.Count > 0)
+            var queue = QueuePool.Get();
+            try
             {
-                Entity current = queue.Dequeue();
-                if (ignoreDisabled && !current.IsEnabled)
+                queue.Enqueue(this);
+                while (queue.Count > 0)
                 {
+                    Entity current = queue.Dequeue();
+                    if (ignoreDisabled && !current.IsEnabled) continue;
                     action(current);
 
                     for (int i = 0; i < current.Dependencies.Count; i++)
@@ -328,6 +353,10 @@ namespace Adamantium.ECS
                         queue.Enqueue(current.Dependencies[i]);
                     }
                 }
+            }
+            finally
+            {
+                QueuePool.Return(queue);
             }
         }
 
