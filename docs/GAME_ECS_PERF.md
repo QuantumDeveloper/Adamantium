@@ -29,25 +29,39 @@ _Секции A–D — что резать в кадре; **E** — архит�
 
 Ссылки в скобках — на детальные находки по секциям выше.
 
-### Phase 1 — CPU-провалы (безопасно, поведение-сохраняющее). ✅ СДЕЛАНО, собрано x64 (0 ошибок), НЕ закоммичено (2026-07-17)
+### Phase 1 — CPU-провалы (безопасно, поведение-сохраняющее). ✅ COMMITTED c3da6b0 (+ render-thread always-on 6284b84)
 - [x] `Entity.GetComponent/GetComponents` — убрать try/catch + `Console.WriteLine` с горячего пути (C2)
 - [x] `EntityComponentCollection.Get/GetAll/Contains` — один лок через `ItemsSpan`; `GetAll` — одна аллокация (C1/C2)
 - [x] `LightManager.Update` — dirty-гейт `_lightsDirty` вместо 3 LINQ-сканов/кадр (B2)
 - [x] `ForwardRenderingProcessor` — `GetActive` вынесен в per-Draw, `Material` — из цикла рендереров (C4/C5)
 
-### Phase 2 — архитектура трансформа + главный CPU-выигрыш. ⏳ НЕ НАЧАТО (нужен запуск для проверки)
-- [ ] `Transform` — dirty-флаг в сеттерах Position/Rotation/BaseScale/ScaleFactor/Pivot (B1)
-- [ ] Развязать мировую матрицу от камеры: одна camera-independent матрица; camera-relative — на этапе WVP/вида (E.6/2)
-- [ ] `TransformService` — пересчёт только dirty ИЛИ при сдвиге камеры → O(all×cameras) → O(moved) (B1)
-- [ ] Коллайдеры — схлопнуть O(n²)-цикл + убрать лишний `ClearData` (B3) ⚠ culling-sensitive, проверить запуском
-- [ ] `TraverseInDepth` — пулить `Stack` вместо `new` на вызов (C3)
-- [ ] Кэш `viewProj = View*Proj` раз на кадр, в цикле `World*viewProj` (D4)
-- [ ] Мёртвый `controller.FinalMatrices.Values.ToArray()` — сперва подтвердить, что путь мёртв, потом убрать (D5)
+### Phase 3 — иерархические трансформы. ✅ COMMITTED 5016e13, проверено (модель целая, куллинг ок, размер ок)
+> **Корректировка:** оказалась НЕ ломающей. Импортёр [`EntityImportTemplate`] уже строит иерархию (`new Entity(parent…)`)
+> и кладёт ЛОКАЛЬНЫЕ пер-нодовые трансформы (DAE-ноды) — сломано было только вычисление. Миграция импортёра не понадобилась.
+- [x] `Transform.CalculateFinalTransform` — `world = local × parent`; camera-shift один раз в конце (E.1, E.6/1)
+- [x] `TransformService` — берёт `AbsoluteWorld` родителя (top-down); `TransformMetaData.AbsoluteWorld` (camera-independent)
+- [x] `OrientedBoundingBox.Transform(Matrix4x4F)` + `BoundingSphere.Transform(Matrix4x4F)` — новый примитив
+- [x] `Box/SphereCollider.UpdateForCamera` — баунды по композированной мировой матрице (фикс «распадается при приближении»)
+- [x] Чистка API: удалены каскадные сеттеры `SetPosition/SetRotation/SetPivot/SetPivotRotation/SetScalingRotation`,
+  вызовы → свойства `.Position/.Rotation/…` (импортёрный `SetPosition` каскадил → модель уезжала вдвое дальше)
 
-### Phase 3 — ЛОМАЮЩАЯ: иерархические трансформы. ⛔ НЕ НАЧАТО, нужен явный «да»
-- [ ] `Transform` — локальные pos/rot/scale; `world = parent.world * local`; top-down propagate (E.1, E.6/1)
-- [ ] Миграция импортёра моделей на локальное пространство (сейчас в каждый суб-меш запечена МИРОВАЯ позиция)
-- [ ] Проверка: сдвиг корня двигает всю модель; сочленённые иерархии работают
+### Phase 3b — движки/ротаторы self-apply. ✅ СДЕЛАНО, собрано (0 ошибок), UNCOMMITTED. ⚠ нужен твой прогон инструментов в редакторе
+- [x] `Move/Translate/TranslateRight|Up|Forward/TranslatePivot/Rotate/RotateRight|Up|Forward/RotatePivot(+R|U|F)/
+  DivideScale/MultiplyScale/SetScaleFactor/SetBaseScale/Reset*` — убран `Traverse`, применяют к СВОЕМУ узлу (дети — через
+  иерархию); удалены 13 осиротевших статических хелперов. Игровой рендер эти методы не использует → игру не задевает,
+  но Move/Rotate-инструменты редактора надо прогнать вживую.
+
+### Phase 2 — dirty-флаг + CPU-хвосты. ⏳ ЧАСТИЧНО (B1 COMMITTED c22556c; +~100 fps)
+- [x] `Transform` — `IsWorldDirty` в сеттерах Position/Rotation/BaseScale/ScaleFactor/Pivot/PivotRotation (B1)
+- [x] `TransformService` — пересчёт только при dirty / сдвиге камеры (мировая зависит от ПОЗИЦИИ камеры, не поворота →
+  mouse-look бесплатен) / смене пивота; распространение dirty на детей при движении узла (B1)
+- [x] Коллайдеры — O(n²)-цикл схлопнут в O(n), лишний `ClearData` убран (B3)
+- [~] Развязка мировой от камеры (E.6/2) — полностью НЕ нужна: `AbsoluteWorld` уже camera-independent (для композиции
+  детей), `WorldMatrixF` остаётся camera-relative; игровая камера в нуле → пересчёт по её позиции почти не триггерится
+- [x] Кэш viewProj — используем готовый `Camera.ViewProjectionMatrix` (`World * ViewProjectionMatrix`) в `DrawEntity` (D4)
+- [x] Мёртвый `FinalMatrices.Values.ToArray()` — унесён в комментарий: per-frame аллокация убрана, скелетный WIP сохранён (D5)
+- [x] `Entity.TraverseInDepth` пул `Stack` + `TraverseByLayer` пул `Queue` (C3) — `[ThreadStatic]` **claim/release** (вложенный
+  вызов находит пул пустым и берёт свежий) → реентрант-safe, без per-call аллокации. UNCOMMITTED.
 
 ### Phase 4 — рендер-слой (после ECS; фундамент НЕ трогать). ⏳ НЕ НАЧАТО
 - [ ] Минимальный render graph — проходы + ресурсы + авто-барьеры (F.5/1)
@@ -61,6 +75,14 @@ _Секции A–D — что резать в кадре; **E** — архит�
 - [ ] per-entity `Dictionary<Type,IComponent>` (O(1)) вместо линейного скана (E.2, E.6/4)
 - [ ] SoA/архетипы для горячих компонентов (Transform, renderable); OOP-компоненты — для редких/editor (E.6/3)
 - [ ] Модель отложенных структурных изменений вместо грубых локов (E.3, E.6/5)
+
+### Побочный фикс — краш ресайза от render-thread-always-on. ✅ СДЕЛАНО, UNCOMMITTED. ⚠ нужен твой реальный drag-resize
+Render-thread теперь всегда включён (6284b84) → при ресайзе AV `0xC0000005` в `vkQueueSubmit` на render-потоке: поток
+рисовал/сабмитил против **устаревшего** свопчейна (loop-поток метил `IsRendererUpToDate=false`, а пересоздание
+`ResizePresenter` стояло в `FrameEnded` — ПОСЛЕ отрисовки кадра). Фикс: (1) `IsRendererUpToDate` → `volatile` (кросс-поточная
+видимость); (2) `ResizePresenter` перенесён в НАЧАЛО кадра (`WindowRenderService.BeginDraw`) — кадр всегда рисуется против
+свежего свопчейна; `Presenter.Resize` ждёт device-idle и идёт на том же render-потоке, сериализовано с Submit/Present.
+Пережил 120 программных `MoveWindow`-ресайзов, лог чист. `MoveWindow` не 100% повторяет тайминг ручного драга — проверить тебе.
 
 ---
 
