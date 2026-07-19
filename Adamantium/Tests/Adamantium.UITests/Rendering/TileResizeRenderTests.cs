@@ -169,12 +169,13 @@ public class TileResizeRenderTests
     {
         var (root, ic, panel) = BuildTiles(6000, 24);
         var cache = new RenderCache(new DrawingContext(), new FakeRenderUnitFactory());
-        for (var i = 0; i < 40; i++) { WindowExtension.UpdateTree(root); cache.BuildFromVisualTree(root); }
+        for (var i = 0; i < 40; i++) { RenderDirty.Clear(); WindowExtension.UpdateTree(root); cache.BuildFromVisualTree(root); }
 
         var fullWalks = 0;
         double w = ViewportW;
         for (var step = 0; step < 20; step++)
         {
+            RenderDirty.Clear();   // mirror the app's post-frame clear; the reference-order assert below re-dirties the global set
             w += step % 2 == 0 ? 140 : -60;          // drag the window edge
             root.ClientWidth = w;
             root.Width = w;
