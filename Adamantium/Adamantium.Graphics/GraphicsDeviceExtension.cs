@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Extensions;
@@ -29,9 +30,13 @@ public static class GraphicsDeviceExtension
             ImageLayout.ShaderReadOnlyOptimal, ImageLayout.TransferDstOptimal,
             PipelineStageFlagBits.FragmentShaderBit, PipelineStageFlagBits.TransferBit);
 
+        // Clamp the copy region to the SMALLER of the two images. During a resize the source (resolved RT) and the
+        // destination (shared surface / swapchain image) can be different sizes for one frame; copying the full source
+        // extent into a smaller destination writes out of bounds -> GPU fault -> VK_ERROR_DEVICE_LOST
+        // (VUID-vkCmdCopyImage-dstOffset-00150). The few edge pixels dropped for that transient frame are invisible.
         var imageCopy = new ImageCopy
         {
-            Extent = new Extent3D { Width = source.Width, Height = source.Height, Depth = 1 },
+            Extent = new Extent3D { Width = Math.Min(source.Width, destination.Width), Height = Math.Min(source.Height, destination.Height), Depth = 1 },
             SrcOffset = new Offset3D(),
             DstOffset = new Offset3D(),
             SrcSubresource = new ImageSubresourceLayers { AspectMask = ImageAspectFlagBits.ColorBit, LayerCount = 1 },
@@ -72,8 +77,10 @@ public static class GraphicsDeviceExtension
         imageCopy.SrcOffset = new Offset3D();
         imageCopy.DstOffset = new Offset3D();
         imageCopy.Extent.Depth = 1;
-        imageCopy.Extent.Width = sourceTexture.Width;
-        imageCopy.Extent.Height = sourceTexture.Height;
+        // Clamp to the smaller image so a size mismatch (e.g. mid-resize) can't copy past the destination bounds
+        // -> GPU fault -> device lost (VUID-vkCmdCopyImage-dstOffset-00150).
+        imageCopy.Extent.Width = Math.Min(sourceTexture.Width, destinationTexture.Width);
+        imageCopy.Extent.Height = Math.Min(sourceTexture.Height, destinationTexture.Height);
         imageCopy.SrcSubresource = new ImageSubresourceLayers
         {
             AspectMask = ImageAspectFlagBits.ColorBit,

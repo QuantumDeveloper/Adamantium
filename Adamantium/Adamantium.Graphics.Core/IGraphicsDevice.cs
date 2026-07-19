@@ -192,7 +192,12 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
     GraphicsAdapter Adapter { get; }
     
     GraphicsPresenter Presenter { get; set; }
-    
+
+    // True only after THIS frame acquired + submitted: reset false at BeginDraw start, set true after a successful
+    // Submit (which early-returns if the command buffer never started, i.e. acquire failed / the frame was skipped).
+    // The present path gates on it so a skipped/aborted frame during resize never presents a stale/unacquired image.
+    bool CanPresent { get; }
+
     MainGraphicsDevice MainDevice { get; }
 
     Fence GetCurrentFence();
