@@ -333,8 +333,17 @@ namespace Adamantium.Fonts
         internal Glyph RecalculateBounds()
         {
             if (IsEmpty) return this;
-            
+
             var allPoints = Outlines.SelectMany(x => x.Points).Where(x => !x.IsControl).ToArray();
+            // A non-empty glyph can still have a contour with no on-curve points (all control points, or a degenerate
+            // contour) - Min/Max would then throw. Fall back to every point, and if there are truly none, empty bounds.
+            if (allPoints.Length == 0)
+                allPoints = Outlines.SelectMany(x => x.Points).ToArray();
+            if (allPoints.Length == 0)
+            {
+                BoundingRectangle = Rectangle.FromCorners(0, 0, 0, 0);
+                return this;
+            }
             var minX = (int)allPoints.Min(x => x.X);
             var minY = (int)allPoints.Min(x => x.Y);
             var maxX = (int)allPoints.Max(x => x.X);
