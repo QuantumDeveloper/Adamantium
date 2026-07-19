@@ -56,9 +56,6 @@ public class CameraVisualTemplate
 
         entity.AddComponent(material);
 
-        MeshRenderer renderer = new MeshRenderer();
-        entity.AddComponent(renderer);
-
         return entity;
     }
 }

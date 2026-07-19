@@ -16,9 +16,7 @@ public class PointLightMeshTemplate
         var meshComponent = new MeshData();
         meshComponent.Mesh = pointLightMesh;
 
-        var renderer = new MeshRenderer();
         root.Components.Add(meshComponent);
-        root.Components.Add(renderer);
 
         return root;
     }

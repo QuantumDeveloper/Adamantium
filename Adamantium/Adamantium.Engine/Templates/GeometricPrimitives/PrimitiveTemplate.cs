@@ -46,10 +46,8 @@ public abstract class PrimitiveTemplate : IEntityTemplate
                 break;
         }
 
-        MeshRenderer renderer = new MeshRenderer();
         entity.AddComponent(meshData);
         entity.AddComponent(collisionComponent);
-        entity.AddComponent(renderer);
 
         return entity;
     }

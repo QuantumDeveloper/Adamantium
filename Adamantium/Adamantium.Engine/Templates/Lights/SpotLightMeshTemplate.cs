@@ -18,9 +18,7 @@ public class SpotLightMeshTemplate
         var meshComponent = new MeshData();
         meshComponent.Mesh = cone;
 
-        var renderer = new MeshRenderer();
         root.Components.Add(meshComponent);
-        root.Components.Add(renderer);
 
         return root;
     }

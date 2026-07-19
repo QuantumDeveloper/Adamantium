@@ -3,9 +3,11 @@ using System.Linq;
 using Adamantium.Core;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
+using Adamantium.Engine.Rendering;
 using Adamantium.Fonts;
 using Adamantium.FX.Effects.Generated;
 using Adamantium.Graphics.Core.EffectsFramework;
+using Adamantium.Graphics.Core.Vertices;
 using Adamantium.Mathematics;
 using Adamantium.Win32;
 
@@ -20,10 +22,18 @@ public class ForwardRenderingProcessor : RenderingProcessor
     protected override void LoadContent()
     {
         BasicEffect = new BasicEffect(GraphicsDevice);
+        _geometryCache = new MeshGeometryCache(GraphicsDevice);
         base.LoadContent();
     }
-    
+
+    protected override void OnDetached()
+    {
+        _geometryCache?.Dispose();
+        base.OnDetached();
+    }
+
     private BasicEffect BasicEffect { get; set; }
+    private MeshGeometryCache _geometryCache;
     
     public override void Draw(AppTime gameTime)
     {
@@ -73,7 +83,11 @@ public class ForwardRenderingProcessor : RenderingProcessor
                     BasicEffect.Wvp.SetValue(wvp);
                     BasicEffect.MeshColor.SetValue(Colors.White.ToVector3());
                     BasicEffect.BasicColoredPass.Apply();
-                    collider.Draw(GraphicsDevice, ActiveCamera);
+                    if (collider.Geometry == null) collider.GetVisualRepresentation();
+                    if (collider.Geometry != null)
+                    {
+                        _geometryCache.GetOrCreate(collider.Geometry, typeof(MeshVertex)).Draw(GraphicsDevice, RenderState.Default);
+                    }
                     BasicEffect.BasicColoredPass.UnApply();
                 }
             }
@@ -91,7 +105,8 @@ public class ForwardRenderingProcessor : RenderingProcessor
             //BasicEffect.Parameters["Bones"].SetValue(controller.FinalMatrices.Values.ToArray());
         }
 
-        var renderers = entity.GetComponents<MeshRendererBase>();
+        var meshData = entity.GetComponent<MeshData>();
+        if (meshData?.Mesh == null || !meshData.IsEnabled) return;
 
         var transformation = entity.Transform.GetMetadata(ActiveCamera);
         if (!transformation.Enabled)
@@ -99,60 +114,39 @@ public class ForwardRenderingProcessor : RenderingProcessor
             return;
         }
 
-        if (renderers.Length <= 0) return;
-
         var material = entity.GetComponent<Material>();
-        foreach (var component in renderers)
+
+        var meshWvp = transformation.WorldMatrixF * ActiveCamera.ViewProjectionMatrix;
+        BasicEffect.Wvp.SetValue(meshWvp);
+        BasicEffect.MeshColor.SetValue(Colors.Black.ToVector3());
+        BasicEffect.Transparency.SetValue(1f);
+
+        if (material?.Texture != null)
         {
-            var wvp = transformation.WorldMatrixF * ActiveCamera.ViewProjectionMatrix;
-            //var orthoProj = Matrix4x4F.OrthoOffCenter(0, Window.Width, 0, Window.Height, 1f, 100000f);
-            //var wvp = transformation.WorldMatrixF * ActiveCamera.UiProjection;
-            //var wvp = transformation.WorldMatrix * Matrix4x4F.Scaling(1, -1, 1) * Matrix4x4F.Scaling(2.0f / Window.Width, 2.0f/Window.Height, 1.0f / (100000f - 1f));
-            BasicEffect.Wvp.SetValue(wvp);
-            BasicEffect.MeshColor.SetValue(Colors.Black.ToVector3());
-            BasicEffect.Transparency.SetValue(1f);
-            
-            //GraphicsDevice.BasicEffect.Parameters["worldMatrix"].SetValue(transformation.WorldMatrix);
-            //GraphicsDevice.BasicEffect.SetValue(Matrix4x4F.Transpose(Matrix4x4F.Invert(transformation.WorldMatrix)));
+            BasicEffect.SampleType.SetResource(GraphicsDevice.SamplerStates.LinearRepeat);
+            BasicEffect.ShaderTexture.SetResource(material.Texture);
+        }
 
-            //DeferredDevice.RasterizerState = DeferredDevice.RasterizerStates.Default;
-            //DeferredDevice.SetRasterizerState(DeferredDevice.RasterizerStates.CullBackClipDisabled);
-
+        // The render PATH is the mesh data's explicit choice, not a property of the mesh - it selects the shader pass
+        // here and (inside DrawMesh) the vertex format the GPU buffers are built for.
+        if (meshData.RenderMode == MeshRenderMode.Skinned)
+        {
+            BasicEffect.Techniques["Basic"].Passes["Skinned"].Apply();
+        }
+        else
+        {
+            GraphicsDevice.ClearColor = Colors.CornflowerBlue;
             if (material?.Texture != null)
             {
-                BasicEffect.SampleType.SetResource(GraphicsDevice.SamplerStates.LinearRepeat);
-                BasicEffect.ShaderTexture.SetResource(material.Texture);
+                BasicEffect.BasicTexturedPass.Apply();
             }
-            /*else
-                {
-                    GraphicsDevice.BasicEffect.Parameters["shaderTexture"].SetResource(defaultTexture);
-                }*/
-
-            if (component is SkinnedMeshRenderer)
+            else
             {
-                BasicEffect.Techniques["Basic"].Passes["Skinned"].Apply();
-                component.Draw(GraphicsDevice, gameTime);
-            }
-
-            if (component is MeshRenderer)
-            {
-                GraphicsDevice.ClearColor = Colors.CornflowerBlue;
-                // transformation.WorldMatrixF = Matrix4x4F.Translation(entity.Transform.Position);
-                // wvp = transformation.WorldMatrixF * ActiveCamera.ViewMatrix * ActiveCamera.ProjectionMatrix;
-                // GraphicsDevice.BasicEffect.Wvp.SetValue(wvp);
-
-                if (material?.Texture != null)
-                {
-                    BasicEffect.BasicTexturedPass.Apply();
-                }
-                else
-                {
-                    BasicEffect.BasicColoredPass.Apply();
-                }
-
-                component.Draw(GraphicsDevice, gameTime);
+                BasicEffect.BasicColoredPass.Apply();
             }
         }
+
+        _geometryCache.DrawMesh(GraphicsDevice, meshData);
     }
 
     protected void DrawTools(Camera activeCamera)
@@ -234,7 +228,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
         }
 
         var material = current.GetComponent<Material>();
-        var geometries = current.GetComponents<MeshRendererBase>();
+        var geometries = current.GetComponents<MeshData>();
         foreach (var component in geometries)
         {
             var world = transformation.WorldMatrixF;
@@ -282,7 +276,7 @@ public class ForwardRenderingProcessor : RenderingProcessor
         }
 
         var material = current.GetComponent<Material>();
-        var geometries = current.GetComponents<MeshRendererBase>();
+        var geometries = current.GetComponents<MeshData>();
         foreach (var component in geometries)
         {
             var world = transformation.WorldMatrixF;

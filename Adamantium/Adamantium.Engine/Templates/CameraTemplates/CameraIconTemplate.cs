@@ -80,9 +80,6 @@ public class CameraIconTemplate
 
         entity.AddComponent(material);
 
-        MeshRenderer renderer = new MeshRenderer();
-        entity.AddComponent(renderer);
-
         return entity;
     }
 }

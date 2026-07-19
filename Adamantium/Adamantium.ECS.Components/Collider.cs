@@ -1,12 +1,6 @@
-﻿using System;
-using Adamantium.ECS.ComponentsBasics;
-using Adamantium.Graphics;
-using Adamantium.Graphics.Core;
-using Adamantium.Graphics.Core.Extensions;
+﻿using Adamantium.ECS.ComponentsBasics;
 using Adamantium.Graphics.Core.Models;
-using Adamantium.Graphics.Core.Vertices;
 using Adamantium.Mathematics;
-using Buffer = Adamantium.Graphics.Buffer;
 
 namespace Adamantium.ECS.Components
 {
@@ -32,10 +26,9 @@ namespace Adamantium.ECS.Components
             set => SetProperty(ref displayCollider, value);
         }
 
-        protected Mesh Geometry { get; set; }
-        protected Buffer<MeshVertex> VertexBuffer { get; set; }
-        protected Buffer<int> IndexBuffer { get; set; }
-        protected Type LayoutType { get; set; }
+        // The CPU mesh used to visualise the collider bounds (debug draw). Its GPU buffers are built + owned by the
+        // render-layer geometry cache, keyed by this mesh - the collider no longer holds any GPU resource itself.
+        public Mesh Geometry { get; protected set; }
 
         private bool displayCollider;
 
@@ -76,60 +69,5 @@ namespace Adamantium.ECS.Components
         public abstract bool Intersects(ref Ray ray, out Vector3F point);
 
         public abstract bool IntersectsForCamera(Camera camera, ref Ray ray, out Vector3F point);
-
-        public virtual void Draw(IGraphicsDevice renderContext, Camera camera)
-        {
-            if (!Initialized)
-            {
-                Initialize();
-            }
-
-            if (!DisplayCollider || !ContainsDataFor(camera))
-            {
-                return;
-            }
-
-            if (Geometry == null)
-            {
-                GetVisualRepresentation();
-            }
-
-            if (Geometry.IsModified)
-            {
-                CreateVertexData(renderContext);
-                Geometry.AcceptChanges();
-            }
-
-            renderContext.SetVertexBuffer(VertexBuffer);
-            renderContext.VertexType = LayoutType;
-            renderContext.PrimitiveTopology = Geometry.MeshTopology;
-
-            if (Geometry.Indices != null)
-            {
-                renderContext.SetIndexBuffer(IndexBuffer);
-            }
-
-            if (Geometry.Indices != null)
-            {
-                renderContext.DrawIndexed(VertexBuffer, IndexBuffer);
-            }
-            else
-            {
-                renderContext.Draw(VertexBuffer.ElementCount, 1);
-            }
-        }
-
-        protected void CreateVertexData(IGraphicsDevice renderContext)
-        {
-            var meshVertices = Geometry.ToMeshVertices();
-
-            VertexBuffer?.Dispose();
-            VertexBuffer = ToDispose(Buffer.Vertex.New(renderContext, meshVertices, BufferMemoryUsage.GpuOnly));
-
-            IndexBuffer?.Dispose();
-            IndexBuffer = ToDispose(Buffer.Index.New(renderContext, Geometry.Indices, BufferMemoryUsage.GpuOnly));
-
-            LayoutType = typeof(MeshVertex);
-        }
     }
 }

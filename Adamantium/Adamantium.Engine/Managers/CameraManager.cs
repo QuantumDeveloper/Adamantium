@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Adamantium.Core;
 using Adamantium.Core.Collections;
 using Adamantium.Core.Events;
+using Adamantium.Engine.Rendering;
 using Adamantium.Engine.Templates.CameraTemplates;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
@@ -53,7 +54,7 @@ public class CameraManager
 
     private Entity CameraIcon;
     private Entity CameraVisual;
-    private RenderComponent cameraIconRenderer;
+    private MeshData cameraIconRenderer;
     private IEventAggregator eventAggregator;
 
     private Entity SelectedCamera;
@@ -96,7 +97,7 @@ public class CameraManager
     private void CreateCameraIcon()
     {
         CameraIcon = new CameraIconTemplate().BuildEntity(null, "Camera icon");
-        cameraIconRenderer = CameraIcon.GetComponent<RenderComponent>();
+        cameraIconRenderer = CameraIcon.GetComponent<MeshData>();
     }
 
     private void CreateCameraVisual()
@@ -435,7 +436,7 @@ public class CameraManager
         }
     }
 
-    public void DrawCameraIcons(Effect effect, Camera camera, GraphicsDevice drawingContext, AppTime gameTime)
+    public void DrawCameraIcons(Effect effect, Camera camera, GraphicsDevice drawingContext, MeshGeometryCache geometryCache, AppTime gameTime)
     {
         lock (syncRoot)
         {
@@ -468,19 +469,19 @@ public class CameraManager
                 effect.Parameters["wvp"].SetValue(world * view * proj);
                 effect.Parameters["meshColor"].SetValue(Colors.White.ToVector3());
                 effect.Techniques["MeshVertex"].Passes["NoLight"].Apply();
-                cameraIconRenderer.Draw(drawingContext, gameTime);
+                geometryCache.DrawMesh(drawingContext, cameraIconRenderer);
             }
         }
 
         effect.Techniques["MeshVertex"].Passes["NoLight"].UnApply();
     }
 
-    public void DrawDebugCamera(Effect effect, Camera camera, GraphicsDevice drawingContext, AppTime gametime)
+    public void DrawDebugCamera(Effect effect, Camera camera, GraphicsDevice drawingContext, MeshGeometryCache geometryCache, AppTime gametime)
     {
         if (SelectedCamera == null || !SelectedCamera.IsEnabled)
             return;
 
-        var cameraRender = CameraVisual.GetComponent<RenderComponent>();
+        var cameraRender = CameraVisual.GetComponent<MeshData>();
         lock (syncRoot)
         {
             var view = camera.ViewMatrix;
@@ -500,7 +501,7 @@ public class CameraManager
             effect.Parameters["wvp"].SetValue(world * view * proj);
             effect.Parameters["meshColor"].SetValue(Colors.Beige.ToVector3());
             effect.Techniques["MeshVertex"].Passes["NoLight"].Apply();
-            cameraRender.Draw(drawingContext, gametime);
+            geometryCache.DrawMesh(drawingContext, cameraRender);
         }
 
         effect.Techniques["MeshVertex"].Passes["NoLight"].UnApply();
