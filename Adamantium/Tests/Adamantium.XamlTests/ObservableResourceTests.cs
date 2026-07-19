@@ -87,43 +87,4 @@ public class ObservableResourceTests
     {
         protected override void OnInitialize() => Add("AccentColor", "BLUE");
     }
-
-    // ---- minimal fakes: only ResourceManager is exercised (a real instance); the rest are no-ops ----
-
-    private sealed class FakeApp(IDependencyResolver resolver) : IUIApplication
-    {
-        public IUIContext UIContext { get; } = new FakeContext(resolver);
-        public IWindow MainWindow { get; set; }
-        public IWindow ActiveWindow => null;
-        public IReadOnlyList<IWindow> Windows => Array.Empty<IWindow>();
-        public IResourceManager ResourceManager { get; set; }
-        public IThemeManager ThemeManager => null;
-        public IGraphicsContext GraphicsContext => null;
-        public IDispatcher Dispatcher => null;
-        public void AddWindow(IWindow window) { }
-        public void RemoveWindow(IWindow window) { }
-        public void SetActiveWindow(IWindow window) { }
-        public void InactivateWindow(IWindow window) { }
-        public void ExecuteOnUIThread(Action action) => action();
-        public Task ExecuteOnUIThreadAsync(Action action) { action(); return Task.CompletedTask; }
-        public bool IsFixedTimeStep { get; set; }
-        public double TimeStep => 0;
-        public uint DesiredFPS { get; set; }
-        public bool DisableRendering { get; set; }
-    }
-
-    private sealed class FakeContext(IDependencyResolver resolver) : IUIContext
-    {
-        public T Resolve<T>(string name = "") => resolver.Resolve<T>(name);
-        public object Resolve(Type type, string name = "") => resolver.Resolve(type, name);
-        public IThemeContext ThemeContext { get; } = new FakeThemeContext();
-        public IUIApplication UIApplication => null;
-    }
-
-    private sealed class FakeThemeContext : IThemeContext
-    {
-        public void ApplyCurrentTheme(IFundamentalUIComponent control) { }
-        public void ApplyStyles(IFundamentalUIComponent component) { }
-        public void ApplyExternalStyles(IFundamentalUIComponent control, params Style[] styles) { }
-    }
 }
