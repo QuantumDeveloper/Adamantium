@@ -184,12 +184,15 @@ namespace Adamantium.Fonts.Parsers
 
                 var flags = reader.ReadByte();
 
-                var tableTagIndex = flags & 0x1F;
+                // WOFF2 TableDirectoryEntry flags: bits 0-5 = known-tag index (63 => explicit 4-byte tag follows),
+                // bits 6-7 = transform version. (Was masked one bit short - 0x1F/>>5 - which mis-tagged any table with
+                // index >= 32 and never took the explicit-tag path, desyncing the reader on such fonts, e.g. ASANA.)
+                var tableTagIndex = flags & 0x3F;
                 table.Name = tableTagIndex < 63
                     ? knownTableTags[(byte) tableTagIndex]
                     : reader.ReadString(4, Encoding.UTF8);
 
-                table.PreprocessingTransform = (byte)((flags >> 5) & 0x3);
+                table.PreprocessingTransform = (byte)((flags >> 6) & 0x3);
 
                 if (reader.ReadUIntBase128(out var origLength))
                 {
