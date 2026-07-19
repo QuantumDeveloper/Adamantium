@@ -18,16 +18,29 @@ public class PopupLayer
 {
     private readonly List<Popup> _popups = [];
     private readonly Dictionary<IUIComponent, Rect> _lastRect = new();   // last arranged slot per popup child (arrange gate)
+    // _popups/_lastRect are READ on the render (loop) thread (UpdateLayout/Roots) and MUTATED on the pump thread
+    // (Popup.Open/Close -> Add/Remove: a dialog opened from a command, a light-dismissed menu). Without this a popup
+    // opened/closed mid-render corrupts the enumeration ("Collection was modified"). Guard every touch.
+    private readonly object _sync = new();
 
     /// <summary>The laid-out child of every open popup (declaration order = back-to-front), for the overlay to render.</summary>
-    public IReadOnlyList<IUIComponent> Roots => _popups.Select(p => p.Child).OfType<IUIComponent>().ToList();
+    public IReadOnlyList<IUIComponent> Roots
+    {
+        get
+        {
+            lock (_sync) return _popups.Select(p => p.Child).OfType<IUIComponent>().ToList();
+        }
+    }
 
-    public bool HasPopups => _popups.Count > 0;
+    public bool HasPopups { get { lock (_sync) return _popups.Count > 0; } }
 
     public void Add(Popup popup)
     {
-        if (_popups.Contains(popup)) return;
-        _popups.Add(popup);
+        lock (_sync)
+        {
+            if (_popups.Contains(popup)) return;
+            _popups.Add(popup);
+        }
         // Its render units were disposed when it last closed, but its components are still geometry-VALID (closing doesn't
         // invalidate layout), so a clean reopen would record nothing and the cache would "reuse" the disposed units (the
         // fill + border vanish, only re-dirtied text rebuilds). Mark the whole subtree dirty so the next layout re-measures
@@ -37,8 +50,11 @@ public class PopupLayer
 
     public void Remove(Popup popup)
     {
-        _popups.Remove(popup);
-        if (popup.Child is IUIComponent c) _lastRect.Remove(c);
+        lock (_sync)
+        {
+            _popups.Remove(popup);
+            if (popup.Child is IUIComponent c) _lastRect.Remove(c);
+        }
     }
 
     /// <summary>
@@ -49,9 +65,20 @@ public class PopupLayer
     {
         if (!IsFinitePositive(windowSize.Width) || !IsFinitePositive(windowSize.Height)) return;   // window not sized yet
 
-        foreach (var popup in _popups)
+        // Iterate a snapshot: a popup can open/close (Add/Remove on the pump thread) while this lays out on the render thread.
+        Popup[] snapshot;
+        lock (_sync) snapshot = _popups.ToArray();
+        foreach (var popup in snapshot)
         {
             if (popup.Child is not MeasurableUIComponent child) continue;
+
+            // Full-window overlay (e.g. a modal dialog scrim): cover the whole window at the origin - no edge, no target.
+            if (popup.FillWindow)
+            {
+                var filled = RemeasureIfDirty(child, windowSize);
+                ArrangeIfNeeded(child, new Rect(0, 0, windowSize.Width, windowSize.Height), filled);
+                continue;
+            }
 
             // Edge-docked (SlidePanel): pin to a window edge; cross axis fills the window, main axis content or fill.
             if (popup.DockEdge is { } edge)
@@ -121,9 +148,10 @@ public class PopupLayer
     // gates internally too, but skipping the call keeps a STATIC docked panel from re-arranging every frame for nothing.
     private void ArrangeIfNeeded(MeasurableUIComponent child, Rect rect, bool remeasured)
     {
-        if (!remeasured && _lastRect.TryGetValue(child, out var last) && last == rect) return;
+        lock (_sync)
+            if (!remeasured && _lastRect.TryGetValue(child, out var last) && last == rect) return;
         child.Arrange(rect);
-        _lastRect[child] = rect;
+        lock (_sync) _lastRect[child] = rect;
     }
 
     // True if any element in the detached subtree needs re-measuring (its IsMeasureValid was cleared by a content change

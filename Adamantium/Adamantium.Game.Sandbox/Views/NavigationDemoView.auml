@@ -19,6 +19,10 @@
                  existing one). Shared via WindowDemoSettings, so this toggle and the title-bar command stay in sync. -->
             <ToggleSwitch Content="Allow duplicate windows" Margin="0,12,0,0"
                           IsChecked="{Binding WindowSettings.AllowDuplicateWindows, Mode=TwoWay}"/>
+
+            <!-- Drives the title-bar Dialog/Help commands: ON = dialogs open in their OWN window, OFF = in-window overlay. -->
+            <ToggleSwitch Content="Show dialogs as separate windows" Margin="0,8,0,0"
+                          IsChecked="{Binding WindowSettings.DialogsAsWindows, Mode=TwoWay}"/>
         </StackPanel>
 
         <Grid Grid.Row="1" ColumnDefinitions="*,16,300">

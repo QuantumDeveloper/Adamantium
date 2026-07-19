@@ -5,7 +5,7 @@ using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Controls.Decorators;
 
-public abstract class Decorator : MeasurableUIComponent, IContainer
+public abstract class Decorator : InputUIComponent, IContainer
 {
    public static readonly AdamantiumProperty PaddingProperty = AdamantiumProperty.Register(nameof(Padding),
       typeof(Thickness), typeof(Decorator),

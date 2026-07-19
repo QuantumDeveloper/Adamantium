@@ -9,4 +9,7 @@ namespace Adamantium.Game.Sandbox.ViewModels;
 public partial class WindowDemoSettings
 {
     [Bindable] private bool _allowDuplicateWindows;
+
+    // When on, the title-bar dialog commands (Confirm / About) open in their OWN window instead of an in-window overlay.
+    [Bindable] private bool _dialogsAsWindows;
 }

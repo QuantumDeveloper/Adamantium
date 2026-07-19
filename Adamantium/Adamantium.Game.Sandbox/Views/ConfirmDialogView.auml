@@ -1,0 +1,14 @@
+<View xmlns="http://adamantium/ui">
+    <!-- DataContext is ConfirmDialogViewModel (set by the ViewLocator; resolved by the FooViewModel->FooView convention).
+         The buttons run the VM's Ok/Cancel commands, which close the dialog with a result via RequestClose. -->
+    <StackPanel Orientation="Vertical" 
+                HorizontalAlignment="Center"
+                Width="380">
+        <TextBlock Text="{Binding Title}" FontSize="18" MarginBottom="12"/>
+        <TextBlock Text="{Binding Message}" FontSize="14" MarginBottom="24"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="Cancel" Command="{Binding CancelCommand}" Width="100" Height="32" MarginRight="8"/>
+            <Button Content="OK" Command="{Binding OkCommand}" Width="100" Height="32"/>
+        </StackPanel>
+    </StackPanel>
+</View>
