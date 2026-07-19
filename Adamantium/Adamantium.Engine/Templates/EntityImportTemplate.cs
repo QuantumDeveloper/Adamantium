@@ -184,22 +184,17 @@ public class EntityImportTemplate : IEntityTemplate
     {
         var meshData = new MeshData();
         meshData.Mesh = mesh;
+        // Import default: a mesh that carries joint data gets the animated path, others the plain path. This is now an
+        // EXPLICIT, overridable choice on MeshData (not re-derived from the semantic at draw time), so the same mesh can
+        // later be rendered either statically or skinned.
+        meshData.RenderMode = mesh.Semantic.HasFlag(VertexSemantic.JointIndices)
+            ? MeshRenderMode.Skinned
+            : MeshRenderMode.Static;
         entity.AddComponent(meshData);
 
         Collider collider = new BoxCollider();
         entity.AddComponent(collider);
         collider.Initialize();
-
-        if (mesh.Semantic.HasFlag(VertexSemantic.JointIndices))
-        {
-            var renderer = new SkinnedMeshRenderer();
-            entity.AddComponent(renderer);
-        }
-        else
-        {
-            var renderer = new MeshRenderer();
-            entity.AddComponent(renderer);
-        }
 
         SceneData.Material materialData;
         if (!String.IsNullOrEmpty(mesh.MaterialID))

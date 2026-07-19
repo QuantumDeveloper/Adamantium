@@ -12,7 +12,7 @@ namespace Adamantium.ECS.Components.Extensions
             entity.TraverseInDepth(
                current =>
                {
-                   var geometry = current.GetComponent<MeshRendererBase>();
+                   var geometry = current.GetComponent<MeshData>();
 
                    if (geometry != null)
                    {

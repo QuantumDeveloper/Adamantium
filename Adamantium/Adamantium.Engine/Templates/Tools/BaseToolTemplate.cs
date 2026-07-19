@@ -20,8 +20,6 @@ public abstract class BaseToolTemplate
       material.HighlightColor = Colors.Yellow.ToVector4();
       material.Transparency = transparency;
          
-      var renderer = new MeshRenderer();
-
       var entity = new Entity(owner, name);
 
       entity.Transform.BaseScale = baseScale;
@@ -40,8 +38,6 @@ public abstract class BaseToolTemplate
       }
          
       entity.AddComponent(material);
-
-      entity.AddComponent(renderer);
 
       return entity;
    }

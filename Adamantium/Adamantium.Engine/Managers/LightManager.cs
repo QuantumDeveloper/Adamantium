@@ -7,6 +7,7 @@ using Adamantium.Engine.Tools;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
 using Adamantium.ECS.Components.Extensions;
+using Adamantium.Engine.Rendering;
 using Adamantium.Game.Core;
 using Adamantium.Game.Core.Input;
 using Adamantium.Graphics;
@@ -46,8 +47,8 @@ public class LightManager : GameManagerBase
     private Entity SpotLightMesh;
     private Entity PointLightMesh;
 
-    private MeshRenderer spotLightRenderer;
-    private MeshRenderer pointLightRenderer;
+    private MeshData spotLightRenderer;
+    private MeshData pointLightRenderer;
     private LightToolBase currentToolBase;
 
     private DirectionalLightTool DirectionalLightTool { get; set; }
@@ -68,8 +69,8 @@ public class LightManager : GameManagerBase
         SpotLightMesh = new SpotLightMeshTemplate().BuildEntity();
         PointLightMesh = new PointLightMeshTemplate().BuildEntity();
 
-        spotLightRenderer = SpotLightMesh.GetComponent<MeshRenderer>();
-        pointLightRenderer = PointLightMesh.GetComponent<MeshRenderer>();
+        spotLightRenderer = SpotLightMesh.GetComponent<MeshData>();
+        pointLightRenderer = PointLightMesh.GetComponent<MeshData>();
 
         DirectionalLights = new List<Light>();
         SpotLights = new List<Light>();
@@ -351,14 +352,14 @@ public class LightManager : GameManagerBase
 //            }
 //        }
 
-    public void DrawPointLightMesh(GraphicsDevice device, AppTime gameTime)
+    public void DrawPointLightMesh(GraphicsDevice device, MeshGeometryCache geometryCache, AppTime gameTime)
     {
-        pointLightRenderer.Draw(device, gameTime);
+        geometryCache.DrawMesh(device, pointLightRenderer);
     }
 
-    public void DrawSpotLightMesh(GraphicsDevice device, AppTime gameTime)
+    public void DrawSpotLightMesh(GraphicsDevice device, MeshGeometryCache geometryCache, AppTime gameTime)
     {
-        spotLightRenderer.Draw(device, gameTime);
+        geometryCache.DrawMesh(device, spotLightRenderer);
     }
 
     public bool ProcessLight(Entity lightEntity, CameraManager cameraManager, GameInputManager inputManager)
