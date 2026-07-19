@@ -2,12 +2,17 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using Adamantium.Core;
 using Adamantium.Graphics.Core;
+using Adamantium.MVVM;
 
-namespace Adamantium.ECS.ComponentsBasics
+namespace Adamantium.ECS.Components
 {
-    public abstract class Component : DisposableObject, IComponent, IControllableComponent, IInitializable, IEntityOwner, ICloneableComponent
+    // NOT DisposableObject: components are plain data + behaviour and own no unmanaged/GPU resources (GPU buffers live in
+    // the render-layer geometry cache, not on components). Being IDisposable only invited the dispose pattern -
+    // use-after-dispose, ownership ambiguity - into the data layer for no benefit. NamedObject still supplies the INPC
+    // SetProperty (via PropertyChangedBase) and the Name.
+    [ViewModel]
+    public abstract partial class Component : AdamantiumViewModel, IComponent, IControllableComponent, IInitializable, IEntityOwner, ICloneableComponent
     {
         protected Component()
         {
@@ -46,6 +51,9 @@ namespace Adamantium.ECS.ComponentsBasics
         }
 
         public UInt128 Uid => uid;
+        
+        [Bindable]
+        public partial string Name { get; set; }
 
         protected void Traverse(Action<Entity> action)
         {

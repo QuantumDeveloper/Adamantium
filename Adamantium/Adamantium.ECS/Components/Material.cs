@@ -2,7 +2,7 @@
 using System.ComponentModel;
 using Adamantium.Graphics;
 using Adamantium.Mathematics;
-using Component = Adamantium.ECS.ComponentsBasics.Component;
+using Component = Adamantium.ECS.Components.Component;
 using TextureDimension = Adamantium.Graphics.Core.Models.TextureDimension;
 
 namespace Adamantium.ECS.Components

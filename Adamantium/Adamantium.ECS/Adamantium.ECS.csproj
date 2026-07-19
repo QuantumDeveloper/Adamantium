@@ -12,7 +12,10 @@
 		<ProjectReference Include="..\Adamantium.Graphics.Core\Adamantium.Graphics.Core.csproj" />
 		<ProjectReference Include="..\Adamantium.Graphics\Adamantium.Graphics.csproj" />
 		<ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />
-		<ProjectReference Include="..\Adamantium.Win32\Adamantium.Win32.csproj" />
+		<ProjectReference Include="..\Adamantium.ProceduralGeometry\Adamantium.ProceduralGeometry.csproj" />
+		<!-- AdamantiumViewModel base (UI-free, Core-only) so Component is INPC/[Bindable]-ready + the MVVM generator. -->
+		<ProjectReference Include="..\Adamantium.MVVM\Adamantium.MVVM.csproj" />
+		<ProjectReference Include="..\Adamantium.MVVM.Generators\Adamantium.MVVM.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" SetTargetFramework="TargetFramework=netstandard2.0" />
 	</ItemGroup>
 
 	<ItemGroup>

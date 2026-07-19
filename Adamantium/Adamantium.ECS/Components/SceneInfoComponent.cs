@@ -1,4 +1,4 @@
-﻿using Adamantium.ECS.ComponentsBasics;
+﻿using Adamantium.ECS.Components;
 using Adamantium.Graphics.Core.Models;
 
 namespace Adamantium.ECS.Components

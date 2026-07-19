@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Adamantium.Core;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.ECS.Templates;
-using Adamantium.ECS.ComponentsBasics;
+using Adamantium.ECS.Components;
 
 namespace Adamantium.ECS
 {

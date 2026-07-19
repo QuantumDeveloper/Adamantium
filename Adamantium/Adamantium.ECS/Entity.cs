@@ -2,14 +2,14 @@
 using System.Collections.Generic;
 using Adamantium.Core;
 using Adamantium.Core.Collections;
-using Adamantium.ECS.ComponentsBasics;
+using Adamantium.ECS.Components;
 using Adamantium.Graphics.Core;
 using Microsoft.Extensions.ObjectPool;
-using IComponent = Adamantium.ECS.ComponentsBasics.IComponent;
+using IComponent = Adamantium.ECS.Components.IComponent;
 
 namespace Adamantium.ECS
 {
-    using IComponent = ComponentsBasics.IComponent;
+    using IComponent = Components.IComponent;
 
     /// <summary>
     /// Class containing information about entity and its components

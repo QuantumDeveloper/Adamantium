@@ -1,4 +1,4 @@
-﻿using Adamantium.ECS.ComponentsBasics;
+﻿using Adamantium.ECS.Components;
 using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.RoutedEvents;
 

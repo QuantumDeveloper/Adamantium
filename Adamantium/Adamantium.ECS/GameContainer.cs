@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using Adamantium.ECS.ComponentsBasics;
+using Adamantium.ECS.Components;
 
 namespace Adamantium.ECS
 {

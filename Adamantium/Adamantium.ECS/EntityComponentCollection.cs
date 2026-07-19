@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Adamantium.Core.Collections;
-using Adamantium.ECS.ComponentsBasics;
+using Adamantium.ECS.Components;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Extensions;
 
@@ -211,9 +211,6 @@ namespace Adamantium.ECS
             }
 
             base.RemoveItem(index);
-
-            var disposable = oldComponent as IDisposable;
-            disposable?.Dispose();
 
             entity?.OnComponentChanged(oldComponent, null, ComponentChangedAction.Removed);
 

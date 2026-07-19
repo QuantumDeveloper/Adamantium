@@ -4,7 +4,6 @@ using System.IO;
 using System.Threading.Tasks;
 using Adamantium.ECS;
 using Adamantium.ECS.Components;
-using Adamantium.ECS.ComponentsBasics;
 using Adamantium.ECS.Templates;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core.Content;
