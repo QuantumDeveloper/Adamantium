@@ -2,7 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
-using Adamantium.UI.Core.Commands;
+using Adamantium.Core.Commands;
 
 namespace Adamantium.MVVM;
 

@@ -1,6 +1,6 @@
 using System;
 
-namespace Adamantium.UI.Core.Commands;
+namespace Adamantium.Core.Commands;
 
 /// <summary>
 /// Subscribes to a command's <see cref="ICommand.CanExecuteChanged"/> on behalf of a target, holding the target

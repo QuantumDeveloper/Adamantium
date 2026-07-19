@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Threading.Tasks;
-using Adamantium.UI.Core.Commands;
+using Adamantium.Core.Commands;
 using NUnit.Framework;
 
 namespace Adamantium.MVVM.Tests;

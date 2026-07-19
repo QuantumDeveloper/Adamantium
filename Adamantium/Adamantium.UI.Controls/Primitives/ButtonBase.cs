@@ -1,6 +1,6 @@
 using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Core;
-using Adamantium.UI.Core.Commands;
+using Adamantium.Core.Commands;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.RoutedEvents;
