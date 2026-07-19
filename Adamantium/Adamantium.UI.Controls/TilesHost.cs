@@ -133,7 +133,7 @@ public class TilesHost : ItemsControl
         // yet (Bounds.Width == 0), and reading that gave SourceUW = 0 -> a zero-width slice -> no texture (the "flipped but
         // blank" / "flip did nothing" symptom, and why the re-assign hook seemed to do nothing - it re-assigned zeros).
         // The cell minus the per-tile margin IS the tile, known the moment the tile is created - no layout needed.
-        var margin = _tiles[0].Margin;
+        var margin = _tiles[0].EffectiveMargin;
         var tileW = cellW - margin.Left - margin.Right;
         var tileH = cellH - margin.Top - margin.Bottom;
         var unionW = (cols - 1) * cellW + tileW;   // grid union: col 0 .. last col

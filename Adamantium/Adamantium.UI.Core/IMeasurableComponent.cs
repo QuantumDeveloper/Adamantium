@@ -13,6 +13,9 @@ public interface IMeasurableComponent : IObservableComponent
     Double MaxWidth { get; set; }
     Double MaxHeight { get; set; }
     Thickness Margin { get; set; }
+    /// <summary>The margin the layout uses: <see cref="Margin"/> with any per-side override (MarginLeft/Top/Right/Bottom)
+    /// applied. Read this, NOT Margin, wherever a component's margin feeds a layout calculation.</summary>
+    Thickness EffectiveMargin { get; }
     VerticalAlignment VerticalAlignment { get; set; }
     HorizontalAlignment HorizontalAlignment { get; set; }
     object Tag { get; set; }
