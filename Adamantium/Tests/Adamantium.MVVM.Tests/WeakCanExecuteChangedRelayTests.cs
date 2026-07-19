@@ -1,7 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 using Adamantium.MVVM;
-using Adamantium.UI.Core.Commands;
+using Adamantium.Core.Commands;
 using NUnit.Framework;
 
 namespace Adamantium.MVVM.Tests;

@@ -2,7 +2,7 @@ using System.ComponentModel;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Adamantium.UI.Core.Commands;
+namespace Adamantium.Core.Commands;
 
 /// <summary>
 /// An async-first command. <see cref="ExecuteAsync"/> can be awaited; <see cref="IsRunning"/> (with change

@@ -1,6 +1,6 @@
 using System;
 
-namespace Adamantium.UI.Core.Commands;
+namespace Adamantium.Core.Commands;
 
 /// <summary>
 /// The binding contract a control (e.g. <c>Button</c>) targets. The optional <paramref name="parameter"/> is the

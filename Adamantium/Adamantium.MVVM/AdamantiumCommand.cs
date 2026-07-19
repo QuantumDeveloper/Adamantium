@@ -1,5 +1,5 @@
 using System;
-using Adamantium.UI.Core.Commands;
+using Adamantium.Core.Commands;
 
 namespace Adamantium.MVVM;
 
