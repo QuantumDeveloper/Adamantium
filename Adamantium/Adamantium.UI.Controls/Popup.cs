@@ -41,6 +41,9 @@ public class Popup : MeasurableUIComponent, IContainer
     public static readonly AdamantiumProperty DockFillProperty = AdamantiumProperty.Register(nameof(DockFill),
         typeof(bool), typeof(Popup), new PropertyMetadata(false));
 
+    public static readonly AdamantiumProperty FillWindowProperty = AdamantiumProperty.Register(nameof(FillWindow),
+        typeof(bool), typeof(Popup), new PropertyMetadata(false));
+
     private IPopupHost _host;   // the window layer this popup is registered with while open
 
     public bool IsOpen
@@ -104,6 +107,14 @@ public class Popup : MeasurableUIComponent, IContainer
     {
         get => GetValue<bool>(DockFillProperty);
         set => SetValue(DockFillProperty, value);
+    }
+
+    /// <summary>Fill the ENTIRE window (both axes) at the origin - a full-window overlay (a modal scrim / backdrop). Unlike
+    /// <see cref="DockEdge"/> this carries no edge semantics; it just covers the window. Takes precedence over DockEdge.</summary>
+    public bool FillWindow
+    {
+        get => GetValue<bool>(FillWindowProperty);
+        set => SetValue(FillWindowProperty, value);
     }
 
     /// <summary>Explicit target, else the element this popup is declared under.</summary>

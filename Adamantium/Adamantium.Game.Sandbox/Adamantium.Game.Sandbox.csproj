@@ -7,6 +7,11 @@
 		<Configurations>Debug;Release</Configurations>
 		<LangVersion>latest</LangVersion>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<!-- Product metadata surfaced by the About dialog (read from assembly attributes at runtime). -->
+		<Product>Adamantium Engine Sandbox</Product>
+		<Company>Adamantium</Company>
+		<Version>0.1.0</Version>
+		<Copyright>Copyright © 2026 Adamantium</Copyright>
 		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
 		<CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
 	</PropertyGroup>

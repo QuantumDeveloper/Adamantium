@@ -14,12 +14,30 @@ public partial class MainViewModel
 {
     private readonly INavigationService _navigation;
     private readonly WindowDemoSettings _settings;
+    private readonly IDialogService _dialogs;
 
-    public MainViewModel(INavigationService navigation, WindowDemoSettings settings)
+    public MainViewModel(INavigationService navigation, WindowDemoSettings settings, IDialogService dialogs)
     {
         _navigation = navigation;
         _settings = settings;
+        _dialogs = dialogs;
     }
+
+    // The dialog host follows the Navigation-tab toggle: an in-window overlay, or a separate window.
+    private DialogHostKind DialogHost => _settings.DialogsAsWindows ? DialogHostKind.Window : DialogHostKind.Overlay;
+
+    // Shows a confirm dialog (IDialogService), awaits the result and reports it - the VM-first dialog round-trip from a
+    // title-bar command, hosted as an overlay or a window per the toggle.
+    [Command] 
+    private async Task ShowConfirm()
+    {
+        var result = await _dialogs.ShowDialogAsync<ConfirmDialogViewModel>(
+            new NavigationParameters().Add("message", "Apply changes to the current scene?"), DialogHost);
+        LastCommand = $"Dialog: {result.Result}";
+    }
+
+    // The real Help/About: product/version/manufacturer read from the assembly metadata.
+    [Command] private Task ShowAbout() => _dialogs.ShowDialogAsync<AboutDialogViewModel>(host: DialogHost);
 
     // Opens the SECOND window entirely from the view model: name the "workspace" shell (a custom WorkspaceWindow) and the
     // framework creates it and loads WorkspaceShellViewModel's view - this VM never touches a Window type. The
@@ -47,11 +65,8 @@ public partial class MainViewModel
 
     [Command] private void ToggleDiagnosticsPanel() => DiagnosticsPanelOpen = !DiagnosticsPanelOpen;
 
-    // Last title-bar command that ran - shown in the content so the demo commands do something visible AND distinct.
+    // Last dialog result - shown in the window content (written by ShowConfirm).
     [Bindable] private string _lastCommand = "(none)";
-
-    // One parameterized command the caption buttons share; the CommandParameter says which action it was.
-    [Command] private void RunAction(string name) => LastCommand = name;
 
     // Window resize mode (bound two-way to Window.ResizeMode) + a toggle between full edge resize and grip-only resize
     // (the borderless ResizeGripper in the bottom-right corner).
@@ -69,20 +84,15 @@ public partial class MainViewModel
     private List<WindowCommand> _rightWindowCommands;
     public IEnumerable RightWindowCommands => _rightWindowCommands ??= new()
     {
-        new WindowCommand { IconData = "M7,2 L7,12 M2,7 L12,7",                    Label = "New",  ToolTip = "New file",  Command = RunActionCommand, CommandParameter = "New" },
-        new WindowCommand { IconData = "M0,3 L5,3 L6,1 L13,1 L13,13 L0,13 Z",      Label = "Open", ToolTip = "Open",      Command = RunActionCommand, CommandParameter = "Open" },
-        new WindowCommand { IconData = "M7,1 L7,9 M3,5 L7,9 L11,5 M1,13 L13,13",   Label = "Save", ToolTip = "Save",      Command = RunActionCommand, CommandParameter = "Save" },
-        new WindowCommand { IconData = "M5,2 L1,7 L5,12 M1,7 L13,7",               Label = "Undo", ToolTip = "Undo",      Command = RunActionCommand, CommandParameter = "Undo" },
         new WindowCommand { IconData = "M1,2 L13,2 L13,12 L1,12 Z M1,5 L13,5",     Label = "Workspace", ToolTip = "Open workspace window", Command = OpenWorkspaceCommand },
-        new WindowCommand { IconData = "M7,0 L14,7 L7,14 L0,7 Z",                  Label = "Help", ToolTip = "Help",      Command = RunActionCommand, CommandParameter = "Help" },
+        new WindowCommand { IconData = "M1,2 L13,2 L13,12 L1,12 Z M4,6 L10,6 M4,9 L8,9", Label = "Dialog", ToolTip = "Show a confirm dialog", Command = ShowConfirmCommand },
+        new WindowCommand { IconData = "M7,0 L14,7 L7,14 L0,7 Z",                  Label = "Help", ToolTip = "About Adamantium Sandbox", Command = ShowAboutCommand },
     };
 
     private List<WindowCommand> _leftWindowCommands;
     public IEnumerable LeftWindowCommands => _leftWindowCommands ??= new()
     {
-        // A real, distinct action to show variety: "Diagnostics" toggles the side panel; "File" just reports itself.
         new WindowCommand { IconData = "M1,13 L1,7 M6,13 L6,2 M11,13 L11,9",       Label = "Diagnostics", ToolTip = "Toggle diagnostics panel", Command = ToggleDiagnosticsPanelCommand },
-        new WindowCommand { IconData = "M2,0 L9,0 L12,3 L12,14 L2,14 Z M9,0 L9,3 L12,3", Label = "File",  ToolTip = "File",              Command = RunActionCommand, CommandParameter = "File" },
         // Grip-only resize toggle - a diagonal resize double-arrow.
         new WindowCommand { IconData = "M2,2 L12,12 M12,12 L12,8 M12,12 L8,12 M2,2 L2,6 M2,2 L6,2", Label = "Resize mode", ToolTip = "Toggle grip-only resize", Command = ToggleGripResizeCommand },
     };

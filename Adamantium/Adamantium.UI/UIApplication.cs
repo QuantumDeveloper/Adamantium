@@ -429,6 +429,20 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
             containerRegistry.RegisterInstance<RegionAdapterMappings>(mappings);
         }
 
+        // Dialogs (NAVIGATION_PLAN.md phase 2): the host registry seeded with the in-window OverlayDialogHost (Default ->
+        // Overlay), plus the UI-free DialogService. A window-modal host registers alongside later.
+        if (!containerRegistry.IsRegistered<Adamantium.Navigation.IDialogHostRegistry>())
+        {
+            var dialogHosts = new Adamantium.Navigation.DialogHostRegistry();
+            var overlayHost = new OverlayDialogHost(this, Container.Resolve<IViewLocator>());
+            dialogHosts.Register(overlayHost.Kind, overlayHost);
+            var windowHost = new WindowDialogHost(this, Container.Resolve<IViewLocator>(), Container.Resolve<IWindowShellRegistry>());
+            dialogHosts.Register(windowHost.Kind, windowHost);
+            containerRegistry.RegisterInstance<Adamantium.Navigation.IDialogHostRegistry>(dialogHosts);
+        }
+        if (!containerRegistry.IsRegistered<Adamantium.Navigation.IDialogService>())
+            containerRegistry.RegisterSingleton<Adamantium.Navigation.IDialogService, Adamantium.Navigation.DialogService>();
+
         Navigation = Container.Resolve<Adamantium.Navigation.INavigationService>();
     }
     
