@@ -6,6 +6,7 @@ using Adamantium.Imaging;
 using Adamantium.UI.Core.Diagnostics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Extensions;
+using Adamantium.Graphics.Core.Presentation;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
@@ -163,7 +164,13 @@ public class WindowRenderService : UiRenderService
         // NOW, before this frame draws, so the render thread never records/submits/presents against the STALE swapchain.
         // ResizePresenter waits for device idle and runs on THIS (render) thread, so it is serialized with our own
         // Submit/Present - it used to run only in FrameEnded, AFTER the frame had already been drawn against the old one.
-        if (windowRenderer.Presenter != null && !windowRenderer.IsRendererUpToDate)
+        // Recreate on a pending size change (IsRendererUpToDate cleared by WM_SIZE) OR when the swapchain has gone
+        // OutOfDate. The latter is the SELF-HEAL: a resize can leave the swapchain OutOfDate with no further WM_SIZE to
+        // trigger a rebuild (the drag already ended), so acquire keeps failing and - now that present is correctly gated
+        // on a real acquire+submit - the picture freezes. Rebuilding whenever the presenter reports OutOfDate makes the
+        // swapchain recover deterministically instead of "works most of the time".
+        if (windowRenderer.Presenter != null &&
+            (!windowRenderer.IsRendererUpToDate || windowRenderer.Presenter.LastPresenterState == PresenterState.OutOfDate))
         {
             windowRenderer.ResizePresenter((uint)(Window.ClientWidth * RenderScale), (uint)(Window.ClientHeight * RenderScale));
         }

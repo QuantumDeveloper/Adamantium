@@ -153,7 +153,12 @@ public class RenderTargetGameOutput : AdamantiumGameOutputBase
         Height = height;
         ClientBounds = new Rectangle(0, 0, (int)width, (int)height);
         UpdateViewportAndScissor(width, height);
-        RaiseSizeChangedEvent(new GameOutputSizeChangedPayload(this, new Adamantium.Mathematics.Size(width, height)));
+        var sizePayload = new GameOutputSizeChangedPayload(this, new Adamantium.Mathematics.Size(width, height));
+        RaiseSizeChangedEvent(sizePayload);
+        // Also publish on the aggregator: CameraManager rebuilds the projection (aspect ratio) off THIS event, not the
+        // local SizeChanged C# event. Width/Height are already set above, so UpdateDimensions reads the new size. Without
+        // this the game's projection never re-aspects on a panel resize.
+        EventAggregator.GetEvent<GameOutputSizeChanged>().Publish(sizePayload);
         ResizeRequested = true;
         EventAggregator.GetEvent<GameOutputChangesRequestedEvent>().Publish(new GameOutputParametersPayload(this, Description, ChangeReason.Resize));
         // The surface is re-created on the next CopyOutput (size mismatch) and re-handed to the control.

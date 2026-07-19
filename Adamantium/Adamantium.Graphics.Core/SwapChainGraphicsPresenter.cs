@@ -269,6 +269,11 @@ namespace Adamantium.Graphics.Core
             // GraphicsDevice.LogicalDevice.ResetFences(1u, fence);
 
             if (!CanPresent) return LastPresenterState;
+            // One present per acquire. CanPresent is set by AcquireNextImage; consume it here so a later frame that did
+            // NOT re-acquire (a skip/recreate during resize churn) can't re-present this already-presented, not-
+            // reacquired image. That was the "image not acquired since last present" + "semaphore has no way to be
+            // signaled" pair that lost the device on drag-resize.
+            CanPresent = false;
 
             var presenterImage = GetCurrentImage();
 

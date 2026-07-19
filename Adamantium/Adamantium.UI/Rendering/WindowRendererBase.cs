@@ -168,8 +168,13 @@ public abstract class WindowRendererBase : IWindowRenderer
 
     public virtual void Present()
     {
-        Presenter?.Present();
-        
+        // Present ONLY when this frame actually acquired + submitted. GraphicsDevice.CanPresent is reset false at
+        // BeginDraw start and set true only after a successful Submit, so a frame skipped/aborted during resize churn
+        // (no acquire/submit) does NOT re-present a stale, not-reacquired swapchain image with an unsignaled semaphore
+        // - the pair of VUIDs that lost the device on drag-resize.
+        if (GraphicsDevice.CanPresent)
+            Presenter?.Present();
+
         if (Window.ShouldDisplayWindow)
         {
             // Dispatcher.CurrentDispatcher.Invoke(() =>
