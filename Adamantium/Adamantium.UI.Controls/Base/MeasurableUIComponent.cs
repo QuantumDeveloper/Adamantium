@@ -62,6 +62,26 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     public static readonly AdamantiumProperty MarginProperty = AdamantiumProperty.Register(nameof(Margin),
         typeof(Thickness), typeof(MeasurableUIComponent), new PropertyMetadata(default(Thickness), PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
 
+    // CSS-style single-side margins. Each is an OPTIONAL override of ONE side of Margin: NaN (the default) means "not set,
+    // defer to Margin's side"; a real value overrides just that side. Nothing writes back into Margin - the effective
+    // margin is composed at layout time (see EffectiveMargin), so each side is independently settable/bindable/animatable
+    // and never fights Margin's own value or priority.
+    public static readonly AdamantiumProperty MarginLeftProperty = AdamantiumProperty.Register(nameof(MarginLeft),
+        typeof(Double), typeof(MeasurableUIComponent),
+        new PropertyMetadata(Double.NaN, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange, OnMarginSideChanged));
+
+    public static readonly AdamantiumProperty MarginTopProperty = AdamantiumProperty.Register(nameof(MarginTop),
+        typeof(Double), typeof(MeasurableUIComponent),
+        new PropertyMetadata(Double.NaN, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange, OnMarginSideChanged));
+
+    public static readonly AdamantiumProperty MarginRightProperty = AdamantiumProperty.Register(nameof(MarginRight),
+        typeof(Double), typeof(MeasurableUIComponent),
+        new PropertyMetadata(Double.NaN, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange, OnMarginSideChanged));
+
+    public static readonly AdamantiumProperty MarginBottomProperty = AdamantiumProperty.Register(nameof(MarginBottom),
+        typeof(Double), typeof(MeasurableUIComponent),
+        new PropertyMetadata(Double.NaN, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange, OnMarginSideChanged));
+
     public static readonly AdamantiumProperty UseLayoutRoundingProperty = AdamantiumProperty.Register(nameof(UseLayoutRounding),
         typeof(Boolean), typeof(MeasurableUIComponent), new PropertyMetadata(false, PropertyMetadataOptions.AffectsArrange));
     
@@ -167,6 +187,69 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     {
         get => GetValue<Thickness>(MarginProperty);
         set => SetValue(MarginProperty, value);
+    }
+
+    /// <summary>An optional override of just <see cref="Thickness.Left"/> of <see cref="Margin"/>, so a one-sided offset is
+    /// <c>MarginLeft="8"</c> instead of <c>Margin="8,0,0,0"</c>. Unset by default (the getter returns Margin.Left); once
+    /// assigned it overrides that side only. The effective margin is composed at layout, so Margin and the per-side
+    /// overrides never fight over value or priority - each is independently settable, bindable and animatable.</summary>
+    public Double MarginLeft
+    {
+        get { var v = GetValue<Double>(MarginLeftProperty); return Double.IsNaN(v) ? Margin.Left : v; }
+        set => SetValue(MarginLeftProperty, value);
+    }
+
+    /// <summary>An optional override of just <see cref="Thickness.Top"/> of <see cref="Margin"/> (see <see cref="MarginLeft"/>).</summary>
+    public Double MarginTop
+    {
+        get { var v = GetValue<Double>(MarginTopProperty); return Double.IsNaN(v) ? Margin.Top : v; }
+        set => SetValue(MarginTopProperty, value);
+    }
+
+    /// <summary>An optional override of just <see cref="Thickness.Right"/> of <see cref="Margin"/> (see <see cref="MarginLeft"/>).</summary>
+    public Double MarginRight
+    {
+        get { var v = GetValue<Double>(MarginRightProperty); return Double.IsNaN(v) ? Margin.Right : v; }
+        set => SetValue(MarginRightProperty, value);
+    }
+
+    /// <summary>An optional override of just <see cref="Thickness.Bottom"/> of <see cref="Margin"/> (see <see cref="MarginLeft"/>).</summary>
+    public Double MarginBottom
+    {
+        get { var v = GetValue<Double>(MarginBottomProperty); return Double.IsNaN(v) ? Margin.Bottom : v; }
+        set => SetValue(MarginBottomProperty, value);
+    }
+
+    // Set once ANY per-side override is assigned, so layout skips the compose for the common case (no overrides).
+    private bool _hasSideMargin;
+
+    private static void OnMarginSideChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        var c = (MeasurableUIComponent)a;
+        c._hasSideMargin = !Double.IsNaN(c.GetValue<Double>(MarginLeftProperty))
+                        || !Double.IsNaN(c.GetValue<Double>(MarginTopProperty))
+                        || !Double.IsNaN(c.GetValue<Double>(MarginRightProperty))
+                        || !Double.IsNaN(c.GetValue<Double>(MarginBottomProperty));
+    }
+
+    /// <summary>The margin layout actually uses: <see cref="Margin"/> with any per-side override applied on top. Composed
+    /// only when an override exists, so a control without per-side margins pays a single flag read.</summary>
+    public Thickness EffectiveMargin
+    {
+        get
+        {
+            var m = Margin;
+            if (!_hasSideMargin) return m;
+            var l = GetValue<Double>(MarginLeftProperty);
+            var t = GetValue<Double>(MarginTopProperty);
+            var r = GetValue<Double>(MarginRightProperty);
+            var b = GetValue<Double>(MarginBottomProperty);
+            return new Thickness(
+                Double.IsNaN(l) ? m.Left : l,
+                Double.IsNaN(t) ? m.Top : t,
+                Double.IsNaN(r) ? m.Right : r,
+                Double.IsNaN(b) ? m.Bottom : b);
+        }
     }
 
     public VerticalAlignment VerticalAlignment
@@ -391,9 +474,9 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     {
         if (Visibility is Visibility.Visible or Visibility.Hidden)
         {
-            var margin = Margin;
-                
-            Size constrained; 
+            var margin = EffectiveMargin;
+
+            Size constrained;
                 
             // IWindow is top level control. Constraints should be ignored by top level controls
             // because it will lead to incorrect measurements
@@ -447,8 +530,8 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     {
         if (Visibility is Visibility.Visible or Visibility.Hidden)
         {
-            var margin = Margin;
-                
+            var margin = EffectiveMargin;
+
             // IWindow is top level control. Margin should be ignored by top level controls
             // because there is no element to margin from for IWindow
             if (this is IWindow)

@@ -45,7 +45,7 @@
                                                    Foreground="{TemplateBinding Foreground}"
                                                    FontSize="{TemplateBinding FontSize}"
                                                    VerticalAlignment="Center"
-                                                   Margin="10 0 0 0"/>
+                                                   Margin="14 0 0 0"/>
                     </controls:StackPanel>
                 </ControlTemplate>
             </Setter.Value>

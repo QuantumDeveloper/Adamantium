@@ -478,7 +478,7 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         var adamantiumProperty = AdamantiumPropertyMap.FindRegistered(GetType(), property);
         if (adamantiumProperty == null)
             return;
-        
+
         // Honour the caller's priority - this dropped it (always Local), which is why a ControlTemplate literal
         // set via this overload at Template priority could not be overridden by a Trigger (Local outranks Trigger).
         SetValue(adamantiumProperty, value, priority);

@@ -467,7 +467,7 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
     // not. First descendant with a non-zero margin wins.
     private static Thickness FindItemMargin(IUIComponent node)
     {
-        if (node is IMeasurableComponent m && !IsZero(m.Margin)) return m.Margin;
+        if (node is IMeasurableComponent m && !IsZero(m.EffectiveMargin)) return m.EffectiveMargin;
         foreach (var child in node.VisualChildren)
         {
             var found = FindItemMargin(child);
