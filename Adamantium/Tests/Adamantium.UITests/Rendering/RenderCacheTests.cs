@@ -31,7 +31,14 @@ public class RenderCacheTests
         _cache = new RenderCache(new DrawingContext(), _factory);
     }
 
-    private void RenderFrame() => _cache.BuildFromVisualTree(_root);
+    private void RenderFrame()
+    {
+        _cache.BuildFromVisualTree(_root);
+        // RenderDirty is a GLOBAL set that the app clears ONCE after all windows record (UIApplication.DispatchRenderFrame),
+        // NOT inside ApplyFrame. With no UIApplication here, the harness must clear it, else every frame past the first
+        // still sees the initial marks and re-does a Full walk instead of Clean/Partial/Structural.
+        RenderDirty.Clear();
+    }
 
     private static void DrawsRectangle(TestControl c, Brush brush = null) =>
         c.RenderAction = s => s.DrawRectangle(brush ?? Brushes.Red, Box);
