@@ -1,7 +1,7 @@
 ﻿using System;
 using Adamantium.Core;
 using Adamantium.ECS.Components.Extensions;
-using Adamantium.ECS.ComponentsBasics;
+using Adamantium.ECS.Components;
 using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
 

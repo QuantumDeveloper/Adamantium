@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using Adamantium.ECS.ComponentsBasics;
+using Adamantium.ECS.Components;
 using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
 using Adamantium.ProceduralGeometry;

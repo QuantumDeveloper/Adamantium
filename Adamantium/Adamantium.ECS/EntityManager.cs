@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Adamantium.ECS.ComponentsBasics;
+using Adamantium.ECS.Components;
 using Adamantium.ECS.Templates;
 
 namespace Adamantium.ECS;

@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Adamantium.ECS.ComponentsBasics
+namespace Adamantium.ECS.Components
 {
     public abstract class ActivatableComponent : Component
     {

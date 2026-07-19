@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace Adamantium.ECS.ComponentsBasics
+namespace Adamantium.ECS.Components
 {
    [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
    public class RequiredComponentAttribute:Attribute

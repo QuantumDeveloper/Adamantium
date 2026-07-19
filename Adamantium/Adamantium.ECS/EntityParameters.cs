@@ -1,4 +1,4 @@
-using Adamantium.ECS.ComponentsBasics;
+using Adamantium.ECS.Components;
 
 namespace Adamantium.ECS;
 

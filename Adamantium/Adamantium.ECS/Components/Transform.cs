@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using Adamantium.Mathematics;
 
-namespace Adamantium.ECS.ComponentsBasics
+namespace Adamantium.ECS.Components
 {
     public sealed class Transform : ActivatableComponent
     {

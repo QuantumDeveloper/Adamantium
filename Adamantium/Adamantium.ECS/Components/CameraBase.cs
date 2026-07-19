@@ -3,7 +3,7 @@ using System;
 using Adamantium.Core;
 using Adamantium.Graphics.Core;
 
-namespace Adamantium.ECS.ComponentsBasics
+namespace Adamantium.ECS.Components
 {
     public abstract class CameraBase : ActivatableComponent
     {

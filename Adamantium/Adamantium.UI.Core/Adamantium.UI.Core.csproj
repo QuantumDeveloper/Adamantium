@@ -14,7 +14,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Adamantium.ECS.Components\Adamantium.ECS.Components.csproj"/>
+        <ProjectReference Include="..\Adamantium.ECS\Adamantium.ECS.csproj"/>
         <ProjectReference Include="..\Adamantium.Fonts\Adamantium.Fonts.csproj"/>
         <ProjectReference Include="..\Adamantium.MacOS\Adamantium.MacOS.csproj"/>
         <ProjectReference Include="..\Adamantium.Mathematics\Adamantium.Mathematics.csproj" />

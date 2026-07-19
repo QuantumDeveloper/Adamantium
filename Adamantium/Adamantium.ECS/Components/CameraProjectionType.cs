@@ -1,4 +1,4 @@
-﻿namespace Adamantium.ECS.ComponentsBasics
+﻿namespace Adamantium.ECS.Components
 {
     public enum CameraProjectionType
     {

@@ -1,5 +1,5 @@
 ﻿using System;
-using Adamantium.ECS.ComponentsBasics;
+using Adamantium.ECS.Components;
 using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
 

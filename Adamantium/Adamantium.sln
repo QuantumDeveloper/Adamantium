@@ -23,8 +23,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Vulkan", "..\..\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Vulkan.Loader", "..\..\AdamantiumVulkan\Adamantium.Vulkan.Loader\Adamantium.Vulkan.Loader.csproj", "{F86F0DA0-D713-43CB-A1CE-0C33A7CE5624}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.ECS.Components", "Adamantium.ECS.Components\Adamantium.ECS.Components.csproj", "{76BFB7BF-3501-440E-A189-A4C74673E96D}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Game", "Adamantium.Game\Adamantium.Game.csproj", "{A02907D8-8A1C-4D77-A397-C57CB4323021}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Adamantium.Engine", "Adamantium.Engine\Adamantium.Engine.csproj", "{2703C5BE-1D98-4111-A195-C465BF176357}"
@@ -343,22 +341,6 @@ Global
 		{F86F0DA0-D713-43CB-A1CE-0C33A7CE5624}.Release|x64.Build.0 = Release|x64
 		{F86F0DA0-D713-43CB-A1CE-0C33A7CE5624}.Release|x86.ActiveCfg = Release|x64
 		{F86F0DA0-D713-43CB-A1CE-0C33A7CE5624}.Release|x86.Build.0 = Release|x64
-		{76BFB7BF-3501-440E-A189-A4C74673E96D}.Debug|Any CPU.ActiveCfg = Debug|x64
-		{76BFB7BF-3501-440E-A189-A4C74673E96D}.Debug|Any CPU.Build.0 = Debug|x64
-		{76BFB7BF-3501-440E-A189-A4C74673E96D}.Debug|arm64.ActiveCfg = Debug|x64
-		{76BFB7BF-3501-440E-A189-A4C74673E96D}.Debug|arm64.Build.0 = Debug|x64
-		{76BFB7BF-3501-440E-A189-A4C74673E96D}.Debug|x64.ActiveCfg = Debug|x64
-		{76BFB7BF-3501-440E-A189-A4C74673E96D}.Debug|x64.Build.0 = Debug|x64
-		{76BFB7BF-3501-440E-A189-A4C74673E96D}.Debug|x86.ActiveCfg = Debug|x64
-		{76BFB7BF-3501-440E-A189-A4C74673E96D}.Debug|x86.Build.0 = Debug|x64
-		{76BFB7BF-3501-440E-A189-A4C74673E96D}.Release|Any CPU.ActiveCfg = Release|x64
-		{76BFB7BF-3501-440E-A189-A4C74673E96D}.Release|Any CPU.Build.0 = Release|x64
-		{76BFB7BF-3501-440E-A189-A4C74673E96D}.Release|arm64.ActiveCfg = Release|x64
-		{76BFB7BF-3501-440E-A189-A4C74673E96D}.Release|arm64.Build.0 = Release|x64
-		{76BFB7BF-3501-440E-A189-A4C74673E96D}.Release|x64.ActiveCfg = Release|x64
-		{76BFB7BF-3501-440E-A189-A4C74673E96D}.Release|x64.Build.0 = Release|x64
-		{76BFB7BF-3501-440E-A189-A4C74673E96D}.Release|x86.ActiveCfg = Release|x64
-		{76BFB7BF-3501-440E-A189-A4C74673E96D}.Release|x86.Build.0 = Release|x64
 		{A02907D8-8A1C-4D77-A397-C57CB4323021}.Debug|Any CPU.ActiveCfg = Debug|x64
 		{A02907D8-8A1C-4D77-A397-C57CB4323021}.Debug|Any CPU.Build.0 = Debug|x64
 		{A02907D8-8A1C-4D77-A397-C57CB4323021}.Debug|arm64.ActiveCfg = Debug|x64
