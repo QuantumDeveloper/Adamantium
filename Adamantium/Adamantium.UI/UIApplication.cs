@@ -443,6 +443,14 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         if (!containerRegistry.IsRegistered<Adamantium.Navigation.IDialogService>())
             containerRegistry.RegisterSingleton<Adamantium.Navigation.IDialogService, Adamantium.Navigation.DialogService>();
 
+        // Overlays (floating in-window OverlayWindows) - a service of their own, distinct from dialogs.
+        if (!containerRegistry.IsRegistered<Adamantium.Navigation.IOverlayService>())
+        {
+            var overlayService = new OverlayService(this, Container.Resolve<IViewLocator>(),
+                Container.Resolve<Adamantium.Core.DependencyInjection.IDependencyResolver>());
+            containerRegistry.RegisterInstance<Adamantium.Navigation.IOverlayService>(overlayService);
+        }
+
         Navigation = Container.Resolve<Adamantium.Navigation.INavigationService>();
     }
     

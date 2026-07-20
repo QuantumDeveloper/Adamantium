@@ -25,6 +25,7 @@ public partial class AboutDialogViewModel : AdamantiumViewModel, IDialogAware
         Version = plus >= 0 ? version[..plus] : version;
     }
 
+    public string Title => "About";
     public string Product { get; }
     public string Version { get; }
     public string Manufacturer { get; }
