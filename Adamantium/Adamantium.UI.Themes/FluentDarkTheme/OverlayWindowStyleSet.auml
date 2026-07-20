@@ -108,6 +108,12 @@
         <PropertyTrigger Property="ShowTitleBar" Value="false">
             <Setter TargetName="PART_TitleBar" Property="Visibility" Value="Collapsed"/>
         </PropertyTrigger>
+        <!-- Inactive (not the front-most window): dim the title bar like an inactive OS window. Overrides the window's own
+             TitleBarBackground/TitleForeground, which the bar, title, icon and pin/close glyphs all bind to. -->
+        <PropertyTrigger Property="IsActive" Value="false">
+            <Setter Property="TitleBarBackground" Value="{ResourceReference ControlFillColorSecondary}"/>
+            <Setter Property="TitleForeground" Value="{ResourceReference TextFillColorSecondary}"/>
+        </PropertyTrigger>
     </Style>
 
 </StyleSet>

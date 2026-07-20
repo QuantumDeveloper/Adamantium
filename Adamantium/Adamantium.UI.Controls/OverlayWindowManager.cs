@@ -28,15 +28,17 @@ public sealed class OverlayWindowManager
 
     private readonly IPopupHost _host;
     private readonly List<OverlayWindow> _windows = [];   // order = back-to-front; pinned windows always sort to the end (top)
-    private bool _keyHooked;
+    private OverlayWindow _active;   // the front-most / last-interacted window (drives IsActive + the Escape target)
+    private bool _hostHooked;
+    private MouseButtonEventHandler _previewDown;
 
     private OverlayWindowManager(IPopupHost host) => _host = host;
 
     /// <summary>Open windows, back-to-front. The last one is the active (front-most) window.</summary>
     public IReadOnlyList<OverlayWindow> Windows => _windows;
 
-    /// <summary>The front-most window, or null when none are open.</summary>
-    public OverlayWindow ActiveWindow => _windows.Count > 0 ? _windows[^1] : null;
+    /// <summary>The front-most (last-interacted) window, or null when none are open.</summary>
+    public OverlayWindow ActiveWindow => _active;
 
     /// <summary>Shows a window on the overlay and completes when it closes, with its <see cref="OverlayWindow.Result"/>.</summary>
     public Task<object> ShowAsync(OverlayWindow window)
@@ -73,7 +75,8 @@ public sealed class OverlayWindowManager
         _host.PopupLayer.Add(window.HostPopup);
         Normalize();
         KeepPinnedOnTop(window);
-        EnsureKeyHook();
+        SetActive(window);
+        EnsureHostHooks();
 
         var tcs = new TaskCompletionSource<object>();
         void OnClosed(object sender, EventArgs e)
@@ -84,7 +87,8 @@ public sealed class OverlayWindowManager
             window.HostPopup = null;
             window.ScrimPopup = null;
             _windows.Remove(window);
-            if (_windows.Count == 0) RemoveKeyHook();
+            SetActive(_windows.Count > 0 ? _windows[^1] : null);   // the next front-most becomes active
+            if (_windows.Count == 0) RemoveHostHooks();
             tcs.TrySetResult(window.Result);
         }
         window.Closed += OnClosed;
@@ -107,6 +111,15 @@ public sealed class OverlayWindowManager
         Normalize();
         RaiseInLayer(window);
         KeepPinnedOnTop(window);
+        SetActive(window);
+    }
+
+    // The front-most / last-interacted window is "active" (full accent title bar); the rest dim, like inactive OS windows.
+    private void SetActive(OverlayWindow window)
+    {
+        _active = window;
+        foreach (var w in _windows)
+            w.SetActive(ReferenceEquals(w, window));
     }
 
     /// <summary>Re-sorts the layer after a window's pin state changed (raise it to the top of its new group).</summary>
@@ -151,18 +164,23 @@ public sealed class OverlayWindowManager
         return new Vector2(i * step, i * step);
     }
 
-    private void EnsureKeyHook()
+    private void EnsureHostHooks()
     {
-        if (_keyHooked || _host is not InputUIComponent input) return;
+        if (_hostHooked || _host is not InputUIComponent input) return;
         input.KeyDown += OnHostKeyDown;
-        _keyHooked = true;
+        // Preview tunnels from the window root, so this catches EVERY press - even one a content control handles - letting a
+        // click on the window behind deactivate the overlays (like clicking away from an OS window). See OnHostPreviewDown.
+        _previewDown ??= OnHostPreviewDown;
+        input.AddHandler(Mouse.PreviewMouseDownEvent, _previewDown, handledEventsToo: true);
+        _hostHooked = true;
     }
 
-    private void RemoveKeyHook()
+    private void RemoveHostHooks()
     {
-        if (!_keyHooked || _host is not InputUIComponent input) return;
+        if (!_hostHooked || _host is not InputUIComponent input) return;
         input.KeyDown -= OnHostKeyDown;
-        _keyHooked = false;
+        if (_previewDown != null) input.RemoveHandler(Mouse.PreviewMouseDownEvent, _previewDown);
+        _hostHooked = false;
     }
 
     private void OnHostKeyDown(object sender, KeyEventArgs e)
@@ -174,5 +192,23 @@ public sealed class OverlayWindowManager
             e.Handled = true;
             active.Close();
         }
+    }
+
+    // A press inside any overlay (its card - or its modal scrim, which must not deactivate the modal) keeps it active; the
+    // overlay's own handler raises it. A press anywhere else is on the window content behind, so deactivate them all.
+    private void OnHostPreviewDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_active == null || e.OriginalSource is not IUIComponent src) return;
+        foreach (var w in _windows)
+            if (IsWithin(src, w) || (w.ScrimPopup?.Child is IUIComponent scrim && IsWithin(src, scrim)))
+                return;
+        SetActive(null);
+    }
+
+    private static bool IsWithin(IUIComponent node, IUIComponent ancestor)
+    {
+        for (var n = node; n != null; n = n.VisualParent)
+            if (ReferenceEquals(n, ancestor)) return true;
+        return false;
     }
 }
