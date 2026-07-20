@@ -845,13 +845,27 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         return GraphicsDeviceService.IsReady;
     }
 
+    /// <summary>A frame slower than this (~20 fps) is treated as a STALL - a build/JIT hitch or a post-idle wake - not as
+    /// real animation time, so the animation doesn't burn its duration during it. Healthy 30-120 fps frames are well under.</summary>
+    private const double StallFrameSeconds = 1.0 / 20.0;
+
+    /// <summary>How far the animation heartbeat advances THROUGH a stall frame - a sliver, so it near-pauses instead of
+    /// jumping, yet still creeps forward if the low frame rate is sustained rather than a one-off hitch.</summary>
+    private const double StallAnimationStep = 0.004;
+
     protected void Update(AppTime frameTime)
     {
         // Apply input marshalled onto this (loop) thread BEFORE anything reads/writes the visual tree, so window input
         // (and the layout invalidation it triggers) lands on the loop thread ahead of layout instead of racing it.
         Threading.Dispatcher.CurrentDispatcher?.DrainPending();
-        // Drive time-based animations once per frame (FrameTime is in seconds) before the services update/layout.
-        AnimationManager.Tick(frameTime.FrameTime);
+        // Drive time-based animations before the services update/layout. A HEALTHY frame advances by its real delta. A STALL
+        // frame - a cold first-visit build (a tab's first measure/arrange/bake), a JIT hitch, or a wake after a long idle -
+        // has a huge real delta the render can NOT present as smooth intermediate frames; advancing the animation by that
+        // (even a clamped chunk) BURNS its duration during the stall, so it appears to jump straight ahead (the first-visit
+        // "snap"). Advance a stall by only a sliver, so the animation effectively PAUSES through it and plays over the frames
+        // actually presented. The sliver (not zero) keeps it progressing under a genuinely sustained low frame rate.
+        var animationStep = frameTime.FrameTime < StallFrameSeconds ? frameTime.FrameTime : StallAnimationStep;
+        AnimationManager.Tick(animationStep);
         EntityWorld.ServiceManager.Update(frameTime);
     }
 

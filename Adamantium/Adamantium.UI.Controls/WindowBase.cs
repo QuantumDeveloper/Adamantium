@@ -535,7 +535,9 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     void IWindowInternals.OnSourceInitialized()
     {
         SourceInitialized?.Invoke(this, EventArgs.Empty);
-        InvalidateMeasure();
+        // Seed the initial layout via the manager, NOT InvalidateMeasure(): a fresh root is IsMeasureValid=false, so that
+        // method's early-return drops the enqueue - the first real layout would otherwise defer to the first user input.
+        LayoutManager.GetOrCreate(this).InvalidateMeasure(this);
     }
 
     public void SetIsActive(bool isActive)

@@ -324,8 +324,11 @@ public class Slider : RangeBase
                 Child = _valueToolTipText
             };
             _valueToolTip = new Popup { Child = badge };
+            // Logical child only (for DataContext inheritance), NOT visual: the badge is a PORTAL rendered on the window's
+            // popup layer and anchored to the thumb (PlacementTarget), so it never needs to sit in the slider's visual tree.
+            // Adding it there invalidated the slider's measure, which cascaded UP to the root -> a full-window re-layout on
+            // the FIRST drag (the ~345 ms freeze). Opening it (IsOpen) still hosts it via the thumb's ancestors.
             LogicalChildrenCollection.Add(_valueToolTip);
-            VisualChildrenCollection.Add(_valueToolTip);
         }
         _valueToolTip.PlacementTarget = _track?.Thumb;
         _valueToolTip.Placement = horizontal ? PlacementMode.Top : PlacementMode.Right;
