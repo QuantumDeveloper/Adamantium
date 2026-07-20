@@ -283,8 +283,13 @@ public class ContentPresenter : InputUIComponent
         // changed, so the subtree's SIZE is unchanged - skip re-walking it. If the reused child's OWN size actually changed
         // (a string's text, an AffectsMeasure binding), it invalidated ITSELF, so IsMeasureValid is false and we fall
         // through to measure it. A genuine content REBUILD (_lastContentRebuilt) always measures the new subtree.
+        // NOT with a LayoutTransform: there DesiredSize is the OUTER (transformed) footprint, but MeasureOverride must
+        // return the INNER (untransformed) size - MeasureCore transforms it. Returning DesiredSize here would re-transform
+        // an already-transformed size and COMPOUND it every re-measure (a ZoomBox scaling this presenter exploded/collapsed
+        // the extent). Re-measure so we return the inner size.
         if (!_lastContentRebuilt && _currentRoot is IMeasurableComponent { IsMeasureValid: true }
-            && PreviousMeasureConstraint == availableSize)
+            && PreviousMeasureConstraint == availableSize
+            && LayoutTransform == null)
             return DesiredSize;
         return base.MeasureOverride(availableSize);
     }
