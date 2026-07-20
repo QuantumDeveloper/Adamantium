@@ -48,15 +48,15 @@ public class PopupRenderProcessor : EntityProcessor<WindowRenderService>
         window.LayoutPopups();
 
         var flat = Flatten(window.PopupRoots);
-        // GATE the expensive rebuild. The overlay pipeline (component walk + ProcessCommands + text rasterization) ran
-        // EVERY frame - fine for a transient tooltip, but a persistent panel (e.g. a docked SlidePanel) then rebuilt its
-        // whole subtree ~60-1000x/sec for nothing, unlike the incremental main-content cache. Rebuild ONLY when the open
-        // set, any subtree's geometry, or a popup's world position actually changed; otherwise Draw() re-renders the
-        // already-built cache unchanged. Moving tooltips still rebuild (their world position changes each frame).
-        if (!OverlayChanged(flat)) return;
+        // Rebuild (component walk + rasterization) only when the open set / geometry / a popup's position changed.
+        if (OverlayChanged(flat))
+        {
+            _cache.BuildFromComponents(flat, projection);
+            _cache.ProcessCommands(projection, AssociatedService.RenderScale);
+        }
 
-        _cache.BuildFromComponents(flat, projection);
-        _cache.ProcessCommands(projection, AssociatedService.RenderScale);
+        // But PreRender (GPU-stroke compute) runs EVERY frame, like the content stage: a re-record promotes a stroke's
+        // vertex buffer to a per-frame ring, and each slot must be refilled before Draw reads it, else it smears a frame.
         _cache.PreRender();
     }
 
