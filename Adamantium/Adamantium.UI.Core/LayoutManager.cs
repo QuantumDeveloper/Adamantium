@@ -8,71 +8,50 @@ using Adamantium.UI.Core.Diagnostics;
 namespace Adamantium.UI.Core;
 
 /// <summary>
-/// Owns the per-frame layout pass for one visual-tree root (a window / top-level). It is the single driver of
-/// style-application + measure + arrange, replacing the old per-component full-tree walk that lived in WindowExtension.
+/// Owns the per-frame layout pass for one visual-tree root (a window / top-level): the single driver of style-application
+/// + measure + arrange. Invalidation registers the affected node in this manager's dirty queues;
+/// <see cref="ExecuteLayoutPass"/> drains only those, so a clean frame (nothing invalid) walks nothing. One manager per
+/// root, kept persistently so invalidations BETWEEN passes accumulate; a node finds its manager by its top-most visual
+/// ancestor (<see cref="For"/>). See docs/LAYOUT_MANAGER_PLAN.md.
 /// </summary>
-/// <remarks>
-/// Phase 1 of the layout-manager plan (docs/LAYOUT_MANAGER_PLAN.md): the full per-frame DFS walk is gone. Invalidation
-/// (<see cref="IMeasurableComponent.InvalidateMeasure"/> / <see cref="IMeasurableComponent.InvalidateArrange"/> /
-/// <see cref="IFundamentalUIComponent.InvalidateStyles"/>) now registers the affected node in this manager's dirty
-/// queues; <see cref="ExecuteLayoutPass"/> drains only those queues. A clean frame (nothing invalid) walks nothing.
-///
-/// One manager per root, kept persistently (so invalidations that happen BETWEEN passes accumulate). A node finds its
-/// manager by walking up to its top-most visual ancestor (<see cref="For"/>); every entry point (the window's per-frame
-/// update and the tests' UpdateTree) is invoked with that same top-most node, so both resolve to the same instance.
-///
-/// Later phases make arrange strictly top-down (drop the parent.DesiredSize fallback) and remove the re-entrancy
-/// crutches - all behind this same entry point.
-/// </remarks>
 public sealed class LayoutManager
 {
     // Persistent per-root managers, keyed (weakly) by the top-most visual node so they are GC'd with their tree.
     private static readonly ConditionalWeakTable<IUIComponent, LayoutManager> Managers = new();
 
-    // Guards against a pathological re-dirtying loop (a node that invalidates itself every time it's laid out): the
-    // outer drain loop bails after this many iterations rather than spinning forever.
+    // Backstop against a node that re-dirties itself every time it is laid out: bail the drain loop after this many iterations.
     private const int MaxPassIterations = 100;
 
-    // No per-frame TIME budget: a layout pass always drains FULLY, so what is drawn is always internally consistent. An
-    // earlier time-budget that cut a pass mid-way and re-queued the tail published TORN frames (a grid with tiles of two
-    // sizes - a deferred arrange sat at its previous rect while neighbours had moved) - "a budget that buys milliseconds by
-    // publishing a torn frame is a bug", so it was ripped out. Two things now cover what it was for: the compositor presents
-    // at its own pace (a slow Update no longer freezes the picture), and heavy INTAKE is bounded AT THE SOURCE - a
-    // virtualizing panel realizes only the viewport + margin and slices a big realize over frames via
-    // InvalidateMeasureNextPass. A real intake-time budget is future work - see docs/TECH_DEBT.md.
+    // No per-frame TIME budget: a pass always drains FULLY, so the drawn frame is internally consistent. An earlier budget
+    // that cut a pass mid-way and re-queued the tail published TORN frames (a grid with tiles of two sizes). What replaced it:
+    // the compositor presents at its own pace, and heavy INTAKE is bounded at the source (a virtualizing panel realizes only
+    // viewport+margin, slicing big realizes over frames via InvalidateMeasureNextPass). See docs/TECH_DEBT.md.
 
     private readonly IUIComponent _root;
     private readonly DirtyQueue _toStyle = new();
     private readonly DirtyQueue _toMeasure = new();
     private readonly DirtyQueue _toArrange = new();
-    // Nodes that asked to be re-measured on the NEXT pass, not this one. A virtualizing panel realizing a large window in
-    // per-frame slices re-queues itself here so the continuation lands next frame - if it enqueued into _toMeasure the
-    // drain loop below would process it in THIS same pass, realizing the whole window in one frame (the very burst we are
-    // spreading). Promoted into the real measure queue at the start of each pass.
+    // Nodes asking to be re-measured NEXT pass, not this one (a virtualizing panel slicing a large realize over frames).
+    // Enqueuing into _toMeasure would drain it THIS pass - the very burst we spread. Promoted at the start of each pass.
     private readonly HashSet<IUIComponent> _toMeasureNextPass = new();
     private readonly List<IUIComponent> _passBuffer = new();   // reused snapshot buffer for one phase's drain
     private readonly List<IUIComponent> _promoteBuffer = new();   // reused scratch for promoting next-pass deferrals
-    private readonly System.Diagnostics.Stopwatch _passStopwatch = new();   // reused per pass (no per-frame allocation, RuntimeStats)
+    private readonly System.Diagnostics.Stopwatch _passStopwatch = new();   // reused per pass (RuntimeStats)
 
     public LayoutManager(IUIComponent root)
     {
         _root = root ?? throw new ArgumentNullException(nameof(root));
     }
 
-    /// <summary>Gets (creating once) the manager that owns the given root. The root is whatever top-level node the
-    /// layout pass is driven from (a window at runtime, an arbitrary subtree root in tests).</summary>
+    /// <summary>Gets (creating once) the manager that owns the given root (a window at runtime, a subtree root in tests).</summary>
     public static LayoutManager GetOrCreate(IUIComponent root) => Managers.GetValue(root, static r => new LayoutManager(r));
 
-    /// <summary>Resolves the manager responsible for <paramref name="node"/> by walking up to its top-most visual
-    /// ancestor and getting (or creating) that root's manager.</summary>
+    /// <summary>Resolves the manager responsible for <paramref name="node"/> via its top-most visual ancestor.</summary>
     public static LayoutManager For(IUIComponent node)
     {
-        // The node's root visual is already cached and kept current by the attach/detach walk (SetVisualParent propagates
-        // RootVisual through the WHOLE subtree on both attach and detach), so read it directly - O(1) - instead of walking
-        // to the top on every call. For() is on the layout invalidation hot path: every InvalidateMeasure/InvalidateArrange
-        // resolves the owning manager through here. A not-yet-attached subtree (or a plain non-root test tree) has
-        // RootVisual == null; fall back to the walk so its local top still owns a manager - the same key the layout pass is
-        // driven from (GetOrCreate(window/root)), so the resolved manager is identical either way.
+        // RootVisual is cached + kept current by the attach/detach walk, so read it directly (O(1)) - For() is on the
+        // invalidation hot path. A not-yet-attached / plain test tree has RootVisual == null; fall back to the walk to its
+        // local top (the same key the pass is driven from, so the resolved manager is identical either way).
         var root = node.RootVisual;
         if (root != null)
         {
@@ -87,10 +66,8 @@ public sealed class LayoutManager
         return GetOrCreate(top);
     }
 
-    // Every invalidation means the loop owes another layout pass - so it must not be asleep. Layout is NOT covered by the
-    // render-dirty marks (a measure/arrange is not a render mark), so without this the loop only woke on its 250 ms safety
-    // timeout: a tab's content, which is built and laid out over several passes, then crawled in at four passes a second and
-    // looked simply blank. See LoopSignal.
+    // Every invalidation owes the loop another pass, so wake it: layout is NOT covered by render-dirty marks, so without
+    // this the loop only woke on its 250 ms safety timeout and a tab's content crawled in at ~4 passes/sec. See LoopSignal.
     public void InvalidateStyle(IUIComponent node)
     {
         _toStyle.Enqueue(node);
@@ -100,13 +77,11 @@ public sealed class LayoutManager
     public void InvalidateMeasure(IUIComponent node)
     {
         LoopSignal.Request();
-        // Parallel-rebind window (a virtualizing panel is preparing+measuring its tiles across threads): a rebind's
-        // synchronous binding writes flip AffectsMeasure props -> InvalidateMeasure, which would concurrently mutate this
-        // root's DirtyQueue (PriorityQueue + HashSet, NOT thread-safe). COLLECT lock-free and REPLAY sequentially when the
-        // pass ends (BeginDeferredInvalidation/EndDeferredInvalidation) - deferred write, no locks on the layout hot path.
+        // Parallel-rebind window: a rebind's synchronous writes flip AffectsMeasure -> InvalidateMeasure off worker threads,
+        // which would concurrently mutate this root's (non-thread-safe) DirtyQueue. Collect lock-free, replay when the pass
+        // ends (see BeginDeferredInvalidation).
         if (_deferInvalidations) { DeferredMeasure.Enqueue(node); return; }
-        // A measure-invalid node also needs re-arranging; enqueue it for both so the arrange phase re-runs after the
-        // measure phase recomputes sizes.
+        // A measure-invalid node also needs re-arranging: enqueue both so arrange re-runs after measure recomputes sizes.
         _toMeasure.Enqueue(node);
         _toArrange.Enqueue(node);
     }
@@ -118,13 +93,10 @@ public sealed class LayoutManager
         _toArrange.Enqueue(node);
     }
 
-    // ---- Parallel-rebind deferred invalidation ---------------------------------------------------------------------
-    // A virtualizing panel rebinds+measures its tiles across cores (each tile is a disjoint subtree, so its own
-    // component-flag writes are isolated); the ONLY escape is the shared per-root DirtyQueue enqueue above. While the
-    // flag is set, InvalidateMeasure/Arrange route into these lock-free concurrent queues instead; EndDeferredInvalidation
-    // replays them through the normal path on the (single) coordinating thread once the parallel pass has joined.
-    // Static: the flag is toggled around a Parallel.ForEach (a full fork/join barrier, so the write is visible to workers
-    // and their enqueues are visible back), and only worker threads run in between, so a single global switch is enough.
+    // ---- Parallel-rebind deferred invalidation ----
+    // While a virtualizing panel rebinds+measures its (disjoint) tiles across cores, the only shared escape is the per-root
+    // DirtyQueue enqueue above; route those into these lock-free queues instead and replay on the coordinating thread once
+    // the parallel pass joins. Static: the flag toggles around a Parallel.ForEach (fork/join barrier), so one switch suffices.
     private static volatile bool _deferInvalidations;
     private static readonly System.Collections.Concurrent.ConcurrentQueue<IUIComponent> DeferredMeasure = new();
     private static readonly System.Collections.Concurrent.ConcurrentQueue<IUIComponent> DeferredArrange = new();
@@ -138,35 +110,24 @@ public sealed class LayoutManager
         while (DeferredArrange.TryDequeue(out var n)) For(n).InvalidateArrange(n);
     }
 
-    /// <summary>Requests that <paramref name="node"/> be re-measured on the NEXT pass rather than this one. Used by a
-    /// virtualizing panel that realized only a slice of a large window this frame and wants to continue next frame (so a
-    /// big realize burst is spread over frames instead of hanging one). Safe to call mid-pass: it does not touch this
-    /// pass's queues.</summary>
-    // The panel slices its own realize across frames (bounding INTAKE at the source - the surviving replacement for the
-    // removed frame budget). Nothing will EVENT the loop back - the work is already known - so it must signal here, or the
-    // fill stalls until the safety timeout.
+    /// <summary>Requests <paramref name="node"/> be re-measured on the NEXT pass, not this one - a virtualizing panel
+    /// continuing a sliced realize. Safe mid-pass: it doesn't touch this pass's queues.</summary>
+    // Nothing else will wake the loop for this (the work is already known), so signal here or the fill stalls until the timeout.
     public void InvalidateMeasureNextPass(IUIComponent node)
     {
         _toMeasureNextPass.Add(node);
         LoopSignal.Request();
     }
 
-    /// <summary>Raised once at the end of a layout pass that actually did work (queues drained), i.e. when layout has
-    /// settled for this frame. Not raised on a clean frame - so a consumer (e.g. the render cache) can rebuild on this
-    /// signal instead of every frame.</summary>
+    /// <summary>Raised at the end of a pass that actually did work (queues drained) - layout settled for this frame. Not
+    /// raised on a clean frame, so a consumer (e.g. the render cache) can rebuild on this instead of every frame.</summary>
     public event EventHandler LayoutUpdated;
 
-    /// <summary>Raised after a pass that found NO work at all: every queue was empty AND nothing re-dirtied itself, so
-    /// this tree has fully SETTLED.</summary>
+    /// <summary>Raised after a pass that found NO work: every queue empty AND nothing re-dirtied, so this tree has SETTLED.</summary>
     /// <remarks>
-    /// This is the honest "the cascade I started has finished" signal, and it is NOT <see cref="LayoutUpdated"/>: that one
-    /// fires after a pass that DID work, which mid-cascade is just one of several passes. A theme swap (re-style →
-    /// re-template → re-measure → re-arrange) drains over several passes, and each of them looks "settled" in the
-    /// LayoutUpdated sense; only a workless pass proves nothing is left. The render side already relies on exactly this
-    /// (RenderDirty.ForceStructuralUntilSettled) - this exposes the same fact instead of inventing a second one.
-    ///
-    /// Static because a settle concerns whoever started the cascade, not one root: with several windows the starter waits
-    /// until each of their managers reports this (see <see cref="IsSettled"/>).
+    /// Distinct from <see cref="LayoutUpdated"/> (which fires after a pass that DID work - mid-cascade, just one of several).
+    /// A theme swap drains over several passes that each look "settled" in the LayoutUpdated sense; only a workless pass
+    /// proves nothing is left. Static because a settle concerns whoever started the cascade, not one root (see <see cref="IsSettled"/>).
     /// </remarks>
     public static event Action<LayoutManager> Quiescent;
 
@@ -174,34 +135,28 @@ public sealed class LayoutManager
     public bool IsSettled => _toStyle.IsEmpty && _toMeasure.IsEmpty && _toArrange.IsEmpty && _toMeasureNextPass.Count == 0;
 
     /// <summary>
-    /// Runs one layout pass: drain the style queue (apply themes - this can change templates, so it must precede
-    /// measure), then the measure queue, then the arrange queue, ancestors-first within each. Re-dirtying during the
-    /// pass (e.g. a measure that invalidates an arrange) is handled by looping until all queues drain.
+    /// Runs one layout pass: drain style (themes can change templates, so it precedes measure), then measure, then arrange,
+    /// ancestors-first within each. Re-dirtying during the pass loops until all queues drain.
     /// </summary>
     public void ExecuteLayoutPass()
     {
-        // F2: apply this frame's batched binding updates (coalesced) BEFORE laying out, so the target writes and the
-        // measure/arrange invalidations they trigger are drained by this same pass. The global queue flushes once per
-        // frame: the first root's pass empties it, later roots find it empty.
+        // Apply this frame's batched (coalesced) binding updates BEFORE laying out, so their target writes and the
+        // invalidations they trigger drain in this same pass. The global queue flushes once/frame (first root empties it).
         BindingUpdateQueue.Flush();
 
-        // Promote nodes that deferred their re-measure to this pass (a virtualizing panel continuing a sliced realize).
-        // Snapshot + clear first: a promoted node re-measures later in this pass's drain and may re-defer itself for the
-        // NEXT pass, which must land in the now-empty set rather than being wiped. InvalidateMeasure (not a bare enqueue)
-        // so the validity flag is actually cleared - a bare enqueue would be gate-skipped by MeasureDirty. _inLayout is
-        // false here (pass start), so a panel's muted-invalidation override lets this through.
+        // Promote nodes that deferred to this pass. Snapshot+clear first: a promoted node may re-defer for the NEXT pass,
+        // which must land in the now-empty set. InvalidateMeasure (not a bare enqueue) so the validity flag is cleared.
         if (_toMeasureNextPass.Count > 0)
         {
             _promoteBuffer.Clear();
-            foreach (var node in _toMeasureNextPass) _promoteBuffer.Add(node);   // struct enumerator, no boxing/heap alloc
+            foreach (var node in _toMeasureNextPass) _promoteBuffer.Add(node);   // struct enumerator, no alloc
             _toMeasureNextPass.Clear();
             foreach (var node in _promoteBuffer)
                 if (node is IMeasurableComponent measurable) measurable.InvalidateMeasure();
         }
 
-        // Forward-progress safety net: if the root itself is dirty but was never enqueued (e.g. it was invalidated
-        // during construction, before this manager existed / before the subtree was assembled under it), seed it now.
-        // This is O(1) - two flag reads on the root - not a tree walk, so a clean frame still costs nothing.
+        // Forward-progress safety net: if the root is dirty but was never enqueued (invalidated during construction, before
+        // this manager existed), seed it now. O(1) - two flag reads - so a clean frame still costs nothing.
         if (_root is IMeasurableComponent rootMeasurable)
         {
             if (!rootMeasurable.IsMeasureValid) InvalidateMeasure(_root);
@@ -221,10 +176,8 @@ public sealed class LayoutManager
             }
             didWork = true;
 
-            // Drain each queue FULLY as a SNAPSHOT (process only what's queued now), ordered style -> measure -> arrange.
-            // Work re-dirtied DURING a phase lands back in the queues and is handled on the NEXT iteration - keeping the
-            // phases ordered and letting re-entrant invalidation converge. No time budget: the whole pass finishes in one
-            // go, so what is drawn is always internally consistent (see the FrameBudget note above).
+            // Drain each queue as a SNAPSHOT (only what's queued now), ordered style -> measure -> arrange. Work re-dirtied
+            // DURING a phase lands back in the queues and is handled on the NEXT iteration, letting re-entrancy converge.
             DrainPhase(_toStyle, ApplyTheme);
             DrainPhase(_toMeasure, MeasureDirty);
             DrainPhase(_toArrange, ArrangeDirty);
@@ -232,10 +185,8 @@ public sealed class LayoutManager
 
         var settled = _toStyle.IsEmpty && _toMeasure.IsEmpty && _toArrange.IsEmpty;
 
-        // A pass that found NOTHING to do (queues empty at start, nothing promoted) is the "swap has settled" signal for
-        // RenderDirty.ForceStructuralUntilSettled (theme/DPI): every settle write flows through this pass (binding flush,
-        // style/measure/arrange drains, the resource flush below), so a workless pass means the cascade is done - and the
-        // frame's render build, which runs AFTER this, still does one final forced walk to pick up the tail.
+        // A pass that found NOTHING to do is the "swap has settled" signal for RenderDirty.ForceStructuralUntilSettled
+        // (theme/DPI): every settle write flows through this pass, so a workless pass means the cascade is done.
         if (!didWork)
         {
             RenderDirty.NotifyLayoutQuiescent();
@@ -245,18 +196,16 @@ public sealed class LayoutManager
         RuntimeStats.LastLayoutPassMs = _passStopwatch.Elapsed.TotalMilliseconds;
         RuntimeStats.LastPassBudgetDeferred = !settled;
 
-        // LayoutUpdated = "layout settled this frame" - only when everything drained, not when budget-deferred.
+        // LayoutUpdated = "layout settled this frame" - only when everything drained.
         if (didWork && settled)
             LayoutUpdated?.Invoke(this, EventArgs.Empty);
 
-        // Coalesced resource-change notification: the style drain above may have loaded a new theme's dictionaries (a
-        // theme swap re-themes via the style queue), so fire ResourcesChanged HERE, once, after they're present - live
-        // {ObservableResource}s then re-resolve to the new values. No-op (a flag read) when nothing changed.
+        // Coalesced resource-change notification: the style drain may have loaded a new theme's dictionaries, so fire
+        // ResourcesChanged once, here, after they're present. No-op (a flag read) when nothing changed.
         UIAppContext.Current?.ResourceManager?.FlushResourceChanges();
     }
 
-    // Drains one queue FULLY as a snapshot (process only what is queued NOW, so work re-dirtied during the phase is handled
-    // on the next pass iteration, not this drain), ancestors-first.
+    // Drains one queue FULLY as a snapshot (work re-dirtied during the phase waits for the next iteration), ancestors-first.
     private void DrainPhase(DirtyQueue queue, Action<IUIComponent> process)
     {
         queue.DrainInto(_passBuffer);
@@ -285,10 +234,8 @@ public sealed class LayoutManager
 
         var before = control.DesiredSize;
 
-        // Re-measure with the element's OWN cached constraint (the available size the parent last gave it), NOT a guess.
-        // MeasureOverride cascades down, the validity gate skipping any clean subtree. A root visual (window or any
-        // IRootVisualComponent top-level) uses its client size; a never-measured top-most node falls back to its
-        // Width/Height (-> Infinity if auto).
+        // Re-measure with the element's OWN cached constraint, NOT a guess; MeasureOverride cascades down, the validity gate
+        // skipping any clean subtree. A root visual uses its client size; a never-measured top uses its Width/Height.
         if (node is IRootVisualComponent root)
         {
             MeasureControl(control, root.ClientWidth, root.ClientHeight);
@@ -302,14 +249,10 @@ public sealed class LayoutManager
             MeasureControl(control, control.Width, control.Height);
         }
 
-        // Finer propagation: a parent's measure depends on this child only if the child's OUTWARD size changed. If it
-        // did, invalidate the parent (re-measured next iteration, gate-skipping this now-clean child); if it did not,
-        // the re-measure stayed contained in this subtree - no walk up to the window.
-        // EXCEPT a parent that is a MEASURE BOUNDARY (its DesiredSize can't change from a child - a virtualizing items
-        // host whose extent is count×cell, or any element with a fixed Width+Height): propagating into it here is
-        // spurious and, because this runs on the queue-drain path OUTSIDE the panel's own _inLayout mute, it re-dirties
-        // the panel every iteration and spins the pass to MaxPassIterations - the whole realize backlog draining in one
-        // pass instead of one slice per frame. Honor the boundary here too, so InvalidateMeasureNextPass is respected.
+        // Propagate up only if the child's OUTWARD size changed (else the re-measure stayed contained). EXCEPT a parent that
+        // is a MEASURE BOUNDARY (fixed size, or a virtualizing host whose extent is count×cell): propagating in is spurious
+        // and, running outside the panel's _inLayout mute, re-dirties it every iteration and spins to MaxPassIterations
+        // (draining the whole realize backlog in one pass). Honor the boundary so InvalidateMeasureNextPass is respected.
         if (control.DesiredSize != before
             && node.VisualParent is IMeasurableComponent { IsMeasureValid: true } parent
             && !parent.IsMeasureBoundary)
@@ -324,23 +267,16 @@ public sealed class LayoutManager
         if (control.IsArrangeValid) return;
         if (!control.IsMeasureValid)
         {
-            // Its measure was re-dirtied (re-entrancy) after this arrange entry was queued; defer the arrange to a later
-            // iteration, after the measure queue re-drains. (Re-enqueue rather than drop, or the node stays unarranged.)
+            // Its measure was re-dirtied after this arrange was queued; defer to a later iteration (re-enqueue, don't drop).
             _toArrange.Enqueue(node);
             return;
         }
 
-        // Arrange the node into its OWN last correct slot (preserved across invalidation), NOT parent.DesiredSize - that
-        // old fallback parked a dirty child at its parent's origin (the "pile at (0,0)" bug, plan problem #3). The node's
-        // ArrangeOverride then re-distributes correct rects to its children. Only a node that was never arranged (the
-        // root, on first layout) has no saved slot -> it fills its own measured area.
-        //
-        // The root visual is the exception: its slot is its CURRENT client area, never a saved slot. On a resize (e.g.
-        // maximize) the client size grows and the root re-measures to it (MeasureDirty uses ClientWidth), but its
-        // PreviousArrangeSlot still holds the OLD rect. ArrangeCore force-sets the root's RenderSize to DesiredSize (so
-        // Bounds looked correct), yet the alignment clamp re-derives ClipRectangle from finalRect - so the stale slot
-        // pinned the window's clip (and thus root-level hit-testing) to the old size while every child grew, killing
-        // hovers/scroll in the newly-exposed area. Feed the live client rect so measure and arrange agree.
+        // Arrange into the node's OWN last correct slot (preserved across invalidation), NOT parent.DesiredSize (the old
+        // fallback piled dirty children at the parent origin). A never-arranged node (the root, first layout) fills its
+        // measured area. The root visual is special: its slot is the LIVE client rect, never a saved slot - on a resize the
+        // client grows and the root re-measures to it, but PreviousArrangeSlot still holds the OLD rect, which would pin the
+        // window's clip (and root hit-testing) to the old size. Feed the live client rect so measure/arrange agree.
         var slot = node is IRootVisualComponent { ClientWidth: > 0, ClientHeight: > 0 } root
             ? new Rect(0, 0, root.ClientWidth, root.ClientHeight)
             : control.PreviousArrangeSlot ?? new Rect(control.DesiredSize);
@@ -373,11 +309,10 @@ public sealed class LayoutManager
     }
 
     /// <summary>
-    /// A set of dirty nodes drained ancestors-first. Dedup via a membership set (a node enqueued twice produces one
-    /// entry); ordered by visual depth via a min-heap so a parent is processed before its children and its
-    /// measure/arrange cascade validates them (their own dequeue then no-ops on the validity gate). Depth is computed
-    /// at enqueue time (it can change with reparenting); a slightly stale order only costs a little redundant work, not
-    /// correctness, because the per-node validity gates make re-processing safe.
+    /// A set of dirty nodes drained ancestors-first: dedup via a membership set, ordered by visual depth via a min-heap so a
+    /// parent is processed before its children (their cascade validates them, so their own dequeue no-ops on the gate).
+    /// Depth is computed at enqueue time; a stale order only costs redundant work, not correctness (the validity gates make
+    /// re-processing safe).
     /// </summary>
     private sealed class DirtyQueue
     {
