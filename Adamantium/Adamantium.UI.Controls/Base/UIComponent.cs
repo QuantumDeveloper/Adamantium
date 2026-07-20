@@ -33,9 +33,19 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         if (e.OldValue is Transform old && ReferenceEquals(old.Owner, owner)) old.Owner = null;
         if (e.NewValue is Transform t) t.Owner = owner;
     }
-    
+
+    // Same wiring for a LayoutTransform, PLUS mark it as one: a value change on it must re-run the owner's layout (it
+    // reshapes the footprint), not just the render - see Transform.UpdateTransform.
+    private static void OnLayoutTransformChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is not UIComponent owner) return;
+        if (e.OldValue is Transform old && ReferenceEquals(old.Owner, owner)) { old.Owner = null; old.IsLayoutTransform = false; }
+        if (e.NewValue is Transform t) { t.Owner = owner; t.IsLayoutTransform = true; }
+    }
+
     public static readonly AdamantiumProperty LayoutTransformProperty =
-        AdamantiumProperty.Register(nameof(LayoutTransform), typeof(Transform), typeof(UIComponent));
+        AdamantiumProperty.Register(nameof(LayoutTransform), typeof(Transform), typeof(UIComponent),
+            new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange, OnLayoutTransformChanged));
 
     // Paint/hit-test order among siblings: higher ZIndex is drawn later (on top) and hit first. AffectsRender because a
     // change re-orders how the parent composites its children (the render walk re-sorts siblings by ZIndex, mirroring the
@@ -584,6 +594,14 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
                 localTransform = matrix * localTransform;
             }
+
+            // LayoutTransform is applied INNERMOST - to the content in its own (inner) space, before RenderTransform and
+            // the layout offset - so the rendered content scales/rotates to fill the footprint that layout already
+            // reserved for its bounding box (ArrangeCore set RenderSize to the inner size, Bounds to the outer one).
+            var layoutTransform = LayoutTransform;
+            if (layoutTransform != null)
+                localTransform = (Matrix4x4F)layoutTransform.Matrix * localTransform;
+
             return localTransform;
         }
     }
