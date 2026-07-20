@@ -115,9 +115,22 @@ public class Transform : AnimatableUIComponent
     /// instead of the global transform flag that re-bakes the whole scene.</summary>
     internal IUIComponent Owner { get; set; }
 
+    /// <summary>True when this transform is an element's LayoutTransform (not its RenderTransform): a value change then
+    /// re-runs the owner's LAYOUT, because it reshapes the footprint - not just the render.</summary>
+    internal bool IsLayoutTransform { get; set; }
+
     private void UpdateTransform()
     {
         Matrix = CalculateFinalTransform();
+
+        // A LayoutTransform reshapes the owner's FOOTPRINT, so a value change (AUML setting ScaleX after the property, an
+        // animated zoom, ...) must re-run LAYOUT: measure re-cascades into arrange and the render. A RenderTransform only
+        // moves an already-laid-out element, so it falls through to the render mark below.
+        if (IsLayoutTransform)
+        {
+            if (Owner is IMeasurableComponent measurable) measurable.InvalidateMeasure();
+            return;
+        }
 
         // The RENDER thread IS drawing this transform's animated matrix (see Compositor) - so re-baking it here is pure
         // double work (the fps cost). This loop write is only the MIRROR that keeps hit-testing and bindings in step.

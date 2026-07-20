@@ -477,7 +477,9 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             var margin = EffectiveMargin;
 
             Size constrained;
-                
+            Matrix4x4 lt = default;
+            var hasLayout = false;
+
             // IWindow is top level control. Constraints should be ignored by top level controls
             // because it will lead to incorrect measurements
             if (this is IWindow)
@@ -487,7 +489,12 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             }
             else
             {
-                constrained = this.ApplyLayoutConstraints(availableSize.Deflate(margin));
+                // With a LayoutTransform, measure the content in its OWN (untransformed) space: turn the parent-space
+                // available size into the local size whose transform fits it, then constrain + measure there.
+                var available = availableSize.Deflate(margin);
+                hasLayout = TryGetLayoutMatrix(out lt);
+                if (hasLayout) available = InverseTransformSize(lt, available);
+                constrained = this.ApplyLayoutConstraints(available);
             }
 
             var measured = MeasureOverride(constrained);
@@ -510,7 +517,10 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             height = Math.Min(height, MaxHeight);
             height = Math.Max(height, MinHeight);
 
-            return NonNegative(new Size(width, height).Inflate(margin));
+            // Report the transform's BOUNDING BOX to the parent (the footprint the scaled/rotated content occupies).
+            var desired = new Size(width, height);
+            if (hasLayout) desired = TransformSize(lt, desired);
+            return NonNegative(desired.Inflate(margin));
         }
         else
         {
@@ -564,7 +574,11 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
                 size.Height = Math.Min(size.Height, Math.Max(0, DesiredSize.Height - margin.Top - margin.Bottom));
             }
 
-            size = this.ApplyLayoutConstraints(size);
+            // Width/Height/Min/Max constrain the element's OWN size. With a LayoutTransform that own size is the INNER one,
+            // so the constraints are applied to the inner arrange size below (after the inverse-transform), not to the outer
+            // footprint - clamping the footprint to Width here would cancel the scale.
+            var hasLayout = TryGetLayoutMatrix(out var lt);
+            if (!hasLayout) size = this.ApplyLayoutConstraints(size);
 
             if (this is IRootVisualComponent)
             {
@@ -581,19 +595,25 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
                     Math.Ceiling(sizeMinusMargins.Height));
             }
 
-            size = ArrangeOverride(size).Constrain(size);
+            // With a LayoutTransform, arrange the content in its OWN space (the inverse of the footprint it is given, with
+            // the constraints applied there), and the footprint it then occupies is the transform's bounding box. RenderSize
+            // is the content (inner) size that LocalTransform scales/rotates; the FOOTPRINT (Bounds/clip/alignment) is outer.
+            var innerArrange = hasLayout ? this.ApplyLayoutConstraints(InverseTransformSize(lt, size)) : size;
+            var innerUsed = ArrangeOverride(innerArrange).Constrain(innerArrange);
+            var outerUsed = hasLayout ? TransformSize(lt, innerUsed) : innerUsed;
 
             // A size change must re-run OnRender: a control that first rendered at a STALE size (e.g. 0x0 while still
             // unarranged - which happens for content built during a measure pass, like a tab body added via a
             // ContentPresenter/DataTemplate) cached that geometry and, being "geometry-valid", would never redraw at the
             // new size - its fill rect stays 0x0 = invisible. Invalidate the render geometry so the render pass re-records
             // it at the arranged size. Measure already does this (MeasureCore); arrange must too when the size changes.
-            var renderSizeChanged = !MathHelper.NearEqual(RenderSize.Width, size.Width)
-                                    || !MathHelper.NearEqual(RenderSize.Height, size.Height);
+            var renderSizeChanged = !MathHelper.NearEqual(RenderSize.Width, innerUsed.Width)
+                                    || !MathHelper.NearEqual(RenderSize.Height, innerUsed.Height);
 
-            ActualWidth = size.Width;
-            ActualHeight = size.Height;
-            RenderSize = size;
+            ActualWidth = innerUsed.Width;     // the element's OWN size (= RenderSize): controls draw their geometry at this,
+            ActualHeight = innerUsed.Height;   // and LocalTransform then scales it up to the outer footprint (no double-scale)
+            RenderSize = innerUsed;
+            size = outerUsed;   // the rest of arrange (alignment, clip, bounds) works in the FOOTPRINT (outer) space
 
             if (renderSizeChanged) IsGeometryValid = false;
 
@@ -605,17 +625,17 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
                 // content to the centre of its parent the moment the element stopped filling.
                 case HorizontalAlignment.Left:
                 case HorizontalAlignment.Stretch:
-                    size.Width = Math.Min(sizeMinusMargins.Width, ActualWidth);
+                    size.Width = Math.Min(sizeMinusMargins.Width, outerUsed.Width);
                     break;
                 case HorizontalAlignment.Center:
                     originX += (sizeMinusMargins.Width - size.Width) / 2;
                     clipOriginX = Math.Max(originX, finalRect.X + margin.Left);
-                    size.Width = Math.Min(sizeMinusMargins.Width, ActualWidth);
+                    size.Width = Math.Min(sizeMinusMargins.Width, outerUsed.Width);
                     break;
                 case HorizontalAlignment.Right:
                     originX += sizeMinusMargins.Width - size.Width;
                     clipOriginX = Math.Max(originX, margin.Left);
-                    size.Width = Math.Min(sizeMinusMargins.Width, ActualWidth);
+                    size.Width = Math.Min(sizeMinusMargins.Width, outerUsed.Width);
                     break;
             }
 
@@ -623,17 +643,17 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             {
                 case VerticalAlignment.Top:
                 case VerticalAlignment.Stretch:
-                    size.Height = Math.Min(sizeMinusMargins.Height, ActualHeight);
+                    size.Height = Math.Min(sizeMinusMargins.Height, outerUsed.Height);
                     break;
                 case VerticalAlignment.Center:
                     originY += (sizeMinusMargins.Height - size.Height) / 2;
                     clipOriginY = Math.Max(originY, finalRect.Y + margin.Top);
-                    size.Height = Math.Min(sizeMinusMargins.Height, ActualHeight);
+                    size.Height = Math.Min(sizeMinusMargins.Height, outerUsed.Height);
                     break;
                 case VerticalAlignment.Bottom:
                     originY += sizeMinusMargins.Height - size.Height;
                     clipOriginY = Math.Max(originY, finalRect.Y);
-                    size.Height = Math.Min(sizeMinusMargins.Height, ActualHeight);
+                    size.Height = Math.Min(sizeMinusMargins.Height, outerUsed.Height);
                     break;
             }
 
@@ -646,7 +666,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             ClipRectangle = new Rect(clipOriginX, clipOriginY,
                 size.Width, size.Height);
 
-            var newBounds = new Rect(originX, originY, ActualWidth, ActualHeight);
+            var newBounds = new Rect(originX, originY, outerUsed.Width, outerUsed.Height);
             if (Bounds != newBounds)
             {
                 Bounds = newBounds;
@@ -677,6 +697,44 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
                 }
             }
         }
+    }
+
+    // --- LayoutTransform (WPF-parity): a transform that PARTICIPATES IN LAYOUT (unlike RenderTransform, which is render
+    // only). The element measures/arranges its content in its OWN, untransformed space; the parent sees the transform's
+    // bounding box, and LocalTransform (UIComponent) applies the transform to the rendered content. Everything below is a
+    // no-op unless a non-identity LayoutTransform is set, so the null path is byte-identical to before. ------------------
+
+    /// <summary>The LayoutTransform's matrix, when set and its 2D linear part is not identity (a pure translate or no
+    /// transform is treated as none - it changes no size).</summary>
+    private bool TryGetLayoutMatrix(out Matrix4x4 m)
+    {
+        var lt = LayoutTransform;
+        if (lt == null) { m = default; return false; }
+        m = lt.Matrix;
+        return m.M11 != 1 || m.M22 != 1 || m.M12 != 0 || m.M21 != 0;
+    }
+
+    // One axis's absolute contribution to a bounding-box extent: |size * coeff|, but 0 (NOT NaN) when coeff is 0. A
+    // StackPanel/WrapPanel measures with an INFINITE axis along its orientation, and inf * 0 = NaN would poison the whole
+    // measure; a zero coefficient just means that axis doesn't contribute (size is always >= 0 here, so no sign to lose).
+    private static double AxisContribution(double size, double coeff)
+        => coeff == 0 ? 0 : size * Math.Abs(coeff);
+
+    // Bounding-box size of the rect (0,0,size) under a matrix's 2D linear part (translation cannot change a size). Correct
+    // for scale AND rotation: a rect's image is a parallelogram whose extents are the summed absolute axis contributions.
+    private static Size TransformSize(Matrix4x4 m, Size s)
+        => new(AxisContribution(s.Width, m.M11) + AxisContribution(s.Height, m.M21),
+               AxisContribution(s.Width, m.M12) + AxisContribution(s.Height, m.M22));
+
+    // The inverse map's bounding box - the local (untransformed) size whose transform fits the given outer size. Used to
+    // turn an available/arrange size in the parent's space into the space the content is measured/arranged in.
+    private static Size InverseTransformSize(Matrix4x4 m, Size s)
+    {
+        var det = m.M11 * m.M22 - m.M12 * m.M21;
+        if (Math.Abs(det) < 1e-9) return s;   // singular (e.g. a zero scale) - nothing sensible to invert
+        double i11 = m.M22 / det, i12 = -m.M12 / det, i21 = -m.M21 / det, i22 = m.M11 / det;
+        return new(AxisContribution(s.Width, i11) + AxisContribution(s.Height, i21),
+                   AxisContribution(s.Width, i12) + AxisContribution(s.Height, i22));
     }
 
     /// <summary>See <see cref="IMeasurableComponent.IsMeasureBoundary"/>. An element with BOTH Width and Height set

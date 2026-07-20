@@ -1,0 +1,110 @@
+<View xmlns="http://adamantium/ui">
+    <!-- The SAME fixed 120x80 vector card is shown through a Viewbox in each Stretch mode and StretchDirection, inside an
+         identical clipping box, so the scaling is directly comparable. Uniform keeps aspect (the ellipse stays round);
+         Fill distorts to fill; UniformToFill fills and overflows (clipped); None leaves it at 120x80. -->
+    <ScrollViewer>
+        <StackPanel Orientation="Vertical" Margin="24">
+
+            <TextBlock Text="Stretch — one 120×80 card scaled into a 220×160 box" FontSize="18" MarginBottom="12"/>
+            <WrapPanel Orientation="Horizontal">
+                <StackPanel Orientation="Vertical" Margin="10">
+                    <TextBlock Text="None" HorizontalAlignment="Center" MarginBottom="6"/>
+                    <Border Width="220" Height="160" Background="#0F172A" BorderBrush="#334155" BorderThickness="1" ClipToBounds="True">
+                        <Viewbox Stretch="None">
+                            <Border Width="120" Height="80" Background="#1E293B" CornerRadius="8" BorderBrush="#38BDF8" BorderThickness="2">
+                                <Grid>
+                                    <Ellipse Fill="#0EA5E9" Margin="12"/>
+                                    <TextBlock Text="120×80" Foreground="White" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                        </Viewbox>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Orientation="Vertical" Margin="10">
+                    <TextBlock Text="Fill" HorizontalAlignment="Center" MarginBottom="6"/>
+                    <Border Width="220" Height="160" Background="#0F172A" BorderBrush="#334155" BorderThickness="1" ClipToBounds="True">
+                        <Viewbox Stretch="Fill">
+                            <Border Width="120" Height="80" Background="#1E293B" CornerRadius="8" BorderBrush="#38BDF8" BorderThickness="2">
+                                <Grid>
+                                    <Ellipse Fill="#0EA5E9" Margin="12"/>
+                                    <TextBlock Text="120×80" Foreground="White" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                        </Viewbox>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Orientation="Vertical" Margin="10">
+                    <TextBlock Text="Uniform" HorizontalAlignment="Center" MarginBottom="6"/>
+                    <Border Width="220" Height="160" Background="#0F172A" BorderBrush="#334155" BorderThickness="1" ClipToBounds="True">
+                        <Viewbox Stretch="Uniform">
+                            <Border Width="120" Height="80" Background="#1E293B" CornerRadius="8" BorderBrush="#38BDF8" BorderThickness="2">
+                                <Grid>
+                                    <Ellipse Fill="#0EA5E9" Margin="12"/>
+                                    <TextBlock Text="120×80" Foreground="White" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                        </Viewbox>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Orientation="Vertical" Margin="10">
+                    <TextBlock Text="UniformToFill" HorizontalAlignment="Center" MarginBottom="6"/>
+                    <Border Width="220" Height="160" Background="#0F172A" BorderBrush="#334155" BorderThickness="1" ClipToBounds="True">
+                        <Viewbox Stretch="UniformToFill">
+                            <Border Width="120" Height="80" Background="#1E293B" CornerRadius="8" BorderBrush="#38BDF8" BorderThickness="2">
+                                <Grid>
+                                    <Ellipse Fill="#0EA5E9" Margin="12"/>
+                                    <TextBlock Text="120×80" Foreground="White" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                        </Viewbox>
+                    </Border>
+                </StackPanel>
+            </WrapPanel>
+
+            <TextBlock Text="StretchDirection (Uniform) — big box (220×160), 120×80 card" FontSize="18" Margin="0,24,0,12"/>
+            <WrapPanel Orientation="Horizontal">
+                <StackPanel Orientation="Vertical" Margin="10">
+                    <TextBlock Text="Both (scales up)" HorizontalAlignment="Center" MarginBottom="6"/>
+                    <Border Width="220" Height="160" Background="#0F172A" BorderBrush="#334155" BorderThickness="1" ClipToBounds="True">
+                        <Viewbox Stretch="Uniform" StretchDirection="Both">
+                            <Border Width="120" Height="80" Background="#1E293B" CornerRadius="8" BorderBrush="#38BDF8" BorderThickness="2">
+                                <TextBlock Text="120×80" Foreground="White" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                        </Viewbox>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Orientation="Vertical" Margin="10">
+                    <TextBlock Text="DownOnly (stays 120×80)" HorizontalAlignment="Center" MarginBottom="6"/>
+                    <Border Width="220" Height="160" Background="#0F172A" BorderBrush="#334155" BorderThickness="1" ClipToBounds="True">
+                        <Viewbox Stretch="Uniform" StretchDirection="DownOnly">
+                            <Border Width="120" Height="80" Background="#1E293B" CornerRadius="8" BorderBrush="#38BDF8" BorderThickness="2">
+                                <TextBlock Text="120×80" Foreground="White" FontSize="15" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                        </Viewbox>
+                    </Border>
+                </StackPanel>
+            </WrapPanel>
+
+            <TextBlock Text="LayoutTransform — A[100×50], B is 100×50 scaled ×1.5 (footprint must be 150×75, so C starts at x=250)" FontSize="18" Margin="0,24,0,12"/>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
+                <Border Width="100" Height="50" Background="#334155" VerticalAlignment="Top">
+                    <TextBlock Text="A" Foreground="White" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <Border Width="100" Height="50" Background="#0EA5E9" VerticalAlignment="Top">
+                    <Border.LayoutTransform>
+                        <Transform ScaleX="1.5" ScaleY="1.5"/>
+                    </Border.LayoutTransform>
+                    <TextBlock Text="B ×1.5" Foreground="White" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <Border Width="100" Height="50" Background="#334155" VerticalAlignment="Top">
+                    <TextBlock Text="C" Foreground="White" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</View>
