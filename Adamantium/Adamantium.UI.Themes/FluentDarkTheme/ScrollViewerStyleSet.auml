@@ -22,6 +22,9 @@
                             x:Name="PART_ScrollContentPresenter"
                             Content="{TemplateBinding Content}"
                             ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                        <!-- The vertical bar runs the FULL height (so it fills the bottom-right corner); the horizontal bar
+                             stops one bar-thickness (12) short of the right, meeting the vertical bar's edge - no overlap in
+                             the corner (they used to pile up there) and no transparent gap (the vertical bar covers it). -->
                         <controls:ScrollBar
                             x:Name="PART_VerticalScrollBar"
                             Orientation="Vertical"
@@ -34,6 +37,7 @@
                             Orientation="Horizontal"
                             VerticalAlignment="Bottom"
                             HorizontalAlignment="Stretch"
+                            MarginRight="12"
                             Opacity="0"
                             IsHitTestVisible="False"/>
                     </controls:Grid>

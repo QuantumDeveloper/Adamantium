@@ -1,0 +1,66 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions">
+    <!-- A 2800x2000 "map" shown through a fixed 640x420 ZoomBox. Wheel zooms toward the cursor, dragging pans, scrollbars
+         auto-appear. The two sliders are bound TWO-WAY to the ZoomBox's ScaleX / ScaleY via {Binding ..., ElementName=Zoom}
+         (element-to-element) - dragging a slider zooms that axis; a wheel zoom moves both sliders back. Wrapped in a
+         ScrollViewer so the whole tab scrolls when the sliders + the fixed 420-tall box don't fit the visible height. -->
+    <ScrollViewer>
+    <StackPanel Orientation="Vertical" Margin="24">
+
+        <TextBlock Text="ZoomBox — wheel: zoom to cursor · drag: pan · scrollbars auto"
+                   FontSize="18" MarginBottom="4"/>
+        <TextBlock Text="The sliders are two-way bound to ScaleX / ScaleY by ElementName (element-to-element binding). Wheel-zoom moves both."
+                   FontSize="13" Foreground="#94A3B8" MarginBottom="16"/>
+
+        <StackPanel Orientation="Horizontal" MarginBottom="10">
+            <TextBlock Text="Scale X" Width="56" VerticalAlignment="Center"/>
+            <Slider Width="240" Minimum="0.15" Maximum="6"
+                    Value="{Binding ScaleX, ElementName=Zoom, Mode=TwoWay}" VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding ScaleX, ElementName=Zoom}" Width="60" HorizontalTextAlignment="Right"
+                       VerticalAlignment="Center" MarginLeft="12"/>
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" MarginBottom="16">
+            <TextBlock Text="Scale Y" Width="56" VerticalAlignment="Center"/>
+            <Slider Width="240" Minimum="0.15" Maximum="6"
+                    Value="{Binding ScaleY, ElementName=Zoom, Mode=TwoWay}" VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding ScaleY, ElementName=Zoom}" Width="60" HorizontalTextAlignment="Right"
+                       VerticalAlignment="Center" MarginLeft="12"/>
+        </StackPanel>
+
+        <!-- Square corners: the viewport clip is a rectangular scissor, so a rounded frame would let the content's
+             square corners poke out past it (no rounded-rect clip). -->
+        <Border BorderBrush="#334155" BorderThickness="1" HorizontalAlignment="Left">
+            <ZoomBox x:Name="Zoom" Width="640" Height="420" MinScale="0.15" MaxScale="6">
+                <Grid Width="2800" Height="2000" Background="#0B1220">
+                    <Border Width="300" Height="220" Background="#0EA5E9" CornerRadius="18"
+                            HorizontalAlignment="Left" VerticalAlignment="Top" Margin="50">
+                        <TextBlock Text="↖ TL" Foreground="White" FontSize="40"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <Border Width="300" Height="220" Background="#F59E0B" CornerRadius="18"
+                            HorizontalAlignment="Right" VerticalAlignment="Top" Margin="50">
+                        <TextBlock Text="TR ↗" Foreground="White" FontSize="40"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <Border Width="300" Height="220" Background="#22C55E" CornerRadius="18"
+                            HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="50">
+                        <TextBlock Text="↙ BL" Foreground="White" FontSize="40"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <Border Width="300" Height="220" Background="#EF4444" CornerRadius="18"
+                            HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="50">
+                        <TextBlock Text="BR ↘" Foreground="White" FontSize="40"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <Ellipse Width="520" Height="520" Fill="#7C3AED"
+                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <TextBlock Text="2800 × 2000" Foreground="White" FontSize="56"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Grid>
+            </ZoomBox>
+        </Border>
+
+    </StackPanel>
+    </ScrollViewer>
+</View>

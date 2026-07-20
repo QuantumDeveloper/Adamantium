@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions"
+          xmlns:controls="http://adamantium/ui">
+
+    <!-- ZoomBox: a zoom+pan viewport. The template is just a ScrollViewer hosting a ContentPresenter "surface"; the
+         control puts a LayoutTransform (scale) on the surface in code, so zooming grows the scrollable EXTENT and the
+         bars/pan track it (a render-only scale would not). Wheel zooms toward the cursor, drag pans - both via the inner
+         ScrollViewer, whose PanningMode the control pushes from its own PanningMode. -->
+    <Style Selector="ZoomBox">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ZoomBox">
+                    <controls:ScrollViewer x:Name="PART_Scroll"
+                                           HorizontalScrollBarVisibility="Auto"
+                                           VerticalScrollBarVisibility="Auto">
+                        <controls:ContentPresenter x:Name="PART_Surface"
+                                                   HorizontalAlignment="Left"
+                                                   VerticalAlignment="Top"
+                                                   Content="{TemplateBinding Content}"
+                                                   ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                    </controls:ScrollViewer>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

@@ -240,6 +240,7 @@ public class ScrollViewer : ContentControl
             _horizontalBar.Visibility = ComputeVisibility(HorizontalScrollBarVisibility, extent.Width, viewport.Width);
         }
         _syncingBars = false;
+        ScrollChanged?.Invoke(this, EventArgs.Empty);
     }
 
     // A bar moved (thumb drag, page, line, wheel-synced): push both bars' values as the new offset.
@@ -256,6 +257,17 @@ public class ScrollViewer : ContentControl
 
     /// <summary>Size of the visible window onto the content. Zero before templating.</summary>
     public Size ViewportSize => _presenter?.Viewport ?? default;
+
+    /// <summary>Total size of the (possibly scaled) content. Zero before templating.</summary>
+    public Size ExtentSize => _presenter?.Extent ?? default;
+
+    /// <summary>Sets the absolute scroll offset (content-space top-left of the viewport), clamped to the current extent.
+    /// No-op before templating.</summary>
+    public void SetScrollOffset(Vector2 offset) => _presenter?.SetOffset(offset);
+
+    /// <summary>Raised after the scroll metrics (offset / extent / viewport) actually changed - lets a host react once the
+    /// extent reflects a new layout (e.g. a ZoomBox applying a zoom-to-cursor offset after a scale change grew it).</summary>
+    public event EventHandler ScrollChanged;
 
     /// <summary>Scroll the minimum amount so <paramref name="rect"/> (in CONTENT coordinates) is fully inside the viewport
     /// - the caret-follow primitive for a TextBox hosting its surface here. No-op until the presenter exists.</summary>
