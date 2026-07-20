@@ -29,7 +29,6 @@ _Собрано 2026-07-16, сверено с кодом. Сюда — толь�
 - **[P2] `DoubleAnimation` (`RunningAnimation`) не композитится** — только keyframe `Animation`. Такое же лечение (pure curve + канал). `compositor-animations-initiative`.
 - **[P3] Gradient-stop sweeps (shimmer) не композитятся** — таргет `GradientStop`, не `Brush`. Остаётся на loop (один элемент, дёшево).
 - **[P3] `Compositor.RefreshBases()`** — раз в кадр на энтри (lock + property read). Ок сейчас; пересмотреть, если композитных анимаций станет много.
-- **[P2] `IsRenderMotionNode` не сбрасывается после анимации.** `Compositor.TryTakeOver` промоутит Owner в motion-node (`Compositor.cs:220`), но обратно в `false` НИКОГДА не возвращает. Раз-анимированный статичный узел с per-unit штрихом тогда full-re-records каждый кадр (перф, НЕ визуал — смаз капшн-глифов чинится попап-`PreRender`-фиксом `3873d60`). Из-за этого у OverlayWindow **убрана «поп»-анимация открытия** (`OverlayWindow.NotifyShown`) — вернуть, когда узел будет un-promote'иться на завершении/детаче анимации. `render-thread-compositor-initiative`.
 
 ## Смена темы
 
