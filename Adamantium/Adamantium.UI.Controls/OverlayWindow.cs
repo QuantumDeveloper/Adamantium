@@ -1,5 +1,3 @@
-using System;
-using Adamantium.Mathematics;
 using Adamantium.Navigation;
 using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Controls.Base;
@@ -7,6 +5,7 @@ using Adamantium.UI.Controls.Buttons;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
+using Adamantium.UI.Core.Media.Animation;
 using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Controls;
@@ -25,6 +24,9 @@ public class OverlayWindow : ContentControl
 {
     // The manager owns the show/close lifecycle, so IsOpen is read-only state a consumer can bind to.
     public static readonly AdamantiumProperty IsOpenProperty = AdamantiumProperty.RegisterReadOnly(nameof(IsOpen),
+        typeof(bool), typeof(OverlayWindow), new PropertyMetadata(false));
+
+    public static readonly AdamantiumProperty IsActiveProperty = AdamantiumProperty.RegisterReadOnly(nameof(IsActive),
         typeof(bool), typeof(OverlayWindow), new PropertyMetadata(false));
 
     public static readonly AdamantiumProperty TitleProperty = AdamantiumProperty.Register(nameof(Title),
@@ -96,6 +98,16 @@ public class OverlayWindow : ContentControl
         get => GetValue<bool>(IsOpenProperty);
         private set => SetValue(IsOpenProperty, value);
     }
+
+    /// <summary>True when this is the front-most / last-interacted window (like <c>Window.IsActive</c>); the title bar dims
+    /// when false. Read-only - the <see cref="OverlayWindowManager"/> maintains it.</summary>
+    public bool IsActive
+    {
+        get => GetValue<bool>(IsActiveProperty);
+        private set => SetValue(IsActiveProperty, value);
+    }
+
+    internal void SetActive(bool active) => IsActive = active;
 
     /// <summary>Title content shown on the left of the title bar.</summary>
     public object Title
@@ -370,12 +382,22 @@ public class OverlayWindow : ContentControl
 
     internal void NotifyShown(OverlayWindowManager manager)
     {
-        // No RenderTransform "pop": animating the transform promotes the card to a render motion node (Compositor), which
-        // is NEVER un-promoted (IsRenderMotionNode stays true), and a static popup motion node with per-unit stroked content
-        // (the caption glyphs) then full-re-records every frame -> the glyph flicker. The pop returns once that engine bug
-        // (un-promote on release) is fixed. See docs/TECH_DEBT.md.
         _manager = manager;
         IsOpen = true;
+
+        // A subtle scale-in "pop". The transform promotes the card to a compositor motion node while it plays; the compositor
+        // now un-promotes it on completion (Compositor.Release), so the card returns to a static, world-baked node afterwards
+        // instead of full-re-recording every frame. FillBehavior.Stop clears the scale back to 1 at the end.
+        if (OpenDuration > 0)
+        {
+            var pop = RenderTransform ?? new Transform();
+            RenderTransform = pop;
+            RenderTransformOrigin = new Vector2(0.5f, 0.5f);   // scale about the centre
+            var duration = TimeSpan.FromSeconds(OpenDuration);
+            pop.BeginAnimation(Transform.ScaleXProperty, new DoubleAnimation { From = 0.85, To = 1, Duration = duration, FillBehavior = FillBehavior.Stop });
+            pop.BeginAnimation(Transform.ScaleYProperty, new DoubleAnimation { From = 0.85, To = 1, Duration = duration, FillBehavior = FillBehavior.Stop });
+        }
+
         Opened?.Invoke(this, EventArgs.Empty);
     }
 
