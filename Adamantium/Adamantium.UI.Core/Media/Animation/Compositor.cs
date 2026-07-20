@@ -94,6 +94,12 @@ public static class Compositor
 
         // Transform-only.
         public IUIComponent Owner { get; }
+
+        /// <summary>True when the compositor itself flipped Owner into a motion node for THIS animation (it was a plain
+        /// world-baked element). Release then flips it back - a node that was ALREADY a motion node (FlipTile, a scroll
+        /// viewport) has this false and is left promoted. Carried across a re-animation of the same target.</summary>
+        internal bool Promoted { get; set; }
+
         private volatile Basis _basis;
         public Matrix4x4F Local { get; private set; }
 
@@ -214,13 +220,16 @@ public static class Compositor
                 if (target is not Transform transform || transform.Owner is not { } owner) return null;
 
                 // A world-baked element cannot be moved by a matrix write. Promote it - and mark it structural, because its
-                // subtree's instances must be re-baked in the node's space before the slot means anything.
-                if (!owner.IsRenderMotionNode)
+                // subtree's instances must be re-baked in the node's space before the slot means anything. Remember WE did
+                // it (Promoted) so Release un-promotes it; a node that was already a motion node is left as it was.
+                var promoted = !owner.IsRenderMotionNode;
+                if (promoted)
                 {
                     owner.IsRenderMotionNode = true;
                     RenderDirty.MarkStructural(owner);
                 }
                 entry = Entry.ForTransform(transform, owner, curve, CaptureBasis(transform, owner), resumeElapsed);
+                entry.Promoted = promoted;
                 break;
             }
             case CompositorChannel.Paint:
@@ -239,7 +248,12 @@ public static class Compositor
 
         lock (Gate)
         {
-            Entries.RemoveAll(e => ReferenceEquals(e.Target, target));   // re-animating the same target replaces it
+            // Re-animating the same target replaces it; carry a running compositor-promotion across the swap so it isn't
+            // lost (the node stays a motion node, and the LAST Release un-promotes it).
+            if (entry.Channel == CompositorChannel.Transform && !entry.Promoted &&
+                Entries.Find(e => ReferenceEquals(e.Target, target)) is { Promoted: true })
+                entry.Promoted = true;
+            Entries.RemoveAll(e => ReferenceEquals(e.Target, target));
             Entries.Add(entry);
         }
         return entry;
@@ -248,7 +262,22 @@ public static class Compositor
     /// <summary>Stop compositing this target (the animation was cancelled or finished). Loop thread.</summary>
     public static void Release(AdamantiumComponent target)
     {
-        lock (Gate) Entries.RemoveAll(e => ReferenceEquals(e.Target, target));
+        lock (Gate)
+        {
+            for (var i = Entries.Count - 1; i >= 0; i--)
+            {
+                var e = Entries[i];
+                if (!ReferenceEquals(e.Target, target)) continue;
+                // Un-promote a node WE promoted, so a once-animated static node stops full-re-recording every frame; re-bake
+                // it in world space now no matrix drives it. An intrinsic motion node (FlipTile, scroll viewport) is left be.
+                if (e.Promoted && e.Owner != null)
+                {
+                    e.Owner.IsRenderMotionNode = false;
+                    RenderDirty.MarkStructural(e.Owner);
+                }
+                Entries.RemoveAt(i);
+            }
+        }
     }
 
     public static void Reset()
