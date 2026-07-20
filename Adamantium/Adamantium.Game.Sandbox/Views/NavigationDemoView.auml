@@ -23,6 +23,12 @@
             <!-- Drives the title-bar Dialog/Help commands: ON = dialogs open in their OWN window, OFF = in-window overlay. -->
             <ToggleSwitch Content="Show dialogs as separate windows" Margin="0,8,0,0"
                           IsChecked="{Binding WindowSettings.DialogsAsWindows, Mode=TwoWay}"/>
+
+            <!-- In-window draggable windows (OverlayWindow + OverlayWindowManager). Each click cascades a new one. -->
+            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                <Button Content="Show overlay window" Command="{Binding ShowOverlayWindowCommand}" Height="32" Margin="0,0,8,0"/>
+                <Button Content="Show modal overlay"  Command="{Binding ShowOverlayModalCommand}"  Height="32"/>
+            </StackPanel>
         </StackPanel>
 
         <Grid Grid.Row="1" ColumnDefinitions="*,16,300">

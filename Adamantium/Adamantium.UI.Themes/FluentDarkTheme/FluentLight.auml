@@ -34,6 +34,7 @@
         <StyleInclude Source="{x:Type fluentDark:TabControlStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:TabItemStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:SlidePanelStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:OverlayWindowStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:TitleBarStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ResizeGripperStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:WindowStyleSet}"/>

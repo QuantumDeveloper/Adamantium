@@ -1,16 +1,16 @@
+using System.ComponentModel;
+using System.Threading;
+using System.Threading.Tasks;
 using Adamantium.Navigation;
-using Adamantium.ProceduralGeometry;
-using Adamantium.UI.Controls.Decorators;
 using Adamantium.UI.Controls.Navigation;
 using Adamantium.UI.Core;
-using Adamantium.UI.Core.Media;
 
 namespace Adamantium.UI.Controls;
 
-/// <summary>Overlay dialog host: shows the dialog as a dimmed, centred card on the ACTIVE window's popup layer (in-window,
-/// never a separate OS window - it draws on top of all content and stays within the window bounds). The scrim dims and
-/// blocks the content behind it; the dialog closes only when the view model raises RequestClose (its buttons).
-/// This is presentation only - the open/close lifecycle and the result live in <see cref="DialogSession"/>.</summary>
+/// <summary>Overlay dialog host: shows the dialog inside a draggable, modal <see cref="OverlayWindow"/> on the active
+/// window's overlay (in-window, never a separate OS window). The dim scrim blocks + dims the content behind; the dialog
+/// closes when the view model raises RequestClose, or when the user closes the window (x / Escape) - which the view model
+/// can veto via CanCloseDialog. Presentation only; the lifecycle + result live in <see cref="DialogSession"/>.</summary>
 public sealed class OverlayDialogHost : IDialogHost
 {
     private readonly IUIApplication _application;
@@ -31,36 +31,35 @@ public sealed class OverlayDialogHost : IDialogHost
             return Task.FromResult<IDialogResult>(new DialogResult(DialogButtonResult.None));
 
         var view = _viewLocator.ResolveView(dialogViewModel);
+        var aware = dialogViewModel as IDialogAware;
 
-        // The dialog card: the resolved view in a themed, rounded surface (the same brush menu/flyout surfaces use),
-        // centred in the window.
-        var card = new Border
+        var window = new OverlayWindow
         {
-            Background = ThemeBrush("CardBackgroundFillColorDefault", 0xFF2B2B2B),
-            CornerRadius = new CornerRadius(8),
-            Padding = new Thickness(16),
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            Child = view as IMeasurableComponent
+            Title = aware?.Title ?? string.Empty,
+            IsModal = true,          // a dialog dims + blocks the content behind
+            AllowMove = true,        // draggable by the title bar
+            CloseOnOverlay = false,  // a dialog closes via its buttons / RequestClose, not a scrim click
+            Content = view
         };
 
-        // The scrim: a full-window layer (theme smoke brush) that dims the content and BLOCKS input to it (it hit-tests,
-        // so clicks land on the scrim, not the content behind). It does NOT dismiss on click - the dialog closes only via
-        // the view's buttons (RequestClose). Click-outside-to-dismiss can be added later with an explicit bounds check.
-        var scrim = new Border
+        // Live title: the dialog may change its Title while open; reflect it on the bar.
+        if (aware is INotifyPropertyChanged inpc)
         {
-            Background = ThemeBrush("SmokeFillColorDefault", 0x99000000),
-            Child = card
-        };
+            void OnPropertyChanged(object sender, PropertyChangedEventArgs e)
+            {
+                if (e.PropertyName == nameof(IDialogAware.Title)) window.Title = aware.Title;
+            }
+            inpc.PropertyChanged += OnPropertyChanged;
+            window.Closed += (_, _) => inpc.PropertyChanged -= OnPropertyChanged;
+        }
 
-        var popup = new Popup { FillWindow = true, Child = scrim };   // a full-window overlay, not an edge-docked panel
+        var session = DialogSession.Begin(dialogViewModel, parameters, () => window.Close());
+        // A user-initiated close (x / Escape) routes back through the session as a None result, still honouring
+        // CanCloseDialog: veto the window close when the dialog refuses to close.
+        window.Closing += (_, args) => { if (aware != null && !aware.CanCloseDialog()) args.Cancel = true; };
+        window.Closed += (_, _) => session.RequestClose(new DialogResult(DialogButtonResult.None));
 
-        var session = DialogSession.Begin(dialogViewModel, parameters, () => host.PopupLayer.Remove(popup));
-        host.PopupLayer.Add(popup);   // portal into the overlay (rendered last => on top of everything)
+        OverlayWindowManager.GetFor(host).Show(window);
         return session.Completion;
     }
-
-    // Brushes come from the active theme (FindResource); the ARGB fallback keeps the dialog usable if a key is missing.
-    private Brush ThemeBrush(string key, uint fallbackArgb) =>
-        _application.ResourceManager?.FindResource(key) as Brush ?? new SolidColorBrush(Color.FromArgb(fallbackArgb));
 }

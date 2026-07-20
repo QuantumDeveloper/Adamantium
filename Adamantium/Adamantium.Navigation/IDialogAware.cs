@@ -6,6 +6,9 @@ namespace Adamantium.Navigation;
 /// a result) by raising <see cref="RequestClose"/>.</summary>
 public interface IDialogAware
 {
+    /// <summary>Shown on the dialog's title bar (draggable overlay chrome). May be empty.</summary>
+    string Title { get; }
+
     void OnDialogOpened(NavigationParameters parameters);
 
     bool CanCloseDialog();

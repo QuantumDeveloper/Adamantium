@@ -14,10 +14,22 @@ namespace Adamantium.UI.Controls;
 /// </summary>
 public class ResizeGripper : Control
 {
+    /// <summary>Whether the grip publishes its rect to the OS window as the native sizing corner (HTBOTTOMRIGHT). Default
+    /// true (the window-chrome use). Set false to reuse ONLY the visual + hit box - e.g. an OverlayWindow, which is not an
+    /// OS window and resizes itself with a managed drag; publishing there would make the OS resize the whole window.</summary>
+    public static readonly AdamantiumProperty PublishToWindowProperty = AdamantiumProperty.Register(nameof(PublishToWindow),
+        typeof(bool), typeof(ResizeGripper), new PropertyMetadata(true));
+
+    public bool PublishToWindow
+    {
+        get => GetValue<bool>(PublishToWindowProperty);
+        set => SetValue(PublishToWindowProperty, value);
+    }
+
     protected override Size ArrangeOverride(Size finalSize)
     {
         var size = base.ArrangeOverride(finalSize);
-        var window = OwnerWindow;
+        var window = PublishToWindow ? OwnerWindow : null;
         if (window != null)
         {
             // The grip lives in the window's bottom-right corner, so its client-DIP rect follows directly from the client
@@ -32,7 +44,7 @@ public class ResizeGripper : Control
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
-        var window = OwnerWindow;
+        var window = PublishToWindow ? OwnerWindow : null;
         if (window != null) window.ResizeGripRect = default;   // grip left the tree -> stop hit-testing its (stale) rect
         base.OnDetachedFromVisualTree(e);
     }
