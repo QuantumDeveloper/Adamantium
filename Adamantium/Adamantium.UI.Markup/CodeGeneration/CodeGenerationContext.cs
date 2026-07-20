@@ -145,6 +145,11 @@ public class CodeGenerationContext
             else
             {
                 TextGenerator.WriteLine($"{declaration} = new {typeInfo.FullName}();");
+                // Carry the x:Name at runtime too, so {Binding ..., ElementName=X} resolves it by walking the tree (a view
+                // exposes named elements as fields; Name is what an ElementName binding matches on). Only for types that
+                // HAVE a Name property - a named non-UI object (e.g. a Transform an animation targets) does not.
+                if (isNamed && typeInfo.GetMemberByName("Name") is { MemberType: not null })
+                    TextGenerator.WriteLine($"{elementName}.Name = \"{named}\";");
             }
             if (isNamed && CurrentTemplate != null)
             {
@@ -1024,6 +1029,10 @@ public class CodeGenerationContext
             case "Source":
                 var source = EmitValueExpression(value, "object", diagnostics, isResource);
                 if (source != null) TextGenerator.WriteLine($"{bindingVar}.Source = {source};");
+                break;
+            case "ElementName":
+                if ((value as AumlAstTextNode)?.Text?.Trim() is { Length: > 0 } elementName)
+                    TextGenerator.WriteLine($"{bindingVar}.ElementName = \"{elementName}\";");
                 break;
             default:
                 diagnostics.ReportWarning(Metadata.ClassName, $"Unknown binding property '{name}'");

@@ -30,6 +30,7 @@ public class BindingExpression : BindingExpressionBase
    private PropertyInfo _sourceProperty;
    private Func<object, object> _sourceGetter;   // compiled reader for _sourceProperty (the hot ComputeValue path)
    private INotifyPropertyChanged _observed;
+   private AdamantiumComponent _observedComponent;   // element source ({ElementName}) - observed via AdamantiumProperty changes, not INPC
    private string[] _segments;   // cached Binding.Path split on '.', computed once (path is fixed per expression)
 
    // Property-accessor cache: `GetType().GetProperty(name)` is a slow metadata search and `PropertyInfo.GetValue` a slow
@@ -116,6 +117,14 @@ public class BindingExpression : BindingExpressionBase
          _observed = newObserved;
          SharedSourceRegistry.Subscribe(newObserved, this);   // one shared subscription per source, O(1) add (see SharedSourceRegistry)
       }
+      // Element source ({ElementName}): a UI element does not implement INotifyPropertyChanged - its properties change
+      // through the AdamantiumProperty system. Observe THAT so source->target updates flow (a wheel-zoom moving a slider
+      // bound to ZoomBox.ScaleX, a value readout, ...). Not shared (element bindings aren't the virtualized-list hot path).
+      if (newObserved == null && ResolvedSource is AdamantiumComponent component)
+      {
+         _observedComponent = component;
+         component.PropertyChanged += OnSourceComponentChanged;
+      }
       if (Mode == BindingMode.TwoWay && !IsProducer && Target != null)
          Target.PropertyChanged += OnTargetPropertyChanged;
    }
@@ -127,6 +136,11 @@ public class BindingExpression : BindingExpressionBase
       {
          SharedSourceRegistry.Unsubscribe(_observed, this);   // O(1) remove - the reason a shrunk window can release cheaply
          _observed = null;
+      }
+      if (_observedComponent != null)
+      {
+         _observedComponent.PropertyChanged -= OnSourceComponentChanged;
+         _observedComponent = null;
       }
       if (Mode == BindingMode.TwoWay && !IsProducer && Target != null)
          Target.PropertyChanged -= OnTargetPropertyChanged;
@@ -141,7 +155,7 @@ public class BindingExpression : BindingExpressionBase
       _sourceGetter = null;
       SourcePropertyName = null;
 
-      var root = Binding.Source ?? Target?.DataContext;
+      var root = Binding.Source ?? ResolveElementName() ?? Target?.DataContext;
       var path = Binding.Path?.Path;
       if (root == null || string.IsNullOrEmpty(path)) return;
 
@@ -161,11 +175,38 @@ public class BindingExpression : BindingExpressionBase
       (_sourceProperty, _sourceGetter) = GetAccessor(current.GetType(), SourcePropertyName);
    }
 
+   // {Binding Path, ElementName=X}: the source is the element named X in the target's tree (not the DataContext). Resolved
+   // by walking to the tree root and searching for a matching Name - re-runs with ResolveSource on every DataContext change
+   // (attach), so a forward-referenced element resolves once the whole tree exists. Null until then.
+   private object ResolveElementName()
+   {
+      if (string.IsNullOrEmpty(Binding.ElementName) || Target is not IUIComponent target) return null;
+      var root = target;
+      while (root.VisualParent is { } parent) root = parent;
+      return FindByName(root, Binding.ElementName);
+   }
+
+   private static IUIComponent FindByName(IUIComponent node, string name)
+   {
+      if (node is IFundamentalUIComponent named && named.Name == name) return node;
+      foreach (var child in node.VisualChildren)
+         if (FindByName(child, name) is { } found) return found;
+      return null;
+   }
+
    // Called by SharedSourceRegistry (the source's single fan-out handler), not subscribed directly.
    internal void OnSourcePropertyChanged(object sender, PropertyChangedEventArgs e)
    {
       // F2: a runtime source change is batched + coalesced (applied once per frame), not pushed synchronously.
       if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == SourcePropertyName)
+         ScheduleUpdate();
+   }
+
+   // Element source ({ElementName}) property changed via the AdamantiumProperty system - push to the target if it's the
+   // property we bind.
+   private void OnSourceComponentChanged(object sender, AdamantiumPropertyChangedEventArgs e)
+   {
+      if (e.Property?.Name == SourcePropertyName)
          ScheduleUpdate();
    }
 
