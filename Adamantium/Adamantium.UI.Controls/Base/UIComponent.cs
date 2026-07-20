@@ -184,6 +184,20 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         set => SetValue(FontSizeProperty, value);
     }
 
+    // Cursor is INHERITED (like Foreground): the cursor is applied from the element the pointer ENTERS (see
+    // InputUIComponent.OnMouseEnter), so a cursor set on a container must flow down to its parts - a grip/splitter whose hit
+    // target is a template child would otherwise show the child's default arrow. Declared HERE (not on InputUIComponent) so
+    // the property exists on EVERY node the inheritance walks - including non-input ones like Popup - otherwise propagating
+    // it into their subtree throws "not registered" on them.
+    public static readonly AdamantiumProperty CursorProperty = AdamantiumProperty.Register(nameof(Cursor),
+        typeof(Cursor), typeof(UIComponent), new PropertyMetadata(Cursor.Default, PropertyMetadataOptions.Inherits));
+
+    public Cursor Cursor
+    {
+        get => GetValue<Cursor>(CursorProperty);
+        set => SetValue(CursorProperty, value);
+    }
+
     #endregion
 
     #region Events

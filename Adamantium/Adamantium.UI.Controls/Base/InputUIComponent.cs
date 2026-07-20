@@ -160,9 +160,6 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     public static readonly AdamantiumProperty FocusableProperty = AdamantiumProperty.Register(nameof(Focusable),
         typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false));
     
-    public static readonly AdamantiumProperty CursorProperty = AdamantiumProperty.Register(nameof(Cursor),
-        typeof(Cursor), typeof(InputUIComponent), new PropertyMetadata(Cursor.Default));
-    
     public static readonly AdamantiumProperty IsKeyboardFocusedProperty =
         AdamantiumProperty.RegisterReadOnly(nameof(IsKeyboardFocused),
             typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false));
@@ -204,11 +201,6 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         private set => SetValue(IsKeyboardFocusedProperty, value);
     }
     
-    public Cursor Cursor
-    {
-        get => GetValue<Cursor>(CursorProperty);
-        set => SetValue(CursorProperty, value);
-    }
 
     /// <summary>Content shown as a hover tooltip - a string, or any UI content. A regular, bindable property (WPF's
     /// FrameworkElement.ToolTip); its change is forwarded to the shared <see cref="ToolTipService"/> that shows the card.</summary>
