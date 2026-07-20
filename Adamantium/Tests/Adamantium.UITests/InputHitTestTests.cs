@@ -93,11 +93,12 @@ public class InputHitTestTests
         Assert.That(hit, Is.SameAs(shape), "the centred shape must be hit, not the background panel behind it");
     }
 
-    // The designer must be able to select a NON-INPUT authored element (a bare Border, a Shape). Mouse HitTest returns
-    // only IInputComponent targets, so a Border falls through to whatever interactive element is behind it (the panel) -
-    // the "selecting a control picks the background panel" designer bug. GetVisualsAt returns the Border for selection.
+    // A Border is itself an input control now, so the mouse HitTest lands ON it (no fall-through to the panel behind).
+    // GetVisualsAt likewise returns it: the designer selects the authored Border under the pointer, not the background
+    // panel. (HitTest returns the topmost IInputComponent; GetVisualsAt returns any visual on its geometry - here the same
+    // Border, since it is both.)
     [Test]
-    public void GetVisualsAt_FindsNonInputBorder_WhereHitTestFallsThrough()
+    public void GetVisualsAt_AndHitTest_SelectTheAuthoredBorder()
     {
         var border = new Border
         {
@@ -117,8 +118,8 @@ public class InputHitTestTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(inputHit, Is.Not.SameAs(border), "mouse HitTest skips the non-input Border (root of the designer bug)");
-            Assert.That(visualHit, Is.SameAs(border), "the designer's visual hit-test selects the Border");
+            Assert.That(inputHit, Is.SameAs(border), "the Border is an input control, so the mouse HitTest lands on it");
+            Assert.That(visualHit, Is.SameAs(border), "the designer's visual hit-test also selects the Border");
         });
     }
 }

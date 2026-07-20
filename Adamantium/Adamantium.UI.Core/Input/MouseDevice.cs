@@ -476,7 +476,14 @@ public class MouseDevice
     private void MouseWheel(IInputComponent rootComponent, Vector2 p, InputModifiers modifiers, uint timestemp, Int32 wheelDelta)
     {
         var hit = HitTestTopmost(rootComponent, p);
+        if (hit == null) return;
 
-        hit?.RaiseEvent(new MouseWheelEventArgs(this, modifiers, wheelDelta, timestemp) { RoutedEvent = Mouse.MouseWheelEvent });
+        // Tunnel (Preview) THEN bubble (Main) on ONE args object, exactly as MouseDown does, so a PreviewMouseWheel
+        // handler's Handled carries into the bubbling MouseWheel and suppresses it. Previously only the bubble was raised,
+        // so PreviewMouseWheel never fired at all.
+        var args = new MouseWheelEventArgs(this, modifiers, wheelDelta, timestemp) { RoutedEvent = Mouse.PreviewMouseWheelEvent };
+        hit.RaiseEvent(args);
+        args.RoutedEvent = Mouse.MouseWheelEvent;
+        hit.RaiseEvent(args);
     }
 }

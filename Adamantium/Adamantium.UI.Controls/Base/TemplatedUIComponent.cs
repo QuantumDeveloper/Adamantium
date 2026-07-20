@@ -105,6 +105,14 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent
         if (child is AdamantiumComponent component)
             component.InheritanceParent = this;
         AddVisualChild(child);
+
+        // A template ROOT is attached visual-only (no logical SetParent), so - unlike every logical child, which SetParent
+        // themes on attach - it never gets its theme applied. That is invisible for a plain Border/Grid root (renders
+        // directly), but a TEMPLATED control used as a template root (e.g. a ScrollViewer) would then never build its OWN
+        // template. Apply the theme here, mirroring SetParent. Its descendants are logical children built by Template.Build
+        // and are already themed through their own SetParent, so the IsStyleApplied guard keeps this to the root only.
+        if (child is FundamentalUIComponent { IsStyleApplied: false } themedRoot)
+            themedRoot.ApplyCurrentTheme();
     }
 
     public virtual void OnRemoveTemplate()
