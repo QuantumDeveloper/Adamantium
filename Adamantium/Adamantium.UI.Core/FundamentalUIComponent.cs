@@ -408,7 +408,7 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         }
     }
 
-    public void ApplyCurrentTheme()
+    public virtual void ApplyCurrentTheme()
     {
         if (UIAppContext.Current == null)
             return;

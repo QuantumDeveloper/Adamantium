@@ -56,11 +56,21 @@
                              overlaps the row), so Placement=Right opens the submenu just past the row's right edge. -->
                         <controls:Popup x:Name="PART_SubmenuPopup" Placement="Right" FlipToFit="True"
                                 IsOpen="{TemplateBinding IsSubmenuOpen}">
-                            <controls:Border Background="{ResourceReference CardBackgroundFillColorDefault}"
-                                    BorderBrush="{ResourceReference ControlStrokeColorDefault}"
-                                    BorderThickness="1" CornerRadius="6" Padding="4" MinWidth="160">
-                                <controls:ItemsPresenter x:Name="PART_ItemsPresenter"/>
-                            </controls:Border>
+                            <!-- The submenu's card + items host are built LAZILY on first open (ChildTemplate), not eagerly in
+                                 every MenuItem's template - so a leaf that never opens a submenu never pays to build+theme it. -->
+                            <controls:Popup.ChildTemplate>
+                                <ControlTemplate TargetType="Popup">
+                                    <controls:Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                            BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                            BorderThickness="1" CornerRadius="6" Padding="4" MinWidth="160">
+                                        <!-- Menu taller than the window: capped to the window (MaxHeight set in code) and scrolled
+                                             by the ▲/▼ arrows the MenuScrollViewer grows - no scrollbar. A short menu is content-sized. -->
+                                        <controls:MenuScrollViewer x:Name="PART_MenuScroll">
+                                            <controls:ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                        </controls:MenuScrollViewer>
+                                    </controls:Border>
+                                </ControlTemplate>
+                            </controls:Popup.ChildTemplate>
                         </controls:Popup>
                     </controls:Grid>
                 </ControlTemplate>
@@ -93,6 +103,57 @@
         </Setter>
     </Style>
 
+    <!-- MenuScrollViewer: a scrollbar-less scroll host for menus. ▲/▼ strips at the edges appear only when there is content
+         to scroll (CanScrollUp/Down) and scroll it while hovered; the wheel scrolls too. A short menu keeps them hidden. -->
+    <Style Selector="MenuScrollViewer">
+        <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+        <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuScrollViewer">
+                    <!-- Arrows are RepeatButtons in their OWN rows (not overlaying content): a click scrolls a step and a
+                         hold repeats it (mouse-captured, so it's stable). The * row bounds the presenter (the card has a
+                         MaxHeight) so it scrolls; the Auto arrow rows are 0-tall when collapsed. -->
+                    <controls:Grid RowDefinitions="Auto,*,Auto">
+                        <controls:RepeatButton x:Name="PART_ScrollUp" Grid.Row="0" Height="18" Visibility="Collapsed"
+                                Delay="300" Interval="40">
+                            <controls:RepeatButton.Template>
+                                <ControlTemplate TargetType="RepeatButton">
+                                    <controls:Border Background="{ResourceReference CardBackgroundFillColorDefault}">
+                                        <controls:Path Data="M0,5 L5,0 L10,5 Z" Fill="{ResourceReference TextFillColorSecondary}"
+                                                Width="10" Height="5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </controls:Border>
+                                </ControlTemplate>
+                            </controls:RepeatButton.Template>
+                        </controls:RepeatButton>
+                        <controls:ScrollContentPresenter x:Name="PART_ScrollContentPresenter" Grid.Row="1"
+                                Content="{TemplateBinding Content}"/>
+                        <controls:RepeatButton x:Name="PART_ScrollDown" Grid.Row="2" Height="18" Visibility="Collapsed"
+                                Delay="300" Interval="40">
+                            <controls:RepeatButton.Template>
+                                <ControlTemplate TargetType="RepeatButton">
+                                    <controls:Border Background="{ResourceReference CardBackgroundFillColorDefault}">
+                                        <controls:Path Data="M0,0 L10,0 L5,5 Z" Fill="{ResourceReference TextFillColorSecondary}"
+                                                Width="10" Height="5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </controls:Border>
+                                </ControlTemplate>
+                            </controls:RepeatButton.Template>
+                        </controls:RepeatButton>
+                    </controls:Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="MenuScrollViewer">
+        <PropertyTrigger Property="CanScrollUp" Value="true">
+            <Setter TargetName="PART_ScrollUp" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="CanScrollDown" Value="true">
+            <Setter TargetName="PART_ScrollDown" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+    </Style>
+
     <!-- ContextMenu: a light-dismiss flyout of MenuItems in the popup overlay. Template = a Popup portal whose content is
          a themed card hosting the items (PART_ItemsPresenter). The control is zero-size inline (items live in the overlay). -->
 
@@ -117,7 +178,11 @@
                                     Background="{ResourceReference CardBackgroundFillColorDefault}"
                                     BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                                     BorderThickness="1" CornerRadius="6" Padding="4" MinWidth="160">
-                                <controls:ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                <!-- Menu taller than the window: capped to the window (MaxHeight set in code) and scrolled by
+                                     the ▲/▼ hover-arrows the MenuScrollViewer grows - no scrollbar. A short menu is content-sized. -->
+                                <controls:MenuScrollViewer x:Name="PART_MenuScroll">
+                                    <controls:ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                </controls:MenuScrollViewer>
                             </controls:Border>
                         </controls:Popup>
                     </controls:Grid>

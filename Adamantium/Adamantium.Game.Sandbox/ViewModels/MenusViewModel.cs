@@ -16,6 +16,19 @@ public partial class MenusViewModel : TabPageViewModel
 
     public MenusViewModel() : base("Menus")
     {
+        // A deliberately long submenu (taller than the window) to show the flyout scrolls instead of clipping - and each
+        // entry has its OWN submenu, so a submenu opens off a SCROLLED row (it anchors to the row's live position).
+        var recent = new MenuNode { Title = "Recent files" };
+        for (var i = 1; i <= 40; i++)
+        {
+            var name = $"project_{i:00}.auml";
+            recent.Children.Add(MenuNode.Parent(name,
+                MenuNode.Leaf("Open", new AdamantiumCommand(() => Pick($"Open {name}"))),
+                MenuNode.Leaf("Reveal in Explorer", new AdamantiumCommand(() => Pick($"Reveal {name}"))),
+                MenuNode.Divider(),
+                MenuNode.Leaf("Remove from list", new AdamantiumCommand(() => Pick($"Remove {name}")))));
+        }
+
         MenuItems =
         [
             MenuNode.Leaf("Cut", new AdamantiumCommand(() => Pick("Cut")), "Ctrl+X"),
@@ -33,6 +46,7 @@ public partial class MenusViewModel : TabPageViewModel
             MenuNode.Parent("Arrange",
                 MenuNode.Leaf("Bring to front", new AdamantiumCommand(() => Pick("Arrange · Bring to front"))),
                 MenuNode.Leaf("Send to back", new AdamantiumCommand(() => Pick("Arrange · Send to back")))),
+            recent,
             MenuNode.Divider(),
             MenuNode.Leaf("Properties…", new AdamantiumCommand(() => Pick("Properties…"))),
         ];

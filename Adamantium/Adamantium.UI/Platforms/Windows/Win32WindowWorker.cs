@@ -234,12 +234,10 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         // Un-minimize first (Restore returns to the prior normal/maximized state); a minimized window can't be raised.
         if (chromeState == WindowState.Minimized)
             Win32Interop.ShowWindow(hwnd, WindowShowStyle.Restore);
-        // SetForegroundWindow ALONE only flashes the taskbar when the calling process isn't already the foreground one
-        // (the OS foreground-lock, hit at startup and when opening a window from a background app). Toggling the window
-        // topmost then back raises it above everything WITHOUT leaving it permanently on top; then take input focus.
-        var flags = SetWindowPosFlags.Nomove | SetWindowPosFlags.Nosize | SetWindowPosFlags.Showwindow;
-        Win32Interop.SetWindowPos(hwnd, new IntPtr(-1), 0, 0, 0, 0, flags);   // HWND_TOPMOST
-        Win32Interop.SetWindowPos(hwnd, new IntPtr(-2), 0, 0, 0, 0, flags);   // HWND_NOTOPMOST
+        // Request foreground the STANDARD way. When the calling process isn't already the foreground one (launched from a
+        // background process, e.g. a shell/launcher), Windows deliberately refuses to steal focus and just flashes the
+        // taskbar - and that's correct. The old topmost-toggle (HWND_TOPMOST -> HWND_NOTOPMOST) forced it above everything,
+        // which left the window stuck on top: a click on another window couldn't send it to the back. Don't force it.
         Win32Interop.SetForegroundWindow(hwnd);
     }
 
