@@ -40,6 +40,7 @@
         <StyleInclude Source="{x:Type fluentDark:ResizeGripperStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:WindowStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:MenuStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:TreeViewStyleSet}"/>
 	</Theme.StyleIncludes>
 
 	<!-- Accent: ONE seed; the theme derives the ramp + on-accent text colour (see FluentDark.auml). A darker seed here

@@ -90,25 +90,32 @@ public class StackPanel : VirtualizingPanel
       var horizontal = Orientation == Orientation.Horizontal;
 
       // Cross-axis = the CONTENT extent (DesiredSize: the tallest/widest child, or an explicit Width/Height), clamped to
-      // the slot - never the full slot on its own. A stack only occupies what it stacks, so it must not report (and
+      // the slot - never the full slot on its own. A stack only occupies what it stacks, so it must not REPORT (and
       // therefore hit-test) cross space it doesn't use: a horizontal Stretch stack otherwise swallowed the whole window
-      // height for input, blocking everything beneath it. Children are still given the full cross extent so they can
-      // align within it. (Stacking axis = the running content sum - a stack never fills along its orientation either.)
+      // height for input, blocking everything beneath it. That clamp is the panel's RETURN value below.
       double cross = horizontal
          ? Math.Min(finalSize.Height, DesiredSize.Height)
          : Math.Min(finalSize.Width, DesiredSize.Width);
+
+      // Children, however, get the FULL cross slot so a Stretch child fills the panel's width (a full-width row - a
+      // TreeView/list item that spans the viewport, clickable + highlight edge-to-edge); a non-Stretch child sizes to its
+      // content within that slot (its own Arrange aligns it). Clamping the CHILD to `cross` - as this used to - is what
+      // pinned every Stretch child to content width. Guard infinity (an unconstrained arrange) back to the content extent.
+      double childCross = horizontal
+         ? (double.IsInfinity(finalSize.Height) ? cross : finalSize.Height)
+         : (double.IsInfinity(finalSize.Width) ? cross : finalSize.Width);
 
       double main = 0;
       foreach (var child in Children)
       {
          if (horizontal)
          {
-            child.Arrange(new Rect(main, 0, child.DesiredSize.Width, cross));
+            child.Arrange(new Rect(main, 0, child.DesiredSize.Width, childCross));
             main += child.DesiredSize.Width;
          }
          else
          {
-            child.Arrange(new Rect(0, main, cross, child.DesiredSize.Height));
+            child.Arrange(new Rect(0, main, childCross, child.DesiredSize.Height));
             main += child.DesiredSize.Height;
          }
       }
