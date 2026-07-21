@@ -762,14 +762,16 @@ public class TextLayout : DisposableObject
         // out inflated by that bearing. Now the line just starts at the natural LSB indent.
         glyphLeft += horizontalShift;
 
-        // Anchor every glyph to the line's baseline so they share an exact pixel row. Rounding glyphTop and
-        // the ink bottom independently rounds each glyph's own ink extremes, so a letter that overshoots the
-        // baseline (round bottoms: о е с а) lands a whole pixel below a flat-bottomed one (к и в) - the
-        // baseline visibly wobbles once the text is crisp. Instead round the baseline ONCE (it's the same for
-        // the whole line) and round the ascent/descent RELATIVE to it: sub-pixel overshoot is absorbed, real
-        // descenders (р у) are preserved, and every baseline-sitting glyph bottoms on the same row.
+        // Anchor every glyph to SHARED reference lines - the baseline for the bottom, the ascender line for the top - so
+        // same-height glyphs share exact pixel rows. Rounding a glyph's OWN ink extremes independently rounds its overshoot
+        // per glyph, so a round-bottomed letter (о е с а) lands a pixel below a flat one (к и в) AND a round-topped cap/digit
+        // (0 8 9) lands a pixel above a flat one (1 4 7) at small sizes - the line visibly wobbles. Instead round each shared
+        // reference ONCE, then round the ink's distance FROM it: sub-pixel overshoot is absorbed both ways, real descenders
+        // (р у) and true ascenders are preserved, and every baseline-sitting glyph bottoms - and every cap tops - on one row.
         var baseR = (int)System.Math.Round(glyphBase);
-        var top = baseR - (int)System.Math.Round(glyphBase - glyphTop);
+        var ascLine = glyphBase - Font.Ascender * scale;
+        var ascR = (int)System.Math.Round(ascLine);
+        var top = ascR + (int)System.Math.Round(glyphTop - ascLine);
         var bottom = baseR - (int)System.Math.Round(glyphBase - (glyphTop + glyphHeight));
 
         // X axis stays SUB-PIXEL: keep the glyph at its exact fractional position/width (do NOT round). The
