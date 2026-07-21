@@ -6,6 +6,7 @@ using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.Decorators;
 using Adamantium.UI.Controls.Panels;
+using Adamantium.UI.Controls.Primitives;
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Data;
@@ -1148,12 +1149,35 @@ public class ItemsControlTests
         });
     }
 
+    // A non-virtualizing StackPanel host (a menu) stacks items by their OWN measured height, so a short "separator" takes
+    // only its height instead of a uniform row cell. The uniform-cell (virtualized) path would report 3*30 = 90.
+    [Test]
+    public void NonVirtualizingStackPanel_StacksMixedHeightsIndividually()
+    {
+        var items = new object[] { new Border { Height = 30 }, new Border { Height = 8 }, new Border { Height = 30 } };
+        var ic = new ItemsControl
+        {
+            ItemsSource = items,
+            ItemsPanel = new ItemsPanelTemplate(() => new TemplateResult
+            {
+                RootComponent = new StackPanel { Orientation = Orientation.Vertical, IsVirtualizing = false }
+            })
+        };
+        ic.Template = ItemsPresenterTemplate();
+        ic.Measure(new Size(200, 500));
+        ic.Arrange(new Rect(0, 0, 200, 500));
+
+        var scroll = (IScrollableContent)ic.ItemsHostPanel;
+        Assert.That(scroll.Extent.Height, Is.EqualTo(68).Within(0.5),
+            "mixed heights stacked individually (30+8+30), NOT a uniform 3*30 cell");
+    }
+
     private sealed class MyContainer : ContentPresenter { }
 
     private sealed class CustomContainerItemsControl : ItemsControl
     {
         protected internal override bool IsItemItsOwnContainer(object item) => false;
-        protected internal override IUIComponent GetContainerForItem() => new MyContainer();
+        protected internal override IUIComponent GetContainerForItem(object item) => new MyContainer();
     }
 
     [Test]
@@ -1267,6 +1291,72 @@ public class ItemsControlTests
             Assert.That(((ContentPresenter)gen.ContainerFromIndex(0)).Content, Is.EqualTo("one"));
             Assert.That(((ContentPresenter)gen.ContainerFromIndex(1)).Content, Is.EqualTo("two"));
             Assert.That(gen.ContainerFromIndex(2), Is.Null);
+        });
+    }
+
+    // --- HierarchicalDataTemplate: a MenuItem root projects a tree; a PARENT node's generated container gets its own
+    // items bound from the node's Children (HasItems true), a LEAF's stays empty. This is the menu / TreeView recursion. ---
+    private sealed class TreeNode : ISeparatorItem
+    {
+        public string Title { get; init; }
+        public bool IsSeparator { get; init; }
+        public ObservableCollection<TreeNode> Children { get; } = [];
+    }
+
+    [Test]
+    public void HierarchicalDataTemplate_SeparatorNode_BecomesSeparatorContainer()
+    {
+        var hdt = new HierarchicalDataTemplate(() => new TemplateResult { RootComponent = new TextBlock() })
+        {
+            ItemsSource = new Binding { Path = new PropertyPath("Children") }
+        };
+
+        var items = new object[] { new TreeNode { Title = "Cut" }, new TreeNode { IsSeparator = true }, new TreeNode { Title = "Paste" } };
+        var root = new MenuItem { ItemTemplate = hdt, ItemsSource = items };
+        root.Template = ItemsPresenterTemplate();
+
+        Assert.DoesNotThrow(() => { root.Measure(new Size(300, 300)); root.Arrange(new Rect(0, 0, 300, 300)); },
+            "realizing a menu that mixes MenuItem rows and a separator node must not throw");
+
+        var gen = root.ItemContainerGenerator;
+        Assert.Multiple(() =>
+        {
+            Assert.That(gen.ContainerFromIndex(0), Is.InstanceOf<MenuItem>(), "a normal node -> MenuItem");
+            Assert.That(gen.ContainerFromIndex(1), Is.InstanceOf<Separator>(), "a separator node -> Separator");
+            Assert.That(gen.ContainerFromIndex(2), Is.InstanceOf<MenuItem>());
+        });
+    }
+
+    [Test]
+    public void HierarchicalDataTemplate_ParentNodeContainer_GetsChildrenBound()
+    {
+        var parent = new TreeNode { Title = "Zoom" };
+        parent.Children.Add(new TreeNode { Title = "50%" });
+        parent.Children.Add(new TreeNode { Title = "200%" });
+        var leaf = new TreeNode { Title = "Cut" };
+
+        var hdt = new HierarchicalDataTemplate(() => new TemplateResult { RootComponent = new TextBlock() })
+        {
+            ItemsSource = new Binding { Path = new PropertyPath("Children") }
+        };
+
+        var root = new MenuItem { ItemTemplate = hdt, ItemsSource = new[] { parent, leaf } };
+        root.Template = ItemsPresenterTemplate();
+        root.Measure(new Size(300, 300));
+        root.Arrange(new Rect(0, 0, 300, 300));
+
+        var gen = root.ItemContainerGenerator;
+        var parentContainer = gen.ContainerFromIndex(0) as MenuItem;
+        var leafContainer = gen.ContainerFromIndex(1) as MenuItem;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(parentContainer, Is.Not.Null, "parent node -> MenuItem container");
+            Assert.That(leafContainer, Is.Not.Null, "leaf node -> MenuItem container");
+            Assert.That(parentContainer?.DataContext, Is.SameAs(parent), "container bound to its node");
+            Assert.That(parentContainer?.HasItems, Is.True, "parent's Children bound into the container's Items");
+            Assert.That(parentContainer?.Items.Count, Is.EqualTo(2), "both child nodes present");
+            Assert.That(leafContainer?.HasItems, Is.False, "leaf has no children");
         });
     }
 }

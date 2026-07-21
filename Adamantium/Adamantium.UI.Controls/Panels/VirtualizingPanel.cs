@@ -14,11 +14,13 @@ namespace Adamantium.UI.Controls.Panels;
 /// <summary>
 /// Base for panels that can host an <see cref="ItemsControl"/>'s items with virtualization: it owns the whole mechanism
 /// (the <see cref="IScrollableContent"/> seam, the realized window, realize/recycle through the generator, and the
-/// measure/arrange dispatch) and leaves only the geometry to subclasses (StackPanel = 1D, WrapPanel = 2D). There is no
-/// user "turn virtualization off" knob: as a plain container (no owner) it lays its <see cref="Panel.Children"/> out via
-/// <see cref="MeasurePlain"/>/<see cref="ArrangePlain"/> exactly as before; as an items host it realizes only the visible
-/// window. When given an unbounded extent on the scroll axis (no viewport) it realizes everything (the degenerate case)
-/// and reports it via <see cref="OnNoViewport"/> instead of silently being slow.
+/// measure/arrange dispatch) and leaves only the geometry to subclasses (StackPanel = 1D, WrapPanel = 2D). As a plain
+/// container (no owner) it lays its <see cref="Panel.Children"/> out via <see cref="MeasurePlain"/>/<see cref="ArrangePlain"/>
+/// exactly as before; as an items host it realizes only the visible window. When given an unbounded extent on the scroll
+/// axis (no viewport) it realizes everything (the degenerate case) and reports it via <see cref="OnNoViewport"/> instead of
+/// silently being slow. Set <see cref="IsVirtualizing"/> = false for a small mixed-height host (a menu: 34px rows + a 9px
+/// separator) where the uniform-cell assumption would give every item the same slot - then it realizes all items and stacks
+/// them by their OWN measured extents.
 /// </summary>
 public abstract class VirtualizingPanel : Panel, IScrollableContent
 {
@@ -45,12 +47,23 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
     // re-measure propagate an InvalidateMeasure back up into this panel: that spurious re-dirty is what span the layout
     // pass to MaxPassIterations (the whole realize backlog draining in ONE pass instead of one slice per frame). As a
     // plain container (no owner) the size tracks children, so defer to the base (fixed Width+Height still a boundary).
-    public override bool IsMeasureBoundary => IsItemsHost || base.IsMeasureBoundary;
+    public override bool IsMeasureBoundary => (IsItemsHost && IsVirtualizing) || base.IsMeasureBoundary;
 
     public override void InvalidateMeasure()
     {
         if (_inLayout) return;
         base.InvalidateMeasure();
+    }
+
+    /// <summary>Whether to virtualize when hosting items (default true). Set false for a small, mixed-height host (a menu)
+    /// so every item is realized and measured/arranged at its OWN size instead of a uniform cell extent.</summary>
+    public static readonly AdamantiumProperty IsVirtualizingProperty = AdamantiumProperty.Register(nameof(IsVirtualizing),
+        typeof(bool), typeof(VirtualizingPanel), new PropertyMetadata(true));
+
+    public bool IsVirtualizing
+    {
+        get => GetValue<bool>(IsVirtualizingProperty);
+        set => SetValue(IsVirtualizingProperty, value);
     }
 
     public override void InvalidateArrange()

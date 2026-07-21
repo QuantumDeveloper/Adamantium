@@ -15,6 +15,7 @@ public partial class GalleryViewModel
     public ObservableCollection<TabPageViewModel> Tabs { get; } = new()
     {
         new ButtonsViewModel(),
+        new MenusViewModel(),
         new RangesViewModel(),
         new ResourcesViewModel(),
         new ScrollBarViewModel(),

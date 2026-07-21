@@ -15,6 +15,7 @@ public class StackPanel : VirtualizingPanel
    private const double DefaultViewport = 1080.0;   // fallback viewport (px) before any real one is known
    private const int ParallelArrangeThreshold = 64;   // arrange tiles across cores only above this many realized (else thread overhead > win)
    private readonly List<int> _arrangeIndexBuf = [];  // reused each arrange - no per-frame List alloc over the window
+   private readonly List<double> _itemStarts = [];    // non-virtualized: cumulative main-axis start per item (mixed heights)
 
    public static readonly AdamantiumProperty OrientationProperty = AdamantiumProperty.Register(nameof(Orientation),
       typeof(Orientation), typeof(StackPanel),
@@ -133,6 +134,24 @@ public class StackPanel : VirtualizingPanel
          ? new Size(crossAvailable, double.PositiveInfinity)
          : new Size(double.PositiveInfinity, crossAvailable);
 
+      // Non-virtualized host (a small mixed-height menu): realize + measure EVERY item at its OWN extent and stack them by
+      // cumulative offset, so a short row (a separator) takes only its own height instead of a uniform cell.
+      if (!IsVirtualizing)
+      {
+         foreach (var c in Owner.ItemContainerGenerator.SetWindow(0, count - 1)) ParkContainer(c);   // realize all
+         _itemStarts.Clear();
+         double runningMain = 0, crossMaxAll = 0;
+         for (var i = 0; i < count; i++)
+         {
+            var container = (IMeasurableComponent)RealizeInWindow(i);
+            container.Measure(childConstraint);
+            _itemStarts.Add(runningMain);
+            runningMain += vertical ? container.DesiredSize.Height : container.DesiredSize.Width;
+            crossMaxAll = Math.Max(crossMaxAll, vertical ? container.DesiredSize.Width : container.DesiredSize.Height);
+         }
+         return vertical ? new Size(crossMaxAll, runningMain) : new Size(runningMain, crossMaxAll);
+      }
+
       // Probe a representative item for the (uniform) main-axis extent. Reuse the last window start as the probe so the
       // estimate tracks the items actually on screen. KEEP the last good size if the probe momentarily measures to nothing
       // (a recycled container mid-rebind can report a stale/zero DesiredSize): collapsing _itemExtent to 1 shrinks the whole
@@ -186,6 +205,20 @@ public class StackPanel : VirtualizingPanel
    {
       var vertical = Orientation == Orientation.Vertical;
       var cross = vertical ? finalSize.Width : finalSize.Height;
+
+      // Non-virtualized host: arrange each item at its cumulative start (from measure) with its OWN main extent.
+      if (!IsVirtualizing)
+      {
+         var count = Owner.Items.Count;
+         for (var i = 0; i < count && i < _itemStarts.Count; i++)
+         {
+            if (Owner.ItemContainerGenerator.ContainerFromIndex(i) is not IMeasurableComponent container) continue;
+            var start = _itemStarts[i];
+            var mainSize = vertical ? container.DesiredSize.Height : container.DesiredSize.Width;
+            container.Arrange(vertical ? new Rect(0, start, cross, mainSize) : new Rect(start, 0, mainSize, cross));
+         }
+         return;
+      }
 
       // ABSOLUTE slots (no -offset): the scroll offset is applied once, by the ScrollContentPresenter translating this
       // viewport-sized panel and clipping (same physical-scroll seam as WrapPanel). A tile's rect is constant across

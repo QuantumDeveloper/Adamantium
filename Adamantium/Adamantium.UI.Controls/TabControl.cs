@@ -630,7 +630,7 @@ public class TabControl : Selector
 
     protected internal override bool IsItemItsOwnContainer(object item) => item is TabItem;
 
-    protected internal override IUIComponent GetContainerForItem()
+    protected internal override IUIComponent GetContainerForItem(object item)
     {
         var container = new TabItem();
         if (ItemContainerStyle != null) container.AttachStyles(ItemContainerStyle);

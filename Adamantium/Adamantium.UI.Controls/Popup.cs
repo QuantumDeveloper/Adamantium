@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Runtime.CompilerServices;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
@@ -151,23 +152,41 @@ public class Popup : MeasurableUIComponent, IContainer
         base.OnDetachedFromVisualTree(e);
     }
 
+    // A popup's hosted CHILD is a logical-only child rendered detached on the overlay - it has NO visual path back to the
+    // window. So a popup opened from WITHIN an overlay (a submenu inside an open menu) can't find the window by walking its
+    // anchor's visual ancestors. Record each hosted overlay root -> its window here; a nested popup then finds the SAME
+    // window via the recorded entry on its anchor's overlay-root ancestor. Weak-keyed so a closed popup's child is collectable.
+    private static readonly ConditionalWeakTable<IUIComponent, IPopupHost> OverlayRootHost = new();
+
     private void Open()
     {
         if (_host != null || Child == null) return;
-        // Find the window (popup host) via the TARGET's tree, falling back to the popup's own. A declared popup finds it
-        // either way; an externally-created one (a ToolTip's popup, which is NOT in the visual tree) still hosts as long
-        // as its target is in a window - the target is always the anchor we position against anyway.
+        // Find the window (popup host) from the TARGET's tree, falling back to the popup's own. A declared popup finds it by
+        // walking visual ancestors; a popup opened inside an overlay (a submenu) has no such path, so also consult the host
+        // recorded on each overlay root when it was hosted (below). The target is always the anchor we position against.
         IUIComponent anchor = EffectiveTarget ?? this;
-        _host = anchor.GetVisualAncestors().OfType<IPopupHost>().FirstOrDefault();
+        _host = FindPopupHost(anchor);
         if (_host == null) return;   // not in a window yet; OnAttachedToVisualTree retries
         if (Child is UIComponent child) child.DataContext = DataContext;
+        if (Child is IUIComponent overlayRoot) OverlayRootHost.AddOrUpdate(overlayRoot, _host);   // so nested popups find it
         _host.PopupLayer.Add(this);
     }
 
     private void Close()
     {
+        if (Child is IUIComponent overlayRoot) OverlayRootHost.Remove(overlayRoot);
         _host?.PopupLayer.Remove(this);
         _host = null;
+    }
+
+    private static IPopupHost FindPopupHost(IUIComponent anchor)
+    {
+        for (var node = anchor; node != null; node = node.VisualParent)
+        {
+            if (node is IPopupHost host) return host;                            // in the main window tree
+            if (OverlayRootHost.TryGetValue(node, out var recorded)) return recorded;   // inside an already-open overlay
+        }
+        return null;
     }
 
     // IContainer: the AUML loader sets Child via the [Content] property.
