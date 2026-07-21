@@ -120,6 +120,14 @@ public class ItemsControl : Control, IContainer
         _presenter?.Connect(this);
     }
 
+    /// <summary>Connect an items host that arrives AFTER OnApplyTemplate - e.g. a MenuItem whose PART_ItemsPresenter lives in
+    /// its submenu Popup's lazily-built <see cref="Popup.ChildTemplate"/>, so GetTemplateChild couldn't find it up front.</summary>
+    protected void ConnectPresenter(ItemsPresenter presenter)
+    {
+        _presenter = presenter;
+        _presenter?.Connect(this);
+    }
+
     private static void OnItemsSourceChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
         ((ItemsControl)a).Items.SetSource(e.NewValue as IEnumerable);

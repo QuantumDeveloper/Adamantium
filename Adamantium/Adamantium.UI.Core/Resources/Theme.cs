@@ -13,6 +13,8 @@ public class Theme : AdamantiumComponent, ITheme
         StyleIncludes = new StyleIncludeCollection();
         ResourceManager = UIAppContext.Current.ResourceManager;
         MergedStyles = new StyleSet();
+        // Any change to the merged style set invalidates the per-type match cache below (init, AddStyleSet, hot-reload).
+        MergedStyles.Styles.CollectionChanged += (_, _) => _typeStyleCache.Clear();
         // Seed the theme's font so it's a real (non-null) property value from the start: a {ThemeResource FontFamily}
         // binding reads the raw GetValue, and a theme can override it (live) to restyle all text.
         FontFamily = SystemDefaultFontFamily;
@@ -197,19 +199,35 @@ public class Theme : AdamantiumComponent, ITheme
 
     public StyleSet MergedStyles { get; }
 
+    // Cache of the matched-and-ordered style set per runtime type, for components with no id and no classes (see below).
+    private readonly Dictionary<Type, Style[]> _typeStyleCache = [];
+
     public Style[] FindStylesForComponent(IFundamentalUIComponent component)
     {
         if (component == null) return [];
+
+        var type = component.GetType();
+
+        // Selector.Match is purely STRUCTURAL - type IS-A + id + classes, no instance state. So a component with no id and
+        // no classes can be matched ONLY by type selectors, making its matched set a pure function of its runtime type:
+        // cache it by type. This collapses the per-element theme scan from O(all theme styles) to O(1) on repeats, so
+        // realizing N identical containers (e.g. 40 MenuItems) scans the styles once per DISTINCT type, not once per element.
+        // Class/id-bearing components are rare; they take the full scan every time (correctness over their cold path).
+        var cacheable = component.Id == null && component.ClassNames.Count == 0;
+        if (cacheable && _typeStyleCache.TryGetValue(type, out var cached)) return cached;
 
         // Base-first ordering: a matched style that targets a BASE type (larger SpecificityDistance) is applied BEFORE
         // one that targets a more-derived type, so the most-specific style's setters land last and win (e.g. Button's
         // template overrides the ContentControl template it now also matches). OrderByDescending is stable, so styles of
         // equal specificity keep their document/include order (the existing base + template + triggers + Accent cascade).
-        var type = component.GetType();
-        return MergedStyles.Styles
+        var styles = MergedStyles.Styles
             .Where(x => x.Selector.Match(component))
             .OrderByDescending(x => x.Selector.SpecificityDistance(type))
             .ToArray();
+
+        if (cacheable) 
+            _typeStyleCache[type] = styles;
+        return styles;
     }
 
     public object GetResource(string key)

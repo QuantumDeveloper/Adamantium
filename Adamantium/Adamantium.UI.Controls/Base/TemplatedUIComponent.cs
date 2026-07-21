@@ -30,8 +30,30 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent
     // effective template, not off the raw written value: otherwise a masked lower-priority write would wrongly rebuild,
     // and swap-back would tear the template down without restoring the base. Rebuild only when the effective template
     // actually differs from the one currently applied.
+    // While a theme is being applied (ApplyCurrentTheme below), Template can be written MULTIPLE times - a base style's
+    // Template setter (e.g. ItemsControl's Border+ScrollViewer default) then a more-specific one (MenuItem's own). Building
+    // each in turn constructs a whole template subtree only to tear it down for the next - dozens of wasted elements per
+    // control, across every ContentControl/ItemsControl-derived type. So defer the build until the theme SETTLES: writes
+    // just mark it pending, and the single build (off the final, effective Template) runs once when ApplyCurrentTheme returns.
+    private bool _suspendTemplateBuild;
+    private bool _pendingTemplateBuild;
+
+    public override void ApplyCurrentTheme()
+    {
+        var wasSuspended = _suspendTemplateBuild;   // save/restore so a nested re-theme doesn't build early - only the outermost does
+        _suspendTemplateBuild = true;
+        base.ApplyCurrentTheme();
+        _suspendTemplateBuild = wasSuspended;
+        if (!wasSuspended && _pendingTemplateBuild)
+        {
+            _pendingTemplateBuild = false;
+            OnTemplateChanged();
+        }
+    }
+
     private void OnTemplateChanged()
     {
+        if (_suspendTemplateBuild) { _pendingTemplateBuild = true; return; }
         var effective = Template;
         if (ReferenceEquals(effective, appliedTemplate)) return;
 

@@ -1,8 +1,10 @@
+using System;
 using System.Collections.Specialized;
 using System.Linq;
 using Adamantium.Core.Commands;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Dispatcher;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.RoutedEvents;
@@ -94,15 +96,29 @@ public class MenuItem : ItemsControl, IHeaderedItemsControl
 
     private void OnItemsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e) => HasItems = Items.Count > 0;
 
-    // Closing a submenu must close everything BELOW it too: the flyout's rows live in an overlay popup that isn't detached
-    // when the popup closes, so a deeper open submenu would otherwise linger. Walk this item's realized child containers and
-    // close each - which recurses through their own callback.
+    // Submenu open/close side effects: on open, cap its scroll to the window; on close, recursively close every deeper
+    // submenu (overlay popups aren't detached on close, so a nested one would otherwise linger).
     private static void OnIsSubmenuOpenChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
-        // The property system fires this for the default during construction (ItemContainerGenerator not built yet) - skip.
-        if ((bool)e.NewValue || a is not MenuItem mi || mi.ItemContainerGenerator is null) return;
-        foreach (var index in mi.ItemContainerGenerator.RealizedIndices.ToList())
-            if (mi.ItemContainerGenerator.ContainerFromIndex(index) is MenuItem child)
+        if (a is not MenuItem mi) return;
+        if ((bool)e.NewValue)
+        {
+            // Opening: cap the submenu's scroll to the window (the row is in the overlay, so find the window via the popup
+            // host recorded on an ancestor overlay root) so a long submenu scrolls instead of clipping.
+            if (mi._scroll != null) mi._scroll.MaxHeight = Popup.WindowHeightCap(Popup.FindPopupHost(mi));
+            return;
+        }
+        // Closing must close everything BELOW too: the flyout's rows live in an overlay popup that isn't detached when the
+        // popup closes, so a deeper open submenu would otherwise linger.
+        mi.CloseChildSubmenus();
+    }
+
+    // Close every open child submenu (skipped during construction: the generator isn't built yet).
+    private void CloseChildSubmenus()
+    {
+        if (ItemContainerGenerator is null) return;
+        foreach (var index in ItemContainerGenerator.RealizedIndices.ToList())
+            if (ItemContainerGenerator.ContainerFromIndex(index) is MenuItem child)
                 child.IsSubmenuOpen = false;
     }
 
@@ -110,9 +126,16 @@ public class MenuItem : ItemsControl, IHeaderedItemsControl
     // a HierarchicalDataTemplate). Mirrors ListBox -> ListBoxItem. A node flagged ISeparatorItem becomes a Separator; only a
     // HierarchicalDataTemplate needs the headered MenuItem container; a flat ItemTemplate keeps the base ContentPresenter. --
     protected internal override IUIComponent GetContainerForItem(object item)
-        => item is ISeparatorItem { IsSeparator: true } ? new Separator()
-         : ItemTemplate is HierarchicalDataTemplate ? CreateContainer(ItemContainerStyle)
-         : base.GetContainerForItem(item);
+    {
+        if (item is ISeparatorItem { IsSeparator: true }) return new Separator();
+        if (ItemTemplate is not HierarchicalDataTemplate) return base.GetContainerForItem(item);
+        var container = CreateContainer(ItemContainerStyle);
+        container.OwnerMenu = this;   // so a child hovering cancels THIS item's submenu-close timer
+        return container;
+    }
+
+    /// <summary>The MenuItem whose submenu this row lives in (null for a ContextMenu's own top-level rows).</summary>
+    internal MenuItem OwnerMenu { get; set; }
 
     /// <summary>Creates a MenuItem container carrying the owner's ItemContainerStyle (into Styles, applied AFTER the theme).</summary>
     internal static MenuItem CreateContainer(Style itemContainerStyle)
@@ -122,14 +145,40 @@ public class MenuItem : ItemsControl, IHeaderedItemsControl
         return container;
     }
 
+    private ScrollViewer _scroll;   // wraps this item's submenu items; capped to the window height so a long submenu scrolls
+    private DispatcherTimer _closeTimer;   // closes this row's submenu a moment after the pointer leaves the branch
+    private const int CloseDelayMs = 400;
+
     public override void OnApplyTemplate()
     {
-        base.OnApplyTemplate();
-        // A leaf's Click bubbles only to the presenter of ITS popup, not across to the outer menu (submenus are separate
-        // overlay branches). So each parent watches its own submenu's presenter: on a descendant Click it closes its flyout
-        // and re-raises Click on itself - which lives in the OUTER popup - so the whole chain collapses out to the ContextMenu.
-        if (GetTemplateChild("PART_ItemsPresenter") is IInputComponent presenter)
-            presenter.AddHandler(ClickEvent, new RoutedEventHandler(OnDescendantClicked), handledEventsToo: true);
+        base.OnApplyTemplate();   // can't find PART_ItemsPresenter yet - it lives in the submenu's lazily-built content
+        // The submenu's card + scroll host + items presenter build lazily on first open (Popup.ChildTemplate), so wire those
+        // parts up when they arrive instead of up front - keeps a never-opened leaf from ever building that subtree.
+        if (GetTemplateChild("PART_SubmenuPopup") is Popup popup)
+            popup.ContentBuilt += OnSubmenuContentBuilt;
+    }
+
+    private void OnSubmenuContentBuilt(object sender, EventArgs e)
+    {
+        var popup = (Popup)sender;
+        _scroll = popup.FindContentChild("PART_MenuScroll") as ScrollViewer;
+        // Scrolling this item's submenu list closes any open grandchild submenu so it doesn't ride along with its row.
+        if (_scroll != null)
+        {
+            _scroll.ScrollChanged += (_, _) => CloseChildSubmenus();
+            // Cap here too: on the FIRST open the content isn't built yet when OnIsSubmenuOpenChanged runs, so it applies the
+            // window cap now (later opens reuse this built content and cap via OnIsSubmenuOpenChanged).
+            _scroll.MaxHeight = Popup.WindowHeightCap(Popup.FindPopupHost(this));
+        }
+        // Connect the items host now that it exists, and watch its Click chain: a leaf's Click bubbles only to the presenter
+        // of ITS popup, so each parent closes its flyout on a descendant Click and re-raises Click on itself (which lives in
+        // the OUTER popup), collapsing the whole chain out to the ContextMenu.
+        if (popup.FindContentChild("PART_ItemsPresenter") is ItemsPresenter itemsPresenter)
+        {
+            ConnectPresenter(itemsPresenter);
+            if (itemsPresenter is IInputComponent input)
+                input.AddHandler(ClickEvent, new RoutedEventHandler(OnDescendantClicked), handledEventsToo: true);
+        }
     }
 
     private void OnDescendantClicked(object sender, RoutedEventArgs e)
@@ -150,10 +199,39 @@ public class MenuItem : ItemsControl, IHeaderedItemsControl
     protected override void OnMouseEnter(MouseEventArgs e)
     {
         base.OnMouseEnter(e);
+        // The pointer is back on a menu row: cancel any pending close - of THIS row (re-entered) and of the parent whose
+        // submenu we just moved INTO (so it doesn't close behind us).
+        CancelCloseTimer();
+        OwnerMenu?.CancelCloseTimer();
         // Hovering a row is what drives a menu: this row's submenu opens (if it has one) and any sibling's submenu that
         // was open closes, so only one branch is ever expanded at a time.
         CloseSiblingSubmenus();
         if (HasItems) IsSubmenuOpen = true;
+    }
+
+    protected override void OnMouseLeave(MouseEventArgs e)
+    {
+        base.OnMouseLeave(e);
+        // Left this row while its submenu is open: close it shortly, UNLESS the pointer moved into the submenu (a child's
+        // OnMouseEnter cancels this timer) or onto a sibling (which closes it immediately). The delay bridges the gap the
+        // pointer crosses from the row to its flyout.
+        if (HasItems && IsSubmenuOpen) StartCloseTimer();
+    }
+
+    private void StartCloseTimer()
+    {
+        _closeTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(CloseDelayMs) };
+        _closeTimer.Tick -= OnCloseTick;
+        _closeTimer.Tick += OnCloseTick;
+        _closeTimer.Start(TimeSpan.FromMilliseconds(CloseDelayMs));
+    }
+
+    private void CancelCloseTimer() => _closeTimer?.Stop();
+
+    private void OnCloseTick(object sender, EventArgs e)
+    {
+        _closeTimer.Stop();
+        IsSubmenuOpen = false;
     }
 
     protected override void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)

@@ -1,9 +1,11 @@
+using System;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.RoutedEvents;
+using Adamantium.UI.Core.Templates;
 
 namespace Adamantium.UI.Controls;
 
@@ -20,6 +22,9 @@ public class Popup : MeasurableUIComponent, IContainer
 
     public static readonly AdamantiumProperty ChildProperty = AdamantiumProperty.Register(nameof(Child),
         typeof(IMeasurableComponent), typeof(Popup), new PropertyMetadata(null, OnChildChanged));
+
+    public static readonly AdamantiumProperty ChildTemplateProperty = AdamantiumProperty.Register(nameof(ChildTemplate),
+        typeof(ControlTemplate), typeof(Popup), new PropertyMetadata(null));
 
     public static readonly AdamantiumProperty PlacementTargetProperty = AdamantiumProperty.Register(nameof(PlacementTarget),
         typeof(UIComponent), typeof(Popup), new PropertyMetadata(null));
@@ -59,6 +64,24 @@ public class Popup : MeasurableUIComponent, IContainer
         get => GetValue<IMeasurableComponent>(ChildProperty);
         set => SetValue(ChildProperty, value);
     }
+
+    /// <summary>A template for the popup's <see cref="Child"/>, built LAZILY on the first <see cref="Open"/> instead of
+    /// eagerly with the owner's template. For heavy content that is pointless to build until shown (a menu submenu's card +
+    /// items host, otherwise built + themed inside every MenuItem, even leaves that never open). Ignored once Child is set.</summary>
+    public ControlTemplate ChildTemplate
+    {
+        get => GetValue<ControlTemplate>(ChildTemplateProperty);
+        set => SetValue(ChildTemplateProperty, value);
+    }
+
+    /// <summary>Raised right after <see cref="ChildTemplate"/> is built into <see cref="Child"/> (once, on first open) so the
+    /// owner can wire up named parts inside the freshly built content (e.g. a MenuItem connecting its ItemsPresenter).</summary>
+    public event EventHandler ContentBuilt;
+
+    private TemplateResult _deferredContent;
+
+    /// <summary>Finds a named element inside the lazily-built <see cref="ChildTemplate"/> content (null before first open).</summary>
+    internal IAdamantiumComponent FindContentChild(string name) => _deferredContent?.GetComponentByName(name);
 
     /// <summary>The element the popup positions against. Defaults to the element the popup is declared under.</summary>
     public UIComponent PlacementTarget
@@ -160,6 +183,17 @@ public class Popup : MeasurableUIComponent, IContainer
 
     private void Open()
     {
+        // First open: realize the deferred content (build + theme it NOW, not in the owner's template). A leaf whose submenu
+        // never opens never runs this, which is the whole point - it drops the submenu card/items-host cost off every row.
+        if (Child == null && ChildTemplate != null)
+        {
+            _deferredContent = ChildTemplate.Build(this);
+            if (_deferredContent?.RootComponent is IMeasurableComponent built)
+            {
+                Child = built;   // OnChildChanged logical-parents (and themes) it
+                ContentBuilt?.Invoke(this, EventArgs.Empty);
+            }
+        }
         if (_host != null || Child == null) return;
         // Find the window (popup host) from the TARGET's tree, falling back to the popup's own. A declared popup finds it by
         // walking visual ancestors; a popup opened inside an overlay (a submenu) has no such path, so also consult the host
@@ -179,7 +213,8 @@ public class Popup : MeasurableUIComponent, IContainer
         _host = null;
     }
 
-    private static IPopupHost FindPopupHost(IUIComponent anchor)
+    // Also used by a menu to find its window (for capping submenu scroll height) - its overlay rows have no visual path back.
+    internal static IPopupHost FindPopupHost(IUIComponent anchor)
     {
         for (var node = anchor; node != null; node = node.VisualParent)
         {
@@ -187,6 +222,25 @@ public class Popup : MeasurableUIComponent, IContainer
             if (OverlayRootHost.TryGetValue(node, out var recorded)) return recorded;   // inside an already-open overlay
         }
         return null;
+    }
+
+    /// <summary>True if <paramref name="node"/> sits inside an open popup hosted by <paramref name="host"/> (any card in the
+    /// menu's own overlay tree). Lets a menu treat a press on a submenu's chrome - a scroll arrow, the card padding - as
+    /// "inside", not a light-dismiss, even though that chrome is neither a MenuItem nor the root popup's own card.</summary>
+    internal static bool IsWithinOverlayOf(IUIComponent node, IPopupHost host)
+    {
+        if (host == null) return false;
+        for (var n = node; n != null; n = n.VisualParent)
+            if (OverlayRootHost.TryGetValue(n, out var h) && ReferenceEquals(h, host)) return true;
+        return false;
+    }
+
+    /// <summary>A MaxHeight that keeps a scrollable flyout (a long menu) inside <paramref name="host"/>'s window with a small
+    /// margin - so it scrolls rather than clipping; unbounded when the window size isn't known yet.</summary>
+    internal static double WindowHeightCap(IPopupHost host)
+    {
+        var windowHeight = host?.PopupLayer?.WindowSize.Height ?? 0;
+        return windowHeight > 24 ? windowHeight - 24 : double.PositiveInfinity;
     }
 
     // IContainer: the AUML loader sets Child via the [Content] property.

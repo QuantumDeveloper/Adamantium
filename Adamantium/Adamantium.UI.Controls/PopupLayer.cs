@@ -34,6 +34,10 @@ public class PopupLayer
 
     public bool HasPopups { get { lock (_sync) return _popups.Count > 0; } }
 
+    /// <summary>The window's client size from the last layout pass - what a popup caps its scrollable content to so a menu
+    /// taller than the window scrolls instead of clipping. Zero until the first sized pass.</summary>
+    public Size WindowSize { get; private set; }
+
     public void Add(Popup popup)
     {
         lock (_sync)
@@ -64,6 +68,7 @@ public class PopupLayer
     public void UpdateLayout(Size windowSize)
     {
         if (!IsFinitePositive(windowSize.Width) || !IsFinitePositive(windowSize.Height)) return;   // window not sized yet
+        WindowSize = windowSize;
 
         // Iterate a snapshot: a popup can open/close (Add/Remove on the pump thread) while this lays out on the render thread.
         Popup[] snapshot;
@@ -148,10 +153,30 @@ public class PopupLayer
     // gates internally too, but skipping the call keeps a STATIC docked panel from re-arranging every frame for nothing.
     private void ArrangeIfNeeded(MeasurableUIComponent child, Rect rect, bool remeasured)
     {
+        // Re-arrange on a slot change, a re-measure, OR when any element inside went arrange-dirty on its own without a
+        // re-measure - a SCROLL (the ScrollContentPresenter slides its content by -offset). Like the measure path, a deep
+        // dirty node does NOT invalidate its ancestors, so find it by walking the subtree, then invalidate the whole subtree
+        // so the forced re-arrange cascades down to it instead of gating at a still-valid ancestor.
+        var arrangeDirty = NeedsArrange(child);
         lock (_sync)
-            if (!remeasured && _lastRect.TryGetValue(child, out var last) && last == rect) return;
-        child.Arrange(rect);
+            if (!remeasured && !arrangeDirty && _lastRect.TryGetValue(child, out var last) && last == rect) return;
+        if (arrangeDirty) InvalidateArrangeSubtree(child);
+        child.Arrange(rect, force: arrangeDirty);
         lock (_sync) _lastRect[child] = rect;
+    }
+
+    private static bool NeedsArrange(IUIComponent node)
+    {
+        if (node is IMeasurableComponent { IsArrangeValid: false }) return true;
+        foreach (var child in node.VisualChildren)
+            if (NeedsArrange(child)) return true;
+        return false;
+    }
+
+    private static void InvalidateArrangeSubtree(IUIComponent node)
+    {
+        (node as IMeasurableComponent)?.InvalidateArrange();
+        foreach (var child in node.VisualChildren) InvalidateArrangeSubtree(child);
     }
 
     // True if any element in the detached subtree needs re-measuring (its IsMeasureValid was cleared by a content change

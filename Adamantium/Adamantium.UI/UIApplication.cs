@@ -114,23 +114,8 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         RegisterBasicServices(Container);
         
         applicationLoopThread = new Thread(ApplicationLoopThread);
-        Keyboard.KeyDownEvent.RegisterClassHandler<IUIComponent>(new KeyEventHandler(KeyEventHandler), true);
         
         ConfigureLogging();
-    }
-
-    private void KeyEventHandler(object sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.UpArrow)
-        {
-            var fluentDark = ThemeManager["FluentDark"];
-            ThemeManager.SetTheme(fluentDark);
-        }
-        else if (e.Key == Key.DownArrow)
-        {
-            var fluentLight = ThemeManager["FluentLight"];
-            ThemeManager.SetTheme(fluentLight);
-        }
     }
 
     protected virtual IThemeManager CreateThemeManager(IDependencyContainer container)

@@ -27,6 +27,7 @@ public class ContextMenu : ItemsControl
 
     private Popup _popup;
     private IInputComponent _clickRoot;   // the items presenter; leaf-row clicks bubble to it (it IS an input element)
+    private ScrollViewer _scroll;         // wraps the items; capped to the window height so a long menu scrolls
     private IPopupHost _host;
     private readonly MouseButtonEventHandler _lightDismiss;
 
@@ -91,6 +92,10 @@ public class ContextMenu : ItemsControl
         base.OnApplyTemplate();
         _popup = GetTemplateChild("PART_Popup") as Popup;
         _clickRoot = GetTemplateChild("PART_ItemsPresenter") as IInputComponent;
+        _scroll = GetTemplateChild("PART_MenuScroll") as ScrollViewer;
+        // Scrolling the list = browsing it, not navigating a submenu: close any open submenu so it doesn't ride along with
+        // the scrolled row it's anchored to.
+        if (_scroll != null) _scroll.ScrollChanged += (_, _) => CloseAllSubmenus();
         if (_popup != null)
         {
             _popup.PlacementTarget = PlacementTarget ?? this;
@@ -117,7 +122,11 @@ public class ContextMenu : ItemsControl
             menu._popup.VerticalOffset = menu.VerticalOffset;
             menu._popup.IsOpen = (bool)e.NewValue;
         }
-        if ((bool)e.NewValue) menu.HookLightDismiss();
+        if ((bool)e.NewValue)
+        {
+            menu.HookLightDismiss();   // resolves _host
+            if (menu._scroll != null) menu._scroll.MaxHeight = Popup.WindowHeightCap(menu._host);
+        }
         else { menu.CloseAllSubmenus(); menu.UnhookLightDismiss(); }
     }
 
@@ -164,6 +173,8 @@ public class ContextMenu : ItemsControl
             if (n is MenuItem) return true;
             if (card != null && ReferenceEquals(n, card)) return true;
         }
-        return false;
+        // Chrome inside a SUBMENU popup (a scroll arrow, card padding) is neither a MenuItem nor the root card, but it
+        // belongs to this menu's overlay tree - a press there must not dismiss.
+        return Popup.IsWithinOverlayOf(node, _host);
     }
 }
