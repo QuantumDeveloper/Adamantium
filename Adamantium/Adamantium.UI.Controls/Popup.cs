@@ -65,6 +65,12 @@ public class Popup : MeasurableUIComponent, IContainer
         set => SetValue(ChildProperty, value);
     }
 
+    /// <summary>Lock-free mirror of <see cref="Child"/> (updated in OnChildChanged). The popup layer reads this on the render
+    /// thread WHILE holding its own lock; reading <see cref="Child"/> there instead takes the component property lock under
+    /// that lock, which deadlocks against a popup closing (its IsOpen SetValue holds the property lock, then wants the layer
+    /// lock). A plain reference read is atomic - same "hot paths read fields, not the property system" rule as Visibility.</summary>
+    internal IMeasurableComponent ChildValue { get; private set; }
+
     /// <summary>A template for the popup's <see cref="Child"/>, built LAZILY on the first <see cref="Open"/> instead of
     /// eagerly with the owner's template. For heavy content that is pointless to build until shown (a menu submenu's card +
     /// items host, otherwise built + themed inside every MenuItem, even leaves that never open). Ignored once Child is set.</summary>
@@ -157,6 +163,7 @@ public class Popup : MeasurableUIComponent, IContainer
     private static void OnChildChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
         var popup = (Popup)a;
+        popup.ChildValue = e.NewValue as IMeasurableComponent;   // keep the lock-free mirror in step (Child is only ever set at Local priority)
         // Logical child only (for DataContext inheritance) - NOT a visual child, so the main layout/render never draws
         // it in place; the popup layer measures/arranges/renders it in the overlay.
         if (e.OldValue is IMeasurableComponent oldChild) popup.LogicalChildrenCollection.Remove(oldChild);

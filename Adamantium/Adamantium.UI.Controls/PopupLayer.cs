@@ -28,7 +28,10 @@ public class PopupLayer
     {
         get
         {
-            lock (_sync) return _popups.Select(p => p.Child).OfType<IUIComponent>().ToList();
+            // Read ChildValue (a lock-free FIELD), NOT Child (a property whose GetValue takes the component lock). Taking a
+            // component lock while holding _sync inverts against Popup.Close, whose IsOpen SetValue holds the component lock
+            // then wants _sync (via Remove) - a deadlock the render thread hit reading roots exactly as a DropDown closed.
+            lock (_sync) return _popups.Select(p => p.ChildValue).OfType<IUIComponent>().ToList();
         }
     }
 
@@ -49,7 +52,7 @@ public class PopupLayer
         // invalidate layout), so a clean reopen would record nothing and the cache would "reuse" the disposed units (the
         // fill + border vanish, only re-dirtied text rebuilds). Mark the whole subtree dirty so the next layout re-measures
         // it and the render cache re-records its units.
-        if (popup.Child is { } child) InvalidateSubtree(child);
+        if (popup.ChildValue is { } child) InvalidateSubtree(child);
     }
 
     public void Remove(Popup popup)
@@ -57,7 +60,7 @@ public class PopupLayer
         lock (_sync)
         {
             _popups.Remove(popup);
-            if (popup.Child is IUIComponent c) _lastRect.Remove(c);
+            if (popup.ChildValue is IUIComponent c) _lastRect.Remove(c);   // ChildValue = lock-free field (see Roots): no component lock under _sync
         }
     }
 
@@ -75,7 +78,7 @@ public class PopupLayer
         lock (_sync) snapshot = _popups.ToArray();
         foreach (var popup in snapshot)
         {
-            if (popup.Child is not MeasurableUIComponent child) continue;
+            if (popup.ChildValue is not MeasurableUIComponent child) continue;
 
             // Full-window overlay (e.g. a modal dialog scrim): cover the whole window at the origin - no edge, no target.
             if (popup.FillWindow)
