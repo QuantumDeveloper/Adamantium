@@ -1,0 +1,43 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions">
+    <!-- The tree is a REAL drive's file system (TreesViewModel.Nodes). A HierarchicalDataTemplate projects each node - its
+         body draws the name (Title), ItemsSource="{Binding Children}" supplies the child nodes, and the SAME template
+         recurses down every level. Directories load lazily on expand (the ItemContainerStyle binds each container's
+         IsExpanded back to the node). No nodes are authored in markup. -->
+    <StackPanel Orientation="Vertical" Margin="24" MaxWidth="900">
+
+        <TextBlock Text="TreeView — a real file system"
+                   FontSize="20" MarginBottom="4"/>
+        <TextBlock Text="Pointed at a drive and built lazily: each folder reads its contents only when you expand it (a folder like System32 has thousands of siblings — a stress test for the coming virtualization). Double-click a folder to expand/collapse; pick the drive and selection mode below."
+                   FontSize="13" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="14"/>
+
+        <StackPanel Orientation="Horizontal" MarginBottom="12">
+            <TextBlock Text="Drive:" VerticalAlignment="Center" MarginRight="8"/>
+            <DropDown ItemsSource="{Binding Drives}"
+                      SelectedItem="{Binding SelectedDrive, Mode=TwoWay}" Width="110" MarginRight="24"/>
+            <TextBlock Text="Selection mode:" VerticalAlignment="Center" MarginRight="8"/>
+            <DropDown ItemsSource="{Binding SelectionModes}"
+                      SelectedItem="{Binding SelectedMode, Mode=TwoWay}" Width="150"/>
+            <Button Content="Refresh" Command="{Binding RefreshCommand}" MarginLeft="24"/>
+        </StackPanel>
+
+        <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                BorderThickness="1" CornerRadius="10" Padding="8" Height="420">
+            <TreeView ItemsSource="{Binding Nodes}" SelectionMode="{Binding SelectedMode}">
+                <TreeView.ItemContainerStyle>
+                    <!-- Bind each node's expansion back to its view-model, so first expand triggers the lazy directory read. -->
+                    <Style Selector="TreeViewItem">
+                        <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                    </Style>
+                </TreeView.ItemContainerStyle>
+                <TreeView.ItemTemplate>
+                    <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                        <TextBlock Text="{Binding Title}" VerticalAlignment="Center" VerticalTextAlignment="Center"/>
+                    </HierarchicalDataTemplate>
+                </TreeView.ItemTemplate>
+            </TreeView>
+        </Border>
+
+    </StackPanel>
+</View>

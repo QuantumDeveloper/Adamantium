@@ -40,6 +40,7 @@
         <StyleInclude Source="{x:Type fluentDark:ResizeGripperStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:WindowStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:MenuStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:TreeViewStyleSet}"/>
 	</Theme.StyleIncludes>
 
 	<!-- Accent: ONE seed. The theme derives the ramp (hover/pressed) and the on-accent TEXT colour for contrast (see
