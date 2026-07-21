@@ -175,7 +175,7 @@ public class ItemContainerGenerator
             }
             else
             {
-                container = _owner.GetContainerForItem();
+                container = _owner.GetContainerForItem(item);
                 _generated.Add(container);
                 rebinds++;
                 _owner.PrepareContainer(container, item);
@@ -212,7 +212,7 @@ public class ItemContainerGenerator
         // The item already is its own container (e.g. a Button authored directly): host it as-is, never recycle it.
         if (_owner.IsItemItsOwnContainer(item)) return (IUIComponent)item;
 
-        var container = _recyclePool.Count > 0 ? _recyclePool.Pop() : _owner.GetContainerForItem();
+        var container = _recyclePool.Count > 0 ? _recyclePool.Pop() : _owner.GetContainerForItem(item);
         _generated.Add(container);
         _owner.PrepareContainer(container, item);
         return container;

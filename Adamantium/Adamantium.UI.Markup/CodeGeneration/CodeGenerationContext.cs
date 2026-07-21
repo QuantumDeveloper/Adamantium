@@ -403,7 +403,15 @@ public class CodeGenerationContext
                         case "MultiBinding":
                         {
                             var bindingVar = EmitBinding(extension, diagnostics, isResource);
-                            if (IsBindingTypedProperty(resolvedType))
+                            if (element.TypeReference.Namespace == "Adamantium.UI.Core.Resources")
+                            {
+                                // {Binding} as a Setter/trigger value: store the binding OBJECT so Setter.Apply establishes
+                                // it as a live binding on the styled element (resolved against ITS DataContext) - this is
+                                // what lets an ItemContainerStyle bind a generated container's props from the data item.
+                                // Mirrors the ResourceReference/Ancestor/Self markers above.
+                                TextGenerator.WriteLine($"{symbolName} = {bindingVar};");
+                            }
+                            else if (IsBindingTypedProperty(resolvedType))
                             {
                                 // The property itself HOLDS a binding object (e.g. DataTrigger.Binding) - assign it.
                                 TextGenerator.WriteLine($"{symbolName} = {bindingVar};");
@@ -734,6 +742,12 @@ public class CodeGenerationContext
 
         TextGenerator.WriteLine($"{targetVar} = new {templateTypeName}({templateBuilderMethod});");
 
+        // The builder below produces the template's VISUAL (a DataTemplate's item / a HierarchicalDataTemplate's header).
+        // A template's own CONFIGURATION attributes (e.g. HierarchicalDataTemplate.ItemsSource / ItemContainerStyle /
+        // ItemTemplate) aren't part of that visual - emit them onto the template variable itself.
+        var templateVar = targetVar.StartsWith("var ") ? targetVar.Substring(4) : targetVar;
+        EmitTemplateConfigProperties(templateVar, templateNode, isResource, diagnostics);
+
         TextGenerator.NewLine();
         TextGenerator.WriteLine($"{Metadata.DefaultTypeContainer.TemplateResult.FullName} {templateBuilderMethod}()");
         TextGenerator.WriteOpenBraceAndIndent();
@@ -772,6 +786,29 @@ public class CodeGenerationContext
 
         TextGenerator.WriteLine($"return result;");
         TextGenerator.UnindentAndWriteCloseBrace();
+    }
+
+    // A template's OWN configuration properties (distinct from its visual body): a HierarchicalDataTemplate's ItemsSource
+    // (the child-collection binding - stored as the binding OBJECT, since it is cloned + re-resolved per container), and an
+    // optional ItemContainerStyle / child ItemTemplate. Only {Binding} and object-valued props are emitted: a TEXT value
+    // (e.g. ControlTemplate's TargetType="MenuItem") is a generation-time hint, not a runtime assignment - skip it.
+    // Triggers live in the built result and are handled in the builder.
+    private void EmitTemplateConfigProperties(string templateVar, IAumlAstNode templateNode, bool isResource, IDiagnosticSink diagnostics)
+    {
+        foreach (var prop in templateNode.GetProperties())
+        {
+            var name = ((AumlAstPropertyReference)prop.Property).Name;
+            if (name == "Triggers") continue;
+            switch (prop.Values.FirstOrDefault())
+            {
+                case AumlAstMarkupExtensionNode me when me.TypeReference?.Name is "Binding" or "MultiBinding":
+                    TextGenerator.WriteLine($"{templateVar}.{name} = {EmitBinding(me, diagnostics, isResource)};");
+                    break;
+                case AumlAstObjectNode obj:
+                    TextGenerator.WriteLine($"{templateVar}.{name} = {ProcessControlElements(obj, diagnostics, isResource)};");
+                    break;
+            }
+        }
     }
 
     private void GenerateSimpleAssignment(string symbolName, string valueText, IResolvedType member)

@@ -1,0 +1,45 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions">
+    <!-- The whole menu tree comes from the view-model (MenusViewModel.MenuItems - a tree of MenuNode). A
+         HierarchicalDataTemplate projects each node: its body draws the header (Title), ItemsSource="{Binding Children}"
+         supplies the submenu, and the SAME template recurses down every level. The ItemContainerStyle binds each generated
+         MenuItem's Command / gesture / separator flag from the node. No menu rows are authored in markup. -->
+    <ScrollViewer>
+    <StackPanel Orientation="Vertical" Margin="24" MaxWidth="900">
+
+        <TextBlock Text="Context menu — built from the view-model"
+                   FontSize="20" MarginBottom="4"/>
+        <TextBlock Text="Right-click the surface. The nested submenus (▸) and separators all come from MenusViewModel via a HierarchicalDataTemplate — nothing is hardcoded in the view."
+                   FontSize="13" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="18"/>
+
+        <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                BorderThickness="1" CornerRadius="10" Height="180">
+            <Border.ContextMenu>
+                <ContextMenu ItemsSource="{Binding MenuItems}">
+                    <ContextMenu.ItemTemplate>
+                        <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                            <TextBlock Text="{Binding Title}"/>
+                        </HierarchicalDataTemplate>
+                    </ContextMenu.ItemTemplate>
+                    <ContextMenu.ItemContainerStyle>
+                        <Style Selector="MenuItem">
+                            <Setter Property="Command" Value="{Binding Command}"/>
+                            <Setter Property="InputGestureText" Value="{Binding Gesture}"/>
+                        </Style>
+                    </ContextMenu.ItemContainerStyle>
+                </ContextMenu>
+            </Border.ContextMenu>
+            <TextBlock Text="Right-click me  —  nested submenus (▸) + separators, all from the VM"
+                       FontSize="16" Foreground="{ResourceReference TextFillColorPrimary}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+
+        <StackPanel Orientation="Horizontal" MarginTop="16">
+            <TextBlock Text="Last action:" Foreground="{ResourceReference TextFillColorSecondary}" MarginRight="8"/>
+            <TextBlock Text="{Binding LastAction}" Foreground="{ResourceReference TextFillColorPrimary}"/>
+        </StackPanel>
+
+    </StackPanel>
+    </ScrollViewer>
+</View>

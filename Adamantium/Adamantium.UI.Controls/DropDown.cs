@@ -268,10 +268,13 @@ public class DropDown : Selector
 
     protected internal override bool IsItemItsOwnContainer(object item) => item is DropDownItem;
 
-    protected internal override IUIComponent GetContainerForItem()
+    protected internal override IUIComponent GetContainerForItem(object item)
     {
         var container = new DropDownItem { Owner = this };   // back-ref: the popup detaches the container's visual tree
-        if (ItemContainerStyle != null) container.AttachStyles(ItemContainerStyle);
+        
+        if (ItemContainerStyle != null) 
+            container.AttachStyles(ItemContainerStyle);
+        
         return container;
     }
 

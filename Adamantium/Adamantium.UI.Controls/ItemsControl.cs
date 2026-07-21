@@ -1,11 +1,10 @@
 using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Specialized;
-using System.Linq;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Generators;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Data;
 using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.Core.Templates;
@@ -151,8 +150,9 @@ public class ItemsControl : Control, IContainer
     /// <summary>True if the item is already a ready-to-host UI element (used as its own container, no wrapping).</summary>
     protected internal virtual bool IsItemItsOwnContainer(object item) => item is IUIComponent;
 
-    /// <summary>Creates the container for one item. Base = a <see cref="ContentPresenter"/> carrying the ItemContainerStyle.</summary>
-    protected internal virtual IUIComponent GetContainerForItem()
+    /// <summary>Creates the container for <paramref name="item"/>. Base = a <see cref="ContentPresenter"/> carrying the
+    /// ItemContainerStyle (the item lets a subclass pick a different container - e.g. a Separator for an ISeparatorItem).</summary>
+    protected internal virtual IUIComponent GetContainerForItem(object item)
     {
         var presenter = new ContentPresenter();
         // Into the Styles collection (a user style applied AFTER the theme), not AttachStyles which runs before the
@@ -164,6 +164,21 @@ public class ItemsControl : Control, IContainer
     /// <summary>Binds a (new or recycled) container to <paramref name="item"/>: DataContext + content + item template.</summary>
     protected internal virtual void PrepareContainer(IUIComponent container, object item)
     {
+        // A HierarchicalDataTemplate + a headered container (MenuItem / TreeViewItem) = one tree level: draw the item as
+        // the header via the HDT, bind this container's OWN items to the node's children, and re-apply the SAME template to
+        // them so the tree unrolls recursively. Set the child template + style BEFORE ItemsSource (setting the source is
+        // what triggers child-container generation). See HierarchicalDataTemplate.
+        if (ItemTemplate is HierarchicalDataTemplate hdt && container is IHeaderedItemsControl headered && container is ItemsControl childItems)
+        {
+            childItems.DataContext = item;
+            headered.Header = item;
+            headered.HeaderTemplate = hdt;
+            childItems.ItemContainerStyle = hdt.ItemContainerStyle ?? ItemContainerStyle;
+            childItems.ItemTemplate = hdt.ItemTemplate ?? hdt;
+            if (hdt.ItemsSource != null) childItems.SetBinding(ItemsSourceProperty, (BindingBase)hdt.ItemsSource.Clone());
+            return;
+        }
+
         if (container is ContentPresenter presenter)
         {
             presenter.DataContext = item;
@@ -180,6 +195,8 @@ public class ItemsControl : Control, IContainer
     {
         if (container is ContentPresenter presenter)
             presenter.DataContext = null;
+        else if (container is IHeaderedItemsControl and ItemsControl headered)
+            headered.DataContext = null;
     }
 
     // IContainer: markup children flow into Items.

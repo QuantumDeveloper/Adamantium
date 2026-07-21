@@ -213,7 +213,7 @@ public class ListBox : Selector
 
     protected internal override bool IsItemItsOwnContainer(object item) => item is ListBoxItem;
 
-    protected internal override IUIComponent GetContainerForItem()
+    protected internal override IUIComponent GetContainerForItem(object item)
     {
         var container = new ListBoxItem();
         // Into the Styles collection (a USER style), not AttachStyles: the theme is applied to the container on attach,

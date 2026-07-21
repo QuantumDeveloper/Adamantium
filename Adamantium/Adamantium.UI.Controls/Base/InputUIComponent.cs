@@ -134,6 +134,22 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         RawMouseRightButtonUpEvent.RegisterClassHandler<IInputComponent>(new MouseButtonEventHandler(RawMouseRightButtonUpHandler));
         RawMouseMiddleButtonDownEvent.RegisterClassHandler<IInputComponent>(new MouseButtonEventHandler(RawMouseMiddleButtonDownHandler));
         RawMouseMiddleButtonUpEvent.RegisterClassHandler<IInputComponent>(new MouseButtonEventHandler(RawMouseMiddleButtonUpHandler));
+
+        MouseRightButtonUpEvent.RegisterClassHandler<IInputComponent>(new MouseButtonEventHandler(OpenContextMenuHandler));
+    }
+
+    // A right-click on an element with a ContextMenu (its own or an ancestor's) opens it at the cursor. The right-button-up
+    // event is Direct (fires on the deepest target), so walk up to the first element that carries a ContextMenu.
+    private static void OpenContextMenuHandler(object sender, MouseButtonEventArgs e)
+    {
+        if (e.Handled) return;
+        for (var node = sender as IUIComponent; node != null; node = node.VisualParent)
+            if (node is InputUIComponent { ContextMenu: { } menu } host)
+            {
+                menu.Open(host, e.GetPosition(host));
+                e.Handled = true;
+                return;
+            }
     }
 
     public static readonly AdamantiumProperty IsFocusedProperty =
@@ -150,6 +166,25 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     private static void OnToolTipChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
         if (a is InputUIComponent c) ToolTipService.SetToolTip(c, e.NewValue);
+    }
+
+    /// <summary>A right-click flyout for this element (WPF's FrameworkElement.ContextMenu): set it and it opens at the
+    /// cursor on right-button-up. Kept connected as a logical child so it is themed (its template + popup build) and
+    /// inherits DataContext; it is zero-size inline (its rows live in the popup overlay), so it doesn't affect layout.</summary>
+    public static readonly AdamantiumProperty ContextMenuProperty = AdamantiumProperty.Register(nameof(ContextMenu),
+        typeof(Adamantium.UI.Controls.ContextMenu), typeof(InputUIComponent), new PropertyMetadata(null, OnContextMenuChanged));
+
+    public Adamantium.UI.Controls.ContextMenu ContextMenu
+    {
+        get => GetValue<Adamantium.UI.Controls.ContextMenu>(ContextMenuProperty);
+        set => SetValue(ContextMenuProperty, value);
+    }
+
+    private static void OnContextMenuChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is not InputUIComponent host) return;
+        if (e.OldValue is Adamantium.UI.Controls.ContextMenu old) host.RemoveLogicalChild(old);
+        if (e.NewValue is Adamantium.UI.Controls.ContextMenu menu) host.AddLogicalChild(menu);
     }
 
     // Default FALSE (as in WPF's UIElement): most elements - panels, presenters, decorators, text, shapes, plain

@@ -89,7 +89,7 @@
                             <controls:ContextMenu x:Name="PART_RightOverflowMenu" ItemsSource="{TemplateBinding RightWindowCommands}">
                                 <controls:ContextMenu.ItemTemplate>
                                     <DataTemplate>
-                                        <controls:MenuItem Content="{Binding OverflowLabel}"
+                                        <controls:MenuItem Header="{Binding OverflowLabel}"
                                                 Command="{Binding Command}" CommandParameter="{Binding CommandParameter}"/>
                                     </DataTemplate>
                                 </controls:ContextMenu.ItemTemplate>

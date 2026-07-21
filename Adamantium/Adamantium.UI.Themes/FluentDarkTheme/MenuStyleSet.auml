@@ -3,37 +3,66 @@
           xmlns:x="http://adamantium/ui/xaml/extensions"
           xmlns:controls="http://adamantium/ui">
 
-    <!-- MenuItem: a flyout row - icon | label (Content) | gesture hint. Reuses ButtonBase click/command; a flat leaf. -->
+    <!-- MenuItem: a flyout row - icon | label (Header) | gesture hint or submenu chevron. A LEAF runs its command; a
+         PARENT (one with child items) opens a submenu flyout to the right on hover. The child items live in PART_ItemsPresenter
+         inside PART_SubmenuPopup. -->
 
     <Style Selector="MenuItem">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
         <Setter Property="FontSize" Value="14"/>
-        <Setter Property="MinHeight" Value="34"/>
-        <Setter Property="HorizontalContentAlignment" Value="Left"/>
-        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <!-- Small mixed-height host: don't virtualize, so the separator takes its OWN 9px, not a 34px row cell. -->
+                    <controls:StackPanel Orientation="Vertical" IsVirtualizing="False"/>
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style Selector="MenuItem">
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="MenuItem">
-                    <controls:Border x:Name="Root" Background="{TemplateBinding Background}"
-                            CornerRadius="4" Padding="10 6 10 6">
-                        <controls:Grid ColumnDefinitions="Auto,*,Auto">
-                            <controls:ContentPresenter Grid.Column="0" Content="{TemplateBinding Icon}"
-                                    VerticalAlignment="Center" Margin="0 0 10 0"/>
-                            <controls:ContentPresenter x:Name="PART_ContentPresenter" Grid.Column="1"
-                                    Content="{TemplateBinding Content}"
-                                    ContentTemplate="{TemplateBinding ContentTemplate}"
-                                    Foreground="{TemplateBinding Foreground}"
-                                    FontSize="{TemplateBinding FontSize}"
-                                    HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                            <controls:TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}"
-                                    Foreground="{ResourceReference TextFillColorSecondary}"
-                                    FontSize="12" VerticalAlignment="Center" Margin="24 0 0 0"/>
-                        </controls:Grid>
-                    </controls:Border>
+                    <controls:Grid>
+                        <!-- MinHeight lives on Root (a part), not on the MenuItem: a separator collapses Root, so its row
+                             shrinks to just the rule instead of holding a full-height empty band. -->
+                        <controls:Border x:Name="Root" Background="{TemplateBinding Background}"
+                                CornerRadius="4" Padding="10 6 10 6" MinHeight="34">
+                            <!-- Fixed icon gutter (column 0): always reserved so every row's label aligns whether or not it
+                                 has an icon, and a checkmark/glyph has a consistent home - like a real menu. -->
+                            <controls:Grid ColumnDefinitions="28,*,Auto,Auto">
+                                <controls:ContentPresenter Grid.Column="0" Content="{TemplateBinding Icon}"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <controls:ContentPresenter x:Name="PART_ContentPresenter" Grid.Column="1"
+                                        Content="{TemplateBinding Header}"
+                                        ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                        Foreground="{TemplateBinding Foreground}"
+                                        FontSize="{TemplateBinding FontSize}"
+                                        HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                <controls:TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}"
+                                        Foreground="{ResourceReference TextFillColorSecondary}"
+                                        FontSize="12" VerticalAlignment="Center" Margin="24 0 0 0"/>
+                                <!-- Vector chevron (not a glyph - a Path always renders regardless of the UI font's coverage). -->
+                                <controls:Path x:Name="Chevron" Grid.Column="3"
+                                        Data="M0,0 L5,4 L0,8 Z"
+                                        Fill="{ResourceReference TextFillColorSecondary}"
+                                        Width="5" Height="8" Visibility="Collapsed"
+                                        VerticalAlignment="Center" Margin="16 0 0 0"/>
+                            </controls:Grid>
+                        </controls:Border>
+                        <!-- No PlacementTarget: the popup falls back to its VisualParent (this template's root Grid, which
+                             overlaps the row), so Placement=Right opens the submenu just past the row's right edge. -->
+                        <controls:Popup x:Name="PART_SubmenuPopup" Placement="Right" FlipToFit="True"
+                                IsOpen="{TemplateBinding IsSubmenuOpen}">
+                            <controls:Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                    BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                    BorderThickness="1" CornerRadius="6" Padding="4" MinWidth="160">
+                                <controls:ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                            </controls:Border>
+                        </controls:Popup>
+                    </controls:Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -46,6 +75,22 @@
         <PropertyTrigger Property="IsEnabled" Value="false">
             <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ResourceReference TextFillColorDisabled}"/>
         </PropertyTrigger>
+        <!-- Parent rows show the submenu chevron (leaf rows keep it hidden and show the gesture hint instead). -->
+        <PropertyTrigger Property="HasItems" Value="true">
+            <Setter TargetName="Chevron" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- Separator: a 1px divider rule between menu rows. -->
+    <Style Selector="Separator">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Separator">
+                    <controls:Border Height="1" Margin="8 4 8 4"
+                            Background="{ResourceReference ControlStrokeColorDefault}"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- ContextMenu: a light-dismiss flyout of MenuItems in the popup overlay. Template = a Popup portal whose content is
@@ -55,7 +100,8 @@
         <Setter Property="ItemsPanel">
             <Setter.Value>
                 <ItemsPanelTemplate>
-                    <controls:StackPanel Orientation="Vertical"/>
+                    <!-- Small mixed-height host: don't virtualize, so the separator takes its OWN 9px, not a 34px row cell. -->
+                    <controls:StackPanel Orientation="Vertical" IsVirtualizing="False"/>
                 </ItemsPanelTemplate>
             </Setter.Value>
         </Setter>
