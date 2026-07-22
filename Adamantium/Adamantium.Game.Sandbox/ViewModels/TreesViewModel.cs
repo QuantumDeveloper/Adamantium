@@ -28,6 +28,10 @@ public partial class TreesViewModel : TabPageViewModel
     /// <summary>The live selection mode - bound two-way to the DropDown and into TreeView.SelectionMode.</summary>
     [Bindable] private TreeViewSelectionMode _selectedMode = TreeViewSelectionMode.Single;
 
+    /// <summary>The tree's scroll position (px) - bound two-way to TreeView.VerticalOffset so it survives a tab switch
+    /// (the view is recreated, this view-model persists).</summary>
+    [Bindable] private double _scrollOffset;
+
     public TreesViewModel() : base("Trees")
     {
         Drives = DriveInfo.GetDrives().Where(d => d.IsReady).Select(d => d.Name).ToArray();

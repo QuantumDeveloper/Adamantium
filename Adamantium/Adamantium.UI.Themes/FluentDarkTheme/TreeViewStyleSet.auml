@@ -3,13 +3,15 @@
           xmlns:x="http://adamantium/ui/xaml/extensions"
           xmlns:controls="http://adamantium/ui">
 
-    <!-- TreeView: a scrollable host of top-level TreeViewItem nodes. The nested nodes come from each item's own template. -->
+    <!-- TreeView: the tree is FLATTENED into one virtualized list of rows (one per visible node, indented by depth), so a
+         branch of thousands of siblings realizes only the viewport. The ItemsPanel is a VIRTUALIZING StackPanel; the
+         ScrollViewer gives it its bounded viewport. -->
     <Style Selector="TreeView" BasedOn="ItemsControl">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="ItemsPanel">
             <Setter.Value>
                 <ItemsPanelTemplate>
-                    <controls:StackPanel Orientation="Vertical" IsVirtualizing="False"/>
+                    <controls:StackPanel Orientation="Vertical"/>
                 </ItemsPanelTemplate>
             </Setter.Value>
         </Setter>
@@ -20,10 +22,12 @@
             <Setter.Value>
                 <ControlTemplate TargetType="TreeView">
                     <controls:Border Background="{TemplateBinding Background}">
-                        <!-- Horizontal scroll DISABLED so the ScrollViewer constrains content to the viewport width - rows then
-                             stretch full-width (the whole row is clickable + the selection highlight spans it), instead of
-                             sizing to the widest node (Auto measures content unconstrained on X to find the extent). -->
-                        <controls:ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                        <!-- CanContentScroll=true so the ScrollViewer measures the items host at the VIEWPORT (not unbounded)
+                             and delegates scrolling to the virtualizing panel - without it the panel sees infinite height and
+                             realizes a fixed ~screenful, so items past it never appear. Horizontal scroll DISABLED so rows
+                             stretch full-width (the whole row is clickable + the selection highlight spans it). -->
+                        <controls:ScrollViewer x:Name="PART_ScrollViewer" CanContentScroll="True"
+                                               HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
                             <controls:ItemsPresenter x:Name="PART_ItemsPresenter"/>
                         </controls:ScrollViewer>
                     </controls:Border>
@@ -32,22 +36,15 @@
         </Setter>
     </Style>
 
-    <!-- TreeViewItem: [expander] header  |  its child nodes below, indented one step, shown while IsExpanded. The indent
-         COMPOUNDS through nesting (each level's child presenter insets by the same step), so depth N sits N steps in. -->
+    <!-- TreeViewItem: a single FLAT row - [indent][expander] header. It hosts no nested nodes (the tree is flattened, so a
+         node's children are sibling rows in the same virtualized list); depth is expressed by the Indent inset, not nesting. -->
     <Style Selector="TreeViewItem" BasedOn="ItemsControl">
         <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
         <Setter Property="FontSize" Value="14"/>
-        <Setter Property="ItemsPanel">
-            <Setter.Value>
-                <ItemsPanelTemplate>
-                    <controls:StackPanel Orientation="Vertical" IsVirtualizing="False"/>
-                </ItemsPanelTemplate>
-            </Setter.Value>
-        </Setter>
     </Style>
 
     <!-- The expander glyph, its own swappable template (TreeViewItem.ExpanderTemplate). Checked = expanded, so the ▶ swaps
-         to ▼. Restyle the arrow by overriding ExpanderTemplate alone - the node template just hosts PART_Expander. -->
+         to ▼. Restyle the arrow by overriding ExpanderTemplate alone - the row template just hosts PART_Expander. -->
     <Style Selector="TreeViewItem">
         <Setter Property="ExpanderTemplate">
             <Setter.Value>
@@ -55,14 +52,14 @@
                     <controls:Grid Width="16" Height="16" Background="Transparent">
                         <controls:Path x:Name="ChevronRight" Data="M0,0 L5,4 L0,8 Z"
                                 Fill="{ResourceReference TextFillColorSecondary}"
-                                Width="5" 
-                                Height="8" 
-                               HorizontalAlignment="Center" 
+                                Width="5"
+                                Height="8"
+                               HorizontalAlignment="Center"
                                VerticalAlignment="Center"/>
                         <controls:Path x:Name="ChevronDown" Data="M0,0 L8,0 L4,5 Z"
                                 Fill="{ResourceReference TextFillColorSecondary}"
-                                Width="8" 
-                               Height="5" 
+                                Width="8"
+                               Height="5"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
                                 Visibility="Collapsed"/>
@@ -82,51 +79,42 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TreeViewItem">
-                    <!-- Vertical StackPanel: header row, then the child nodes below it. It stretches the Root border to the
-                         full row width (a Stretch child now fills the panel's arranged cross extent - see StackPanel
-                         .ArrangePlain), so rows span the viewport (clickable + selection highlight edge-to-edge) at any depth. -->
-                    <controls:StackPanel Orientation="Vertical">
-                        <!-- Root.Background carries the SELECTION; a separate translucent HoverOverlay ABOVE it carries HOVER.
-                             Layering them (rather than both writing Root.Background) means a selected+hovered row stays accent
-                             - just a touch lighter - instead of reverting to the hover grey and looking deselected. Padding
-                             moved onto the inner content grid so BOTH the selection fill and the hover overlay span the row. -->
-                        <controls:Border x:Name="Root" Background="Transparent" CornerRadius="4" MinHeight="26">
-                            <controls:Grid>
-                                <controls:Border x:Name="HoverOverlay" Background="Transparent" CornerRadius="4"/>
-                                <controls:Grid ColumnDefinitions="16,*" Margin="4 3 6 3">
-                                    <!-- Pin the expander to its 16x16 glyph: the base ToggleButton style leaks MinHeight=32 +
-                                         Padding via the IS-A selector, which inflated the button and pushed the arrow off its
-                                         row centre. Un-inherit them here so the chevron sits dead-centre. -->
-                                    <controls:ToggleButton x:Name="PART_Expander" Grid.Column="0"
-                                            Template="{TemplateBinding ExpanderTemplate}"
-                                            Width="16" Height="16" MinWidth="0" MinHeight="0" Padding="0"
-                                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    <controls:ContentPresenter x:Name="PART_ContentPresenter" Grid.Column="1"
-                                            Content="{TemplateBinding Header}"
-                                            ContentTemplate="{TemplateBinding HeaderTemplate}"
-                                            Foreground="{TemplateBinding Foreground}"
-                                            FontSize="{TemplateBinding FontSize}"
-                                            VerticalAlignment="Center" Margin="4 0 0 0"/>
-                                </controls:Grid>
+                    <!-- Root spans the full row width (Border stretches by default), so the selection fill + hover overlay run
+                         edge-to-edge and the whole row is clickable at any depth. -->
+                    <controls:Border x:Name="Root" Background="Transparent" CornerRadius="4" MinHeight="26">
+                        <controls:Grid>
+                            <controls:Border x:Name="HoverOverlay" Background="Transparent" CornerRadius="4"/>
+                            <controls:Grid ColumnDefinitions="Auto,16,*" Margin="4 3 6 3">
+                                <!-- Depth indent: a zero-width spacer at depth 0, Depth × step further in at each level. -->
+                                <controls:Border Grid.Column="0" Width="{TemplateBinding Indent}"/>
+                                <!-- Pin the expander to its 16x16 glyph: the base ToggleButton style leaks MinHeight=32 +
+                                     Padding via the IS-A selector, which inflated the button and pushed the arrow off its
+                                     row centre. Un-inherit them here so the chevron sits dead-centre. -->
+                                <controls:ToggleButton x:Name="PART_Expander" Grid.Column="1"
+                                        Template="{TemplateBinding ExpanderTemplate}"
+                                        Width="16" Height="16" MinWidth="0" MinHeight="0" Padding="0"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <controls:ContentPresenter x:Name="PART_ContentPresenter" Grid.Column="2"
+                                        Content="{TemplateBinding Header}"
+                                        ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                        Foreground="{TemplateBinding Foreground}"
+                                        FontSize="{TemplateBinding FontSize}"
+                                        VerticalAlignment="Center" Margin="4 0 0 0"/>
                             </controls:Grid>
-                        </controls:Border>
-                        <controls:ItemsPresenter x:Name="PART_ItemsPresenter" Margin="16 0 0 0" Visibility="Collapsed"/>
-                    </controls:StackPanel>
+                        </controls:Grid>
+                    </controls:Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
 
     <Style Selector="TreeViewItem">
-        <!-- Hover uses IsPointerOverHeader (this row only), NOT IsMouseOver (true across the whole subtree - would light up
-             every ancestor of a hovered deep node). -->
+        <!-- Hover uses IsPointerOverHeader (this row only), layered ABOVE the selection fill so a selected+hovered row stays
+             accent (just a touch lighter) instead of reverting to the hover grey. -->
         <PropertyTrigger Property="IsPointerOverHeader" Value="true">
             <Setter TargetName="HoverOverlay" Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
         </PropertyTrigger>
-        <!-- A branch node shows its children when expanded; a leaf hides the expander entirely. -->
-        <PropertyTrigger Property="IsExpanded" Value="true">
-            <Setter TargetName="PART_ItemsPresenter" Property="Visibility" Value="Visible"/>
-        </PropertyTrigger>
+        <!-- A leaf hides the expander entirely (no children to open). -->
         <PropertyTrigger Property="HasItems" Value="false">
             <Setter TargetName="PART_Expander" Property="Visibility" Value="Hidden"/>
         </PropertyTrigger>

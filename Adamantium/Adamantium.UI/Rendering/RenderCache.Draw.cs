@@ -52,6 +52,9 @@ public partial class RenderCache
     private bool _recording;       // this frame runs the walk and is appending ops
     private bool _opsRecorded;     // _ops holds a complete frame from a prior walk
     private bool _opsReplayable;   // the recorded stream faithfully reproduces the frame (currently always true - see above)
+    private bool _opsHaveInstancedFlush;   // the recorded stream contains an instanced-fill flush op - a splice that INSERTS a
+                                           // rect segment must yield to the full walk (it can't place the segment relative to
+                                           // that flush, so an appended highlight could draw OVER instanced geometry)
 
     private readonly List<Compositor.Entry> _compositedBuf = new();   // this thread's view of the composited set (reused)
     private readonly Dictionary<IUIComponent, (LayoutSnapshot Snap, Matrix4x4F ParentWorld)> _compositedFallback = new();   // keep animating across a settling swap's snapshot re-capture
@@ -112,7 +115,14 @@ public partial class RenderCache
         _recording = device != null;   // a device walk records its op stream for a later clean-frame replay
         if (_recording)
         {
-            _ops.Clear(); _opsReplayable = true; _rectSlotByUnit.Clear(); _sdfSlotByUnit.Clear(); _unitsByBrush.Clear(); _walkGroup = null; _walkVersion++;
+            _ops.Clear(); 
+            _opsReplayable = true; 
+            _opsHaveInstancedFlush = false; 
+            _rectSlotByUnit.Clear(); 
+            _sdfSlotByUnit.Clear(); 
+            _unitsByBrush.Clear(); 
+            _walkGroup = null; 
+            _walkVersion++;
             _nodeAllAware.Clear();
             _movedNodesBuf.Clear();   // a full walk re-bakes fresh node matrices - pending node moves are subsumed
             // ...but "subsumed" holds only if this walk composes CURRENT transforms. When the fast path BAILS on a moved
@@ -656,7 +666,17 @@ public partial class RenderCache
             _patchBuf.Add(new GroupPatch { Group = group, Items = items.ToArray(), Scissor = scissor, InPlace = inPlace });
         }
 
-        if (appendTotal > _rectBatch.PatchCapacityLeft) return false;   // arena full - full walk compacts it
+        if (appendTotal > _rectBatch.PatchCapacityLeft) 
+            return false;   // arena full - full walk compacts it
+
+        // A splice that INSERTS rect segments (a 0->N appear: a selection/hover highlight materializing) anchors them only by
+        // neighboring groups' rect runs - it has no handle on where the instanced-fill flush sits in the op stream, so the
+        // appended segment can land AFTER it and the highlight would draw OVER the instanced geometry (a selection accent on
+        // top of an instanced star instead of behind it), flipping z as splices and full walks alternate. When the frame has
+        // an instanced flush, yield any INSERTING splice to the full walk (it emits rects before the instanced flush = correct
+        // z). Excise-only (a highlight vanishing) and in-place recolors don't insert, so they stay on the fast path.
+        if (_opsHaveInstancedFlush && appendTotal > 0) 
+            return false;
 
         // Every surgery group must have a findable segment for each retained run, and an op referencing it.
         foreach (var p in _patchBuf)
