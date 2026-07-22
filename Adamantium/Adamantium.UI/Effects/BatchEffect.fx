@@ -604,12 +604,13 @@ float4 GradientFillPS(GradFillPSInput input) : SV_Target
 struct PatternRectData
 {
     float4 Bounds;       // NODE-local x, y, w, h (world for slot-0 legacy bakes - identity matrix)
-    float4 Params;       // .x corner radius, .y pattern type (0 checker/1 stripes/2 dots/3 grid), .z cell size (px), .w slot
+    float4 Params;       // .x corner radius, .y pattern type (0 checker/1 stripes/2 dots/3 grid/4 FBM noise), .z cell (px), .w slot
     float4 Color1;       // straight RGBA, opacity folded
     float4 Color2;       // straight RGBA, opacity folded
     float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
     float4 Stroke0;      // width_px, align, dashOn, dashGap
     float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
+    float4 Noise;        // FBM noise (type 4 only): x octaves, y seed, z lacunarity, w gain
 };
 
 struct PatternPSInput
@@ -642,10 +643,62 @@ PatternPSInput PatternRectInstancedVS(uint vertexId : SV_VertexID, uint instance
     return o;
 }
 
+// --- Ashima/Gustavson 2D simplex noise (texture-free, ALU only; the webgl-noise MIT function). Returns ~[-1,1]. Feeds the
+// FBM noise pattern type - no texture lookup, so it needs no descriptor, pure ALU like the rest of the batch. ---
+float3 mod289_3(float3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+float2 mod289_2(float2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+float3 permute289(float3 x) { return mod289_3(((x * 34.0) + 1.0) * x); }
+
+float snoise(float2 v)
+{
+    const float4 C = float4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
+    float2 i  = floor(v + dot(v, C.yy));
+    float2 x0 = v - i + dot(i, C.xx);
+    float2 i1 = (x0.x > x0.y) ? float2(1.0, 0.0) : float2(0.0, 1.0);
+    float4 x12 = x0.xyxy + C.xxzz;
+    x12.xy -= i1;
+    i = mod289_2(i);
+    float3 pp = permute289(permute289(i.y + float3(0.0, i1.y, 1.0)) + i.x + float3(0.0, i1.x, 1.0));
+    float3 m = max(0.5 - float3(dot(x0, x0), dot(x12.xy, x12.xy), dot(x12.zw, x12.zw)), 0.0);
+    m = m * m;
+    m = m * m;
+    float3 x = 2.0 * frac(pp * C.www) - 1.0;
+    float3 h = abs(x) - 0.5;
+    float3 ox = floor(x + 0.5);
+    float3 a0 = x - ox;
+    m *= 1.79284291400159 - 0.85373472095314 * (a0 * a0 + h * h);
+    float3 g;
+    g.x  = a0.x * x0.x + h.x * x0.y;
+    g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+    return 130.0 * dot(m, g);
+}
+
+// Fractional Brownian motion: sum `oct` octaves of simplex noise, each octave freq*lacunarity and amp*gain. Normalised to
+// ~[-1,1]. The 8-iteration loop with an early break caps the cost while honouring the per-instance octave count.
+float fbm(float2 p, int oct, float lacunarity, float gain)
+{
+    float amp = 0.5;
+    float freq = 1.0;
+    float sum = 0.0;
+    float norm = 0.0;
+    for (int o = 0; o < 8; o++)
+    {
+        if (o >= oct)
+        {
+            break;
+        }
+        sum += amp * snoise(p * freq);
+        norm += amp;
+        freq *= lacunarity;
+        amp *= gain;
+    }
+    return (norm > 1e-5) ? sum / norm : 0.0;
+}
+
 // Pattern mix factor at fragment `p` (device px from the rect's top-left): 0 = Color1, 1 = Color2. Anti-aliased by the
 // fragment's pixel footprint (fwidth) - the checkerboard analytically (iq's filtered checker), the others via a ~1px
-// smoothstep on a signed field - so edges stay crisp without a tiled texture.
-float PatternMix(int type, float2 p, float cell)
+// smoothstep on a signed field - so edges stay crisp without a tiled texture. Type 4 is FBM noise (continuous 0..1).
+float PatternMix(int type, float2 p, float cell, float4 noise)
 {
     cell = max(cell, 1.0);
     float2 g = p / cell;
@@ -671,6 +724,13 @@ float PatternMix(int type, float2 p, float cell)
         return 1.0 - smoothstep(0.5, 0.5 + aa + 1.0, dmin);   // ~1px line
     }
 
+    if (type == 4)   // FBM fractal noise: Color1 (low) -> Color2 (high)
+    {
+        float2 np = g + noise.y;                                          // base noise domain + seed offset
+        float n = fbm(np, int(noise.x), max(noise.z, 1.0), noise.w);     // ~[-1,1]
+        return saturate(n * 0.5 + 0.5);
+    }
+
     // checkerboard (type 0): iq's analytically-filtered checker (period 2 in g -> cell-sized squares)
     float2 w2 = fwidth(g) + 1e-4;
     float2 i2 = 2.0 * (abs(frac((g - 0.5 * w2) * 0.5) - 0.5) - abs(frac((g + 0.5 * w2) * 0.5) - 0.5)) / w2;
@@ -688,7 +748,7 @@ float4 PatternPS(PatternPSInput input) : SV_Target
     float d = SdRoundRectJoin(input.Local, input.Half, r, joinType);
 
     float2 p = input.Local + input.Half;   // fragment from the rect's TOP-LEFT (stable pattern origin at the corner)
-    float k = PatternMix(int(it.Params.y), p, it.Params.z);
+    float k = PatternMix(int(it.Params.y), p, it.Params.z, it.Noise);
     float4 fill = lerp(it.Color1, it.Color2, k);
 
     float mask = 1.0;

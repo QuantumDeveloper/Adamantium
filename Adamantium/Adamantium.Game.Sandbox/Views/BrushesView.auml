@@ -149,6 +149,34 @@
                 </Rectangle>
             </WrapPanel>
 
+            <TextBlock Text="Noise brush — FBM simplex (NEW)" FontSize="18" Margin="0,20,0,10"/>
+            <WrapPanel Orientation="Horizontal">
+                <!-- grayscale FBM -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <NoiseBrush Color1="#0B1220" Color2="#94A3B8" Scale="34" Octaves="5"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <!-- coloured, shifted by a seed -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <NoiseBrush Color1="#1E1B4B" Color2="#F472B6" Scale="52" Octaves="4" Seed="12"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <!-- fine grain: 1 octave, small scale -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <NoiseBrush Color1="#052E16" Color2="#4ADE80" Scale="14" Octaves="1"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <!-- clouds: many octaves, large scale -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <NoiseBrush Color1="#0C4A6E" Color2="#E0F2FE" Scale="70" Octaves="6" Seed="4"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+            </WrapPanel>
+
             <TextBlock Text="Gradients — ellipses" FontSize="18" Margin="0,20,0,10"/>
             <WrapPanel Orientation="Horizontal">
                 <Ellipse Width="120" Height="120" Margin="10">

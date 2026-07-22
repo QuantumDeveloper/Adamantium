@@ -16,8 +16,8 @@ public struct PatternRectItem
     /// <summary>World-space bounds: x, y, w, h.</summary>
     public Vector4F Bounds;
 
-    /// <summary>.x = corner radius; .y = pattern type (0 checker, 1 stripes, 2 dots, 3 grid); .z = cell size (device px);
-    /// .w = transform-table slot.</summary>
+    /// <summary>.x = corner radius; .y = pattern type (0 checker, 1 stripes, 2 dots, 3 grid, 4 FBM noise); .z = cell size
+    /// (device px; the base noise cell for type 4); .w = transform-table slot.</summary>
     public Vector4F Params;
 
     /// <summary>Primary (background) colour, straight RGBA, opacity folded into .w.</summary>
@@ -34,4 +34,7 @@ public struct PatternRectItem
 
     /// <summary>Stroke arc-length: x = dash offset, y = trim start, z = trim end, w = flags (join/cap codes).</summary>
     public Vector4F Stroke1;
+
+    /// <summary>FBM noise params (pattern type 4 only; zero otherwise): x = octaves, y = seed, z = lacunarity, w = gain.</summary>
+    public Vector4F Noise;
 }
