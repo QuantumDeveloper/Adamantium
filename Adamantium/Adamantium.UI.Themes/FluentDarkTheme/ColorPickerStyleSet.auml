@@ -89,14 +89,16 @@
                                 </controls:Grid>
                             </controls:Border>
 
-                            <!-- Alpha bar (opaque top -> transparent bottom) over a neutral backdrop; the gradient is set in code. -->
+                            <!-- Alpha bar (opaque top -> transparent bottom) over a checkerboard backdrop; the gradient is set in code. -->
                             <controls:Border x:Name="PART_AlphaArea"
                                              Width="22"
                                              Height="220"
                                              CornerRadius="4"
                                              ClipToBounds="True"
-                                             Background="#FFBFBFBF"
                                              MarginLeft="14">
+                                <controls:Border.Background>
+                                    <PatternBrush Pattern="Checkerboard" Color1="#FFFFFFFF" Color2="#FFCCCCCC" CellSize="6"/>
+                                </controls:Border.Background>
                                 <controls:Grid>
                                     <controls:Border x:Name="PART_AlphaGradient"/>
                                     <controls:Border x:Name="PART_AlphaThumb"
@@ -117,12 +119,21 @@
                                 <controls:TextBlock Text="Preview"
                                                     Foreground="{ResourceReference TextFillColorSecondary}"
                                                     MarginBottom="4"/>
-                                <!-- Neutral backdrop so a colour's alpha shows as a lighter blend (a real checkerboard would
-                                     need a tiling brush, which the engine doesn't have yet). -->
-                                <controls:Border Background="#FFBFBFBF"
-                                                 CornerRadius="6"
+                                <!-- A checkerboard backdrop (PatternBrush) so a colour's alpha reads truthfully - the
+                                     transparency preview this whole tile-brush effort started for. The checkerboard is INSET
+                                     2px inside PART_Preview so the colour layer always covers the pattern's 1px SDF AA
+                                     fringe - a coincident-size checkerboard bled its bright edge past the rounded border. -->
+                                <controls:Border CornerRadius="6"
                                                  Height="46">
-                                    <controls:Border x:Name="PART_Preview" CornerRadius="6"/>
+                                    <controls:Grid>
+                                        <controls:Border CornerRadius="6"
+                                                         Margin="2">
+                                            <controls:Border.Background>
+                                                <PatternBrush Pattern="Checkerboard" Color1="#FFFFFFFF" Color2="#FFCCCCCC" CellSize="6"/>
+                                            </controls:Border.Background>
+                                        </controls:Border>
+                                        <controls:Border x:Name="PART_Preview" CornerRadius="6"/>
+                                    </controls:Grid>
                                 </controls:Border>
 
                                 <controls:TextBlock Text="Hex"
