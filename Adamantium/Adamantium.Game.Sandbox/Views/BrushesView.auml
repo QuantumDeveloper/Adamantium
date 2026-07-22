@@ -177,6 +177,23 @@
                 </Rectangle>
             </WrapPanel>
 
+            <TextBlock Text="Noise — live (drag the sliders to re-bake in real time)" FontSize="18" Margin="0,20,0,10"/>
+            <StackPanel Orientation="Horizontal">
+                <Rectangle Width="300" Height="200" CornerRadius="12" Margin="10" Fill="{Binding LiveNoise}"/>
+                <StackPanel Orientation="Vertical" Width="300" MarginLeft="16" VerticalAlignment="Center">
+                    <TextBlock Text="Scale" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding NoiseScale, Mode=TwoWay}" Minimum="6" Maximum="120" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Octaves" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding NoiseOctaves, Mode=TwoWay}" Minimum="1" Maximum="8" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Seed" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding NoiseSeed, Mode=TwoWay}" Minimum="0" Maximum="50" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Lacunarity" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding NoiseLacunarity, Mode=TwoWay}" Minimum="1.5" Maximum="3.5" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Gain" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding NoiseGain, Mode=TwoWay}" Minimum="0.2" Maximum="0.8" Width="280"/>
+                </StackPanel>
+            </StackPanel>
+
             <TextBlock Text="Gradients — ellipses" FontSize="18" Margin="0,20,0,10"/>
             <WrapPanel Orientation="Horizontal">
                 <Ellipse Width="120" Height="120" Margin="10">
