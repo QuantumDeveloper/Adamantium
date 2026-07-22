@@ -73,42 +73,38 @@ public class GridSplitter:Thumb
 
    private double definition1LengthNew;
    private double definition2LengthNew;
-   private double prevDelta = 0;
+   // The two definition lengths captured at drag start. DragEventArgs.Change is CUMULATIVE (total pointer movement since
+   // the press - see Thumb.DragPosition), so the resize is measured from THESE, not the current (already-resized) lengths.
+   private double originLength1;
+   private double originLength2;
+
+   protected override void OnDragStarted(DragStartedEventArgs e)
+   {
+      base.OnDragStarted(e);
+      if (isResizeBehaviorValid)
+      {
+         originLength1 = GetActualLength(definition1);
+         originLength2 = GetActualLength(definition2);
+      }
+   }
 
    protected override void OnDragDelta(DragEventArgs e)
    {
-      if (isResizeBehaviorValid)
+      if (!isResizeBehaviorValid) return;
+
+      double delta = ResizeDirection == ResizeDirection.Columns ? e.Change.X : e.Change.Y;
+      GetDeltaConstraints(out var min, out var max);
+      delta = Math.Min(Math.Max(delta, min), max);
+
+      // From the ORIGIN lengths + the cumulative delta - so the split follows the cursor 1:1. Adding a cumulative delta
+      // to the current length instead compounded every tick and ran the splitter ahead of the pointer. definition2 is a
+      // function of definition1 so their sum stays exactly (origin1 + origin2), free of drift.
+      definition1LengthNew = originLength1 + delta;
+      definition2LengthNew = originLength1 + originLength2 - definition1LengthNew;
+
+      if (!DeferredResizeEnabled)
       {
-         double delta = ResizeDirection == ResizeDirection.Columns ? e.Change.X : e.Change.Y;
-         double max;
-         double min;
-         GetDeltaConstraints(out min, out max);
-         delta = Math.Min(Math.Max(delta, min), max);
-
-         if (prevDelta != delta)
-         {
-            prevDelta = delta;
-            double actualPrev = GetActualLength(definition1);
-            double actualNext = GetActualLength(definition2);
-
-            // With floating point operations there may be loss of precision to some degree. Eg. Adding a very 
-            // small value to a very large one might result in the small value being ignored. In the following 
-            // steps there are two floating point operations viz. actualLength1+delta and actualLength2-delta. 
-            // It is possible that the addition resulted in loss of precision and the delta value was ignored, whereas 
-            // the subtraction actual absorbed the delta value. This now means that 
-            // (definition1LengthNew + definition2LengthNewis) 2 factors of precision away from 
-            // (actualLength1 + actualLength2). This can cause a problem in the subsequent drag iteration where 
-            // this will be interpreted as the cancellation of the resize operation. To avoid this imprecision we use 
-            // make definition2LengthNew be a function of definition1LengthNew so that the precision or the loss 
-            // thereof can be counterbalanced.
-            definition1LengthNew = actualPrev + delta;
-            definition2LengthNew = actualPrev + actualNext - definition1LengthNew;
-               
-            if (!DeferredResizeEnabled)
-            {
-               SetLength(definition1LengthNew, definition2LengthNew);
-            }
-         }
+         SetLength(definition1LengthNew, definition2LengthNew);
       }
    }
 
@@ -157,11 +153,12 @@ public class GridSplitter:Thumb
 
    private void GetDeltaConstraints(out double min, out double max)
    {
-      double definition1Len = GetActualLength(definition1);
+      // Measured from the ORIGIN lengths (drag start), matching the cumulative delta they bound - see OnDragDelta.
+      double definition1Len = originLength1;
       double definition1Min = GetMinLength(definition1);
       double definition1Max = GetMaxLength(definition1);
-         
-      double definition2Len = GetActualLength(definition2);
+
+      double definition2Len = originLength2;
       double definition2Min = GetMinLength(definition2);
       double definition2Max = GetMaxLength(definition2);
 

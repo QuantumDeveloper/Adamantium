@@ -50,9 +50,12 @@ public class StyleSelector
 
         // AND of every SPECIFIED facet (CSS/WPF semantics): "Button.Accent" = type Button AND class Accent; a
         // single-facet selector ("Button") still matches purely on that facet.
-        // Type match is IS-A (assignable), not exact: a "Window" style applies to a MainWindow : Window, a "ContentControl"
-        // style to every ContentControl - the CSS/WPF way. When several matched styles overlap, SpecificityDistance orders
-        // them so the MORE-DERIVED selector wins (see FindStylesForComponent), so a base style never clobbers a derived one.
+        // Type match is IS-A here (a Window selector matches a MainWindow : Window) - it decides only CANDIDACY. The
+        // BOUNDARY that stops a base type's implicit style from bleeding onto a derived one is applied in
+        // Theme.FindStylesForComponent, which keeps only the NEAREST styled ancestor's type styles (DefaultStyleKey
+        // semantics): a control with its own style is a hard boundary (a CheckBox does NOT get the ToggleButton style),
+        // while a subclass with NO style of its own (an AUML x:Class MainWindow) still falls back to its base's. Explicit
+        // cross-type sharing is via Style.BasedOn. IS-A candidacy (not exact) is also what lets Attach apply that fallback.
         if (Types.Count > 0 && !Types.Any(t => t.IsAssignableFrom(control.GetType()))) return false;
         if (Id != null && control.Id != Id) return false;
         if (Classes.Count > 0 && !HasAllClasses(control)) return false;

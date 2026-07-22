@@ -9,7 +9,7 @@
     <!-- Base brushes live on the control (via {ResourceReference}); the template parts bind them with {TemplateBinding}
          (Template priority), so the IsChecked trigger (higher priority) can repaint them. Setting a part brush directly
          with {ResourceReference} would bake it at Local priority and the trigger could never override it. -->
-    <Style Selector="CheckBox">
+    <Style Selector="CheckBox" BasedOn="ToggleButton">
         <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
         <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
         <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>

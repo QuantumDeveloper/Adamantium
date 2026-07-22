@@ -1,0 +1,42 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions">
+    <StackPanel Orientation="Vertical" Margin="24" MaxWidth="900">
+
+        <TextBlock Text="GridSplitter + UniformGrid"
+                   FontSize="20" MarginBottom="4"/>
+        <TextBlock Text="Drag the divider to resize the two panes — a GridSplitter (a Thumb subtype that now carries its own style under exact-type matching). Below, a UniformGrid tiles its children into equal cells (Columns=4)."
+                   FontSize="13" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="14"/>
+
+        <TextBlock Text="GridSplitter — resizable panes" FontSize="14" MarginBottom="6"/>
+        <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                BorderThickness="1" CornerRadius="10" Height="180" MarginBottom="20">
+            <Grid ColumnDefinitions="*,6,*">
+                <Border Grid.Column="0" Background="{ResourceReference SubtleFillColorSecondary}" CornerRadius="8" Margin="8" ClipToBounds="True">
+                    <TextBlock Text="Left pane" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <GridSplitter Grid.Column="1" ResizeDirection="Columns"/>
+                <Border Grid.Column="2" Background="{ResourceReference SubtleFillColorSecondary}" CornerRadius="8" Margin="8" ClipToBounds="True">
+                    <TextBlock Text="Right pane" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+            </Grid>
+        </Border>
+
+        <TextBlock Text="UniformGrid — equal cells" FontSize="14" MarginBottom="6"/>
+        <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                BorderThickness="1" CornerRadius="10" Padding="8" Height="180">
+            <UniformGrid Columns="4" RowSpacing="8" ColumnSpacing="8">
+                <Border Background="#FF3A6EA5" CornerRadius="6"/>
+                <Border Background="#FF4C8C4A" CornerRadius="6"/>
+                <Border Background="#FFB5843A" CornerRadius="6"/>
+                <Border Background="#FF9A4C8C" CornerRadius="6"/>
+                <Border Background="#FF3A9AA5" CornerRadius="6"/>
+                <Border Background="#FFA5533A" CornerRadius="6"/>
+                <Border Background="#FF5A6EA5" CornerRadius="6"/>
+                <Border Background="#FF6E8C3A" CornerRadius="6"/>
+            </UniformGrid>
+        </Border>
+
+    </StackPanel>
+</View>

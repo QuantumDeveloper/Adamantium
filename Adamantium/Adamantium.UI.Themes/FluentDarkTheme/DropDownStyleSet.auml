@@ -8,7 +8,7 @@
          the popup in code; the popup is edge-aware (FlipToFit) and its width tracks the header. Per the small-styles
          convention: properties, then template, then triggers. -->
 
-    <Style Selector="DropDown">
+    <Style Selector="DropDown" BasedOn="ItemsControl">
         <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
         <Setter Property="BackgroundPointerOver" Value="{ResourceReference ControlFillColorSecondary}"/>
         <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>

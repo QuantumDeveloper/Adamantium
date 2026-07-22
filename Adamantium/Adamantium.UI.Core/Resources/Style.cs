@@ -26,7 +26,14 @@ public class Style : AdamantiumComponent
     internal ITheme Theme { get; set; }
 
     public StyleSelector Selector { get; set; }
-    
+
+    /// <summary>Explicit style inheritance (the antidote to type matching being EXACT now): the base type(s) this style
+    /// builds on. Their setters + triggers are applied FIRST when this style attaches, so this style's own contributions
+    /// override them. Multiple bases compose like mixins - listed left-to-right, LATER wins over earlier (own wins over
+    /// all). A base type's styles are found by exact type in the theme, recursively (a base may itself be BasedOn another).
+    /// Parsed from the same type syntax as <see cref="Selector"/> (e.g. <c>BasedOn="ToggleButton"</c>).</summary>
+    public StyleSelector BasedOn { get; set; }
+
     public SetterCollection Setters { get; }
 
     public TriggerCollection Triggers { get; }
@@ -81,6 +88,20 @@ public class Style : AdamantiumComponent
         // preceding detach), so activators + their subscriptions never accumulate across re-applies.
         ReleaseActivators(component);
 
+        // BasedOn bases FIRST (base-first, mixin order), so this style's own setters/triggers - applied after - override
+        // them. A base's contributions are tracked under THIS style, so Detach undoes them together.
+        foreach (var baseStyle in ResolveBases())
+        {
+            baseStyle.ApplyContributions(component, this);
+        }
+
+        ApplyContributions(component, this);
+    }
+
+    // Apply THIS style's own setters + triggers to `component`, tracked under `owner` (this, or - for a BasedOn base -
+    // the deriving style, so the base's contribution is released together with it).
+    private void ApplyContributions(IFundamentalUIComponent component, Style owner)
+    {
         if (Selector.HasConditions)
         {
             // The selector carries property conditions ("TabControl[TabStripPlacement=Left]"): its setters apply only
@@ -88,19 +109,19 @@ public class Style : AdamantiumComponent
             // activator a MultiTrigger uses - at Trigger priority, which outranks an unconditional base style's setters.
             var gate = new MultiTrigger { Setters = Setters };
             gate.Conditions.AddRange(Selector.Conditions);
-            RecordActivator(component, gate.Apply(new StyleTriggerExecutionContext(component, Theme)));
+            owner.RecordActivator(component, gate.Apply(new StyleTriggerExecutionContext(component, owner.Theme)));
         }
         else
         {
             foreach (var setter in Setters)
             {
-                setter.Apply(component, this, Theme);
+                setter.Apply(component, owner, owner.Theme);
             }
         }
 
         foreach (var trigger in Triggers)
         {
-            RecordActivator(component, trigger.Apply(new StyleTriggerExecutionContext(component, Theme)));
+            owner.RecordActivator(component, trigger.Apply(new StyleTriggerExecutionContext(component, owner.Theme)));
         }
     }
 
@@ -113,17 +134,44 @@ public class Style : AdamantiumComponent
             return;
         }
 
-        // Conditioned styles applied their setters through the activator, never unconditionally - so only an
-        // unconditional style undoes setters here; ReleaseActivators tears the conditioned/trigger ones down.
-        if (!Selector.HasConditions)
+        // Undo own then base setters (bases were tracked under THIS style); ReleaseActivators tears down every activator
+        // this style recorded (its own triggers AND any base triggers).
+        RemoveContributions(component, this);
+        foreach (var baseStyle in ResolveBases())
         {
-            foreach (var setter in Setters)
-            {
-                setter.Remove(component, this, Theme);
-            }
+            baseStyle.RemoveContributions(component, this);
         }
 
         ReleaseActivators(component);
+    }
+
+    // Undo THIS style's own SETTERS from `component` (tracked under `owner`). Conditioned styles applied their setters
+    // through an activator, never unconditionally - those are torn down by ReleaseActivators, not here.
+    private void RemoveContributions(IFundamentalUIComponent component, Style owner)
+    {
+        if (Selector.HasConditions) return;
+        foreach (var setter in Setters)
+        {
+            setter.Remove(component, owner, owner.Theme);
+        }
+    }
+
+    private List<Style> _resolvedBases;
+
+    // The base styles this style is BasedOn, in application order (base-first, deduped, recursive - a base may itself be
+    // BasedOn another). Resolved by EXACT type from the theme; empty when there is no BasedOn (the common case). Memoized:
+    // a style's bases are constant for its lifetime (a theme swap builds fresh Style objects), so thousands of identical
+    // containers don't each re-scan the theme.
+    private IReadOnlyList<Style> ResolveBases()
+    {
+        if (_resolvedBases != null) return _resolvedBases;
+        var result = new List<Style>();
+        if (BasedOn is { Types.Count: > 0 } && Theme is Theme theme)
+        {
+            var seen = new HashSet<Style> { this };   // guard against a self/cyclic BasedOn
+            theme.CollectBasedOn(BasedOn, result, seen);
+        }
+        return _resolvedBases = result;
     }
 
     // Add an activator to both the component's shared list (so a template-change reevaluation sees it) and this style's

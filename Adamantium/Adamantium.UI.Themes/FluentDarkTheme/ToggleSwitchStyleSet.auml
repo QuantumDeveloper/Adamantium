@@ -9,7 +9,7 @@
 
     <!-- Base brushes on the control, bound onto the track with {TemplateBinding} so the IsChecked trigger can repaint it
          (a {ResourceReference} straight on the part would bake at Local priority and block the trigger). -->
-    <Style Selector="ToggleSwitch">
+    <Style Selector="ToggleSwitch" BasedOn="ToggleButton">
         <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
         <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
         <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>

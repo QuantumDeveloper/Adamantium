@@ -7,7 +7,7 @@
          PARENT (one with child items) opens a submenu flyout to the right on hover. The child items live in PART_ItemsPresenter
          inside PART_SubmenuPopup. -->
 
-    <Style Selector="MenuItem">
+    <Style Selector="MenuItem" BasedOn="ItemsControl">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
         <Setter Property="FontSize" Value="14"/>
@@ -105,7 +105,7 @@
 
     <!-- MenuScrollViewer: a scrollbar-less scroll host for menus. ▲/▼ strips at the edges appear only when there is content
          to scroll (CanScrollUp/Down) and scroll it while hovered; the wheel scrolls too. A short menu keeps them hidden. -->
-    <Style Selector="MenuScrollViewer">
+    <Style Selector="MenuScrollViewer" BasedOn="ScrollViewer">
         <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
         <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
         <Setter Property="Template">
@@ -157,7 +157,7 @@
     <!-- ContextMenu: a light-dismiss flyout of MenuItems in the popup overlay. Template = a Popup portal whose content is
          a themed card hosting the items (PART_ItemsPresenter). The control is zero-size inline (items live in the overlay). -->
 
-    <Style Selector="ContextMenu">
+    <Style Selector="ContextMenu" BasedOn="ItemsControl">
         <Setter Property="ItemsPanel">
             <Setter.Value>
                 <ItemsPanelTemplate>

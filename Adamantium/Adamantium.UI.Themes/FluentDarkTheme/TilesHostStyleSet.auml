@@ -7,7 +7,7 @@
          exact type, not the base), so it gets the same Border>ScrollViewer>ItemsPresenter host as ItemsControl -
          CanContentScroll=true lets a virtualizing items panel drive it when the board is big. The default ItemsPanel
          (a vertical virtualizing StackPanel) is usually replaced with a WrapPanel for the tiled layout. -->
-    <Style Selector="TilesHost">
+    <Style Selector="TilesHost" BasedOn="ItemsControl">
         <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
     </Style>
 
