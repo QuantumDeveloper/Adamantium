@@ -22,6 +22,7 @@ public class ColorWheel : Control
     private double _hue;
     private double _sat = 1;
     private double _val = 1;
+    private double _alpha = 1;   // the wheel doesn't EDIT alpha, but it PRESERVES it - so binding to an alpha-carrying colour (an alpha bar on the same colour) isn't clobbered opaque
     private bool _syncing;   // guards the colour <-> hsv <-> Value fan-out from re-entering itself
     private bool _dragging;
 
@@ -158,6 +159,7 @@ public class ColorWheel : Control
     // doesn't snap as saturation is dragged to the centre.
     private void ApplyColor(Color color)
     {
+        _alpha = color.A / 255.0;
         RgbToHsv(color, out var h, out var s, out var v);
         _val = v;
         _sat = s;
@@ -170,7 +172,7 @@ public class ColorWheel : Control
     // Recompute the colour from HSV and push it to SelectedColor + Value + the visuals, guarded so none re-enters the fan-out.
     private void Commit()
     {
-        var color = HsvToColor(_hue, _sat, _val);
+        var color = HsvToColor(_hue, _sat, _val, _alpha);
         _syncing = true;
         SetCurrentValue(SelectedColorProperty, color);
         SetCurrentValue(ValueProperty, _val);
@@ -205,7 +207,7 @@ public class ColorWheel : Control
 
     // ---- HSV <-> RGB ---------------------------------------------------------------------------------------------
 
-    private static Color HsvToColor(double h, double s, double v)
+    private static Color HsvToColor(double h, double s, double v, double a)
     {
         var c = v * s;
         var x = c * (1 - Math.Abs(h / 60 % 2 - 1));
@@ -221,7 +223,7 @@ public class ColorWheel : Control
             default: r = c; b = x; break;
         }
 
-        return new Color(ToByte(r + m), ToByte(g + m), ToByte(b + m), (byte)255);
+        return new Color(ToByte(r + m), ToByte(g + m), ToByte(b + m), ToByte(a));
     }
 
     private static void RgbToHsv(Color color, out double h, out double s, out double v)
