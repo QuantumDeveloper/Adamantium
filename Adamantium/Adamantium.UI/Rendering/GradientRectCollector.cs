@@ -88,7 +88,9 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
         item.Stroke0 = stroke0;
         item.Stroke1 = stroke1;
 
-        item.Params = new Vector4F((float)(cornerRadius * sx), type, count, (float)g.SpreadMethod);
+        // Params.w packs BOTH the spread (0 pad/1 reflect/2 repeat) and the colour-interpolation mode (0 sRGB/1 OKLab):
+        // spread + 8*mode. The shader unpacks (packed & 7) for spread and (packed >> 3) for the mode - no extra record field.
+        item.Params = new Vector4F((float)(cornerRadius * sx), type, count, (float)g.SpreadMethod + 8f * (float)g.ColorInterpolationMode);
         return true;
     }
 }

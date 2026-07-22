@@ -46,6 +46,10 @@ public abstract class GradientBrush : Brush
     public static readonly AdamantiumProperty SpreadMethodProperty = AdamantiumProperty.Register(nameof(SpreadMethod),
         typeof(GradientSpreadMethod), typeof(GradientBrush), new PropertyMetadata(GradientSpreadMethod.Pad, PropertyMetadataOptions.AffectsPaint));
 
+    // PAINT: how the stops are interpolated (sRGB vs OKLab) is a per-fragment colour choice, never a shape/layout change.
+    public static readonly AdamantiumProperty ColorInterpolationModeProperty = AdamantiumProperty.Register(nameof(ColorInterpolationMode),
+        typeof(ColorInterpolationMode), typeof(GradientBrush), new PropertyMetadata(ColorInterpolationMode.Srgb, PropertyMetadataOptions.AffectsPaint));
+
     /// <summary>The colour stops, ordered by the author; the renderer reads them sorted by <see cref="GradientStop.Offset"/>.
     /// A collection (not an AdamantiumProperty) so it is never a shared mutable default across instances. [Content] so AUML
     /// populates it from the brush's child &lt;GradientStop/&gt; elements (like GeometryGroup.Children).</summary>
@@ -56,6 +60,17 @@ public abstract class GradientBrush : Brush
     {
         get => GetValue<GradientSpreadMethod>(SpreadMethodProperty);
         set { if (IsFrozen) return; SetValue(SpreadMethodProperty, value); }
+    }
+
+    /// <summary>How to interpolate between stops - sRGB (default, WPF-like) or perceptual OKLab.</summary>
+    public ColorInterpolationMode ColorInterpolationMode
+    {
+        get => GetValue<ColorInterpolationMode>(ColorInterpolationModeProperty);
+        set
+        {
+            if (IsFrozen) return;
+            SetValue(ColorInterpolationModeProperty, value);
+        }
     }
 
     // A deep copy of the stops as NEW GradientStop instances, so a frozen gradient never aliases the live, animatable stop

@@ -436,12 +436,58 @@ float GradParam(GradientRectData it, float2 uv)
     return dot(uv - start, axis) / denom;
 }
 
+// ---- sRGB <-> OKLab (Bjorn Ottosson) for PERCEPTUAL gradient interpolation. Blending in sRGB muddies midpoints (a grey
+// dead-zone between complements) and bands; OKLab is perceptually uniform, so the blend keeps even brightness + hue. Used
+// only when a stop's interpolation mode is OKLab (mode 1); mode 0 (sRGB) leaves the colours untouched.
+float3 SrgbToLinear(float3 c)
+{
+    float3 lo = c / 12.92;
+    float3 hi = pow((c + 0.055) / 1.055, float3(2.4, 2.4, 2.4));
+    return float3(c.x <= 0.04045 ? lo.x : hi.x, c.y <= 0.04045 ? lo.y : hi.y, c.z <= 0.04045 ? lo.z : hi.z);
+}
+
+float3 LinearToSrgb(float3 c)
+{
+    float3 lo = c * 12.92;
+    float3 hi = 1.055 * pow(max(c, 0.0), float3(1.0 / 2.4, 1.0 / 2.4, 1.0 / 2.4)) - 0.055;
+    return float3(c.x <= 0.0031308 ? lo.x : hi.x, c.y <= 0.0031308 ? lo.y : hi.y, c.z <= 0.0031308 ? lo.z : hi.z);
+}
+
+float3 LinearToOklab(float3 c)
+{
+    float l = 0.4122214708 * c.x + 0.5363325363 * c.y + 0.0514459929 * c.z;
+    float m = 0.2119034982 * c.x + 0.6806995451 * c.y + 0.1073969566 * c.z;
+    float s = 0.0883024619 * c.x + 0.2817188376 * c.y + 0.6299787005 * c.z;
+    float l_ = pow(max(l, 0.0), 1.0 / 3.0);
+    float m_ = pow(max(m, 0.0), 1.0 / 3.0);
+    float s_ = pow(max(s, 0.0), 1.0 / 3.0);
+    return float3(
+        0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+        1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+        0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_);
+}
+
+float3 OklabToLinear(float3 c)
+{
+    float l_ = c.x + 0.3963377774 * c.y + 0.2158037573 * c.z;
+    float m_ = c.x - 0.1055613458 * c.y - 0.0638541728 * c.z;
+    float s_ = c.x - 0.0894841775 * c.y - 1.2914855480 * c.z;
+    float l = l_ * l_ * l_;
+    float m = m_ * m_ * m_;
+    float s = s_ * s_ * s_;
+    return float3(
+        4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s);
+}
+
 // The colour at parameter t (already spread-mapped to 0..1) by interpolating the (offset-sorted) stops. `aa` is the pixel
-// footprint of t (fwidth) so every stop transition is at least one pixel wide: this ANTI-ALIASES hard stops (two stops on
-// one offset - a conic pie chart's segment edges, a hard linear split), which otherwise stair-step. A smooth segment
-// (wider than a pixel) keeps its exact linear ramp. Written as summed OVER-lerps rather than an early-out segment lookup so
-// a zero-width segment still contributes its 1px transition instead of being skipped.
-float4 GradColor(GradientRectData it, float t, float aa)
+// footprint of t (fwidth) so every stop transition is at least one pixel wide - ANTI-ALIASES hard stops (two stops on one
+// offset), which otherwise stair-step; a smooth segment keeps its exact linear ramp. Summed OVER-lerps (not an early-out
+// lookup) so a zero-width segment still contributes its 1px transition. `mode` 1 interpolates in OKLab (perceptual): the
+// stops are converted to OKLab up front, blended there, and the result converted back - only the blend space changes (mode
+// 0 is byte-for-byte the old sRGB path).
+float4 GradColor(GradientRectData it, float t, float aa, int mode)
 {
     int n = int(it.Params.z);
     if (n <= 0) return float4(0.0, 0.0, 0.0, 0.0);
@@ -451,6 +497,14 @@ float4 GradColor(GradientRectData it, float t, float aa)
     float4 cols[8];
     cols[0] = it.Stop0; cols[1] = it.Stop1; cols[2] = it.Stop2; cols[3] = it.Stop3;
     cols[4] = it.Stop4; cols[5] = it.Stop5; cols[6] = it.Stop6; cols[7] = it.Stop7;
+
+    if (mode == 1)   // straight-sRGB stop colours -> OKLab (alpha stays linear)
+    {
+        for (int k = 0; k < n; k++)
+        {
+            cols[k] = float4(LinearToOklab(SrgbToLinear(cols[k].xyz)), cols[k].w);
+        }
+    }
 
     float4 col = cols[0];
     for (int i = 1; i < n; i++)
@@ -468,6 +522,11 @@ float4 GradColor(GradientRectData it, float t, float aa)
             bl = saturate((t - 0.5 * (lo + hi)) / max(aa, 1e-6) + 0.5);   // 1px ramp centred on a hard stop
         }
         col = lerp(col, cols[i], bl);
+    }
+
+    if (mode == 1)   // blended in OKLab -> back to straight sRGB
+    {
+        col = float4(LinearToSrgb(OklabToLinear(col.xyz)), col.w);
     }
     return col;
 }
@@ -518,8 +577,9 @@ float4 GradientPS(GradPSInput input) : SV_Target
     float d = ellipse ? SdEllipse(input.Local, input.Half) : SdRoundRectJoin(input.Local, input.Half, r, joinType);
 
     float2 uv = input.Local / max(input.Half * 2.0, float2(1e-4, 1e-4)) + 0.5;   // 0..1 across the bounds
-    float gt = GradSpread(GradParam(it, uv), int(it.Params.w));
-    float4 fill = GradColor(it, gt, fwidth(gt));
+    int packedW = int(it.Params.w + 0.5);                       // Params.w packs spread (low 3 bits) + interp mode (>> 3)
+    float gt = GradSpread(GradParam(it, uv), packedW & 7);
+    float4 fill = GradColor(it, gt, fwidth(gt), packedW >> 3);
 
     float mask = 1.0;
     if (it.Stroke0.z > 0.0 || it.Stroke1.y > 0.0 || it.Stroke1.z < 1.0)
@@ -544,7 +604,7 @@ float4 GradientPS(GradPSInput input) : SV_Target
 struct GradGeomData
 {
     float4x4 World;
-    float4 Params;       // .x type (1 linear/2 radial), .y spread, .z stop count, .w _
+    float4 Params;       // .x type (1 linear/2 radial), .y spread, .z stop count, .w interp mode (0 sRGB/1 OKLab)
     float4 Geom0;        // LOCAL 0..1: linear (startXY, endXY) | radial (centerXY, radiusXY)
     float4 Geom1;        // radial focal (originXY, _, _)
     float4 LocalBounds;  // shape local bounds: minXY, sizeXY
@@ -594,7 +654,7 @@ float4 GradientFillPS(GradFillPSInput input) : SV_Target
 
     float2 uv = (input.Local - it.LocalBounds.xy) / max(it.LocalBounds.zw, float2(1e-4, 1e-4));
     float gt = GradSpread(GradParam(gd, uv), int(gd.Params.w));
-    return GradColor(gd, gt, fwidth(gt));
+    return GradColor(gd, gt, fwidth(gt), int(it.Params.w));   // interp mode from GradGeomData.Params.w - OKLab flows here too
 }
 
 // ---- Pattern batch: the SAME SDF rounded-rect (self-AA shape + the shared stroke), but the FILL is a PROCEDURAL two-colour

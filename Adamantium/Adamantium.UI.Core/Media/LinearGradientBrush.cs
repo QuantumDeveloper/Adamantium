@@ -36,6 +36,7 @@ public sealed class LinearGradientBrush : GradientBrush
             StartPoint = StartPoint,
             EndPoint = EndPoint,
             SpreadMethod = SpreadMethod,
+            ColorInterpolationMode = ColorInterpolationMode,
             Opacity = Opacity
         };
 }
