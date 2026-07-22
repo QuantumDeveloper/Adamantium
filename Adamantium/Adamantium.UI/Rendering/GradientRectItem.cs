@@ -20,10 +20,11 @@ public struct GradientRectItem
     /// <summary>World-space bounds: x, y, w, h.</summary>
     public Vector4F Bounds;
 
-    /// <summary>.x = corner radius (uniform); .y = type (1 linear, 2 radial); .z = stop count; .w = spread (0 pad, 1 reflect, 2 repeat).</summary>
+    /// <summary>.x = corner radius (uniform); .y = type (1 linear, 2 radial, 3 conic); .z = stop count; .w = spread (0 pad, 1 reflect, 2 repeat).</summary>
     public Vector4F Params;
 
-    /// <summary>LOCAL (0..1) gradient geometry. Linear: (startX, startY, endX, endY). Radial: (centerX, centerY, radiusX, radiusY).</summary>
+    /// <summary>LOCAL (0..1) gradient geometry. Linear: (startX, startY, endX, endY). Radial: (centerX, centerY, radiusX, radiusY).
+    /// Conic: (centerX, centerY, startAngleTurns, _).</summary>
     public Vector4F Geom0;
 
     /// <summary>Radial only: (originX, originY, _, _) - the focal point. Unused for linear.</summary>

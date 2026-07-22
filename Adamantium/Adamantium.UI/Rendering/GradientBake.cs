@@ -29,8 +29,9 @@ internal static class GradientBake
         return count;
     }
 
-    // The gradient geometry (relative 0..1): type (1 linear / 2 radial) + the two geometry vectors the shader reads.
-    // Linear: Geom0 = (startXY, endXY). Radial: Geom0 = (centerXY, radiusXY), Geom1 = (originXY, 0, 0).
+    // The gradient geometry (relative 0..1): type (1 linear / 2 radial / 3 conic) + the two geometry vectors the shader
+    // reads. Linear: Geom0 = (startXY, endXY). Radial: Geom0 = (centerXY, radiusXY), Geom1 = (originXY, 0, 0).
+    // Conic: Geom0 = (centerXY, startAngleTurns, 0) - the shader sweeps the angle around the centre.
     public static float PackGeometry(GradientBrush g, out Vector4F geom0, out Vector4F geom1)
     {
         if (g is RadialGradientBrush radial)
@@ -38,6 +39,12 @@ internal static class GradientBake
             geom0 = new Vector4F((float)radial.Center.X, (float)radial.Center.Y, (float)radial.RadiusX, (float)radial.RadiusY);
             geom1 = new Vector4F((float)radial.GradientOrigin.X, (float)radial.GradientOrigin.Y, 0f, 0f);
             return 2f;
+        }
+        if (g is ConicGradientBrush conic)
+        {
+            geom0 = new Vector4F((float)conic.Center.X, (float)conic.Center.Y, (float)(conic.StartAngle / 360.0), 0f);
+            geom1 = Vector4F.Zero;
+            return 3f;
         }
         var lin = (LinearGradientBrush)g;
         geom0 = new Vector4F((float)lin.StartPoint.X, (float)lin.StartPoint.Y, (float)lin.EndPoint.X, (float)lin.EndPoint.Y);
