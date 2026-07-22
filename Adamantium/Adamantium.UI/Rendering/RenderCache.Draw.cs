@@ -25,6 +25,7 @@ public partial class RenderCache
     private TransformTable _transformTable;
     private GradientRectCollector _gradientRectBatch;   // SDF family: rounded rects with a linear/radial GRADIENT fill
     private GradientEllipseCollector _gradientEllipseBatch;   // SDF family: ellipses with a linear/radial GRADIENT fill
+    private PatternRectCollector _patternBatch;   // SDF family: rounded rects with a PROCEDURAL pattern fill (checker/stripes/dots/grid)
     private Rect2D _batchScissor;
     private bool _batchOpen;
 
@@ -45,7 +46,7 @@ public partial class RenderCache
         public RenderOpKind Kind;
         public Rect2D Scissor;    // Scissor
         public IRenderUnit Unit;  // Unit
-        public byte Batch;        // Segment: which collector (0 rect, 1 ellipse, 2 text)
+        public byte Batch;        // Segment: which collector (0 rect, 1 ellipse, 2 text, 3 gradient-rect, 4 gradient-ellipse, 5 pattern)
         public int SegIndex;      // Segment: index into that collector's recorded segment list; InstancedFlush: flush index
     }
     private readonly List<RenderOp> _ops = new();
@@ -143,11 +144,13 @@ public partial class RenderCache
             _ellipseBatch ??= new EllipseBatchCollector();
             _gradientRectBatch ??= new GradientRectCollector();
             _gradientEllipseBatch ??= new GradientEllipseCollector();
+            _patternBatch ??= new PatternRectCollector();
             _textBatch.BeginFrame(device);
             _rectBatch.BeginFrame(device);
             _ellipseBatch.BeginFrame(device);
             _gradientRectBatch.BeginFrame(device);
             _gradientEllipseBatch.BeginFrame(device);
+            _patternBatch.BeginFrame(device);
             // Transform table: identity at slot 0, (re)sized at this fence-safe point; the SDF collectors read the address
             // per draw (BeginFrame may have reallocated the buffer).
             if (_transformTable == null)
@@ -164,6 +167,7 @@ public partial class RenderCache
             _ellipseBatch.TransformsAddress = _transformTable.DeviceAddress;
             _gradientRectBatch.TransformsAddress = _transformTable.DeviceAddress;
             _gradientEllipseBatch.TransformsAddress = _transformTable.DeviceAddress;
+            _patternBatch.TransformsAddress = _transformTable.DeviceAddress;
             _textBatch.TransformsAddress = _transformTable.DeviceAddress;   // glyph VS fetches the block's node matrix by slot
             var sceneClean = LastBuildKind == RenderBuildKind.Clean;
             _textBatch.SceneClean = sceneClean;
@@ -171,6 +175,7 @@ public partial class RenderCache
             _ellipseBatch.SceneClean = sceneClean;
             _gradientRectBatch.SceneClean = sceneClean;
             _gradientEllipseBatch.SceneClean = sceneClean;
+            _patternBatch.SceneClean = sceneClean;
             // Incremental upload: a Clean frame re-bakes byte-identical items into slots the buffers already hold, so Flush
             // skips the redundant upload (zero bytes move on an idle frame).
             if (InstancedFillCollector.Enabled)
@@ -323,6 +328,31 @@ public partial class RenderCache
                 geru.EnsureMachinery();
                 unit.Update(wt, _projectionMatrix, _renderScale);
             }
+            else if (device != null && unit is RectangleRenderUnit pru && _patternBatch.CanBatch(pru.RectPayload))
+            {
+                // A rounded rect with a PROCEDURAL PATTERN fill (checkerboard/stripes/dots/grid): a new SDF-batch sibling,
+                // its own pass evaluates the pattern per fragment. Shares the clip group with the other batches.
+                var patternBounds = LogicalBounds(unit.Component, wt);
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(4, patternBounds))   // 4 = pattern layer
+                {
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                }
+                var patBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Pat);
+                if (_patternBatch.TryAdd(pru.RectPayload, patBakeWorld, pru.FillOpacity, scissor, patternBounds, slot4Pat))
+                {
+                    // Pattern is node-aware (rides the transform table), but NOT paint/splice-patchable in v1: no
+                    // _sdfSlotByUnit entry, so a dirty pattern falls to a full walk (patterns are static backdrops).
+                    if (_recording)
+                    {
+                        group.PatchableRectOnly = false;
+                    }
+                    _batchScissor = scissor;
+                    _batchOpen = true;
+                    continue;
+                }
+                pru.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
+            }
             else if (device != null && unit is TextRenderUnit tru && tru.TextComponent is { } tc && _textBatch.CanBatch(tc, out var atlas))
             {
                 if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_textBatch.SameAtlas(atlas))
@@ -375,12 +405,12 @@ public partial class RenderCache
                 }
                 ggru.FillInstanced = false;
             }
-            else if (device != null && (_rectBatch.Active || _ellipseBatch.Active || _gradientRectBatch.Active || _gradientEllipseBatch.Active || _textBatch.Active || (_instancedFill?.Active ?? false)))
+            else if (device != null && (_rectBatch.Active || _ellipseBatch.Active || _gradientRectBatch.Active || _gradientEllipseBatch.Active || _patternBatch.Active || _textBatch.Active || (_instancedFill?.Active ?? false)))
             {
                 // A non-batchable unit that overlaps any pending batch: flush them first so this unit paints OVER them, as
                 // its later source order requires. Spatially disjoint units (a list's items) don't flush.
                 var lb = LogicalBounds(unit.Component, wt);
-                if (_rectBatch.OverlapsPending(lb) || _ellipseBatch.OverlapsPending(lb) || _gradientRectBatch.OverlapsPending(lb) || _gradientEllipseBatch.OverlapsPending(lb) || _textBatch.OverlapsPending(lb) || (_instancedFill?.OverlapsPending(lb) ?? false))
+                if (_rectBatch.OverlapsPending(lb) || _ellipseBatch.OverlapsPending(lb) || _gradientRectBatch.OverlapsPending(lb) || _gradientEllipseBatch.OverlapsPending(lb) || _patternBatch.OverlapsPending(lb) || _textBatch.OverlapsPending(lb) || (_instancedFill?.OverlapsPending(lb) ?? false))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
             }
             else if (device == null && unit is RectangleRenderUnit rruNoDev)
@@ -430,12 +460,12 @@ public partial class RenderCache
         }
     }
 
-    // The batches flush bottom-up (rect < ellipse < gradient-rect < gradient-ellipse < instanced < text), so a HIGHER-layer
-    // batch draws ON TOP. A unit going into `layer` that OVERLAPS a pending higher-layer batch would be drawn UNDER it - yet
-    // that batch holds units EARLIER in paint order, so this (later) unit belongs on top (a solid thumb sitting on a gradient
-    // bar, a solid overlay over gradient content). Returning true here flushes the pending batches first, dropping this unit
-    // into a fresh cycle that draws after them = correct paint order. Same-or-lower layers keep their insertion order and are
-    // fine as-is; disjoint content never overlaps, so a plain list of same-material tiles pays only O(1) union checks.
+    // The batches flush bottom-up (rect < ellipse < gradient-rect < gradient-ellipse < pattern < instanced < text), so a
+    // HIGHER-layer batch draws ON TOP. A unit going into `layer` that OVERLAPS a pending higher-layer batch would be drawn
+    // UNDER it - yet that batch holds units EARLIER in paint order, so this (later) unit belongs on top (a solid thumb
+    // sitting on a gradient bar, a solid overlay over gradient content). Returning true here flushes the pending batches
+    // first, dropping this unit into a fresh cycle that draws after them = correct paint order. Same-or-lower layers keep
+    // their insertion order and are fine as-is; disjoint content never overlaps, so same-material tiles pay only O(1) checks.
     private bool OverlapsHigherLayer(int layer, Rect lb)
     {
         if (layer < 1 && _ellipseBatch.OverlapsPending(lb))
@@ -453,12 +483,17 @@ public partial class RenderCache
             return true;
         }
 
-        if (layer < 4 && (_instancedFill?.OverlapsPending(lb) ?? false))
+        if (layer < 4 && _patternBatch.OverlapsPending(lb))
         {
             return true;
         }
 
-        if (layer < 5 && _textBatch.OverlapsPending(lb))
+        if (layer < 5 && (_instancedFill?.OverlapsPending(lb) ?? false))
+        {
+            return true;
+        }
+
+        if (layer < 6 && _textBatch.OverlapsPending(lb))
         {
             return true;
         }
