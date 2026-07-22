@@ -18,6 +18,7 @@ public partial class GalleryViewModel
         new MenusViewModel(),
         new TreesViewModel(),
         new SplitterViewModel(),
+        new ColorPickerViewModel(),
         new RangesViewModel(),
         new ResourcesViewModel(),
         new ScrollBarViewModel(),

@@ -229,10 +229,11 @@ public partial class RenderCache
             // overlaps either flushes both first so it paints on top.
             if (device != null && unit is RectangleRenderUnit rru && _rectBatch.CanBatch(rru.RectPayload))
             {
-                if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
+                var rectBounds = LogicalBounds(unit.Component, wt);
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(0, rectBounds))   // 0 = rect layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var bakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Rect);
-                if (_rectBatch.TryAdd(rru.RectPayload, bakeWorld, rru.FillOpacity, scissor, LogicalBounds(unit.Component, wt), slot4Rect))
+                if (_rectBatch.TryAdd(rru.RectPayload, bakeWorld, rru.FillOpacity, scissor, rectBounds, slot4Rect))
                 {
                     if (_recording)
                     {
@@ -259,10 +260,11 @@ public partial class RenderCache
             {
                 // A rounded rect with a LINEAR/RADIAL gradient fill: same SDF-batch family, different pass (the pixel shader
                 // evaluates the gradient). Shares the clip group with the other batches.
-                if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
+                var gradRectBounds = LogicalBounds(unit.Component, wt);
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(2, gradRectBounds))   // 2 = gradient-rect layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var gradBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Grad);
-                if (_gradientRectBatch.TryAdd(grru.RectPayload, gradBakeWorld, grru.FillOpacity, scissor, LogicalBounds(unit.Component, wt), slot4Grad))
+                if (_gradientRectBatch.TryAdd(grru.RectPayload, gradBakeWorld, grru.FillOpacity, scissor, gradRectBounds, slot4Grad))
                 {
                     if (_recording)
                     {
@@ -279,10 +281,11 @@ public partial class RenderCache
             }
             else if (device != null && unit is EllipseRenderUnit eru && _ellipseBatch.CanBatch(eru.EllipsePayload))
             {
-                if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
+                var ellipseBounds = LogicalBounds(unit.Component, wt);
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(1, ellipseBounds))   // 1 = ellipse layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var bakeWorld = ResolveBake(device, unit.Component, wt, out var slot4El);
-                if (_ellipseBatch.TryAdd(eru.EllipsePayload, bakeWorld, eru.FillOpacity, scissor, LogicalBounds(unit.Component, wt), slot4El))
+                if (_ellipseBatch.TryAdd(eru.EllipsePayload, bakeWorld, eru.FillOpacity, scissor, ellipseBounds, slot4El))
                 {
                     if (_recording)
                     {
@@ -301,10 +304,11 @@ public partial class RenderCache
             else if (device != null && unit is EllipseRenderUnit geru && _gradientEllipseBatch.CanBatch(geru.EllipsePayload))
             {
                 // A full ellipse with a LINEAR/RADIAL gradient fill: gradient sibling of the solid ellipse SDF batch.
-                if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
+                var gradElBounds = LogicalBounds(unit.Component, wt);
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(3, gradElBounds))   // 3 = gradient-ellipse layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var gradElBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4GradEl);
-                if (_gradientEllipseBatch.TryAdd(geru.EllipsePayload, gradElBakeWorld, geru.FillOpacity, scissor, LogicalBounds(unit.Component, wt), slot4GradEl))
+                if (_gradientEllipseBatch.TryAdd(geru.EllipsePayload, gradElBakeWorld, geru.FillOpacity, scissor, gradElBounds, slot4GradEl))
                 {
                     if (_recording)
                     {
@@ -424,6 +428,42 @@ public partial class RenderCache
         {
             _opsRecorded = true; _recording = false;
         }
+    }
+
+    // The batches flush bottom-up (rect < ellipse < gradient-rect < gradient-ellipse < instanced < text), so a HIGHER-layer
+    // batch draws ON TOP. A unit going into `layer` that OVERLAPS a pending higher-layer batch would be drawn UNDER it - yet
+    // that batch holds units EARLIER in paint order, so this (later) unit belongs on top (a solid thumb sitting on a gradient
+    // bar, a solid overlay over gradient content). Returning true here flushes the pending batches first, dropping this unit
+    // into a fresh cycle that draws after them = correct paint order. Same-or-lower layers keep their insertion order and are
+    // fine as-is; disjoint content never overlaps, so a plain list of same-material tiles pays only O(1) union checks.
+    private bool OverlapsHigherLayer(int layer, Rect lb)
+    {
+        if (layer < 1 && _ellipseBatch.OverlapsPending(lb))
+        {
+            return true;
+        }
+
+        if (layer < 2 && _gradientRectBatch.OverlapsPending(lb))
+        {
+            return true;
+        }
+
+        if (layer < 3 && _gradientEllipseBatch.OverlapsPending(lb))
+        {
+            return true;
+        }
+
+        if (layer < 4 && (_instancedFill?.OverlapsPending(lb) ?? false))
+        {
+            return true;
+        }
+
+        if (layer < 5 && _textBatch.OverlapsPending(lb))
+        {
+            return true;
+        }
+
+        return false;
     }
 
     // Play this frame's composited animations for RIGHT NOW and push to GPU, without the loop thread or the property system

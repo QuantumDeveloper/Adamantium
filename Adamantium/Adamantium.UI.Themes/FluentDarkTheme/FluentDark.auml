@@ -42,6 +42,7 @@
         <StyleInclude Source="{x:Type fluentDark:MenuStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:TreeViewStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:GridSplitterStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ColorPickerStyleSet}"/>
 	</Theme.StyleIncludes>
 
 	<!-- Accent: ONE seed. The theme derives the ramp (hover/pressed) and the on-accent TEXT colour for contrast (see

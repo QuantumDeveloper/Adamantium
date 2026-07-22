@@ -572,7 +572,11 @@ public abstract class TextBoxBase : Control
 
         RecordUndo(isTyping);
 
-        Text = newText;
+        // SetCurrentValue, NOT `Text = ` (which is a Local-priority set): an edit must write in the BINDING's own slot so a
+        // two-way {Binding}/{Ancestor} fires its write-back AND later source->target updates still apply. A plain Local set
+        // MASKS the binding - the box then "lives on its own", never reflecting a later source change (a ColorPicker field
+        // stuck after you typed in it). Mirrors Slider.SetValueFromInput.
+        SetCurrentValue(TextProperty, newText);
         var newCaret = start + insert.Length;
         SelectionStart = newCaret;
         SelectionLength = 0;
@@ -619,7 +623,7 @@ public abstract class TextBoxBase : Control
     {
         _restoring = true;
         _typingRun = false;
-        Text = s.Text;
+        SetCurrentValue(TextProperty, s.Text);   // binding-slot write (see ReplaceSelection), so undo doesn't mask a two-way binding either
         var len = TextLength;
         SelectionStart = Math.Clamp(s.SelStart, 0, len);
         SelectionLength = Math.Clamp(s.SelLength, 0, len - Math.Clamp(s.SelStart, 0, len));
