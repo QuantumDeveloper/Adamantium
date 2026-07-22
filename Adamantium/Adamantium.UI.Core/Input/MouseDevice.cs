@@ -58,18 +58,27 @@ public class MouseDevice
 
     public Vector2 GetPosition(IInputComponent relativeTo)
     {
-        var p = Position;
-        IUIComponent v = relativeTo;
-        IUIComponent root = null;
+        // Walk up to the root (window) that owns the screen<->client transform.
+        IUIComponent root = relativeTo;
+        while (root.VisualParent != null)
+        {
+            root = root.VisualParent;
+        }
 
+        // Convert the PHYSICAL screen position to LOGICAL client coords FIRST (PointToClient divides by the DPI scale),
+        // THEN subtract the elements' logical Bounds.Location down the chain - all in the same DIP space. The old order
+        // subtracted logical offsets straight off the physical screen position and converted after, mixing units: correct
+        // only at 100% DPI, and increasingly wrong (by the DPI scale) the further an element sits from the window origin -
+        // which made a picker on a scaled second monitor unusable.
+        var p = root.PointToClient(Position);
+        IUIComponent v = relativeTo;
         while (v != null)
         {
             p -= v.Bounds.Location;
-            root = v;
             v = v.VisualParent;
         }
 
-        return root.PointToClient(p);
+        return p;
     }
 
     public void SetCursor(Cursor cursor)
