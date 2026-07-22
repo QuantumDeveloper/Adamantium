@@ -7,7 +7,7 @@
     <Grid RowDefinitions="Auto,*" Margin="24">
         <StackPanel Grid.Row="0" Orientation="Vertical">
             <TextBlock Text="600 star polygons — identical tessellated mesh, per-item colour (non-SDF fill)."/>
-            <TextBlock Text="Run with env RETAINED_INSTANCING=1: the visible stars draw as ONE instanced call."
+            <TextBlock Text="Identical star meshes batch automatically into ONE instanced draw (geometry-identity instancing)."
                        Foreground="#94A3B8" Margin="0,4,0,0"/>
         </StackPanel>
 

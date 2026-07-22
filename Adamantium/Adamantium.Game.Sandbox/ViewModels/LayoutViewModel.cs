@@ -27,6 +27,10 @@ public partial class LayoutViewModel : TabPageViewModel
 
     public ObservableCollection<ColorRect> Rectangles { get; }
 
+    // The selected tile - bound two-way to ListBox.SelectedItem so the selection is state ON the view-model and survives a
+    // tab switch (the view is recreated, this view-model persists), same idea as the tree's node-side selection.
+    [Bindable] private ColorRect _selectedRect;
+
     // Cell width/height are independent so the aspect ratio (width/height) is adjustable - a non-square cell shows a real
     // ellipse (rx != ry) / a stretched rounded rect. Defaults are non-square so the aspect is visible immediately.
     [Bindable] private double _cellWidth = 120;

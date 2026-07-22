@@ -69,8 +69,13 @@ public partial class RenderCache
         if (_instancedFill != null)
         {
             var fi = _instancedFill.Flush(fullScissor, _projectionMatrix);
-            if (_recording && fi >= 0) _ops.Add(new RenderOp { Kind = RenderOpKind.InstancedFlush, SegIndex = fi });
+            if (_recording && fi >= 0)
+            {
+                _ops.Add(new RenderOp { Kind = RenderOpKind.InstancedFlush, SegIndex = fi });
+                _opsHaveInstancedFlush = true;
+            }
         }
+
         RecordSegment(2, _textBatch.Flush(device, fullScissor, _projectionMatrix));
         scissorNarrowed = false;
         _batchOpen = false;

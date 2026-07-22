@@ -24,11 +24,15 @@
         <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
                 BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                 BorderThickness="1" CornerRadius="10" Padding="8" Height="420">
-            <TreeView ItemsSource="{Binding Nodes}" SelectionMode="{Binding SelectedMode}">
+            <TreeView ItemsSource="{Binding Nodes}" SelectionMode="{Binding SelectedMode}"
+                      VerticalOffset="{Binding ScrollOffset, Mode=TwoWay}">
                 <TreeView.ItemContainerStyle>
-                    <!-- Bind each node's expansion back to its view-model, so first expand triggers the lazy directory read. -->
+                    <!-- Bind each node's expansion + selection back to its view-model: first expand triggers the lazy
+                         directory read, and expansion/selection become state ON the node, so they survive a tab switch
+                         (the view is recreated, the view-model persists). The scroll position rides along on VerticalOffset. -->
                     <Style Selector="TreeViewItem">
                         <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
                     </Style>
                 </TreeView.ItemContainerStyle>
                 <TreeView.ItemTemplate>

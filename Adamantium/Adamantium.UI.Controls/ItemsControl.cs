@@ -130,11 +130,23 @@ public class ItemsControl : Control, IContainer
 
     private static void OnItemsSourceChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
-        ((ItemsControl)a).Items.SetSource(e.NewValue as IEnumerable);
+        ((ItemsControl)a).ApplyItemsSource(e.NewValue as IEnumerable);
     }
 
+    /// <summary>Applies a new ItemsSource to the effective item list. Base points <see cref="Items"/> straight at the
+    /// source; overridden where the source is projected into a different backing list (TreeView flattens a tree into its
+    /// rows and points Items at THOSE).</summary>
+    protected virtual void ApplyItemsSource(IEnumerable newValue) => Items.SetSource(newValue);
+
     private static void OnItemTemplateChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
-        => OnRegenerateContainers(a, e);
+    {
+        ((ItemsControl)a).OnItemTemplateChangedCore();
+        OnRegenerateContainers(a, e);
+    }
+
+    /// <summary>Called when ItemTemplate changes, before containers regenerate. Overridden where the template drives the
+    /// backing list (TreeView resolves each node's children from the HierarchicalDataTemplate's ItemsSource path).</summary>
+    protected virtual void OnItemTemplateChangedCore() { }
 
     // ItemTemplate / ItemTemplateSelector / ItemContainerStyle changed: existing containers were projected through the
     // old settings, so drop them and re-generate.

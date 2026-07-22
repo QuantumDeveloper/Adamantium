@@ -131,9 +131,10 @@
             </StackPanel>
         </Grid>
 
-        <ListBox Grid.Row="2" 
-                 Margin="0 14 0 0" 
-                 ItemsSource="{Binding Rectangles}">
+        <ListBox Grid.Row="2"
+                 Margin="0 14 0 0"
+                 ItemsSource="{Binding Rectangles}"
+                 SelectedItem="{Binding SelectedRect, Mode=TwoWay}">
             <!-- The base template (rounded rectangle) is a Setter, NOT a local ItemTemplate attribute: a local value
                  (priority Local=1) would outrank the DataTrigger's Setter (Trigger=3) and the toggle could never swap it.
                  As a Setter (Style=5) the trigger wins while ShowEllipses is true (-> ellipses) and falls back to the

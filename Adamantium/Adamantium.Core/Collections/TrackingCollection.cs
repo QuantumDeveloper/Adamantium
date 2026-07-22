@@ -31,7 +31,7 @@ namespace Adamantium.Core.Collections
         /// </summary>
         /// <param name="items">The items that were added.</param>
         /// <param name="index">The starting index.</param>
-        private void NotifyAdd(IList items, int index)
+        protected void NotifyAdd(IList items, int index)
         {
             if (CollectionChanged != null)
             {
@@ -73,7 +73,7 @@ namespace Adamantium.Core.Collections
         /// </summary>
         /// <param name="items">The items that were removed.</param>
         /// <param name="index">The starting index.</param>
-        private void NotifyRemove(IList items, int index)
+        protected void NotifyRemove(IList items, int index)
         {
             if (CollectionChanged != null)
             {
@@ -87,7 +87,7 @@ namespace Adamantium.Core.Collections
         /// <summary>
         /// Raises the <see cref="CollectionChanged"/> event with a reset action.
         /// </summary>
-        private void NotifyReset()
+        protected void NotifyReset()
         {
             if (CollectionChanged != null)
             {

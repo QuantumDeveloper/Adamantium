@@ -8,14 +8,18 @@ using Adamantium.UI.Core.Templates;
 namespace Adamantium.UI.Controls;
 
 /// <summary>
-/// A node in a <see cref="TreeView"/>: a <see cref="Header"/> plus, when it has children, those child nodes shown indented
-/// below it while <see cref="IsExpanded"/>. Data-driven via <c>ItemsSource</c> + a <see cref="HierarchicalDataTemplate"/>
-/// (the same container seam as MenuItem), so a tree of any depth unrolls from the view-model. Clicking the header selects
-/// the node; clicking the expander toggles its children. The expander glyph is <see cref="ExpanderTemplate"/> - swap it to
-/// restyle the arrow without touching the item template.
+/// A realized row of a <see cref="TreeView"/>: the container for one visible node of the FLATTENED tree. It draws the
+/// node's <see cref="Header"/> (via the tree's HierarchicalDataTemplate), indented by <see cref="Indent"/> for its depth,
+/// with an expander when the node has children. It hosts NO child nodes of its own - the tree is flattened, so a node's
+/// children are sibling rows in the same virtualized list, not nested inside this control. Clicking the header selects the
+/// node; the expander (or a double-click) toggles the node's branch in the flat list. The expander glyph is
+/// <see cref="ExpanderTemplate"/> - swap it to restyle the arrow without touching the item template.
 /// </summary>
 public class TreeViewItem : ItemsControl, IHeaderedItemsControl
 {
+    // The step (px) each depth level insets the row - Indent = Depth * this.
+    private const double IndentStep = 16;
+
     public static readonly AdamantiumProperty HeaderProperty = AdamantiumProperty.Register(nameof(Header),
         typeof(object), typeof(TreeViewItem), new PropertyMetadata(null));
 
@@ -33,7 +37,14 @@ public class TreeViewItem : ItemsControl, IHeaderedItemsControl
     public static readonly AdamantiumProperty IsSelectedProperty = AdamantiumProperty.Register(nameof(IsSelected),
         typeof(bool), typeof(TreeViewItem), new PropertyMetadata(false, OnIsSelectedChanged));
 
-    // Read-only: true once the node has children (a branch, not a leaf). Drives the expander's visibility.
+    /// <summary>The row's indent (px) for its depth: Depth × step. The template insets the header by this, so a deep node
+    /// sits further right - the tree's shape, now expressed by indent instead of nesting.</summary>
+    public static readonly AdamantiumProperty IndentProperty = AdamantiumProperty.Register(nameof(Indent),
+        typeof(double), typeof(TreeViewItem), new PropertyMetadata(0.0,
+            PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
+
+    // Read-only: true when the node has children (a branch, not a leaf). Drives the expander's visibility. Set by the
+    // owner when the container is bound to its row (the flattened design resolves this from the data, not nested Items).
     public static readonly AdamantiumProperty HasItemsProperty = AdamantiumProperty.Register(nameof(HasItems),
         typeof(bool), typeof(TreeViewItem), new PropertyMetadata(false));
 
@@ -54,10 +65,8 @@ public class TreeViewItem : ItemsControl, IHeaderedItemsControl
         FocusableProperty.OverrideMetadata(typeof(TreeViewItem), new PropertyMetadata(true));
     }
 
-    public TreeViewItem()
-    {
-        Items.CollectionChanged += (_, _) => HasItems = Items.Count > 0;
-    }
+    /// <summary>The flat row this container currently shows (its depth / expand / selection model). Null before binding.</summary>
+    internal TreeRow Row { get; private set; }
 
     /// <summary>The node's label.</summary>
     public object Header { get => GetValue<object>(HeaderProperty); set => SetValue(HeaderProperty, value); }
@@ -68,11 +77,14 @@ public class TreeViewItem : ItemsControl, IHeaderedItemsControl
     /// <summary>The expander arrow's template - restyle the glyph here without rewriting the node template.</summary>
     public ControlTemplate ExpanderTemplate { get => GetValue<ControlTemplate>(ExpanderTemplateProperty); set => SetValue(ExpanderTemplateProperty, value); }
 
-    /// <summary>Whether this branch's children are shown.</summary>
+    /// <summary>Whether this branch is open (its children are shown as following rows in the flat list).</summary>
     public bool IsExpanded { get => GetValue<bool>(IsExpandedProperty); set => SetValue(IsExpandedProperty, value); }
 
-    /// <summary>Whether this node is the tree's selected one.</summary>
+    /// <summary>Whether this node is one of the tree's selected ones.</summary>
     public bool IsSelected { get => GetValue<bool>(IsSelectedProperty); set => SetValue(IsSelectedProperty, value); }
+
+    /// <summary>The row's depth indent (px). Read-only; set by the owner from the row's depth.</summary>
+    public double Indent { get => GetValue<double>(IndentProperty); private set => SetValue(IndentProperty, value); }
 
     /// <summary>True when the node has children (a branch). Read-only.</summary>
     public bool HasItems { get => GetValue<bool>(HasItemsProperty); private set => SetValue(HasItemsProperty, value); }
@@ -91,23 +103,43 @@ public class TreeViewItem : ItemsControl, IHeaderedItemsControl
     internal static TreeViewItem CreateContainer(Style itemContainerStyle)
     {
         var container = new TreeViewItem();
-        if (itemContainerStyle != null) container.Styles.Add(itemContainerStyle);
+        if (itemContainerStyle != null)
+        {
+            container.Styles.Add(itemContainerStyle);
+        }
+
         return container;
+    }
+
+    /// <summary>Binds this container to a flat <paramref name="row"/>: draw its node via <paramref name="headerTemplate"/>,
+    /// indent by depth, mirror the row's expand/selection state. The node is the DataContext so the header's {Binding}s and
+    /// the ItemContainerStyle's IsExpanded two-way binding resolve against it. Setting IsExpanded here only syncs the glyph
+    /// (the flattener already holds the row's state) - it does NOT re-drive expansion, which routes through the owner.</summary>
+    internal void BindRow(TreeRow row, DataTemplate headerTemplate)
+    {
+        Row = row;
+        DataContext = row.Node;
+        Header = row.Node;
+        HeaderTemplate = headerTemplate;
+        Indent = row.Depth * IndentStep;
+        HasItems = row.HasChildren;
+        IsExpanded = row.IsExpanded;
+        IsSelected = row.IsSelected;
     }
 
     public override void OnApplyTemplate()
     {
-        base.OnApplyTemplate();   // connects PART_ItemsPresenter (the indented child host)
+        base.OnApplyTemplate();
         // The expander is a ToggleButton whose CHECKED state mirrors IsExpanded (so ExpanderTemplate can rotate the arrow off
-        // its own IsChecked trigger). Sync both ways in code rather than relying on a two-way template binding.
+        // its own IsChecked trigger). Its click routes to the owner, which splices/removes the branch in the flat list.
         _expander = GetTemplateChild("PART_Expander") as ToggleButton;
         if (_expander != null)
         {
             _expander.IsChecked = IsExpanded;
-            _expander.Click += (_, _) => IsExpanded = _expander.IsChecked == true;
+            _expander.Click += (_, _) => FindOwnerTreeView()?.ToggleRow(this);
         }
-        // Track hover on the HEADER row only. The children live in a sibling ItemsPresenter (outside Root), so Root's
-        // mouse enter/leave is exactly "over this node's own row" - unlike IsMouseOver, which stays true over descendants.
+        // Track hover on the HEADER row only. Root's mouse enter/leave is exactly "over this node's own row" - unlike
+        // IsMouseOver, which would stay true over descendants (though the flat design has none nested, this stays correct).
         if (GetTemplateChild("Root") is IInputComponent root)
         {
             root.AddHandler(Mouse.MouseEnterEvent, new MouseEventHandler((_, _) => IsPointerOverHeader = true), true);
@@ -120,39 +152,61 @@ public class TreeViewItem : ItemsControl, IHeaderedItemsControl
         base.OnMouseLeftButtonDown(sender, e);
         // Select only the node whose OWN header row is under the pointer. e.Handled CAN'T gate this: MouseDownEvent bubbles,
         // and its class handler re-raises a FRESH MouseLeftButtonDown (Handled=false) for every ancestor - so a child's
-        // Handled is invisible to them, and each ancestor would select, leaving only the topmost (root) selected after
-        // Single-mode's deselect. IsPointerOverHeader is true only for the row directly under the pointer (a descendant's
-        // children live in a sibling presenter, so an ancestor's header is NOT under the pointer). The WPF-canonical guard.
-        if (!IsPointerOverHeader) return;
+        // Handled is invisible to them. IsPointerOverHeader is true only for the row directly under the pointer. WPF-canonical.
+        if (!IsPointerOverHeader)
+        {
+            return;
+        }
+
         e.Handled = true;
         // Double-click a branch toggles its expansion (the first click already selected on ClickCount==1). A leaf does
-        // nothing. The owner TreeView's ExpandOnDoubleClick (true by default) gates it.
+        // nothing. The owner TreeView's ExpandOnDoubleClick (true by default) gates it, and it owns the flat-list splice.
         if (e.ClickCount >= 2)
         {
-            if (HasItems && (FindOwnerTreeView()?.ExpandOnDoubleClick ?? true)) IsExpanded = !IsExpanded;
+            if (HasItems && (FindOwnerTreeView()?.ExpandOnDoubleClick ?? true))
+            {
+                FindOwnerTreeView()?.ToggleRow(this);
+            }
+
             return;
         }
         // Route the click (with its Ctrl/Shift modifiers) to the owner TreeView - the Single/Multiple/Extended policy lives
-        // there, since it must reach across nodes to clear or range-select the others.
+        // there, since it must reach across rows to clear or range-select the others.
         FindOwnerTreeView()?.OnItemClicked(this, e.Modifiers);
     }
 
-    // The TreeView hosting this node (shared by every node at any depth); its SelectionMode decides the click policy.
+    // The TreeView hosting this node; its SelectionMode decides the click policy and it owns the flat-list expansion.
     private TreeView FindOwnerTreeView()
     {
         for (IUIComponent c = VisualParent; c != null; c = c.VisualParent)
-            if (c is TreeView tv) return tv;
+        {
+            if (c is TreeView tv)
+            {
+                return tv;
+            }
+        }
+
         return null;
     }
 
     private static void OnIsExpandedChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
-        if (a is TreeViewItem item && item._expander != null) item._expander.IsChecked = (bool)e.NewValue;
+        if (a is TreeViewItem item && item._expander != null)
+        {
+            item._expander.IsChecked = (bool)e.NewValue;
+        }
     }
 
     private static void OnIsSelectedChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
-        if (a is not TreeViewItem item) return;
-        if ((bool)e.NewValue) item.RaiseEvent(new RoutedEventArgs(SelectedEvent, item));
+        if (a is not TreeViewItem item)
+        {
+            return;
+        }
+
+        if ((bool)e.NewValue)
+        {
+            item.RaiseEvent(new RoutedEventArgs(SelectedEvent, item));
+        }
     }
 }
