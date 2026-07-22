@@ -26,10 +26,7 @@ public sealed class ConicGradientBrush : GradientBrush
         get => GetValue<Vector2>(CenterProperty);
         set
         {
-            if (IsFrozen)
-            {
-                return;
-            }
+            if (IsFrozen) return;
             SetValue(CenterProperty, value);
         }
     }
@@ -40,10 +37,7 @@ public sealed class ConicGradientBrush : GradientBrush
         get => GetValue<double>(StartAngleProperty);
         set
         {
-            if (IsFrozen)
-            {
-                return;
-            }
+            if (IsFrozen) return;
             SetValue(StartAngleProperty, value);
         }
     }

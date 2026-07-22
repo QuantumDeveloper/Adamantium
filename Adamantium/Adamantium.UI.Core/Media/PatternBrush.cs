@@ -30,10 +30,7 @@ public sealed class PatternBrush : Brush
         get => GetValue<PatternType>(PatternProperty);
         set
         {
-            if (IsFrozen)
-            {
-                return;
-            }
+            if (IsFrozen) return;
             SetValue(PatternProperty, value);
         }
     }
@@ -44,10 +41,7 @@ public sealed class PatternBrush : Brush
         get => GetValue<Color>(Color1Property);
         set
         {
-            if (IsFrozen)
-            {
-                return;
-            }
+            if (IsFrozen) return;
             SetValue(Color1Property, value);
         }
     }
@@ -58,10 +52,7 @@ public sealed class PatternBrush : Brush
         get => GetValue<Color>(Color2Property);
         set
         {
-            if (IsFrozen)
-            {
-                return;
-            }
+            if (IsFrozen) return;
             SetValue(Color2Property, value);
         }
     }
@@ -72,10 +63,7 @@ public sealed class PatternBrush : Brush
         get => GetValue<double>(CellSizeProperty);
         set
         {
-            if (IsFrozen)
-            {
-                return;
-            }
+            if (IsFrozen) return;
             SetValue(CellSizeProperty, value);
         }
     }

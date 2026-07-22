@@ -21,15 +21,15 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
 
     protected override IEffectPass DrawPass => Effect.BatchPatternPass;
 
-    // Batchable = a PatternBrush fill, a batchable pen (none or a solid stroke the SDF shader draws), and uniform corner
-    // radius. Mirrors GradientRectCollector.CanBatch.
+    // Batchable = a PROCEDURAL fill (PatternBrush or NoiseBrush - both bake into this pass), a batchable pen (none or a
+    // solid stroke the SDF shader draws), and uniform corner radius. Mirrors GradientRectCollector.CanBatch.
     public bool CanBatch(RectanglePayload p)
     {
         if (!Enabled)
         {
             return false;
         }
-        if (p.Brush is not PatternBrush)
+        if (p.Brush is not (PatternBrush or NoiseBrush))
         {
             return false;
         }
@@ -59,9 +59,9 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
         return true;
     }
 
-    // Bake a pattern fill into an instance record. Position -> world; the pattern is fill-relative, so one brush paints any
-    // size. False on a rotated/sheared world (the axis-aligned instance can't hold it). Cell size scales by the world
-    // device scale (sx), matching how corner radius + stroke width are baked into device px.
+    // Bake a procedural fill (PatternBrush or NoiseBrush) into an instance record. Position -> world; the pattern is
+    // fill-relative, so one brush paints any size. False on a rotated/sheared world (the axis-aligned instance can't hold
+    // it). Cell/scale scales by the world device scale (sx), matching how corner radius + stroke width are baked into px.
     public static bool BakeItem(RectanglePayload p, Matrix4x4F world, double opacity, int transformSlot, out PatternRectItem item)
     {
         item = default;
@@ -70,17 +70,42 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
         {
             return false;   // rotation/shear -> per-unit
         }
-        if (p.Brush is not PatternBrush pat)
+
+        int type;
+        Color color1;
+        Color color2;
+        double cell;
+        double brushOpacity;
+        var noise = Vector4F.Zero;
+
+        if (p.Brush is PatternBrush pat)
+        {
+            type = (int)pat.Pattern;
+            color1 = pat.Color1;
+            color2 = pat.Color2;
+            cell = pat.CellSize;
+            brushOpacity = pat.Opacity;
+        }
+        else if (p.Brush is NoiseBrush n)
+        {
+            type = 4;   // shader contract: PatternMix type 4 = FBM noise
+            color1 = n.Color1;
+            color2 = n.Color2;
+            cell = n.Scale;
+            brushOpacity = n.Opacity;
+            noise = new Vector4F(n.Octaves, (float)n.Seed, (float)n.Lacunarity, (float)n.Gain);
+        }
+        else
         {
             return false;
         }
 
         var sx = world.M11; var sy = world.M22; var tx = world.M41; var ty = world.M42;
-        var alpha = (float)(opacity * pat.Opacity);
+        var alpha = (float)(opacity * brushOpacity);
 
-        var c1 = pat.Color1.ToVector4();
+        var c1 = color1.ToVector4();
         c1.W *= alpha;
-        var c2 = pat.Color2.ToVector4();
+        var c2 = color2.ToVector4();
         c2.W *= alpha;
 
         RectBatchCollector.BakeStroke(p.Pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1);
@@ -89,12 +114,13 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
         item = new PatternRectItem
         {
             Bounds = new Vector4F((float)(r.X * sx + tx), (float)(r.Y * sy + ty), (float)(r.Width * sx), (float)(r.Height * sy)),
-            Params = new Vector4F((float)(p.CornerRadius.TopLeft * sx), (int)pat.Pattern, (float)(pat.CellSize * sx), transformSlot),
+            Params = new Vector4F((float)(p.CornerRadius.TopLeft * sx), type, (float)(cell * sx), transformSlot),
             Color1 = c1,
             Color2 = c2,
             StrokeColor = strokeColor,
             Stroke0 = stroke0,
-            Stroke1 = stroke1
+            Stroke1 = stroke1,
+            Noise = noise
         };
         return true;
     }
