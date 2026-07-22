@@ -19,6 +19,17 @@
             <StackPanel Orientation="Vertical"
                         MarginLeft="32"
                         VerticalAlignment="Top">
+                <TextBlock Text="Colour wheel (conic hue × radial saturation)"
+                           FontSize="14"
+                           MarginBottom="14"/>
+                <!-- Two-way to the SAME PickedColor as the inline picker: drag the wheel for hue+saturation, the picker's
+                     SV square for value; both stay in sync and both drive the theme accent. The wheel dims to the value. -->
+                <ColorWheel SelectedColor="{Binding PickedColor, Mode=TwoWay}"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Vertical"
+                        MarginLeft="32"
+                        VerticalAlignment="Top">
                 <TextBlock Text="Live theme accent"
                            FontSize="14"
                            MarginBottom="14"/>
