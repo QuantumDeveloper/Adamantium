@@ -269,7 +269,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         inst.Geom0 = geom0;
         inst.Geom1 = geom1;
         inst.LocalBounds = new Vector4F((float)localBounds.X, (float)localBounds.Y, (float)localBounds.Width, (float)localBounds.Height);
-        inst.Params = new Vector4F(type, (float)g.SpreadMethod, count, 0f);
+        inst.Params = new Vector4F(type, (float)g.SpreadMethod, count, (float)g.ColorInterpolationMode);   // .w = interp mode (0 sRGB/1 OKLab)
         return inst;
     }
 

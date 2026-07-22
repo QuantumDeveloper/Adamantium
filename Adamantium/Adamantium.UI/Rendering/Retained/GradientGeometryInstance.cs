@@ -18,7 +18,7 @@ public struct GradientGeometryInstance
     /// <summary>Full per-instance world transform (element local -> world). Row-vector convention (as GeometryInstance).</summary>
     public Matrix4x4F World;
 
-    /// <summary>.x type (1 linear/2 radial); .y spread (0 pad/1 reflect/2 repeat); .z stop count; .w unused.</summary>
+    /// <summary>.x type (1 linear/2 radial); .y spread (0 pad/1 reflect/2 repeat); .z stop count; .w interp mode (0 sRGB/1 OKLab).</summary>
     public Vector4F Params;
 
     /// <summary>LOCAL 0..1: linear (startXY, endXY) | radial (centerXY, radiusXY).</summary>

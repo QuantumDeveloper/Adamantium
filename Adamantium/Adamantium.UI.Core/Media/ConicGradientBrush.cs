@@ -48,6 +48,7 @@ public sealed class ConicGradientBrush : GradientBrush
             Center = Center,
             StartAngle = StartAngle,
             SpreadMethod = SpreadMethod,
+            ColorInterpolationMode = ColorInterpolationMode,
             Opacity = Opacity
         };
 }

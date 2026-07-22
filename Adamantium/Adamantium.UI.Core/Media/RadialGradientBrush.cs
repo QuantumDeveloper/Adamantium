@@ -59,6 +59,7 @@ public sealed class RadialGradientBrush : GradientBrush
             RadiusX = RadiusX,
             RadiusY = RadiusY,
             SpreadMethod = SpreadMethod,
+            ColorInterpolationMode = ColorInterpolationMode,
             Opacity = Opacity
         };
 }
