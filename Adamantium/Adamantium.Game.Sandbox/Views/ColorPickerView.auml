@@ -1,0 +1,42 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions">
+    <StackPanel Orientation="Vertical" Margin="24">
+
+        <TextBlock Text="Color Picker"
+                   FontSize="20"
+                   MarginBottom="4"/>
+        <TextBlock Text="An inline HSV picker: drag the square (saturation / value), the hue bar and the alpha bar, or type a hex / R-G-B-A value. The picked colour is fed into the THEME accent, so the controls on the right recolour live."
+                   FontSize="13"
+                   Foreground="{ResourceReference TextFillColorSecondary}"
+                   MaxWidth="680"
+                   HorizontalAlignment="Left"
+                   MarginBottom="18"/>
+
+        <StackPanel Orientation="Horizontal">
+            <ColorPicker SelectedColor="{Binding PickedColor, Mode=TwoWay}"
+                         VerticalAlignment="Top"/>
+
+            <StackPanel Orientation="Vertical"
+                        MarginLeft="32"
+                        VerticalAlignment="Top">
+                <TextBlock Text="Live theme accent"
+                           FontSize="14"
+                           MarginBottom="14"/>
+                <CheckBox Content="Checkbox"
+                          IsChecked="True"
+                          MarginBottom="12"/>
+                <RadioButton Content="Radio button"
+                             IsChecked="True"
+                             MarginBottom="12"/>
+                <ToggleSwitch IsChecked="True"
+                              MarginBottom="16"/>
+                <Slider Width="200"
+                        Value="60"
+                        MarginBottom="16"/>
+                <ProgressBar Width="200"
+                             Value="60"/>
+            </StackPanel>
+        </StackPanel>
+
+    </StackPanel>
+</View>
