@@ -597,6 +597,113 @@ float4 GradientFillPS(GradFillPSInput input) : SV_Target
     return GradColor(gd, gt, fwidth(gt));
 }
 
+// ---- Pattern batch: the SAME SDF rounded-rect (self-AA shape + the shared stroke), but the FILL is a PROCEDURAL two-colour
+// PATTERN (checkerboard/stripes/dots/grid) evaluated per fragment - resolution-independent, no texture. Per-instance
+// PatternRectData from a BDA storage buffer by SV_InstanceID; the PS re-reads the record (light interpolator signature, like
+// GradientPS) and mixes Color1/Color2 by the pattern. Solid/gradient rects stay in their own passes.
+struct PatternRectData
+{
+    float4 Bounds;       // NODE-local x, y, w, h (world for slot-0 legacy bakes - identity matrix)
+    float4 Params;       // .x corner radius, .y pattern type (0 checker/1 stripes/2 dots/3 grid), .z cell size (px), .w slot
+    float4 Color1;       // straight RGBA, opacity folded
+    float4 Color2;       // straight RGBA, opacity folded
+    float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
+    float4 Stroke0;      // width_px, align, dashOn, dashGap
+    float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
+};
+
+struct PatternPSInput
+{
+    float4 Position : SV_Position;
+    float2 Local    : TEXCOORD0;   // fragment relative to the rect CENTRE (SDF space, device px)
+    float2 Half     : TEXCOORD1;   // rect half-size
+    float  Radius   : TEXCOORD2;   // corner radius
+    nointerpolation uint InstId : TEXCOORD3;   // instance -> re-read PatternRectData in the PS
+};
+
+[shader("vertex")]
+PatternPSInput PatternRectInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
+{
+    PatternRectData* items = (PatternRectData*)InstancesAddress;
+    PatternRectData it = items[instanceId];
+
+    PatternPSInput o;
+    float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
+    float outset = max(it.Stroke0.x * (0.5 * (1.0 + it.Stroke0.y) + 0.5), 0.0) + 1.0;
+    float4x4* transforms = (float4x4*)TransformsAddress;
+    float4x4 nodeWorld = transforms[(uint)it.Params.w];
+    float2 localPos = it.Bounds.xy + corner * it.Bounds.zw + (corner * 2.0 - 1.0) * outset;
+    float4 worldPos = mul(float4(localPos, 0.0, 1.0), nodeWorld);
+    o.Position = mul(worldPos, Projection);
+    o.Half   = it.Bounds.zw * 0.5;
+    o.Local  = (corner - 0.5) * it.Bounds.zw + (corner * 2.0 - 1.0) * outset;
+    o.Radius = it.Params.x;
+    o.InstId = instanceId;
+    return o;
+}
+
+// Pattern mix factor at fragment `p` (device px from the rect's top-left): 0 = Color1, 1 = Color2. Anti-aliased by the
+// fragment's pixel footprint (fwidth) - the checkerboard analytically (iq's filtered checker), the others via a ~1px
+// smoothstep on a signed field - so edges stay crisp without a tiled texture.
+float PatternMix(int type, float2 p, float cell)
+{
+    cell = max(cell, 1.0);
+    float2 g = p / cell;
+
+    if (type == 1)   // vertical stripes (the x-component of the checker: Color2 every other cell)
+    {
+        float w = fwidth(g.x) + 1e-4;
+        float i = 2.0 * (abs(frac((g.x - 0.5 * w) * 0.5) - 0.5) - abs(frac((g.x + 0.5 * w) * 0.5) - 0.5)) / w;
+        return saturate(0.5 - 0.5 * i);
+    }
+    if (type == 2)   // dots: a Color2 disc centred in each cell
+    {
+        float2 f = frac(g) - 0.5;
+        float d = length(f) - 0.34;                // radius 0.34 cells
+        float aa = fwidth(d) + 1e-4;
+        return 1.0 - smoothstep(-aa, aa, d);       // 1 inside the dot
+    }
+    if (type == 3)   // grid: thin Color2 lines at cell boundaries
+    {
+        float2 dl = (0.5 - abs(frac(g) - 0.5)) * cell;   // px distance to the nearest line, per axis
+        float dmin = min(dl.x, dl.y);
+        float aa = fwidth(dmin) + 1e-4;
+        return 1.0 - smoothstep(0.5, 0.5 + aa + 1.0, dmin);   // ~1px line
+    }
+
+    // checkerboard (type 0): iq's analytically-filtered checker (period 2 in g -> cell-sized squares)
+    float2 w2 = fwidth(g) + 1e-4;
+    float2 i2 = 2.0 * (abs(frac((g - 0.5 * w2) * 0.5) - 0.5) - abs(frac((g + 0.5 * w2) * 0.5) - 0.5)) / w2;
+    return saturate(0.5 - 0.5 * i2.x * i2.y);
+}
+
+[shader("fragment")]
+float4 PatternPS(PatternPSInput input) : SV_Target
+{
+    PatternRectData* items = (PatternRectData*)InstancesAddress;
+    PatternRectData it = items[input.InstId];
+
+    float r = min(input.Radius, min(input.Half.x, input.Half.y));
+    int joinType = int(fmod(floor(it.Stroke1.w / 512.0), 8.0));
+    float d = SdRoundRectJoin(input.Local, input.Half, r, joinType);
+
+    float2 p = input.Local + input.Half;   // fragment from the rect's TOP-LEFT (stable pattern origin at the corner)
+    float k = PatternMix(int(it.Params.y), p, it.Params.z);
+    float4 fill = lerp(it.Color1, it.Color2, k);
+
+    float mask = 1.0;
+    if (it.Stroke0.z > 0.0 || it.Stroke1.y > 0.0 || it.Stroke1.z < 1.0)
+    {
+        float halfW = it.Stroke0.x * 0.5;
+        float perim;
+        float s = RoundRectArc(input.Local, input.Half, r, perim);
+        float dPerp = d - it.Stroke0.y * halfW;
+        mask = DashTrimMask(s, s, perim, it.Stroke0.z, it.Stroke0.w, it.Stroke1.x, it.Stroke1.y,
+                            it.Stroke1.z, dPerp, halfW, it.Stroke1.w);
+    }
+    return CompositeFillStroke(d, fill, it.StrokeColor, it.Stroke0.x, it.Stroke0.y, mask);
+}
+
 // =====================================================================================================================
 // TECHNIQUE - one technique, one pass per draw variant (kept together at the end of the file so the shader code above
 // reads top-to-bottom without technique boilerplate breaking it up). Each pass names its vertex + pixel shader; the C#
@@ -651,5 +758,15 @@ technique Batch
         Profile = 6.6;
         VertexShader = GradientRectInstancedVS;
         PixelShader = GradientPS;
+    }
+
+    // SDF rounded-rect fills with a PROCEDURAL PATTERN fill (per-instance PatternRectData; the PS re-reads by SV_InstanceID
+    // and mixes Color1/Color2 by the pattern); quad from SV_VertexID. Solid/gradient rects use pass Rect/Gradient.
+    pass Pattern
+    {
+        EffectName = "BatchEffect";
+        Profile = 6.6;
+        VertexShader = PatternRectInstancedVS;
+        PixelShader = PatternPS;
     }
 }

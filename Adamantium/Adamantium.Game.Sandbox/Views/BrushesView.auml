@@ -115,6 +115,40 @@
                 </Ellipse>
             </WrapPanel>
 
+            <TextBlock Text="Pattern brushes — procedural, resolution-independent (NEW)" FontSize="18" Margin="0,20,0,10"/>
+            <WrapPanel Orientation="Horizontal">
+                <!-- checkerboard: the classic transparency backdrop -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <PatternBrush Pattern="Checkerboard" Color1="#FFFFFF" Color2="#BFBFBF" CellSize="12"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <!-- vertical stripes -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <PatternBrush Pattern="Stripes" Color1="#1E3A8A" Color2="#3B82F6" CellSize="12"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <!-- dots -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <PatternBrush Pattern="Dots" Color1="#111827" Color2="#22D3EE" CellSize="22"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <!-- grid -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <PatternBrush Pattern="Grid" Color1="#0B1220" Color2="#475569" CellSize="20"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <!-- checkerboard + a stroke: the shared SDF stroke still draws over a pattern fill -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10" Stroke="#88FFFFFF" StrokeThickness="3">
+                    <Rectangle.Fill>
+                        <PatternBrush Pattern="Checkerboard" Color1="#0F172A" Color2="#1E293B" CellSize="16"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+            </WrapPanel>
+
             <TextBlock Text="Gradients — ellipses" FontSize="18" Margin="0,20,0,10"/>
             <WrapPanel Orientation="Horizontal">
                 <Ellipse Width="120" Height="120" Margin="10">
