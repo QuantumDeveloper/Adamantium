@@ -8,7 +8,7 @@
          comes from ItemsPanel (default = a vertical virtualizing StackPanel; set it to a WrapPanel for a tiled list).
          Items are ListBoxItem containers (see ListBoxItemStyleSet). Only Background is per-instance (Control.Background);
          the border/corner are theme chrome. -->
-    <Style Selector="ListBox">
+    <Style Selector="ListBox" BasedOn="ItemsControl">
         <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
     </Style>
 

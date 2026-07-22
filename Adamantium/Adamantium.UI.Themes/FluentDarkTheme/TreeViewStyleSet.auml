@@ -4,7 +4,7 @@
           xmlns:controls="http://adamantium/ui">
 
     <!-- TreeView: a scrollable host of top-level TreeViewItem nodes. The nested nodes come from each item's own template. -->
-    <Style Selector="TreeView">
+    <Style Selector="TreeView" BasedOn="ItemsControl">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="ItemsPanel">
             <Setter.Value>
@@ -34,7 +34,7 @@
 
     <!-- TreeViewItem: [expander] header  |  its child nodes below, indented one step, shown while IsExpanded. The indent
          COMPOUNDS through nesting (each level's child presenter insets by the same step), so depth N sits N steps in. -->
-    <Style Selector="TreeViewItem">
+    <Style Selector="TreeViewItem" BasedOn="ItemsControl">
         <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
         <Setter Property="FontSize" Value="14"/>
         <Setter Property="ItemsPanel">

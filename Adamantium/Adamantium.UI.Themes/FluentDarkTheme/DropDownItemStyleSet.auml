@@ -6,7 +6,7 @@
     <!-- DropDownItem: a row in the DropDown popup list. Same chrome as ListBoxItem (it derives from it); rest transparent,
          hover/pressed subtle fills, selected uses the accent. Per the small-styles convention: properties, template, triggers. -->
 
-    <Style Selector="DropDownItem">
+    <Style Selector="DropDownItem" BasedOn="ListBoxItem">
         <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
         <Setter Property="BackgroundPointerOver" Value="{ResourceReference ControlFillColorSecondary}"/>
         <Setter Property="BackgroundPressed" Value="{ResourceReference ControlFillColorTertiary}"/>

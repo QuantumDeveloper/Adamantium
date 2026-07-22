@@ -216,19 +216,52 @@ public class Theme : AdamantiumComponent, ITheme
         var cacheable = component.Id == null && component.ClassNames.Count == 0;
         if (cacheable && _typeStyleCache.TryGetValue(type, out var cached)) return cached;
 
-        // Base-first ordering: a matched style that targets a BASE type (larger SpecificityDistance) is applied BEFORE
-        // one that targets a more-derived type, so the most-specific style's setters land last and win (e.g. Button's
-        // template overrides the ContentControl template it now also matches). OrderByDescending is stable, so styles of
-        // equal specificity keep their document/include order (the existing base + template + triggers + Accent cascade).
-        var styles = MergedStyles.Styles
-            .Where(x => x.Selector.Match(component))
+        // A styled TYPE is a BOUNDARY (DefaultStyleKey semantics): among the IS-A candidates, keep the type styles of only
+        // the NEAREST styled ancestor (smallest inheritance distance). So a derived control does NOT inherit a base type's
+        // implicit style - a CheckBox : ToggleButton gets the CheckBox style, not ToggleButton's - which makes matching
+        // predictable and kills the accidental-inheritance leaks. But a subclass with NO style of its own (an AUML x:Class
+        // MainWindow : Window) still falls back to its base's chrome, because the nearest styled ancestor IS the base.
+        // A selector with no type facet (class/id only) is not type-bound and always applies. Cross-type sharing that a
+        // control DOES want is explicit via Style.BasedOn. Ordering within the kept set is base-first + stable (document
+        // order at equal specificity), so a class style still lands after the type style it refines.
+        var matched = MergedStyles.Styles.Where(x => x.Selector.Match(component)).ToArray();
+        var nearestDistance = matched
+            .Where(x => x.Selector.Types.Count > 0)
+            .Select(x => x.Selector.SpecificityDistance(type))
+            .DefaultIfEmpty(int.MaxValue)
+            .Min();
+        var styles = matched
+            .Where(x => x.Selector.Types.Count == 0 || x.Selector.SpecificityDistance(type) == nearestDistance)
             .OrderByDescending(x => x.Selector.SpecificityDistance(type))
             .ToArray();
 
-        if (cacheable) 
+        if (cacheable)
             _typeStyleCache[type] = styles;
         return styles;
     }
+
+    // Expand a BasedOn selector into the base styles a deriving style pulls in - base-first, deduped, and recursive (a
+    // base may itself be BasedOn another). `seen` starts with the deriving style so a base can't re-pull it (cycle guard).
+    internal void CollectBasedOn(StyleSelector basedOn, List<Style> result, HashSet<Style> seen)
+    {
+        foreach (var type in basedOn.Types)
+            foreach (var s in StylesForType(type))
+                AddWithBases(s, result, seen);
+    }
+
+    private void AddWithBases(Style s, List<Style> result, HashSet<Style> seen)
+    {
+        if (!seen.Add(s)) return;
+        if (s.BasedOn is { Types.Count: > 0 }) CollectBasedOn(s.BasedOn, result, seen);   // its own bases first
+        result.Add(s);
+    }
+
+    // The PURE-TYPE styles for a type (no id/class/group facet) - the set an instance of exactly that type would match.
+    // BasedOn pulls these in for a derived control that opts into the base look.
+    private IEnumerable<Style> StylesForType(Type type) =>
+        MergedStyles.Styles.Where(s =>
+            s.Selector.Id == null && s.Selector.Classes.Count == 0 && s.Selector.ClassGroups.Count == 0
+            && s.Selector.Types.Any(t => t == type));
 
     public object GetResource(string key)
     {

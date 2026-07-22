@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions"
+          xmlns:controls="http://adamantium/ui">
+
+    <!-- GridSplitter: a draggable divider that resizes the Grid rows/columns on either side of it. A Thumb subtype - the
+         drag mechanics come from Thumb (in code), so this style is just the LOOK: a thin subtle bar that lights up accent
+         while hovered. The resize cursor (SizeWE / SizeNS) is set by the control itself from its ResizeDirection. Under
+         exact-type matching it no longer inherits the Thumb style, so it carries its own template. -->
+    <Style Selector="GridSplitter">
+        <Setter Property="Background" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="GridSplitter">
+                    <controls:Border Background="{TemplateBinding Background}"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="GridSplitter">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter Property="Background" Value="{ResourceReference AccentFillColorDefault}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

@@ -9,7 +9,7 @@
 
     <!-- Shared chrome + the default (horizontal) header panel. The drag-reorder motion feel is declared here (the easing
          defaults to a decelerate cubic in code). -->
-    <Style Selector="TabControl">
+    <Style Selector="TabControl" BasedOn="ItemsControl">
         <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
         <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
         <Setter Property="BorderThickness" Value="1"/>
