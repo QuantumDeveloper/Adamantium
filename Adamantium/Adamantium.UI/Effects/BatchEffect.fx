@@ -383,7 +383,7 @@ EllipsePSInput EllipseBatchInstancedVS(uint vertexId : SV_VertexID, uint instanc
 struct GradientRectData
 {
     float4 Bounds;       // world x, y, w, h
-    float4 Params;       // .x corner radius, .y type (1 linear/2 radial), .z stop count, .w spread (0 pad/1 reflect/2 repeat)
+    float4 Params;       // .x corner radius, .y type (1 linear/2 radial/3 conic), .z stop count, .w spread (0 pad/1 reflect/2 repeat)
     float4 Geom0;        // LOCAL 0..1: linear (startXY, endXY) | radial (centerXY, radiusXY)
     float4 Geom1;        // radial focal (originXY, _, _); unused for linear
     float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
@@ -423,6 +423,12 @@ float GradParam(GradientRectData it, float2 uv)
         float sEdge = -b + sqrt(max(b * b - c, 0.0));      // dist focal->unit-circle along the ray
         return (sEdge > 1e-6) ? (dlen / sEdge) : 0.0;
     }
+    if (int(it.Params.y) == 3)   // conic: angular sweep around Geom0.xy; Geom0.z = start angle in turns
+    {
+        float2 d = uv - it.Geom0.xy;
+        float ang = atan2(d.x, -d.y);                    // 0 at top (12 o'clock), + is clockwise (screen y is down)
+        return frac(ang * 0.15915494309 - it.Geom0.z);   // * 1/(2*pi), rotated by the start angle
+    }
     float2 start = it.Geom0.xy;
     float2 axis = it.Geom0.zw - start;
     float denom = dot(axis, axis);
@@ -430,8 +436,12 @@ float GradParam(GradientRectData it, float2 uv)
     return dot(uv - start, axis) / denom;
 }
 
-// The colour at parameter t by interpolating the (offset-sorted) stops. t is already spread-mapped to 0..1.
-float4 GradColor(GradientRectData it, float t)
+// The colour at parameter t (already spread-mapped to 0..1) by interpolating the (offset-sorted) stops. `aa` is the pixel
+// footprint of t (fwidth) so every stop transition is at least one pixel wide: this ANTI-ALIASES hard stops (two stops on
+// one offset - a conic pie chart's segment edges, a hard linear split), which otherwise stair-step. A smooth segment
+// (wider than a pixel) keeps its exact linear ramp. Written as summed OVER-lerps rather than an early-out segment lookup so
+// a zero-width segment still contributes its 1px transition instead of being skipped.
+float4 GradColor(GradientRectData it, float t, float aa)
 {
     int n = int(it.Params.z);
     if (n <= 0) return float4(0.0, 0.0, 0.0, 0.0);
@@ -441,16 +451,25 @@ float4 GradColor(GradientRectData it, float t)
     float4 cols[8];
     cols[0] = it.Stop0; cols[1] = it.Stop1; cols[2] = it.Stop2; cols[3] = it.Stop3;
     cols[4] = it.Stop4; cols[5] = it.Stop5; cols[6] = it.Stop6; cols[7] = it.Stop7;
-    if (t <= offs[0]) return cols[0];
+
+    float4 col = cols[0];
     for (int i = 1; i < n; i++)
     {
-        if (t <= offs[i])
+        float lo = offs[i - 1];
+        float hi = offs[i];
+        float w = hi - lo;
+        float bl;
+        if (w > aa)
         {
-            float seg = max(offs[i] - offs[i - 1], 1e-6);
-            return lerp(cols[i - 1], cols[i], saturate((t - offs[i - 1]) / seg));
+            bl = saturate((t - lo) / max(w, 1e-6));                       // linear across the real segment
         }
+        else
+        {
+            bl = saturate((t - 0.5 * (lo + hi)) / max(aa, 1e-6) + 0.5);   // 1px ramp centred on a hard stop
+        }
+        col = lerp(col, cols[i], bl);
     }
-    return cols[n - 1];
+    return col;
 }
 
 struct GradPSInput
@@ -499,7 +518,8 @@ float4 GradientPS(GradPSInput input) : SV_Target
     float d = ellipse ? SdEllipse(input.Local, input.Half) : SdRoundRectJoin(input.Local, input.Half, r, joinType);
 
     float2 uv = input.Local / max(input.Half * 2.0, float2(1e-4, 1e-4)) + 0.5;   // 0..1 across the bounds
-    float4 fill = GradColor(it, GradSpread(GradParam(it, uv), int(it.Params.w)));
+    float gt = GradSpread(GradParam(it, uv), int(it.Params.w));
+    float4 fill = GradColor(it, gt, fwidth(gt));
 
     float mask = 1.0;
     if (it.Stroke0.z > 0.0 || it.Stroke1.y > 0.0 || it.Stroke1.z < 1.0)
@@ -573,7 +593,8 @@ float4 GradientFillPS(GradFillPSInput input) : SV_Target
     gd.Offsets0 = it.Offsets0; gd.Offsets1 = it.Offsets1;
 
     float2 uv = (input.Local - it.LocalBounds.xy) / max(it.LocalBounds.zw, float2(1e-4, 1e-4));
-    return GradColor(gd, GradSpread(GradParam(gd, uv), int(gd.Params.w)));
+    float gt = GradSpread(GradParam(gd, uv), int(gd.Params.w));
+    return GradColor(gd, gt, fwidth(gt));
 }
 
 // =====================================================================================================================

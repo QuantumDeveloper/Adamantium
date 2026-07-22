@@ -60,6 +60,61 @@
                 </Rectangle>
             </WrapPanel>
 
+            <TextBlock Text="Conic gradients — angular sweep (NEW)" FontSize="18" Margin="0,20,0,10"/>
+            <WrapPanel Orientation="Horizontal">
+                <!-- full-spectrum sweep (a colour wheel's hue): start at top, clockwise; last stop meets the first -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <ConicGradientBrush Center="0.5,0.5">
+                            <GradientStop Color="#FF0000" Offset="0"/>
+                            <GradientStop Color="#FFFF00" Offset="0.1667"/>
+                            <GradientStop Color="#00FF00" Offset="0.3333"/>
+                            <GradientStop Color="#00FFFF" Offset="0.5"/>
+                            <GradientStop Color="#0000FF" Offset="0.6667"/>
+                            <GradientStop Color="#FF00FF" Offset="0.8333"/>
+                            <GradientStop Color="#FF0000" Offset="1"/>
+                        </ConicGradientBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <!-- two-colour sweep rotated to start from the right (StartAngle 90) -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <ConicGradientBrush Center="0.5,0.5" StartAngle="90">
+                            <GradientStop Color="#1E293B" Offset="0"/>
+                            <GradientStop Color="#38BDF8" Offset="0.5"/>
+                            <GradientStop Color="#1E293B" Offset="1"/>
+                        </ConicGradientBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <!-- pie chart: hard segments (a stop doubled at each boundary) -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <ConicGradientBrush Center="0.5,0.5">
+                            <GradientStop Color="#EF4444" Offset="0"/>
+                            <GradientStop Color="#EF4444" Offset="0.25"/>
+                            <GradientStop Color="#22C55E" Offset="0.25"/>
+                            <GradientStop Color="#22C55E" Offset="0.6"/>
+                            <GradientStop Color="#3B82F6" Offset="0.6"/>
+                            <GradientStop Color="#3B82F6" Offset="1"/>
+                        </ConicGradientBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <!-- conic on a circle = a proper colour wheel -->
+                <Ellipse Width="140" Height="140" Margin="10">
+                    <Ellipse.Fill>
+                        <ConicGradientBrush Center="0.5,0.5">
+                            <GradientStop Color="#FF0000" Offset="0"/>
+                            <GradientStop Color="#FFFF00" Offset="0.1667"/>
+                            <GradientStop Color="#00FF00" Offset="0.3333"/>
+                            <GradientStop Color="#00FFFF" Offset="0.5"/>
+                            <GradientStop Color="#0000FF" Offset="0.6667"/>
+                            <GradientStop Color="#FF00FF" Offset="0.8333"/>
+                            <GradientStop Color="#FF0000" Offset="1"/>
+                        </ConicGradientBrush>
+                    </Ellipse.Fill>
+                </Ellipse>
+            </WrapPanel>
+
             <TextBlock Text="Gradients — ellipses" FontSize="18" Margin="0,20,0,10"/>
             <WrapPanel Orientation="Horizontal">
                 <Ellipse Width="120" Height="120" Margin="10">
