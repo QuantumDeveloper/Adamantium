@@ -26,6 +26,7 @@ public partial class RenderCache
     private GradientRectCollector _gradientRectBatch;   // SDF family: rounded rects with a linear/radial GRADIENT fill
     private GradientEllipseCollector _gradientEllipseBatch;   // SDF family: ellipses with a linear/radial GRADIENT fill
     private PatternRectCollector _patternBatch;   // SDF family: rounded rects with a PROCEDURAL pattern fill (checker/stripes/dots/grid)
+    private FractalRectCollector _fractalBatch;   // SDF family: rounded rects with an escape-time FRACTAL fill (Julia/Mandelbrot)
     private Rect2D _batchScissor;
     private bool _batchOpen;
 
@@ -46,7 +47,7 @@ public partial class RenderCache
         public RenderOpKind Kind;
         public Rect2D Scissor;    // Scissor
         public IRenderUnit Unit;  // Unit
-        public byte Batch;        // Segment: which collector (0 rect, 1 ellipse, 2 text, 3 gradient-rect, 4 gradient-ellipse, 5 pattern)
+        public byte Batch;        // Segment: which collector (0 rect, 1 ellipse, 2 text, 3 gradient-rect, 4 gradient-ellipse, 5 pattern, 6 fractal)
         public int SegIndex;      // Segment: index into that collector's recorded segment list; InstancedFlush: flush index
     }
     private readonly List<RenderOp> _ops = new();
@@ -145,12 +146,14 @@ public partial class RenderCache
             _gradientRectBatch ??= new GradientRectCollector();
             _gradientEllipseBatch ??= new GradientEllipseCollector();
             _patternBatch ??= new PatternRectCollector();
+            _fractalBatch ??= new FractalRectCollector();
             _textBatch.BeginFrame(device);
             _rectBatch.BeginFrame(device);
             _ellipseBatch.BeginFrame(device);
             _gradientRectBatch.BeginFrame(device);
             _gradientEllipseBatch.BeginFrame(device);
             _patternBatch.BeginFrame(device);
+            _fractalBatch.BeginFrame(device);
             // Transform table: identity at slot 0, (re)sized at this fence-safe point; the SDF collectors read the address
             // per draw (BeginFrame may have reallocated the buffer).
             if (_transformTable == null)
@@ -168,6 +171,7 @@ public partial class RenderCache
             _gradientRectBatch.TransformsAddress = _transformTable.DeviceAddress;
             _gradientEllipseBatch.TransformsAddress = _transformTable.DeviceAddress;
             _patternBatch.TransformsAddress = _transformTable.DeviceAddress;
+            _fractalBatch.TransformsAddress = _transformTable.DeviceAddress;
             _textBatch.TransformsAddress = _transformTable.DeviceAddress;   // glyph VS fetches the block's node matrix by slot
             var sceneClean = LastBuildKind == RenderBuildKind.Clean;
             _textBatch.SceneClean = sceneClean;
@@ -176,6 +180,7 @@ public partial class RenderCache
             _gradientRectBatch.SceneClean = sceneClean;
             _gradientEllipseBatch.SceneClean = sceneClean;
             _patternBatch.SceneClean = sceneClean;
+            _fractalBatch.SceneClean = sceneClean;
             // Incremental upload: a Clean frame re-bakes byte-identical items into slots the buffers already hold, so Flush
             // skips the redundant upload (zero bytes move on an idle frame).
             if (InstancedFillCollector.Enabled)
@@ -353,6 +358,30 @@ public partial class RenderCache
                 pru.EnsureMachinery();
                 unit.Update(wt, _projectionMatrix, _renderScale);
             }
+            else if (device != null && unit is RectangleRenderUnit fru && _fractalBatch.CanBatch(fru.RectPayload))
+            {
+                // A rounded rect with an escape-time FRACTAL fill (Julia/Mandelbrot): a new SDF-batch sibling, its own pass
+                // iterates z=z²+c per fragment. Shares the clip group with the other batches; auto-morph is a shader-side
+                // Time drift, so this batch is not paint/slot-patchable (no _sdfSlotByUnit entry) - a full walk re-records it.
+                var fractalBounds = LogicalBounds(unit.Component, wt);
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(5, fractalBounds))   // 5 = fractal layer
+                {
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                }
+                var fracBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Frac);
+                if (_fractalBatch.TryAdd(fru.RectPayload, fracBakeWorld, fru.FillOpacity, scissor, fractalBounds, slot4Frac))
+                {
+                    if (_recording)
+                    {
+                        group.PatchableRectOnly = false;
+                    }
+                    _batchScissor = scissor;
+                    _batchOpen = true;
+                    continue;
+                }
+                fru.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
+            }
             else if (device != null && unit is TextRenderUnit tru && tru.TextComponent is { } tc && _textBatch.CanBatch(tc, out var atlas))
             {
                 if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_textBatch.SameAtlas(atlas))
@@ -405,12 +434,12 @@ public partial class RenderCache
                 }
                 ggru.FillInstanced = false;
             }
-            else if (device != null && (_rectBatch.Active || _ellipseBatch.Active || _gradientRectBatch.Active || _gradientEllipseBatch.Active || _patternBatch.Active || _textBatch.Active || (_instancedFill?.Active ?? false)))
+            else if (device != null && (_rectBatch.Active || _ellipseBatch.Active || _gradientRectBatch.Active || _gradientEllipseBatch.Active || _patternBatch.Active || _fractalBatch.Active || _textBatch.Active || (_instancedFill?.Active ?? false)))
             {
                 // A non-batchable unit that overlaps any pending batch: flush them first so this unit paints OVER them, as
                 // its later source order requires. Spatially disjoint units (a list's items) don't flush.
                 var lb = LogicalBounds(unit.Component, wt);
-                if (_rectBatch.OverlapsPending(lb) || _ellipseBatch.OverlapsPending(lb) || _gradientRectBatch.OverlapsPending(lb) || _gradientEllipseBatch.OverlapsPending(lb) || _patternBatch.OverlapsPending(lb) || _textBatch.OverlapsPending(lb) || (_instancedFill?.OverlapsPending(lb) ?? false))
+                if (_rectBatch.OverlapsPending(lb) || _ellipseBatch.OverlapsPending(lb) || _gradientRectBatch.OverlapsPending(lb) || _gradientEllipseBatch.OverlapsPending(lb) || _patternBatch.OverlapsPending(lb) || _fractalBatch.OverlapsPending(lb) || _textBatch.OverlapsPending(lb) || (_instancedFill?.OverlapsPending(lb) ?? false))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
             }
             else if (device == null && unit is RectangleRenderUnit rruNoDev)
@@ -460,7 +489,7 @@ public partial class RenderCache
         }
     }
 
-    // The batches flush bottom-up (rect < ellipse < gradient-rect < gradient-ellipse < pattern < instanced < text), so a
+    // The batches flush bottom-up (rect < ellipse < gradient-rect < gradient-ellipse < pattern < fractal < instanced < text), so a
     // HIGHER-layer batch draws ON TOP. A unit going into `layer` that OVERLAPS a pending higher-layer batch would be drawn
     // UNDER it - yet that batch holds units EARLIER in paint order, so this (later) unit belongs on top (a solid thumb
     // sitting on a gradient bar, a solid overlay over gradient content). Returning true here flushes the pending batches
@@ -488,12 +517,17 @@ public partial class RenderCache
             return true;
         }
 
-        if (layer < 5 && (_instancedFill?.OverlapsPending(lb) ?? false))
+        if (layer < 5 && _fractalBatch.OverlapsPending(lb))
         {
             return true;
         }
 
-        if (layer < 6 && _textBatch.OverlapsPending(lb))
+        if (layer < 6 && (_instancedFill?.OverlapsPending(lb) ?? false))
+        {
+            return true;
+        }
+
+        if (layer < 7 && _textBatch.OverlapsPending(lb))
         {
             return true;
         }

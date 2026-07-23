@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions"
+          xmlns:controls="http://adamantium/ui">
+
+    <!-- ColorPickerButton: a swatch (its fill = SelectedBrush, which tracks SelectedColor) that opens a ColorPicker in a
+         floating popup. The control toggles/positions the popup and light-dismisses in code; the picker's SelectedColor is
+         {Ancestor}-bound two-way (the Ancestor binding walks the logical tree, which stays intact for popup content). -->
+
+    <Style Selector="ColorPickerButton">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ColorPickerButton">
+                    <controls:Grid>
+                        <controls:Border x:Name="PART_Header"
+                                CornerRadius="6"
+                                Background="{ResourceReference ControlFillColorDefault}"
+                                BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                BorderThickness="1"
+                                Padding="4">
+                            <controls:Border Background="{TemplateBinding SelectedBrush}"
+                                    CornerRadius="4"
+                                    Width="72"
+                                    Height="22"/>
+                        </controls:Border>
+
+                        <controls:Popup x:Name="PART_Popup"
+                                Placement="Bottom" FlipToFit="True" VerticalOffset="4">
+                            <!-- DataContext is set to the ColorPickerButton in code (Popup.Open propagates it to the child),
+                                 so this plain {Binding} resolves to our SelectedColor two-way. -->
+                            <controls:ColorPicker SelectedColor="{Binding SelectedColor, Mode=TwoWay}"/>
+                        </controls:Popup>
+                    </controls:Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="ColorPickerButton">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="PART_Header" Property="Background" Value="{ResourceReference ControlFillColorSecondary}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

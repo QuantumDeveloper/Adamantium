@@ -43,6 +43,7 @@
         <StyleInclude Source="{x:Type fluentDark:TreeViewStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:GridSplitterStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ColorPickerStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:ColorPickerButtonStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ColorWheelStyleSet}"/>
 	</Theme.StyleIncludes>
 

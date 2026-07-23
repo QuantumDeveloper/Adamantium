@@ -27,6 +27,10 @@ public class MouseDevice
 
     private Vector2 Position;
 
+    // The window the current Position was measured against (set on every raw event). GetPosition falls back to it when the
+    // relativeTo element has NO VisualParent path to a window - i.e. it lives on a popup overlay (a detached logical child).
+    private IInputComponent _positionRoot;
+
     private static MouseDevice currentDevice;
         
     public static MouseDevice CurrentDevice => currentDevice ??= new MouseDevice();
@@ -70,7 +74,12 @@ public class MouseDevice
         // subtracted logical offsets straight off the physical screen position and converted after, mixing units: correct
         // only at 100% DPI, and increasingly wrong (by the DPI scale) the further an element sits from the window origin -
         // which made a picker on a scaled second monitor unusable.
-        var p = root.PointToClient(Position);
+        // Popup-overlay content is a DETACHED logical child (no VisualParent path to the window), so the walk above stops at
+        // the overlay root, NOT the window. Use the window the Position was measured against for the screen->client + DPI
+        // conversion; the overlay child's Bounds.Location is already window-space, so the offset walk below stays correct.
+        // Without this, GetPosition inside a popup is garbage and drag controls (ColorPicker / Slider / ColorWheel) die there.
+        var clientRoot = root is IWindow ? root : ((_positionRoot as IUIComponent) ?? root);
+        var p = clientRoot.PointToClient(Position);
         IUIComponent v = relativeTo;
         while (v != null)
         {
@@ -109,6 +118,7 @@ public class MouseDevice
     public void ProcessEvent(RawMouseEventArgs e)
     {
         Position = e.RootComponent.PointToScreen(e.Position);
+        _positionRoot = e.RootComponent;   // remembered for GetPosition on detached popup-overlay content
         UpdateButtonStates(e.InputModifiers);
         var button = MouseButtons.None;
         switch (e.EventType)
