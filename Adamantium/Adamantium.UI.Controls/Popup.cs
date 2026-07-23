@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.Core.Templates;
 
@@ -50,7 +51,14 @@ public class Popup : MeasurableUIComponent, IContainer
     public static readonly AdamantiumProperty FillWindowProperty = AdamantiumProperty.Register(nameof(FillWindow),
         typeof(bool), typeof(Popup), new PropertyMetadata(false));
 
+    public static readonly AdamantiumProperty KeepOpenProperty = AdamantiumProperty.Register(nameof(KeepOpen),
+        typeof(bool), typeof(Popup), new PropertyMetadata(true));
+
+    public static readonly AdamantiumProperty IgnoreTargetPressProperty = AdamantiumProperty.Register(nameof(IgnoreTargetPress),
+        typeof(bool), typeof(Popup), new PropertyMetadata(false));
+
     private IPopupHost _host;   // the window layer this popup is registered with while open
+    private MouseButtonEventHandler _lightDismiss;   // window preview-press handler while an open, !KeepOpen popup is shown
 
     public bool IsOpen
     {
@@ -147,6 +155,29 @@ public class Popup : MeasurableUIComponent, IContainer
         set => SetValue(FillWindowProperty, value);
     }
 
+    /// <summary>When false, the popup LIGHT-DISMISSES: a mouse press outside its overlay (and outside the element it opened
+    /// against) closes it. Default true = stays open until closed explicitly (WPF's StaysOpen). Lets any flyout - a dropdown,
+    /// the tab-overflow list, ... - get click-outside-to-close WITHOUT re-implementing the window hook in each control.</summary>
+    public bool KeepOpen
+    {
+        get => GetValue<bool>(KeepOpenProperty);
+        set => SetValue(KeepOpenProperty, value);
+    }
+
+    /// <summary>When light-dismissing (KeepOpen=false), whether a press on the PlacementTarget is IGNORED (not a dismiss).
+    /// Set true when the target is the toggle that opens/closes the popup (a dropdown header, the tab ▾): the target's own
+    /// click then closes it, instead of light-dismiss closing then the toggle re-opening. Default false - e.g. a context
+    /// menu, whose target is just the anchored element, dismisses on a press there like anywhere else outside it.</summary>
+    public bool IgnoreTargetPress
+    {
+        get => GetValue<bool>(IgnoreTargetPressProperty);
+        set => SetValue(IgnoreTargetPressProperty, value);
+    }
+
+    /// <summary>Raised when the popup closes (explicitly OR via light-dismiss) so an owner can sync its UI - e.g. un-press
+    /// the toggle that opened it. Not raised when an already-closed popup is closed again.</summary>
+    public event EventHandler Closed;
+
     /// <summary>Explicit target, else the element this popup is declared under.</summary>
     internal UIComponent EffectiveTarget => PlacementTarget ?? VisualParent as UIComponent;
 
@@ -211,13 +242,49 @@ public class Popup : MeasurableUIComponent, IContainer
         if (Child is UIComponent child) child.DataContext = DataContext;
         if (Child is IUIComponent overlayRoot) OverlayRootHost.AddOrUpdate(overlayRoot, _host);   // so nested popups find it
         _host.PopupLayer.Add(this);
+        if (!KeepOpen) HookLightDismiss();   // click-outside-to-close, hosted centrally here (see OnGlobalPreviewDown)
     }
 
     private void Close()
     {
+        var wasOpen = _host != null;
+        UnhookLightDismiss();                    // while _host is still set
         if (Child is IUIComponent overlayRoot) OverlayRootHost.Remove(overlayRoot);
         _host?.PopupLayer.Remove(this);
         _host = null;
+        if (wasOpen) Closed?.Invoke(this, EventArgs.Empty);
+    }
+
+    // Light dismiss (KeepOpen == false): a preview mouse-press that is neither inside THIS popup's overlay (its card or a
+    // nested popup opened from it) nor on the element it opened against closes it. Hooking the window's preview stream is
+    // the ONE place this lives now, instead of being re-implemented in every flyout control.
+    private void HookLightDismiss()
+    {
+        if (_host is not IInputComponent root) return;
+        _lightDismiss ??= OnGlobalPreviewDown;
+        root.AddHandler(Mouse.PreviewMouseDownEvent, _lightDismiss, handledEventsToo: true);
+    }
+
+    private void UnhookLightDismiss()
+    {
+        if (_lightDismiss != null && _host is IInputComponent root)
+            root.RemoveHandler(Mouse.PreviewMouseDownEvent, _lightDismiss);
+    }
+
+    private void OnGlobalPreviewDown(object sender, MouseButtonEventArgs e)
+    {
+        if (e.OriginalSource is not IUIComponent src) { IsOpen = false; return; }
+        if (IsWithinOverlayOf(src, _host)) return;      // inside my overlay (or a nested popup opened from it) - keep open
+        if (IgnoreTargetPress && IsWithin(src, EffectiveTarget)) return;   // on the toggle target - it handles the close itself
+        IsOpen = false;
+    }
+
+    private static bool IsWithin(IUIComponent node, IUIComponent ancestor)
+    {
+        if (ancestor == null) return false;
+        for (var n = node; n != null; n = n.VisualParent)
+            if (ReferenceEquals(n, ancestor)) return true;
+        return false;
     }
 
     // Also used by a menu to find its window (for capping submenu scroll height) - its overlay rows have no visual path back.

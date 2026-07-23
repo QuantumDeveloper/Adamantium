@@ -498,6 +498,38 @@ namespace Adamantium.UITests
 
       }
 
+      // A '*' + 'Auto' split with a fixed-width child in the Auto column: Auto takes exactly the child's width, '*' takes
+      // the rest, and the Auto child sits flush against the right edge. This is the tab strip's overflow-button row; a
+      // FRESH measure (no stale-cache confound) pins the grid math itself - the reflow-after-a-visibility-toggle case is a
+      // layout-loop concern (a bare re-Measure early-returns; see CalculatesColSpanCorrectly's explicit InvalidateMeasure),
+      // NOT a grid-math bug.
+      [Test]
+      public void StarPlusAutoColumns_SplitByChildWidth()
+      {
+         Grid grid = new Grid();
+         grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
+         grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+
+         var star = new Border { Height = 30 };
+         var auto = new Border { Width = 28, Height = 30 };
+         Grid.SetColumn(star, 0);
+         Grid.SetColumn(auto, 1);
+         grid.Children.Add(star);
+         grid.Children.Add(auto);
+
+         grid.Measure(new Size(300, 30));
+         grid.Arrange(new Rect(0, 0, 300, 30));
+
+         Assert.Multiple(() =>
+         {
+            Assert.AreEqual(28, grid.ColumnDefinitions[1].ActualWidth, "Auto column = child width");
+            Assert.AreEqual(272, grid.ColumnDefinitions[0].ActualWidth, "Star column = the remainder");
+            Assert.AreEqual(272, star.Bounds.Width, 0.5, "star child fills its column");
+            Assert.AreEqual(272, auto.Bounds.X, 0.5, "Auto child starts flush at the right edge");
+            Assert.AreEqual(28, auto.Bounds.Width, 0.5, "Auto child keeps its own width");
+         });
+      }
+
       [Test]
       public void ComputeActualWidth()
       {

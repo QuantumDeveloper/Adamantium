@@ -1,3 +1,4 @@
+using System;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
@@ -29,13 +30,9 @@ public class ColorPickerButton : Control
 
     private readonly SolidColorBrush _swatchBrush = new(Colors.White);   // field init runs BEFORE the base ctor's callbacks
     private Popup _popup;
-    private UIComponent _header;
-    private IPopupHost _host;
-    private readonly MouseButtonEventHandler _lightDismiss;
 
     public ColorPickerButton()
     {
-        _lightDismiss = OnGlobalPreviewDown;
         _swatchBrush.Color = SelectedColor;
         SelectedBrush = _swatchBrush;
     }
@@ -65,7 +62,6 @@ public class ColorPickerButton : Control
     {
         base.OnApplyTemplate();
         _popup = GetTemplateChild("PART_Popup") as Popup;
-        _header = GetTemplateChild("PART_Header") as UIComponent;
         if (_popup != null)
         {
             // The flyout's ColorPicker binds SelectedColor with a plain {Binding} against US: give the popup our DataContext
@@ -73,7 +69,11 @@ public class ColorPickerButton : Control
             // popup content - it walks the visual tree, which is detached onto the overlay, and template parts aren't logical
             // children either, so neither Ancestor mode reaches this control.
             _popup.DataContext = this;
-            _popup.PlacementTarget = _header ?? this;   // anchor the flyout under the swatch
+            _popup.PlacementTarget = this;               // anchor the flyout under the swatch
+            _popup.KeepOpen = false;                     // click-outside-to-close, owned by Popup now
+            _popup.IgnoreTargetPress = true;             // a swatch press is handled by us (toggle) - don't dismiss+reopen
+            _popup.Closed -= OnPopupClosed;
+            _popup.Closed += OnPopupClosed;
             _popup.IsOpen = IsOpen;
         }
     }
@@ -96,37 +96,8 @@ public class ColorPickerButton : Control
     {
         var b = (ColorPickerButton)a;
         if (b._popup != null) b._popup.IsOpen = (bool)e.NewValue;   // _popup is null until OnApplyTemplate
-        if ((bool)e.NewValue) b.HookLightDismiss(); else b.UnhookLightDismiss();
     }
 
-    // Light dismiss (mirrors DropDown): while open, a preview mouse-down anywhere that is NOT inside this button or the
-    // popup closes the flyout. Preview tunnels from the window root, so we catch every press.
-    private void HookLightDismiss()
-    {
-        _host ??= this.GetVisualAncestors().OfType<IPopupHost>().FirstOrDefault();
-        if (_host is IInputComponent root)
-            root.AddHandler(Mouse.PreviewMouseDownEvent, _lightDismiss, handledEventsToo: true);
-    }
-
-    private void UnhookLightDismiss()
-    {
-        if (_host is IInputComponent root)
-            root.RemoveHandler(Mouse.PreviewMouseDownEvent, _lightDismiss);
-    }
-
-    private void OnGlobalPreviewDown(object sender, MouseButtonEventArgs e)
-    {
-        if (e.OriginalSource is IUIComponent src &&
-            (IsWithin(src, this) || (_popup?.Child is IUIComponent child && IsWithin(src, child))))
-            return;
-        IsOpen = false;
-    }
-
-    private static bool IsWithin(IUIComponent node, IUIComponent ancestor)
-    {
-        if (ancestor == null) return false;
-        for (var n = node; n != null; n = n.VisualParent)
-            if (ReferenceEquals(n, ancestor)) return true;
-        return false;
-    }
+    // The flyout light-dismissed (a click outside) - reflect it so the swatch's next click reopens.
+    private void OnPopupClosed(object sender, EventArgs e) => IsOpen = false;
 }

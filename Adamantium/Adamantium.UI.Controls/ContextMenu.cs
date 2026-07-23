@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Base;
@@ -28,13 +29,6 @@ public class ContextMenu : ItemsControl
     private Popup _popup;
     private IInputComponent _clickRoot;   // the items presenter; leaf-row clicks bubble to it (it IS an input element)
     private ScrollViewer _scroll;         // wraps the items; capped to the window height so a long menu scrolls
-    private IPopupHost _host;
-    private readonly MouseButtonEventHandler _lightDismiss;
-
-    public ContextMenu()
-    {
-        _lightDismiss = OnGlobalPreviewDown;
-    }
 
     /// <summary>Whether the menu is shown. Set true (with a PlacementTarget) to open; cleared on pick / outside click.</summary>
     public bool IsOpen
@@ -103,6 +97,9 @@ public class ContextMenu : ItemsControl
             _popup.HorizontalOffset = HorizontalOffset;
             _popup.VerticalOffset = VerticalOffset;
             _popup.FlipToFit = true;
+            _popup.KeepOpen = false;                     // click-outside-to-close (submenu overlays included), owned by Popup
+            _popup.Closed -= OnPopupClosed;
+            _popup.Closed += OnPopupClosed;
             _popup.IsOpen = IsOpen;
         }
         // Any leaf row's Click bubbles up to the items presenter - close the menu after the command has run.
@@ -110,6 +107,9 @@ public class ContextMenu : ItemsControl
     }
 
     private void OnItemClicked(object sender, RoutedEventArgs e) => IsOpen = false;
+
+    // The popup light-dismissed (a press outside the menu's overlay) - drive our IsOpen false so the whole menu tears down.
+    private void OnPopupClosed(object sender, EventArgs e) => IsOpen = false;
 
     private static void OnIsOpenChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
@@ -124,10 +124,9 @@ public class ContextMenu : ItemsControl
         }
         if ((bool)e.NewValue)
         {
-            menu.HookLightDismiss();   // resolves _host
-            if (menu._scroll != null) menu._scroll.MaxHeight = Popup.WindowHeightCap(menu._host);
+            if (menu._scroll != null) menu._scroll.MaxHeight = Popup.WindowHeightCap(Popup.FindPopupHost(menu));
         }
-        else { menu.CloseAllSubmenus(); menu.UnhookLightDismiss(); }
+        else menu.CloseAllSubmenus();
     }
 
     // Closing the menu must close every open submenu flyout too (they are independent overlay popups). Close each top-level
@@ -141,40 +140,4 @@ public class ContextMenu : ItemsControl
                 child.IsSubmenuOpen = false;
     }
 
-    // Light dismiss: a preview mouse-down anywhere that is NOT inside the popup closes the menu (mirrors DropDown).
-    private void HookLightDismiss()
-    {
-        _host ??= this.GetVisualAncestors().OfType<IPopupHost>().FirstOrDefault()
-                  ?? PlacementTarget?.GetVisualAncestors().OfType<IPopupHost>().FirstOrDefault();
-        if (_host is IInputComponent root)
-            root.AddHandler(Mouse.PreviewMouseDownEvent, _lightDismiss, handledEventsToo: true);
-    }
-
-    private void UnhookLightDismiss()
-    {
-        if (_host is IInputComponent root)
-            root.RemoveHandler(Mouse.PreviewMouseDownEvent, _lightDismiss);
-    }
-
-    private void OnGlobalPreviewDown(object sender, MouseButtonEventArgs e)
-    {
-        if (e.OriginalSource is IUIComponent src && IsInsideMenu(src)) return;   // inside the open menu - not a dismiss
-        IsOpen = false;
-    }
-
-    // A press is "inside" the menu when it lands in the root popup card OR in any MenuItem: every submenu flyout's rows are
-    // MenuItems of this open menu, but those flyouts are SEPARATE overlay popups that the root popup's card doesn't contain -
-    // so a plain "inside the root card" test would wrongly dismiss the menu on a click in a submenu.
-    private bool IsInsideMenu(IUIComponent node)
-    {
-        var card = _popup?.Child as IUIComponent;
-        for (var n = node; n != null; n = n.VisualParent)
-        {
-            if (n is MenuItem) return true;
-            if (card != null && ReferenceEquals(n, card)) return true;
-        }
-        // Chrome inside a SUBMENU popup (a scroll arrow, card padding) is neither a MenuItem nor the root card, but it
-        // belongs to this menu's overlay tree - a press there must not dismiss.
-        return Popup.IsWithinOverlayOf(node, _host);
-    }
 }

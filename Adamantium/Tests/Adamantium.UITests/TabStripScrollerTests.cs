@@ -259,4 +259,107 @@ public class TabStripScrollerTests
             Assert.That(tabs[2].Bounds.X, Is.EqualTo(140).Within(0.5));
         });
     }
+
+    // The overflow ▾ button binds its visibility to the scroller's scroll state, so that state must be correct: a strip
+    // wider than the viewport reports CanScrollForward (content past the end) at rest, and CanScrollBack only once panned.
+    [Test]
+    public void Scroller_ReportsOverflow_ThenBack_AfterPanning()
+    {
+        var scroller = new TabStripScroller
+        {
+            Orientation = Orientation.Horizontal,
+            Child = new Border { Width = 800, Height = 30 }
+        };
+        scroller.Measure(new Size(300, 30));       // viewport 300 < 800 extent -> overflows
+        scroller.Arrange(new Rect(0, 0, 300, 30));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(scroller.CanScrollForward, Is.True, "800 extent > 300 viewport -> more content past the end");
+            Assert.That(scroller.CanScrollBack, Is.False, "at rest (offset 0) nothing is hidden before the start");
+        });
+
+        scroller.LineScroll(+1);                   // pan toward the end
+        scroller.Measure(new Size(300, 30));
+        scroller.Arrange(new Rect(0, 0, 300, 30));
+        Assert.That(scroller.CanScrollBack, Is.True, "panned off the start -> content is now hidden before the viewport");
+    }
+
+    // The off-screen-until-resize bug: the ▾ overflow button is now OVERLAID on the strip (a single-cell grid, right-
+    // aligned) and starts Collapsed; when shown it must re-lay-out flush inside the right edge, never past it. This drives
+    // the real LayoutManager loop (ExecuteLayoutPass) - NOT a bare grid.Measure, which early-returns on the unchanged root
+    // constraint: a child's InvalidateMeasure enqueues the child in the manager, and only the loop drains it and propagates
+    // the re-measure up to the grid (MeasureDirty -> parent.InvalidateMeasure on a size change). A resize "fixed" the button
+    // only because it fed the root a NEW constraint, forcing a fresh pass; the loop makes it reflow with no resize.
+    [Test]
+    public void OverflowButton_RelaysOutInBounds_AfterBecomingVisible_ViaLayoutPass()
+    {
+        var grid = new Grid();
+        var strip = new Border { Height = 30 };                                  // fills the cell (the scroller stand-in)
+        var overflow = new Border
+        {
+            Width = 28, Height = 30,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Visibility = Visibility.Collapsed
+        };
+        grid.Children.Add(strip);
+        grid.Children.Add(overflow);
+
+        grid.Measure(new Size(300, 30));
+        grid.Arrange(new Rect(0, 0, 300, 30));
+        Assert.That(overflow.Bounds.Width, Is.EqualTo(0).Within(0.5), "collapsed -> not laid out");
+
+        overflow.Visibility = Visibility.Visible;          // enqueues the button in its LayoutManager
+        LayoutManager.For(grid).ExecuteLayoutPass();       // one frame of layout - the loop the running app uses
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(overflow.Bounds.Width, Is.EqualTo(28).Within(0.5), "shown -> re-measured to its width");
+            Assert.That(overflow.Bounds.Right, Is.LessThanOrEqualTo(300 + 0.5), "stays inside the right edge (the off-screen regression)");
+            Assert.That(overflow.Bounds.X, Is.EqualTo(272).Within(0.5), "pinned flush to the right edge");
+        });
+    }
+
+    // A stand-in for the scroller: takes no space itself, and REVEALS a sibling (flips it Collapsed->Visible) from inside
+    // its own ArrangeOverride - exactly what TabStripScroller does when it learns mid-arrange that the strip overflows and
+    // shows the ▾. Reproduces the real trigger for the "grid never reflows, the revealed child stays off-screen" bug.
+    private sealed class RevealOnArrange : Panel
+    {
+        public Border ToReveal;
+        protected override Size MeasureOverride(Size availableSize) => Size.Zero;
+        protected override Size ArrangeOverride(Size finalSize)
+        {
+            if (ToReveal is { Visibility: Visibility.Collapsed }) ToReveal.Visibility = Visibility.Visible;
+            return finalSize;
+        }
+    }
+
+    // THE ROOT CASE (no per-control workaround): a child made Visible DURING a layout pass must make its `* , Auto` grid
+    // reflow - the Auto child laid out (28 wide) at the right, the `*` shrunk - WITHOUT anything deferring the reveal to a
+    // post-pass hook. Drives the real LayoutManager; the reveal happens inside an ArrangeOverride, mid-pass.
+    [Test]
+    public void Grid_ReflowsAutoChild_RevealedByASiblingDuringArrange()
+    {
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
+        grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+        var star = new RevealOnArrange();
+        var auto = new Border { Width = 28, Height = 30, Visibility = Visibility.Collapsed };
+        star.ToReveal = auto;
+        Grid.SetColumn(star, 0);
+        Grid.SetColumn(auto, 1);
+        grid.Children.Add(star);
+        grid.Children.Add(auto);
+
+        grid.Measure(new Size(300, 30));
+        grid.Arrange(new Rect(0, 0, 300, 30));     // star's ArrangeOverride flips auto Visible -> InvalidateMeasure(auto)
+        LayoutManager.For(grid).ExecuteLayoutPass();   // the loop must recover the mid-arrange invalidation and reflow
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(auto.Visibility, Is.EqualTo(Visibility.Visible));
+            Assert.That(auto.Bounds.Width, Is.EqualTo(28).Within(0.5), "the revealed Auto child is laid out");
+            Assert.That(auto.Bounds.X, Is.EqualTo(272).Within(0.5), "the grid reflowed: Auto at the right, * shrank to fit");
+        });
+    }
 }

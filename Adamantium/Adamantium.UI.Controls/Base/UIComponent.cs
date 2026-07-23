@@ -64,6 +64,7 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         new PropertyMetadata(Visibility.Visible,
             PropertyMetadataOptions.BindsTwoWayByDefault |
             PropertyMetadataOptions.AffectsMeasure |
+            PropertyMetadataOptions.AffectsParentMeasure |
             PropertyMetadataOptions.AffectsRender,
             OnVisibilityChanged));
 

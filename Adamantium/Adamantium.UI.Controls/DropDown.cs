@@ -58,9 +58,6 @@ public class DropDown : Selector
         nameof(BackgroundPointerOver), typeof(Brush), typeof(DropDown), new PropertyMetadata(default(Brush)));
 
     private Popup _popup;
-    private UIComponent _header;
-    private IPopupHost _host;
-    private readonly MouseButtonEventHandler _lightDismiss;
 
     static DropDown()
     {
@@ -70,7 +67,6 @@ public class DropDown : Selector
 
     public DropDown()
     {
-        _lightDismiss = OnGlobalPreviewDown;
         SelectionChanged += (_, _) => UpdateDisplayContent();
         MouseWheel += OnHeaderMouseWheel;
     }
@@ -157,10 +153,13 @@ public class DropDown : Selector
     {
         base.OnApplyTemplate();
         _popup = GetTemplateChild("PART_Popup") as Popup;
-        _header = GetTemplateChild("PART_Header") as UIComponent;
         if (_popup != null)
         {
-            _popup.PlacementTarget = _header ?? this;   // position/size the list against the header
+            _popup.PlacementTarget = this;              // position against the control (== the header)
+            _popup.KeepOpen = false;                    // click-outside-to-close, owned by Popup now
+            _popup.IgnoreTargetPress = true;            // a header press is handled by us (toggle) - don't dismiss+reopen
+            _popup.Closed -= OnPopupClosed;
+            _popup.Closed += OnPopupClosed;
             _popup.IsOpen = IsDropDownOpen;
         }
         UpdateDisplayContent();
@@ -227,42 +226,10 @@ public class DropDown : Selector
     {
         var dd = (DropDown)a;
         if (dd._popup != null) dd._popup.IsOpen = (bool)e.NewValue;
-        if ((bool)e.NewValue) dd.HookLightDismiss(); else dd.UnhookLightDismiss();
     }
 
-    // Light dismiss: while open, a preview mouse-down anywhere in the window that is NOT inside the header or the popup
-    // closes the list (WPF/browser dropdown behaviour). Preview tunnels from the window root, so we catch every press.
-    private void HookLightDismiss()
-    {
-        _host ??= this.GetVisualAncestors().OfType<IPopupHost>().FirstOrDefault();
-        if (_host is IInputComponent root)
-            root.AddHandler(Mouse.PreviewMouseDownEvent, _lightDismiss, handledEventsToo: true);
-    }
-
-    private void UnhookLightDismiss()
-    {
-        if (_host is IInputComponent root)
-            root.RemoveHandler(Mouse.PreviewMouseDownEvent, _lightDismiss);
-    }
-
-    private void OnGlobalPreviewDown(object sender, MouseButtonEventArgs e)
-    {
-        // Inside the dropdown control itself (the header - which toggles open/closed) or inside the open popup -> not a
-        // dismiss. Check `this`, not the header part: a header click's hit target is the DropDown, whose header is a
-        // DESCENDANT, so an IsWithin(_header) test would miss it and close-then-reopen (the "second click won't close").
-        if (e.OriginalSource is IUIComponent src &&
-            (IsWithin(src, this) || (_popup?.Child is IUIComponent child && IsWithin(src, child))))
-            return;
-        IsDropDownOpen = false;
-    }
-
-    private static bool IsWithin(IUIComponent node, IUIComponent ancestor)
-    {
-        if (ancestor == null) return false;
-        for (var n = node; n != null; n = n.VisualParent)
-            if (ReferenceEquals(n, ancestor)) return true;
-        return false;
-    }
+    // The popup light-dismissed (a click outside the control + list) - reflect it so the next header click reopens.
+    private void OnPopupClosed(object sender, EventArgs e) => IsDropDownOpen = false;
 
     // --- Container seam: items host as DropDownItem in the popup list ----------------------------------------------
 
