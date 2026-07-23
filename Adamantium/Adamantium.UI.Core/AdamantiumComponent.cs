@@ -556,19 +556,6 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             {
                 measurable.InvalidateArrange();
             }
-
-            // A change that affects the PARENT's layout (e.g. Visibility: the parent owns this child's participation, so a
-            // Collapsed<->Visible flip must re-run the PARENT's measure - re-measuring the child alone reuses its stale
-            // collapsed constraint and keeps it 0-sized). Invalidate up the visual tree, not just this element.
-            if (metadata.AffectsParentMeasure && element.VisualParent is IMeasurableComponent parentMeasure)
-            {
-                parentMeasure.InvalidateMeasure();
-                parentMeasure.InvalidateArrange();
-            }
-            else if (metadata.AffectsParentArrange && element.VisualParent is IMeasurableComponent parentArrange)
-            {
-                parentArrange.InvalidateArrange();
-            }
         }
 
         if (metadata.AffectsRender)

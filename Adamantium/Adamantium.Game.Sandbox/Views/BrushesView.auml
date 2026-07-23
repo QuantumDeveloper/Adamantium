@@ -374,9 +374,9 @@
                 <StackPanel Orientation="Vertical" MarginLeft="24" VerticalAlignment="Top">
                     <TextBlock Text="Colours — click a swatch to edit" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="8"/>
                     <TextBlock Text="Color 1 (inside / edge)" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <ColorPickerButton SelectedColor="{Binding FractalColor1, Mode=TwoWay}" MarginBottom="12"/>
+                    <ColorPickerButton SelectedColor="{Binding FractalColor1, Mode=TwoWay}" Width="200" Height="30" MarginBottom="12"/>
                     <TextBlock Text="Color 2 (escaping outside)" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <ColorPickerButton SelectedColor="{Binding FractalColor2, Mode=TwoWay}"/>
+                    <ColorPickerButton SelectedColor="{Binding FractalColor2, Mode=TwoWay}" Width="200" Height="30"/>
                 </StackPanel>
             </StackPanel>
             <TextBlock Text="Drag the fractal to pan, wheel to zoom toward the cursor (built into FractalView)."
