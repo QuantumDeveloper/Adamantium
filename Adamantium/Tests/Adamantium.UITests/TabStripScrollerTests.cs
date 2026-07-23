@@ -320,46 +320,4 @@ public class TabStripScrollerTests
         });
     }
 
-    // A stand-in for the scroller: takes no space itself, and REVEALS a sibling (flips it Collapsed->Visible) from inside
-    // its own ArrangeOverride - exactly what TabStripScroller does when it learns mid-arrange that the strip overflows and
-    // shows the ▾. Reproduces the real trigger for the "grid never reflows, the revealed child stays off-screen" bug.
-    private sealed class RevealOnArrange : Panel
-    {
-        public Border ToReveal;
-        protected override Size MeasureOverride(Size availableSize) => Size.Zero;
-        protected override Size ArrangeOverride(Size finalSize)
-        {
-            if (ToReveal is { Visibility: Visibility.Collapsed }) ToReveal.Visibility = Visibility.Visible;
-            return finalSize;
-        }
-    }
-
-    // THE ROOT CASE (no per-control workaround): a child made Visible DURING a layout pass must make its `* , Auto` grid
-    // reflow - the Auto child laid out (28 wide) at the right, the `*` shrunk - WITHOUT anything deferring the reveal to a
-    // post-pass hook. Drives the real LayoutManager; the reveal happens inside an ArrangeOverride, mid-pass.
-    [Test]
-    public void Grid_ReflowsAutoChild_RevealedByASiblingDuringArrange()
-    {
-        var grid = new Grid();
-        grid.ColumnDefinitions.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
-        grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
-        var star = new RevealOnArrange();
-        var auto = new Border { Width = 28, Height = 30, Visibility = Visibility.Collapsed };
-        star.ToReveal = auto;
-        Grid.SetColumn(star, 0);
-        Grid.SetColumn(auto, 1);
-        grid.Children.Add(star);
-        grid.Children.Add(auto);
-
-        grid.Measure(new Size(300, 30));
-        grid.Arrange(new Rect(0, 0, 300, 30));     // star's ArrangeOverride flips auto Visible -> InvalidateMeasure(auto)
-        LayoutManager.For(grid).ExecuteLayoutPass();   // the loop must recover the mid-arrange invalidation and reflow
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(auto.Visibility, Is.EqualTo(Visibility.Visible));
-            Assert.That(auto.Bounds.Width, Is.EqualTo(28).Within(0.5), "the revealed Auto child is laid out");
-            Assert.That(auto.Bounds.X, Is.EqualTo(272).Within(0.5), "the grid reflowed: Auto at the right, * shrank to fit");
-        });
-    }
 }

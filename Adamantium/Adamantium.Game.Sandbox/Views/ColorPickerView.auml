@@ -37,6 +37,7 @@
                 <!-- Same PickedColor as the inline picker + wheel: the swatch shows it; clicking opens a floating,
                      light-dismissing ColorPicker flyout - editing there stays in sync and drives the theme accent too. -->
                 <ColorPickerButton SelectedColor="{Binding PickedColor, Mode=TwoWay}"
+                                   Width="180" Height="30"
                                    HorizontalAlignment="Left"/>
             </StackPanel>
 

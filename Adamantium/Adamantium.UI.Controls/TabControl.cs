@@ -772,9 +772,18 @@ public class TabControl : Selector
     // The overflow ▾ shows whenever the strip overflows (can scroll either way) and the toggle is on.
     private void RefreshTabStripAffordances()
     {
+        if (_overflow == null) return;
         var overflowing = (_tabStrip?.CanScrollBack ?? false) || (_tabStrip?.CanScrollForward ?? false);
-        if (_overflow != null)
-            _overflow.Visibility = ShowTabOverflowMenu && overflowing ? Visibility.Visible : Visibility.Collapsed;
+        var visibility = ShowTabOverflowMenu && overflowing ? Visibility.Visible : Visibility.Collapsed;
+        if (_overflow.Visibility == visibility) return;
+
+        _overflow.Visibility = visibility;
+        // The ▾ lives in an Auto column/row of the strip Grid: showing/hiding it changes that track's size, so the GRID must
+        // re-measure. A bare Visibility flip only invalidates the ▾'s OWN measure (and re-measuring it alone reuses its stale
+        // collapsed constraint, staying 0-sized), so nudge the parent directly. Deliberately SCOPED to this one, rare
+        // (overflow-state) change - a global "Visibility invalidates the parent" re-measures every parent on every
+        // visibility change everywhere, which tanks a heavy board that re-runs per-pass work (TilesHost.LayoutUpdated).
+        (_overflow.VisualParent as IMeasurableComponent)?.InvalidateMeasure();
     }
 
     /// <summary>Raised when a tab's close button is clicked. Cancelable; if not canceled the tab is removed by default.</summary>

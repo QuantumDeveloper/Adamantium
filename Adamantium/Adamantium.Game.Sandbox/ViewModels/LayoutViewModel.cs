@@ -15,15 +15,11 @@ public partial class LayoutViewModel : TabPageViewModel
     public LayoutViewModel() : base("Layout")
     {
         Rectangles = new(Enumerable.Range(0, 60000)
-            .Select(i => new ColorRect { Color = Palette[i % Palette.Length], Stroke = Stroke }));
+            .Select(i => new ColorRect { Color = Palette[i % Palette.Length] }));
     }
 
     private static readonly string[] Palette =
         ["#3B82F6", "#22C55E", "#F59E0B", "#EF4444", "#8B5CF6", "#14B8A6", "#EC4899", "#EAB308"];
-
-    // One shared stroke settings object for every tile AND the sliders (see StrokeSettings). The ctor hands this same
-    // instance to each ColorRect, so a slider mutating it updates only the realized tiles - no per-item propagation.
-    public StrokeSettings Stroke { get; } = new();
 
     public ObservableCollection<ColorRect> Rectangles { get; }
 

@@ -6,8 +6,4 @@ namespace Adamantium.Game.Sandbox.ViewModels;
 public sealed class ColorRect
 {
     public string Color { get; init; }
-
-    /// <summary>The SHARED stroke settings (same instance for every tile), so the sliders drive the whole grid: the tile
-    /// template binds the shape's stroke through the nested path <c>Stroke.StrokeWidth</c> etc.</summary>
-    public StrokeSettings Stroke { get; init; }
 }

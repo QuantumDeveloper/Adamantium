@@ -1,5 +1,7 @@
 <View xmlns="http://adamantium/ui">
-    <!-- DataContext is the ShapesViewModel. Every static shape's StrokeThickness is bound to one value. -->
+    <!-- DataContext is the ShapesViewModel. Every static shape's StrokeThickness is bound to one value. Wrapped in a
+         ScrollViewer (horizontal Disabled so the WrapPanels wrap to the viewport) - the content now exceeds the tab. -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
     <StackPanel Orientation="Vertical" Margin="24">
 
         <StackPanel Orientation="Horizontal">
@@ -17,6 +19,91 @@
                   Data="F0 M110,10 L168.78,190.9 L14.89,79.1 L205.11,79.1 L51.22,190.9 Z"
                   Width="200" Height="200" Margin="10"/>
         </WrapPanel>
+
+        <!-- Full Pen playground (moved here from the Layout tab): thickness, dashes, trim, caps, joins, corner, hue driving a
+             big rectangle + ellipse. A solid stroke goes through the SDF batch; a dashed/trimmed one falls back to the
+             compute stroke expander - both correct. As dash/trim/caps land in the SDF shader, this preview validates them. -->
+        <TextBlock Text="Stroke / Pen parameters — rectangle &amp; ellipse preview:" Margin="0,20,0,6"/>
+        <Grid ColumnDefinitions="Auto,*">
+            <Grid Grid.Column="0" ColumnDefinitions="Auto,Auto">
+                <StackPanel Grid.Column="0" Orientation="Vertical" Margin="0,0,20,0">
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Thickness" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="30" Value="{Binding Stroke.StrokeWidth, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Stroke.StrokeWidth}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Dash on" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="40" Value="{Binding Stroke.DashOn, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Stroke.DashOn}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Dash gap" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="40" Value="{Binding Stroke.DashGap, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Stroke.DashGap}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Dash offset" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="60" Value="{Binding Stroke.DashOffset, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Stroke.DashOffset}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Trim start" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="1" Value="{Binding Stroke.TrimStart, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Stroke.TrimStart}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Vertical">
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Trim end" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="1" Value="{Binding Stroke.TrimEnd, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Stroke.TrimEnd}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Corner" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="60" Value="{Binding Stroke.Corner, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Stroke.Corner}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Cap 0/1/2" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="5" Value="{Binding Stroke.CapValue, Mode=TwoWay}" TickFrequency="1" IsSnapToTickEnabled="true"/>
+                        <TextBlock Text="{Binding Stroke.CapValue}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Join 0/1/2" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="2" Value="{Binding Stroke.JoinValue, Mode=TwoWay}" TickFrequency="1" IsSnapToTickEnabled="true"/>
+                        <TextBlock Text="{Binding Stroke.JoinValue}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Color (hue)" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="360" Value="{Binding Stroke.Hue, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Stroke.Hue}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center">
+                <Rectangle Width="160" Height="120" Fill="#1E293B" Stroke="{Binding Stroke.StrokeBrush}"
+                           CornerRadius="{Binding Stroke.CornerRadius}"
+                           StrokeThickness="{Binding Stroke.StrokeWidth}"
+                           StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
+                           StrokeDashOffset="{Binding Stroke.DashOffset}"
+                           StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                           StrokeLineJoin="{Binding Stroke.Join}"
+                           StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,24,0"/>
+                <Ellipse Width="160" Height="120" Fill="#1E293B" Stroke="{Binding Stroke.StrokeBrush}"
+                         StrokeThickness="{Binding Stroke.StrokeWidth}"
+                         StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
+                         StrokeDashOffset="{Binding Stroke.DashOffset}"
+                         StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                         StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"
+                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Grid>
 
         <!-- Border showcase: uniform + non-uniform thickness, sharp + rounded corners, all with TRANSLUCENT fills and
              brushes (the alpha composites over whatever is behind). Left-to-right: uniform | non-uniform thickness |
@@ -61,4 +148,5 @@
             </Line.Triggers>
         </Line>
     </StackPanel>
+    </ScrollViewer>
 </View>
