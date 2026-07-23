@@ -51,24 +51,65 @@
         </Setter>
     </Style>
 
+    <!-- The overflow flyout's list: a PIXEL-scrolling ScrollViewer (no CanContentScroll) capped by MaxHeight, mirroring the
+         DropDown's proven popup - item/logical scrolling reports "it all fits" when measured UNBOUNDED in an overlay and so
+         never scrolls; pixel scrolling caps + scrolls. Applied BY CLASS so this template lives ONCE for every placement's
+         overflow list. Only tens of tabs, so realizing them all (no virtualization) costs nothing here. -->
+    <Style Selector="ListBox.TabOverflowList">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBox">
+                    <ScrollViewer MaxHeight="360"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Auto">
+                        <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                    </ScrollViewer>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Top (default): strip in the Auto row, content fills below. -->
     <Style Selector="TabControl[TabStripPlacement=Top]">
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TabControl">
                     <Grid RowDefinitions="Auto,*">
-                        <TabStripScroller x:Name="PART_TabStrip" Grid.Row="0" Orientation="Horizontal">
-                            <Grid>
-                                <ItemsPresenter x:Name="PART_ItemsPresenter"/>
-                                <Rectangle x:Name="PART_SelectionIndicator"
-                                           Fill="{TemplateBinding SelectionIndicatorBrush}"
-                                           Width="1"
-                                           Height="{TemplateBinding SelectionIndicatorThickness}"
-                                           HorizontalAlignment="Left"
-                                           VerticalAlignment="Bottom"
-                                           IsHitTestVisible="False"/>
-                            </Grid>
-                        </TabStripScroller>
+                        <!-- Strip row: the scroller (headers overflow + wheel-pan) in the * column, a ▾ overflow button in an
+                             Auto column beside it - so the button RESERVES space (the last tab ends before it, never hidden
+                             behind it). Its visibility is set POST-layout (TabControl.OnLayoutSettled), not mid-arrange, so the
+                             * / Auto reflow actually re-runs - a mid-pass visibility flip loses its invalidation and the button
+                             then sat off-screen until a resize. Shown only when the strip overflows + ShowTabOverflowMenu;
+                             toggles PART_TabOverflowPopup - a ListBox of every tab; picking a row selects it + scrolls it in. -->
+                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                            <TabStripScroller x:Name="PART_TabStrip" Grid.Column="0" Orientation="Horizontal">
+                                <Grid>
+                                    <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                    <Rectangle x:Name="PART_SelectionIndicator"
+                                               Fill="{TemplateBinding SelectionIndicatorBrush}"
+                                               Width="1"
+                                               Height="{TemplateBinding SelectionIndicatorThickness}"
+                                               HorizontalAlignment="Left"
+                                               VerticalAlignment="Bottom"
+                                               IsHitTestVisible="False"/>
+                                </Grid>
+                            </TabStripScroller>
+                            <ToggleButton x:Name="PART_TabOverflow" Grid.Column="1" VerticalAlignment="Stretch"
+                                          MinWidth="28" Padding="4 0" Visibility="Collapsed" BorderThickness="0"
+                                          HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                          Background="{ResourceReference SolidBackgroundFillColorBase}">
+                                <Path Data="M0,0 L8,0 L4,5 Z" Fill="{ResourceReference TextFillColorSecondary}"
+                                      Width="8" Height="5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </ToggleButton>
+                            <!-- Flyout list of every tab (wired in code), opened below the ▾ (edge-aware via FlipToFit). -->
+                            <Popup x:Name="PART_TabOverflowPopup" Grid.Column="1" Placement="Bottom" FlipToFit="True" VerticalOffset="2">
+                                <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                        BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                        BorderThickness="1" CornerRadius="4" Padding="2">
+                                    <ListBox x:Name="PART_TabOverflowList" Classes="TabOverflowList" MinWidth="160"/>
+                                </Border>
+                            </Popup>
+                        </Grid>
                         <Border Grid.Row="1"
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
@@ -109,18 +150,35 @@
                                               ContentTransition="{TemplateBinding ContentTransition}"
                                               TransitionDuration="{TemplateBinding ContentTransitionDuration}"/>
                         </Border>
-                        <TabStripScroller x:Name="PART_TabStrip" Grid.Row="1" Orientation="Horizontal">
-                            <Grid>
-                                <ItemsPresenter x:Name="PART_ItemsPresenter"/>
-                                <Rectangle x:Name="PART_SelectionIndicator"
-                                           Fill="{TemplateBinding SelectionIndicatorBrush}"
-                                           Width="1"
-                                           Height="{TemplateBinding SelectionIndicatorThickness}"
-                                           HorizontalAlignment="Left"
-                                           VerticalAlignment="Top"
-                                           IsHitTestVisible="False"/>
-                            </Grid>
-                        </TabStripScroller>
+                        <!-- Strip + ▾ overflow (Auto column beside the * scroller) - see the Top template for the rationale. -->
+                        <Grid Grid.Row="1" ColumnDefinitions="*,Auto">
+                            <TabStripScroller x:Name="PART_TabStrip" Grid.Column="0" Orientation="Horizontal">
+                                <Grid>
+                                    <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                    <Rectangle x:Name="PART_SelectionIndicator"
+                                               Fill="{TemplateBinding SelectionIndicatorBrush}"
+                                               Width="1"
+                                               Height="{TemplateBinding SelectionIndicatorThickness}"
+                                               HorizontalAlignment="Left"
+                                               VerticalAlignment="Top"
+                                               IsHitTestVisible="False"/>
+                                </Grid>
+                            </TabStripScroller>
+                            <ToggleButton x:Name="PART_TabOverflow" Grid.Column="1" VerticalAlignment="Stretch"
+                                          MinWidth="28" Padding="4 0" Visibility="Collapsed" BorderThickness="0"
+                                          HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                          Background="{ResourceReference SolidBackgroundFillColorBase}">
+                                <Path Data="M0,0 L8,0 L4,5 Z" Fill="{ResourceReference TextFillColorSecondary}"
+                                      Width="8" Height="5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </ToggleButton>
+                            <Popup x:Name="PART_TabOverflowPopup" Grid.Column="1" Placement="Bottom" FlipToFit="True" VerticalOffset="2">
+                                <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                        BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                        BorderThickness="1" CornerRadius="4" Padding="2">
+                                    <ListBox x:Name="PART_TabOverflowList" Classes="TabOverflowList" MinWidth="160"/>
+                                </Border>
+                            </Popup>
+                        </Grid>
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>
@@ -140,18 +198,36 @@
             <Setter.Value>
                 <ControlTemplate TargetType="TabControl">
                     <Grid ColumnDefinitions="Auto,*">
-                        <TabStripScroller x:Name="PART_TabStrip" Grid.Column="0" Orientation="Vertical">
-                            <Grid>
-                                <ItemsPresenter x:Name="PART_ItemsPresenter"/>
-                                <Rectangle x:Name="PART_SelectionIndicator"
-                                           Fill="{TemplateBinding SelectionIndicatorBrush}"
-                                           Width="{TemplateBinding SelectionIndicatorThickness}"
-                                           Height="1"
-                                           HorizontalAlignment="Right"
-                                           VerticalAlignment="Top"
-                                           IsHitTestVisible="False"/>
-                            </Grid>
-                        </TabStripScroller>
+                        <!-- Strip + ▾ overflow in an Auto ROW below the * scroller (the strip is vertical, so it overflows
+                             DOWNWARD - the ▾ sits at the bottom and reserves a row). -->
+                        <Grid Grid.Column="0" RowDefinitions="*,Auto">
+                            <TabStripScroller x:Name="PART_TabStrip" Grid.Row="0" Orientation="Vertical">
+                                <Grid>
+                                    <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                    <Rectangle x:Name="PART_SelectionIndicator"
+                                               Fill="{TemplateBinding SelectionIndicatorBrush}"
+                                               Width="{TemplateBinding SelectionIndicatorThickness}"
+                                               Height="1"
+                                               HorizontalAlignment="Right"
+                                               VerticalAlignment="Top"
+                                               IsHitTestVisible="False"/>
+                                </Grid>
+                            </TabStripScroller>
+                            <ToggleButton x:Name="PART_TabOverflow" Grid.Row="1" HorizontalAlignment="Stretch"
+                                          MinHeight="24" Padding="0 4" Visibility="Collapsed" BorderThickness="0"
+                                          HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                          Background="{ResourceReference SolidBackgroundFillColorBase}">
+                                <Path Data="M0,0 L8,0 L4,5 Z" Fill="{ResourceReference TextFillColorSecondary}"
+                                      Width="8" Height="5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </ToggleButton>
+                            <Popup x:Name="PART_TabOverflowPopup" Grid.Row="1" Placement="Bottom" FlipToFit="True" VerticalOffset="2">
+                                <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                        BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                        BorderThickness="1" CornerRadius="4" Padding="2">
+                                    <ListBox x:Name="PART_TabOverflowList" Classes="TabOverflowList" MinWidth="160"/>
+                                </Border>
+                            </Popup>
+                        </Grid>
                         <Border Grid.Column="1"
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
@@ -199,18 +275,35 @@
                                               ContentTransition="{TemplateBinding ContentTransition}"
                                               TransitionDuration="{TemplateBinding ContentTransitionDuration}"/>
                         </Border>
-                        <TabStripScroller x:Name="PART_TabStrip" Grid.Column="1" Orientation="Vertical">
-                            <Grid>
-                                <ItemsPresenter x:Name="PART_ItemsPresenter"/>
-                                <Rectangle x:Name="PART_SelectionIndicator"
-                                           Fill="{TemplateBinding SelectionIndicatorBrush}"
-                                           Width="{TemplateBinding SelectionIndicatorThickness}"
-                                           Height="1"
-                                           HorizontalAlignment="Left"
-                                           VerticalAlignment="Top"
-                                           IsHitTestVisible="False"/>
-                            </Grid>
-                        </TabStripScroller>
+                        <!-- Strip + ▾ overflow in an Auto ROW below the * scroller (vertical strip - see the Left template). -->
+                        <Grid Grid.Column="1" RowDefinitions="*,Auto">
+                            <TabStripScroller x:Name="PART_TabStrip" Grid.Row="0" Orientation="Vertical">
+                                <Grid>
+                                    <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                    <Rectangle x:Name="PART_SelectionIndicator"
+                                               Fill="{TemplateBinding SelectionIndicatorBrush}"
+                                               Width="{TemplateBinding SelectionIndicatorThickness}"
+                                               Height="1"
+                                               HorizontalAlignment="Left"
+                                               VerticalAlignment="Top"
+                                               IsHitTestVisible="False"/>
+                                </Grid>
+                            </TabStripScroller>
+                            <ToggleButton x:Name="PART_TabOverflow" Grid.Row="1" HorizontalAlignment="Stretch"
+                                          MinHeight="24" Padding="0 4" Visibility="Collapsed" BorderThickness="0"
+                                          HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                          Background="{ResourceReference SolidBackgroundFillColorBase}">
+                                <Path Data="M0,0 L8,0 L4,5 Z" Fill="{ResourceReference TextFillColorSecondary}"
+                                      Width="8" Height="5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </ToggleButton>
+                            <Popup x:Name="PART_TabOverflowPopup" Grid.Row="1" Placement="Bottom" FlipToFit="True" VerticalOffset="2">
+                                <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                        BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                        BorderThickness="1" CornerRadius="4" Padding="2">
+                                    <ListBox x:Name="PART_TabOverflowList" Classes="TabOverflowList" MinWidth="160"/>
+                                </Border>
+                            </Popup>
+                        </Grid>
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>

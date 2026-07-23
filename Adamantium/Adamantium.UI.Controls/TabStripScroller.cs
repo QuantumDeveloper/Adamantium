@@ -27,6 +27,14 @@ public class TabStripScroller : InputUIComponent, IContainer
         typeof(Orientation), typeof(TabStripScroller),
         new PropertyMetadata(Orientation.Horizontal, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
 
+    // Read-only scroll state, for the overflow affordances (fade edges / chevron buttons) to bind their visibility to:
+    // CanScrollBack = panned away from the start (content hidden before the viewport); CanScrollForward = more past the end.
+    public static readonly AdamantiumProperty CanScrollBackProperty = AdamantiumProperty.Register(nameof(CanScrollBack),
+        typeof(bool), typeof(TabStripScroller), new PropertyMetadata(false));
+
+    public static readonly AdamantiumProperty CanScrollForwardProperty = AdamantiumProperty.Register(nameof(CanScrollForward),
+        typeof(bool), typeof(TabStripScroller), new PropertyMetadata(false));
+
     private double _offset;      // how far the strip is panned along the axis
     private double _extent;      // the child's length along the axis (from measure)
     private double _viewport;    // our own length along the axis (from arrange)
@@ -51,6 +59,63 @@ public class TabStripScroller : InputUIComponent, IContainer
     }
 
     private bool IsHorizontal => Orientation == Orientation.Horizontal;
+
+    /// <summary>True when the strip is panned off its start (hidden content before the viewport). Drives a start-edge
+    /// fade / chevron.</summary>
+    public bool CanScrollBack
+    {
+        get => GetValue<bool>(CanScrollBackProperty);
+        private set => SetValue(CanScrollBackProperty, value);
+    }
+
+    /// <summary>True when there is hidden content past the end of the viewport. Drives an end-edge fade / chevron.</summary>
+    public bool CanScrollForward
+    {
+        get => GetValue<bool>(CanScrollForwardProperty);
+        private set => SetValue(CanScrollForwardProperty, value);
+    }
+
+    /// <summary>Pan a step toward the start (direction &lt; 0) or the end (direction &gt; 0) - the chevron buttons call this.</summary>
+    public void LineScroll(int direction)
+    {
+        var max = Math.Max(0, _extent - _viewport);
+        if (max <= 0) return;
+        var step = Math.Max(WheelStep * 2, _viewport * 0.5);
+        _offset = Math.Clamp(_offset + Math.Sign(direction) * step, 0, max);
+        InvalidateArrange();
+    }
+
+    /// <summary>Pan just enough to bring <paramref name="element"/> (a tab) fully into view - the overflow menu calls this
+    /// when a hidden tab is picked. No-op if it is already visible.</summary>
+    public void ScrollIntoView(IUIComponent element)
+    {
+        if (element == null || Child is not IUIComponent child) return;
+        double start = 0;
+        for (var n = element; n != null && !ReferenceEquals(n, child); n = n.VisualParent)
+            start += IsHorizontal ? n.Bounds.X : n.Bounds.Y;
+        var size = IsHorizontal ? element.Bounds.Width : element.Bounds.Height;
+        var max = Math.Max(0, _extent - _viewport);
+        if (start < _offset) _offset = Math.Clamp(start, 0, max);
+        else if (start + size > _offset + _viewport) _offset = Math.Clamp(start + size - _viewport, 0, max);
+        InvalidateArrange();
+    }
+
+    /// <summary>Raised when <see cref="CanScrollBack"/>/<see cref="CanScrollForward"/> change, so an owner (TabControl) can
+    /// refresh the fade / chevron affordances without polling.</summary>
+    public event EventHandler ScrollStateChanged;
+
+    // Recompute CanScrollBack/Forward from the current offset/extent/viewport. Called from every arrange (which runs after
+    // any offset change via InvalidateArrange), so the affordances stay in step with wheeling, resizing and tab add/close.
+    private void UpdateScrollState()
+    {
+        var max = Math.Max(0, _extent - _viewport);
+        var back = _offset > 0.5;
+        var forward = _offset < max - 0.5;
+        if (back == CanScrollBack && forward == CanScrollForward) return;
+        CanScrollBack = back;
+        CanScrollForward = forward;
+        ScrollStateChanged?.Invoke(this, EventArgs.Empty);
+    }
 
     private static void OnChildChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
@@ -93,6 +158,7 @@ public class TabStripScroller : InputUIComponent, IContainer
         {
             _viewport = IsHorizontal ? finalSize.Width : finalSize.Height;
             ClampOffset();
+            UpdateScrollState();
             var rect = IsHorizontal
                 ? new Rect(-_offset, 0, Math.Max(_extent, finalSize.Width), finalSize.Height)
                 : new Rect(0, -_offset, finalSize.Width, Math.Max(_extent, finalSize.Height));

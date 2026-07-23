@@ -2,7 +2,9 @@ using System.Collections;
 using System.Collections.Specialized;
 using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Controls.Base;
+using Adamantium.UI.Controls.Primitives;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Data;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Media.Animation;
@@ -140,7 +142,14 @@ public class TabControl : Selector
             // Slide the indicator for a USER selection (layout is stable). A reselection driven by a COLLECTION change
             // (close/add) is about to reflow the strip, so a slide would head to the pre-reflow slot - defer to
             // PlaceIndicator, which authoritatively places the bar from the next arrange pass (see _reselecting).
-            if (!_reselecting) UpdateIndicator(animate: true);
+            // The same gate covers the scroll-into-view: bring the selected tab (possibly hidden - e.g. picked from the
+            // overflow flyout) into view; a no-op when it is already visible.
+            if (!_reselecting)
+            {
+                UpdateIndicator(animate: true);
+                _tabStrip?.ScrollIntoView(ItemContainerGenerator.ContainerFromIndex(SelectedIndex) as IUIComponent);
+            }
+            if (_overflow?.IsChecked == true) _overflow.IsChecked = false;   // a pick from the flyout closes it
         };
         Items.CollectionChanged += OnItemsChanged;
     }
@@ -498,6 +507,8 @@ public class TabControl : Selector
             // placement change until a click. Clear it here.
             _animatingIndicator = false;
         }
+
+        WireTabStripAffordances();
     }
 
     // The indicator is placed from TWO complementary hooks, because neither alone covers every case:
@@ -687,6 +698,83 @@ public class TabControl : Selector
     {
         get => GetValue<ControlTemplate>(CloseButtonTemplateProperty);
         set => SetValue(CloseButtonTemplateProperty, value);
+    }
+
+    // --- Tab-strip overflow menu ----------------------------------------------------------------------------------
+    // When the headers overflow the strip (wheel to scroll them), a ▾ overflow button appears listing every tab, the
+    // current one highlighted - pick any (even a hidden one) to switch to it. PART_TabStrip is the TabStripScroller; its
+    // CanScrollBack/Forward tell us it overflows. Toggleable (default ON). Prep for a docking control's tab groups.
+
+    public static readonly AdamantiumProperty ShowTabOverflowMenuProperty = AdamantiumProperty.Register(
+        nameof(ShowTabOverflowMenu), typeof(bool), typeof(TabControl), new PropertyMetadata(true, OnAffordanceToggleChanged));
+
+    /// <summary>Show an overflow ▾ menu listing every tab when they overflow the strip. Default true.</summary>
+    public bool ShowTabOverflowMenu { get => GetValue<bool>(ShowTabOverflowMenuProperty); set => SetValue(ShowTabOverflowMenuProperty, value); }
+
+    private TabStripScroller _tabStrip;
+    private ToggleButton _overflow;        // the ▾ icon; its checked state opens the flyout
+    private Popup _overflowPopup;
+    private ListBox _overflowList;         // the flyout list of every tab, current highlighted
+
+    private static void OnAffordanceToggleChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+        => (a as TabControl)?.RefreshTabStripAffordances();
+
+    // Find the overflow parts (a custom template may omit them), (re)subscribe, and set the initial state.
+    private void WireTabStripAffordances()
+    {
+        if (_tabStrip != null) _tabStrip.ScrollStateChanged -= OnTabStripScrollStateChanged;
+        if (_overflow != null) { _overflow.Checked -= OnOverflowToggled; _overflow.Unchecked -= OnOverflowToggled; }
+        if (_overflowPopup != null) _overflowPopup.Closed -= OnOverflowClosed;
+
+        _tabStrip = GetTemplateChild("PART_TabStrip") as TabStripScroller;
+        _overflow = GetTemplateChild("PART_TabOverflow") as ToggleButton;
+        _overflowPopup = GetTemplateChild("PART_TabOverflowPopup") as Popup;
+        _overflowList = GetTemplateChild("PART_TabOverflowList") as ListBox;
+
+        // The ▾ visibility tracks the strip's overflow state; the scroller flips CanScroll* during its own arrange and now,
+        // with Visibility marked AffectsParentMeasure, a mid-arrange show/hide correctly reflows the strip Grid (no deferral).
+        if (_tabStrip != null) _tabStrip.ScrollStateChanged += OnTabStripScrollStateChanged;
+        if (_overflow != null) { _overflow.Checked += OnOverflowToggled; _overflow.Unchecked += OnOverflowToggled; }
+        if (_overflowPopup != null)
+        {
+            _overflowPopup.PlacementTarget = _overflow;
+            _overflowPopup.KeepOpen = false;             // click-outside-to-close, owned by Popup now (no per-control hook)
+            _overflowPopup.IgnoreTargetPress = true;     // a ▾ press is the toggle - it handles the close, don't dismiss+reopen
+            _overflowPopup.Closed += OnOverflowClosed;   // un-press the ▾ when the flyout light-dismisses
+        }
+        if (_overflowList != null)
+        {
+            // The flyout mirrors the tabs; two-way selection with ours, so the current tab is highlighted and picking one
+            // (even a hidden one) selects it - SelectionChanged then closes the flyout + scrolls it into view.
+            _overflowList.ItemsSource = Items;
+            _overflowList.ItemTemplate = ItemTemplate;
+            _overflowList.SetBinding(Selector.SelectedItemProperty,
+                new Binding(nameof(SelectedItem)) { Source = this, Mode = BindingMode.TwoWay });
+        }
+        RefreshTabStripAffordances();
+    }
+
+    // Open/close the flyout with the ▾. The list's own template (a pixel-scrolling ScrollViewer capped by MaxHeight) handles
+    // the height + scrolling, so there is nothing to size here.
+    private void OnOverflowToggled(object sender, RoutedEventArgs e)
+    {
+        if (_overflowPopup != null) _overflowPopup.IsOpen = _overflow?.IsChecked == true;
+    }
+
+    // The popup light-dismissed (a click outside it) - un-press the ▾ so its NEXT click reopens, not just un-presses.
+    private void OnOverflowClosed(object sender, EventArgs e)
+    {
+        if (_overflow?.IsChecked == true) _overflow.IsChecked = false;
+    }
+
+    private void OnTabStripScrollStateChanged(object sender, EventArgs e) => RefreshTabStripAffordances();
+
+    // The overflow ▾ shows whenever the strip overflows (can scroll either way) and the toggle is on.
+    private void RefreshTabStripAffordances()
+    {
+        var overflowing = (_tabStrip?.CanScrollBack ?? false) || (_tabStrip?.CanScrollForward ?? false);
+        if (_overflow != null)
+            _overflow.Visibility = ShowTabOverflowMenu && overflowing ? Visibility.Visible : Visibility.Collapsed;
     }
 
     /// <summary>Raised when a tab's close button is clicked. Cancelable; if not canceled the tab is removed by default.</summary>
