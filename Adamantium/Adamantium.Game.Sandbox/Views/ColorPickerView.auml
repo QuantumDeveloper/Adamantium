@@ -1,5 +1,6 @@
 <View xmlns="http://adamantium/ui"
       xmlns:x="http://adamantium/ui/xaml/extensions">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
     <StackPanel Orientation="Vertical" Margin="24">
 
         <TextBlock Text="Color Picker"
@@ -30,6 +31,18 @@
             <StackPanel Orientation="Vertical"
                         MarginLeft="32"
                         VerticalAlignment="Top">
+                <TextBlock Text="Compact swatch → flyout (ColorPickerButton)"
+                           FontSize="14"
+                           MarginBottom="14"/>
+                <!-- Same PickedColor as the inline picker + wheel: the swatch shows it; clicking opens a floating,
+                     light-dismissing ColorPicker flyout - editing there stays in sync and drives the theme accent too. -->
+                <ColorPickerButton SelectedColor="{Binding PickedColor, Mode=TwoWay}"
+                                   HorizontalAlignment="Left"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Vertical"
+                        MarginLeft="32"
+                        VerticalAlignment="Top">
                 <TextBlock Text="Live theme accent"
                            FontSize="14"
                            MarginBottom="14"/>
@@ -50,4 +63,5 @@
         </StackPanel>
 
     </StackPanel>
+    </ScrollViewer>
 </View>

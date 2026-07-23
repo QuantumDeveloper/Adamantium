@@ -14,6 +14,10 @@
 
 float4x4 Projection;
 
+// Global frame time in seconds, advanced by the render loop each present. Only the fractal's auto-morph reads it; every
+// other pass ignores it. Unset (0) = no drift, so a static fractal renders fine before the loop starts feeding it.
+float Time;
+
 // GPU-resident TRANSFORM TABLE (see Rendering/TransformTable.cs): one world matrix per MOTION NODE (a scrolled panel, an
 // animating tile), fetched by the per-instance slot index. Slot 0 is ALWAYS identity, so world-baked instances (index 0)
 // render unchanged - the migration path: content moves to node-LOCAL bounds + a real slot incrementally, and from then on
@@ -824,6 +828,200 @@ float4 PatternPS(PatternPSInput input) : SV_Target
     return CompositeFillStroke(d, fill, it.StrokeColor, it.Stroke0.x, it.Stroke0.y, mask);
 }
 
+// ---- Fractal batch: the SAME SDF rounded-rect (self-AA shape + shared stroke), but the FILL is an escape-time FRACTAL
+// (Julia/Mandelbrot) iterated per fragment - resolution-independent, no texture. Per-instance FractalRectData from a BDA
+// storage buffer by SV_InstanceID; the PS re-reads the record, maps the fragment to the complex plane, iterates z=z²+c and
+// colours by the smooth escape count. With the animate flag set, a Julia's C drifts on a Lissajous over the global Time.
+struct FractalRectData
+{
+    float4 Bounds;       // NODE-local x, y, w, h
+    float4 Params;       // .x corner radius, .y type (0 Julia/1 Mandelbrot), .z transform slot, .w max iterations
+    float4 Geom;         // .x/.y complex-plane centre, .z zoom, .w morph speed
+    float4 Julia;        // .x/.y Julia constant C, .z animate flag, .w reserved
+    float4 Color1;       // straight RGBA, opacity folded
+    float4 Color2;       // straight RGBA, opacity folded
+    float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
+    float4 Stroke0;      // width_px, align, dashOn, dashGap
+    float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
+};
+
+struct FractalPSInput
+{
+    float4 Position : SV_Position;
+    float2 Local    : TEXCOORD0;   // fragment relative to the rect CENTRE (SDF space, device px)
+    float2 Half     : TEXCOORD1;   // rect half-size
+    float  Radius   : TEXCOORD2;   // corner radius
+    nointerpolation uint InstId : TEXCOORD3;   // instance -> re-read FractalRectData in the PS
+};
+
+[shader("vertex")]
+FractalPSInput FractalRectInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
+{
+    FractalRectData* items = (FractalRectData*)InstancesAddress;
+    FractalRectData it = items[instanceId];
+
+    FractalPSInput o;
+    float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
+    float outset = max(it.Stroke0.x * (0.5 * (1.0 + it.Stroke0.y) + 0.5), 0.0) + 1.0;
+    float4x4* transforms = (float4x4*)TransformsAddress;
+    float4x4 nodeWorld = transforms[(uint)it.Params.z];
+    float2 localPos = it.Bounds.xy + corner * it.Bounds.zw + (corner * 2.0 - 1.0) * outset;
+    float4 worldPos = mul(float4(localPos, 0.0, 1.0), nodeWorld);
+    o.Position = mul(worldPos, Projection);
+    o.Half   = it.Bounds.zw * 0.5;
+    o.Local  = (corner - 0.5) * it.Bounds.zw + (corner * 2.0 - 1.0) * outset;
+    o.Radius = it.Params.x;
+    o.InstId = instanceId;
+    return o;
+}
+
+// Newton fractal for z³ - 1: iterate z -= (z³-1)/(3z²) and colour by which of the 3 cube roots of unity it converges to
+// (a different look from escape-time: smooth colour basins with a fractal border). The two brush colours take two roots,
+// their blend the third; converging in more steps (near a border) darkens, so the boundary detail shows. Animate flows it.
+float4 NewtonColor(float2 z, int maxIt, bool animate, float4 c1, float4 c2)
+{
+    float2 r0 = float2(1.0, 0.0);
+    float2 r1 = float2(-0.5, 0.8660254);
+    float2 r2 = float2(-0.5, -0.8660254);
+    int hit = -1;
+    int i = 0;
+    for (i = 0; i < maxIt; i++)
+    {
+        float2 z2 = float2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y);              // z²
+        float2 z3 = float2(z2.x * z.x - z2.y * z.y, z2.x * z.y + z2.y * z.x);    // z³
+        float2 num = float2(z3.x - 1.0, z3.y);                                  // z³ - 1
+        float2 den = float2(3.0 * z2.x, 3.0 * z2.y);                            // 3z²
+        float dd = dot(den, den);
+        if (dd < 1e-12) break;                                                  // derivative ~0: stationary
+        z -= float2(num.x * den.x + num.y * den.y, num.y * den.x - num.x * den.y) / dd;   // z -= num/den (complex divide)
+        if (dot(z - r0, z - r0) < 1e-4) { hit = 0; break; }
+        if (dot(z - r1, z - r1) < 1e-4) { hit = 1; break; }
+        if (dot(z - r2, z - r2) < 1e-4) { hit = 2; break; }
+    }
+
+    float shade = 1.0 - float(i) / float(maxIt);
+    if (animate) shade = frac(shade + Time * 0.05);
+
+    float4 baseCol;
+    if (hit == 0) baseCol = c1;
+    else if (hit == 1) baseCol = c2;
+    else if (hit == 2) baseCol = lerp(c1, c2, 0.5);
+    else baseCol = float4(0.0, 0.0, 0.0, c1.w);   // never converged
+    return float4(baseCol.rgb * shade, baseCol.w);
+}
+
+[shader("fragment")]
+float4 FractalPS(FractalPSInput input) : SV_Target
+{
+    FractalRectData* items = (FractalRectData*)InstancesAddress;
+    FractalRectData it = items[input.InstId];
+
+    float r = min(input.Radius, min(input.Half.x, input.Half.y));
+    int joinType = int(fmod(floor(it.Stroke1.w / 512.0), 8.0));
+    float d = SdRoundRectJoin(input.Local, input.Half, r, joinType);
+
+    // Fragment -> complex plane, aspect-correct: the smaller axis spans 3/zoom around the centre, so pixels stay square.
+    float minHalf = max(min(input.Half.x, input.Half.y), 1e-4);
+    float2 cp = it.Geom.xy + (input.Local / minHalf) * (1.5 / max(it.Geom.z, 1e-4));
+
+    int formula = int(it.Julia.w);   // 0 Quadratic, 1 BurningShip, 2 Tricorn, 3 Celtic, 4 Multibrot, 5 Newton
+    bool animate = it.Julia.z > 0.5;
+    int maxIt = min(int(it.Params.w), 400);
+
+    float4 fill;
+    if (formula == 5)   // Newton: convergence basins, not escape-time (C-mode does not apply, so map the raw fragment)
+    {
+        fill = NewtonColor(cp, maxIt, animate, it.Color1, it.Color2);
+    }
+    else
+    {
+        bool mandelbrot = int(it.Params.y) == 1;   // C-mode: c is the fragment (else c is the Julia constant)
+        float zoomAmp = 1.0 / max(it.Geom.z, 1.0);   // shrink morph amplitude as we zoom past 1x, so on-screen morph speed stays constant
+        float expo = it.Geom.w;                       // Multibrot exponent d
+        if (formula == 4 && animate)
+        {
+            expo = max(1.1, it.Geom.w + 2.0 * zoomAmp * sin(Time * 0.6));   // breathe the petals open/closed instead of drifting C
+        }
+
+        // Julia: z0 = fragment, c = constant (drifting when animate). Mandelbrot: z0 = 0, c = fragment.
+        float2 z;
+        float2 cc;
+        if (mandelbrot)
+        {
+            z = float2(0.0, 0.0);
+            cc = cp;
+        }
+        else
+        {
+            z = cp;
+            cc = it.Julia.xy;
+            if (animate && formula != 4)   // drift the Julia constant; amplitude ~ 1/Zoom so the on-screen morph speed is zoom-independent
+            {
+                float amp = 0.18 * zoomAmp;
+                cc += float2(amp * cos(Time), amp * sin(Time * 0.86));
+            }
+
+        }
+
+        int i = 0;
+        for (i = 0; i < maxIt; i++)
+        {
+            if (formula == 1)         // Burning Ship: (|Re z| + i|Im z|)² + c
+            {
+                float2 za = float2(abs(z.x), abs(z.y));
+                z = float2(za.x * za.x - za.y * za.y, 2.0 * za.x * za.y) + cc;
+            }
+            else if (formula == 2)    // Tricorn / Mandelbar: conj(z)² + c
+            {
+                z = float2(z.x * z.x - z.y * z.y, -2.0 * z.x * z.y) + cc;
+            }
+            else if (formula == 3)    // Celtic: |Re(z²)| + i·Im(z²) + c
+            {
+                float2 z2 = float2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y);
+                z = float2(abs(z2.x), z2.y) + cc;
+            }
+            else if (formula == 4)    // Multibrot: z^d + c (polar power, so d may be fractional / animated)
+            {
+                float rr = length(z);
+                float th = atan2(z.y, z.x);
+                z = pow(rr, expo) * float2(cos(expo * th), sin(expo * th)) + cc;
+            }
+            else                      // Quadratic: z² + c
+            {
+                z = float2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + cc;
+            }
+            if (dot(z, z) > 256.0) break;   // large bail radius -> smoother continuous colouring
+        }
+
+        if (i >= maxIt)
+        {
+            fill = float4(0.0, 0.0, 0.0, it.Color1.w);   // inside the set: black (keep the fill alpha)
+        }
+        else
+        {
+            float sm = float(i) + 1.0 - log2(max(0.5 * log2(dot(z, z)), 1.0));   // smooth (continuous) escape count
+            float ramp = sqrt(saturate(sm / float(maxIt)));
+            if (animate && mandelbrot && formula != 4)   // Mandelbrot-mode: no C to morph, so flow the colour ramp instead
+            {
+                ramp = frac(ramp + Time * 0.06);
+            }
+            fill = lerp(it.Color1, it.Color2, ramp);
+        }
+    }
+
+    float mask = 1.0;
+    if (it.Stroke0.z > 0.0 || it.Stroke1.y > 0.0 || it.Stroke1.z < 1.0)
+    {
+        float halfW = it.Stroke0.x * 0.5;
+        float perim;
+        float s = RoundRectArc(input.Local, input.Half, r, perim);
+        float dPerp = d - it.Stroke0.y * halfW;
+        mask = DashTrimMask(s, s, perim, it.Stroke0.z, it.Stroke0.w, it.Stroke1.x, it.Stroke1.y,
+                            it.Stroke1.z, dPerp, halfW, it.Stroke1.w);
+    }
+    return CompositeFillStroke(d, fill, it.StrokeColor, it.Stroke0.x, it.Stroke0.y, mask);
+}
+
 // =====================================================================================================================
 // TECHNIQUE - one technique, one pass per draw variant (kept together at the end of the file so the shader code above
 // reads top-to-bottom without technique boilerplate breaking it up). Each pass names its vertex + pixel shader; the C#
@@ -888,5 +1086,15 @@ technique Batch
         Profile = 6.6;
         VertexShader = PatternRectInstancedVS;
         PixelShader = PatternPS;
+    }
+
+    // SDF rounded-rect fills with an escape-time FRACTAL fill (per-instance FractalRectData; the PS iterates z=z²+c and
+    // colours by the smooth escape count, morphing C over Time when animate is set); quad from SV_VertexID.
+    pass Fractal
+    {
+        EffectName = "BatchEffect";
+        Profile = 6.6;
+        VertexShader = FractalRectInstancedVS;
+        PixelShader = FractalPS;
     }
 }
