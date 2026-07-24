@@ -105,12 +105,37 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
 
         List<(Adamantium.Mathematics.Vector2[], bool)> list = [];
         foreach (var contour in mesh.Contours)
-            if (contour.Points is { Length: >= 2 })
-                list.Add((contour.Points, contour.IsGeometryClosed));
+        {
+            if (contour.Points is not { Length: >= 2 }) continue;
+            var pts = DedupPoints(contour.Points, contour.IsGeometryClosed);
+            if (pts.Length >= 2)
+                list.Add((pts, contour.IsGeometryClosed));
+        }
 
         if (list.Count == 0) return false;
         contours = list;
         return true;
+    }
+
+    // Drop consecutive coincident points (within ~1e-3 px). A zero-length segment makes the GPU stroke expander take a
+    // normalize(0) -> a garbage segment normal -> a random miter direction, i.e. a spike. The mesh/flattener can emit these
+    // (a closing point repeating the start, a curve sampled down to a near-cusp). A closed loop also drops a trailing point
+    // coincident with the first (the wrap is implicit).
+    private static Adamantium.Mathematics.Vector2[] DedupPoints(Adamantium.Mathematics.Vector2[] pts, bool closed)
+    {
+        const double epsSq = 1e-6;
+        List<Adamantium.Mathematics.Vector2> outv = [pts[0]];
+        for (var i = 1; i < pts.Length; i++)
+        {
+            var d = pts[i] - outv[^1];
+            if (d.X * d.X + d.Y * d.Y > epsSq) outv.Add(pts[i]);
+        }
+        if (closed && outv.Count > 2)
+        {
+            var d = outv[^1] - outv[0];
+            if (d.X * d.X + d.Y * d.Y <= epsSq) outv.RemoveAt(outv.Count - 1);
+        }
+        return [.. outv];
     }
 
     // On a geometry change, try to rewrite the existing GPU stroke's points in place (same topology + size-compatible
