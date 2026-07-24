@@ -335,8 +335,8 @@
                     </StackPanel>
                     <TextBlock Text="Zoom (log, ×)" Foreground="{ResourceReference TextFillColorSecondary}"/>
                     <StackPanel Orientation="Horizontal" MarginBottom="8">
-                        <Slider Value="{Binding FractalZoomExp, Mode=TwoWay}" Minimum="-0.52" Maximum="3.7" IsMoveToPointEnabled="true" Width="230"/>
-                        <TextBlock Text="{Binding ZoomText}" Width="52" MarginLeft="8" VerticalAlignment="Center" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                        <Slider Value="{Binding FractalZoomExp, Mode=TwoWay}" Minimum="-0.52" Maximum="15" IsMoveToPointEnabled="true" Width="230"/>
+                        <TextBlock Text="{Binding ZoomText}" MarginLeft="8" VerticalAlignment="Center" Foreground="{ResourceReference TextFillColorSecondary}"/>
                     </StackPanel>
                     <TextBlock Text="Iterations" Foreground="{ResourceReference TextFillColorSecondary}"/>
                     <StackPanel Orientation="Horizontal" MarginBottom="8">

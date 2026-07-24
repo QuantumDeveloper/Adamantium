@@ -14,8 +14,8 @@ namespace Adamantium.UI.Controls.Shapes;
 public class FractalView : Rectangle
 {
     private const double Span = 1.5;      // matches BatchEffect.fx: cp = center + (local / minHalf) * (1.5 / zoom)
-    private const double MinExp = -0.52;  // log10(~0.3x) .. log10(~5000x); the safe float32 zoom band
-    private const double MaxExp = 3.7;
+    private const double MinExp = -0.52;  // log10(~0.3x) .. log10(1e15x). Past ~1e5 the shader switches to the perturbation
+    private const double MaxExp = 15.0;   // deep path (double reference orbit); the double centre resolves pixels to ~1e15.
     private const double ZoomStep = 0.2;      // ZoomExp added per standard wheel notch (accumulated into the target)
     private const double SmoothRate = 12.0;   // ease-to-target rate per second - higher snaps sooner, lower glides longer
 

@@ -25,6 +25,11 @@ float Time;
 // instances inside the batch (the old axis-aligned world bake had to reject them to per-unit draws).
 uint64_t TransformsAddress;
 
+// GPU-resident FRACTAL REFERENCE ORBITS (perturbation deep-zoom): a flat float2[] holding every deep-zoom fractal
+// instance's reference orbit Z_n concatenated. Each FractalRectData.Ref.x is this instance's START INDEX into it and
+// .y the length. Zero (address 0) when no deep-zoom fractal is live - the shader only dereferences it on the deep path.
+uint64_t OrbitAddress;
+
 // ---- Shared SDF fill+stroke compositing --------------------------------------------------------------------------
 // Both SDF families (rounded-rect, ellipse) share the same stroke story: given the signed distance `d` to the contour
 // (device-px, negative inside), a fill and an OPTIONAL stroke are composited in ONE pass. The stroke is a ring built
@@ -878,6 +883,7 @@ struct FractalRectData
     float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
     float4 Stroke0;      // width_px, align, dashOn, dashGap
     float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
+    float4 Ref;          // perturbation: .x orbit start index (into OrbitAddress), .y orbit length, .z deep flag (1=use), .w reserved
 };
 
 struct FractalPSInput
@@ -978,6 +984,66 @@ float4 FractalPS(FractalPSInput input) : SV_Target
             expo = max(1.1, it.Geom.w + 2.0 * zoomAmp * sin(Time * 0.6));   // breathe the petals open/closed instead of drifting C
         }
 
+        // PERTURBATION deep-zoom path (armed only for Quadratic z2+c past the deep threshold): iterate the SMALL delta
+        // from a high-precision reference orbit (Z_n from OrbitAddress) so the whole shader stays float32 - no fp64, no wall.
+        // NOTE: the .fx parser does NOT accept unary '!', so bail flags are tested as (escaped) / (escaped == false).
+        if (it.Ref.y > 0.5)   // Ref.y = reference-orbit length; > 0 means the deep path is armed for this instance
+        {
+            float2* orbit = (float2*)OrbitAddress;
+            uint ofs = (uint)it.Ref.x;
+            int rlen = (int)it.Ref.y;
+            // pixel offset from the REFERENCE point: (pixel - view centre) + (view centre - C_ref). The second term
+            // (Ref.zw) lets the CPU pick a reference OFF the view centre (a longer-living orbit) without moving the view.
+            float2 delta = (input.Local / minHalf) * (1.5 / max(it.Geom.z, 1e-4)) + float2(it.Ref.z, it.Ref.w);
+            // SEGMENTED REBASING (Zhuoran, driver-friendly form): the naive rebase indexes the orbit by a data-dependent
+            // variable (orbit[ofs+m], m resets to 0) - the driver's NVVM shader compiler AVs on that at startup. Here the
+            // reference index is the INNER loop COUNTER j (monotonic, like the plain perturbation loop the driver accepts);
+            // a rebase just breaks the inner loop and the OUTER loop starts a fresh segment from j=0. One orbit serves any
+            // depth: no glitch blobs (reference near zero) and no short-orbit truncation.
+            float2 Ref0 = orbit[ofs];
+            float2 dz = mandelbrot ? float2(0.0, 0.0) : delta;   // Delta = z - Ref[j]. Julia: z0 offset. Mandelbrot: 0.
+            float2 dc = mandelbrot ? delta : float2(0.0, 0.0);   // per-iteration additive. Mandelbrot: dc. Julia: 0.
+            int pi = 0;                 // true iteration count (drives the smooth colour)
+            float2 pz = float2(0.0, 0.0);
+            bool escaped = false;
+            bool done = false;
+            for (int seg = 0; seg < maxIt; seg++)   // one segment per rebase; runtime bound so the driver does not unroll
+            {
+                bool rebased = false;
+                int j = 0;
+                for (j = 0; j + 1 < rlen; j++)
+                {
+                    float2 Z = orbit[ofs + (uint)j];                  // MONOTONIC reference index
+                    pz = Z + dz;                                      // full z at this true iteration
+                    if (dot(pz, pz) > 256.0) { escaped = true; break; }
+                    if (pi + 1 >= maxIt) { done = true; break; }
+                    float2 zdz = float2(Z.x * dz.x - Z.y * dz.y, Z.x * dz.y + Z.y * dz.x);
+                    float2 dz2 = float2(dz.x * dz.x - dz.y * dz.y, 2.0 * dz.x * dz.y);
+                    dz = 2.0 * zdz + dz2 + dc;                        // advance the perturbation
+                    pi = pi + 1;
+                    float2 Zn = orbit[ofs + (uint)(j + 1)];           // MONOTONIC (j+1)
+                    pz = Zn + dz;                                     // full z after the advance
+                    if (dot(pz, pz) < dot(dz, dz)) { dz = pz - Ref0; rebased = true; break; }   // rebase now
+                }
+                if (escaped) break;
+                if (done) break;
+                if (rebased == false) dz = pz - Ref0;   // inner ran out of reference -> rebase, restart the segment at j=0
+            }
+            if (escaped)
+            {
+                float sm = float(pi) + 1.0 - log2(max(0.5 * log2(dot(pz, pz)), 1.0));   // smooth continuous escape count
+                float ramp = sqrt(saturate(sm / float(maxIt)));
+                if (animate && mandelbrot) ramp = frac(ramp + Time * 0.06);   // Mandelbrot-mode: flow the colour ramp
+                fill = lerp(it.Color1, it.Color2, ramp);
+            }
+            else
+            {
+                fill = float4(0.0, 0.0, 0.0, it.Color1.w);   // inside the set / glitch / ran out of reference: black
+            }
+        }
+        else
+        {
+
         // Julia: z0 = fragment, c = constant (drifting when animate). Mandelbrot: z0 = 0, c = fragment.
         float2 z;
         float2 cc;
@@ -1042,6 +1108,7 @@ float4 FractalPS(FractalPSInput input) : SV_Target
             }
             fill = lerp(it.Color1, it.Color2, ramp);
         }
+        }   // end float-path else (perturbation deep path handled above)
     }
 
     float mask = 1.0;
