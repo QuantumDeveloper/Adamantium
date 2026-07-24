@@ -39,4 +39,8 @@ public struct FractalRectItem
 
     /// <summary>Stroke arc-length: x = dash offset, y = trim start, z = trim end, w = flags (join/cap codes).</summary>
     public Vector4F Stroke1;
+
+    /// <summary>Perturbation deep-zoom: .x = reference-orbit start index into the shared orbit buffer (OrbitAddress),
+    /// .y = orbit length, .z = deep flag (1 = iterate the perturbation path), .w = reserved.</summary>
+    public Vector4F Ref;
 }
