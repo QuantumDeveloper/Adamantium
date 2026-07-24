@@ -1,20 +1,42 @@
-using System;
 using System.Globalization;
 using Adamantium.Core;
-using Adamantium.Core.TypeParsing;
+using Adamantium.Mathematics;
 using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Core.Media;
 
 namespace Adamantium.Game.Sandbox.ViewModels;
 
-/// <summary>Shared stroke ("кайма") parameters for the Layout demo. ONE instance is referenced by every ColorRect tile
-/// AND by the slider bindings, so a slider change mutates the single object and only the realized tiles (virtualization)
-/// re-read it - no per-item propagation across thousands of tiles. Bound via the nested path <c>Stroke.StrokeWidth</c>
-/// (BindingExpression walks dotted paths and observes the leaf object).</summary>
+/// <summary>Shared stroke ("кайма") parameters for the Shapes-tab pen playground. ONE instance drives the stroke of
+/// EVERY shape in the tab: thickness, dashes, trim, corner, cap/join (bound to <c>DropDown</c>s) and colour (bound to a
+/// <c>ColorPicker</c>). Sliders/dropdowns/picker mutate this one object; each shape binds its stroke off <c>Stroke.*</c>.</summary>
 public sealed class StrokeSettings : PropertyChangedBase
 {
     private double _strokeWidth = 8;
     public double StrokeWidth { get => _strokeWidth; set => SetProperty(ref _strokeWidth, value); }
+
+    // Curve tessellation density: number of points each Bézier/NURBS/B-spline is sampled into (evenly by arc length).
+    // 0 = automatic (~3px spacing). The curves bind their Samples to this so the panel drives them all.
+    private double _samples = 32;   // demo slider START only; the real default lives on CurveBase.Samples (32)
+    public double Samples { get => _samples; set => SetProperty(ref _samples, value); }
+
+    // --- NURBS playground (the demo NURBS has 6 control points) --------------------------------------------------------
+    // Weight of the two TOP control points (the peak). >1 pulls the NURBS toward them; =1 = a plain B-spline. This is the
+    // "R" (rational) that a B-spline lacks - drag it and the curve bulges toward the peak.
+    private double _nurbsWeight = 1;
+    public double NurbsWeight
+    {
+        get => _nurbsWeight;
+        set { if (SetProperty(ref _nurbsWeight, value)) RaisePropertyChanged(nameof(NurbsWeights)); }
+    }
+    public System.Collections.Generic.IReadOnlyList<double> NurbsWeights => [1, 1, _nurbsWeight, _nurbsWeight, 1, 1];
+
+    // Piecewise-polynomial degree of the NURBS (a B-spline concept too): higher = smoother, pulls further from the
+    // control polygon. The plain B-spline shape stays fixed for comparison.
+    private double _nurbsDegree = 3;
+    public double NurbsDegree { get => _nurbsDegree; set => SetProperty(ref _nurbsDegree, value); }
+
+    private bool _nurbsUniform;   // false = non-uniform/clamped knots (smooth, reaches endpoints); true = uniform (floats)
+    public bool NurbsUniform { get => _nurbsUniform; set => SetProperty(ref _nurbsUniform, value); }
 
     private double _dashOffset;
     public double DashOffset { get => _dashOffset; set => SetProperty(ref _dashOffset, value); }
@@ -25,53 +47,28 @@ public sealed class StrokeSettings : PropertyChangedBase
     private double _trimEnd = 1.0;
     public double TrimEnd { get => _trimEnd; set => SetProperty(ref _trimEnd, value); }
 
-    // Uniform corner radius for the rectangle tiles/preview. The slider binds the scalar Corner; the shape's CornerRadius
-    // property (a CornerRadius struct, not a double) reads the derived value.
+    // Uniform corner radius for the rectangle. The slider binds the scalar Corner; the shape's CornerRadius property
+    // (a CornerRadius struct, not a double) reads the derived value.
     private double _corner = 4;
     public double Corner { get => _corner; set { if (SetProperty(ref _corner, value)) RaisePropertyChanged(nameof(CornerRadius)); } }
     public CornerRadius CornerRadius => new(_corner);
 
-    // Cap shape for dash-piece ends AND trim ends. Slider 0..5 covers all six PenLineCaps (0 flat, 1 square, 2 convex
-    // round, 3 convex triangle, 4 concave triangle, 5 concave round). Set the Cap slider's Maximum to 5 to reach them.
-    private double _capValue = 2;
-    public double CapValue { get => _capValue; set { if (SetProperty(ref _capValue, value)) RaisePropertyChanged(nameof(Cap)); } }
-    public PenLineCap Cap => (int)Math.Round(_capValue) switch
-    {
-        1 => PenLineCap.Square,
-        2 => PenLineCap.ConvexRound,
-        3 => PenLineCap.ConvexTriangle,
-        4 => PenLineCap.ConcaveTriangle,
-        5 => PenLineCap.ConcaveRound,
-        _ => PenLineCap.Flat,
-    };
+    // Cap for dash-piece ends AND trim ends. Bound two-way to a DropDown (EnumType=PenLineCap) - all six caps.
+    private PenLineCap _cap = PenLineCap.ConvexRound;
+    public PenLineCap Cap { get => _cap; set => SetProperty(ref _cap, value); }
 
-    // Corner join: slider 0 = miter (sharp), 1 = bevel (chamfer), 2 = round. Visible on a sharp rectangle (Corner = 0).
-    private double _joinValue = 2;
-    public double JoinValue { get => _joinValue; set { if (SetProperty(ref _joinValue, value)) RaisePropertyChanged(nameof(Join)); } }
-    public PenLineJoin Join => _joinValue >= 1.5 ? PenLineJoin.Round : _joinValue >= 0.5 ? PenLineJoin.Bevel : PenLineJoin.Miter;
+    // Corner join. Bound two-way to a DropDown (EnumType=PenLineJoin): Miter / Bevel / Round.
+    private PenLineJoin _join = PenLineJoin.Round;
+    public PenLineJoin Join { get => _join; set => SetProperty(ref _join, value); }
 
-    // Stroke colour by HUE (0..360, full saturation/value) - one slider covers the whole spectrum. The shapes bind their
-    // Stroke to StrokeBrush.
-    private double _hue = 32;
-    public double Hue { get => _hue; set { if (SetProperty(ref _hue, value)) RaisePropertyChanged(nameof(StrokeBrush)); } }
-    public Brush StrokeBrush => TypeParser.Parse<Brush>(HueToHex(_hue));
-
-    private static string HueToHex(double hue)
-    {
-        double h = ((hue % 360) + 360) % 360 / 60.0;
-        double x = 1 - Math.Abs(h % 2 - 1);
-        double r = 0, g = 0, b = 0;
-        switch ((int)h)
-        {
-            case 0: r = 1; g = x; break;
-            case 1: r = x; g = 1; break;
-            case 2: g = 1; b = x; break;
-            case 3: g = x; b = 1; break;
-            case 4: r = x; b = 1; break;
-            default: r = 1; b = x; break;
-        }
-        return $"#{(int)(r * 255):X2}{(int)(g * 255):X2}{(int)(b * 255):X2}";
-    }
+    // Stroke colour, driven by a ColorPicker. StrokeBrush is ONE cached brush every shape binds its Stroke to - a colour
+    // change mutates its Color in place (AffectsPaint re-bakes the users), NOT a new brush per read. Creating a fresh
+    // SolidColorBrush (an AdamantiumComponent) on every read churned the property system and deadlocked the render thread
+    // (which reads brush colours under a per-component Monitor lock) against the pump thread on a colour change.
+    private readonly SolidColorBrush _strokeBrush = new(new Color(255, 136, 0));   // orange, matching the old default hue 32
+    private Color _selectedColor = new(255, 136, 0);
+    public Color SelectedColor { get => _selectedColor; set { if (SetProperty(ref _selectedColor, value)) _strokeBrush.Color = value; } }
+    public Brush StrokeBrush => _strokeBrush;
 
     // Dash on-length / gap drive the pattern as a symbolic glyph string (reliable to bind vs a live collection). On == 0
     // = solid (empty symbols); otherwise a repeating "Dash" whose width/gap come from DashGlyphs.

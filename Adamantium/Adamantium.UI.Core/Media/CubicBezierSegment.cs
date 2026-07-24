@@ -39,7 +39,10 @@ public class CubicBezierSegment : BezierSegmentBase
     
     internal override Vector2[] ProcessSegment(Vector2 currentPoint)
     {
-        var rate = CalculatePointsLength(new[] { currentPoint, ControlPoint1, ControlPoint2, Point });
-        return MathHelper.GetCubicBezier(currentPoint, ControlPoint1, ControlPoint2, Point, (uint)rate).ToArray();
+        // Dense uniform-t base for accuracy, then EVEN arc-length resample (~3px spacing): smooth stroke with no
+        // sub-pixel bunching (which tore the stroke) and no under-sampled flats.
+        var fine = MathHelper.GetCubicBezier(currentPoint, ControlPoint1, ControlPoint2, Point, 256);
+        var count = System.Math.Clamp((int)(MathHelper.PolylineLength(fine) / 3.0), 8, 256);
+        return MathHelper.ResampleByArcLength(fine, count);
     }
 }

@@ -129,11 +129,18 @@ public class Thumb : Control
       RaiseEvent(new DragCompletedEventArgs(delta, false) { RoutedEvent = DragCompletedEvent });
    }
 
-   // Pointer position in the thumb's PARENT space, which does NOT move while the thumb is dragged. Measuring the delta
-   // there makes DragDelta the true CUMULATIVE pointer movement since the press; measuring it relative to the thumb
-   // itself was a residual that broke as soon as the thumb re-positioned (the value ran away to an extreme).
+   // Pointer position in the TOPMOST visual's space (the window / popup root) - the only frame guaranteed not to shift
+   // while the thumb is dragged, so DragDelta is the true CUMULATIVE pointer movement since the press. Measuring in the
+   // thumb's own space broke when the thumb re-positioned; measuring in the immediate PARENT's space broke when the
+   // dragged value drives a layout that MOVES the parent mid-drag - a slider bound to an AffectsMeasure property (stroke
+   // thickness) re-arranges its own row as it changes, folding the panel's movement into the delta so the value ran away
+   // to an extreme. The root never moves, so neither residual can creep in.
    private Vector2 DragPosition(MouseEventArgs e)
-      => VisualParent is IInputComponent parent ? e.GetPosition(parent) : e.GetPosition(this);
+   {
+      IUIComponent root = this;
+      while (root.VisualParent is { } parent) root = parent;
+      return root is IInputComponent ric ? e.GetPosition(ric) : e.GetPosition(this);
+   }
 
    protected override Size MeasureOverride(Size availableSize)
    {

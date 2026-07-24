@@ -94,8 +94,10 @@ public class NurbsSegment : BSplineSegment
             degree = CustomDegree;
         }
 
-        var rate = CalculatePointsLength(Points);
-        return MathHelper.GetNurbsCurve(points, degree, IsUniform, 1.0/rate);
+        // Dense base, then EVEN arc-length resample (~3px) - smooth stroke, no sub-pixel bunching.
+        var fine = MathHelper.GetNurbsCurve(points, degree, IsUniform, 1.0 / 256.0);
+        var count = System.Math.Clamp((int)(MathHelper.PolylineLength(fine) / 3.0), 8, 256);
+        return MathHelper.ResampleByArcLength(fine, count);
     }
 
     

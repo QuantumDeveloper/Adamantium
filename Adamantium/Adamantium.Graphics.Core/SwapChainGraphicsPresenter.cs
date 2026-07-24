@@ -234,23 +234,30 @@ namespace Adamantium.Graphics.Core
 
         public override bool AcquireNextImage(Fence fence, Semaphore semaphore)
         {
+            // Finite timeout (1s), NOT UINT64_MAX: the spec forbids an infinite timeout when forward progress cannot be
+            // guaranteed (VUID-vkAcquireNextImageKHR-surface-07783), and an infinite wait turned a transient swapchain
+            // stall into a HARD freeze - the render thread blocked in AcquireNextImage forever.
             var result =
                 GraphicsDevice.LogicalDevice.AcquireNextImageKHR(
-                    this, 
-                    ulong.MaxValue, 
+                    this,
+                    1_000_000_000UL,   // 1 second, in nanoseconds
                     semaphore, null,
                     ref currentImageIndex);
-            
+
             if (result == Result.ErrorOutOfDateKhr)
             {
                 LastPresenterState = ConvertState(result);
                 CanPresent = false;
                 return false;
             }
-            
+
             if (result != Result.Success && result != Result.SuboptimalKhr)
             {
-                Log.Logger.Error("Failed to acquire swap chain image! Operation result was: {result}");
+                // Timeout or a real error: flag the swapchain OutOfDate so the render service recreates it next frame
+                // (the existing self-heal at WindowRenderService.BeginDraw), instead of the render thread spinning on a
+                // permanently-failing acquire.
+                Log.Logger.Error($"Failed to acquire swap chain image. Result: {result}. Flagging OutOfDate to self-heal.");
+                LastPresenterState = PresenterState.OutOfDate;
                 CanPresent = false;
                 return false;
             }

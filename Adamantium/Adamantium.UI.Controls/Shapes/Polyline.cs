@@ -8,16 +8,12 @@ using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Controls.Shapes;
 
-public class Polyline : Shape
+public class Polyline : CurveBase
 {
-    protected StreamGeometry StreamGeometry { get; }
-        
     public Polyline()
     {
-        StreamGeometry = new StreamGeometry();
-        StreamGeometry.IsClosed = false;
     }
-        
+
     public static readonly AdamantiumProperty PointsProperty = AdamantiumProperty.Register(nameof(Points),
         typeof(PointsCollection), typeof(Polyline),
         new PropertyMetadata(null,
@@ -58,9 +54,13 @@ public class Polyline : Shape
 
     protected override void OnRender(IDrawingContext context)
     {
-        var streamContext = StreamGeometry.Open();
-        streamContext.BeginFigure(Points[0], true, true).PolylineLineTo(Points.Skip(1), true);
+        // FRESH geometry each render (see CubicBezierCurve): the render cache compares geometry by reference, so a
+        // reused instance mutated in place is never seen as changed - a Points/Samples change would not rebuild the stroke.
+        var geometry = new StreamGeometry { IsClosed = false };
+        var streamContext = geometry.Open();
+        streamContext.BeginFigure(Points[0], false, false).PolylineLineTo(Points.Skip(1), true);
 
-        context.ForControl(this).DrawGeometry(Stroke, StreamGeometry, GetPen());
+        // A polyline is OPEN and stroke-first: fill with Fill (null = none), not Stroke, and don't close the figure.
+        context.ForControl(this).DrawGeometry(Fill, geometry, GetPen());
     }
 }
