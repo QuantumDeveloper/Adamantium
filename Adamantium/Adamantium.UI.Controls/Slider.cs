@@ -152,7 +152,16 @@ public class Slider : RangeBase
     // in the binding's own slot instead, so the two-way write-back fires AND later source changes still apply.
     private void SetValueFromInput(double value) => SetCurrentValue(ValueProperty, value);
 
-    private void OnThumbDragCompleted(object sender, DragCompletedEventArgs e) => HideValueToolTip();
+    private void OnThumbDragCompleted(object sender, DragCompletedEventArgs e)
+    {
+        // Commit the FINAL pointer position. DragDelta events can be coalesced/starved during a FAST drag - each step
+        // drives a full layout through an AffectsMeasure binding (e.g. stroke thickness on many shapes), so the UI thread
+        // falls behind and the LAST delta processed lags the release point. The value then sticks short of the endpoint
+        // (a quick flick couldn't reach 0/Max, and how much was left over depended on drag speed). The completed delta is
+        // the true release position, so land the value exactly on it.
+        if (_track != null) SetValueFromInput(SnapToTick(_dragStartValue + _track.ValueFromDistance(e.Change.X, e.Change.Y)));
+        HideValueToolTip();
+    }
 
     // Click on the track: page towards/away from the thumb by LargeChange - OR, when IsMoveToPointEnabled, jump straight
     // to the clicked point. Each page area (DecreaseRepeatButton/IncreaseRepeatButton) fires its own Click; either side

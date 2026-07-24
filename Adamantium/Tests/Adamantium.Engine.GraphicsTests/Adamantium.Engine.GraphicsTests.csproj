@@ -42,6 +42,13 @@
     <Content Include="EffectsData\DashCut.fx">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <!-- The REAL production stroke shader, linked (not copied) so the dash/trim tests compile the actual StrokeDashCutCS
+         + EmitJoin - no drift from a hand-kept prototype. Runtime-compiled via Effect.CompileFromFile only; the FX
+         generator never sees it here (this project doesn't run the generator), so no phantom duplicate class. -->
+    <Content Include="..\..\Adamantium.UI\Effects\StrokeEffect.fx">
+      <Link>EffectsData\StrokeEffect.fx</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

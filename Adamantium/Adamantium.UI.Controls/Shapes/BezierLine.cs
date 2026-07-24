@@ -44,8 +44,9 @@ public class BezierLine : BezierCurveBase
 
     protected override void OnRender(IDrawingContext context)
     {
-        var streamContext = StreamGeometry.Open();
+        var geometry = new StreamGeometry();
+        var streamContext = geometry.Open();
         streamContext.BeginFigure(StartPoint, true, false).QuadraticBezierTo(ControlPoint1, EndPoint);
-        context.ForControl(this).DrawGeometry(Fill, StreamGeometry, GetPen());
+        context.ForControl(this).DrawGeometry(Fill, geometry, GetPen());
     }
 }

@@ -194,9 +194,17 @@ public class BindingExpression : BindingExpressionBase
       return null;
    }
 
+   // True WHILE UpdateSource writes the source (a TwoWay write-back from the target). The write raises the source's
+   // PropertyChanged synchronously; without this guard OnSourcePropertyChanged would schedule a source->target push that
+   // echoes our OWN write back onto the target one frame later - fighting an active drag so a TwoWay-bound slider never
+   // converges on the endpoint (stuck ~0.1 short of Minimum). Other bindings to the same source still update; only THIS
+   // expression skips echoing its own write.
+   private bool _writingSource;
+
    // Called by SharedSourceRegistry (the source's single fan-out handler), not subscribed directly.
    internal void OnSourcePropertyChanged(object sender, PropertyChangedEventArgs e)
    {
+      if (_writingSource) return;   // our own TwoWay write-back - don't echo it back to the target
       // F2: a runtime source change is batched + coalesced (applied once per frame), not pushed synchronously.
       if (string.IsNullOrEmpty(e.PropertyName) || e.PropertyName == SourcePropertyName)
          ScheduleUpdate();
@@ -206,6 +214,7 @@ public class BindingExpression : BindingExpressionBase
    // property we bind.
    private void OnSourceComponentChanged(object sender, AdamantiumPropertyChangedEventArgs e)
    {
+      if (_writingSource) return;   // our own TwoWay write-back - don't echo it back to the target
       if (e.Property?.Name == SourcePropertyName)
          ScheduleUpdate();
    }
@@ -293,7 +302,10 @@ public class BindingExpression : BindingExpressionBase
       var value = Target.GetValue(TargetProperty);
       if (Binding.Converter != null)
          value = Binding.Converter.ConvertBack(value, _sourceProperty.PropertyType, Binding.ConverterParameter, CultureInfo.CurrentCulture);
-      _sourceProperty.SetValue(ResolvedSource, Coerce(value, _sourceProperty.PropertyType));
+      // Guard the ECHO (see _writingSource): our synchronous source write must not schedule a source->target push back.
+      _writingSource = true;
+      try { _sourceProperty.SetValue(ResolvedSource, Coerce(value, _sourceProperty.PropertyType)); }
+      finally { _writingSource = false; }
    }
 
    // Minimal target-type coercion (no full converter pipeline): pass-through when assignable, ToString for a string

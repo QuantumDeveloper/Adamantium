@@ -4,15 +4,12 @@ using Adamantium.UI.Core.Media;
 
 namespace Adamantium.UI.Controls.Shapes;
 
-public abstract class BezierCurveBase : Shape
+public abstract class BezierCurveBase : CurveBase
 {
     protected BezierCurveBase()
     {
-        StreamGeometry = new StreamGeometry();
     }
-    
-    protected StreamGeometry StreamGeometry { get; }
-    
+
     public static readonly AdamantiumProperty StartPointProperty =
         AdamantiumProperty.Register(nameof(StartPoint), typeof(Vector2), typeof(BezierCurveBase),
             new PropertyMetadata(Vector2.Zero, PropertyMetadataOptions.AffectsMeasure));

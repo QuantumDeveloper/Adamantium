@@ -28,7 +28,9 @@ public class QuadraticBezierSegment : BezierSegmentBase
     
     internal override Vector2[] ProcessSegment(Vector2 currentPoint)
     {
-        var rate = CalculatePointsLength(new[] { currentPoint, ControlPoint, Point });
-        return MathHelper.GetQuadraticBezier(currentPoint, ControlPoint, Point, (uint)rate).ToArray();
+        // Dense uniform-t base, then EVEN arc-length resample (~3px) - smooth stroke, no sub-pixel bunching.
+        var fine = MathHelper.GetQuadraticBezier(currentPoint, ControlPoint, Point, 256);
+        var count = System.Math.Clamp((int)(MathHelper.PolylineLength(fine) / 3.0), 8, 256);
+        return MathHelper.ResampleByArcLength(fine, count);
     }
 }

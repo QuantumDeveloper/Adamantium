@@ -903,17 +903,26 @@ namespace Adamantium.Mathematics
             return curvePoints;
         }
         
+        // Non-rational overload (all weights = 1): a plain B-spline evaluated with the general basis.
         public static Vector2[] GetNurbsCurve(IEnumerable<Vector2> points, int degree, bool isUniform, double stepSize)
+            => GetNurbsCurve(points, null, degree, isUniform, stepSize);
+
+        // RATIONAL: each control point i carries a weight w_i (the "R" in NURBS). A higher weight pulls the curve toward
+        // that point; equal weights degenerate to a plain B-spline. Weights are what let a NURBS trace an EXACT conic
+        // (circle/ellipse) that a B-spline can only approximate. weights == null or shorter than points -> the missing
+        // ones default to 1.
+        public static Vector2[] GetNurbsCurve(IEnumerable<Vector2> points, IReadOnlyList<double> weights,
+            int degree, bool isUniform, double stepSize)
     {
         var result = new List<Vector2>();
         var hash = new HashSet<Vector2>();
         var pointsArray = points as Vector2[] ?? points.ToArray();
-        
+
         var knots = CalculateKnots(degree, pointsArray.Length, isUniform);
 
         for (double i = 0; i < 1; i += stepSize)
         {
-            var point = RationalBSplinePoint(pointsArray, degree, knots, i);
+            var point = RationalBSplinePoint(pointsArray, weights, degree, knots, i);
             if (!hash.Contains(point))
             {
                 hash.Add(point);
@@ -923,23 +932,27 @@ namespace Adamantium.Mathematics
 
         return result.ToArray();
     }
-    
-    private static Vector2 RationalBSplinePoint(Vector2[] points, int degree, double[] knots, double t)
+
+    private static Vector2 RationalBSplinePoint(Vector2[] points, System.Collections.Generic.IReadOnlyList<double> weights,
+        int degree, double[] knots, double t)
     {
         double x = 0, y = 0;
         double rationalWeight = 0d;
 
         for (int i = 0; i < points.Length; i++)
         {
-            double temp = Nip(i, degree, knots, t);
-            rationalWeight += temp;
+            var w = weights != null && i < weights.Count ? weights[i] : 1.0;
+            rationalWeight += Nip(i, degree, knots, t) * w;
         }
+
+        if (rationalWeight == 0) return points[0];
 
         for (int i = 0; i < points.Length; i++)
         {
-            double temp = Nip(i, degree, knots, t);
-            x += points[i].X * temp / rationalWeight;
-            y += points[i].Y * temp / rationalWeight;
+            var w = weights != null && i < weights.Count ? weights[i] : 1.0;
+            double temp = Nip(i, degree, knots, t) * w / rationalWeight;
+            x += points[i].X * temp;
+            y += points[i].Y * temp;
         }
 
         return new Vector2(x, y);
@@ -1095,7 +1108,65 @@ namespace Adamantium.Mathematics
             
             return bezierPoints;
         }
-        
+
+        // Drops points closer than minSpacing to the last KEPT point (the first and last are always kept). Curve
+        // tessellators sample by PARAMETER (uniform t), not arc length, so a "slow" stretch of the curve packs samples
+        // sub-pixel-close; the GPU stroke expander then builds degenerate/overlapping quads there and the stroke looks
+        // torn. Removing the sub-pixel samples leaves clean >= minSpacing segments (works for solid AND dashed strokes).
+        public static Vector2[] SimplifyByMinSpacing(System.Collections.Generic.IReadOnlyList<Vector2> points, double minSpacing)
+        {
+            if (points == null || points.Count == 0) return System.Array.Empty<Vector2>();
+            var minSq = minSpacing * minSpacing;
+            var result = new System.Collections.Generic.List<Vector2>(points.Count) { points[0] };
+            for (var i = 1; i < points.Count - 1; i++)
+                if ((points[i] - result[result.Count - 1]).LengthSquared() >= minSq)
+                    result.Add(points[i]);
+            if (points.Count > 1)
+            {
+                var last = points[points.Count - 1];
+                if ((last - result[result.Count - 1]).LengthSquared() >= minSq) result.Add(last);
+                else result[result.Count - 1] = last;   // collapse a sub-min final segment onto the true endpoint
+            }
+            return result.ToArray();
+        }
+
+        // Total length of a polyline (sum of segment lengths).
+        public static double PolylineLength(System.Collections.Generic.IReadOnlyList<Vector2> poly)
+        {
+            double len = 0;
+            for (var i = 1; i < (poly?.Count ?? 0); i++) len += (poly[i] - poly[i - 1]).Length();
+            return len;
+        }
+
+        // Resamples a polyline to `count` points spaced EVENLY BY ARC LENGTH (both endpoints preserved). Curve tessellators
+        // sample by PARAMETER (uniform t), which bunches points where the curve is "slow" (sub-pixel-close -> the stroke
+        // expander tears) and starves the "fast" flats (angular). Walking the flattened curve by arc length instead gives
+        // uniform spacing: smooth strokes, no sub-pixel bunching, no under-sampled straights.
+        public static Vector2[] ResampleByArcLength(System.Collections.Generic.IReadOnlyList<Vector2> poly, int count)
+        {
+            if (poly == null || poly.Count == 0) return System.Array.Empty<Vector2>();
+            if (count < 2 || poly.Count < 2) return new[] { poly[0] };
+
+            var cum = new double[poly.Count];
+            for (var i = 1; i < poly.Count; i++) cum[i] = cum[i - 1] + (poly[i] - poly[i - 1]).Length();
+            var total = cum[poly.Count - 1];
+            if (total <= 1e-9) return new[] { poly[0], poly[poly.Count - 1] };
+
+            var result = new Vector2[count];
+            result[0] = poly[0];
+            var seg = 1;
+            for (var k = 1; k < count - 1; k++)
+            {
+                var target = total * k / (count - 1);
+                while (seg < poly.Count - 1 && cum[seg] < target) seg++;
+                var span = cum[seg] - cum[seg - 1];
+                var t = span > 1e-9 ? (target - cum[seg - 1]) / span : 0.0;
+                result[k] = poly[seg - 1] + (poly[seg] - poly[seg - 1]) * t;
+            }
+            result[count - 1] = poly[poly.Count - 1];
+            return result;
+        }
+
         private static (double startAngle, double sweepAngle, Vector2 center) GetArcData(Vector2 start, Vector2 end, double radius, bool clockwise = true)
         {
             var d = new Vector2((end.X - start.X) * 0.5, (end.Y - start.Y) * 0.5);

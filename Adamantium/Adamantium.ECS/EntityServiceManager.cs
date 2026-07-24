@@ -181,42 +181,73 @@ namespace Adamantium.ECS
         
         public void OnFrameEnded()
         {
-            lock (syncObject)
+            // Lock-free like Update/Draw/Present: iterate the published snapshot, NOT the live collection under syncObject.
+            // Holding the manager lock here while calling into each service deadlocked the independent render thread against a
+            // service being added (a popup overlay) whose SyncServices init held syncObject during its content load.
+            foreach (var service in _snapshot)
             {
-                foreach (var service in services)
-                {
-                    service.FrameEnded();
-                }
+                service.FrameEnded();
             }
             FrameEnded?.Invoke();
             SyncServices();
         }
 
+        // Apply queued adds/removes. The lock guards ONLY the collection edits + snapshot republish; every SERVICE CALLBACK
+        // (Initialize / LoadContent / UnloadContent and the Added/Removed events) runs OUTSIDE syncObject. A service whose
+        // init or teardown blocks or takes another lock - a popup overlay creating GPU resources - must not do so while
+        // holding the lock the render thread takes each frame (OnFrameEnded), or the independent render thread deadlocks
+        // against it. Snapshot is republished at the SAFE moment per service: after a remove leaves the draw set (before its
+        // content is unloaded) and after an add is initialised (before it enters the draw set), so a service is never drawn
+        // un-initialised or drawn while its content is being freed.
         internal void SyncServices()
         {
+            EntityService[] toRemove, toAdd;
             lock (syncObject)
             {
-                if (servicesToRemove.Count > 0)
+                if (servicesToRemove.Count == 0 && servicesToAdd.Count == 0) return;
+                toRemove = [.. servicesToRemove];
+                servicesToRemove.Clear();
+                toAdd = [.. servicesToAdd];
+                servicesToAdd.Clear();
+            }
+
+            foreach (var service in toRemove)
+            {
+                if (service == null) continue;
+                bool removed;
+                lock (syncObject)
                 {
-                    foreach (var entity in servicesToRemove)
+                    removed = activeServices.Remove(service.Uid);
+                    if (removed)
                     {
-                        RemoveServiceInternal(entity);
+                        services.Remove(service);
+                        RepublishSnapshot();   // hide it from the draw set BEFORE its content is freed
                     }
-
-                    servicesToRemove.Clear();
                 }
+                if (!removed) continue;
+                service.UnloadContent();
+                OnServiceRemoved(service);
+            }
 
-                if (servicesToAdd.Count > 0)
+            foreach (var service in toAdd)
+            {
+                lock (syncObject)
                 {
-                    foreach (var entity in servicesToAdd)
-                    {
-                        AddServiceInternal(entity);
-                    }
-
-                    servicesToAdd.Clear();
+                    if (activeServices.ContainsKey(service.Uid)) continue;
                 }
-
-                RepublishSnapshot();   // the ONLY place the service set changes - so the only place the iterators' view moves
+                if (appService.IsRunning)
+                {
+                    service.Initialize();   // init BEFORE the service becomes visible to the draw snapshot
+                    service.LoadContent();
+                }
+                lock (syncObject)
+                {
+                    activeServices[service.Uid] = service;
+                    services.Add(service);
+                    if (!appService.IsRunning) pendingServices.Add(service);
+                    RepublishSnapshot();
+                }
+                OnServiceAdded(service);
             }
         }
 
@@ -265,38 +296,6 @@ namespace Adamantium.ECS
             foreach (var service in services)
             {
                 RemoveService(service);
-            }
-        }
-
-        private void AddServiceInternal(EntityService service)
-        {
-            if (!activeServices.TryGetValue(service.Uid, out var result))
-            {
-                activeServices.Add(service.Uid, service);
-                services.Add(service);
-                if (appService.IsRunning)
-                {
-                    service.Initialize();
-                    service.LoadContent();
-                }
-                else
-                {
-                    pendingServices.Add(service);
-                }
-                OnServiceAdded(service);
-            }
-        }
-
-        private void RemoveServiceInternal(EntityService service)
-        {
-            if (service == null) return;
-            
-            if (activeServices.ContainsKey(service.Uid))
-            {
-                service.UnloadContent();
-                activeServices.Remove(service.Uid);
-                services.Remove(service);
-                OnServiceRemoved(service);
             }
         }
 

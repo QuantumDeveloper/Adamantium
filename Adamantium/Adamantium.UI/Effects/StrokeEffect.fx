@@ -294,31 +294,27 @@ void StrokeExpandCS(uint3 tid : SV_DispatchThreadID)
     }
 }
 
-// Emits the JOIN between two straight dash quads at corner V (the dash crosses the corner): round = a disc, bevel = two
-// corner triangles, miter = those plus an outer wedge to the miter tip. nInU/nOutU are the UNIT normals of the incoming
-// / outgoing segments. Both corner triangles are emitted (one fills the convex gap, the other the concave gap; the
-// non-gap side is harmless overlap), so no per-corner left/right test is needed. Returns the advanced vertex count.
+// Emits the BEVEL/ROUND join between two dash quads at corner V (the dash crosses the corner): round = a disc, bevel =
+// a both-sided corner wedge. nInU/nOutU are the UNIT normals of the incoming / outgoing segments. MITER is NOT emitted
+// here - the dash quad ends are mitred onto the shared bisector offset (like StrokeExpandCS), so its corner already
+// meets with constant width and needs no wedge; only bevel/round route through this function.
 uint EmitJoin(float3* outVerts, uint vCount, uint maxV, float2 V, float2 nInU, float2 nOutU)
 {
-    float h = HalfThickness + Fringe * 0.5;   // widened; outer corner verts carry v=+/-h, the centre V carries v=0
+    float h = HalfThickness + Fringe * 0.5;   // widened; the outer corner verts carry v=+/-h, the centre V carries v=0
     if (JoinType == 2u)   // round join: a disc of radius half (same as a round cap; o/perp unused for a full disc)
     {
         uint tris = EmitCapTris(outVerts, vCount, (maxV - vCount) / 3u, V, float2(1.0, 0.0), float2(0.0, 0.0), 2u);
         return vCount + tris * 3u;
     }
-    if (vCount + 6u <= maxV)   // bevel/miter: fill both corner sides (feathered from centre V to the outer edge)
+
+    // BEVEL wedge, filled on BOTH sides (mirrors StrokeExpandCS's bevel): the outer triangle closes the gap the turn
+    // opens, the inner one lands inside the two quads' overlap (harmless for an opaque stroke). Doing both sides avoids
+    // ever having to pick - and mis-pick - the outer side. MITER is not routed here (its quad ends already meet).
+    if (vCount + 6u <= maxV)
     {
-        outVerts[vCount + 0] = float3(V + nInU * h, h); outVerts[vCount + 1] = float3(V + nOutU * h, h); outVerts[vCount + 2] = float3(V, 0.0);
+        outVerts[vCount + 0] = float3(V + nInU * h,  h); outVerts[vCount + 1] = float3(V + nOutU * h,  h); outVerts[vCount + 2] = float3(V, 0.0);
         outVerts[vCount + 3] = float3(V - nInU * h, -h); outVerts[vCount + 4] = float3(V - nOutU * h, -h); outVerts[vCount + 5] = float3(V, 0.0);
         vCount += 6u;
-    }
-    if (JoinType == 0u && vCount + 3u <= maxV)   // miter: extend the outer wedge to the (clamped) miter tip (solid v=0)
-    {
-        float2 bis = normalize(nInU + nOutU);
-        float dd = max(dot(bis, nInU), 0.25);
-        float2 tip = V + bis * (h / dd);
-        outVerts[vCount + 0] = float3(V + nInU * h, 0.0); outVerts[vCount + 1] = float3(tip, 0.0); outVerts[vCount + 2] = float3(V + nOutU * h, 0.0);
-        vCount += 3u;
     }
     return vCount;
 }
@@ -369,6 +365,8 @@ void StrokeDashCutCS(uint3 tid : SV_DispatchThreadID)
 
     uint vCount = 0u;
     float arc = 0.0;
+    bool dashStartPending = false;   // set when the pattern toggles ON: the next visible piece STARTS a dash (gets a cap)
+    bool contInto = (IsClosed != 0u) && on;   // does a live dash cross the vertex ENTERING the current segment (miter start)
     for (uint s = 0u; s < segCount; ++s)
     {
         float2 a = points[s];
@@ -380,9 +378,19 @@ void StrokeDashCutCS(uint3 tid : SV_DispatchThreadID)
         float hw = HalfThickness + Fringe * 0.5;
         float2 nrm = float2(-dir.y, dir.x) * hw;
 
+        // MITER shares the continuous path's trick: where a dash crosses a polyline vertex the two quads meet on the
+        // bisector miter offset (constant width, no gap), NOT perpendicular ends bridged by a wedge - the latter piles
+        // stray triangles all over a densely-tessellated curve at large thickness. Precompute the miter offsets at THIS
+        // segment's two vertices; used only for the ends that land on a crossed vertex (bevel/round keep perpendicular).
+        float2 mSp, mSm, mEp, mEm;
+        OffsetPair(s, mSp, mSm);
+        OffsetPair((s + 1u) % PointCount, mEp, mEm);
+
         float pos = 0.0;
+        bool lastSpanOn = on;   // on-state of the span ending at this segment's corner (captured BEFORE any end-toggle)
         while (pos < segLen - 1e-6)
         {
+            lastSpanOn = on;
             float take = PatternCount > 0u ? min(rem, segLen - pos) : (segLen - pos);
             float drawA = max(arc + pos, tStart);
             float drawB = min(arc + pos + take, tEnd);
@@ -394,13 +402,34 @@ void StrokeDashCutCS(uint3 tid : SV_DispatchThreadID)
                 // use StartCap/EndCap; every other (dash-internal) piece end uses DashCap - so dots/dashes are capped by
                 // DashCap (round -> round dots) while the stroke's actual ends keep Start/EndLineCap. CapShift shapes the
                 // quad (square out / concave inset); EmitCapTris adds the disc/triangle/concave geometry.
-                uint capA = (drawA <= tStart + 1e-4) ? StartCap : DashCap;
-                uint capB = (drawB >= tEnd - 1e-4) ? EndCap : DashCap;
+                // A cap belongs ONLY at a REAL dash boundary. A polyline/curve is a chain of segments and a dash routinely
+                // spans several of them (each star edge is one segment; a curve is many); at those internal segment
+                // boundaries the dash CONTINUES, so it must stay FLAT (0) - the corner is closed by the join below. Capping
+                // every segment boundary sprouted a stray DashCap (convex tri/disc) on BOTH sides of every corner => the
+                // "extra angles sticking out". endsDash = this piece eats the rest of the ON element (real dash end);
+                // dashStartPending = the pattern just toggled ON (real dash start). Only those two get DashCap.
+                bool endsDash = PatternCount > 0u && (rem - take) <= 1e-6;
+                uint capA = (drawA <= tStart + 1e-4) ? StartCap : (dashStartPending ? DashCap : 0u);
+                uint capB = (drawB >= tEnd - 1e-4) ? EndCap : (endsDash ? DashCap : 0u);
+                dashStartPending = false;
                 float2 e0 = p0 - dir * CapShift(capA);
                 float2 e1 = p1 + dir * CapShift(capB);
+
+                // For MITER, a quad end that lands on a CROSSED vertex uses the shared bisector offset (no cap, no wedge);
+                // every other end stays perpendicular. startCont = first piece of a segment a live dash entered; endCont =
+                // last piece, dash continues into the next segment (reaches the seg end, doesn't end the dash here).
+                bool hasNextSeg = (IsClosed != 0u) || (s + 1u < segCount);
+                float arcE = arc + segLen;
+                bool startCont = (JoinType == 0u) && (pos == 0.0) && contInto;
+                bool endCont = (JoinType == 0u) && !endsDash && (pos + take >= segLen - 1e-6) && hasNextSeg
+                               && (arcE > tStart + 1e-4) && (arcE < tEnd - 1e-4);
+                float2 sTop = startCont ? mSp : e0 + nrm;
+                float2 sBot = startCont ? mSm : e0 - nrm;
+                float2 eTop = endCont ? mEp : e1 + nrm;
+                float2 eBot = endCont ? mEm : e1 - nrm;
                 if (vCount + 6u <= MaxVertices)
                 {
-                    EmitQuad(outVerts, vCount, e0 + nrm, e0 - nrm, e1 + nrm, e1 - nrm, hw);
+                    EmitQuad(outVerts, vCount, sTop, sBot, eTop, eBot, hw);
                     vCount += 6u;
                 }
                 if (RoundSegments > 0u)
@@ -413,21 +442,24 @@ void StrokeDashCutCS(uint3 tid : SV_DispatchThreadID)
             if (PatternCount > 0u)
             {
                 rem -= take;
-                if (rem <= 1e-6) { pi = (pi + 1u) % PatternCount; rem = pattern[pi]; on = !on; }
+                if (rem <= 1e-6) { pi = (pi + 1u) % PatternCount; rem = pattern[pi]; on = !on; if (on) dashStartPending = true; }
             }
         }
         arc += segLen;
 
-        // Join at the corner that ENDS this segment (points[s+1]) when the dash is ON across it and the corner is
-        // inside the trim window. Without this the per-segment dash quads meet a corner with no fill - the gaps on the
-        // teeth of a dashed polygon. Skipped at an open contour's final point (no following segment -> it's a cap).
+        // A dash crosses this segment's END vertex when it is ON on both sides (lastSpanOn && on) and inside the trim.
+        // `lastSpanOn && on` requires BOTH sides to be on: if the pattern toggles EXACTLY at the corner, one side is empty
+        // and a lone join would jut out as a triangular tab. MITER needs no join here (the mitered quad ends already meet);
+        // BEVEL/ROUND add the fan. Either way the flag propagates so the NEXT segment mitres its start off this vertex.
         bool hasNext = (IsClosed != 0u) || (s + 1u < segCount);
-        if (hasNext && on && arc > tStart + 1e-4 && arc < tEnd - 1e-4)
+        bool joinHere = hasNext && lastSpanOn && on && arc > tStart + 1e-4 && arc < tEnd - 1e-4;
+        if (joinHere && JoinType != 0u)
         {
             uint cv = (s + 1u) % PointCount;
             float2 dOut = normalize(points[(s + 2u) % PointCount] - points[cv]);
             vCount = EmitJoin(outVerts, vCount, MaxVertices, points[cv], float2(-dir.y, dir.x), float2(-dOut.y, dOut.x));
         }
+        contInto = joinHere;
     }
 
     indirect[0] = vCount;

@@ -95,6 +95,41 @@ float DashTrimMask(float sTrim, float sDash, float perimeter, float dashOn, floa
     return mask;
 }
 
+// Same as DashTrimMask, but the TRIM window wraps the fragment's signed arc offset to [-P/2, P/2] so a CONVEX cap at the
+// contour seam (trimStart 0 -> start at s=0) bulges into the gap on the OTHER side of s=0 instead of clipping flat. Kept
+// SEPARATE from DashTrimMask on purpose: this wrapped form miscompiled the driver's GRADIENT/pattern/fractal pixel-shader
+// objects (they inline the helper too) into a device-lost, while the SOLID rect/ellipse stroke shaders compile it fine -
+// so ONLY those two call it; the fill shaders stay on the plain DashTrimMask. Do NOT re-merge them.
+float DashTrimMaskCapped(float sTrim, float sDash, float perimeter, float dashOn, float dashGap, float dashOffset,
+    float trimStart, float trimEnd, float dPerp, float halfW, float capFlags)
+{
+    int dashCap  = int(fmod(capFlags, 8.0));
+    int startCap = int(fmod(floor(capFlags / 8.0), 8.0));
+    int endCap   = int(fmod(floor(capFlags / 64.0), 8.0));
+
+    float mask = 1.0;
+    if (trimStart > 0.0 || trimEnd < 1.0)
+    {
+        float a = trimStart * perimeter;
+        float b = trimEnd * perimeter;
+        float windowOpen = (b > a) ? 1.0 : 0.0;
+        float centre = (a + b) * 0.5;
+        float halfLen = (b - a) * 0.5;
+        float ds = sTrim - centre;
+        ds -= perimeter * floor(ds / perimeter + 0.5);
+        float reach = CapReach((ds < 0.0) ? startCap : endCap, dPerp, halfW);
+        mask *= windowOpen * saturate((halfLen - abs(ds)) + reach + 0.5);
+    }
+    float period = dashOn + dashGap;
+    if (dashOn > 0.0 && period > 0.0)
+    {
+        float ph = frac((sDash + dashOffset) / period) * period;
+        float dEdge = (ph <= dashOn) ? min(ph, dashOn - ph) : -min(ph - dashOn, period - ph);
+        mask *= saturate(dEdge + CapReach(dashCap, dPerp, halfW) + 0.5);
+    }
+    return mask;
+}
+
 // Arc-length `s` (device px) of the point on the ROUNDED-RECT contour nearest `p`, and the perimeter. Exact/closed-form.
 // Traversal CCW from the start of the top-right arc: TR arc, top edge, TL arc, left edge, BL arc, bottom edge, BR arc,
 // right edge. (Start point is arbitrary for dashes; dashOffset shifts the phase.)
@@ -212,7 +247,7 @@ float4 RectBatchPS(PSInput input) : SV_Target
         // Dash on the CONTINUOUS centreline arc-length through corners too (like the ellipse), so a dash flows around a
         // corner uniformly instead of the whole corner snapping to one on/off state at its midpoint - the latter cut a
         // dash short at the corner (a stub that wandered with the dash phase) when the run ended inside the corner arc.
-        mask = DashTrimMask(s, s, perim, input.Stroke0.z, input.Stroke0.w, input.Stroke1.x, input.Stroke1.y,
+        mask = DashTrimMaskCapped(s, s, perim, input.Stroke0.z, input.Stroke0.w, input.Stroke1.x, input.Stroke1.y,
                             input.Stroke1.z, dPerp, halfW, input.Stroke1.w);
     }
     return CompositeFillStroke(d, input.Color, input.StrokeColor, input.Stroke0.x, input.Stroke0.y, mask);
@@ -336,7 +371,7 @@ float4 EllipseBatchPS(EllipsePSInput input) : SV_Target
         float s = EllipseArc(input.Local, input.Half, perim);
         float halfW = input.Stroke0.x * 0.5;
         float dPerp = d - input.Stroke0.y * halfW;
-        mask = DashTrimMask(s, s, perim, input.Stroke0.z, input.Stroke0.w, input.Stroke1.x, input.Stroke1.y,
+        mask = DashTrimMaskCapped(s, s, perim, input.Stroke0.z, input.Stroke0.w, input.Stroke1.x, input.Stroke1.y,
                             input.Stroke1.z, dPerp, halfW, input.Stroke1.w);
     }
     return CompositeFillStroke(d, input.Color, input.StrokeColor, input.Stroke0.x, input.Stroke0.y, mask);

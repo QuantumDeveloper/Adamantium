@@ -20,8 +20,10 @@ public class BSplineSegment : PolylineSegment
     {
         var points = new PointsCollection { currentPoint };
         points.AddRange(Points);
-        var rate = CalculatePointsLength(points);
-        return MathHelper.GetBSpline2(points, (uint)rate).ToArray();
+        // Dense base, then EVEN arc-length resample (~3px) - smooth stroke, no sub-pixel bunching.
+        var fine = MathHelper.GetBSpline2(points, 256);
+        var count = System.Math.Clamp((int)(MathHelper.PolylineLength(fine) / 3.0), 8, 256);
+        return MathHelper.ResampleByArcLength(fine, count);
     }
     
     protected double CalculatePointsLength(PointsCollection points)

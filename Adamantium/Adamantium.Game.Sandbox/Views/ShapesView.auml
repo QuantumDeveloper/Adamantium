@@ -1,29 +1,117 @@
-<View xmlns="http://adamantium/ui">
-    <!-- DataContext is the ShapesViewModel. Every static shape's StrokeThickness is bound to one value. Wrapped in a
-         ScrollViewer (horizontal Disabled so the WrapPanels wrap to the viewport) - the content now exceeds the tab. -->
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:m="clr-namespace:Adamantium.UI.Core.Media;assembly=Adamantium.UI.Core">
+    <!-- DataContext is the ShapesViewModel. ONE Stroke settings object drives the stroke of EVERY shape in the gallery
+         and the big preview - the pen panel (thickness/dashes/trim/corner/cap/join/colour) retraces them all at once.
+         Wrapped in a ScrollViewer (horizontal Disabled so the WrapPanels wrap to the viewport). -->
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
     <StackPanel Orientation="Vertical" Margin="24">
 
-        <StackPanel Orientation="Horizontal">
-            <TextBlock Text="Stroke thickness:" VerticalAlignment="Center"/>
-            <Slider Width="220" Minimum="1" Maximum="12" Value="{Binding StrokeThickness, Mode=TwoWay}" Margin="12,0,0,0"/>
-            <TextBlock Text="{Binding StrokeThickness}" VerticalAlignment="Center" FontSize="16" Margin="12,0,0,0"/>
-        </StackPanel>
-
-        <WrapPanel Orientation="Horizontal" Margin="0,20,0,0">
-            <Ellipse Width="96" Height="96" Fill="#3B82F6" Stroke="Cyan" StrokeThickness="{Binding StrokeThickness}" Margin="10"/>
-            <Rectangle Width="120" Height="90" Fill="#22C55E" Stroke="White" StrokeThickness="{Binding StrokeThickness}" CornerRadius="12" Margin="10"/>
-            <Polygon Points="60,0 120,96 0,96" Fill="#F59E0B" Stroke="Black" StrokeThickness="{Binding StrokeThickness}" Margin="10"/>
-            <Path Fill="Magenta" Stroke="Cyan" StrokeLineJoin="Round"
-                  StrokeThickness="{Binding StrokeThickness}"
+        <!-- Shape gallery: every shape (incl. the Bézier + NURBS curves) binds its stroke off Stroke.*, so the pen panel
+             below drives ALL of them - not just the rect+ellipse preview. Fills stay per-shape; the curves are stroke-only. -->
+        <TextBlock Text="Shape gallery — every shape's stroke is driven by the pen panel below:" Margin="0,0,0,6"/>
+        <WrapPanel Orientation="Horizontal">
+            <Ellipse Width="96" Height="96" Fill="#3B82F6" Margin="10"
+                     Stroke="{Binding Stroke.StrokeBrush}" StrokeThickness="{Binding Stroke.StrokeWidth}"
+                     StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
+                     StrokeDashOffset="{Binding Stroke.DashOffset}"
+                     StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                     StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"/>
+            <Rectangle Width="120" Height="90" Fill="#22C55E" Margin="10" CornerRadius="{Binding Stroke.CornerRadius}"
+                     Stroke="{Binding Stroke.StrokeBrush}" StrokeThickness="{Binding Stroke.StrokeWidth}"
+                     StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
+                     StrokeDashOffset="{Binding Stroke.DashOffset}"
+                     StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                     StrokeLineJoin="{Binding Stroke.Join}"
+                     StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"/>
+            <Polygon Points="60,0 120,96 0,96" Fill="#F59E0B" Margin="10"
+                     Stroke="{Binding Stroke.StrokeBrush}" StrokeThickness="{Binding Stroke.StrokeWidth}"
+                     StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
+                     StrokeDashOffset="{Binding Stroke.DashOffset}"
+                     StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                     StrokeLineJoin="{Binding Stroke.Join}"
+                     StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"/>
+            <Path Fill="Magenta" Width="200" Height="200" Margin="10"
                   Data="F0 M110,10 L168.78,190.9 L14.89,79.1 L205.11,79.1 L51.22,190.9 Z"
-                  Width="200" Height="200" Margin="10"/>
+                  Stroke="{Binding Stroke.StrokeBrush}" StrokeThickness="{Binding Stroke.StrokeWidth}"
+                  StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
+                  StrokeDashOffset="{Binding Stroke.DashOffset}"
+                  StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                  StrokeLineJoin="{Binding Stroke.Join}"
+                  StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"/>
+          <StackPanel Orientation="Vertical" Margin="10">
+            <TextBlock Text="Cubic Bézier" HorizontalAlignment="Center" MarginBottom="4"
+                       Foreground="{ResourceReference TextFillColorSecondary}"/>
+            <CubicBezierCurve Width="240" Height="160" Samples="{Binding Stroke.Samples}"
+                     StartPoint="15,140" ControlPoint1="75,10" ControlPoint2="165,150" EndPoint="225,20"
+                     Stroke="{Binding Stroke.StrokeBrush}" StrokeThickness="{Binding Stroke.StrokeWidth}"
+                     StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
+                     StrokeDashOffset="{Binding Stroke.DashOffset}"
+                     StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                     StrokeLineJoin="{Binding Stroke.Join}"
+                     StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"/>
+          </StackPanel>
+            <!-- Quadratic Bézier curve (open, stroke-only). -->
+          <StackPanel Orientation="Vertical" Margin="10">
+            <TextBlock Text="Quadratic Bézier" HorizontalAlignment="Center" MarginBottom="4"
+                       Foreground="{ResourceReference TextFillColorSecondary}"/>
+            <QuadraticBezierCurve Width="220" Height="150"
+                                  Samples="{Binding Stroke.Samples}"
+                                    StartPoint="10,130" 
+                                  ControlPoint="110,-10" 
+                                  EndPoint="210,130"
+                     Stroke="{Binding Stroke.StrokeBrush}" 
+                                  StrokeThickness="{Binding Stroke.StrokeWidth}"
+                     StrokeDashSymbols="{Binding Stroke.DashSymbols}" 
+                                  StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
+                     StrokeDashOffset="{Binding Stroke.DashOffset}"
+                     StrokeDashCap="{Binding Stroke.Cap}" 
+                                  StartLineCap="{Binding Stroke.Cap}" 
+                                  EndLineCap="{Binding Stroke.Cap}"
+                     StrokeLineJoin="{Binding Stroke.Join}"
+                     StrokeTrimStart="{Binding Stroke.TrimStart}"
+                                  StrokeTrimEnd="{Binding Stroke.TrimEnd}"/>
+          </StackPanel>
+            <!-- NURBS curve (open, stroke-only). -->
+          <StackPanel Orientation="Vertical" Margin="10">
+            <TextBlock Text="NURBS" HorizontalAlignment="Center" MarginBottom="4"
+                       Foreground="{ResourceReference TextFillColorSecondary}"/>
+            <Nurbs Width="300" Height="160" Samples="{Binding Stroke.Samples}"
+                     IsUniform="{Binding Stroke.NurbsUniform}" Degree="{Binding Stroke.NurbsDegree}"
+                     Weights="{Binding Stroke.NurbsWeights}"
+                     Points="10,140 60,20 130,20 180,140 250,140 290,30"
+                     Stroke="{Binding Stroke.StrokeBrush}" StrokeThickness="{Binding Stroke.StrokeWidth}"
+                     StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
+                     StrokeDashOffset="{Binding Stroke.DashOffset}"
+                     StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                     StrokeLineJoin="{Binding Stroke.Join}"
+                     StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"/>
+          </StackPanel>
+            <!-- B-spline curve (open, stroke-only). -->
+          <StackPanel Orientation="Vertical" Margin="10">
+            <TextBlock Text="B-spline" HorizontalAlignment="Center" MarginBottom="4"
+                       Foreground="{ResourceReference TextFillColorSecondary}"/>
+            <BSpline Width="300" Height="160"
+                     Samples="{Binding Stroke.Samples}"
+                     Degree="{Binding Stroke.NurbsDegree}" IsUniform="{Binding Stroke.NurbsUniform}"
+                     Points="10,140 60,20 130,20 180,140 250,140 290,30"
+                     Stroke="{Binding Stroke.StrokeBrush}" 
+                     StrokeThickness="{Binding Stroke.StrokeWidth}"
+                     StrokeDashSymbols="{Binding Stroke.DashSymbols}" 
+                     StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
+                     StrokeDashOffset="{Binding Stroke.DashOffset}"
+                     StrokeDashCap="{Binding Stroke.Cap}" 
+                     StartLineCap="{Binding Stroke.Cap}" 
+                     EndLineCap="{Binding Stroke.Cap}"
+                     StrokeLineJoin="{Binding Stroke.Join}"
+                     StrokeTrimStart="{Binding Stroke.TrimStart}"
+                     StrokeTrimEnd="{Binding Stroke.TrimEnd}"/>
+          </StackPanel>
         </WrapPanel>
 
-        <!-- Full Pen playground (moved here from the Layout tab): thickness, dashes, trim, caps, joins, corner, hue driving a
-             big rectangle + ellipse. A solid stroke goes through the SDF batch; a dashed/trimmed one falls back to the
-             compute stroke expander - both correct. As dash/trim/caps land in the SDF shader, this preview validates them. -->
-        <TextBlock Text="Stroke / Pen parameters — rectangle &amp; ellipse preview:" Margin="0,20,0,6"/>
+        <!-- The pen playground. Thickness/dash/trim/corner are sliders; Cap and Join are enum DropDowns; Colour is a
+             ColorPicker (compact button that opens the full HSV picker). Everything mutates the one Stroke object above. -->
+        <TextBlock Text="Stroke / Pen parameters:" Margin="0,20,0,6"/>
         <Grid ColumnDefinitions="Auto,*">
             <Grid Grid.Column="0" ColumnDefinitions="Auto,Auto">
                 <StackPanel Grid.Column="0" Orientation="Vertical" Margin="0,0,20,0">
@@ -65,19 +153,21 @@
                         <TextBlock Text="{Binding Stroke.Corner}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
-                        <TextBlock Text="Cap 0/1/2" Width="80" VerticalAlignment="Center"/>
-                        <Slider Width="130" Minimum="0" Maximum="5" Value="{Binding Stroke.CapValue, Mode=TwoWay}" TickFrequency="1" IsSnapToTickEnabled="true"/>
-                        <TextBlock Text="{Binding Stroke.CapValue}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                        <TextBlock Text="Samples" Width="80" VerticalAlignment="Center"/>
+                        <Slider Width="130" Minimum="0" Maximum="50" Value="{Binding Stroke.Samples, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Stroke.Samples}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
-                        <TextBlock Text="Join 0/1/2" Width="80" VerticalAlignment="Center"/>
-                        <Slider Width="130" Minimum="0" Maximum="2" Value="{Binding Stroke.JoinValue, Mode=TwoWay}" TickFrequency="1" IsSnapToTickEnabled="true"/>
-                        <TextBlock Text="{Binding Stroke.JoinValue}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                        <TextBlock Text="Cap" Width="80" VerticalAlignment="Center"/>
+                        <DropDown Width="176" EnumType="{x:Type m:PenLineCap}" SelectedItem="{Binding Stroke.Cap, Mode=TwoWay}"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
-                        <TextBlock Text="Color (hue)" Width="80" VerticalAlignment="Center"/>
-                        <Slider Width="130" Minimum="0" Maximum="360" Value="{Binding Stroke.Hue, Mode=TwoWay}"/>
-                        <TextBlock Text="{Binding Stroke.Hue}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                        <TextBlock Text="Join" Width="80" VerticalAlignment="Center"/>
+                        <DropDown Width="176" EnumType="{x:Type m:PenLineJoin}" SelectedItem="{Binding Stroke.Join, Mode=TwoWay}"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Color" Width="80" VerticalAlignment="Center"/>
+                        <ColorPickerButton Width="176" Height="28" SelectedColor="{Binding Stroke.SelectedColor, Mode=TwoWay}"/>
                     </StackPanel>
                 </StackPanel>
             </Grid>
@@ -104,6 +194,21 @@
                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </StackPanel>
         </Grid>
+
+        <!-- NURBS playground: weights + degree + knot-uniformity are exactly what a plain B-spline lacks. Drag Weight and
+             the NURBS bulges toward its two peak control points; raise Degree for a smoother/looser curve; toggle Uniform
+             knots. The B-spline (same control points) stays fixed for comparison. -->
+        <TextBlock Text="NURBS parameters (a B-spline has none of these):" Margin="0,20,0,6"/>
+        <StackPanel Orientation="Horizontal">
+            <TextBlock Text="Weight" Width="60" VerticalAlignment="Center"/>
+            <Slider Width="130" Minimum="0.1" Maximum="10" Value="{Binding Stroke.NurbsWeight, Mode=TwoWay}"/>
+            <TextBlock Text="{Binding Stroke.NurbsWeight}" Width="40" VerticalAlignment="Center" Margin="6,0,24,0"/>
+            <TextBlock Text="Degree" Width="60" VerticalAlignment="Center"/>
+            <Slider Width="100" Minimum="1" Maximum="5" Value="{Binding Stroke.NurbsDegree, Mode=TwoWay}"/>
+            <TextBlock Text="{Binding Stroke.NurbsDegree}" Width="30" VerticalAlignment="Center" Margin="6,0,24,0"/>
+            <TextBlock Text="Uniform" Width="60" VerticalAlignment="Center"/>
+            <ToggleSwitch IsChecked="{Binding Stroke.NurbsUniform, Mode=TwoWay}" VerticalAlignment="Center"/>
+        </StackPanel>
 
         <!-- Border showcase: uniform + non-uniform thickness, sharp + rounded corners, all with TRANSLUCENT fills and
              brushes (the alpha composites over whatever is behind). Left-to-right: uniform | non-uniform thickness |

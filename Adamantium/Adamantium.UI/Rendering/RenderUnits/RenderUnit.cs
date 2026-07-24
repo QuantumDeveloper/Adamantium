@@ -67,7 +67,14 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
 
     protected void ProcessStrokeData(Pen pen, Geometry geometry)
     {
-        if (pen == null) return;
+        // No pen (thickness -> 0, or no/transparent stroke brush): DROP any existing stroke so it vanishes, rather than
+        // leaving the last-built stroke on screen (or - the bug - letting TryRepoint deref a null pen and NRE the frame).
+        if (pen == null)
+        {
+            StrokeRenderer?.DeferDispose();
+            StrokeRenderer = null;
+            return;
+        }
 
         StrokeRenderer?.DeferDispose();
 

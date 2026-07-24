@@ -815,6 +815,12 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     /// caller that only sees the bool (e.g. the designer's headless render) can report the real reason, not "render failed".</summary>
     public string LastFrameError { get; private set; }
 
+    // Last fence-wait error already logged. A persistent device error makes BeginDraw fail EVERY frame; logging it per
+    // frame floods the Serilog console sink and the render thread then blocks forever on that sink's lock (a slow/stalled
+    // console write, held across all loggers) - which turned a recoverable device hiccup into a hard freeze. Log only on a
+    // NEW error transition instead.
+    private Result _lastFenceWaitError = Result.Success;
+
     // The factual error code (e.g. ErrorDeviceLost) is only the SYMPTOM; the validation layers carry the real cause.
     // Append whatever they reported so the report isn't a guess. Empty (with a hint) when validation is off.
     private static string DescribeRecentValidation()
@@ -864,19 +870,23 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
         if (result != Result.Success && result != Result.Timeout)
         {
-            Log.Logger.Information($"Wait for fences result: {result}");
-            LastFrameError = $"WaitForFences returned {result}{DescribeDeviceFault()}{DescribeRecentValidation()}";
+            // Only on a NEW error - the per-frame flood on a persistent error froze the render thread on the console sink
+            // lock (see _lastFenceWaitError). The expensive fault/validation describe is likewise done once per transition.
+            if (result != _lastFenceWaitError)
+            {
+                _lastFenceWaitError = result;
+                LastFrameError = $"WaitForFences returned {result}{DescribeDeviceFault()}{DescribeRecentValidation()}";
+                Log.Logger.Information($"Wait for fences result: {result}. DETAIL: {LastFrameError}");
+            }
             return false;
         }
+        _lastFenceWaitError = Result.Success;   // recovered - re-arm the log for the next new error
 
-        if (Presenter is SwapChainGraphicsPresenter swapchain)
-        {
-            if (!Presenter.AcquireNextImage(null, ImageAvailableSemaphores[CurrentFrame]))
-            {
-                LastFrameError = $"swapchain AcquireNextImage failed{DescribeRecentValidation()}";
-                return false;
-            }
-        }
+        // Swapchain image is ACQUIRED LATE - at the very end of BeginDraw, after the command buffer + beforeRenderPass
+        // record (see below). The frame renders to an OFFSCREEN target; the swapchain image is only needed for EndDraw's
+        // blit + present. Acquiring HERE (before the fallible record) leaked the image + its ImageAvailable semaphore
+        // whenever anything after it aborted the frame before Submit - the acquire/present imbalance that exhausted the
+        // swapchain until AcquireNextImage blocked forever (VUID-vkAcquireNextImageKHR-semaphore-01286 / -surface-07783).
 
         // if (Presenter is SwapChainGraphicsPresenter swapchain)
         // {
@@ -932,9 +942,21 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
         BeginRendering(commandBuffer, false, depth, stencil);
 
+        // LATE acquire (see the note near the top of BeginDraw): every fallible step above - CB begin, image transitions,
+        // the beforeRenderPass record, BeginRendering - has run WITHOUT touching the swapchain image, so a failure there
+        // aborts the frame with no dangling acquired image. Only now, committed to Submit + Present, do we take one.
+        if (Presenter is SwapChainGraphicsPresenter)
+        {
+            if (!Presenter.AcquireNextImage(null, ImageAvailableSemaphores[CurrentFrame]))
+            {
+                LastFrameError = $"swapchain AcquireNextImage failed{DescribeRecentValidation()}";
+                return false;
+            }
+        }
+
         return true;
     }
-        
+
     public void BeginRendering(CommandBuffer commandBuffer, bool continueRendering = false, float depth = 1.0f, uint stencil = 0)
     {
         var clearColorValue = new ClearValue

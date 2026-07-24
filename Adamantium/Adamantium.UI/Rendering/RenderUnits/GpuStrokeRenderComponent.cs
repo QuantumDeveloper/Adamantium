@@ -88,7 +88,7 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
     // swapped without reallocating - TryRepoint / TryUpdateGeometry just re-dispatch with the new uniforms.
     private bool IsPenSizeCompatible(Pen newPen)
     {
-        if (newPen.Brush is not SolidColorBrush) return false;   // non-solid -> CPU stroke path, not this component
+        if (newPen?.Brush is not SolidColorBrush) return false;   // null pen (no stroke, e.g. thickness 0) or non-solid -> not repointable
         var newHasDashes = newPen.DashStrokeArray is { Count: > 0 };
         var newUseCut = newHasDashes || newPen.TrimStart > 0.0 || newPen.TrimEnd < 1.0;
         if (newUseCut != _useCut) return false;                       // continuous <-> cut changes the buffer set
@@ -183,7 +183,10 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
 
             // Pattern buffer: the real dash array, or a 1-element dummy for trim-only (PatternCount=0 -> not read).
             var patternArr = _hasDashes ? new float[_pen.DashStrokeArray.Count] : new float[1];
-            for (var i = 0; i < _pen.DashStrokeArray.Count; i++) patternArr[i] = (float)_pen.DashStrokeArray[i];
+            // Clamp each dash segment to >=1px. This CUT path turns every dash into REAL geometry, and a sub-pixel piece
+            // becomes a degenerate quad that never rasterizes - the line breaks up at DashOn<1. The SDF batch is analytic
+            // (per-fragment coverage) so a sub-pixel dash just fades there; only this compute path needs the floor.
+            for (var i = 0; i < _pen.DashStrokeArray.Count; i++) patternArr[i] = Math.Max((float)_pen.DashStrokeArray[i], 1.0f);
             c.PatternBuffer = ToDispose(Buffer.New(_device, (ulong)(patternArr.Length * sizeof(float)),
                 BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, StrokeMemory));
             var pp = c.PatternBuffer.MapMemory();
