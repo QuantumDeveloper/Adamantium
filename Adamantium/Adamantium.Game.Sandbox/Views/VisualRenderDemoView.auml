@@ -1,0 +1,44 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel Orientation="Vertical" Margin="24">
+
+        <TextBlock Text="Visual → Image (RenderTargetBitmap)"
+                   FontSize="20"
+                   MarginBottom="4"/>
+        <TextBlock Text="IVisualRenderer parses the AUML on the left into a fresh tree, renders it OFF-SCREEN into a texture, reads it back on the CPU, and returns a bitmap the Image on the right draws. The foundation for the drag-drop ghost and VisualBrush/DrawingBrush."
+                   FontSize="13"
+                   Foreground="{ResourceReference TextFillColorSecondary}"
+                   MaxWidth="720"
+                   HorizontalAlignment="Left"
+                   MarginBottom="18"/>
+
+        <StackPanel Orientation="Horizontal">
+
+            <StackPanel Orientation="Vertical" MarginRight="28">
+                <TextBlock Text="AUML source" FontSize="14" MarginBottom="8"/>
+                <TextBox Text="{Binding AumlText, Mode=TwoWay}"
+                         Width="380" Height="150"/>
+                <Button Content="Render"
+                        Command="{Binding RenderSnapshotCommand}"
+                        Width="120" Height="34"
+                        MarginTop="12"
+                        HorizontalAlignment="Left"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Vertical">
+                <TextBlock Text="Rendered bitmap (1:1, auto-sized)" FontSize="14" MarginBottom="8"/>
+                <!-- The frame hugs the image (no fixed size, Stretch=None so it's shown 1:1); MinWidth/Height keep a visible
+                     placeholder before the first Render. -->
+                <Border BorderBrush="#40FFFFFF" BorderThickness="1" Padding="1"
+                        MinWidth="224" MinHeight="120"
+                        HorizontalAlignment="Left" VerticalAlignment="Top">
+                    <Image Source="{Binding Snapshot}" Stretch="None"/>
+                </Border>
+            </StackPanel>
+
+        </StackPanel>
+
+    </StackPanel>
+    </ScrollViewer>
+</View>
