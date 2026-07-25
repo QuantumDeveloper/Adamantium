@@ -39,6 +39,48 @@ public partial class BrushesViewModel : TabPageViewModel
     partial void OnNoiseLacunarityChanged(double value) => LiveNoise.Lacunarity = value;
     partial void OnNoiseGainChanged(double value) => LiveNoise.Gain = value;
 
+    // Colour-picker bound: the two noise colours (low -> high). Match LiveNoise's initial colours so the pickers start right.
+    [Bindable] private Color _noiseColor1 = new Color(11, 18, 32, 255);
+    [Bindable] private Color _noiseColor2 = new Color(125, 211, 252, 255);
+
+    partial void OnNoiseColor1Changed(Color value) => LiveNoise.Color1 = value;
+    partial void OnNoiseColor2Changed(Color value) => LiveNoise.Color2 = value;
+
+    /// <summary>All noise variants, in declaration order - the source for the "Noise type" dropdown.</summary>
+    public NoiseType[] NoiseTypes { get; } = Enum.GetValues<NoiseType>();
+
+    // Dropdown-bound noise-variant selector.
+    [Bindable] private NoiseType _noiseKind;
+
+    partial void OnNoiseKindChanged(NoiseType value) => LiveNoise.NoiseType = value;
+
+    // Flow animation (best with NoiseType = Worley: the cells flow in place). Checkbox + speed slider.
+    [Bindable] private bool _noiseAnimate;
+    [Bindable] private double _noiseFlowSpeed = 1.0;
+
+    partial void OnNoiseAnimateChanged(bool value) => LiveNoise.Animate = value;
+    partial void OnNoiseFlowSpeedChanged(double value) => LiveNoise.FlowSpeed = value;
+
+    // CombustibleVoronoi only: fire palette vs the brush's own Color1/Mid/Color2 ramp (checkbox below the pickers).
+    [Bindable] private bool _noiseFirePalette = true;
+    partial void OnNoiseFirePaletteChanged(bool value) => LiveNoise.UseFirePalette = value;
+
+    // Mid colour = the ONLY thing that separates "tritone" from plain noise: with it on, the SAME noise maps through a
+    // 3-colour gradient-map ramp (Color1 -> Mid -> Color2) instead of the 2-colour duotone. Off (checkbox clear) sets the
+    // brush's MidColor transparent, which the shader reads as "duotone". Same brush, same pattern - only the colour mapping.
+    [Bindable] private bool _noiseUseMid;
+    [Bindable] private Color _noiseMid = new Color(249, 115, 22, 255);   // a warm mid; applied only while UseMid is on
+
+    partial void OnNoiseUseMidChanged(bool value) => LiveNoise.MidColor = value ? _noiseMid : new Color(0, 0, 0, 0);
+
+    partial void OnNoiseMidChanged(Color value)
+    {
+        if (_noiseUseMid)
+        {
+            LiveNoise.MidColor = value;
+        }
+    }
+
     /// <summary>The live fractal brush the demo panel fills with; every control below drives one of its parameters. Toggling
     /// Animate makes its C drift on its own each frame (the brush keeps the render loop presenting while it's on).</summary>
     public FractalBrush LiveFractal { get; } = new FractalBrush

@@ -37,4 +37,8 @@ public struct PatternRectItem
 
     /// <summary>FBM noise params (pattern type 4 only; zero otherwise): x = octaves, y = seed, z = lacunarity, w = gain.</summary>
     public Vector4F Noise;
+
+    /// <summary>Optional MID colour for a 3-colour gradient-map ramp of the noise (Color1 -> Color3 -> Color2); straight
+    /// RGBA, opacity folded. .w == 0 = disabled (plain two-colour duotone).</summary>
+    public Vector4F Color3;
 }

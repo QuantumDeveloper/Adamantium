@@ -28,7 +28,8 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
     public bool CanBatch(RectanglePayload p)
     {
         if (!Enabled) return false;
-        if (p.Brush is not GradientBrush g || g.GradientStops.Count == 0) return false;
+        if (p.Brush is not GradientBrush g) return false;
+        if (g is not MeshGradientBrush && g.GradientStops.Count == 0) return false;   // mesh carries corners, not stops
         if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
         var c = p.CornerRadius;
         return c.TopLeft == c.TopRight && c.TopRight == c.BottomRight && c.BottomRight == c.BottomLeft;

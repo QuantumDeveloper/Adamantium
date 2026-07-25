@@ -1,9 +1,96 @@
-<View xmlns="http://adamantium/ui">
+<View xmlns="http://adamantium/ui"
+      xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters">
     <!-- DataContext is the BrushesViewModel. Every gradient below is authored in AUML (element syntax:
          <Shape.Fill><LinearGradientBrush><GradientStop/>...) - proving gradients are fully markup-authorable, on any
          element, and batched by the SDF gradient batches. -->
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Orientation="Vertical" Margin="24">
+
+            <!-- One labelled swatch per noise type. At the TOP so any shader device-lost is caught on launch. -->
+            <TextBlock Text="Noise types (all selectable in the live panel below)" FontSize="18" Margin="0,0,0,10"/>
+            <WrapPanel Orientation="Horizontal">
+                <StackPanel Orientation="Vertical" Margin="10">
+                    <Rectangle Width="150" Height="110" CornerRadius="12">
+                        <Rectangle.Fill>
+                            <NoiseBrush NoiseType="Simplex" Scale="42" Octaves="5" Animate="true" FlowSpeed="0.6" Color1="#0B1220" Color2="#7DD3FC"/>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <TextBlock Text="Simplex" HorizontalAlignment="Center" MarginTop="6" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Margin="10">
+                    <Rectangle Width="150" Height="110" CornerRadius="12">
+                        <Rectangle.Fill>
+                            <NoiseBrush NoiseType="Perlin" Scale="42" Octaves="5" Animate="true" FlowSpeed="0.6" Color1="#0B1220" Color2="#86EFAC"/>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <TextBlock Text="Perlin" HorizontalAlignment="Center" MarginTop="6" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Margin="10">
+                    <Rectangle Width="150" Height="110" CornerRadius="12">
+                        <Rectangle.Fill>
+                            <NoiseBrush NoiseType="Value" Scale="42" Octaves="5" Animate="true" FlowSpeed="0.6" Color1="#0B1220" Color2="#FDE68A"/>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <TextBlock Text="Value" HorizontalAlignment="Center" MarginTop="6" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Margin="10">
+                    <Rectangle Width="150" Height="110" CornerRadius="12">
+                        <Rectangle.Fill>
+                            <NoiseBrush NoiseType="Worley" Scale="52" Octaves="2" Color1="#0B1220" Color2="#FCA5A5"/>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <TextBlock Text="Worley" HorizontalAlignment="Center" MarginTop="6" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Margin="10">
+                    <Rectangle Width="150" Height="110" CornerRadius="12">
+                        <Rectangle.Fill>
+                            <NoiseBrush NoiseType="Worley" Scale="56" Octaves="1" Animate="true" FlowSpeed="0.8" Color1="#0B1220" Color2="#C4B5FD"/>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <TextBlock Text="Worley (flow)" HorizontalAlignment="Center" MarginTop="6" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Margin="10">
+                    <Rectangle Width="150" Height="110" CornerRadius="12">
+                        <Rectangle.Fill>
+                            <NoiseBrush NoiseType="Ridged" Scale="60" Octaves="6" Animate="true" FlowSpeed="0.5" Color1="#0B1220" Color2="#FBBF24"/>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <TextBlock Text="Ridged" HorizontalAlignment="Center" MarginTop="6" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Margin="10">
+                    <Rectangle Width="150" Height="110" CornerRadius="12">
+                        <Rectangle.Fill>
+                            <NoiseBrush NoiseType="Turbulence" Scale="54" Octaves="6" Animate="true" FlowSpeed="0.5" Color1="#0B1220" Color2="#38BDF8"/>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <TextBlock Text="Turbulence" HorizontalAlignment="Center" MarginTop="6" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Margin="10">
+                    <Rectangle Width="150" Height="110" CornerRadius="12">
+                        <Rectangle.Fill>
+                            <NoiseBrush NoiseType="VoronoiBorders" Scale="46" Animate="true" FlowSpeed="0.7" Color1="#0B1220" Color2="#67E8F9"/>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <TextBlock Text="Voronoi borders" HorizontalAlignment="Center" MarginTop="6" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Margin="10">
+                    <Rectangle Width="150" Height="110" CornerRadius="12">
+                        <Rectangle.Fill>
+                            <NoiseBrush NoiseType="CombustibleVoronoi" Scale="40" Animate="true" FlowSpeed="1.0"/>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <TextBlock Text="Combustible (fire)" HorizontalAlignment="Center" MarginTop="6" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Margin="10">
+                    <Rectangle Width="150" Height="110" CornerRadius="12">
+                        <Rectangle.Fill>
+                            <NoiseBrush NoiseType="CombustibleVoronoi" Scale="40" Animate="true" FlowSpeed="1.0"
+                                        UseFirePalette="false" Color1="#020617" MidColor="#0EA5E9" Color2="#E0F2FE"/>
+                        </Rectangle.Fill>
+                    </Rectangle>
+                    <TextBlock Text="Combustible (custom)" HorizontalAlignment="Center" MarginTop="6" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                </StackPanel>
+            </WrapPanel>
 
             <TextBlock Text="Linear gradients — rectangles" FontSize="18" Margin="0,0,0,10"/>
             <WrapPanel Orientation="Horizontal">
@@ -115,6 +202,18 @@
                 </Ellipse>
             </WrapPanel>
 
+            <!-- Mesh gradient (4-corner bilinear) DEFERRED - the gradient pass flakes vkCreateShadersEXT compile (branch-free
+                 too, ~25% launch). MeshGradientBrush C# kept; re-enable the GradientPS mesh branch + uncomment these on a better driver.
+            <TextBlock Text="Mesh gradient — 4-corner bilinear (NEW, beyond WPF)" FontSize="18" Margin="0,20,0,10"/>
+            <WrapPanel Orientation="Horizontal">
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <MeshGradientBrush TopLeft="#EF4444" TopRight="#3B82F6" BottomLeft="#EAB308" BottomRight="#22C55E"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+            </WrapPanel>
+            -->
+
             <TextBlock Text="Pattern brushes — procedural, resolution-independent (NEW)" FontSize="18" Margin="0,20,0,10"/>
             <WrapPanel Orientation="Horizontal">
                 <!-- checkerboard: the classic transparency backdrop -->
@@ -139,6 +238,18 @@
                 <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
                     <Rectangle.Fill>
                         <PatternBrush Pattern="Grid" Color1="#0B1220" Color2="#475569" CellSize="20"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <!-- hexagonal honeycomb grid -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <PatternBrush Pattern="Hexagon" Color1="#0B1220" Color2="#38BDF8" CellSize="18"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <!-- diagonal hatch -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <PatternBrush Pattern="Hatch" Color1="#1F2937" Color2="#FBBF24" CellSize="14"/>
                     </Rectangle.Fill>
                 </Rectangle>
                 <!-- checkerboard + a stroke: the shared SDF stroke still draws over a pattern fill -->
@@ -177,20 +288,72 @@
                 </Rectangle>
             </WrapPanel>
 
-            <TextBlock Text="Noise — live (drag the sliders to re-bake in real time)" FontSize="18" Margin="0,20,0,10"/>
+            <TextBlock Text="Gradient-map noise — 3-colour ramp via MidColor (NEW, beyond WPF)" FontSize="18" Margin="0,20,0,10"/>
+            <WrapPanel Orientation="Horizontal">
+                <!-- lava: dark -> orange -> yellow -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <NoiseBrush Color1="#450A0A" MidColor="#F97316" Color2="#FEF08A" Scale="40" Octaves="5" Seed="3"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <!-- terrain: deep water -> sand -> forest -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <NoiseBrush Color1="#0C4A6E" MidColor="#FDE68A" Color2="#166534" Scale="46" Octaves="6" Seed="7"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <!-- spectral: magenta -> cyan -> lime -->
+                <Rectangle Width="150" Height="96" CornerRadius="14" Margin="10">
+                    <Rectangle.Fill>
+                        <NoiseBrush Color1="#7E22CE" MidColor="#22D3EE" Color2="#A3E635" Scale="30" Octaves="4" Seed="1"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+            </WrapPanel>
+
+            <TextBlock Text="Noise — live (drag to re-bake; tick “Mid colour” for a 3-colour gradient-map ramp)" FontSize="18" Margin="0,20,0,10"/>
             <StackPanel Orientation="Horizontal">
                 <Rectangle Width="300" Height="200" CornerRadius="12" Margin="10" Fill="{Binding LiveNoise}"/>
                 <StackPanel Orientation="Vertical" Width="300" MarginLeft="16" VerticalAlignment="Center">
-                    <TextBlock Text="Scale" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding NoiseScale, Mode=TwoWay}" Minimum="6" Maximum="120" Width="280" MarginBottom="10"/>
-                    <TextBlock Text="Octaves" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding NoiseOctaves, Mode=TwoWay}" Minimum="1" Maximum="8" Width="280" MarginBottom="10"/>
-                    <TextBlock Text="Seed" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding NoiseSeed, Mode=TwoWay}" Minimum="0" Maximum="50" Width="280" MarginBottom="10"/>
-                    <TextBlock Text="Lacunarity" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding NoiseLacunarity, Mode=TwoWay}" Minimum="1.5" Maximum="3.5" Width="280" MarginBottom="10"/>
-                    <TextBlock Text="Gain" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding NoiseGain, Mode=TwoWay}" Minimum="0.2" Maximum="0.8" Width="280"/>
+                    <TextBlock Text="Noise type" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <DropDown ItemsSource="{Binding NoiseTypes}" SelectedItem="{Binding NoiseKind, Mode=TwoWay}" Width="280" MarginBottom="10"/>
+                    <CheckBox Content="Animate (flow — best with Worley)" IsChecked="{Binding NoiseAnimate, Mode=TwoWay}" MarginBottom="6"/>
+                    <TextBlock Text="Flow speed" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding NoiseFlowSpeed, Mode=TwoWay}" Minimum="0.1" Maximum="3" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Vertical" Visibility="{Binding NoiseKind, Converter={conv:NoiseParamVisibilityConverter}, ConverterParameter=Scale}">
+                        <TextBlock Text="Scale" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <Slider Value="{Binding NoiseScale, Mode=TwoWay}" Minimum="6" Maximum="120" Width="280" MarginBottom="10"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Vertical" Visibility="{Binding NoiseKind, Converter={conv:NoiseParamVisibilityConverter}, ConverterParameter=Fbm}">
+                        <TextBlock Text="Octaves" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <Slider Value="{Binding NoiseOctaves, Mode=TwoWay}" Minimum="1" Maximum="8" Width="280" MarginBottom="10"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Vertical" Visibility="{Binding NoiseKind, Converter={conv:NoiseParamVisibilityConverter}, ConverterParameter=Seed}">
+                        <TextBlock Text="Seed" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <Slider Value="{Binding NoiseSeed, Mode=TwoWay}" Minimum="0" Maximum="50" Width="280" MarginBottom="10"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Vertical" Visibility="{Binding NoiseKind, Converter={conv:NoiseParamVisibilityConverter}, ConverterParameter=Fbm}">
+                        <TextBlock Text="Lacunarity" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <Slider Value="{Binding NoiseLacunarity, Mode=TwoWay}" Minimum="1.5" Maximum="3.5" Width="280" MarginBottom="10"/>
+                        <TextBlock Text="Gain" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <Slider Value="{Binding NoiseGain, Mode=TwoWay}" Minimum="0.2" Maximum="0.8" Width="280" MarginBottom="10"/>
+                    </StackPanel>
+                    <CheckBox Content="Fire palette (off = use colours below)" IsChecked="{Binding NoiseFirePalette, Mode=TwoWay}" MarginBottom="6"
+                              Visibility="{Binding NoiseKind, Converter={conv:NoiseParamVisibilityConverter}, ConverterParameter=FirePalette}"/>
+                    <StackPanel Orientation="Vertical">
+                        <StackPanel.Visibility>
+                            <MultiBinding Converter="{conv:CombustibleColorsVisibilityConverter}">
+                                <Binding Path="NoiseKind"/>
+                                <Binding Path="NoiseFirePalette"/>
+                            </MultiBinding>
+                        </StackPanel.Visibility>
+                        <CheckBox Content="Mid colour (3-colour gradient-map ramp)" IsChecked="{Binding NoiseUseMid, Mode=TwoWay}" MarginBottom="6"/>
+                        <TextBlock Text="Colours (low / mid / high — mid used only when ticked)" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <StackPanel Orientation="Horizontal">
+                            <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding NoiseColor1, Mode=TwoWay}" MarginRight="8"/>
+                            <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding NoiseMid, Mode=TwoWay}" MarginRight="8"/>
+                            <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding NoiseColor2, Mode=TwoWay}"/>
+                        </StackPanel>
+                    </StackPanel>
                 </StackPanel>
             </StackPanel>
 

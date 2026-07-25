@@ -622,6 +622,12 @@ float4 GradientPS(GradPSInput input) : SV_Target
 
     float2 uv = input.Local / max(input.Half * 2.0, float2(1e-4, 1e-4)) + 0.5;   // 0..1 across the bounds
     int packedW = int(it.Params.w + 0.5);                       // Params.w packs spread (low 3 bits) + interp mode (>> 3)
+    // MESH gradient (type 4) DEFERRED - it is NOT the ternary issue: the GRADIENT pass just flakes vkCreateShadersEXT COMPILE
+    // with ANY extra code (tested branch-free too: ~25% window launch). All C# kept (MeshGradientBrush / GradientBake type 4 /
+    // GradientRectCollector); re-enable ONE of these on a saner driver (branch-free preferred - no ?: which device-losts):
+    //   float4 grad = GradColor(it, GradSpread(GradParam(it, uv), packedW & 7), fwidth(gt), packedW >> 3);
+    //   float4 mesh = lerp(lerp(it.Stop0, it.Stop1, uv.x), lerp(it.Stop2, it.Stop3, uv.x), uv.y);
+    //   float4 fill = lerp(grad, mesh, step(3.5, it.Params.y));
     float gt = GradSpread(GradParam(it, uv), packedW & 7);
     float4 fill = GradColor(it, gt, fwidth(gt), packedW >> 3);
 
@@ -715,6 +721,7 @@ struct PatternRectData
     float4 Stroke0;      // width_px, align, dashOn, dashGap
     float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
     float4 Noise;        // FBM noise (type 4 only): x octaves, y seed, z lacunarity, w gain
+    float4 Color3;       // optional MID colour for a 3-colour noise gradient-map (Color1->Color3->Color2); .w==0 = off
 };
 
 struct PatternPSInput
@@ -777,9 +784,168 @@ float snoise(float2 v)
     return 130.0 * dot(m, g);
 }
 
-// Fractional Brownian motion: sum `oct` octaves of simplex noise, each octave freq*lacunarity and amp*gain. Normalised to
-// ~[-1,1]. The 8-iteration loop with an early break caps the cost while honouring the per-instance octave count.
-float fbm(float2 p, int oct, float lacunarity, float gain)
+// --- Alternative base noise functions for NoiseBrush.NoiseType. All texture-free ALU, return ~[-1,1] to match snoise so
+// FBM/gradient-map stay identical across types. Only the base field changes. ---
+// Dave Hoskins hash12 (same family as hash22, which is seam-free in Worley). Reduces the input with frac FIRST (robust at
+// large lattice coords, no sin), mixes every component into every other via the dot, and finishes with an ADDITION
+// (p3.x+p3.y)*p3.z - so it never collapses to ~0 along an axis the way frac(p.x*p.y*(p.x+p.y)) did (that zero-column was
+// the vertical seam in value/perlin). Returns [0,1).
+float hash21(float2 p)
+{
+    float3 p3 = frac(float3(p.x, p.y, p.x) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return frac((p3.x + p3.y) * p3.z);
+}
+
+float2 hash22(float2 p)
+{
+    float3 p3 = frac(p.xyx * float3(0.1031, 0.1030, 0.0973));
+    p3 += dot(p3, p3.yzx + 33.33);
+    return frac((p3.xx + p3.yz) * p3.zy);
+}
+
+// Value noise: bilinearly interpolate a random value per lattice point (smoothstep fade). Blockier than gradient noise.
+float vnoise(float2 v)
+{
+    float2 i = floor(v);
+    float2 f = frac(v);
+    float2 u = f * f * (3.0 - 2.0 * f);
+    float a = hash21(i);
+    float b = hash21(i + float2(1.0, 0.0));
+    float c = hash21(i + float2(0.0, 1.0));
+    float d = hash21(i + float2(1.0, 1.0));
+    return (lerp(lerp(a, b, u.x), lerp(c, d, u.x), u.y)) * 2.0 - 1.0;
+}
+
+// Classic Perlin gradient noise: a random unit gradient per lattice point (angle from the now well-distributed hash21, so
+// no column seam), dotted with the offset and interpolated. Smooth like simplex. The angle stays in [0,2pi], so no sin of
+// large arguments.
+float pnoise(float2 v)
+{
+    float2 i = floor(v);
+    float2 f = frac(v);
+    float2 u = f * f * (3.0 - 2.0 * f);
+    float g0 = hash21(i) * 6.2831853;
+    float g1 = hash21(i + float2(1.0, 0.0)) * 6.2831853;
+    float g2 = hash21(i + float2(0.0, 1.0)) * 6.2831853;
+    float g3 = hash21(i + float2(1.0, 1.0)) * 6.2831853;
+    float a = dot(float2(cos(g0), sin(g0)), f - float2(0.0, 0.0));
+    float b = dot(float2(cos(g1), sin(g1)), f - float2(1.0, 0.0));
+    float c = dot(float2(cos(g2), sin(g2)), f - float2(0.0, 1.0));
+    float d = dot(float2(cos(g3), sin(g3)), f - float2(1.0, 1.0));
+    return lerp(lerp(a, b, u.x), lerp(c, d, u.x), u.y) * 1.4;
+}
+
+// Worley (cellular / Voronoi): squared distance to the nearest of one feature point per cell over the 3x3 neighbourhood,
+// inverted so cell centres are bright. `phase` orbits each cell's feature point on a per-cell Lissajous so the cells FLOW in
+// place when animated (phase=0 -> a fixed per-cell point, i.e. a static Voronoi). NESTED loop - this driver's weak spot.
+float worley(float2 v, float phase)
+{
+    float2 i = floor(v);
+    float2 f = frac(v);
+    float md = 1.5;
+    for (int y = -1; y <= 1; y++)
+    {
+        for (int x = -1; x <= 1; x++)
+        {
+            float2 nb = float2(x, y);
+            float2 h = hash22(i + nb);
+            float2 pt = 0.5 + 0.35 * sin(phase + 6.2831853 * h);   // feature point orbits over time -> flowing cells
+            float2 diff = nb + pt - f;
+            md = min(md, dot(diff, diff));
+        }
+    }
+    return (1.0 - sqrt(md)) * 2.0 - 1.0;
+}
+
+// iq's Voronoi distance (shadertoy Xd23Dh): distance to the nearest cell BORDER (the Voronoi edge network), NOT the nearest
+// point - thin glowing cell walls / cracks instead of Worley's filled cells. Pass 1 finds the nearest feature point (mr) and
+// its cell (mb); pass 2 takes the min distance to the perpendicular bisectors with the neighbours of mb. Feature points orbit
+// by `phase` so the whole network morphs. Guards normalize(0) at the nearest cell itself. TWO nested loops - driver risk.
+float voronoiEdge(float2 v, float phase)
+{
+    float2 n = floor(v);
+    float2 f = frac(v);
+    float2 mr = float2(0.0, 0.0);
+    float2 mb = float2(0.0, 0.0);
+    float md = 8.0;
+    for (int j = -1; j <= 1; j++)
+    {
+        for (int i = -1; i <= 1; i++)
+        {
+            float2 b = float2(i, j);
+            float2 h = hash22(n + b);
+            float2 o = 0.5 + 0.35 * sin(phase + 6.2831853 * h);   // animated feature point
+            float2 r = b + o - f;
+            float d = dot(r, r);
+            if (d < md)
+            {
+                md = d;
+                mr = r;
+                mb = b;
+            }
+        }
+    }
+    md = 8.0;
+    for (int j = -1; j <= 1; j++)
+    {
+        for (int i = -1; i <= 1; i++)
+        {
+            float2 b = mb + float2(i, j);
+            float2 h = hash22(n + b);
+            float2 o = 0.5 + 0.35 * sin(phase + 6.2831853 * h);
+            float2 r = b + o - f;
+            float2 diff = r - mr;
+            if (dot(diff, diff) > 1e-5)                            // skip the nearest cell itself -> no normalize(0)
+            {
+                md = min(md, dot(0.5 * (mr + r), normalize(diff)));
+            }
+        }
+    }
+    return md;   // 0 at borders, growing inside cells
+}
+
+// Pick the base noise by basis index (0 simplex / 1 perlin / 2 value / 3 worley). `phase` drives the Worley flow (others
+// ignore it). Scalar branches only - no vector ternary.
+float baseNoise(float2 p, int basis, float phase)
+{
+    if (basis == 1) return pnoise(p);
+    if (basis == 2) return vnoise(p);
+    if (basis == 3) return worley(p, phase);
+    return snoise(p);
+}
+
+// Fractional Brownian motion: sum `oct` octaves of the chosen base noise, each octave freq*lacunarity and amp*gain.
+// Normalised to ~[-1,1]. The 8-iteration loop with an early break caps the cost while honouring the per-instance octave count.
+float fbm(float2 p, int oct, float lacunarity, float gain, int basis, float phase)
+{
+    float amp = 0.5;
+    float freq = 1.0;
+    float sum = 0.0;
+    float norm = 0.0;
+    float dmask = 1.0;
+    if (basis == 3) dmask = 0.0;   // Worley animates via its own feature-point orbit, not a domain drift
+    for (int o = 0; o < 8; o++)
+    {
+        if (o >= oct)
+        {
+            break;
+        }
+        // Per-octave domain warp: each octave drifts on its own phase-shifted orbit so the layers churn over each other
+        // (the field evolves in place instead of rigidly scrolling). phase=0 when not animating -> a static field.
+        float2 dv = dmask * 0.4 * float2(sin(phase * 0.6 + 1.7 * float(o)), cos(phase * 0.5 + 1.3 * float(o)));
+        sum += amp * baseNoise(p * freq + dv, basis, phase);
+        norm += amp;
+        freq *= lacunarity;
+        amp *= gain;
+    }
+    return (norm > 1e-5) ? sum / norm : 0.0;
+}
+
+// Ridged / turbulence FBM folds over simplex. Turbulence (mode 0) sums |noise| -> billowy/smoky; ridged (mode 1) sums
+// (1-|noise|)^2 -> sharp ridges / marble veins. Returns ~[0,1] (already non-negative from the abs), so the caller maps it
+// straight to the colour ramp rather than the signed *0.5+0.5 of the plain FBM types.
+float fbmFold(float2 p, int oct, float lacunarity, float gain, int mode, float phase)
 {
     float amp = 0.5;
     float freq = 1.0;
@@ -791,7 +957,14 @@ float fbm(float2 p, int oct, float lacunarity, float gain)
         {
             break;
         }
-        sum += amp * snoise(p * freq);
+        float2 dv = 0.4 * float2(sin(phase * 0.6 + 1.7 * float(o)), cos(phase * 0.5 + 1.3 * float(o)));   // per-octave churn
+        float v = abs(snoise(p * freq + dv));
+        if (mode == 1)
+        {
+            v = 1.0 - v;
+            v = v * v;
+        }
+        sum += amp * v;
         norm += amp;
         freq *= lacunarity;
         amp *= gain;
@@ -828,17 +1001,126 @@ float PatternMix(int type, float2 p, float cell, float4 noise)
         return 1.0 - smoothstep(0.5, 0.5 + aa + 1.0, dmin);   // ~1px line
     }
 
-    if (type == 4)   // FBM fractal noise: Color1 (low) -> Color2 (high)
+    if (type == 4 || type == 7 || type == 8 || type == 9)   // FBM noise: 4 simplex / 7 perlin / 8 value / 9 worley
     {
-        float2 np = g + noise.y;                                          // base noise domain + seed offset
-        float n = fbm(np, int(noise.x), max(noise.z, 1.0), noise.w);     // ~[-1,1]
+        int basis = type - 6;                                            // 7->1 perlin, 8->2 value, 9->3 worley
+        if (type == 4) basis = 0;                                        // 4 -> simplex
+        int oct = int(abs(noise.x));                                     // octaves is sign-encoded: negative = animate
+        float phase = 0.0;
+        if (noise.x < 0.0) phase = Time;                                 // only an animating instance advances by Time
+        float2 np = g + noise.y;                                         // base noise domain + seed offset
+        float n = fbm(np, oct, max(noise.z, 1.0), noise.w, basis, phase);   // Color1 (low) -> Color2 (high); phase drives flow
         return saturate(n * 0.5 + 0.5);
+    }
+    if (type == 10 || type == 11)   // ridged (10) / turbulence (11): FBM folds over simplex, already ~[0,1]
+    {
+        int mode = 0;                              // turbulence
+        if (type == 10) mode = 1;                  // ridged
+        int oct = int(abs(noise.x));
+        float phase = 0.0;
+        if (noise.x < 0.0) phase = Time;
+        float2 np = g + noise.y;
+        float n = fbmFold(np, oct, max(noise.z, 1.0), noise.w, mode, phase);
+        if (type == 11) n = n * 1.6;               // turbulence is dimmer (averaged |noise|) - lift it for contrast
+        return saturate(n);
+    }
+    if (type == 12)   // Voronoi BORDER network (iq Xd23Dh): thin bright cell walls, morphing under Animate
+    {
+        float ph = 0.0;
+        if (noise.x < 0.0) ph = Time;              // octaves-sign = animate flag
+        float dd = voronoiEdge(g + noise.y, ph);
+        float aa = fwidth(dd) + 1e-4;
+        return 1.0 - smoothstep(0.0, 0.06 + aa, dd);   // Color2 on the borders, Color1 inside the cells
+    }
+    if (type == 5)   // hexagonal grid (honeycomb) lines
+    {
+        float2 grid = float2(1.0, 1.7320508);
+        float2 hh = grid * 0.5;
+        float2 a = frac(g / grid) * grid - hh;
+        float2 b = frac((g + hh) / grid) * grid - hh;
+        float2 gv = dot(a, a) < dot(b, b) ? a : b;             // fragment within the nearest hex, centred
+        float2 ag = abs(gv);
+        float hd = max(ag.x * 0.8660254 + ag.y * 0.5, ag.y);   // 0 at centre .. 0.5 at the hex edge
+        float dpx = (0.5 - hd) * cell;                         // px to the nearest honeycomb edge
+        float aa = fwidth(dpx) + 1e-4;
+        return 1.0 - smoothstep(0.5, 0.5 + aa + 1.0, dpx);     // ~1px hex lines
+    }
+    if (type == 6)   // diagonal 45-degree hatch lines
+    {
+        float t = (p.x + p.y) / cell;
+        float dpx = (0.5 - abs(frac(t) - 0.5)) * cell * 0.7071068;   // px to the nearest 45-degree line
+        float aa = fwidth(dpx) + 1e-4;
+        return 1.0 - smoothstep(0.5, 0.5 + aa + 1.0, dpx);
     }
 
     // checkerboard (type 0): iq's analytically-filtered checker (period 2 in g -> cell-sized squares)
     float2 w2 = fwidth(g) + 1e-4;
     float2 i2 = 2.0 * (abs(frac((g - 0.5 * w2) * 0.5) - 0.5) - abs(frac((g + 0.5 * w2) * 0.5) - 0.5)) / w2;
     return saturate(0.5 - 0.5 * i2.x * i2.y);
+}
+
+// --- Combustible Voronoi (Shane, shadertoy 4tlSzl): 3D Voronoi fBm coloured by a blackbody FIRE palette. Its own colour
+// path (the palette returns RGB, not a 2-colour lerp), so PatternPS handles type 13 specially. 5 layers x a 3x3x3 cell
+// search - the heaviest pattern branch; watch the driver. ---
+float3 hash33(float3 p)
+{
+    float n = sin(dot(p, float3(7.0, 157.0, 113.0)));
+    return frac(float3(2097152.0, 262144.0, 32768.0) * n);
+}
+
+// 3D Voronoi (Shane's rehash of iq): squared distance to the nearest 3D feature point over the 3x3 cell block, the z loop
+// unrolled (GPUs dislike deep nesting). Range [0,1].
+float voronoi3(float3 p)
+{
+    float3 g = floor(p);
+    p = frac(p);
+    float3 b;
+    float3 r;
+    float d = 1.0;
+    for (int j = -1; j <= 1; j++)
+    {
+        for (int i = -1; i <= 1; i++)
+        {
+            b = float3(float(i), float(j), -1.0);
+            r = b - p + hash33(g + b);
+            d = min(d, dot(r, r));
+            b.z = 0.0;
+            r = b - p + hash33(g + b);
+            d = min(d, dot(r, r));
+            b.z = 1.0;
+            r = b - p + hash33(g + b);
+            d = min(d, dot(r, r));
+        }
+    }
+    return d;
+}
+
+// fBm of the 3D Voronoi with time dilation on the z axis (position and time frequencies advance at different rates -> a
+// parallax "combustible" flow). 5 layers. Range [0,1].
+float noiseLayers(float3 p, float time)
+{
+    float3 t = float3(0.0, 0.0, p.z + time * 1.5);
+    float tot = 0.0;
+    float sum = 0.0;
+    float amp = 1.0;
+    for (int i = 0; i < 3; i++)   // 3 layers (was 5) - trimmed to buy NVVM budget for the configurable palette
+    {
+        tot += voronoi3(p + t) * amp;
+        p *= 2.0;
+        t *= 1.5;
+        sum += amp;
+        amp *= 0.5;
+    }
+    return tot / sum;
+}
+
+// Shane's favourite fire palette: blackbody radiation across a 1400..2700K temperature range (Planck-ish per wavelength).
+float3 firePalette(float i)
+{
+    float T = 1400.0 + 1300.0 * i;
+    float3 L = float3(7.4, 5.6, 4.4);
+    L = pow(L, float3(5.0, 5.0, 5.0)) * (exp(143876.719683 / (T * L)) - 1.0);
+    return 1.0 - exp(-5e8 / L);
 }
 
 [shader("fragment")]
@@ -852,8 +1134,46 @@ float4 PatternPS(PatternPSInput input) : SV_Target
     float d = SdRoundRectJoin(input.Local, input.Half, r, joinType);
 
     float2 p = input.Local + input.Half;   // fragment from the rect's TOP-LEFT (stable pattern origin at the corner)
-    float k = PatternMix(int(it.Params.y), p, it.Params.z, it.Noise);
-    float4 fill = lerp(it.Color1, it.Color2, k);
+    int ptype = int(it.Params.y);
+
+    float4 fill;
+    if (ptype == 13)   // Combustible Voronoi: its own 3D-ray + fire-palette colour path (ignores Color1/Color2 as a lerp)
+    {
+        float time = 0.0;
+        if (it.Noise.x < 0.0) time = Time;   // octaves-sign = animate flag; a fire really wants Animate on
+        float2 uv = input.Local / max(input.Half.y, 1.0);   // centred, normalised by half height
+        float cs = cos(time * 0.25);
+        float si = sin(time * 0.25);
+        float3 rd = normalize(float3(uv.x, uv.y, 0.3926991));   // ~PI/8 ray, gives the central fireball
+        rd.xy = float2(rd.x * cs - rd.y * si, rd.x * si + rd.y * cs);   // rolling camera
+        float c = noiseLayers(rd * 2.0, time);
+        c = max(c + dot(hash33(rd) * 2.0 - 1.0, float3(0.015, 0.015, 0.015)), 0.0);   // subtle dust
+        c *= sqrt(c) * 1.5;                                  // contrast
+        // Palette. noise.w = flag (>=0.5 built-in blackbody fire; <0.5 the brush's own Color1->MidColor->Color2 ramp). Both
+        // are computed and selected BRANCH-FREE by step() - the NVVM AV'd on this over-full PS with a divergent branch here,
+        // and noiseLayers was cut to 3 layers to buy back the budget.
+        float3 fireCol = sqrt(saturate(pow(firePalette(c), float3(1.25, 1.25, 1.25))));
+        float cc = saturate(c);
+        float3 duo = lerp(it.Color1.xyz, it.Color2.xyz, cc);
+        float3 triLo = lerp(it.Color1.xyz, it.Color3.xyz, saturate(cc * 2.0));
+        float3 triHi = lerp(it.Color3.xyz, it.Color2.xyz, saturate(cc * 2.0 - 1.0));
+        float3 tri = lerp(triLo, triHi, step(0.5, cc));
+        float3 userCol = lerp(duo, tri, step(0.001, it.Color3.w));   // Color3.w==0 -> 2-colour ramp
+        float3 col = lerp(userCol, fireCol, step(0.5, it.Noise.w));
+        fill = float4(col, it.Color1.w);                            // alpha carries brush opacity
+    }
+    else
+    {
+        float k = PatternMix(ptype, p, it.Params.z, it.Noise);
+        // TRITONE gradient-map (Color1 -> Color3 mid -> Color2), BRANCH-FREE: the earlier nested ternary (k<0.5 ? lerp : lerp)
+        // device-lost on this driver's NVVM. Here everything is computed and blended by step() - no ternary, no if. Color3.w==0
+        // (no mid colour) blends back to the plain two-colour duotone.
+        float4 duo = lerp(it.Color1, it.Color2, k);
+        float4 triLo = lerp(it.Color1, it.Color3, saturate(k * 2.0));
+        float4 triHi = lerp(it.Color3, it.Color2, saturate(k * 2.0 - 1.0));
+        float4 tri = lerp(triLo, triHi, step(0.5, k));
+        fill = lerp(duo, tri, step(0.001, it.Color3.w));
+    }
 
     float mask = 1.0;
     if (it.Stroke0.z > 0.0 || it.Stroke1.y > 0.0 || it.Stroke1.z < 1.0)

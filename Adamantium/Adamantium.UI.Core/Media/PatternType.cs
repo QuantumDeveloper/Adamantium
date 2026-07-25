@@ -14,5 +14,13 @@ public enum PatternType
     Dots,
 
     /// <summary>Thin Color2 grid lines at each cell boundary over a Color1 background.</summary>
-    Grid
+    Grid = 3,
+
+    // value 4 is reserved for NoiseBrush (shader PatternMix type 4 = FBM noise), so the new patterns start at 5.
+
+    /// <summary>Thin Color2 honeycomb (hexagonal) grid lines over a Color1 background.</summary>
+    Hexagon = 5,
+
+    /// <summary>Thin Color2 diagonal (45 deg) hatch lines over a Color1 background.</summary>
+    Hatch = 6
 }

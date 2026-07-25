@@ -16,6 +16,15 @@ internal static class GradientBake
     // Returns the valid stop count (<= 8). Unused slots are left as passed in (callers zero-init the instance).
     public static int PackStops(GradientBrush g, float alpha, Span<Vector4F> colors, Span<float> offsets)
     {
+        if (g is MeshGradientBrush m)   // 4 corner colours -> first four slots (offsets unused; shader bilerps by uv)
+        {
+            colors[0] = Fold(m.TopLeft, alpha);
+            colors[1] = Fold(m.TopRight, alpha);
+            colors[2] = Fold(m.BottomLeft, alpha);
+            colors[3] = Fold(m.BottomRight, alpha);
+            return 4;
+        }
+
         var stops = new List<GradientStop>(g.GradientStops);
         stops.Sort((a, b) => a.Offset.CompareTo(b.Offset));
         var count = Math.Min(stops.Count, MaxStops);
@@ -32,8 +41,16 @@ internal static class GradientBake
     // The gradient geometry (relative 0..1): type (1 linear / 2 radial / 3 conic) + the two geometry vectors the shader
     // reads. Linear: Geom0 = (startXY, endXY). Radial: Geom0 = (centerXY, radiusXY), Geom1 = (originXY, 0, 0).
     // Conic: Geom0 = (centerXY, startAngleTurns, 0) - the shader sweeps the angle around the centre.
+    private static Vector4F Fold(Color c, float alpha) { var v = c.ToVector4(); v.W *= alpha; return v; }
+
     public static float PackGeometry(GradientBrush g, out Vector4F geom0, out Vector4F geom1)
     {
+        if (g is MeshGradientBrush)   // 4-corner mesh: no axis geometry; the corners ride the stop slots
+        {
+            geom0 = Vector4F.Zero;
+            geom1 = Vector4F.Zero;
+            return 4f;
+        }
         if (g is RadialGradientBrush radial)
         {
             geom0 = new Vector4F((float)radial.Center.X, (float)radial.Center.Y, (float)radial.RadiusX, (float)radial.RadiusY);
