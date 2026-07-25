@@ -439,6 +439,14 @@ internal sealed class AumlInstantiator
         if (_resolver.Resolve(typeRef.GetFullTypeName()) is ReflectionResolvedType resolved)
             return resolved.ClrType;
 
+        // Nested elements under a NON-entity runtime root (a bare <StackPanel>/<Border> handed to AumlLoader.Load, not a
+        // Window/View/Page) arrive type-UNRESOLVED: DefaultAumlTransformer early-returns for an Unknown-entity root before
+        // its type-resolution BFS reaches the children, so they still carry the raw xmlns URI as their Namespace (the
+        // xmlns-qualified lookup above then misses). Resolve those by type NAME - the same short-name fallback the
+        // transformer itself uses (ResolveByShortName) for local/unprefixed types.
+        if (_resolver.ResolveByShortName(typeRef.Name) is ReflectionResolvedType byShortName)
+            return byShortName.ClrType;
+
         return _assemblies
             .SelectMany(ReflectionResolvedAssembly.SafeGetTypes)
             .FirstOrDefault(x => x.Name == typeRef.Name && x.Namespace == typeRef.Namespace);
