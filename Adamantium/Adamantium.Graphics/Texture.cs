@@ -492,6 +492,13 @@ public unsafe class Texture : GraphicsResource, ITexture
         fs.Write(new ReadOnlySpan<byte>((void*)_rawReadback.DataPointer, (int)_rawReadback.TotalSizeInBytes));
     }
 
+    public Image ReadbackToImage()
+    {
+        var img = Image.New2D(Width, Height, 1, Description.Format);
+        ReadbackInto(img);
+        return img;
+    }
+
     /// <summary>Reads this texture's pixels into <paramref name="destination"/> via host image copy (fast path) or a
     /// staging buffer, with no colour swap or encoding.</summary>
     private void ReadbackInto(Image destination)
