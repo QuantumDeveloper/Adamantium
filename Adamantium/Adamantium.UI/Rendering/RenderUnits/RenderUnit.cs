@@ -602,13 +602,23 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
         return p.StartAngle <= 0.0 && p.SweepAngle >= 360.0;
     }
 
+    // A full ellipse with a PROCEDURAL pattern/noise fill routes into the pattern SDF batch (self-AA) - like the solid/
+    // gradient cases, build ZERO per-unit machinery. Mirrors PatternRectCollector.CanBatchEllipse.
+    private static bool IsPatternBatchable(EllipsePayload p)
+    {
+        if (!PatternRectCollector.Enabled) return false;
+        if (p.Brush is not (PatternBrush or NoiseBrush)) return false;
+        if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
+        return p.StartAngle <= 0.0 && p.SweepAngle >= 360.0;
+    }
+
     public EllipseRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
         // A batchable ellipse is drawn ENTIRELY by the SDF batch (resolution-independent, self-AA) - build ZERO per-unit
         // machinery: no tessellation, no geometry/fringe/stroke, no GPU buffers. The rare rejected case (rotated/sheared
         // world, or per-frame overflow) builds its body lazily in Render via EnsureMachinery. A gradient fill routes to
         // the gradient ellipse batch, also machinery-free.
-        if (IsSdfBatchable(Payload) || IsGradientBatchable(Payload)) return;
+        if (IsSdfBatchable(Payload) || IsGradientBatchable(Payload) || IsPatternBatchable(Payload)) return;
         BuildMachinery(Payload);
     }
 

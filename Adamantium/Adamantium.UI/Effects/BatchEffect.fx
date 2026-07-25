@@ -1048,10 +1048,10 @@ float PatternMix(int type, float2 p, float cell, float4 noise)
         float aa = fwidth(dpx) + 1e-4;
         return 1.0 - smoothstep(0.5, 0.5 + aa + 1.0, dpx);     // ~1px hex lines
     }
-    if (type == 6)   // diagonal 45-degree hatch lines
-    {
-        float t = (p.x + p.y) / cell;
-        float dpx = (0.5 - abs(frac(t) - 0.5)) * cell * 0.7071068;   // px to the nearest 45-degree line
+    if (type == 6)   // hatch lines; noise.xy = the unit line normal (cos/sin baked on the CPU - NO trig here, so the
+    {                //                 already-maxed pattern PS doesn't grow: dot replaces the old p.x+p.y)
+        float t = dot(p, float2(noise.x, noise.y)) / cell;
+        float dpx = (0.5 - abs(frac(t) - 0.5)) * cell;       // px to the nearest line (cell = perpendicular spacing)
         float aa = fwidth(dpx) + 1e-4;
         return 1.0 - smoothstep(0.5, 0.5 + aa + 1.0, dpx);
     }
@@ -1178,11 +1178,12 @@ float4 PatternPS(PatternPSInput input) : SV_Target
     PatternRectData* items = (PatternRectData*)InstancesAddress;
     PatternRectData it = items[input.InstId];
 
+    bool ellipse = it.Params.x < 0.0;   // negative baked corner radius = the ellipse shape flag (a rect passes radius >= 0)
     float r = min(input.Radius, min(input.Half.x, input.Half.y));
     int joinType = int(fmod(floor(it.Stroke1.w / 512.0), 8.0));
-    float d = SdRoundRectJoin(input.Local, input.Half, r, joinType);
+    float d = ellipse ? SdEllipse(input.Local, input.Half) : SdRoundRectJoin(input.Local, input.Half, r, joinType);
 
-    float2 p = input.Local + input.Half;   // fragment from the rect's TOP-LEFT (stable pattern origin at the corner)
+    float2 p = input.Local + input.Half;   // fragment from the shape's TOP-LEFT (stable pattern origin at the corner)
     float4 fill = PatternFillColor(it, p, input.Local, input.Half.y);
 
     float mask = 1.0;
@@ -1190,7 +1191,7 @@ float4 PatternPS(PatternPSInput input) : SV_Target
     {
         float halfW = it.Stroke0.x * 0.5;
         float perim;
-        float s = RoundRectArc(input.Local, input.Half, r, perim);
+        float s = ellipse ? EllipseArc(input.Local, input.Half, perim) : RoundRectArc(input.Local, input.Half, r, perim);
         float dPerp = d - it.Stroke0.y * halfW;
         mask = DashTrimMask(s, s, perim, it.Stroke0.z, it.Stroke0.w, it.Stroke1.x, it.Stroke1.y,
                             it.Stroke1.z, dPerp, halfW, it.Stroke1.w);

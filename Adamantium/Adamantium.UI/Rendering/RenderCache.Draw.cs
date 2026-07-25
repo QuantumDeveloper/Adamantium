@@ -333,6 +333,30 @@ public partial class RenderCache
                 geru.EnsureMachinery();
                 unit.Update(wt, _projectionMatrix, _renderScale);
             }
+            else if (device != null && unit is EllipseRenderUnit peru && _patternBatch.CanBatchEllipse(peru.EllipsePayload))
+            {
+                // A full ellipse with a PROCEDURAL PATTERN/NOISE fill: routes into the SAME pattern SDF batch (self-AA, no
+                // jagged tessellated edges), the shader branching to the ellipse SDF on the negative baked corner radius.
+                // Same clip group + layer 4 as the pattern rect.
+                var patElBounds = LogicalBounds(unit.Component, wt);
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(4, patElBounds))   // 4 = pattern layer
+                {
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                }
+                var patElBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4PatEl);
+                if (_patternBatch.TryAddEllipse(peru.EllipsePayload, patElBakeWorld, peru.FillOpacity, scissor, patElBounds, slot4PatEl))
+                {
+                    if (_recording)
+                    {
+                        group.PatchableRectOnly = false;   // pattern: node-aware, not paint/splice-patchable in v1
+                    }
+                    _batchScissor = scissor;
+                    _batchOpen = true;
+                    continue;
+                }
+                peru.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
+            }
             else if (device != null && unit is RectangleRenderUnit pru && _patternBatch.CanBatch(pru.RectPayload))
             {
                 // A rounded rect with a PROCEDURAL PATTERN fill (checkerboard/stripes/dots/grid): a new SDF-batch sibling,

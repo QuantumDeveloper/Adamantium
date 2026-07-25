@@ -70,10 +70,43 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
         return true;
     }
 
-    // Bake a procedural fill (PatternBrush or NoiseBrush) into an instance record. Position -> world; the pattern is
-    // fill-relative, so one brush paints any size. False on a rotated/sheared world (the axis-aligned instance can't hold
-    // it). Cell/scale scales by the world device scale (sx), matching how corner radius + stroke width are baked into px.
+    // Bake a procedural rounded-rect fill (thin wrapper over the shared core).
     public static bool BakeItem(RectanglePayload p, Matrix4x4F world, double opacity, int transformSlot, out PatternRectItem item)
+        => BakeItemCore(p.Brush, p.DestinationRect, p.CornerRadius.TopLeft, p.Pen, world, opacity, transformSlot, out item);
+
+    // Ellipse variant: a full ellipse with a procedural fill batches into the SAME pattern pass (SDF self-AA, no jagged
+    // tessellated edges) - the shader branches to the ellipse SDF on the NEGATIVE baked corner radius. Mirrors
+    // GradientEllipseCollector.CanBatch/TryAdd but reuses this collector so no separate batch lifecycle is needed.
+    public bool CanBatchEllipse(EllipsePayload p)
+    {
+        if (!Enabled) return false;
+        if (p.Brush is not (PatternBrush or NoiseBrush)) return false;
+        if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
+        return p.StartAngle <= 0.0 && p.SweepAngle >= 360.0;
+    }
+
+    public bool TryAddEllipse(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0)
+    {
+        EnsureCpuCapacity(Count + 1);
+        if (Count + 1 > GpuCapacity)
+        {
+            return false;
+        }
+        if (!BakeItemCore(p.Brush, p.DestinationRect, -1.0, p.Pen, world, opacity, transformSlot, out var item))
+        {
+            return false;
+        }
+        Items[Count++] = item;
+        MarkPending(scissor, logicalBounds);
+        return true;
+    }
+
+    // Bake a procedural fill (PatternBrush or NoiseBrush) into an instance record - shared by the rect AND ellipse pattern
+    // collectors. Position -> world; the pattern is fill-relative, so one brush paints any size. False on a rotated/sheared
+    // world (the axis-aligned instance can't hold it). Cell scales by the world device scale (sx). `cornerRadius` is baked
+    // into Params.x; a NEGATIVE value is the ELLIPSE shape flag (PatternPS branches SdEllipse for it), a rect passes its
+    // >= 0 uniform corner radius.
+    public static bool BakeItemCore(Brush brush, Rect destinationRect, double cornerRadius, Pen pen, Matrix4x4F world, double opacity, int transformSlot, out PatternRectItem item)
     {
         item = default;
         const float eps = 1e-4f;
@@ -90,15 +123,18 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
         double brushOpacity;
         var noise = Vector4F.Zero;
 
-        if (p.Brush is PatternBrush pat)
+        if (brush is PatternBrush pat)
         {
             type = (int)pat.Pattern;
             color1 = pat.Color1;
             color2 = pat.Color2;
             cell = pat.CellSize;
             brushOpacity = pat.Opacity;
+            // Bake the hatch line normal (cos/sin) here so the shader needs NO trig (its pattern PS is at the NVVM limit).
+            var ha = pat.HatchAngle * Math.PI / 180.0;
+            noise = new Vector4F((float)Math.Cos(ha), (float)Math.Sin(ha), 0, 0);
         }
-        else if (p.Brush is NoiseBrush n)
+        else if (brush is NoiseBrush n)
         {
             // shader contract: PatternMix type 4 = simplex FBM; 7/8/9 = perlin/value/worley FBM (same noise record)
             type = n.NoiseType == NoiseType.Simplex ? 4 : 6 + (int)n.NoiseType;
@@ -131,13 +167,13 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
         var c3 = midColor.ToVector4();
         c3.W *= alpha;
 
-        RectBatchCollector.BakeStroke(p.Pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1);
+        RectBatchCollector.BakeStroke(pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1);
 
-        var r = p.DestinationRect;
+        var r = destinationRect;
         item = new PatternRectItem
         {
             Bounds = new Vector4F((float)(r.X * sx + tx), (float)(r.Y * sy + ty), (float)(r.Width * sx), (float)(r.Height * sy)),
-            Params = new Vector4F((float)(p.CornerRadius.TopLeft * sx), type, (float)(cell * sx), transformSlot),
+            Params = new Vector4F((float)(cornerRadius * sx), type, (float)(cell * sx), transformSlot),
             Color1 = c1,
             Color2 = c2,
             StrokeColor = strokeColor,

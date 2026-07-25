@@ -24,6 +24,11 @@ public sealed class PatternBrush : Brush
     public static readonly AdamantiumProperty CellSizeProperty = AdamantiumProperty.Register(nameof(CellSize),
         typeof(double), typeof(PatternBrush), new PropertyMetadata(8.0, PropertyMetadataOptions.AffectsPaint));
 
+    // The line direction for PatternType.Hatch, in degrees (0 = vertical, 45 = the classic diagonal). Ignored by the other
+    // pattern types.
+    public static readonly AdamantiumProperty HatchAngleProperty = AdamantiumProperty.Register(nameof(HatchAngle),
+        typeof(double), typeof(PatternBrush), new PropertyMetadata(45.0, PropertyMetadataOptions.AffectsPaint));
+
     /// <summary>Which procedural pattern to tile. Default <see cref="PatternType.Checkerboard"/>.</summary>
     public PatternType Pattern
     {
@@ -68,6 +73,17 @@ public sealed class PatternBrush : Brush
         }
     }
 
+    /// <summary>Hatch line direction in degrees (0 = vertical, 45 = the classic diagonal). Hatch only. Default 45.</summary>
+    public double HatchAngle
+    {
+        get => GetValue<double>(HatchAngleProperty);
+        set
+        {
+            if (IsFrozen) return;
+            SetValue(HatchAngleProperty, value);
+        }
+    }
+
     protected override Brush CreateClone() =>
         new PatternBrush
         {
@@ -75,6 +91,7 @@ public sealed class PatternBrush : Brush
             Color1 = Color1,
             Color2 = Color2,
             CellSize = CellSize,
+            HatchAngle = HatchAngle,
             Opacity = Opacity
         };
 }
