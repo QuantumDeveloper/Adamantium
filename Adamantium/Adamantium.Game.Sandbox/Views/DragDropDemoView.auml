@@ -14,8 +14,18 @@
 
         <StackPanel Orientation="Horizontal">
 
-            <Border Background="#FF141C28" CornerRadius="8" Padding="12" Width="220" MinHeight="300" MarginRight="16"
+            <Border CornerRadius="8" Padding="12" Width="220" MinHeight="300" MarginRight="16" BorderThickness="2"
                     DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropLeftCommand}">
+                <Border.Styles>
+                    <Style Selector="Border">
+                        <Setter Property="Background" Value="#FF141C28"/>
+                        <Setter Property="BorderBrush" Value="#003BE27A"/>
+                        <PropertyTrigger Property="DragDrop.IsDragOver" Value="True">
+                            <Setter Property="Background" Value="#FF16241C"/>
+                            <Setter Property="BorderBrush" Value="#FF3BE27A"/>
+                        </PropertyTrigger>
+                    </Style>
+                </Border.Styles>
                 <StackPanel Orientation="Vertical">
                     <TextBlock Text="Fruits" Foreground="#FFE0B040" MarginBottom="10"/>
                     <ListBox ItemsSource="{Binding Left}" SelectedItems="{Binding LeftSelection}"
@@ -34,8 +44,18 @@
                 </StackPanel>
             </Border>
 
-            <Border Background="#FF141C28" CornerRadius="8" Padding="12" Width="220" MinHeight="300"
+            <Border CornerRadius="8" Padding="12" Width="220" MinHeight="300" BorderThickness="2"
                     DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropRightCommand}">
+                <Border.Styles>
+                    <Style Selector="Border">
+                        <Setter Property="Background" Value="#FF141C28"/>
+                        <Setter Property="BorderBrush" Value="#003BE27A"/>
+                        <PropertyTrigger Property="DragDrop.IsDragOver" Value="True">
+                            <Setter Property="Background" Value="#FF16241C"/>
+                            <Setter Property="BorderBrush" Value="#FF3BE27A"/>
+                        </PropertyTrigger>
+                    </Style>
+                </Border.Styles>
                 <StackPanel Orientation="Vertical">
                     <TextBlock Text="Animals" Foreground="#FF40C0E0" MarginBottom="10"/>
                     <ListBox ItemsSource="{Binding Right}" SelectedItems="{Binding RightSelection}"

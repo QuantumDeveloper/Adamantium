@@ -3,8 +3,10 @@ using System.Linq;
 using Adamantium.Core.Commands;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.Adorners;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
+using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Media.Imaging;
 using Adamantium.UI.Core.Rendering;
 using Adamantium.UI.Core.RoutedEvents;
@@ -38,6 +40,15 @@ public static class DragDrop
     public static readonly AdamantiumProperty DropCommandProperty = AdamantiumProperty.RegisterAttached(
         "DropCommand", typeof(ICommand), typeof(AdamantiumComponent), new PropertyMetadata(null));
 
+    // Live drag feedback (set by the engine as the cursor moves over a drag): IsDragOver is true on the AllowDrop target
+    // currently under the cursor - drive a highlight off it with a trigger. DragOverCommand fires on that target every move
+    // so a view-model can decide "can THIS payload land here right now" (and later adjust the cursor).
+    public static readonly AdamantiumProperty IsDragOverProperty = AdamantiumProperty.RegisterAttached(
+        "IsDragOver", typeof(bool), typeof(AdamantiumComponent), new PropertyMetadata(false));
+
+    public static readonly AdamantiumProperty DragOverCommandProperty = AdamantiumProperty.RegisterAttached(
+        "DragOverCommand", typeof(ICommand), typeof(AdamantiumComponent), new PropertyMetadata(null));
+
     // Source-side lifecycle. The target ADDS the item to its collection; the SOURCE removes it - on a Move only - from the
     // collection it came from. That split is the only thing that works cross-window / cross-view-model (the target can't
     // touch a collection it doesn't own). DragStarted lets the source record WHERE the item came from before any target
@@ -60,6 +71,12 @@ public static class DragDrop
     public static ICommand GetDropCommand(AdamantiumComponent e) => e.GetValue(DropCommandProperty) as ICommand;
     public static void SetDropCommand(AdamantiumComponent e, ICommand value) => e.SetValue(DropCommandProperty, value);
 
+    public static bool GetIsDragOver(AdamantiumComponent e) => e.GetValue<bool>(IsDragOverProperty);
+    public static void SetIsDragOver(AdamantiumComponent e, bool value) => e.SetValue(IsDragOverProperty, value);
+
+    public static ICommand GetDragOverCommand(AdamantiumComponent e) => e.GetValue(DragOverCommandProperty) as ICommand;
+    public static void SetDragOverCommand(AdamantiumComponent e, ICommand value) => e.SetValue(DragOverCommandProperty, value);
+
     public static ICommand GetDragStartedCommand(AdamantiumComponent e) => e.GetValue(DragStartedCommandProperty) as ICommand;
     public static void SetDragStartedCommand(AdamantiumComponent e, ICommand value) => e.SetValue(DragStartedCommandProperty, value);
 
@@ -78,6 +95,16 @@ public static class DragDrop
     // Multi-item ghost: one snapshot per selected element, composited into a stack once they've all arrived.
     private static (byte[] bgra, int w, int h)[] _ghostParts;
     private static int _ghostPending;
+
+    // The AllowDrop target currently under the cursor (live drag-over feedback).
+    private static IUIComponent _currentTarget;
+
+    // The insertion line: which items host, where the line sits, and the resulting insert index handed to the drop.
+    private static DropInsertionAdorner _indicator;
+    private static AdornerLayer _indicatorLayer;
+    private static ListBox _indicatorList;
+    private static double _indicatorY = double.NaN;
+    private static int _insertIndex = -1;
 
     private static IVisualRenderer _renderer;
     private static IDragGhost _ghost;
@@ -110,6 +137,154 @@ public static class DragDrop
             BeginDrag();
         }
         ShowOrMoveGhost();
+        UpdateDragOver();
+    }
+
+    // Live feedback, every move: which AllowDrop target is under the cursor (across windows), highlight it via IsDragOver,
+    // fire its DragOverCommand, and auto-scroll a scroll area the cursor is near the edge of.
+    private static void UpdateDragOver()
+    {
+        var screen = Mouse.ScreenCoordinates;
+        IUIComponent target = null;
+        IWindow window = null;
+        IUIComponent hit = null;
+        if (WindowUnderCursor(screen) is { } w && w is IUIComponent root)
+        {
+            window = w;
+            hit = root.HitTest(window.PointToClient(screen)) as IUIComponent;
+            AutoScroll(hit);
+            target = FindAllowDropAncestor(hit);
+        }
+
+        if (!ReferenceEquals(target, _currentTarget))
+        {
+            if (_currentTarget != null) SetIsDragOver((AdamantiumComponent)_currentTarget, false);
+            _currentTarget = target;
+            if (_currentTarget != null) SetIsDragOver((AdamantiumComponent)_currentTarget, true);
+        }
+
+        UpdateInsertionIndicator(target != null ? window : null, hit);
+
+        if (target != null && GetDragOverCommand((AdamantiumComponent)target) is { } over)
+        {
+            var args = new DragDropEventArgs(_data, _source, Mouse.GetPosition((IInputComponent)target));
+            if (over.CanExecute(args)) over.Execute(args);
+        }
+    }
+
+    // The insertion line: over an AllowDrop items host, show a bar at the position an item would land and remember that
+    // index for the drop. Recreated (not mutated) when the list or line moves - a fresh adorner renders immediately.
+    private static void UpdateInsertionIndicator(IWindow window, IUIComponent hit)
+    {
+        ListBox list = null;
+        for (var c = hit; c != null; c = c.VisualParent)
+        {
+            if (c is ListBox lb) { list = lb; break; }
+        }
+
+        if (list == null || window is not IAdornerHost host)
+        {
+            ClearIndicator();
+            return;
+        }
+
+        var index = ComputeInsertIndex(list, hit, out var lineY);
+        _insertIndex = index;
+
+        if (ReferenceEquals(list, _indicatorList) && ReferenceEquals(host.AdornerLayer, _indicatorLayer) && lineY == _indicatorY && _indicator != null)
+        {
+            return;   // nothing moved
+        }
+
+        ClearIndicator();
+        _indicatorList = list;
+        _indicatorLayer = host.AdornerLayer;
+        _indicatorY = lineY;
+        _indicator = new DropInsertionAdorner(list, lineY) { Stroke = InsertionBrush() };
+        _indicatorLayer.Add(_indicator);
+    }
+
+    // The insertion caret's colour, from the active theme (the accent) so it matches the app - not a hard-coded hue.
+    private static Brush InsertionBrush()
+    {
+        if (UIApplication.Current?.ThemeManager?.CurrentTheme is { } theme &&
+            theme.TryGetResource("AccentFillColorDefault", out var value) && value is Brush brush)
+        {
+            return brush;
+        }
+        return new SolidColorBrush(Colors.DodgerBlue);
+    }
+
+    // Insert index + the line's Y (in the LIST's local coords) for the cursor: before/after the item under it by its
+    // mid-line; an empty area (or below all items) appends at the bottom of the last item.
+    private static int ComputeInsertIndex(ListBox list, IUIComponent hit, out double lineY)
+    {
+        var pList = Mouse.GetPosition((IInputComponent)list);
+
+        ListBoxItem container = null;
+        for (var c = hit; c != null && !ReferenceEquals(c, list); c = c.VisualParent)
+        {
+            if (c is ListBoxItem li) { container = li; break; }
+        }
+
+        if (container != null)
+        {
+            var index = list.ItemContainerGenerator.IndexFromContainer(container);
+            var pItem = Mouse.GetPosition((IInputComponent)container);
+            var top = pList.Y - pItem.Y;                 // the item's top in list coords (a pure coordinate transform)
+            var itemHeight = container.RenderSize.Height;
+            var below = pItem.Y > itemHeight / 2.0;
+            lineY = top + (below ? itemHeight : 0);
+            return index + (below ? 1 : 0);
+        }
+
+        // No item under the cursor: append. Put the line at the bottom of the last realised item, or the top if empty.
+        var count = list.Items?.Count ?? 0;
+        if (count > 0 && list.ItemContainerGenerator.ContainerFromIndex(count - 1) is { } lastC)
+        {
+            var pLast = Mouse.GetPosition((IInputComponent)lastC);
+            lineY = (pList.Y - pLast.Y) + lastC.RenderSize.Height;
+        }
+        else
+        {
+            lineY = 0;
+        }
+        return count;
+    }
+
+    private static void ClearIndicator()
+    {
+        if (_indicator != null) _indicatorLayer?.Remove(_indicator);
+        _indicator = null;
+        _indicatorLayer = null;
+        _indicatorList = null;
+        _indicatorY = double.NaN;
+        _insertIndex = -1;
+    }
+
+    private static IUIComponent FindAllowDropAncestor(IUIComponent hit)
+    {
+        for (var c = hit; c != null; c = c.VisualParent)
+        {
+            if (GetAllowDrop((AdamantiumComponent)c)) return c;
+        }
+        return null;
+    }
+
+    // Scroll the nearest ScrollViewer when the cursor is within an edge band of it. Fires per move; holding still at the
+    // edge waits for the next move (continuous hold-to-scroll would need a timer - a later refinement).
+    private static void AutoScroll(IUIComponent hit)
+    {
+        for (var c = hit; c != null; c = c.VisualParent)
+        {
+            if (c is not ScrollViewer sv) continue;
+            var local = Mouse.GetPosition((IInputComponent)sv);
+            var height = sv.RenderSize.Height;
+            const double band = 28, step = 20;
+            double dy = local.Y < band ? -step : local.Y > height - band ? step : 0;
+            if (dy != 0) sv.SetScrollOffset(sv.ScrollOffset + new Vector2(0, dy));
+            return;
+        }
     }
 
     private static void BeginDrag()
@@ -230,7 +405,8 @@ public static class DragDrop
         var target = HitTestDropTarget(out var positionInTarget);
         var args = new DragDropEventArgs(_data, _source, positionInTarget)
         {
-            Effects = target != null ? (ctrl ? DragDropEffects.Copy : DragDropEffects.Move) : DragDropEffects.None
+            Effects = target != null ? (ctrl ? DragDropEffects.Copy : DragDropEffects.Move) : DragDropEffects.None,
+            InsertIndex = _insertIndex   // where the insertion line was; -1 if not over an items host
         };
 
         // Order matters: the SOURCE removes (on Move) FIRST, then the TARGET adds. Dropping back into the SAME collection
@@ -258,16 +434,9 @@ public static class DragDrop
         if (WindowUnderCursor(screen) is not { } window || window is not IUIComponent root) return null;
 
         var pointInRoot = window.PointToClient(screen);   // physical screen -> logical client coords (DPI-scaled)
-        var hit = root.HitTest(pointInRoot) as IUIComponent;
-        for (var c = hit; c != null; c = c.VisualParent)
-        {
-            if (GetAllowDrop((AdamantiumComponent)c))
-            {
-                positionInTarget = pointInRoot;   // in the target window's client space (element-relative is a later nicety)
-                return c;
-            }
-        }
-        return null;
+        var target = FindAllowDropAncestor(root.HitTest(pointInRoot) as IUIComponent);
+        positionInTarget = pointInRoot;   // in the target window's client space (element-relative is a later nicety)
+        return target;
     }
 
     // The app window whose client area the physical-screen cursor is over. Iterates UIApplication.Windows; the ghost is a
@@ -288,6 +457,9 @@ public static class DragDrop
     private static void Reset()
     {
         if (_dragging && ReferenceEquals(Mouse.Captured, _source)) Mouse.Capture(null);
+        if (_currentTarget != null) SetIsDragOver((AdamantiumComponent)_currentTarget, false);
+        _currentTarget = null;
+        ClearIndicator();
         _source = null;
         _data = null;
         _dragging = false;

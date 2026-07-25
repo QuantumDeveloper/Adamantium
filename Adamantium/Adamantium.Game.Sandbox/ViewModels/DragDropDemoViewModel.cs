@@ -63,9 +63,13 @@ public partial class DragDropDemoViewModel : TabPageViewModel
     private static void Add(object arg, ObservableCollection<string> target)
     {
         if (arg is not DragDropEventArgs e) return;
+        // Insert at the position the insertion line showed (clamped); -1 = append.
+        var at = e.InsertIndex >= 0 && e.InsertIndex <= target.Count ? e.InsertIndex : target.Count;
         foreach (var item in ItemsOf(e))
         {
-            if (!target.Contains(item)) target.Add(item);
+            if (target.Contains(item)) continue;
+            target.Insert(at > target.Count ? target.Count : at, item);
+            at++;
         }
     }
 
