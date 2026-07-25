@@ -1,4 +1,6 @@
 using System;
+using Adamantium.Graphics;
+using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.EffectsFramework;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
@@ -20,6 +22,15 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
     public PatternRectCollector() : base(512) { }
 
     protected override IEffectPass DrawPass => Effect.BatchPatternPass;
+
+    // Feed the shared noise-flow clock to the shader before drawing (an animated NoiseBrush reads Time to orbit its Worley
+    // feature points; a static pattern/noise ignores it). NoiseClock advances only while an animating noise brush is live,
+    // so Time is 0 otherwise. Same hook the fractal pass uses.
+    protected override void DrawSegment(IGraphicsDevice device, Buffer<PatternRectItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
+    {
+        Effect.Time.SetValue((float)NoiseClock.Time);
+        base.DrawSegment(device, buffer, count, firstInstance, projection);
+    }
 
     // Batchable = a PROCEDURAL fill (PatternBrush or NoiseBrush - both bake into this pass), a batchable pen (none or a
     // solid stroke the SDF shader draws), and uniform corner radius. Mirrors GradientRectCollector.CanBatch.
@@ -74,6 +85,7 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
         int type;
         Color color1;
         Color color2;
+        var midColor = new Color(0, 0, 0, 0);   // gradient-map MID colour (NoiseBrush only); transparent = off
         double cell;
         double brushOpacity;
         var noise = Vector4F.Zero;
@@ -88,12 +100,21 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
         }
         else if (p.Brush is NoiseBrush n)
         {
-            type = 4;   // shader contract: PatternMix type 4 = FBM noise
+            // shader contract: PatternMix type 4 = simplex FBM; 7/8/9 = perlin/value/worley FBM (same noise record)
+            type = n.NoiseType == NoiseType.Simplex ? 4 : 6 + (int)n.NoiseType;
             color1 = n.Color1;
             color2 = n.Color2;
+            midColor = n.MidColor;
             cell = n.Scale;
             brushOpacity = n.Opacity;
-            noise = new Vector4F(n.Octaves, (float)n.Seed, (float)n.Lacunarity, (float)n.Gain);
+            // Animate flag packed into the SIGN of octaves (no spare slot): negative = advance by the shared Time.
+            var octEnc = n.Animate ? -(float)Math.Max(1, n.Octaves) : n.Octaves;
+            noise = new Vector4F(octEnc, (float)n.Seed, (float)n.Lacunarity, (float)n.Gain);
+            // CombustibleVoronoi ignores lacunarity/gain, so reuse .w as the palette flag (1 = fire, 0 = the brush's own ramp).
+            if (n.NoiseType == NoiseType.CombustibleVoronoi)
+            {
+                noise.W = n.UseFirePalette ? 1f : 0f;
+            }
         }
         else
         {
@@ -107,6 +128,8 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
         c1.W *= alpha;
         var c2 = color2.ToVector4();
         c2.W *= alpha;
+        var c3 = midColor.ToVector4();
+        c3.W *= alpha;
 
         RectBatchCollector.BakeStroke(p.Pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1);
 
@@ -120,7 +143,8 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
             StrokeColor = strokeColor,
             Stroke0 = stroke0,
             Stroke1 = stroke1,
-            Noise = noise
+            Noise = noise,
+            Color3 = c3
         };
         return true;
     }
