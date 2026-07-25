@@ -1,0 +1,8 @@
+<Window x:Namespace="Adamantium.Game.Sandbox"
+        xmlns="http://adamantium/ui"
+        xmlns:x="http://adamantium/ui/xaml/extensions"
+        x:CreateInDesignTime="False"
+        Title="Drag &amp; Drop Window"
+        Width="360"
+        Height="480">
+</Window>

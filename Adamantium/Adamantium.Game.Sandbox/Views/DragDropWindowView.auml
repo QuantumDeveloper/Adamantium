@@ -1,0 +1,24 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions">
+    <Border Background="#FF141C28" CornerRadius="8" Padding="12" Margin="16"
+            DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropCommand}">
+        <StackPanel Orientation="Vertical">
+            <TextBlock Text="Wildlife" Foreground="#FF3BE27A" MarginBottom="4"/>
+            <TextBlock Text="Drag items to/from the main window's lists." FontSize="12"
+                       Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="10"/>
+            <ListBox ItemsSource="{Binding Items}" SelectedItems="{Binding Selection}"
+                     SelectionMode="Extended" Background="Transparent">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="#FF2E3B4E" CornerRadius="6" Padding="10" MarginBottom="6"
+                                DragDrop.AllowDrag="True" DragDrop.DragData="{Binding}"
+                                DragDrop.DragStartedCommand="{Ancestor ItemsControl, DataContext.DragStartedCommand}"
+                                DragDrop.DragCompletedCommand="{Ancestor ItemsControl, DataContext.DragCompletedCommand}">
+                            <TextBlock Text="{Binding}" Foreground="#FFFFFFFF"/>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </StackPanel>
+    </Border>
+</View>

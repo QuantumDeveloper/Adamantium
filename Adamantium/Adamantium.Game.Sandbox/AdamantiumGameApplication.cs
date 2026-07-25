@@ -13,6 +13,8 @@ public class AdamantiumGameApplication : GameApplication
         base.RegisterServices(containerRegistry);
         // Register the app's own window shell under "workspace"; the Workspace command opens the second window in it.
         Container.Resolve<IWindowShellRegistry>().Register<WorkspaceWindow>("workspace");
+        // A dedicated shell for the drag-drop cross-window demo, so items can be dragged between it and the main window.
+        Container.Resolve<IWindowShellRegistry>().Register<DragDropWindow>("dragdrop");
         // Shared demo setting (single instance) so the title-bar command and the Navigation-tab toggle see the same flag.
         containerRegistry.RegisterInstance<ViewModels.WindowDemoSettings>(new ViewModels.WindowDemoSettings());
     }

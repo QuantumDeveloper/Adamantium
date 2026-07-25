@@ -55,6 +55,9 @@ public sealed class WindowNavigationBackend : IWindowNavigationBackend
                 shell.Content = _viewLocator.ResolveView(contentViewModel);   // load the chosen content into the live shell
             window.Show();   // the window activates itself on first display (Window.Show); no explicit Activate needed here
             _windows[contentViewModel] = window;
+            // Untrack on close (including the OS title-bar X, which never routes through CloseWindow) - otherwise a stale
+            // entry makes a single-instance re-open just "activate" a dead window instead of opening a fresh one.
+            window.Closed += (_, _) => _windows.Remove(contentViewModel);
             created = window;
         });
         return created;
