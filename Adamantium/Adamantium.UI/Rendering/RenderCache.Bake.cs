@@ -62,7 +62,10 @@ public partial class RenderCache
     /// <summary>Builds units from a FLAT list of components (the adorner stage), not a tree walk. Components cache by
     /// RenderId as in the tree build; units of components no longer in the list are disposed. For overlays outside the
     /// content tree.</summary>
-    public void BuildFromComponents(IReadOnlyList<IUIComponent> components, Matrix4x4F projectionMatrix)
+    // readOnly: emit each component's commands via RenderReadOnly (no IsGeometryValid touch / no RenderDirty mark) instead
+    // of Render() - for snapshotting a LIVE, already-valid subtree through this parallel cache without disturbing the
+    // window (whose loop a mark would wake into a concurrent, hanging render). Adorners (the default) pass false.
+    public void BuildFromComponents(IReadOnlyList<IUIComponent> components, Matrix4x4F projectionMatrix, bool readOnly = false)
     {
         // A FULL rebuild every call. Must record LastBuildKind=Full: the batches' Clean-frame upload-skip reads it, else
         // the overlay batch skips every GPU upload - its SSBO never fills and the whole overlay renders nothing.
@@ -93,8 +96,11 @@ public partial class RenderCache
 
                 var wasGeometryValid = component.IsGeometryValid;
                 _drawingContextInternal.Clear();
-                component.Render(_drawingContext);
-                ProcessRenderCommands(component, _drawingContextInternal.GetDrawCommands(), projectionMatrix, wasGeometryValid, order);
+                if (readOnly) 
+                    component.RenderReadOnly(_drawingContext); 
+                else 
+                    component.Render(_drawingContext);
+                ProcessRenderCommands(component, _drawingContextInternal.GetDrawCommands(), projectionMatrix, !readOnly && wasGeometryValid, order);
                 order += OrderGap;   // the flat list IS the paint order
             }
         }
@@ -261,6 +267,23 @@ public partial class RenderCache
         m = s.RenderParent != null ? s.LocalTransform * World(s.RenderParent) : s.LocalTransform;
         _worldCache[c] = m;
         return m;
+    }
+
+    /// <summary>Rebase the snapshot so <paramref name="element"/> sits at the ORIGIN: freeze it with an IDENTITY local
+    /// transform and NO render parent, so <see cref="World"/> stops there and every descendant composes RELATIVE to it. For
+    /// an off-screen snapshot of a LIVE element into an element-sized target (projection 0,0..size): the geometry AND the
+    /// per-unit clip scissors then share that same 0-based space. Without it, World() runs on up to the window root, so the
+    /// scissors stay in absolute window coords and <see cref="ToFramebufferScissor"/> clamps the whole subtree to the
+    /// target's edge. Call AFTER BuildFromComponents, BEFORE ProcessCommands.</summary>
+    public void RebaseToOrigin(IUIComponent element)
+    {
+        if (element == null) return;
+        var s = ApplySnap(element);
+        _applySnap[element] = new LayoutSnapshot(Matrix4x4F.Identity, s.RenderSize, s.ClipToBounds, false, null, s.Opacity, s.SelfOpacity);
+        _worldCache.Clear();    // drop any absolute transforms/clips memoised during the build so ProcessCommands recomputes rebased
+        _relWorldCache.Clear();
+        _clipCache.Clear();
+        _nodeCache.Clear();
     }
 
     // Effective alpha the bake folds into a unit's colour: SelfOpacity x the OPACITY chain (own Opacity x every

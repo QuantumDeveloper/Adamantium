@@ -39,6 +39,50 @@
 
         </StackPanel>
 
+        <!-- ============ LIVE tree snapshot (the drag-ghost path) ============ -->
+        <TextBlock Text="Live tree → Image (parallel-cache render of the on-screen element)"
+                   FontSize="20"
+                   MarginTop="36" MarginBottom="4"/>
+        <TextBlock Text="This snapshots a LIVE, interactive element by rendering its subtree through a SEPARATE render cache - never a second render into the window's cache, so the live render is untouched. Toggle the controls on the left, hit Snapshot, and the bitmap on the right reflects their CURRENT state. This is exactly how the drag ghost captures what you grab."
+                   FontSize="13"
+                   Foreground="{ResourceReference TextFillColorSecondary}"
+                   MaxWidth="720"
+                   HorizontalAlignment="Left"
+                   MarginBottom="18"/>
+
+        <StackPanel Orientation="Horizontal">
+
+            <StackPanel Orientation="Vertical" MarginRight="28">
+                <TextBlock Text="Live, interactive tree" FontSize="14" MarginBottom="8"/>
+                <StackPanel x:Name="liveTree"
+                            Orientation="Vertical"
+                            Background="#FF10151F"
+                            Width="240"
+                            HorizontalAlignment="Left">
+                    <TextBlock Text="I am a LIVE tree" Foreground="#FFF2C14E" FontSize="16" Margin="16,14,16,10"/>
+                    <CheckBox Content="Toggle me" IsChecked="True" Margin="16,0,16,10"/>
+                    <ToggleSwitch IsChecked="True" Margin="16,0,16,10"/>
+                    <ProgressBar Value="65" Width="200" Margin="16,0,16,16"/>
+                </StackPanel>
+                <Button Content="Snapshot live tree"
+                        Command="{Binding SnapshotLiveCommand}"
+                        CommandParameter="{Binding ElementName=liveTree}"
+                        Width="170" Height="34"
+                        MarginTop="12"
+                        HorizontalAlignment="Left"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Vertical">
+                <TextBlock Text="Snapshot (1:1)" FontSize="14" MarginBottom="8"/>
+                <Border BorderBrush="#40FFFFFF" BorderThickness="1" Padding="1"
+                        MinWidth="242" MinHeight="120"
+                        HorizontalAlignment="Left" VerticalAlignment="Top">
+                    <Image Source="{Binding LiveSnapshot}" Stretch="None"/>
+                </Border>
+            </StackPanel>
+
+        </StackPanel>
+
     </StackPanel>
     </ScrollViewer>
 </View>

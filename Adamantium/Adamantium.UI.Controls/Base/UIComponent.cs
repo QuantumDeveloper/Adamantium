@@ -366,11 +366,18 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     public void Render(IDrawingContext context)
     {
         if (IsGeometryValid) return;
-        
+
         OnRender(context);
         IsGeometryValid = true;
         OnRenderCompleted();
     }
+
+    // Emit this element's draw commands into a context WITHOUT touching IsGeometryValid (so no RenderDirty mark, no loop
+    // wake) and WITHOUT the clean-frame gate. For an OFF-SCREEN snapshot of a LIVE (already-valid) element through a
+    // parallel render cache: the ordinary Render() would no-op on a valid element, and forcing it via InvalidateRender
+    // would mark the global RenderDirty and wake the window loop into a concurrent render (a hang). This just replays
+    // OnRender read-only - the element's own render state is untouched, so the window never notices.
+    public void RenderReadOnly(IDrawingContext context) => OnRender(context);
 
     public event EventHandler<VisualTreeAttachmentEventArgs> AttachedToVisualTreeEvent;
     public event EventHandler<VisualTreeAttachmentEventArgs> DetachedFromVisualTreeEvent;

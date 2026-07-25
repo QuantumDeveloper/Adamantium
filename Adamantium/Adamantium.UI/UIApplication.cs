@@ -346,6 +346,7 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         EntityWorld.Initialize();
         OnInitialize();
         RegisterServices(Container);
+        _visualRenderer = Container.Resolve<IVisualRenderer>();   // the DI singleton; its render device is created lazily, on first snapshot
         IsInitialized = true;
         
         if (MainWindow != null)
@@ -589,6 +590,11 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
 
     private long _loopFrameStart;
 
+    // The off-screen visual renderer (drag-drop ghost, live snapshots, VisualBrush bakes). Resolved once from the container
+    // after service registration; its two queue drains are pumped from the frame loop below - RECORD on the loop thread,
+    // DRAW on the render thread (see VisualRenderer for why the halves split across the two threads).
+    private IVisualRenderer _visualRenderer;
+
     // The loop is BOTH paced and event-driven, and it needs both.
     //
     // PACE first: never run more often than UpdateRateHz. Waking on the pipe alone is not enough, because the loop feeds the
@@ -617,6 +623,12 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
 
     private void OnCycleFinishedInternal()
     {
+        // Live off-screen snapshots, stage 1 (RECORD): read the live subtree and build its cache HERE, on the loop thread,
+        // once the frame is fully settled - Update, Record and the render Dispatch are all done, so the live tree is
+        // quiescent and the render thread is consuming recorded packets, never the live components a read-only record walks.
+        // Device-free; the GPU draw is stage 2, on the render thread (see ExecuteDrawSequence). A no-op when nothing pending.
+        _visualRenderer?.RecordPendingSnapshots();
+
         CheckExitConditions();
         if (GraphicsDeviceService.DeviceUpdateNeeded)
         {
@@ -683,6 +695,13 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
                 RuntimeStats.PresentedFrames++;   // the honest frame rate once the render runs on its own thread
             }
         }
+
+        // Live off-screen snapshots, stage 2 (DRAW): the GPU half. This runs on whichever thread owns the device this frame -
+        // the render thread when threaded (under _renderGate), the loop thread inline - right after the window's own frame,
+        // so the shared VkDevice is never touched by two threads at once. The record (stage 1) already built the cache off
+        // the device on the loop thread; here we only submit + read back. A no-op when nothing pending.
+        _visualRenderer?.DrawPendingSnapshots();
+
         return drew;
     }
 
