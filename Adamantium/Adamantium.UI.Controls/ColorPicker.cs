@@ -304,6 +304,16 @@ public class ColorPicker : Control
     // hue there), so the hue thumb doesn't jump to red as the value/saturation is dragged to an edge.
     private void ApplyColor(Color color)
     {
+        // If the incoming colour is exactly what our current HSV already produces, this is the round-trip of our OWN commit
+        // (SelectedColor -> here), not an external set - so KEEP the HSV state. Re-deriving HSV from RGB loses information the
+        // RGB can't carry and makes the thumb jump AT THE EDGES: saturation is undefined at value 0 (a black bottom row) so
+        // it collapses to 0 (the SV thumb darts left/jitters), and hue 360 == hue 0 in RGB so the hue thumb snaps to the top.
+        var current = HsvToColor(_hue, _sat, _val, _alpha);
+        if (color.R == current.R && color.G == current.G && color.B == current.B && color.A == current.A)
+        {
+            return;
+        }
+
         _alpha = color.A / 255.0;
         RgbToHsv(color, out var h, out var s, out var v);
         _val = v;
