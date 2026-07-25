@@ -39,7 +39,15 @@ public class MouseDevice
     {
         // A null component releases the current capture. Routing (MouseMove/MouseDown/MouseUp) honours Captured, so a
         // control that captures on press keeps receiving move/up even when the pointer leaves it.
+        var previous = Captured;
+        if (ReferenceEquals(previous, component)) return component != null;
         Captured = component;
+
+        // Raise Lost/GotMouseCapture so a captured control learns its capture went away - whether we released it or the OS
+        // revoked it (WM_CAPTURECHANGED: another app, a screenshot overlay, Alt-Tab). Without this a drag that relied on
+        // capture could hang forever when capture was yanked from under it.
+        previous?.RaiseEvent(new MouseEventArgs(this, InputModifiers.None, 0) { RoutedEvent = Mouse.LostMouseCaptureEvent });
+        component?.RaiseEvent(new MouseEventArgs(this, InputModifiers.None, 0) { RoutedEvent = Mouse.GotMouseCaptureEvent });
         return component != null;
     }
 

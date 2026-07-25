@@ -7,7 +7,10 @@
                    FontSize="13"
                    Foreground="{ResourceReference TextFillColorSecondary}"
                    MaxWidth="760"
-                   MarginBottom="18"/>
+                   MarginBottom="12"/>
+
+        <Button Content="Open drop window (cross-window test)" Command="{Binding OpenDropWindowCommand}"
+                Width="280" Height="32" HorizontalAlignment="Left" MarginBottom="18"/>
 
         <StackPanel Orientation="Horizontal">
 
@@ -15,16 +18,19 @@
                     DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropLeftCommand}">
                 <StackPanel Orientation="Vertical">
                     <TextBlock Text="Fruits" Foreground="#FFE0B040" MarginBottom="10"/>
-                    <ItemsControl ItemsSource="{Binding Left}">
-                        <ItemsControl.ItemTemplate>
+                    <ListBox ItemsSource="{Binding Left}" SelectedItems="{Binding LeftSelection}"
+                             SelectionMode="Extended" Background="Transparent" MaxHeight="240">
+                        <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Border Background="#FF2E3B4E" CornerRadius="6" Padding="10" MarginBottom="6"
-                                        DragDrop.AllowDrag="True" DragDrop.DragData="{Binding}">
+                                        DragDrop.AllowDrag="True" DragDrop.DragData="{Binding}"
+                                        DragDrop.DragStartedCommand="{Ancestor ItemsControl, DataContext.DragStartedCommand}"
+                                        DragDrop.DragCompletedCommand="{Ancestor ItemsControl, DataContext.DragCompletedCommand}">
                                     <TextBlock Text="{Binding}" Foreground="#FFFFFFFF"/>
                                 </Border>
                             </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                 </StackPanel>
             </Border>
 
@@ -32,16 +38,19 @@
                     DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropRightCommand}">
                 <StackPanel Orientation="Vertical">
                     <TextBlock Text="Animals" Foreground="#FF40C0E0" MarginBottom="10"/>
-                    <ItemsControl ItemsSource="{Binding Right}">
-                        <ItemsControl.ItemTemplate>
+                    <ListBox ItemsSource="{Binding Right}" SelectedItems="{Binding RightSelection}"
+                             SelectionMode="Extended" Background="Transparent" MaxHeight="240">
+                        <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Border Background="#FF2E3B4E" CornerRadius="6" Padding="10" MarginBottom="6"
-                                        DragDrop.AllowDrag="True" DragDrop.DragData="{Binding}">
+                                        DragDrop.AllowDrag="True" DragDrop.DragData="{Binding}"
+                                        DragDrop.DragStartedCommand="{Ancestor ItemsControl, DataContext.DragStartedCommand}"
+                                        DragDrop.DragCompletedCommand="{Ancestor ItemsControl, DataContext.DragCompletedCommand}">
                                     <TextBlock Text="{Binding}" Foreground="#FFFFFFFF"/>
                                 </Border>
                             </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
                 </StackPanel>
             </Border>
 

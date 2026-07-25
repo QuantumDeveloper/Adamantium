@@ -121,6 +121,14 @@ public class ListBoxItem : ContentControl, ISelectable
         set => SetValue(ForegroundSelectedProperty, value);
     }
 
+    // Multi-select drag support: a plain click on an ALREADY-selected item defers the selection COLLAPSE until mouse-up, so
+    // the whole selection survives long enough to be dragged. If the pointer moves first (a drag begins) the collapse is
+    // cancelled and the selection is kept; a release without moving applies it (the ordinary "click picks just this one").
+    private bool _deferSelect;
+    private Vector2 _downPoint;
+
+    private ListBox OwnerListBox => this.GetVisualAncestors().OfType<ListBox>().FirstOrDefault();
+
     protected override void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonDown(sender, e);
@@ -128,11 +136,30 @@ public class ListBoxItem : ContentControl, ISelectable
         e.Handled = true;
         Focus();
         IsPressed = true;
-        // Select on press (WPF semantics). Reach the owner by walking up - works for both generated containers and a
-        // ListBoxItem authored directly in markup (an "item is its own container"), without a back-reference to maintain.
-        // Use the modifiers carried BY THE EVENT (captured on the OS message thread when it was raised) - input handlers
-        // run later on the loop thread, so re-reading Keyboard.Modifiers there misses the Ctrl/Shift that was held.
-        this.GetVisualAncestors().OfType<ListBox>().FirstOrDefault()?.SelectFromContainer(this, e.Modifiers);
+
+        // Reach the owner by walking up - works for both generated containers and a ListBoxItem authored directly in markup
+        // (an "item is its own container"), without a back-reference to maintain. Use the modifiers carried BY THE EVENT
+        // (captured on the OS message thread when it was raised) - input handlers run later on the loop thread, so re-reading
+        // Keyboard.Modifiers there misses the Ctrl/Shift that was held.
+        var owner = OwnerListBox;
+        var plain = (e.Modifiers & (InputModifiers.LeftControl | InputModifiers.RightControl |
+                                    InputModifiers.LeftShift | InputModifiers.RightShift)) == 0;
+        if (owner != null && plain && IsSelected &&
+            owner.SelectionMode is SelectionMode.Extended or SelectionMode.Multiple)
+        {
+            _deferSelect = true;
+            _downPoint = e.GetPosition(owner);
+            return;
+        }
+        owner?.SelectFromContainer(this, e.Modifiers);
+    }
+
+    protected override void OnMouseMove(object sender, MouseEventArgs e)
+    {
+        base.OnMouseMove(sender, e);
+        if (!_deferSelect) return;
+        var owner = OwnerListBox;
+        if (owner != null && (e.GetPosition(owner) - _downPoint).Length() > 4.0) _deferSelect = false;   // it's a drag - keep the selection
     }
 
     protected override void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -140,6 +167,11 @@ public class ListBoxItem : ContentControl, ISelectable
         base.OnMouseLeftButtonUp(sender, e);
         e.Handled = true;
         IsPressed = false;
+        if (_deferSelect)   // released without dragging -> apply the deferred collapse now
+        {
+            _deferSelect = false;
+            OwnerListBox?.SelectFromContainer(this, e.Modifiers);
+        }
     }
 
     protected override void OnMouseLeave(MouseEventArgs e)
