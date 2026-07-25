@@ -159,6 +159,15 @@ public class ColorWheel : Control
     // doesn't snap as saturation is dragged to the centre.
     private void ApplyColor(Color color)
     {
+        // If the incoming colour is exactly what our current HSV already produces, this is the round-trip of our OWN commit
+        // (SelectedColor -> here), not an external set - KEEP the HSV state. Re-deriving from RGB loses info the RGB can't
+        // carry (saturation is undefined at value 0 -> collapses to 0), which snapped the thumb from the rim to the centre.
+        var current = HsvToColor(_hue, _sat, _val, _alpha);
+        if (color.R == current.R && color.G == current.G && color.B == current.B && color.A == current.A)
+        {
+            return;
+        }
+
         _alpha = color.A / 255.0;
         RgbToHsv(color, out var h, out var s, out var v);
         _val = v;
@@ -180,7 +189,8 @@ public class ColorWheel : Control
 
         if (_valueOverlay != null)
         {
-            _valueOverlay.Opacity = 1 - _val;   // dim the whole wheel toward black as value drops
+            _valueOverlay.Opacity = (1 - _val) * 0.7;   // dim toward (but never fully to) black as value drops, so the hue
+                                                         // wheel stays visible/usable even when the picked colour is black
         }
 
         UpdateThumb();
