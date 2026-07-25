@@ -27,4 +27,8 @@ public class DragDropEventArgs
 
     /// <summary>What the target will do with the payload - set by the target; drives the cursor and the source's outcome.</summary>
     public DragDropEffects Effects { get; set; } = DragDropEffects.Move;
+
+    /// <summary>Index in the target's collection where the payload should be inserted (the position the insertion line
+    /// showed), or -1 to append. Set by the engine from the drop position over an items host.</summary>
+    public int InsertIndex { get; set; } = -1;
 }

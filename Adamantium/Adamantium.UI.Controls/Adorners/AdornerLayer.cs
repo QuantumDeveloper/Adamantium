@@ -13,21 +13,32 @@ namespace Adamantium.UI.Controls.Adorners;
 public class AdornerLayer
 {
     private readonly List<Adorner> _selection = [];
+    private readonly List<Adorner> _overlays = [];   // general-purpose adorners (e.g. a drag-drop insertion line)
     private HoverAdorner _hover;
 
-    /// <summary>All active adorners (selection frames + the optional hover frame) as one flat list for the renderer.
-    /// Selection first, hover last so the transient hover sits over a persistent selection.</summary>
+    /// <summary>All active adorners (selection frames + general overlays + the optional hover frame) as one flat list for
+    /// the renderer. Selection first, overlays next, hover last so the transient hover sits on top.</summary>
     public IReadOnlyList<Adorner> Adorners
     {
         get
         {
-            if (_hover == null) return _selection;
-            var all = new List<Adorner>(_selection.Count + 1);
+            if (_overlays.Count == 0 && _hover == null) return _selection;
+            var all = new List<Adorner>(_selection.Count + _overlays.Count + 1);
             all.AddRange(_selection);
-            all.Add(_hover);
+            all.AddRange(_overlays);
+            if (_hover != null) all.Add(_hover);
             return all;
         }
     }
+
+    /// <summary>Add a general overlay adorner (rendered on top of the content). Idempotent.</summary>
+    public void Add(Adorner adorner)
+    {
+        if (adorner != null && !_overlays.Contains(adorner)) _overlays.Add(adorner);
+    }
+
+    /// <summary>Remove a previously added overlay adorner.</summary>
+    public void Remove(Adorner adorner) => _overlays.Remove(adorner);
 
     /// <summary>Replaces the persistent selection with one frame per element (the designer calls this on click).
     /// Null/empty clears the selection.</summary>
