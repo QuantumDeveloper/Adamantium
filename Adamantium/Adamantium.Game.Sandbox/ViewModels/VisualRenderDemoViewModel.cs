@@ -1,5 +1,6 @@
 using Adamantium.MVVM;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media.Imaging;
 using Adamantium.UI.Core.Rendering;
 
@@ -12,10 +13,12 @@ namespace Adamantium.Game.Sandbox.ViewModels;
 public partial class VisualRenderDemoViewModel : TabPageViewModel
 {
     private readonly IVisualRenderer _renderer;
+    private readonly IDragGhost _ghost;
 
-    public VisualRenderDemoViewModel(IVisualRenderer renderer) : base("Visual → Image")
+    public VisualRenderDemoViewModel(IVisualRenderer renderer, IDragGhost ghost) : base("Visual → Image")
     {
         _renderer = renderer;
+        _ghost = ghost;
     }
 
     // A self-contained snippet (explicit colours, no theme resources / fonts) so it renders standalone off-screen. No fixed
@@ -53,4 +56,18 @@ public partial class VisualRenderDemoViewModel : TabPageViewModel
             _renderer.RequestSnapshot(live, img => LiveSnapshot = img);
         }
     }
+
+    // Phase 1 ghost test: float the last live snapshot as a real layered top-level window over the whole screen (fixed
+    // position for now; following the cursor is the Phase 2 gesture). Proves the per-pixel-alpha ghost path end to end.
+    [Command]
+    private void ShowGhost()
+    {
+        if (LiveSnapshot is BitmapSource bs)
+        {
+            _ghost.Show(DragGhostPixels.ToPremultipliedBgra(bs), (int)bs.PixelWidth, (int)bs.PixelHeight, 600, 400);
+        }
+    }
+
+    [Command]
+    private void HideGhost() => _ghost.Hide();
 }

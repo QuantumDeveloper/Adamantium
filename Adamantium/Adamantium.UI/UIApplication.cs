@@ -18,6 +18,8 @@ using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media.Animation;
 using Adamantium.UI.Core.Rendering;
+using Adamantium.UI.Core.Input;
+using Adamantium.UI.Platforms.Windows;
 using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.EntityServices;
@@ -391,6 +393,12 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         // VisualBrush/DrawingBrush bakes. An app can register its own before base to win.
         if (!containerRegistry.IsRegistered<IVisualRenderer>())
             containerRegistry.RegisterSingleton<IVisualRenderer, VisualRenderer>();
+
+        // Drag ghost - the floating, click-through, per-pixel-alpha window that follows the cursor during a drag. Platform
+        // impl; Windows = layered window + UpdateLayeredWindow. One reusable ghost (Show/Hide reuse the window).
+        if (!containerRegistry.IsRegistered<IDragGhost>() && OperatingSystem.IsWindows())
+            containerRegistry.RegisterSingleton<IDragGhost, Win32DragGhost>();
+
         RegisterNavigationServices(containerRegistry);
     }
 

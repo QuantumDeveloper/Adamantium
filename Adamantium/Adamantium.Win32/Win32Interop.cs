@@ -392,5 +392,41 @@ namespace Adamantium.Win32
 
         [DllImport("gdi32.dll", EntryPoint = "CreatePen")]
         public static extern IntPtr CreatePen(PenStyle penStyle, int width, uint color);
+
+        /*
+            Layered window (drag ghost): per-pixel-alpha composite done by the OS.
+        */
+
+        public const int ULW_ALPHA = 0x00000002;
+        public const byte AC_SRC_OVER = 0x00;
+        public const byte AC_SRC_ALPHA = 0x01;
+        public const uint BI_RGB = 0;
+        public const uint DIB_RGB_COLORS = 0;
+
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetDC(IntPtr hWnd);
+
+        // Push a 32-bit premultiplied-BGRA bitmap onto a WS_EX_LAYERED window; the DWM composites it with per-pixel alpha.
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool UpdateLayeredWindow(
+            IntPtr hwnd, IntPtr hdcDst,
+            ref NativePoint pptDst, ref NativeSize psize,
+            IntPtr hdcSrc, ref NativePoint pptSrc,
+            uint crKey, ref BLENDFUNCTION pblend, uint dwFlags);
+
+        [DllImport("gdi32.dll", SetLastError = true)]
+        public static extern IntPtr CreateCompatibleDC(IntPtr hdc);
+
+        // 32-bit top-down DIB section; ppvBits points at its pixel buffer (write premultiplied BGRA straight into it).
+        [DllImport("gdi32.dll", SetLastError = true)]
+        public static extern IntPtr CreateDIBSection(
+            IntPtr hdc, ref BITMAPINFOHEADER pbmi, uint usage, out IntPtr ppvBits, IntPtr hSection, uint offset);
+
+        [DllImport("gdi32.dll")]
+        public static extern bool DeleteDC(IntPtr hdc);
+
+        [DllImport("gdi32.dll")]
+        public static extern bool DeleteObject(IntPtr hObject);
     }
 }

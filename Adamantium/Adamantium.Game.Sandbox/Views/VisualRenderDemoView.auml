@@ -70,6 +70,10 @@
                         Width="170" Height="34"
                         MarginTop="12"
                         HorizontalAlignment="Left"/>
+                <StackPanel Orientation="Horizontal" MarginTop="8">
+                    <Button Content="Show ghost" Command="{Binding ShowGhostCommand}" Width="100" Height="30"/>
+                    <Button Content="Hide ghost" Command="{Binding HideGhostCommand}" Width="100" Height="30" MarginLeft="8"/>
+                </StackPanel>
             </StackPanel>
 
             <StackPanel Orientation="Vertical">
