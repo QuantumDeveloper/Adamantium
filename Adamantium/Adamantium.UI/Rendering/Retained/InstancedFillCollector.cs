@@ -45,6 +45,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     private static readonly int VertexStride = Marshal.SizeOf<UIVertex>();
     private static readonly int InstanceStride = Marshal.SizeOf<GeometryInstance>();
     private static readonly int GradInstanceStride = Marshal.SizeOf<GradientGeometryInstance>();
+    private static readonly int PatInstanceStride = Marshal.SizeOf<PatternGeometryInstance>();
 
     // Per-key GPU + per-frame accumulation state. The mesh buffers are immutable once uploaded; the instance buffer is
     // rewritten each frame (grown only at BeginFrame).
@@ -73,6 +74,14 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         public Buffer GradGpu;
         public int GradGpuCapacity;
         public bool GradRecreated;
+
+        // Parallel PATTERN/NOISE instance state for this key's shared mesh (a procedural fill on the same geometry).
+        public PatternGeometryInstance[] PatItems = new PatternGeometryInstance[16];
+        public int PatCount;
+        public int PatFlushed;
+        public Buffer PatGpu;
+        public int PatGpuCapacity;
+        public bool PatRecreated;
     }
 
     private readonly GraphicsDevice _device;
@@ -97,9 +106,10 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     {
         public readonly List<(KeySegment Seg, uint First, uint Count)> Keys = new();
         public readonly List<(KeySegment Seg, uint First, uint Count)> GradKeys = new();
+        public readonly List<(KeySegment Seg, uint First, uint Count)> PatKeys = new();
         public readonly List<IRenderUnit> Units = new();
         public Rect2D Scissor;
-        public void Reset() { Keys.Clear(); GradKeys.Clear(); Units.Clear(); }
+        public void Reset() { Keys.Clear(); GradKeys.Clear(); PatKeys.Clear(); Units.Clear(); }
     }
     private readonly List<FlushRecord> _flushRecords = new();
     private int _flushCount;   // records used this frame (pooled objects reused up to this count)
@@ -162,10 +172,27 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             }
             else seg.GradRecreated = false;
 
+            // Parallel grow/reset for the pattern instance buffer (only when this key has ever held pattern instances).
+            if (seg.PatGpu != null && seg.PatGpuCapacity < seg.PatItems.Length)
+            {
+                seg.PatGpu.Dispose();
+                seg.PatGpu = null;
+            }
+            if (seg.PatGpu == null && seg.MeshUploaded && seg.PatCount > 0)
+            {
+                seg.PatGpu = Buffer.New<PatternGeometryInstance>(_device, (uint)seg.PatItems.Length,
+                    BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+                seg.PatGpuCapacity = seg.PatItems.Length;
+                seg.PatRecreated = true;
+            }
+            else seg.PatRecreated = false;
+
             seg.Count = 0;
             seg.Flushed = 0;
             seg.GradCount = 0;
             seg.GradFlushed = 0;
+            seg.PatCount = 0;
+            seg.PatFlushed = 0;
             seg.InPending = false;
         }
         _pendingKeys.Clear();
@@ -273,6 +300,92 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         return inst;
     }
 
+    public bool CanBatchPattern(GeometryRenderUnit unit) => unit.TryGetInstancedPatternFill(out _, out _, out _, out _, out _);
+
+    /// <summary>Collect one instanceable PATTERN/NOISE fill: append its per-instance world + pattern to its key's pattern
+    /// buffer, and register the unit for a deferred fringe/stroke draw. False if it can't be batched.</summary>
+    public bool TryAddPattern(GeometryRenderUnit unit, Matrix4x4F world, Rect2D scissor, Rect logicalBounds)
+    {
+        if (!unit.TryGetInstancedPatternFill(out var key, out var meshObj, out var brush, out var localBounds, out var opacity)) return false;
+        if (meshObj is not FrozenMesh mesh) return false;
+        var seg = GetOrCreate(key, mesh);
+        if (seg == null) return false;
+
+        if (seg.PatCount + 1 > seg.PatItems.Length) Array.Resize(ref seg.PatItems, seg.PatItems.Length * 2);
+        if (seg.PatGpu == null)
+        {
+            seg.PatGpu = Buffer.New<PatternGeometryInstance>(_device, (uint)seg.PatItems.Length,
+                BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+            seg.PatGpuCapacity = seg.PatItems.Length;
+            seg.PatRecreated = true;
+        }
+        if (seg.PatCount + 1 > seg.PatGpuCapacity) return false;
+
+        seg.PatItems[seg.PatCount++] = BuildPatternInstance(brush, world, localBounds, opacity);
+
+        _scissor = scissor;
+        if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
+        _pendingUnits.Add(unit);
+        if (!_hasUnion) { _uL = logicalBounds.X; _uT = logicalBounds.Y; _uR = logicalBounds.Right; _uB = logicalBounds.Bottom; _hasUnion = true; }
+        else
+        {
+            if (logicalBounds.X < _uL) _uL = logicalBounds.X;
+            if (logicalBounds.Y < _uT) _uT = logicalBounds.Y;
+            if (logicalBounds.Right > _uR) _uR = logicalBounds.Right;
+            if (logicalBounds.Bottom > _uB) _uB = logicalBounds.Bottom;
+        }
+        return true;
+    }
+
+    // Pack a PatternBrush/NoiseBrush + world + local bounds into one pattern instance record. Cell stays in LOCAL units (the
+    // geometry PS works in local mesh coords) - no device-scale, unlike the SDF rect bake. Mirrors PatternRectCollector.BakeItem.
+    private static PatternGeometryInstance BuildPatternInstance(Brush brush, Matrix4x4F world, Rect localBounds, double opacity)
+    {
+        var inst = new PatternGeometryInstance { World = world };
+        int type;
+        Color color1;
+        Color color2;
+        var midColor = new Color(0, 0, 0, 0);
+        double cell;
+        double brushOpacity;
+        var noise = Vector4F.Zero;
+
+        if (brush is PatternBrush pat)
+        {
+            type = (int)pat.Pattern;
+            color1 = pat.Color1;
+            color2 = pat.Color2;
+            cell = pat.CellSize;
+            brushOpacity = pat.Opacity;
+        }
+        else
+        {
+            var n = (NoiseBrush)brush;
+            type = n.NoiseType == NoiseType.Simplex ? 4 : 6 + (int)n.NoiseType;
+            color1 = n.Color1;
+            color2 = n.Color2;
+            midColor = n.MidColor;
+            cell = n.Scale;
+            brushOpacity = n.Opacity;
+            var octEnc = n.Animate ? -(float)Math.Max(1, n.Octaves) : n.Octaves;
+            noise = new Vector4F(octEnc, (float)n.Seed, (float)n.Lacunarity, (float)n.Gain);
+            if (n.NoiseType == NoiseType.CombustibleVoronoi) noise.W = n.UseFirePalette ? 1f : 0f;
+        }
+
+        var alpha = (float)(opacity * brushOpacity);
+        var c1 = color1.ToVector4(); c1.W *= alpha;
+        var c2 = color2.ToVector4(); c2.W *= alpha;
+        var c3 = midColor.ToVector4(); c3.W *= alpha;
+
+        inst.Params = new Vector4F(0, type, (float)cell, 0);
+        inst.LocalBounds = new Vector4F((float)localBounds.X, (float)localBounds.Y, (float)localBounds.Width, (float)localBounds.Height);
+        inst.Color1 = c1;
+        inst.Color2 = c2;
+        inst.Color3 = c3;
+        inst.Noise = noise;
+        return inst;
+    }
+
     /// <summary>Does a unit's logical bounds overlap the pending group? A later overlapping non-batched unit must draw
     /// AFTER a flush so it paints on top.</summary>
     public bool OverlapsPending(Rect r)
@@ -312,6 +425,14 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
                     seg.GradGpu.SetData(seg.GradItems.AsSpan(seg.GradFlushed, gcount), (uint)(seg.GradFlushed * GradInstanceStride));
                 rec.GradKeys.Add((seg, (uint)seg.GradFlushed, (uint)gcount));
                 seg.GradFlushed = seg.GradCount;
+            }
+            var pcount = seg.PatCount - seg.PatFlushed;
+            if (pcount > 0)
+            {
+                if (!SceneClean || seg.PatRecreated)
+                    seg.PatGpu.SetData(seg.PatItems.AsSpan(seg.PatFlushed, pcount), (uint)(seg.PatFlushed * PatInstanceStride));
+                rec.PatKeys.Add((seg, (uint)seg.PatFlushed, (uint)pcount));
+                seg.PatFlushed = seg.PatCount;
             }
             seg.InPending = false;
         }
@@ -364,6 +485,26 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
                 _device.SetVertexBuffer(seg.VtxBuffer);
                 _device.PrimitiveTopology = seg.Topology;
                 _effect.BatchGradientFillPass.Apply();
+                if (seg.Indexed)
+                    _device.DrawIndexed(seg.VtxBuffer, seg.IdxBuffer, instanceCount: count, indexCount: seg.IndexCount);
+                else
+                    _device.Draw(seg.VertexCount, count);
+            }
+            _device.SetScissors(fullScissor);
+        }
+
+        // Pattern/noise instanced fills for this group (same shared meshes, pattern-fill pass + per-instance pattern buffer).
+        if (rec.PatKeys.Count > 0)
+        {
+            SetupInstancedState(projection);
+            _effect.Time.SetValue((float)NoiseClock.Time);   // animated noise reads the shared flow clock
+            _device.SetScissors(rec.Scissor);
+            foreach (var (seg, first, count) in rec.PatKeys)
+            {
+                _effect.InstancesAddress.SetValue(seg.PatGpu.GetDeviceAddress() + (ulong)(first * PatInstanceStride));
+                _device.SetVertexBuffer(seg.VtxBuffer);
+                _device.PrimitiveTopology = seg.Topology;
+                _effect.BatchPatternFillPass.Apply();
                 if (seg.Indexed)
                     _device.DrawIndexed(seg.VtxBuffer, seg.IdxBuffer, instanceCount: count, indexCount: seg.IndexCount);
                 else

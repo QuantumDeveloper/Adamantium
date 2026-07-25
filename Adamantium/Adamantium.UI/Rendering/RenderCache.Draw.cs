@@ -434,6 +434,22 @@ public partial class RenderCache
                 }
                 ggru.FillInstanced = false;
             }
+            else if (device != null && InstancedFillCollector.Enabled && unit is GeometryRenderUnit pgru && _instancedFill.CanBatchPattern(pgru))
+            {
+                // General instanced PATTERN/NOISE fill (arbitrary geometry, pattern-fill pass): same path as the gradient
+                // one - the fill body is skipped (FillInstanced) and the unit's fringe/stroke draw at the flush.
+                if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                if (_instancedFill.TryAddPattern(pgru, wt, scissor, LogicalBounds(unit.Component, wt)))
+                {
+                    pgru.FillInstanced = true;
+                    if (_recording) { group.PatchableRectOnly = false; MarkNodeNotAware(unit.Component); }   // instanced pattern: world-baked
+                    _batchScissor = scissor;
+                    _batchOpen = true;
+                    continue;
+                }
+                pgru.FillInstanced = false;
+            }
             else if (device != null && (_rectBatch.Active || _ellipseBatch.Active || _gradientRectBatch.Active || _gradientEllipseBatch.Active || _patternBatch.Active || _fractalBatch.Active || _textBatch.Active || (_instancedFill?.Active ?? false)))
             {
                 // A non-batchable unit that overlaps any pending batch: flush them first so this unit paints OVER them, as

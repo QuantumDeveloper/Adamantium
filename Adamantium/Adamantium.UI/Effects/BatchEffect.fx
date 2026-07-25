@@ -1123,6 +1123,52 @@ float3 firePalette(float i)
     return 1.0 - exp(-5e8 / L);
 }
 
+// Shared FILL colouring for the pattern/noise family - called by BOTH the SDF rect pattern PS and the arbitrary-geometry
+// pattern-fill PS, so the two paths colour identically. `pTopLeft` = fragment from the shape's top-left (the pattern origin,
+// fed to PatternMix); `centerRel`/`halfY` = fragment relative to the shape centre + half-height (the Combustible fireball).
+// Single return (no early return - NVVM dislikes those in .fx helpers).
+float4 PatternFillColor(PatternRectData it, float2 pTopLeft, float2 centerRel, float halfY)
+{
+    int ptype = int(it.Params.y);
+    float4 fill;
+    if (ptype == 13)   // Combustible Voronoi: its own 3D-ray + fire-palette colour path (ignores Color1/Color2 as a lerp)
+    {
+        float time = 0.0;
+        if (it.Noise.x < 0.0) time = Time;   // octaves-sign = animate flag; a fire really wants Animate on
+        float2 uv = centerRel / max(halfY, 1.0);   // centred, normalised by half height
+        float cs = cos(time * 0.25);
+        float si = sin(time * 0.25);
+        float3 rd = normalize(float3(uv.x, uv.y, 0.3926991));   // ~PI/8 ray, gives the central fireball
+        rd.xy = float2(rd.x * cs - rd.y * si, rd.x * si + rd.y * cs);   // rolling camera
+        float c = noiseLayers(rd * 2.0, time);
+        c = max(c + dot(hash33(rd) * 2.0 - 1.0, float3(0.015, 0.015, 0.015)), 0.0);   // subtle dust
+        c *= sqrt(c) * 1.5;                                  // contrast
+        // Palette. noise.w = flag (>=0.5 built-in blackbody fire; <0.5 the brush's own Color1->MidColor->Color2 ramp). Both
+        // are computed and selected BRANCH-FREE by step() - the NVVM AV'd on this over-full PS with a divergent branch here.
+        float3 fireCol = sqrt(saturate(pow(firePalette(c), float3(1.25, 1.25, 1.25))));
+        float cc = saturate(c);
+        float3 duo3 = lerp(it.Color1.xyz, it.Color2.xyz, cc);
+        float3 triLo3 = lerp(it.Color1.xyz, it.Color3.xyz, saturate(cc * 2.0));
+        float3 triHi3 = lerp(it.Color3.xyz, it.Color2.xyz, saturate(cc * 2.0 - 1.0));
+        float3 tri3 = lerp(triLo3, triHi3, step(0.5, cc));
+        float3 userCol = lerp(duo3, tri3, step(0.001, it.Color3.w));   // Color3.w==0 -> 2-colour ramp
+        float3 col = lerp(userCol, fireCol, step(0.5, it.Noise.w));
+        fill = float4(col, it.Color1.w);                            // alpha carries brush opacity
+    }
+    else
+    {
+        float k = PatternMix(ptype, pTopLeft, it.Params.z, it.Noise);
+        // TRITONE gradient-map (Color1 -> Color3 mid -> Color2), BRANCH-FREE (step, no vector ternary - the NVVM device-lost
+        // on a nested ternary here). Color3.w==0 (no mid colour) blends back to the plain two-colour duotone.
+        float4 duo = lerp(it.Color1, it.Color2, k);
+        float4 triLo = lerp(it.Color1, it.Color3, saturate(k * 2.0));
+        float4 triHi = lerp(it.Color3, it.Color2, saturate(k * 2.0 - 1.0));
+        float4 tri = lerp(triLo, triHi, step(0.5, k));
+        fill = lerp(duo, tri, step(0.001, it.Color3.w));
+    }
+    return fill;
+}
+
 [shader("fragment")]
 float4 PatternPS(PatternPSInput input) : SV_Target
 {
@@ -1134,46 +1180,7 @@ float4 PatternPS(PatternPSInput input) : SV_Target
     float d = SdRoundRectJoin(input.Local, input.Half, r, joinType);
 
     float2 p = input.Local + input.Half;   // fragment from the rect's TOP-LEFT (stable pattern origin at the corner)
-    int ptype = int(it.Params.y);
-
-    float4 fill;
-    if (ptype == 13)   // Combustible Voronoi: its own 3D-ray + fire-palette colour path (ignores Color1/Color2 as a lerp)
-    {
-        float time = 0.0;
-        if (it.Noise.x < 0.0) time = Time;   // octaves-sign = animate flag; a fire really wants Animate on
-        float2 uv = input.Local / max(input.Half.y, 1.0);   // centred, normalised by half height
-        float cs = cos(time * 0.25);
-        float si = sin(time * 0.25);
-        float3 rd = normalize(float3(uv.x, uv.y, 0.3926991));   // ~PI/8 ray, gives the central fireball
-        rd.xy = float2(rd.x * cs - rd.y * si, rd.x * si + rd.y * cs);   // rolling camera
-        float c = noiseLayers(rd * 2.0, time);
-        c = max(c + dot(hash33(rd) * 2.0 - 1.0, float3(0.015, 0.015, 0.015)), 0.0);   // subtle dust
-        c *= sqrt(c) * 1.5;                                  // contrast
-        // Palette. noise.w = flag (>=0.5 built-in blackbody fire; <0.5 the brush's own Color1->MidColor->Color2 ramp). Both
-        // are computed and selected BRANCH-FREE by step() - the NVVM AV'd on this over-full PS with a divergent branch here,
-        // and noiseLayers was cut to 3 layers to buy back the budget.
-        float3 fireCol = sqrt(saturate(pow(firePalette(c), float3(1.25, 1.25, 1.25))));
-        float cc = saturate(c);
-        float3 duo = lerp(it.Color1.xyz, it.Color2.xyz, cc);
-        float3 triLo = lerp(it.Color1.xyz, it.Color3.xyz, saturate(cc * 2.0));
-        float3 triHi = lerp(it.Color3.xyz, it.Color2.xyz, saturate(cc * 2.0 - 1.0));
-        float3 tri = lerp(triLo, triHi, step(0.5, cc));
-        float3 userCol = lerp(duo, tri, step(0.001, it.Color3.w));   // Color3.w==0 -> 2-colour ramp
-        float3 col = lerp(userCol, fireCol, step(0.5, it.Noise.w));
-        fill = float4(col, it.Color1.w);                            // alpha carries brush opacity
-    }
-    else
-    {
-        float k = PatternMix(ptype, p, it.Params.z, it.Noise);
-        // TRITONE gradient-map (Color1 -> Color3 mid -> Color2), BRANCH-FREE: the earlier nested ternary (k<0.5 ? lerp : lerp)
-        // device-lost on this driver's NVVM. Here everything is computed and blended by step() - no ternary, no if. Color3.w==0
-        // (no mid colour) blends back to the plain two-colour duotone.
-        float4 duo = lerp(it.Color1, it.Color2, k);
-        float4 triLo = lerp(it.Color1, it.Color3, saturate(k * 2.0));
-        float4 triHi = lerp(it.Color3, it.Color2, saturate(k * 2.0 - 1.0));
-        float4 tri = lerp(triLo, triHi, step(0.5, k));
-        fill = lerp(duo, tri, step(0.001, it.Color3.w));
-    }
+    float4 fill = PatternFillColor(it, p, input.Local, input.Half.y);
 
     float mask = 1.0;
     if (it.Stroke0.z > 0.0 || it.Stroke1.y > 0.0 || it.Stroke1.z < 1.0)
@@ -1186,6 +1193,65 @@ float4 PatternPS(PatternPSInput input) : SV_Target
                             it.Stroke1.z, dPerp, halfW, it.Stroke1.w);
     }
     return CompositeFillStroke(d, fill, it.StrokeColor, it.Stroke0.x, it.Stroke0.y, mask);
+}
+
+// ---- PatternFill: general instanced geometry (a shared tessellated mesh drawn N times) whose FILL is a PROCEDURAL
+// pattern/noise brush - the pattern sibling of GradientFill, so pattern/noise work on ANY geometry (Path/Polygon/glyphs),
+// not just the SDF rect. Per-instance PatGeomData from a BDA buffer by SV_InstanceID; the PS reconstructs a PatternRectData
+// and calls the SAME PatternFillColor the SDF rect pattern PS uses (fed the fragment's LOCAL mesh position).
+struct PatGeomData
+{
+    float4x4 World;
+    float4 Params;       // .y pattern type, .z cell (LOCAL units). .x/.w unused
+    float4 LocalBounds;  // shape local bounds: minXY, sizeXY
+    float4 Color1;
+    float4 Color2;
+    float4 Color3;
+    float4 Noise;        // x octaves (sign=animate), y seed, z lacunarity, w gain (or combustible fire-palette flag)
+};
+
+struct PatFillPSInput
+{
+    float4 Position : SV_Position;
+    float2 Local : TEXCOORD0;                   // varying: fragment's local mesh xy
+    nointerpolation uint InstId : TEXCOORD1;    // instance -> re-read PatGeomData in the PS (light signature)
+};
+
+[shader("vertex")]
+PatFillPSInput PatternFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
+{
+    PatGeomData* items = (PatGeomData*)InstancesAddress;
+    PatGeomData it = items[instanceId];
+    float4 world = mul(float4(v.position.xyz, 1.0), it.World);
+
+    PatFillPSInput o;
+    o.Position = mul(world, Projection);
+    o.Local = v.position.xy;
+    o.InstId = instanceId;
+    return o;
+}
+
+[shader("fragment")]
+float4 PatternFillPS(PatFillPSInput input) : SV_Target
+{
+    PatGeomData* items = (PatGeomData*)InstancesAddress;
+    PatGeomData it = items[input.InstId];
+
+    // Reconstruct a PatternRectData for the shared PatternFillColor (Bounds/stroke fields unused by the fill eval).
+    PatternRectData pd;
+    pd.Bounds = float4(0.0, 0.0, 0.0, 0.0);
+    pd.Params = it.Params;
+    pd.Color1 = it.Color1;
+    pd.Color2 = it.Color2;
+    pd.StrokeColor = float4(0.0, 0.0, 0.0, 0.0);
+    pd.Stroke0 = float4(0.0, 0.0, 0.0, 0.0);
+    pd.Stroke1 = float4(0.0, 0.0, 0.0, 0.0);
+    pd.Noise = it.Noise;
+    pd.Color3 = it.Color3;
+
+    float2 pTopLeft = input.Local - it.LocalBounds.xy;                                   // fragment from the shape top-left
+    float2 centerRel = input.Local - (it.LocalBounds.xy + it.LocalBounds.zw * 0.5);      // fragment from the shape centre
+    return PatternFillColor(pd, pTopLeft, centerRel, max(it.LocalBounds.w * 0.5, 1.0));
 }
 
 // ---- Fractal batch: the SAME SDF rounded-rect (self-AA shape + shared stroke), but the FILL is an escape-time FRACTAL
@@ -1479,6 +1545,16 @@ technique Batch
         Profile = 6.6;
         VertexShader = GradientFillVS;
         PixelShader = GradientFillPS;
+    }
+
+    // General geometry instancing with a PROCEDURAL PATTERN/NOISE fill (per-instance PatGeomData; the PS re-reads the record
+    // and evaluates the shared PatternFillColor per fragment). Solid fills use pass Fill, gradients pass GradientFill.
+    pass PatternFill
+    {
+        EffectName = "BatchEffect";
+        Profile = 6.6;
+        VertexShader = PatternFillVS;
+        PixelShader = PatternFillPS;
     }
 
     // SDF ellipse/circle fills - per-instance EllipseData from a BDA storage buffer by SV_InstanceID; quad from SV_VertexID.

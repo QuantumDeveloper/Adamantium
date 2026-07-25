@@ -92,6 +92,32 @@
                 </StackPanel>
             </WrapPanel>
 
+            <!-- NEW: procedural pattern/noise brushes now fill ARBITRARY geometry (not just the SDF rect) via the instanced
+                 pattern-fill path - the SAME PatternMix/noise on any tessellated Polygon/Path. -->
+            <TextBlock Text="Noise / pattern on ARBITRARY geometry (NEW — Polygon / Path, not just rectangles)" FontSize="18" Margin="0,20,0,10"/>
+            <WrapPanel Orientation="Horizontal">
+                <Polygon Points="70,0 140,120 0,120" Margin="10">
+                    <Polygon.Fill>
+                        <NoiseBrush NoiseType="Worley" Scale="34" Octaves="1" Animate="true" FlowSpeed="0.8" Color1="#0B1220" Color2="#C4B5FD"/>
+                    </Polygon.Fill>
+                </Polygon>
+                <Polygon Points="60,0 75,45 120,45 84,72 96,116 60,90 24,116 36,72 0,45 45,45" Margin="10">
+                    <Polygon.Fill>
+                        <NoiseBrush NoiseType="CombustibleVoronoi" Scale="40" Animate="true" FlowSpeed="1.0"/>
+                    </Polygon.Fill>
+                </Polygon>
+                <Path Data="F0 M110,10 L168.78,190.9 L14.89,79.1 L205.11,79.1 L51.22,190.9 Z" Width="180" Height="180" Margin="10">
+                    <Path.Fill>
+                        <NoiseBrush NoiseType="Turbulence" Scale="30" Octaves="6" Animate="true" FlowSpeed="0.5" Color1="#0B1220" Color2="#38BDF8"/>
+                    </Path.Fill>
+                </Path>
+                <Polygon Points="70,0 140,120 0,120" Margin="10">
+                    <Polygon.Fill>
+                        <PatternBrush Pattern="Checkerboard" CellSize="16" Color1="#1E293B" Color2="#38BDF8"/>
+                    </Polygon.Fill>
+                </Polygon>
+            </WrapPanel>
+
             <TextBlock Text="Linear gradients — rectangles" FontSize="18" Margin="0,0,0,10"/>
             <WrapPanel Orientation="Horizontal">
                 <!-- diagonal, 3 stops -->

@@ -337,6 +337,25 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
         return true;
     }
 
+    // Pattern/noise sibling of TryGetInstancedGradientFill: a PatternBrush/NoiseBrush fill on arbitrary geometry batches
+    // through the pattern instanced-fill path - the SAME procedural brushes the SDF rect batch handles, now on any shape.
+    // Returns the shared-mesh key, the frozen mesh, the brush, and the shape's LOCAL bounds (the shader maps a fragment's
+    // local pos to the pattern origin).
+    public bool TryGetInstancedPatternFill(out GeometryKey key, out object mesh, out Brush brush,
+        out Rect localBounds, out double opacity)
+    {
+        key = default; mesh = null; brush = null; localBounds = default; opacity = 1.0;
+        if (Payload.Brush is not (PatternBrush or NoiseBrush)) return false;
+        if (_frozenMesh is not { HasPoints: true } fm) return false;
+
+        key = fm.Key;
+        mesh = fm;
+        brush = Payload.Brush;
+        localBounds = fm.Bounds;
+        opacity = DrawCommand?.RenderData?.Opacity ?? 1.0;
+        return true;
+    }
+
     public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
     {
         if (drawCommand.Payload is not GeometryPayload inputPayload) return;
