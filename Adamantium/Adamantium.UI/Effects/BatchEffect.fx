@@ -629,7 +629,10 @@ float4 GradientPS(GradPSInput input) : SV_Target
     //   float4 mesh = lerp(lerp(it.Stop0, it.Stop1, uv.x), lerp(it.Stop2, it.Stop3, uv.x), uv.y);
     //   float4 fill = lerp(grad, mesh, step(3.5, it.Params.y));
     float gt = GradSpread(GradParam(it, uv), packedW & 7);
-    float4 fill = GradColor(it, gt, fwidth(gt), packedW >> 3);
+    // Wrap-aware AA width: at a conic/repeat seam gt jumps 1->0 so fwidth(gt) spikes to ~1 (the whole gradient collapses to
+    // hard-stop ramps -> a coloured line). Shifting by half a turn moves the discontinuity to the far side, so min() picks
+    // the TRUE small derivative everywhere. Harmless for linear/radial (min keeps the real value).
+    float4 fill = GradColor(it, gt, min(fwidth(gt), fwidth(frac(gt + 0.5))), packedW >> 3);
 
     float mask = 1.0;
     if (it.Stroke0.z > 0.0 || it.Stroke1.y > 0.0 || it.Stroke1.z < 1.0)
@@ -704,7 +707,7 @@ float4 GradientFillPS(GradFillPSInput input) : SV_Target
 
     float2 uv = (input.Local - it.LocalBounds.xy) / max(it.LocalBounds.zw, float2(1e-4, 1e-4));
     float gt = GradSpread(GradParam(gd, uv), int(gd.Params.w));
-    return GradColor(gd, gt, fwidth(gt), int(it.Params.w));   // interp mode from GradGeomData.Params.w - OKLab flows here too
+    return GradColor(gd, gt, min(fwidth(gt), fwidth(frac(gt + 0.5))), int(it.Params.w));   // wrap-aware AA (conic/repeat seam)
 }
 
 // ---- Pattern batch: the SAME SDF rounded-rect (self-AA shape + the shared stroke), but the FILL is a PROCEDURAL two-colour

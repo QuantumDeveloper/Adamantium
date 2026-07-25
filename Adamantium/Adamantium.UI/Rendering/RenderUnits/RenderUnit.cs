@@ -157,9 +157,10 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
     {
         FillFringeRenderer?.DeferDispose();
         FillFringeRenderer = null;
-        // A solid OR a gradient fill gets an analytic-AA fringe (the fringe shader now colours the ring by the gradient
-        // too - so a tessellated gradient shape no longer has aliased edges). Image/null fills still don't.
-        if (!UseGpuFill || FillFringeEffect == null || brush is not (SolidColorBrush or GradientBrush)) return;
+        // A solid/gradient/pattern/noise fill gets an analytic-AA fringe (the ring is coloured by the gradient, or a flat
+        // representative colour for a procedural pattern/noise - so a tessellated procedural shape no longer has aliased
+        // edges). Image/null fills still don't.
+        if (!UseGpuFill || FillFringeEffect == null || brush is not (SolidColorBrush or GradientBrush or PatternBrush or NoiseBrush)) return;
 
         // Feather the RESOLVED fill boundary (outer outline + holes, extracted from the fill mesh) so self-intersecting /
         // holed shapes get their inner edges AA'd too; fall back to the raw path contours if extraction finds nothing.
@@ -211,7 +212,7 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
         {
             fringe.Brush = brush;
         }
-        else if (UseGpuFill && FillFringeEffect != null && brush is SolidColorBrush)
+        else if (UseGpuFill && FillFringeEffect != null && brush is (SolidColorBrush or GradientBrush or PatternBrush or NoiseBrush))
         {
             geometry.ProcessGeometry(GeometryType.Both);
             ProcessFillFringe(geometry, brush);

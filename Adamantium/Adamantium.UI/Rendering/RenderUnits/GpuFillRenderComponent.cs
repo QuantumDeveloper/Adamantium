@@ -205,7 +205,7 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
     // when that slot is stale (a static fill settles to zero work; an animated one re-expands the current slot).
     public override void PreRender()
     {
-        if (!AnalyticAa.Enabled || Brush is not (SolidColorBrush or GradientBrush)) return;   // AA off / no fill: skip the expander
+        if (!AnalyticAa.Enabled || Brush is not (SolidColorBrush or GradientBrush or PatternBrush or NoiseBrush)) return;   // AA off / no fringe-eligible fill: skip the expander
         var fringeWidth = ComputeFringeWidth();
         if (fringeWidth != _expandedFringe)
         {
@@ -238,7 +238,7 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
 
     public override void Render()
     {
-        if (!AnalyticAa.Enabled || _contours.Count == 0 || Brush is not (SolidColorBrush or GradientBrush)) return;
+        if (!AnalyticAa.Enabled || _contours.Count == 0 || Brush is not (SolidColorBrush or GradientBrush or PatternBrush or NoiseBrush)) return;
 
         _effect.Projection.SetValue(RenderData.TransformMatrix * RenderData.ProjectionMatrix);
         if (Brush is GradientBrush g)
@@ -246,12 +246,16 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
             SetGradientUniforms(g);
             _effect.IsGradient.SetValue(1);
         }
-        else
+        else if (Brush is SolidColorBrush solid)
         {
-            var solid = (SolidColorBrush)Brush;
             var color = solid.Color.ToVector4();
             color.W *= (float)solid.Opacity * RenderData.Opacity;   // colour alpha x brush Opacity x element Opacity
             _effect.FillColor.SetValue(color);
+            _effect.IsGradient.SetValue(0);
+        }
+        else   // PatternBrush / NoiseBrush: a flat representative edge colour (the 1px ring doesn't evaluate the pattern)
+        {
+            _effect.FillColor.SetValue(PatternFringeColor(Brush));
             _effect.IsGradient.SetValue(0);
         }
 
@@ -290,5 +294,20 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
         _effect.GS4.SetValue(cols[4]); _effect.GS5.SetValue(cols[5]); _effect.GS6.SetValue(cols[6]); _effect.GS7.SetValue(cols[7]);
         _effect.GOff0.SetValue(new Vector4F(offs[0], offs[1], offs[2], offs[3]));
         _effect.GOff1.SetValue(new Vector4F(offs[4], offs[5], offs[6], offs[7]));
+    }
+
+    // Analytic-AA fringe colour for a procedural pattern/noise fill: the ring is 1px, so rather than evaluate the whole
+    // pattern there (a heavy fringe shader), colour it with the brush's LOW colour (Color1). A procedural field is mostly its
+    // background/low value, so a shape edge is dominated by Color1 - the ring blends into it instead of ringing a bright
+    // midpoint. Not per-fragment exact, but smooths the edge without a highlighted rim. Alpha folds brush + element opacity.
+    private Vector4F PatternFringeColor(Brush brush)
+    {
+        Color c1;
+        double bo;
+        if (brush is PatternBrush pb) { c1 = pb.Color1; bo = pb.Opacity; }
+        else { var nb = (NoiseBrush)brush; c1 = nb.Color1; bo = nb.Opacity; }
+        var v = c1.ToVector4();
+        v.W *= (float)bo * RenderData.Opacity;
+        return v;
     }
 }
