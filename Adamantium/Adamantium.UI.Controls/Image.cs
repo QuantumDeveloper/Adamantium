@@ -25,7 +25,10 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
 
    public static readonly AdamantiumProperty SourceProperty = AdamantiumProperty.Register(nameof(Source),
       typeof(ImageSource), typeof(Image),
-      new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender, OnSourceChanged));
+      // AffectsMeasure too: a NON-BitmapImage source (a RenderTargetImage / a VisualRenderer bitmap) has its size known
+      // immediately but ProcessImageSource only re-measures for the async BitmapImage path - without this the Image keeps
+      // the size it had while Source was null (0x0) and draws nothing. Source drives the desired size, so it must measure.
+      new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender, OnSourceChanged));
 
    public static readonly AdamantiumProperty FilterBrushProperty = AdamantiumProperty.Register(nameof(FilterBrush),
       typeof(Brush), typeof(Image), new PropertyMetadata(Brushes.White, PropertyMetadataOptions.AffectsRender));
