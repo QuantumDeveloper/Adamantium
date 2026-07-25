@@ -46,7 +46,12 @@ public interface ITexture : INamedObject
     /// swap and no image encoding) to <paramref name="path"/>. Far faster than <see cref="Save"/> for repeated
     /// read-back (no per-frame PNG zlib) - used by the live designer's frame transport, which converts the bytes itself.</summary>
     void SaveRaw(string path);
-    
+
+    /// <summary>Reads this texture back into a fresh host-memory image (native B8G8R8A8, no colour swap / encode); the
+    /// caller owns and disposes it. For off-screen bakes that need CPU pixels (the drag ghost, thumbnails) rather than a
+    /// file.</summary>
+    Adamantium.Imaging.Image ReadbackToImage();
+
     ImageViewCreateInfo Info { get; }
 
     /// <summary>

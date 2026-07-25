@@ -17,6 +17,7 @@ using Adamantium.UI.Core.Dispatcher;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media.Animation;
+using Adamantium.UI.Core.Rendering;
 using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.EntityServices;
@@ -384,6 +385,11 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
     protected virtual void RegisterServices(IContainerRegistry containerRegistry)
     {
         containerRegistry.RegisterSingleton<IThemeManager>(ThemeManager);
+        // Off-screen visual->texture renderer (UWP RenderTargetBitmap analog). Singleton, resolved on first use (after the
+        // main device is up) - it then creates its own dedicated render device. Foundation for the drag-drop ghost and
+        // VisualBrush/DrawingBrush bakes. An app can register its own before base to win.
+        if (!containerRegistry.IsRegistered<IVisualRenderer>())
+            containerRegistry.RegisterSingleton<IVisualRenderer, VisualRenderer>();
         RegisterNavigationServices(containerRegistry);
     }
 
