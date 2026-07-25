@@ -26,6 +26,37 @@ public partial class BrushesViewModel : TabPageViewModel
         Color2 = new Color(125, 211, 252, 255)
     };
 
+    /// <summary>The brush the "live pattern" rectangle fills with; the controls below drive its type/cell/colours - one
+    /// configurable PatternBrush that replaces the static per-pattern swatch row.</summary>
+    public PatternBrush LivePattern { get; } = new PatternBrush
+    {
+        Pattern = PatternType.Dots,
+        CellSize = 22,
+        Color1 = new Color(15, 23, 42, 255),
+        Color2 = new Color(56, 189, 248, 255)
+    };
+
+    /// <summary>All procedural pattern types (Checkerboard..Hatch; the reserved noise slot has no name so GetValues skips
+    /// it) - the source for the "Pattern type" dropdown.</summary>
+    public PatternType[] PatternTypes { get; } = Enum.GetValues<PatternType>();
+
+    [Bindable] private PatternType _patternKind = PatternType.Dots;
+    [Bindable] private double _patternCell = 22;
+    [Bindable] private double _patternHatchAngle = 45;   // Hatch line direction (deg); ignored by the other pattern types
+    [Bindable] private Color _patternColor1 = new Color(15, 23, 42, 255);
+    [Bindable] private Color _patternColor2 = new Color(56, 189, 248, 255);
+
+    partial void OnPatternKindChanged(PatternType value) => LivePattern.Pattern = value;
+    partial void OnPatternCellChanged(double value) => LivePattern.CellSize = value;
+    partial void OnPatternHatchAngleChanged(double value) => LivePattern.HatchAngle = value;
+    partial void OnPatternColor1Changed(Color value) => LivePattern.Color1 = value;
+    partial void OnPatternColor2Changed(Color value) => LivePattern.Color2 = value;
+
+    // Corner-radius sliders for the live tiles - bound to the Rectangle.CornerRadius via DoubleToCornerRadiusConverter, so
+    // the view-model stays a plain double (no CornerRadius UI-primitive in the VM).
+    [Bindable] private double _noiseRadius = 12;
+    [Bindable] private double _patternRadius = 12;
+
     // Slider-bound (double) FBM params; each pushes into LiveNoise (Octaves cast to int). The brush's paint change re-bakes.
     [Bindable] private double _noiseScale = 48;
     [Bindable] private double _noiseOctaves = 5;

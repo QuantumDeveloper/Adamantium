@@ -23,9 +23,14 @@
                 <TextBlock Text="Colour wheel (conic hue × radial saturation)"
                            FontSize="14"
                            MarginBottom="14"/>
-                <!-- Two-way to the SAME PickedColor as the inline picker: drag the wheel for hue+saturation, the picker's
-                     SV square for value; both stay in sync and both drive the theme accent. The wheel dims to the value. -->
-                <ColorWheel SelectedColor="{Binding PickedColor, Mode=TwoWay}"/>
+                <!-- Two-way to the SAME PickedColor as the inline picker. The wheel picks hue+saturation; its OWN Value slider
+                     below picks brightness (so the wheel alone is a full picker and can reach black at 0). All stay in sync
+                     and drive the theme accent. The wheel dims toward the value. -->
+                <ColorWheel SelectedColor="{Binding PickedColor, Mode=TwoWay}"
+                            Value="{Binding WheelValue, Mode=TwoWay}"/>
+                <TextBlock Text="Value (brightness — 0 = black)" FontSize="12" MarginTop="12" MarginBottom="2"
+                           Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <Slider Width="256" Minimum="0" Maximum="1" Value="{Binding WheelValue, Mode=TwoWay}"/>
             </StackPanel>
 
             <StackPanel Orientation="Vertical"
