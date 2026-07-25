@@ -1,0 +1,50 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions">
+    <StackPanel Orientation="Vertical" Margin="24">
+
+        <TextBlock Text="Drag &amp; Drop (in-window)" FontSize="20" MarginBottom="4"/>
+        <TextBlock Text="Press an item and move past the threshold: it bakes into a ghost that follows the cursor (a real layered OS window). Release over a panel to drop - the panel's DropCommand moves the item in the view-model and the lists rebind."
+                   FontSize="13"
+                   Foreground="{ResourceReference TextFillColorSecondary}"
+                   MaxWidth="760"
+                   MarginBottom="18"/>
+
+        <StackPanel Orientation="Horizontal">
+
+            <Border Background="#FF141C28" CornerRadius="8" Padding="12" Width="220" MinHeight="300" MarginRight="16"
+                    DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropLeftCommand}">
+                <StackPanel Orientation="Vertical">
+                    <TextBlock Text="Fruits" Foreground="#FFE0B040" MarginBottom="10"/>
+                    <ItemsControl ItemsSource="{Binding Left}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#FF2E3B4E" CornerRadius="6" Padding="10" MarginBottom="6"
+                                        DragDrop.AllowDrag="True" DragDrop.DragData="{Binding}">
+                                    <TextBlock Text="{Binding}" Foreground="#FFFFFFFF"/>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <Border Background="#FF141C28" CornerRadius="8" Padding="12" Width="220" MinHeight="300"
+                    DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropRightCommand}">
+                <StackPanel Orientation="Vertical">
+                    <TextBlock Text="Animals" Foreground="#FF40C0E0" MarginBottom="10"/>
+                    <ItemsControl ItemsSource="{Binding Right}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#FF2E3B4E" CornerRadius="6" Padding="10" MarginBottom="6"
+                                        DragDrop.AllowDrag="True" DragDrop.DragData="{Binding}">
+                                    <TextBlock Text="{Binding}" Foreground="#FFFFFFFF"/>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </StackPanel>
+</View>

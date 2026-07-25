@@ -52,6 +52,7 @@ public partial class GalleryViewModel
         Tabs.Insert(0, resolver.Resolve<NavigationDemoViewModel>());
         // Visual -> Image showcase (RenderTargetBitmap analog): needs IVisualRenderer, so resolve it through DI too.
         Tabs.Insert(1, resolver.Resolve<VisualRenderDemoViewModel>());
-        SelectedTab = Tabs[0];
+        Tabs.Insert(2, resolver.Resolve<DragDropDemoViewModel>());
+        SelectedTab = Tabs[2];
     }
 }
