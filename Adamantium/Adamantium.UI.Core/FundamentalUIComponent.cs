@@ -253,16 +253,17 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
     
     public IAdamantiumComponent TemplatedParent { get; internal set; }
 
-    public BindingExpression SetBinding(string property, BindingBase bindingBase)
+    public BindingExpressionBase SetBinding(string property, BindingBase bindingBase)
     {
         var adamantiumProperty = GetProperty(property);
         return SetBinding(adamantiumProperty, bindingBase);
     }
-    
-    public BindingExpression SetBinding(AdamantiumProperty property, BindingBase bindingBase)
+
+    public BindingExpressionBase SetBinding(AdamantiumProperty property, BindingBase bindingBase)
     {
-        // Bindings live in the central BindingEngine registry (queryable/refreshable), not as element-private state.
-        return (BindingExpression)BindingEngine.SetBinding(this, property, bindingBase);
+        // Bindings live in the central BindingEngine registry (queryable/refreshable), not as element-private state. Returns
+        // the base type - a MultiBinding yields a MultiBindingExpression, not a BindingExpression (they're siblings).
+        return BindingEngine.SetBinding(this, property, bindingBase);
     }
     
     public void RemoveBinding(string property)

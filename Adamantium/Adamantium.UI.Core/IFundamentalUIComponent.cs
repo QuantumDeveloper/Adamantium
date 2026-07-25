@@ -24,9 +24,10 @@ public interface IFundamentalUIComponent : IAdamantiumComponent, IDispatcherComp
 
     void RemoveLogicalChild(IFundamentalUIComponent child);
 
-    public BindingExpression SetBinding(AdamantiumProperty property, BindingBase bindingBase);
-    
-    public BindingExpression SetBinding(string property, BindingBase bindingBase);
+    // Returns the base type so a MultiBinding (MultiBindingExpression) is handled too, not just single BindingExpression.
+    public BindingExpressionBase SetBinding(AdamantiumProperty property, BindingBase bindingBase);
+
+    public BindingExpressionBase SetBinding(string property, BindingBase bindingBase);
     
     public void RemoveBinding(AdamantiumProperty property);
     
