@@ -50,6 +50,8 @@ public partial class GalleryViewModel
         // The Navigation tab owns a region and needs INavigationService - resolve it through DI (which injects the service)
         // rather than newing it here. It's the default tab so the demo opens on it.
         Tabs.Insert(0, resolver.Resolve<NavigationDemoViewModel>());
+        // Visual -> Image showcase (RenderTargetBitmap analog): needs IVisualRenderer, so resolve it through DI too.
+        Tabs.Insert(1, resolver.Resolve<VisualRenderDemoViewModel>());
         SelectedTab = Tabs[0];
     }
 }
