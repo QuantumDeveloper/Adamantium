@@ -29,6 +29,7 @@ public class BindingExpression : BindingExpressionBase
 
    private PropertyInfo _sourceProperty;
    private Func<object, object> _sourceGetter;   // compiled reader for _sourceProperty (the hot ComputeValue path)
+   private bool _bindToSource;   // empty path ({Binding}, {Binding ElementName=x}) -> the value IS the resolved source object
    private INotifyPropertyChanged _observed;
    private AdamantiumComponent _observedComponent;   // element source ({ElementName}) - observed via AdamantiumProperty changes, not INPC
    private string[] _segments;   // cached Binding.Path split on '.', computed once (path is fixed per expression)
@@ -154,10 +155,20 @@ public class BindingExpression : BindingExpressionBase
       _sourceProperty = null;
       _sourceGetter = null;
       SourcePropertyName = null;
+      _bindToSource = false;
 
       var root = Binding.Source ?? ResolveElementName() ?? Target?.DataContext;
       var path = Binding.Path?.Path;
-      if (root == null || string.IsNullOrEmpty(path)) return;
+      if (root == null) return;
+
+      // Empty path with a source -> bind to the SOURCE OBJECT ITSELF ({Binding}, {Binding ElementName=x}, {Binding Source=y}),
+      // the standard WPF behaviour. There is no leaf property to read/observe - the value simply IS the resolved source.
+      if (string.IsNullOrEmpty(path))
+      {
+         ResolvedSource = root;
+         _bindToSource = true;
+         return;
+      }
 
       // Split ONCE per expression, not per resolve: the path is fixed for the binding's life, but ResolveSource runs on
       // every DataContext change (every rebind of every recycled tile) - a fresh string[] alloc per call was steady GC
@@ -248,6 +259,12 @@ public class BindingExpression : BindingExpressionBase
    // resolved value is null (falling back to FallbackValue if no TargetNullValue is set).
    private object ComputeValue(Type targetType)
    {
+      // Empty-path binding: the value is the resolved source object itself (optionally run through the converter).
+      if (_bindToSource)
+      {
+         var self = Binding.Converter != null ? ConvertCached(ResolvedSource, targetType) : ResolvedSource;
+         return self ?? BindingBase.TargetNullValue ?? BindingBase.FallbackValue;
+      }
       if (_sourceProperty == null) return BindingBase.FallbackValue;
       var value = _sourceGetter != null ? _sourceGetter(ResolvedSource) : _sourceProperty.GetValue(ResolvedSource);
       if (Binding.Converter != null)

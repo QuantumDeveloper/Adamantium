@@ -66,6 +66,11 @@ public interface IUIComponent : IFundamentalUIComponent
 
     void InvalidateRender(bool invalidateChildren);
 
+    /// <summary>Emits this element's draw commands into <paramref name="context"/> read-only - runs OnRender WITHOUT
+    /// touching IsGeometryValid (no RenderDirty mark, no loop wake) or the clean-frame gate. For an off-screen snapshot of
+    /// a LIVE element through a parallel render cache, where the ordinary <c>Render()</c> would no-op on a valid element.</summary>
+    void RenderReadOnly(IDrawingContext context);
+
     /// <summary>Only this element's PAINT changed - same shape, same draw commands, a new colour/brush/opacity. It is NOT
     /// re-rendered: the renderer re-bakes the GPU data of the units it already holds (see
     /// <see cref="PropertyMetadataOptions.AffectsPaint"/>).</summary>
