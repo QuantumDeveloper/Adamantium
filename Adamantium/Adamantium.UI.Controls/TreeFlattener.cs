@@ -67,7 +67,17 @@ internal sealed class TreeFlattener
     /// observing its children collection.</summary>
     public void Expand(TreeRow row)
     {
-        if (row.IsExpanded || !row.HasChildren)
+        if (row.IsExpanded)
+        {
+            return;
+        }
+
+        // Re-evaluate children LIVE rather than trusting the cached flag: a node that was a leaf when its row was built may
+        // have gained children since (a drop into it, a lazy load). Refresh the row's flag too, so a former leaf now shows
+        // an expander and can open - a stale HasChildren=false would silently swallow the new child.
+        var children = _childrenOf(row.Node);
+        row.HasChildren = HasAny(children);
+        if (!row.HasChildren)
         {
             return;
         }
@@ -79,7 +89,6 @@ internal sealed class TreeFlattener
             return;
         }
 
-        var children = _childrenOf(row.Node);
         Subscribe(row, children);
         Rows.InsertMany(index + 1, BuildRows(children, row.Depth + 1));
     }
@@ -277,9 +286,10 @@ internal sealed class TreeFlattener
         }
     }
 
-    private bool HasChildren(object node)
+    private bool HasChildren(object node) => HasAny(_childrenOf(node));
+
+    private static bool HasAny(IEnumerable children)
     {
-        var children = _childrenOf(node);
         if (children == null)
         {
             return false;

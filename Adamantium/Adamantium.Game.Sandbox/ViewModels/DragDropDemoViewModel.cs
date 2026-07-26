@@ -105,20 +105,24 @@ public partial class DragDropDemoViewModel : TabPageViewModel
 
     // Hybrid tree drop: the engine hands us the hovered node (DropTarget) + where the drop lands (Placement). Into -> a
     // child (and auto-expand so it shows); Before/After -> a sibling in the target's parent collection; else a root node.
+    // A node dragged from WITHIN the tree is MOVED (the same node reparented, not a copy); a string dragged in from another
+    // panel becomes a fresh node.
     [Command]
     private void DropTree(object arg)
     {
         if (arg is not DragDropEventArgs e) return;
         var target = e.DropTarget as DragTreeNode;
-        foreach (var item in ItemsOf(e))
+        foreach (var node in DraggedNodes(e))
         {
-            var node = new DragTreeNode(item);
+            if (target != null && IsSelfOrAncestor(node, target)) continue;   // can't drop a node into its own subtree
+            (node.Parent?.Children ?? Tree).Remove(node);   // detach from the old spot first -> MOVE (no-op for a fresh node)
+            node.Parent = null;
             switch (e.Placement)
             {
                 case DropPlacement.Into when target != null:
                     node.Parent = target;
-                    target.IsExpanded = true;   // VM-driven expand (materializes children) so the drop is visible
-                    target.Children.Add(node);
+                    target.Children.Add(node);   // add FIRST so the branch has the child when we expand...
+                    target.IsExpanded = true;    // ...then open it - the flattener re-checks children live and splices
                     break;
                 case DropPlacement.Before or DropPlacement.After when target != null:
                     var siblings = target.Parent?.Children ?? Tree;
@@ -132,6 +136,19 @@ public partial class DragDropDemoViewModel : TabPageViewModel
                     break;
             }
         }
+    }
+
+    // The dragged tree nodes: the actual node for a tree-internal move (identity preserved -> reparent, not copy), or a
+    // fresh node wrapping each string dropped in from another panel.
+    private static IEnumerable<DragTreeNode> DraggedNodes(DragDropEventArgs e) =>
+        e.Data?.Get<DragTreeNode>() is { } node ? [node] : ItemsOf(e).Select(s => new DragTreeNode(s));
+
+    // True if target is node itself or one of node's descendants - dropping there would splice the subtree into itself.
+    private static bool IsSelfOrAncestor(DragTreeNode node, DragTreeNode target)
+    {
+        for (var n = target; n != null; n = n.Parent)
+            if (ReferenceEquals(n, node)) return true;
+        return false;
     }
 
     private static void Add(object arg, ObservableCollection<string> target)
@@ -160,7 +177,9 @@ public partial class DragDropDemoViewModel : TabPageViewModel
         _dragItems = null;
     }
 
-    // The dragged items from the payload: the packaged selection if present, else the single pressed item.
+    // The dragged items as strings: the packaged selection if present, else the single pressed string, else a tree node's
+    // Title (so a tree node dragged into a flat panel still drops its label).
     internal static IReadOnlyList<string> ItemsOf(DragDropEventArgs e) =>
-        e.Data?.Get<List<string>>() ?? (e.Data?.Get<string>() is { } s ? [s] : []);
+        e.Data?.Get<List<string>>() ?? (e.Data?.Get<string>() is { } s ? [s]
+            : e.Data?.Get<DragTreeNode>() is { } n ? [n.Title] : []);
 }

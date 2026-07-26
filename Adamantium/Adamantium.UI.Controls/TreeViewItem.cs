@@ -98,6 +98,13 @@ public class TreeViewItem : ItemsControl, IHeaderedItemsControl, ISpringLoadable
     /// <summary>True when the node has children (a branch). Read-only.</summary>
     public bool HasItems { get => GetValue<bool>(HasItemsProperty); private set => SetValue(HasItemsProperty, value); }
 
+    // Re-read HasItems from the row after its HasChildren was re-evaluated live (a leaf that just gained its first child):
+    // the expander glyph appears without recycling the container. Called by the owner from SyncRowExpansion.
+    internal void SyncHasItems()
+    {
+        if (Row is { } row) HasItems = row.HasChildren;
+    }
+
     /// <summary>True while the pointer is over this node's OWN header row (not a descendant). Read-only; drives the hover highlight.</summary>
     public bool IsPointerOverHeader { get => GetValue<bool>(IsPointerOverHeaderProperty); private set => SetValue(IsPointerOverHeaderProperty, value); }
 
