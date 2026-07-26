@@ -15,10 +15,19 @@ namespace Adamantium.UI.Controls;
 /// node; the expander (or a double-click) toggles the node's branch in the flat list. The expander glyph is
 /// <see cref="ExpanderTemplate"/> - swap it to restyle the arrow without touching the item template.
 /// </summary>
-public class TreeViewItem : ItemsControl, IHeaderedItemsControl
+public class TreeViewItem : ItemsControl, IHeaderedItemsControl, ISpringLoadable
 {
     // The step (px) each depth level insets the row - Indent = Depth * this.
     private const double IndentStep = 16;
+
+    /// <summary>Spring-load: a drag has dwelled over this node, so expand it to reveal drop targets deeper in the tree.
+    /// The tree is flattened, so expansion must route through the owner (which splices the child rows into the flat list) -
+    /// setting IsExpanded alone only flips the glyph. Collapsed branches only; a leaf or an already-open node does nothing.</summary>
+    public void SpringLoad()
+    {
+        if (Row is { HasChildren: true, IsExpanded: false }) 
+            FindOwnerTreeView()?.ToggleRow(this);
+    }
 
     public static readonly AdamantiumProperty HeaderProperty = AdamantiumProperty.Register(nameof(Header),
         typeof(object), typeof(TreeViewItem), new PropertyMetadata(null));
@@ -191,10 +200,21 @@ public class TreeViewItem : ItemsControl, IHeaderedItemsControl
 
     private static void OnIsExpandedChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
-        if (a is TreeViewItem item && item._expander != null)
+        if (a is not TreeViewItem item)
         {
-            item._expander.IsChecked = (bool)e.NewValue;
+            return;
         }
+
+        var expanded = (bool)e.NewValue;
+        if (item._expander != null)
+        {
+            item._expander.IsChecked = expanded;
+        }
+
+        // Route EVERY IsExpanded change into the flattener - a VM two-way binding, code, or spring-load, not just the
+        // expander click - so the child rows actually splice/unsplice. The owner no-ops when the row is already in that
+        // state, so this stays idempotent with ToggleRow and with container recycling (BindRow sets it to the row's state).
+        item.FindOwnerTreeView()?.SyncRowExpansion(item, expanded);
     }
 
     private static void OnIsSelectedChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)

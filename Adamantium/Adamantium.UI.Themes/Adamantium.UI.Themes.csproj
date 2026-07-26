@@ -29,43 +29,8 @@
     <ItemGroup>
         <AdditionalFiles Include="$(ProjectDir)**\*.auml" />
         <CompilerVisibleProperty Include="RootNamespace" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\BorderStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\Brushes.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\BrushesLight.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\ButtonStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\CheckBoxStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\ContentControlStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\DropDownItemStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\DropDownStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\FlipTileStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\FluentDark.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\FluentLight.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\ItemsControlStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\ListBoxItemStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\ListBoxStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\MenuStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\OverlayWindowStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\ProgressBarStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\RadioButtonStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\RingProgressBarStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\RepeatButtonStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\ResizeGripperStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\ScrollBarStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\ScrollViewerStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\SlidePanelStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\SliderStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\TabControlStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\TabItemStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\TextBlockStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\TextBoxStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\ThumbStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\TilesHostStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\TitleBarStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\ToggleButtonStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\ToggleSwitchStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\ToolTipStyleSet.auml" />
-        <UpToDateCheckInput Include="C:\AdamantiumEngine\Adamantium\Adamantium\Adamantium.UI.Themes\FluentDarkTheme\WindowStyleSet.auml" />
         <!-- IDE up-to-date check: rebuild when generator inputs (AdditionalFiles) change. -->
+        <UpToDateCheckInput Include="@(AdditionalFiles)" />
     </ItemGroup>
 
 </Project>

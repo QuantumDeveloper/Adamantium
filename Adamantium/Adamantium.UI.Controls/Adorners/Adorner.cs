@@ -1,4 +1,3 @@
-using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Shapes;
 using Adamantium.UI.Core;
@@ -6,32 +5,43 @@ using Adamantium.UI.Core;
 namespace Adamantium.UI.Controls.Adorners;
 
 /// <summary>
-/// Base for a tooling visual drawn ON TOP of an adorned element by the framework adorner stage (it is NOT part of the
-/// content visual tree). The adorner renders in the adorned element's coordinate space - WorldTransform returns the
-/// target's - so decorations drawn at the target's bounds line up with it exactly without the adorner being laid out.
-/// This is the framework equivalent of WPF's Adorner; the designer uses it for selection frames.
+/// A visual drawn ON TOP of an adorned element by the framework adorner stage - NOT part of the content visual tree, so it
+/// never pollutes the user's tree. A full <see cref="TemplatedUIComponent"/> (WPF's Adorner is likewise a FrameworkElement),
+/// so an adorner can either draw itself in <c>OnRender</c> (the designer's selection / hover frames) OR carry a
+/// <c>ControlTemplate</c> from the theme and host a styled subtree (the drag-drop insertion cue - see
+/// <c>DropInsertionIndicator</c>). It renders in the ADORNED element's coordinate space, so its decorations line up on the
+/// target: <see cref="RenderParent"/> is the adorned element, and the adorner stage flattens the whole subtree.
 /// </summary>
-public abstract class Adorner : UIComponent
+public class Adorner : TemplatedUIComponent
 {
-    protected Adorner(UIComponent adornedElement)
+    public Adorner()
+    {
+    }
+
+    public Adorner(IUIComponent adornedElement)
     {
         AdornedElement = adornedElement;
     }
 
-    /// <summary>The element this adorner decorates; the adorner draws in its coordinate space.</summary>
-    public UIComponent AdornedElement { get; }
+    /// <summary>The element this adorner decorates; the adorner (and its template) draw in its coordinate space.</summary>
+    public IUIComponent AdornedElement { get; set; }
 
-    // Render in the adorned element's space so decorations align exactly (the adorner itself is never measured/arranged,
-    // so its own LocalTransform is the identity and WorldTransform composes to exactly the adorned element's).
-    //
-    // This is stated as the RENDER PARENT, not as a WorldTransform override, because the render pass does NOT read
-    // WorldTransform: it composes each component's transform frame-scoped from the frozen snapshot (LocalTransform x
-    // parent), and an override outside that chain is simply invisible to it - the adorner then drew at the window ORIGIN
-    // instead of on its target (only ever right for an element that happens to sit at 0,0).
+    // Stated as the RENDER PARENT, not a WorldTransform override: the render pass composes each component's transform from
+    // LocalTransform x RenderParent, so an adorner outside that chain would draw at the window origin. Pointing RenderParent
+    // at the adorned element places the adorner - and its arranged template - exactly on its target.
     public override IUIComponent RenderParent => AdornedElement;
 
     /// <summary>The adorned element's painted rectangle in its OWN local space: a Shape's stroke-aware RenderBounds,
-    /// otherwise its arranged box. This is what decorations frame.</summary>
-    protected Rect AdornedBounds =>
+    /// otherwise its arranged box. What an OnRender-drawing adorner (a selection / hover frame) decorates.</summary>
+    public Rect AdornedBounds =>
         AdornedElement is Shape shape ? shape.RenderBounds : new Rect(AdornedElement.RenderSize);
+
+    /// <summary>True if this adorner's template should be sized to fill the adorned element's bounds (a frame that wraps its
+    /// target). The adorner stage themes it and re-lays it out to <see cref="AdornedBounds"/> each frame. False for a cue
+    /// placed at a specific spot (the drop insertion indicator), which the drag engine sizes and positions itself.</summary>
+    public virtual bool FillsAdornedBounds => false;
+
+    /// <summary>Set by the adorner stage once it has applied the theme (so a themed frame is templated, not re-themed each
+    /// frame). Reset if the adorner is reused for a different element.</summary>
+    public bool ThemeApplied { get; set; }
 }

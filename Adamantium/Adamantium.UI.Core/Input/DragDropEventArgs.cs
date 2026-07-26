@@ -29,6 +29,12 @@ public class DragDropEventArgs
     public DragDropEffects Effects { get; set; } = DragDropEffects.Move;
 
     /// <summary>Index in the target's collection where the payload should be inserted (the position the insertion line
-    /// showed), or -1 to append. Set by the engine from the drop position over an items host.</summary>
+    /// showed), or -1 to append. Set by the engine from the drop position over an items host. NB: this index is computed
+    /// BEFORE the source removes its items, so in a same-list reorder it can be stale - prefer <see cref="InsertBefore"/>.</summary>
     public int InsertIndex { get; set; } = -1;
+
+    /// <summary>The item the payload should be inserted BEFORE (the item that was at the insertion point), or null to
+    /// append. Robust to a same-list reorder: this reference keeps its place after the source removes the dragged items,
+    /// so <c>target.IndexOf(InsertBefore)</c> gives the right position where a stale numeric index would not.</summary>
+    public object InsertBefore { get; set; }
 }

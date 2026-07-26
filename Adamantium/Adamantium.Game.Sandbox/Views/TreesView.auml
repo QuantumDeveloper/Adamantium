@@ -19,6 +19,7 @@
             <DropDown ItemsSource="{Binding SelectionModes}"
                       SelectedItem="{Binding SelectedMode, Mode=TwoWay}" Width="150"/>
             <Button Content="Refresh" Command="{Binding RefreshCommand}" MarginLeft="24"/>
+            <Button Content="Expand selected (from VM)" Command="{Binding ExpandSelectedCommand}" MarginLeft="12"/>
         </StackPanel>
 
         <Border Background="{ResourceReference CardBackgroundFillColorDefault}"

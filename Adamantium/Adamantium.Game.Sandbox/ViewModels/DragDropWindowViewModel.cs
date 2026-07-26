@@ -38,7 +38,7 @@ public partial class DragDropWindowViewModel : IWindowAware
     private void Drop(object arg)
     {
         if (arg is not DragDropEventArgs e) return;
-        var at = e.InsertIndex >= 0 && e.InsertIndex <= Items.Count ? e.InsertIndex : Items.Count;
+        var at = e.InsertBefore is string before && Items.IndexOf(before) is var idx and >= 0 ? idx : Items.Count;
         foreach (var item in ItemsOf(e))
         {
             if (Items.Contains(item)) continue;

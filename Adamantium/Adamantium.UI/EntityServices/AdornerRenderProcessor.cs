@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using Adamantium.Core;
 using Adamantium.ECS;
+using Adamantium.UI.Controls.Adorners;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Rendering;
@@ -40,9 +42,48 @@ public class AdornerRenderProcessor : EntityProcessor<WindowRenderService>
 
         var window = AssociatedService.Window;
         var projection = window.GetProjectionMatrix();
-        _cache.BuildFromComponents(window.Adorners, projection);
+
+        // Flatten each adorner's SUBTREE, not just the adorner: a raw Adorner draws itself (no children) but a templatable
+        // adorner hosts a styled control tree, and BuildFromComponents renders a flat list - so its content must be in it.
+        _flat.Clear();
+        foreach (var adorner in window.Adorners)
+        {
+            LayoutFrameAdorner(adorner);
+            Flatten(adorner, _flat);
+        }
+        _cache.BuildFromComponents(_flat, projection);
         _cache.ProcessCommands(projection, AssociatedService.RenderScale);
         _cache.PreRender();
+    }
+
+    private readonly List<IUIComponent> _flat = new();
+
+    // A frame adorner (selection / hover) wraps its whole element: apply the theme once so its ControlTemplate resolves,
+    // then size it to the adorned element's bounds every frame (the element can move/resize). If the theme has no template
+    // for it, Template stays null and the adorner falls back to its own OnRender - so the designer frames never disappear.
+    private static void LayoutFrameAdorner(IUIComponent adorner)
+    {
+        if (adorner is not Adorner a || !a.FillsAdornedBounds || a.AdornedElement == null) return;
+
+        if (!a.ThemeApplied)
+        {
+            a.ThemeApplied = true;
+            if (UIApplication.Current?.ThemeManager is { CurrentTheme: { } theme } manager) manager.ApplyTheme(theme, a);
+        }
+
+        if (a.Template != null)
+        {
+            var bounds = a.AdornedBounds;
+            ((IMeasurableComponent)a).Measure(bounds.Size, true);
+            ((IMeasurableComponent)a).Arrange(bounds, true);
+        }
+    }
+
+    private static void Flatten(IUIComponent component, List<IUIComponent> list)
+    {
+        if (component == null || component.Visibility != Visibility.Visible) return;
+        list.Add(component);
+        foreach (var child in component.VisualChildren) Flatten(child, list);
     }
 
     public override void Draw(AppTime gameTime) => _cache?.Render();

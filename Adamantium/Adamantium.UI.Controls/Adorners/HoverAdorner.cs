@@ -23,8 +23,13 @@ public class HoverAdorner : Adorner
     /// <summary>Frame outline colour. Default a bright designer blue, distinct from the selection frame.</summary>
     public Brush Stroke { get; set; } = new SolidColorBrush(Colors.DodgerBlue);
 
+    // The theme's HoverAdorner template wraps the whole element; the stage sizes it to the adorned bounds.
+    public override bool FillsAdornedBounds => true;
+
     protected override void OnRender(IDrawingContext context)
     {
+        if (Template != null) return;   // a themed template draws the frame - this OnRender is the no-theme fallback
+
         // Inset by half the stroke so the whole line stays within the bounds (and thus within the window framebuffer).
         var b = AdornedBounds;
         var half = FrameThickness / 2.0;

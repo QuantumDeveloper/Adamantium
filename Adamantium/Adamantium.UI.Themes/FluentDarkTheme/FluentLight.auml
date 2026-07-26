@@ -7,6 +7,9 @@
 
 	<Theme.StyleIncludes>
 		<StyleInclude Source="{x:Type fluentDark:TextBlockStyleSet}"/>
+		<StyleInclude Source="{x:Type fluentDark:DropInsertionIndicatorStyleSet}"/>
+		<StyleInclude Source="{x:Type fluentDark:SelectionAdornerStyleSet}"/>
+		<StyleInclude Source="{x:Type fluentDark:HoverAdornerStyleSet}"/>
 		<StyleInclude Source="{x:Type fluentDark:BorderStyleSet}"/>
 		<StyleInclude Source="{x:Type fluentDark:ButtonStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ContentControlStyleSet}"/>

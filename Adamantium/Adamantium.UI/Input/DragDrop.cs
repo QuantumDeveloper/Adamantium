@@ -1,9 +1,14 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Core.Commands;
+using Adamantium.UI.Core.Dispatcher;
 using Adamantium.Mathematics;
+using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.Adorners;
+using Adamantium.UI.Controls.Decorators;
+using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
@@ -24,6 +29,12 @@ public static class DragDrop
 {
     // Pixels the pointer must travel before a press becomes a drag - a click is not a drag.
     private const double DragThreshold = 4.0;
+    // How long the cursor must dwell over a spring-loadable before it activates/expands.
+    private const double SpringLoadDwellMs = 600;
+    // Auto-scroll edge band (px), timer cadence, and default speed (px/sec) if a ScrollViewer doesn't set AutoScrollSpeed.
+    private const double AutoScrollBand = 32;
+    private const double AutoScrollTickMs = 16;
+    private const double AutoScrollDefaultSpeed = 450;
     // Ghost sits down-right of the cursor so it doesn't hide it.
     private const int GhostCursorOffset = 12;
 
@@ -58,6 +69,14 @@ public static class DragDrop
 
     public static readonly AdamantiumProperty DragCompletedCommandProperty = AdamantiumProperty.RegisterAttached(
         "DragCompletedCommand", typeof(ICommand), typeof(AdamantiumComponent), new PropertyMetadata(null));
+
+    // Auto-scroll speed (px/sec) while a drag dwells in a ScrollViewer's edge band. Set it on a ScrollViewer to tune how
+    // fast that list auto-scrolls during a drop; default AutoScrollDefaultSpeed. The engine ramps it by band depth.
+    public static readonly AdamantiumProperty AutoScrollSpeedProperty = AdamantiumProperty.RegisterAttached(
+        "AutoScrollSpeed", typeof(double), typeof(AdamantiumComponent), new PropertyMetadata(AutoScrollDefaultSpeed));
+
+    public static double GetAutoScrollSpeed(AdamantiumComponent e) => e.GetValue<double>(AutoScrollSpeedProperty);
+    public static void SetAutoScrollSpeed(AdamantiumComponent e, double value) => e.SetValue(AutoScrollSpeedProperty, value);
 
     public static bool GetAllowDrag(AdamantiumComponent e) => e.GetValue<bool>(AllowDragProperty);
     public static void SetAllowDrag(AdamantiumComponent e, bool value) => e.SetValue(AllowDragProperty, value);
@@ -99,12 +118,23 @@ public static class DragDrop
     // The AllowDrop target currently under the cursor (live drag-over feedback).
     private static IUIComponent _currentTarget;
 
-    // The insertion line: which items host, where the line sits, and the resulting insert index handed to the drop.
-    private static DropInsertionAdorner _indicator;
+    // Spring-loading: dwell over an ISpringLoadable (a tab, a tree node) and it activates/expands so you can drop into
+    // content that isn't visible yet. The timer is armed on entry and fires once if the cursor is still over it.
+    private static ISpringLoadable _springTarget;
+    private static DispatcherTimer _springTimer;
+
+    // Timer-driven auto-scroll: the ScrollViewer being scrolled + how far (px, signed) to move each tick.
+    private static ScrollViewer _autoScrollViewer;
+    private static double _autoScrollPerTick;
+    private static DispatcherTimer _autoScrollTimer;
+
+    // The insertion cue: which items host, the caret's rect + orientation, and the resulting insert index handed to the drop.
+    private static DropInsertionIndicator _indicator;
     private static AdornerLayer _indicatorLayer;
-    private static ListBox _indicatorList;
-    private static double _indicatorY = double.NaN;
+    private static ItemsControl _indicatorList;
+    private static Rect _indicatorRect = Rect.Empty;
     private static int _insertIndex = -1;
+    private static object _insertBefore;   // the item at the insertion point - insert BEFORE it (robust to same-list shifts)
 
     private static IVisualRenderer _renderer;
     private static IDragGhost _ghost;
@@ -156,6 +186,8 @@ public static class DragDrop
             target = FindAllowDropAncestor(hit);
         }
 
+        UpdateSpringLoad(hit);
+
         if (!ReferenceEquals(target, _currentTarget))
         {
             if (_currentTarget != null) SetIsDragOver((AdamantiumComponent)_currentTarget, false);
@@ -172,14 +204,16 @@ public static class DragDrop
         }
     }
 
-    // The insertion line: over an AllowDrop items host, show a bar at the position an item would land and remember that
-    // index for the drop. Recreated (not mutated) when the list or line moves - a fresh adorner renders immediately.
+    // The insertion line: over an AllowDrop items host (a ListBox or a TreeView), show a bar where an item would land and
+    // remember that index for the drop. Recreated (not mutated) when the list or caret moves - a fresh adorner renders at
+    // once. The bar runs ACROSS the item flow: a horizontal caret between stacked rows, a vertical one between side-by-side
+    // items (a WrapPanel), so it reads right in any layout.
     private static void UpdateInsertionIndicator(IWindow window, IUIComponent hit)
     {
-        ListBox list = null;
+        ItemsControl list = null;
         for (var c = hit; c != null; c = c.VisualParent)
         {
-            if (c is ListBox lb) { list = lb; break; }
+            if (c is ListBox or TreeView) { list = (ItemsControl)c; break; }
         }
 
         if (list == null || window is not IAdornerHost host)
@@ -188,10 +222,13 @@ public static class DragDrop
             return;
         }
 
-        var index = ComputeInsertIndex(list, hit, out var lineY);
+        var flow = ItemFlowOrientation(list);
+        var index = ComputeInsertion(list, flow, out var caret);
         _insertIndex = index;
+        _insertBefore = index >= 0 && index < (list.Items?.Count ?? 0) ? list.Items[index] : null;   // the item after the caret
 
-        if (ReferenceEquals(list, _indicatorList) && ReferenceEquals(host.AdornerLayer, _indicatorLayer) && lineY == _indicatorY && _indicator != null)
+        if (ReferenceEquals(list, _indicatorList) && ReferenceEquals(host.AdornerLayer, _indicatorLayer)
+            && caret == _indicatorRect && _indicator != null)
         {
             return;   // nothing moved
         }
@@ -199,10 +236,27 @@ public static class DragDrop
         ClearIndicator();
         _indicatorList = list;
         _indicatorLayer = host.AdornerLayer;
-        _indicatorY = lineY;
-        _indicator = new DropInsertionAdorner(list, lineY) { Stroke = InsertionBrush() };
+        _indicatorRect = caret;
+
+        // A real, themed control: its look is a ControlTemplate from the active theme (restyle the drop cue in the theme,
+        // not here). The bar orientation is PERPENDICULAR to the item flow; the theme template keys its end caps off it.
+        var barOrientation = flow == Orientation.Vertical ? Orientation.Horizontal : Orientation.Vertical;
+        var indicator = new DropInsertionIndicator { AdornedElement = list, Orientation = barOrientation };
+        if (UIApplication.Current?.ThemeManager is { CurrentTheme: { } theme } manager) manager.ApplyTheme(theme, indicator);
+        ((IMeasurableComponent)indicator).Measure(caret.Size, true);
+        ((IMeasurableComponent)indicator).Arrange(caret, true);
+        _indicator = indicator;
         _indicatorLayer.Add(_indicator);
     }
+
+    // The item-flow direction of a host's realized panel: a WrapPanel/StackPanel expose it; anything else (the default
+    // virtualizing stack, a TreeView's flat rows) flows vertically.
+    private static Orientation ItemFlowOrientation(ItemsControl list) => list.ItemsHostPanel switch
+    {
+        WrapPanel wp => wp.Orientation,
+        StackPanel sp => sp.Orientation,
+        _ => Orientation.Vertical,
+    };
 
     // The insertion caret's colour, from the active theme (the accent) so it matches the app - not a hard-coded hue.
     private static Brush InsertionBrush()
@@ -215,41 +269,82 @@ public static class DragDrop
         return new SolidColorBrush(Colors.DodgerBlue);
     }
 
-    // Insert index + the line's Y (in the LIST's local coords) for the cursor: before/after the item under it by its
-    // mid-line; an empty area (or below all items) appends at the bottom of the last item.
-    private static int ComputeInsertIndex(ListBox list, IUIComponent hit, out double lineY)
+    // Insert index + the caret's rect (in the LIST's local coords). Two steps: (1) the nearest realized container + which
+    // side of its mid-line gives the insertion INDEX - nearest, not "directly under", because a WrapPanel's margins let a
+    // gap point fall through hit-test; (2) the caret is placed in the SEAM between item[index-1] and item[index] - the
+    // midpoint of their gap - so its position depends only on the index, not on which plate is nearest. That is what stops
+    // it sticking to one plate's edge then flipping to the other's a few px later. Mouse.GetPosition(c) gives each
+    // container's rect in list coords, so no TransformToVisual is needed.
+    private static int ComputeInsertion(ItemsControl list, Orientation flow, out Rect caret)
     {
+        const double thickness = 8.0;   // the caret's thin dimension (fits the theme template's end-cap dots)
+        var horizontal = flow == Orientation.Horizontal;
+        var listSize = list.RenderSize;
+        var count = list.Items?.Count ?? 0;
         var pList = Mouse.GetPosition((IInputComponent)list);
 
-        ListBoxItem container = null;
-        for (var c = hit; c != null && !ReferenceEquals(c, list); c = c.VisualParent)
+        IUIComponent nearest = null;
+        var nearestIndex = -1;
+        Vector2 nearestPItem = default;
+        var nearestSize = default(Size);
+        var best = double.MaxValue;
+        foreach (var i in list.ItemContainerGenerator.RealizedIndices)
         {
-            if (c is ListBoxItem li) { container = li; break; }
+            if (list.ItemContainerGenerator.ContainerFromIndex(i) is not { } c) continue;
+            var pItem = Mouse.GetPosition((IInputComponent)c);
+            var size = c.RenderSize;
+            // Squared distance from the cursor to this container's rect (0 while inside it).
+            var dx = pItem.X < 0 ? -pItem.X : pItem.X > size.Width ? pItem.X - size.Width : 0;
+            var dy = pItem.Y < 0 ? -pItem.Y : pItem.Y > size.Height ? pItem.Y - size.Height : 0;
+            var dist = dx * dx + dy * dy;
+            if (dist < best) { best = dist; nearest = c; nearestIndex = i; nearestPItem = pItem; nearestSize = size; }
         }
 
-        if (container != null)
+        if (nearest == null)   // nothing realized (empty list)
         {
-            var index = list.ItemContainerGenerator.IndexFromContainer(container);
-            var pItem = Mouse.GetPosition((IInputComponent)container);
-            var top = pList.Y - pItem.Y;                 // the item's top in list coords (a pure coordinate transform)
-            var itemHeight = container.RenderSize.Height;
-            var below = pItem.Y > itemHeight / 2.0;
-            lineY = top + (below ? itemHeight : 0);
-            return index + (below ? 1 : 0);
+            caret = horizontal ? new Rect(0, 0, thickness, listSize.Height) : new Rect(0, 0, listSize.Width, thickness);
+            return count;
         }
 
-        // No item under the cursor: append. Put the line at the bottom of the last realised item, or the top if empty.
-        var count = list.Items?.Count ?? 0;
-        if (count > 0 && list.ItemContainerGenerator.ContainerFromIndex(count - 1) is { } lastC)
+        var after = horizontal ? nearestPItem.X > nearestSize.Width / 2.0 : nearestPItem.Y > nearestSize.Height / 2.0;
+        var index = nearestIndex + (after ? 1 : 0);   // insert BEFORE item `index`
+        caret = SeamCaret(horizontal, thickness, RealizedRect(list, index - 1, pList), RealizedRect(list, index, pList));
+        return index;
+    }
+
+    // The container at `index` as a rect in the LIST's local coords (via Mouse.GetPosition), or null if not realized.
+    private static Rect? RealizedRect(ItemsControl list, int index, Vector2 pList)
+    {
+        if (index < 0 || list.ItemContainerGenerator.ContainerFromIndex(index) is not { } c) return null;
+        var pItem = Mouse.GetPosition((IInputComponent)c);
+        var size = c.RenderSize;
+        return new Rect(pList.X - pItem.X, pList.Y - pItem.Y, size.Width, size.Height);
+    }
+
+    // The caret's rect for the seam between `before` and `after`. Both on the same line -> the MIDPOINT of their gap (so it
+    // never sticks to one plate's edge and flips). A wrap/line boundary or a list end -> the single neighbour's leading /
+    // trailing edge. The caret runs ACROSS the flow, spanning that neighbour's cross-axis extent.
+    private static Rect SeamCaret(bool horizontal, double t, Rect? before, Rect? after)
+    {
+        if (before is { } b && after is { } a)
         {
-            var pLast = Mouse.GetPosition((IInputComponent)lastC);
-            lineY = (pList.Y - pLast.Y) + lastC.RenderSize.Height;
+            var sameLine = horizontal ? Math.Abs(b.Y - a.Y) < 1.0 : Math.Abs(b.X - a.X) < 1.0;
+            if (sameLine)
+            {
+                return horizontal
+                    ? new Rect((b.X + b.Width + a.X) / 2.0 - t / 2.0, b.Y, t, b.Height)
+                    : new Rect(b.X, (b.Y + b.Height + a.Y) / 2.0 - t / 2.0, b.Width, t);
+            }
+
+            // Different lines (a wrap boundary): sit at the leading edge of `after` - the start of its line.
+            return horizontal ? new Rect(a.X - t / 2.0, a.Y, t, a.Height) : new Rect(a.X, a.Y - t / 2.0, a.Width, t);
         }
-        else
-        {
-            lineY = 0;
-        }
-        return count;
+
+        if (after is { } af)    // index == 0: before the first item
+            return horizontal ? new Rect(af.X - t / 2.0, af.Y, t, af.Height) : new Rect(af.X, af.Y - t / 2.0, af.Width, t);
+        if (before is { } bf)   // index == count: after the last item
+            return horizontal ? new Rect(bf.X + bf.Width - t / 2.0, bf.Y, t, bf.Height) : new Rect(bf.X, bf.Y + bf.Height - t / 2.0, bf.Width, t);
+        return default;
     }
 
     private static void ClearIndicator()
@@ -258,8 +353,9 @@ public static class DragDrop
         _indicator = null;
         _indicatorLayer = null;
         _indicatorList = null;
-        _indicatorY = double.NaN;
+        _indicatorRect = Rect.Empty;
         _insertIndex = -1;
+        _insertBefore = null;
     }
 
     private static IUIComponent FindAllowDropAncestor(IUIComponent hit)
@@ -271,20 +367,79 @@ public static class DragDrop
         return null;
     }
 
-    // Scroll the nearest ScrollViewer when the cursor is within an edge band of it. Fires per move; holding still at the
-    // edge waits for the next move (continuous hold-to-scroll would need a timer - a later refinement).
+    // Auto-scroll: when the cursor sits in the top/bottom edge band of the nearest ScrollViewer, scroll it steadily via a
+    // TIMER (not per-move), so the speed is time-based (independent of how fast the mouse moves) and holding still at the
+    // edge keeps scrolling. Speed = DragDrop.AutoScrollSpeed (px/sec) on the ScrollViewer, ramped by how deep into the band.
     private static void AutoScroll(IUIComponent hit)
     {
+        ScrollViewer sv = null;
         for (var c = hit; c != null; c = c.VisualParent)
         {
-            if (c is not ScrollViewer sv) continue;
-            var local = Mouse.GetPosition((IInputComponent)sv);
-            var height = sv.RenderSize.Height;
-            const double band = 28, step = 20;
-            double dy = local.Y < band ? -step : local.Y > height - band ? step : 0;
-            if (dy != 0) sv.SetScrollOffset(sv.ScrollOffset + new Vector2(0, dy));
-            return;
+            if (c is ScrollViewer found) { sv = found; break; }
         }
+
+        if (sv == null) { StopAutoScroll(); return; }
+
+        var local = Mouse.GetPosition((IInputComponent)sv);
+        var height = sv.RenderSize.Height;
+        double dir = local.Y < AutoScrollBand ? -1 : local.Y > height - AutoScrollBand ? 1 : 0;
+        if (dir == 0) { StopAutoScroll(); return; }
+
+        // 0 at the band's inner edge → 1 at the very edge, so it eases in rather than jumping to full speed.
+        var depth = dir < 0 ? (AutoScrollBand - local.Y) / AutoScrollBand : (local.Y - (height - AutoScrollBand)) / AutoScrollBand;
+        depth = depth < 0 ? 0 : depth > 1 ? 1 : depth;
+        var speed = GetAutoScrollSpeed((AdamantiumComponent)sv);   // px/sec
+
+        _autoScrollViewer = sv;
+        _autoScrollPerTick = dir * speed * depth * (AutoScrollTickMs / 1000.0);
+        _autoScrollTimer ??= CreateAutoScrollTimer();
+        if (!_autoScrollTimer.IsEnabled) _autoScrollTimer.Start();
+    }
+
+    private static DispatcherTimer CreateAutoScrollTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(AutoScrollTickMs) };
+        timer.Tick += (_, _) =>
+        {
+            if (!_dragging || _autoScrollViewer == null || _autoScrollPerTick == 0) { StopAutoScroll(); return; }
+            _autoScrollViewer.SetScrollOffset(_autoScrollViewer.ScrollOffset + new Vector2(0, _autoScrollPerTick));
+        };
+        return timer;
+    }
+
+    private static void StopAutoScroll()
+    {
+        _autoScrollTimer?.Stop();
+        _autoScrollViewer = null;
+        _autoScrollPerTick = 0;
+    }
+
+    // Spring-loading: find the nearest ISpringLoadable under the cursor. While the cursor rests over the SAME one the
+    // armed timer keeps counting; move to a different one (or off any) and it restarts/stops. On fire the target activates.
+    private static void UpdateSpringLoad(IUIComponent hit)
+    {
+        ISpringLoadable target = null;
+        for (var c = hit; c != null; c = c.VisualParent)
+        {
+            if (c is ISpringLoadable s) { target = s; break; }
+        }
+
+        if (ReferenceEquals(target, _springTarget)) return;   // same element - let the running dwell continue
+        _springTarget = target;
+        _springTimer ??= CreateSpringTimer();
+        _springTimer.Stop();
+        if (target != null) _springTimer.Start();
+    }
+
+    private static DispatcherTimer CreateSpringTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(SpringLoadDwellMs) };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();   // one-shot per dwell
+            if (_dragging) _springTarget?.SpringLoad();
+        };
+        return timer;
     }
 
     private static void BeginDrag()
@@ -406,7 +561,8 @@ public static class DragDrop
         var args = new DragDropEventArgs(_data, _source, positionInTarget)
         {
             Effects = target != null ? (ctrl ? DragDropEffects.Copy : DragDropEffects.Move) : DragDropEffects.None,
-            InsertIndex = _insertIndex   // where the insertion line was; -1 if not over an items host
+            InsertIndex = _insertIndex,     // where the insertion line was; -1 if not over an items host
+            InsertBefore = _insertBefore    // the item after the caret (survives the source removal - use for a stable reorder)
         };
 
         // Order matters: the SOURCE removes (on Move) FIRST, then the TARGET adds. Dropping back into the SAME collection
@@ -459,6 +615,9 @@ public static class DragDrop
         if (_dragging && ReferenceEquals(Mouse.Captured, _source)) Mouse.Capture(null);
         if (_currentTarget != null) SetIsDragOver((AdamantiumComponent)_currentTarget, false);
         _currentTarget = null;
+        _springTimer?.Stop();
+        _springTarget = null;
+        StopAutoScroll();
         ClearIndicator();
         _source = null;
         _data = null;

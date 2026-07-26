@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Adamantium.UI.Controls.Base;
+using Adamantium.UI.Core;
 
 namespace Adamantium.UI.Controls.Adorners;
 
@@ -13,17 +14,16 @@ namespace Adamantium.UI.Controls.Adorners;
 public class AdornerLayer
 {
     private readonly List<Adorner> _selection = [];
-    private readonly List<Adorner> _overlays = [];   // general-purpose adorners (e.g. a drag-drop insertion line)
+    private readonly List<IUIComponent> _overlays = [];   // general overlays (e.g. the templatable drop-insertion indicator)
     private HoverAdorner _hover;
 
-    /// <summary>All active adorners (selection frames + general overlays + the optional hover frame) as one flat list for
+    /// <summary>All active overlays (selection frames + general overlays + the optional hover frame) as one flat list for
     /// the renderer. Selection first, overlays next, hover last so the transient hover sits on top.</summary>
-    public IReadOnlyList<Adorner> Adorners
+    public IReadOnlyList<IUIComponent> Adorners
     {
         get
         {
-            if (_overlays.Count == 0 && _hover == null) return _selection;
-            var all = new List<Adorner>(_selection.Count + _overlays.Count + 1);
+            var all = new List<IUIComponent>(_selection.Count + _overlays.Count + 1);
             all.AddRange(_selection);
             all.AddRange(_overlays);
             if (_hover != null) all.Add(_hover);
@@ -31,14 +31,14 @@ public class AdornerLayer
         }
     }
 
-    /// <summary>Add a general overlay adorner (rendered on top of the content). Idempotent.</summary>
-    public void Add(Adorner adorner)
+    /// <summary>Add a general overlay (a raw Adorner or a templatable one), rendered on top of the content. Idempotent.</summary>
+    public void Add(IUIComponent overlay)
     {
-        if (adorner != null && !_overlays.Contains(adorner)) _overlays.Add(adorner);
+        if (overlay != null && !_overlays.Contains(overlay)) _overlays.Add(overlay);
     }
 
-    /// <summary>Remove a previously added overlay adorner.</summary>
-    public void Remove(Adorner adorner) => _overlays.Remove(adorner);
+    /// <summary>Remove a previously added overlay.</summary>
+    public void Remove(IUIComponent overlay) => _overlays.Remove(overlay);
 
     /// <summary>Replaces the persistent selection with one frame per element (the designer calls this on click).
     /// Null/empty clears the selection.</summary>

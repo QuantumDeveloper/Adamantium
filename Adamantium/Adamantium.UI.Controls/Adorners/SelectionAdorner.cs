@@ -28,8 +28,13 @@ public class SelectionAdorner : Adorner
     /// <summary>Corner handle fill. Default white.</summary>
     public Brush HandleFill { get; set; } = new SolidColorBrush(Colors.White);
 
+    // The theme's SelectionAdorner template wraps the whole element; the stage sizes it to the adorned bounds.
+    public override bool FillsAdornedBounds => true;
+
     protected override void OnRender(IDrawingContext context)
     {
+        if (Template != null) return;   // a themed template draws the frame + handles - this OnRender is the no-theme fallback
+
         // Inset the frame by half the stroke so the whole 4px line sits within the bounds (never clipped at a window edge).
         var b = AdornedBounds;
         var half = FrameThickness / 2.0;
