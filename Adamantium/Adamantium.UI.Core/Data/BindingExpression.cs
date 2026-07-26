@@ -112,6 +112,17 @@ public class BindingExpression : BindingExpressionBase
 
       // Source object genuinely changed: tear down the old subscription and establish the new one.
       CloseConnection();
+
+      // OneWayToSource: the flow is TARGET -> SOURCE only. Never observe or push the source; write its initial value from
+      // the target, then update it whenever the target changes (a target with a read-only/private-set property that can't
+      // be bound TwoWay - e.g. reading a control's SelectedItem out into a view-model).
+      if (Mode == BindingMode.OneWayToSource && !IsProducer)
+      {
+         UpdateSource();
+         if (Target != null) Target.PropertyChanged += OnTargetPropertyChanged;
+         return;
+      }
+
       Refresh();                    // initial push (or produce)
       if (newObserved != null)
       {
@@ -143,7 +154,7 @@ public class BindingExpression : BindingExpressionBase
          _observedComponent.PropertyChanged -= OnSourceComponentChanged;
          _observedComponent = null;
       }
-      if (Mode == BindingMode.TwoWay && !IsProducer && Target != null)
+      if ((Mode == BindingMode.TwoWay || Mode == BindingMode.OneWayToSource) && !IsProducer && Target != null)
          Target.PropertyChanged -= OnTargetPropertyChanged;
    }
 
@@ -236,7 +247,7 @@ public class BindingExpression : BindingExpressionBase
 
    private void OnTargetPropertyChanged(object sender, AdamantiumPropertyChangedEventArgs e)
    {
-      if (Mode == BindingMode.TwoWay && e.Property == TargetProperty)
+      if ((Mode == BindingMode.TwoWay || Mode == BindingMode.OneWayToSource) && e.Property == TargetProperty)
          UpdateSource();
    }
 

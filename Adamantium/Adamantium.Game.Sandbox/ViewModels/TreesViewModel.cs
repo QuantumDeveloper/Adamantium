@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
@@ -45,24 +44,16 @@ public partial class TreesViewModel : TabPageViewModel
     /// <summary>Re-read the current drive from scratch (generates RefreshCommand) - collapses back to a fresh root.</summary>
     [Command] private void Refresh() => LoadDrive();
 
+    /// <summary>The tree's selected node, pulled out of the control via a ONE-WAY-TO-SOURCE binding on TreeView.SelectedItem
+    /// (which is read-only to markup - private set - so it can't be TwoWay). Target -> source only.</summary>
+    [Bindable] private object _selectedNode;
+
     /// <summary>Expand the selected node from the VIEW-MODEL side (generates ExpandSelectedCommand): set the node's own
     /// IsExpanded, which flows through the container's two-way binding into the tree. Proves programmatic/VM-driven
     /// expansion materializes the children live (not just the expander click).</summary>
     [Command] private void ExpandSelected()
     {
-        if (FindSelected(Nodes) is { } node) node.IsExpanded = true;
-    }
-
-    // The selected node lives as state ON the nodes (IsSelected is two-way bound), so find it by walking the loaded tree.
-    private static TreeNode FindSelected(IEnumerable<TreeNode> nodes)
-    {
-        foreach (var node in nodes)
-        {
-            if (node.IsSelected) return node;
-            if (FindSelected(node.Children) is { } found) return found;
-        }
-
-        return null;
+        if (SelectedNode is TreeNode node) node.IsExpanded = true;
     }
 
     // Point the tree at the selected drive's root. Only the root node is created here; everything below loads lazily on
