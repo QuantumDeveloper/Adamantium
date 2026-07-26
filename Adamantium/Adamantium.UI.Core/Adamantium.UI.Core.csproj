@@ -14,6 +14,14 @@
     </ItemGroup>
 
     <ItemGroup>
+        <!-- Drag-copy cursor (arrow + green plus): no standard Win32 IDC_COPY exists, so ship a .cur and load it via
+             LoadCursorFromFile. Copied next to the app so Cursors.DragCopy can resolve it at AppContext.BaseDirectory. -->
+        <Content Include="Resources\dragcopy.cur">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+    </ItemGroup>
+
+    <ItemGroup>
         <ProjectReference Include="..\Adamantium.ECS\Adamantium.ECS.csproj"/>
         <ProjectReference Include="..\Adamantium.Fonts\Adamantium.Fonts.csproj"/>
         <ProjectReference Include="..\Adamantium.MacOS\Adamantium.MacOS.csproj"/>

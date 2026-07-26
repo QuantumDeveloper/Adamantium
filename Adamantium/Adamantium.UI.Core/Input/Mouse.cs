@@ -107,7 +107,20 @@ public static class Mouse
       set
       {
          _cursor = value;
-         Win32Interop.SetCursor(value.CursorHandle);
+         Win32Interop.SetCursor((OverrideCursor ?? value).CursorHandle);   // an active override wins over per-element cursors
+      }
+   }
+
+   // App-wide cursor override (WPF's Mouse.OverrideCursor): while set, it wins over per-element hover cursors and the
+   // WM_SETCURSOR default - the mechanism a drag uses to show its Copy/Move/No feedback. Applied immediately on set so it
+   // changes live (no wait for the next hover move); clear to null to restore normal per-element cursors.
+   public static Cursor OverrideCursor
+   {
+      get => PrimaryDevice.OverrideCursor;
+      set
+      {
+         PrimaryDevice.OverrideCursor = value;
+         Win32Interop.SetCursor((value ?? _cursor).CursorHandle);
       }
    }
 
