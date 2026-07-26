@@ -2,11 +2,12 @@
 <StyleSet xmlns="http://adamantium/ui"
           xmlns:x="http://adamantium/ui/xaml/extensions">
 
-    <!-- Plain text follows the theme's primary text colour from the palette, so a Dark<->Light swap re-colours labels
-         (a {ResourceReference} re-resolves when the style is re-applied on the swap). Without this, TextBlock kept its
-         hard-coded default (white) and was invisible on the light theme's light background. -->
-    <Style Selector="TextBlock">
-        <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
-    </Style>
+    <!-- No default Foreground on TextBlock. Plain text takes the theme's primary colour by INHERITANCE from the window
+         (WindowStyleSet sets Foreground = TextFillColorPrimary), NOT a per-TextBlock Style setter. A Style-priority
+         Foreground here would outrank the Inherited value a control pushes onto its content on a state change (a selected
+         ListBoxItem recolouring its text to AccentForegroundColor), so templated content text could never follow selection/
+         pressed/disabled - invisible in the dark theme (both ~white), wrong in the light theme. Inheritance lets the nearest
+         ancestor win: the window default applies to loose text, a control overrides it for its own content. -->
+    <!-- (intentionally no TextBlock Foreground style - see above) -->
 
 </StyleSet>

@@ -271,6 +271,10 @@ public class ContentPresenter : InputUIComponent
 
     private void ApplyTextStyle()
     {
+        // The auto-generated TextBlock carries an EXPLICIT Foreground/FontSize (set when it was built), so inheritance
+        // wouldn't reach it - re-push on change. TEMPLATED content needs nothing here: it inherits the presenter's
+        // Foreground/FontSize naturally (the change cascades via ParentPropertyChanged), now that no per-TextBlock Style
+        // sits at a higher priority masking it - see TextBlockStyleSet.
         if (_currentRoot is not TextBlock textBlock) return;
         textBlock.FontSize = FontSize;
         if (Foreground != null) textBlock.Foreground = Foreground;
