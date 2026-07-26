@@ -41,12 +41,13 @@
         <TextBox Text="{Binding Message}" IsReadOnly="True"
                  Width="520" HorizontalAlignment="Left"/>
 
-        <!-- Multi-line editor: AcceptsReturn (Enter inserts a newline) + soft word wrapping, a fixed height so extra
-             lines scroll (caret-follow). Arrow Up/Down navigate lines; selection spans multiple rows. -->
-        <TextBlock Text="Multi-line (AcceptsReturn + WrapByWords):" Margin="0,16,0,6"/>
+        <!-- Multi-line editor: AcceptsReturn (Enter inserts a newline), NO wrap so long lines scroll horizontally. Both bars
+             are Auto - the horizontal one via the shared ScrollViewer.HorizontalScrollBarVisibility attached policy on the
+             TextBox (TextBoxBase now uses the attached props, not its own). Arrow keys navigate; selection spans rows. -->
+        <TextBlock Text="Multi-line (AcceptsReturn, no wrap → H + V scroll):" Margin="0,16,0,6"/>
         <TextBox Text="{Binding Notes, Mode=TwoWay}"
-                 AcceptsReturn="True" TextWrapping="WrapByWords"
-                 VerticalScrollBarVisibility="Auto"
+                 AcceptsReturn="True" TextWrapping="NoWrap"
+                 VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                  Width="520" Height="120" HorizontalAlignment="Left"/>
 
         <!-- Bindable Runs: a single TextBlock built from Run inlines. The middle run's Text binds to Message (updates

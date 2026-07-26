@@ -88,7 +88,8 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
    public double CellScroll => _cellScroll;
 
    public static readonly AdamantiumProperty OrientationProperty = AdamantiumProperty.Register(nameof(Orientation),
-      typeof(Orientation), typeof(WrapPanel), new PropertyMetadata(Orientation.Horizontal, PropertyMetadataOptions.AffectsMeasure|PropertyMetadataOptions.AffectsArrange));
+      typeof(Orientation), typeof(WrapPanel), new PropertyMetadata(Orientation.Horizontal,
+         PropertyMetadataOptions.AffectsMeasure|PropertyMetadataOptions.AffectsArrange));
 
    // AffectsMeasure (not just AffectsArrange): the virtualizing cell size is computed in MeasureVirtualized (SeedCell
    // reads ItemWidth/ItemHeight). If only arrange were invalidated, a slider-driven size change wouldn't recompute the

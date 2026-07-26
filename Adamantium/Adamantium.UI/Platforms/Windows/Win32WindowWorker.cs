@@ -87,6 +87,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         messageTable[(uint)WindowMessages.Xbuttondblclk] = HandleMouseLeftButtonDown;
 
         messageTable[(uint)WindowMessages.MouseWheel] = HandleMouseWheel;
+        messageTable[(uint)WindowMessages.MouseHwheel] = HandleMouseWheel;   // horizontal (tilt) wheel
         messageTable[(uint)WindowMessages.Setcursor] = HandleSetCursor;
         messageTable[BeginMoveDragMessage] = HandleBeginMoveDrag;
         messageTable[RelativeModeMessage] = HandleRelativeModeMessage;
@@ -823,12 +824,13 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     private IntPtr HandleMouseWheel(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
         var eventArgs = new RawMouseWheelEventArgs(
-            Messages.GetWheelDelta(wParam), 
-            RawMouseEventType.MouseWheel, 
+            Messages.GetWheelDelta(wParam),
+            RawMouseEventType.MouseWheel,
             window,
             window.PointToClient(Messages.PointFromLParam(lParam)),
             WindowsMouseDeviceExtension.GetKeyModifiers(windowMessage, wParam),
-            MouseDevice.CurrentDevice, GetTimeStamp());
+            MouseDevice.CurrentDevice, GetTimeStamp(),
+            windowMessage == WindowMessages.MouseHwheel);
         DispatchInput(() => MouseDevice.CurrentDevice.ProcessEvent(eventArgs));
         handled = true;
         return IntPtr.Zero;
