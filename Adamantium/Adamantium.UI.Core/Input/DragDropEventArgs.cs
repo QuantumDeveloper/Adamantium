@@ -22,6 +22,11 @@ public class DragDropEventArgs
     /// <summary>The drag source element (the one that carried <c>DragDrop.DragData</c>).</summary>
     public object Source { get; }
 
+    /// <summary>The ItemsSource of the source's items host (its ListBox/ItemsControl), if any. Lets a view-model identify the
+    /// ORIGIN collection by reference - unambiguous even when equal values live in several lists (after a Copy) - so a Move
+    /// removes from the collection actually dragged from, without the view-model touching the visual tree.</summary>
+    public object SourceItemsSource { get; set; }
+
     /// <summary>Pointer position in the drop target's coordinate space.</summary>
     public Vector2 Position { get; }
 

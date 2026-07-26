@@ -25,6 +25,9 @@ public class DragSourceBehavior : Behavior<AdamantiumComponent>
     public static readonly AdamantiumProperty CompletedCommandProperty = AdamantiumProperty.Register(nameof(CompletedCommand),
         typeof(ICommand), typeof(DragSourceBehavior), new PropertyMetadata(null, OnChanged));
 
+    public static readonly AdamantiumProperty DragTemplateProperty = AdamantiumProperty.Register(nameof(DragTemplate),
+        typeof(Adamantium.UI.Core.Templates.DataTemplate), typeof(DragSourceBehavior), new PropertyMetadata(null, OnChanged));
+
     /// <summary>Whether the host can start a drag (default true).</summary>
     public bool AllowDrag { get => GetValue<bool>(AllowDragProperty); set => SetValue(AllowDragProperty, value); }
 
@@ -37,6 +40,13 @@ public class DragSourceBehavior : Behavior<AdamantiumComponent>
     /// <summary>Fires when the drag ends with the final Effects (the source removes on Move).</summary>
     public ICommand CompletedCommand { get => GetValue(CompletedCommandProperty) as ICommand; set => SetValue(CompletedCommandProperty, value); }
 
+    /// <summary>Optional custom ghost: a DataTemplate pictured (bound to <see cref="Data"/>) instead of a snapshot of the host.</summary>
+    public Adamantium.UI.Core.Templates.DataTemplate DragTemplate
+    {
+        get => GetValue(DragTemplateProperty) as Adamantium.UI.Core.Templates.DataTemplate;
+        set => SetValue(DragTemplateProperty, value);
+    }
+
     protected override void OnAttached(AdamantiumComponent component) => Sync();
 
     protected override void OnDetached(AdamantiumComponent component)
@@ -45,6 +55,7 @@ public class DragSourceBehavior : Behavior<AdamantiumComponent>
         DragDrop.SetDragData(component, null);
         DragDrop.SetDragStartedCommand(component, null);
         DragDrop.SetDragCompletedCommand(component, null);
+        DragDrop.SetDragTemplate(component, null);
     }
 
     private static void OnChanged(AdamantiumComponent b, AdamantiumPropertyChangedEventArgs e) => ((DragSourceBehavior)b).Sync();
@@ -57,5 +68,6 @@ public class DragSourceBehavior : Behavior<AdamantiumComponent>
         DragDrop.SetDragData(c, Data);
         DragDrop.SetDragStartedCommand(c, StartedCommand);
         DragDrop.SetDragCompletedCommand(c, CompletedCommand);
+        DragDrop.SetDragTemplate(c, DragTemplate);
     }
 }
