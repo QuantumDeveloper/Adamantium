@@ -125,7 +125,7 @@ public class AncestorBindingExpression : BindingExpressionBase
     }
 
     private bool IsTargetAttached()
-        => _def.Logical ? Target?.LogicalParent != null
+        => _def.Logical ? Target?.GetLogicalParentOrBridge() != null
          : Target is IUIComponent visual ? visual.VisualParent != null
          : Target?.LogicalParent != null;   // non-visual (a Behavior): attached once it has a host
 
@@ -198,7 +198,9 @@ public class AncestorBindingExpression : BindingExpressionBase
 
         if (_def.Logical)
         {
-            for (var cur = Target.LogicalParent; cur != null; cur = cur.LogicalParent)
+            // Logical walk BRIDGES template boundaries via TemplatedParent (GetLogicalParentOrBridge) - otherwise it
+            // dead-ends at each container's template part and never reaches the ItemsControl. See docs/TREE_MODEL_DESIGN.md.
+            for (var cur = Target.GetLogicalParentOrBridge(); cur != null; cur = cur.GetLogicalParentOrBridge())
             {
                 if (_def.Stop != null && _def.Stop.IsInstanceOfType(cur)) return null;
                 if (Matches(cur) && skip-- <= 0) return cur;

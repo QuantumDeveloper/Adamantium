@@ -23,8 +23,24 @@ public class Adorner : TemplatedUIComponent
         AdornedElement = adornedElement;
     }
 
-    /// <summary>The element this adorner decorates; the adorner (and its template) draw in its coordinate space.</summary>
-    public IUIComponent AdornedElement { get; set; }
+    private IUIComponent _adornedElement;
+
+    /// <summary>The element this adorner decorates; the adorner (and its template) draw in its coordinate space. Setting it
+    /// also makes the adorned element the adorner's INHERITANCE parent, so the adorner inherits its DataContext/inherited
+    /// values (a themed adorner can bind {Binding}). We wire InheritanceParent directly - NOT AddLogicalChild - because an
+    /// adorner is framework chrome themed OUT-OF-BAND by the adorner stage (like a template root, see AddTemplateChild): a
+    /// full logical-child join fires SetParent -> ApplyCurrentTheme on every adorner, which rebuilds its template (and
+    /// re-subscribes its {ThemeResource}s to the global Theme) on every hover/selection/drag cue. See docs/TREE_MODEL_DESIGN.md.</summary>
+    public IUIComponent AdornedElement
+    {
+        get => _adornedElement;
+        set
+        {
+            if (ReferenceEquals(_adornedElement, value)) return;
+            _adornedElement = value;
+            InheritanceParent = value as AdamantiumComponent;
+        }
+    }
 
     // Stated as the RENDER PARENT, not a WorldTransform override: the render pass composes each component's transform from
     // LocalTransform x RenderParent, so an adorner outside that chain would draw at the window origin. Pointing RenderParent

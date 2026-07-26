@@ -427,7 +427,11 @@ public static class DragDrop
     // over empty space yet still wants Placement/DropTarget for the drop).
     private static void ClearIndicatorVisual()
     {
-        if (_indicator != null) _indicatorLayer?.Remove(_indicator);
+        if (_indicator != null)
+        {
+            _indicatorLayer?.Remove(_indicator);
+            _indicator.AdornedElement = null;   // drop the inheritance link so the host doesn't retain the cue
+        }
         _indicator = null;
         _indicatorLayer = null;
         _indicatorList = null;
