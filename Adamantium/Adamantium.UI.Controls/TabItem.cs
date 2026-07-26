@@ -16,7 +16,7 @@ namespace Adamantium.UI.Controls;
 /// selects it. Like every item container its <see cref="IsSelected"/> state is driven BY the owning TabControl, so it
 /// stays correct as tabs are added/removed; the rest/hover/selected chrome is projected from the theme via triggers.
 /// </summary>
-public class TabItem : ContentControl, ISelectable
+public class TabItem : ContentControl, ISelectable, ISpringLoadable
 {
     public static readonly AdamantiumProperty HeaderProperty = AdamantiumProperty.Register(nameof(Header),
         typeof(object), typeof(TabItem), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure));
@@ -239,6 +239,10 @@ public class TabItem : ContentControl, ISelectable
     private bool _dragging;
 
     private TabControl Owner => this.GetVisualAncestors().OfType<TabControl>().FirstOrDefault();
+
+    /// <summary>Spring-load: a drag has dwelled over this tab, so activate it (same path as a click) - the body swaps in
+    /// and you can drop into its content.</summary>
+    public void SpringLoad() => Owner?.SelectTab(this);
 
     protected override void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {

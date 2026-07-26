@@ -1,5 +1,6 @@
 <View xmlns="http://adamantium/ui"
       xmlns:x="http://adamantium/ui/xaml/extensions">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
     <StackPanel Orientation="Vertical" Margin="24">
 
         <TextBlock Text="Drag &amp; Drop (in-window)" FontSize="20" MarginBottom="4"/>
@@ -74,6 +75,93 @@
                 </StackPanel>
             </Border>
 
+            <Border CornerRadius="8" Padding="12" Width="340" MinHeight="300" MarginLeft="16" BorderThickness="2"
+                    DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropWrapCommand}">
+                <Border.Styles>
+                    <Style Selector="Border">
+                        <Setter Property="Background" Value="#FF141C28"/>
+                        <Setter Property="BorderBrush" Value="#003BE27A"/>
+                        <PropertyTrigger Property="DragDrop.IsDragOver" Value="True">
+                            <Setter Property="Background" Value="#FF16241C"/>
+                            <Setter Property="BorderBrush" Value="#FF3BE27A"/>
+                        </PropertyTrigger>
+                    </Style>
+                </Border.Styles>
+                <StackPanel Orientation="Vertical">
+                    <TextBlock Text="Colors (WrapPanel)" Foreground="#FFB080E0" MarginBottom="6"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <TextBlock Text="Flow:" VerticalAlignment="Center" MarginRight="8"/>
+                        <DropDown ItemsSource="{Binding Orientations}"
+                                  SelectedItem="{Binding WrapOrientation, Mode=TwoWay}" Width="130"/>
+                    </StackPanel>
+                    <ListBox ItemsSource="{Binding Wrap}" SelectedItems="{Binding WrapSelection}"
+                             SelectionMode="Extended" Background="Transparent" MaxHeight="240"
+                             ScrollViewer.HorizontalScrollBarVisibility="{Binding WrapHScroll}"
+                             ScrollViewer.VerticalScrollBarVisibility="{Binding WrapVScroll}">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="{Binding WrapOrientation}" ItemWidth="92" ItemHeight="40"/>
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <!-- The chip IS the container (one plate): the theme ListBoxItem sizes to its text and shows rest +
+                             selection consistently. The template is just a transparent draggable surface + the label. -->
+                        <ListBox.ItemContainerStyle>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Background" Value="#FF2E3B4E"/>
+                                <Setter Property="CornerRadius" Value="6"/>
+                                <Setter Property="Margin" Value="4"/>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="Transparent"
+                                        DragDrop.AllowDrag="True" DragDrop.DragData="{Binding}"
+                                        DragDrop.DragStartedCommand="{Ancestor ItemsControl, DataContext.DragStartedCommand}"
+                                        DragDrop.DragCompletedCommand="{Ancestor ItemsControl, DataContext.DragCompletedCommand}">
+                                    <TextBlock Text="{Binding}" VerticalAlignment="Center" VerticalTextAlignment="Center"/>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" MarginTop="16">
+            <Border CornerRadius="8" Padding="12" Width="300" MinHeight="280" BorderThickness="2"
+                    DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropTreeCommand}">
+                <Border.Styles>
+                    <Style Selector="Border">
+                        <Setter Property="Background" Value="#FF141C28"/>
+                        <Setter Property="BorderBrush" Value="#003BE27A"/>
+                        <PropertyTrigger Property="DragDrop.IsDragOver" Value="True">
+                            <Setter Property="Background" Value="#FF16241C"/>
+                            <Setter Property="BorderBrush" Value="#FF3BE27A"/>
+                        </PropertyTrigger>
+                    </Style>
+                </Border.Styles>
+                <StackPanel Orientation="Vertical">
+                    <TextBlock Text="Tree — dwell a folder to auto-expand" Foreground="#FF60C878" MarginBottom="10"/>
+                    <TreeView ItemsSource="{Binding Tree}" MaxHeight="230">
+                        <TreeView.ItemContainerStyle>
+                            <Style Selector="TreeViewItem">
+                                <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
+                                <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                            </Style>
+                        </TreeView.ItemContainerStyle>
+                        <TreeView.ItemTemplate>
+                            <HierarchicalDataTemplate ItemsSource="{Binding Children}">
+                                <Border Background="Transparent"
+                                        DragDrop.AllowDrag="True" DragDrop.DragData="{Binding Title}">
+                                    <TextBlock Text="{Binding Title}" VerticalAlignment="Center"/>
+                                </Border>
+                            </HierarchicalDataTemplate>
+                        </TreeView.ItemTemplate>
+                    </TreeView>
+                </StackPanel>
+            </Border>
         </StackPanel>
     </StackPanel>
+    </ScrollViewer>
 </View>

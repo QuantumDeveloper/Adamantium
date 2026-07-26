@@ -53,6 +53,10 @@ public class TreeView : ItemsControl
     // persists across a view rebuild and reaches OFF-SCREEN rows that have no container. No-op if the style doesn't bind it.
     private Action<object, bool> _setNodeSelected = static (_, _) => { };
 
+    // Writes a node's OWN IsExpanded (the ItemContainerStyle's IsExpanded binding path), so SyncRowExpansion can trigger a
+    // lazy branch's load synchronously BEFORE the flattener reads its children - no reliance on binding-vs-callback order.
+    private Action<object, bool> _setNodeExpanded = static (_, _) => { };
+
     // Two-way scroll-offset plumbing: _scrollViewer is the template's ScrollViewer; _applyingOffset guards the property
     // <-> scrollbar echo from looping; a set offset that can't land yet (extent not measured) is kept _desired and retried
     // as the metrics settle.
@@ -93,10 +97,12 @@ public class TreeView : ItemsControl
         // Expansion + selection paths from the ItemContainerStyle's IsExpanded / IsSelected setter bindings. Letting a
         // rebuild RESTORE the branches/rows the view-model still marks (a tab switch recreates this view, but the VM - and
         // its expanded + selected state - persists). Read from the style's own setters, so there's no second place to declare them.
+        var expandPath = MemberPath(nameof(TreeViewItem.IsExpanded));
         var selectPath = MemberPath(nameof(TreeViewItem.IsSelected));
         _flattener = new TreeFlattener(TreeChildResolver.ForPath(childPath),
-            TreeChildResolver.ForBoolPath(MemberPath(nameof(TreeViewItem.IsExpanded))),
+            TreeChildResolver.ForBoolPath(expandPath),
             TreeChildResolver.ForBoolPath(selectPath));
+        _setNodeExpanded = TreeChildResolver.SetterForBoolPath(expandPath);
         _setNodeSelected = TreeChildResolver.SetterForBoolPath(selectPath);
         _flattener.SetRoots(_roots);
         Items.SetSource(_flattener.Rows);   // the flat rows are now the effective item list -> virtualized directly
@@ -236,25 +242,36 @@ public class TreeView : ItemsControl
         }
     }
 
-    // Expand/collapse a row (from its expander or a double-click). Setting the container's IsExpanded FIRST drives the
-    // node's own IsExpanded (the ItemContainerStyle two-way binding) so a lazy branch reads its contents BEFORE the
-    // flattener splices them - no placeholder flash. The flattener then splices/removes the subtree as one range edit.
+    // Expand/collapse a row (from its expander or a double-click). Just flip the container's IsExpanded: the change routes
+    // through OnIsExpandedChanged -> SyncRowExpansion, the SINGLE splice point that also serves VM-driven expansion.
     internal void ToggleRow(TreeViewItem container)
     {
-        if (container.Row is not { HasChildren: true } row || _flattener == null)
+        if (container.Row is { HasChildren: true } row)
+        {
+            container.IsExpanded = !row.IsExpanded;
+        }
+    }
+
+    // The single point where a container's IsExpanded change drives the flat list: its expander, a VM two-way binding, code,
+    // or spring-load all land here (via OnIsExpandedChanged). Sync the node's OWN IsExpanded FIRST so a lazy branch reads its
+    // contents BEFORE the flattener splices them - no placeholder flash - then splice/remove the subtree as one range edit.
+    // No-op when the row is already in that state, so it's safe on every change: ToggleRow, restore-on-rebuild, recycling.
+    internal void SyncRowExpansion(TreeViewItem container, bool expanded)
+    {
+        if (_flattener == null || container.Row is not { } row || row.IsExpanded == expanded)
         {
             return;
         }
 
-        var expanding = !row.IsExpanded;
-        container.IsExpanded = expanding;
-        if (expanding)
+        if (expanded)
         {
+            _setNodeExpanded(row.Node, true);   // trigger the lazy load before the flattener reads the children
             _flattener.Expand(row);
         }
         else
         {
             _flattener.Collapse(row);
+            _setNodeExpanded(row.Node, false);
         }
     }
 

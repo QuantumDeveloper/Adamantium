@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions"
+          xmlns:controls="http://adamantium/ui">
+
+    <!-- The drag-drop insertion cue: a slim accent capsule showing where a dragged item will land. A real templated control,
+         so the drop cue restyles PURELY here - the drag engine only creates it, sets its Orientation from the target list's
+         flow, and sizes it to the insertion span. Default is a HORIZONTAL bar (a caret between stacked rows); the
+         Orientation=Vertical trigger swaps to the VERTICAL bar (a caret between side-by-side items, e.g. a WrapPanel). -->
+    <Style Selector="DropInsertionIndicator">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DropInsertionIndicator">
+                    <controls:Grid>
+                        <controls:Border x:Name="BarH" Height="3" CornerRadius="1.5"
+                                         Background="{ThemeResource AccentFillColorDefault}"
+                                         VerticalAlignment="Center" HorizontalAlignment="Stretch"/>
+                        <controls:Border x:Name="BarV" Width="3" CornerRadius="1.5"
+                                         Background="{ThemeResource AccentFillColorDefault}"
+                                         VerticalAlignment="Stretch" HorizontalAlignment="Center"
+                                         Visibility="Collapsed"/>
+                    </controls:Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="DropInsertionIndicator">
+        <!-- Vertical caret: hide the horizontal bar, show the vertical one. -->
+        <PropertyTrigger Property="Orientation" Value="Vertical">
+            <Setter TargetName="BarH" Property="Visibility" Value="Collapsed"/>
+            <Setter TargetName="BarV" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+    </Style>
+</StyleSet>
