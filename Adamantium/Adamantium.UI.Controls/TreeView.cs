@@ -267,6 +267,7 @@ public class TreeView : ItemsControl
         {
             _setNodeExpanded(row.Node, true);   // trigger the lazy load before the flattener reads the children
             _flattener.Expand(row);
+            container.SyncHasItems();   // a former leaf may have just become a branch -> reveal its expander
         }
         else
         {

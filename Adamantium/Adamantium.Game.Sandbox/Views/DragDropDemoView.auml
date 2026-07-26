@@ -23,21 +23,21 @@
                 </Border.Behaviors>
                 <Border.Styles>
                     <Style Selector="Border">
-                        <Setter Property="Background" Value="#FF141C28"/>
-                        <Setter Property="BorderBrush" Value="#003BE27A"/>
+                        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+                        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
                         <PropertyTrigger Property="DragDrop.IsDragOver" Value="True">
-                            <Setter Property="Background" Value="#FF16241C"/>
-                            <Setter Property="BorderBrush" Value="#FF3BE27A"/>
+                            <Setter Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+                            <Setter Property="BorderBrush" Value="{ResourceReference SystemFillColorSuccess}"/>
                         </PropertyTrigger>
                     </Style>
                 </Border.Styles>
                 <StackPanel Orientation="Vertical">
-                    <TextBlock Text="Fruits" Foreground="#FFE0B040" MarginBottom="10"/>
+                    <TextBlock Text="Fruits" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="10"/>
                     <ListBox ItemsSource="{Binding Left}" SelectedItems="{Binding LeftSelection}"
                              SelectionMode="Extended" Background="Transparent" MaxHeight="240">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="#FF2E3B4E" CornerRadius="6" Padding="10" MarginBottom="6">
+                                <Border Background="{ResourceReference TileFillColorDefault}" CornerRadius="6" Padding="10" MarginBottom="6">
                                     <!-- DragSourceBehavior: Data={Binding} = the item (behavior inherits the item's DataContext);
                                          the source-lifecycle commands reach the VM via the default VISUAL ancestor walk from
                                          the behavior's host, which crosses the item's template boundary to the ItemsControl. -->
@@ -46,7 +46,9 @@
                                                             StartedCommand="{Ancestor ItemsControl, DataContext.DragStartedCommand}"
                                                             CompletedCommand="{Ancestor ItemsControl, DataContext.DragCompletedCommand}"/>
                                     </Border.Behaviors>
-                                    <TextBlock Text="{Binding}" Foreground="#FFFFFFFF"/>
+                                    <!-- No explicit Foreground: inherit it, so the ListBoxItem theme's ForegroundSelected
+                                         ({ThemeResource AccentForegroundColor}) gives contrast-correct text on the accent selection. -->
+                                    <TextBlock Text="{Binding}"/>
                                 </Border>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
@@ -58,25 +60,27 @@
                     DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropRightCommand}">
                 <Border.Styles>
                     <Style Selector="Border">
-                        <Setter Property="Background" Value="#FF141C28"/>
-                        <Setter Property="BorderBrush" Value="#003BE27A"/>
+                        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+                        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
                         <PropertyTrigger Property="DragDrop.IsDragOver" Value="True">
-                            <Setter Property="Background" Value="#FF16241C"/>
-                            <Setter Property="BorderBrush" Value="#FF3BE27A"/>
+                            <Setter Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+                            <Setter Property="BorderBrush" Value="{ResourceReference SystemFillColorSuccess}"/>
                         </PropertyTrigger>
                     </Style>
                 </Border.Styles>
                 <StackPanel Orientation="Vertical">
-                    <TextBlock Text="Animals" Foreground="#FF40C0E0" MarginBottom="10"/>
+                    <TextBlock Text="Animals" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="10"/>
                     <ListBox ItemsSource="{Binding Right}" SelectedItems="{Binding RightSelection}"
                              SelectionMode="Extended" Background="Transparent" MaxHeight="240">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="#FF2E3B4E" CornerRadius="6" Padding="10" MarginBottom="6"
+                                <Border Background="{ResourceReference TileFillColorDefault}" CornerRadius="6" Padding="10" MarginBottom="6"
                                         DragDrop.AllowDrag="True" DragDrop.DragData="{Binding}"
                                         DragDrop.DragStartedCommand="{Ancestor ItemsControl, DataContext.DragStartedCommand}"
                                         DragDrop.DragCompletedCommand="{Ancestor ItemsControl, DataContext.DragCompletedCommand}">
-                                    <TextBlock Text="{Binding}" Foreground="#FFFFFFFF"/>
+                                    <!-- No explicit Foreground: inherit it, so the ListBoxItem theme's ForegroundSelected
+                                         ({ThemeResource AccentForegroundColor}) gives contrast-correct text on the accent selection. -->
+                                    <TextBlock Text="{Binding}"/>
                                 </Border>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
@@ -88,16 +92,16 @@
                     DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropWrapCommand}">
                 <Border.Styles>
                     <Style Selector="Border">
-                        <Setter Property="Background" Value="#FF141C28"/>
-                        <Setter Property="BorderBrush" Value="#003BE27A"/>
+                        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+                        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
                         <PropertyTrigger Property="DragDrop.IsDragOver" Value="True">
-                            <Setter Property="Background" Value="#FF16241C"/>
-                            <Setter Property="BorderBrush" Value="#FF3BE27A"/>
+                            <Setter Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+                            <Setter Property="BorderBrush" Value="{ResourceReference SystemFillColorSuccess}"/>
                         </PropertyTrigger>
                     </Style>
                 </Border.Styles>
                 <StackPanel Orientation="Vertical">
-                    <TextBlock Text="Colors (WrapPanel)" Foreground="#FFB080E0" MarginBottom="6"/>
+                    <TextBlock Text="Colors (WrapPanel)" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="6"/>
                     <StackPanel Orientation="Horizontal" MarginBottom="10">
                         <TextBlock Text="Flow:" VerticalAlignment="Center" MarginRight="8"/>
                         <DropDown ItemsSource="{Binding Orientations}"
@@ -116,7 +120,7 @@
                              selection consistently. The template is just a transparent draggable surface + the label. -->
                         <ListBox.ItemContainerStyle>
                             <Style Selector="ListBoxItem">
-                                <Setter Property="Background" Value="#FF2E3B4E"/>
+                                <Setter Property="Background" Value="{ResourceReference TileFillColorDefault}"/>
                                 <Setter Property="CornerRadius" Value="6"/>
                                 <Setter Property="Margin" Value="4"/>
                             </Style>
@@ -142,16 +146,16 @@
                     DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropTreeCommand}">
                 <Border.Styles>
                     <Style Selector="Border">
-                        <Setter Property="Background" Value="#FF141C28"/>
-                        <Setter Property="BorderBrush" Value="#003BE27A"/>
+                        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+                        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
                         <PropertyTrigger Property="DragDrop.IsDragOver" Value="True">
-                            <Setter Property="Background" Value="#FF16241C"/>
-                            <Setter Property="BorderBrush" Value="#FF3BE27A"/>
+                            <Setter Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+                            <Setter Property="BorderBrush" Value="{ResourceReference SystemFillColorSuccess}"/>
                         </PropertyTrigger>
                     </Style>
                 </Border.Styles>
                 <StackPanel Orientation="Vertical">
-                    <TextBlock Text="Tree — dwell a folder to auto-expand" Foreground="#FF60C878" MarginBottom="10"/>
+                    <TextBlock Text="Tree — dwell a folder to auto-expand" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="10"/>
                     <TreeView ItemsSource="{Binding Tree}" MaxHeight="230">
                         <TreeView.ItemContainerStyle>
                             <Style Selector="TreeViewItem">
@@ -162,7 +166,7 @@
                         <TreeView.ItemTemplate>
                             <HierarchicalDataTemplate ItemsSource="{Binding Children}">
                                 <Border Background="Transparent"
-                                        DragDrop.AllowDrag="True" DragDrop.DragData="{Binding Title}">
+                                        DragDrop.AllowDrag="True" DragDrop.DragData="{Binding}">
                                     <TextBlock Text="{Binding Title}" VerticalAlignment="Center"/>
                                 </Border>
                             </HierarchicalDataTemplate>
