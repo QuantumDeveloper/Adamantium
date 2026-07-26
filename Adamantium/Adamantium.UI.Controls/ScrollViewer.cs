@@ -26,13 +26,31 @@ public class ScrollViewer : ContentControl
     private ScrollBar _horizontalBar;
     private bool _syncingBars;   // guards the metrics->bars push from bouncing back through ValueChanged
 
-    public static readonly AdamantiumProperty HorizontalScrollBarVisibilityProperty = AdamantiumProperty.Register(
-        nameof(HorizontalScrollBarVisibility), typeof(ScrollBarVisibility), typeof(ScrollViewer),
+    // ATTACHED (WPF-style): set ScrollViewer.HorizontalScrollBarVisibility on ANY element (e.g. a ListBox) and its templated
+    // ScrollViewer picks it up via {TemplateBinding (ScrollViewer.HorizontalScrollBarVisibility)} - no per-control property.
+    // Default Disabled(H)/Auto(V) matches the item hosts' hardcoded policy, so unset hosts behave exactly as before.
+    public static readonly AdamantiumProperty HorizontalScrollBarVisibilityProperty = AdamantiumProperty.RegisterAttached(
+        nameof(HorizontalScrollBarVisibility), typeof(ScrollBarVisibility), typeof(AdamantiumComponent),
+        new PropertyMetadata(ScrollBarVisibility.Disabled, PropertyMetadataOptions.AffectsMeasure, OnScrollBarVisibilityChanged));
+
+    public static readonly AdamantiumProperty VerticalScrollBarVisibilityProperty = AdamantiumProperty.RegisterAttached(
+        nameof(VerticalScrollBarVisibility), typeof(ScrollBarVisibility), typeof(AdamantiumComponent),
         new PropertyMetadata(ScrollBarVisibility.Auto, PropertyMetadataOptions.AffectsMeasure, OnScrollBarVisibilityChanged));
 
-    public static readonly AdamantiumProperty VerticalScrollBarVisibilityProperty = AdamantiumProperty.Register(
-        nameof(VerticalScrollBarVisibility), typeof(ScrollBarVisibility), typeof(ScrollViewer),
-        new PropertyMetadata(ScrollBarVisibility.Auto, PropertyMetadataOptions.AffectsMeasure, OnScrollBarVisibilityChanged));
+    public static ScrollBarVisibility GetHorizontalScrollBarVisibility(AdamantiumComponent e) => e.GetValue<ScrollBarVisibility>(HorizontalScrollBarVisibilityProperty);
+    public static void SetHorizontalScrollBarVisibility(AdamantiumComponent e, ScrollBarVisibility value) => e.SetValue(HorizontalScrollBarVisibilityProperty, value);
+
+    public static ScrollBarVisibility GetVerticalScrollBarVisibility(AdamantiumComponent e) => e.GetValue<ScrollBarVisibility>(VerticalScrollBarVisibilityProperty);
+    public static void SetVerticalScrollBarVisibility(AdamantiumComponent e, ScrollBarVisibility value) => e.SetValue(VerticalScrollBarVisibilityProperty, value);
+
+    // Scroll chaining (attached, default ON): when the wheel reaches this viewer's edge in the scroll direction, DON'T
+    // swallow the event - leave it unhandled so it bubbles to a parent ScrollViewer (nested lists hand off instead of
+    // dead-ending under the cursor, the classic nested-scroll annoyance). Set False for the isolated WPF behaviour.
+    public static readonly AdamantiumProperty ScrollChainingProperty = AdamantiumProperty.RegisterAttached(
+        "ScrollChaining", typeof(bool), typeof(AdamantiumComponent), new PropertyMetadata(true));
+
+    public static bool GetScrollChaining(AdamantiumComponent e) => e.GetValue<bool>(ScrollChainingProperty);
+    public static void SetScrollChaining(AdamantiumComponent e, bool value) => e.SetValue(ScrollChainingProperty, value);
 
     // Changing bar visibility at runtime (e.g. a TextBox toggling wrap) must re-push the CanScroll flags onto the
     // presenter - Disabled means "don't scroll this axis" (measure the content to the viewport so it wraps/fits), any
@@ -305,8 +323,45 @@ public class ScrollViewer : ContentControl
     private void OnMouseWheel(object sender, MouseWheelEventArgs e)
     {
         if (_presenter == null) return;
-        var delta = -(e.Delta / 120.0) * WheelLinesPerNotch * LineStep;   // wheel up -> scroll towards the top
-        _presenter.AnimateScrollBy(new Vector2(0, delta));   // smooth (eased) wheel; instant if inertia is off
+        var step = (e.Delta / 120.0) * WheelLinesPerNotch * LineStep;
+
+        var extent = _presenter.Extent;
+        var viewport = _presenter.Viewport;
+        var offset = ScrollOffset;
+        var canV = _presenter.CanScrollVertically && extent.Height > viewport.Height + 0.5;
+        var canH = _presenter.CanScrollHorizontally && extent.Width > viewport.Width + 0.5;
+
+        // A HORIZONTAL (tilt) wheel scrolls X; a vertical wheel scrolls Y, or X when there's no vertical range (a
+        // horizontally-scrolling list). `delta` is the signed move on the active axis, with current/max for edge testing.
+        Vector2 by;
+        double delta, current, max;
+        if (e.IsHorizontal)
+        {
+            if (!canH) return;                         // horizontal wheel, nothing to scroll -> bubble
+            delta = step;                              // tilt right (delta>0) -> scroll right (offset +)
+            by = new Vector2(delta, 0); current = offset.X; max = extent.Width - viewport.Width;
+        }
+        else if (canV)
+        {
+            delta = -step;                             // wheel up (delta>0) -> scroll toward the top (offset -)
+            by = new Vector2(0, delta); current = offset.Y; max = extent.Height - viewport.Height;
+        }
+        else if (canH)
+        {
+            delta = -step;                             // vertical wheel over a horizontally-scrolling list
+            by = new Vector2(delta, 0); current = offset.X; max = extent.Width - viewport.Width;
+        }
+        else return;   // nothing scrollable here -> leave the wheel unhandled so a parent ScrollViewer takes it
+
+        // Scroll chaining: at the edge in the scroll direction, DON'T handle - let the event bubble to a parent ScrollViewer
+        // so a nested list hands off instead of dead-ending under the cursor. Disabled -> classic (always swallow).
+        if (GetScrollChaining(this))
+        {
+            var atEdge = delta > 0 ? current >= max - 0.5 : current <= 0.5;
+            if (atEdge) return;   // e.Handled stays false -> bubbles up
+        }
+
+        _presenter.AnimateScrollBy(by);   // smooth (eased) wheel; instant if inertia is off
         e.Handled = true;
     }
 

@@ -58,17 +58,6 @@ public abstract class TextBoxBase : Control
         typeof(bool), typeof(TextBoxBase),
         new PropertyMetadata(false, PropertyMetadataOptions.AffectsMeasure, OnLayoutAffectingChanged));
 
-    // Scroll-bar policy forwarded to the hosting ScrollViewer (PART_ContentHost). Horizontal defaults to Hidden so a
-    // single-line box still scrolls the caret into view without ever showing a bar; when the box wraps (TextWrapping !=
-    // NoWrap) the horizontal axis is forced to Disabled - see PushScrollSettings - so content wraps to the viewport.
-    public static readonly AdamantiumProperty HorizontalScrollBarVisibilityProperty = AdamantiumProperty.Register(
-        nameof(HorizontalScrollBarVisibility), typeof(ScrollBarVisibility), typeof(TextBoxBase),
-        new PropertyMetadata(ScrollBarVisibility.Hidden, OnScrollSettingChanged));
-
-    public static readonly AdamantiumProperty VerticalScrollBarVisibilityProperty = AdamantiumProperty.Register(
-        nameof(VerticalScrollBarVisibility), typeof(ScrollBarVisibility), typeof(TextBoxBase),
-        new PropertyMetadata(ScrollBarVisibility.Hidden, OnScrollSettingChanged));
-
     // --- Presentation (Background + Foreground are inherited from Control) ----------------------------------------
 
     public static readonly AdamantiumProperty PlaceholderForegroundProperty = AdamantiumProperty.Register(nameof(PlaceholderForeground),
@@ -103,6 +92,15 @@ public abstract class TextBoxBase : Control
         // An editor is a keyboard-focus target - opt in (the base default is now false). Its inner TextPresenter stays
         // non-focusable, so the focus walk from a click on the surface lands here, on the TextBox.
         FocusableProperty.OverrideMetadata(typeof(TextBoxBase), new PropertyMetadata(true));
+
+        // Scroll-bar policy uses the shared ScrollViewer.* ATTACHED properties (no per-control duplicates). An editor
+        // defaults to Hidden on BOTH axes - a single-line box scrolls its caret into view WITHOUT ever showing a bar - and
+        // its OnScrollSettingChanged callback re-forwards the policy to PART_ContentHost (see PushScrollSettings, which also
+        // forces the horizontal axis to Disabled while the text wraps). ListBox/etc. keep the base Disabled/Auto defaults.
+        ScrollViewer.HorizontalScrollBarVisibilityProperty.OverrideMetadata(typeof(TextBoxBase),
+            new PropertyMetadata(ScrollBarVisibility.Hidden, OnScrollSettingChanged));
+        ScrollViewer.VerticalScrollBarVisibilityProperty.OverrideMetadata(typeof(TextBoxBase),
+            new PropertyMetadata(ScrollBarVisibility.Hidden, OnScrollSettingChanged));
     }
 
     protected TextBoxBase()
@@ -161,20 +159,22 @@ public abstract class TextBoxBase : Control
         set => SetValue(TextWrappingProperty, value);
     }
 
-    /// <summary>Scroll-bar policy on the horizontal axis (forwarded to the internal ScrollViewer). Ignored while the box
+    /// <summary>Scroll-bar policy on the horizontal axis (the shared <see cref="ScrollViewer.HorizontalScrollBarVisibilityProperty"/>
+    /// attached property, forwarded to the internal ScrollViewer). Ignored while the box
     /// wraps - a wrapping box never scrolls horizontally.</summary>
     public ScrollBarVisibility HorizontalScrollBarVisibility
     {
-        get => GetValue<ScrollBarVisibility>(HorizontalScrollBarVisibilityProperty);
-        set => SetValue(HorizontalScrollBarVisibilityProperty, value);
+        get => ScrollViewer.GetHorizontalScrollBarVisibility(this);
+        set => ScrollViewer.SetHorizontalScrollBarVisibility(this, value);
     }
 
-    /// <summary>Scroll-bar policy on the vertical axis (forwarded to the internal ScrollViewer). Use <c>Auto</c> for a
-    /// multi-line box so a bar appears once the text outgrows the height.</summary>
+    /// <summary>Scroll-bar policy on the vertical axis (the shared <see cref="ScrollViewer.VerticalScrollBarVisibilityProperty"/>
+    /// attached property, forwarded to the internal ScrollViewer). Use <c>Auto</c> for a multi-line box so a bar appears
+    /// once the text outgrows the height.</summary>
     public ScrollBarVisibility VerticalScrollBarVisibility
     {
-        get => GetValue<ScrollBarVisibility>(VerticalScrollBarVisibilityProperty);
-        set => SetValue(VerticalScrollBarVisibilityProperty, value);
+        get => ScrollViewer.GetVerticalScrollBarVisibility(this);
+        set => ScrollViewer.SetVerticalScrollBarVisibility(this, value);
     }
 
     /// <summary>Prompt text shown (in <see cref="PlaceholderForeground"/>) while the control is empty and unfocused.</summary>

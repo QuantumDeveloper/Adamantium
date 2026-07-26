@@ -82,6 +82,7 @@ namespace Adamantium.Win32
             case WindowMessages.MiddleButtonup:
                return GetMouseButtons(wParam, WordPart.WholeWord);
             case WindowMessages.MouseWheel:
+            case WindowMessages.MouseHwheel:
                return GetMouseButtons(wParam, WordPart.HiWord);
             case WindowMessages.Xbuttondblclk:
             case WindowMessages.Xbuttondown:
