@@ -25,4 +25,15 @@ public class DropInsertionIndicator : Adorner
         get => GetValue<Orientation>(OrientationProperty);
         set => SetValue(OrientationProperty, value);
     }
+
+    /// <summary>Frame mode: draw a BORDER around the target instead of a caret line - the "drop INTO this node" cue of the
+    /// hybrid tree-drop (a caret means before/after a sibling; a frame means as a child). The theme template keys off it.</summary>
+    public static readonly AdamantiumProperty IsFrameProperty = AdamantiumProperty.Register(nameof(IsFrame),
+        typeof(bool), typeof(DropInsertionIndicator), new PropertyMetadata(false));
+
+    public bool IsFrame
+    {
+        get => GetValue<bool>(IsFrameProperty);
+        set => SetValue(IsFrameProperty, value);
+    }
 }

@@ -103,13 +103,35 @@ public partial class DragDropDemoViewModel : TabPageViewModel
     [Command]
     private void DropWrap(object arg) => Add(arg, Wrap);
 
-    // Tree drop (observation stage): drop lands as a new ROOT node. Precise position/into-node targeting comes with the
-    // hybrid tree-drop (the engine can't yet hand the VM the hovered node - the caret's InsertBefore is an internal row).
+    // Hybrid tree drop: the engine hands us the hovered node (DropTarget) + where the drop lands (Placement). Into -> a
+    // child (and auto-expand so it shows); Before/After -> a sibling in the target's parent collection; else a root node.
     [Command]
     private void DropTree(object arg)
     {
         if (arg is not DragDropEventArgs e) return;
-        foreach (var item in ItemsOf(e)) Tree.Add(new DragTreeNode(item));
+        var target = e.DropTarget as DragTreeNode;
+        foreach (var item in ItemsOf(e))
+        {
+            var node = new DragTreeNode(item);
+            switch (e.Placement)
+            {
+                case DropPlacement.Into when target != null:
+                    node.Parent = target;
+                    target.IsExpanded = true;   // VM-driven expand (materializes children) so the drop is visible
+                    target.Children.Add(node);
+                    break;
+                case DropPlacement.Before or DropPlacement.After when target != null:
+                    var siblings = target.Parent?.Children ?? Tree;
+                    node.Parent = target.Parent;
+                    var at = siblings.IndexOf(target);
+                    if (at < 0) at = siblings.Count;
+                    siblings.Insert(e.Placement == DropPlacement.After ? at + 1 : at, node);
+                    break;
+                default:   // Into with no target (empty area = root), or a flat drop
+                    Tree.Add(node);
+                    break;
+            }
+        }
     }
 
     private static void Add(object arg, ObservableCollection<string> target)
