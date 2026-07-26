@@ -381,23 +381,25 @@ public static class DragDrop
 
         var after = horizontal ? nearestPItem.X > nearestSize.Width / 2.0 : nearestPItem.Y > nearestSize.Height / 2.0;
         var index = nearestIndex + (after ? 1 : 0);   // insert BEFORE item `index`
-        caret = SeamCaret(horizontal, thickness, RealizedRect(list, index - 1, pList), RealizedRect(list, index, pList));
+        var nearestRect = new Rect(pList.X - nearestPItem.X, pList.Y - nearestPItem.Y, nearestSize.Width, nearestSize.Height);
+        caret = SeamCaret(horizontal, thickness, RealizedRect(list, index - 1), RealizedRect(list, index), nearestRect, after);
         return index;
     }
 
-    // The container at `index` as a rect in the LIST's local coords (via Mouse.GetPosition), or null if not realized.
-    private static Rect? RealizedRect(ItemsControl list, int index, Vector2 pList)
+    // The container at `index` as a rect in the LIST's local coords, via TransformBoundsToVisual (element-to-element, no
+    // cursor bridge needed). Null if not realized.
+    private static Rect? RealizedRect(ItemsControl list, int index)
     {
         if (index < 0 || list.ItemContainerGenerator.ContainerFromIndex(index) is not { } c) return null;
-        var pItem = Mouse.GetPosition((IInputComponent)c);
-        var size = c.RenderSize;
-        return new Rect(pList.X - pItem.X, pList.Y - pItem.Y, size.Width, size.Height);
+        return c.TransformBoundsToVisual(list);
     }
 
-    // The caret's rect for the seam between `before` and `after`. Both on the same line -> the MIDPOINT of their gap (so it
-    // never sticks to one plate's edge and flips). A wrap/line boundary or a list end -> the single neighbour's leading /
-    // trailing edge. The caret runs ACROSS the flow, spanning that neighbour's cross-axis extent.
-    private static Rect SeamCaret(bool horizontal, double t, Rect? before, Rect? after)
+    // The caret's rect for the seam at the insertion index. When the two neighbours share a LINE -> the MIDPOINT of their
+    // gap (never sticks to one plate's edge and flips). At a WRAP BOUNDARY or a list END the two representations (trailing
+    // edge of the previous column vs leading edge of the next) are far apart, so anchor to `nearest` - the item UNDER THE
+    // CURSOR - on the side the cursor is on (afterSide). That keeps the caret where the pointer is instead of jumping to the
+    // far column's/row's edge. Runs ACROSS the flow, spanning the anchor's cross-axis extent.
+    private static Rect SeamCaret(bool horizontal, double t, Rect? before, Rect? after, Rect nearest, bool afterSide)
     {
         if (before is { } b && after is { } a)
         {
@@ -408,16 +410,17 @@ public static class DragDrop
                     ? new Rect((b.X + b.Width + a.X) / 2.0 - t / 2.0, b.Y, t, b.Height)
                     : new Rect(b.X, (b.Y + b.Height + a.Y) / 2.0 - t / 2.0, b.Width, t);
             }
-
-            // Different lines (a wrap boundary): sit at the leading edge of `after` - the start of its line.
-            return horizontal ? new Rect(a.X - t / 2.0, a.Y, t, a.Height) : new Rect(a.X, a.Y - t / 2.0, a.Width, t);
         }
 
-        if (after is { } af)    // index == 0: before the first item
-            return horizontal ? new Rect(af.X - t / 2.0, af.Y, t, af.Height) : new Rect(af.X, af.Y - t / 2.0, af.Width, t);
-        if (before is { } bf)   // index == count: after the last item
-            return horizontal ? new Rect(bf.X + bf.Width - t / 2.0, bf.Y, t, bf.Height) : new Rect(bf.X, bf.Y + bf.Height - t / 2.0, bf.Width, t);
-        return default;
+        // Boundary / end: the seam is at the nearest item's TRAILING edge (cursor in its second half) or LEADING edge (first).
+        if (horizontal)
+        {
+            var x = afterSide ? nearest.X + nearest.Width : nearest.X;
+            return new Rect(x - t / 2.0, nearest.Y, t, nearest.Height);
+        }
+
+        var y = afterSide ? nearest.Y + nearest.Height : nearest.Y;
+        return new Rect(nearest.X, y - t / 2.0, nearest.Width, t);
     }
 
     // Remove the cue adorner + reset its visual state, but KEEP the resolved drop target (the tree path clears the visual
