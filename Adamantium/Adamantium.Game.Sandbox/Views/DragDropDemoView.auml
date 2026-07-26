@@ -44,7 +44,17 @@
                                     <Border.Behaviors>
                                         <DragSourceBehavior Data="{Binding}"
                                                             StartedCommand="{Ancestor ItemsControl, DataContext.DragStartedCommand}"
-                                                            CompletedCommand="{Ancestor ItemsControl, DataContext.DragCompletedCommand}"/>
+                                                            CompletedCommand="{Ancestor ItemsControl, DataContext.DragCompletedCommand}">
+                                            <!-- Custom ghost: an accent bar filling the SOURCE ROW's width (the engine measures/arranges
+                                                 the template at the row width). Fruits demos DragTemplate; Animals uses the plain snapshot. -->
+                                            <DragSourceBehavior.DragTemplate>
+                                                <DataTemplate>
+                                                    <Border Background="{ThemeResource AccentFillColorDefault}" CornerRadius="6" Padding="12 8">
+                                                        <TextBlock Text="{Binding}" Foreground="{ThemeResource AccentForegroundColor}"/>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DragSourceBehavior.DragTemplate>
+                                        </DragSourceBehavior>
                                     </Border.Behaviors>
                                     <!-- No explicit Foreground: inherit it, so the ListBoxItem theme's ForegroundSelected
                                          ({ThemeResource AccentForegroundColor}) gives contrast-correct text on the accent selection. -->
@@ -57,7 +67,7 @@
             </Border>
 
             <Border CornerRadius="8" Padding="12" Width="220" MinHeight="300" BorderThickness="2"
-                    DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropRightCommand}">
+                    DragDrop.AllowDrop="{Binding AnimalsAcceptDrop}" DragDrop.DropCommand="{Binding DropRightCommand}">
                 <Border.Styles>
                     <Style Selector="Border">
                         <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
@@ -69,7 +79,9 @@
                     </Style>
                 </Border.Styles>
                 <StackPanel Orientation="Vertical">
-                    <TextBlock Text="Animals" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="10"/>
+                    <TextBlock Text="Animals" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="6"/>
+                    <!-- Uncheck to reject drops here: dragging over Animals then shows the ⊘ no-drop cursor. -->
+                    <CheckBox Content="Accept drop" IsChecked="{Binding AnimalsAcceptDrop, Mode=TwoWay}" MarginBottom="8"/>
                     <ListBox ItemsSource="{Binding Right}" SelectedItems="{Binding RightSelection}"
                              SelectionMode="Extended" Background="Transparent" MaxHeight="240">
                         <ListBox.ItemTemplate>

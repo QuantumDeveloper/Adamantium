@@ -39,6 +39,10 @@ public partial class DragDropDemoViewModel : TabPageViewModel
     [Bindable] private ScrollBarVisibility _wrapHScroll = ScrollBarVisibility.Disabled;
     [Bindable] private ScrollBarVisibility _wrapVScroll = ScrollBarVisibility.Auto;
 
+    // Toggle the "Animals" panel as a drop target: uncheck it and dragging over Animals shows the ⊘ "no-drop" cursor
+    // (the engine maps Effects.None -> Cursors.No) - a live check of the cursor feedback.
+    [Bindable] private bool _animalsAcceptDrop = true;
+
     partial void OnWrapOrientationChanged(Orientation value)
     {
         var vertical = value == Orientation.Vertical;
@@ -82,7 +86,12 @@ public partial class DragDropDemoViewModel : TabPageViewModel
     {
         if (arg is not DragDropEventArgs e) return;
         var pressed = e.Data?.Get<string>();
-        var match = Lists.FirstOrDefault(l => l.List.Contains(pressed));
+        // Origin = the collection the drag ACTUALLY came from, matched by REFERENCE via SourceItemsSource - unambiguous even
+        // after a Copy duplicated the value into another list (matching by value/selection would pick the wrong list, so a
+        // Move deleted from the wrong place). Fall back to selection, then value, if the host didn't report the source.
+        var match = Lists.FirstOrDefault(l => ReferenceEquals(l.List, e.SourceItemsSource));
+        if (match.List == null) match = Lists.FirstOrDefault(l => l.Selection != null && l.Selection.Contains(pressed));
+        if (match.List == null) match = Lists.FirstOrDefault(l => l.List.Contains(pressed));
         _dragOrigin = match.List;
         var selection = match.Selection;
 
