@@ -20,12 +20,18 @@ public sealed class Win32DragGhost : IDragGhost
         WindowStyleEx.Noactivate | WindowStyleEx.Toolwindow;
 
     private Win32NativeWindowWrapper _window;
+    private WindowDpiWatcher _dpiWatcher;
     private bool _visible;
+
+    public event Action<uint> DpiChanged;
 
     private void EnsureWindow(int x, int y, int width, int height)
     {
-        _window ??= new Win32NativeWindowWrapper(
+        if (_window != null) return;
+        _window = new Win32NativeWindowWrapper(
             WindowClassStyle.SaveBits, GhostExStyle, WindowStyle.Popup, x, y, width, height, IntPtr.Zero);
+        _dpiWatcher = new WindowDpiWatcher(_window);
+        _dpiWatcher.DpiChanged += dpi => DpiChanged?.Invoke(dpi);
     }
 
     public void Show(byte[] premultipliedBgra, int width, int height, int screenX, int screenY)
@@ -91,8 +97,24 @@ public sealed class Win32DragGhost : IDragGhost
         _visible = false;
     }
 
+    // DPI of the monitor the ghost is CURRENTLY on, so the drag can re-scale the bitmap when it crosses monitors. Read from
+    // the MONITOR under the window (MonitorFromWindow + GetDpiForMonitor), NOT GetDpiForWindow - the latter reflects a cached
+    // window DPI that only updates on WM_DPICHANGED, lagging a frame or two behind the actual crossing. 96 until shown.
+    private const uint MonitorDefaultToNearest = 2;
+    public uint Dpi
+    {
+        get
+        {
+            if (_window == null) return 96u;
+            var monitor = Win32Interop.MonitorFromWindow(_window.Handle, MonitorDefaultToNearest);
+            return Win32Interop.GetDpiForMonitor(monitor, 0, out var dpiX, out _) == 0 ? dpiX : 96u;
+        }
+    }
+
     public void Dispose()
     {
+        _dpiWatcher?.Dispose();
+        _dpiWatcher = null;
         _window?.Dispose();
         _window = null;
         _visible = false;

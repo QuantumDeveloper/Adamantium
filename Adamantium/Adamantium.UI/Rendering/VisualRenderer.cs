@@ -182,8 +182,20 @@ public sealed class VisualRenderer : IVisualRenderer
 
         // Record at the owning window's device-pixel density (physical px), so the snapshot is as crisp as on screen.
         double scale = 1.0;
+        bool rooted = false;
         for (IUIComponent n = element; n != null; n = n.VisualParent)
-            if (n is IWindow { Renderer: { } r }) { scale = r.RenderScale; break; }
+            if (n is IWindow { Renderer: { } r }) { scale = r.RenderScale; rooted = true; break; }
+        if (!rooted && UIApplication.Current?.Windows is { } windows)   // DETACHED (e.g. a drag ghost's DragTemplate): use the
+        {                                                              // scale of the window UNDER THE CURSOR, so it's crisp on
+            var screen = Adamantium.UI.Core.Input.Mouse.ScreenCoordinates;   // the monitor the drag is actually on.
+            foreach (var w in windows)
+                if (w is IWindow { Renderer: { } r } win)
+                {
+                    var c = win.PointToClient(screen);
+                    if (c.X >= 0 && c.Y >= 0 && c.X <= win.ClientWidth && c.Y <= win.ClientHeight) { scale = r.RenderScale; break; }
+                    scale = r.RenderScale;   // fallback to whatever window we have if none contains the cursor
+                }
+        }
 
         // Flatten the subtree (parent BEFORE children = paint order: parent underneath, children on top).
         var list = new List<IUIComponent>();

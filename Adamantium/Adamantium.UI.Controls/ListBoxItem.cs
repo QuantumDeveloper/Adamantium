@@ -142,9 +142,11 @@ public class ListBoxItem : ContentControl, ISelectable
         // (captured on the OS message thread when it was raised) - input handlers run later on the loop thread, so re-reading
         // Keyboard.Modifiers there misses the Ctrl/Shift that was held.
         var owner = OwnerListBox;
-        var plain = (e.Modifiers & (InputModifiers.LeftControl | InputModifiers.RightControl |
-                                    InputModifiers.LeftShift | InputModifiers.RightShift)) == 0;
-        if (owner != null && plain && IsSelected &&
+        // Defer the selection change on a press over an ALREADY-selected item (multi-select) - a plain OR Ctrl press - so a
+        // drag keeps the whole selection (Ctrl-drag = COPY the selection); a release without a drag applies it on mouse-up
+        // (plain -> collapse to one, Ctrl -> toggle off). Shift stays immediate (it extends the range, not a drag gesture).
+        var noShift = (e.Modifiers & (InputModifiers.LeftShift | InputModifiers.RightShift)) == 0;
+        if (owner != null && noShift && IsSelected &&
             owner.SelectionMode is SelectionMode.Extended or SelectionMode.Multiple)
         {
             _deferSelect = true;

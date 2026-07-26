@@ -18,4 +18,12 @@ public interface IDragGhost : IDisposable
 
     /// <summary>Hide the ghost (kept alive for reuse; Dispose destroys the window).</summary>
     void Hide();
+
+    /// <summary>The DPI of the monitor the ghost window is CURRENTLY on (its own native window reports it) - the drag can
+    /// re-scale the bitmap when the ghost crosses to a monitor of a different DPI. 96 when the window doesn't exist yet.</summary>
+    uint Dpi { get; }
+
+    /// <summary>Raised with the new DPI the instant the ghost crosses onto a monitor of a different DPI (event-driven, no
+    /// polling) - the drag re-scales the ghost bitmap so it keeps its physical size. Not raised while on one monitor.</summary>
+    event Action<uint> DpiChanged;
 }
