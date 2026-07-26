@@ -129,7 +129,9 @@ namespace Adamantium.Win32
         [DllImport("user32.dll")]
         public static extern IntPtr LoadCursor(IntPtr hInstance, NativeCursors cursorName);
 
-        [DllImport("user32.dll", EntryPoint = "LoadCursorFromFileW", SetLastError = true)]
+        // CharSet.Unicode is REQUIRED: the entry point is the W (wide) variant, so the path must be marshalled as UTF-16.
+        // Without it the string goes as ANSI, the W function reads garbage, the file "isn't found" and it returns NULL.
+        [DllImport("user32.dll", EntryPoint = "LoadCursorFromFileW", CharSet = CharSet.Unicode, SetLastError = true)]
         public static extern IntPtr LoadCursorFromFile(string filePath);
 
         [DllImport("user32.dll")]

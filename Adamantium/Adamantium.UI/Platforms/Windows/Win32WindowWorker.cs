@@ -688,6 +688,9 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         var eventArgs = new RawMouseEventArgs(RawMouseEventType.MouseMove, window, ToLogical(Messages.PointFromLParam(lParam)),
             WindowsMouseDeviceExtension.GetKeyModifiers(windowMessage, wParam), MouseDevice.CurrentDevice, GetTimeStamp());
         DispatchInput(() => MouseDevice.CurrentDevice.ProcessEvent(eventArgs));
+        // A drag's override cursor: WM_SETCURSOR barely fires while the mouse is captured, so re-assert the override on
+        // every move here (the reliable path) - otherwise the drop-effect cursor (Move / Copy / No) never shows.
+        if (Mouse.OverrideCursor != null) Win32Interop.SetCursor(Mouse.OverrideCursor.CursorHandle);
         handled = true;
         return IntPtr.Zero;
     }
@@ -839,7 +842,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     private IntPtr HandleSetCursor(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
         handled = false;
-        Win32Interop.SetCursor(Mouse.Cursor.CursorHandle);
+        Win32Interop.SetCursor((Mouse.OverrideCursor ?? Mouse.Cursor).CursorHandle);   // a drag's override wins
         if (isOverSizeFrame)
         {
             return Win32Interop.DefWindowProc(window.Handle, windowMessage, wParam, lParam);

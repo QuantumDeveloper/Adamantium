@@ -33,4 +33,17 @@ public static class Cursors
    public static Cursor Wait => new Cursor(Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.Wait));
 
    public static Cursor None => new Cursor(IntPtr.Zero);
+
+   // The drag-COPY cursor (arrow + green plus). Windows has no standard IDC_COPY, so it ships as a .cur next to the app
+   // (Adamantium.UI.Core/Resources/dragcopy.cur, copied to output) and is loaded once here; falls back to Arrow if absent.
+   private static Cursor _dragCopy;
+   public static Cursor DragCopy => _dragCopy ??= LoadFromFile("dragcopy.cur") ?? Arrow;
+
+   private static Cursor LoadFromFile(string fileName)
+   {
+      var path = System.IO.Path.Combine(AppContext.BaseDirectory, "Resources", fileName);
+      if (!System.IO.File.Exists(path)) return null;
+      var handle = Win32Interop.LoadCursorFromFile(path);
+      return handle != IntPtr.Zero ? new Cursor(handle) : null;
+   }
 }
