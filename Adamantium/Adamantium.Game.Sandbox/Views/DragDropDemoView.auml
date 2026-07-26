@@ -15,8 +15,12 @@
 
         <StackPanel Orientation="Horizontal">
 
-            <Border CornerRadius="8" Padding="12" Width="220" MinHeight="300" MarginRight="16" BorderThickness="2"
-                    DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropLeftCommand}">
+            <Border CornerRadius="8" Padding="12" Width="220" MinHeight="300" MarginRight="16" BorderThickness="2">
+                <!-- Behaviors form: one DropTargetBehavior instead of the DragDrop.* attached properties. Its
+                     {Binding} resolves because the behavior joins this Border's logical tree (shares its DataContext). -->
+                <Border.Behaviors>
+                    <DropTargetBehavior DropCommand="{Binding DropLeftCommand}"/>
+                </Border.Behaviors>
                 <Border.Styles>
                     <Style Selector="Border">
                         <Setter Property="Background" Value="#FF141C28"/>
@@ -33,10 +37,15 @@
                              SelectionMode="Extended" Background="Transparent" MaxHeight="240">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="#FF2E3B4E" CornerRadius="6" Padding="10" MarginBottom="6"
-                                        DragDrop.AllowDrag="True" DragDrop.DragData="{Binding}"
-                                        DragDrop.DragStartedCommand="{Ancestor ItemsControl, DataContext.DragStartedCommand}"
-                                        DragDrop.DragCompletedCommand="{Ancestor ItemsControl, DataContext.DragCompletedCommand}">
+                                <Border Background="#FF2E3B4E" CornerRadius="6" Padding="10" MarginBottom="6">
+                                    <!-- DragSourceBehavior: Data={Binding} = the item (behavior inherits the item's DataContext);
+                                         the source-lifecycle commands reach the VM via the default VISUAL ancestor walk from
+                                         the behavior's host, which crosses the item's template boundary to the ItemsControl. -->
+                                    <Border.Behaviors>
+                                        <DragSourceBehavior Data="{Binding}"
+                                                            StartedCommand="{Ancestor ItemsControl, DataContext.DragStartedCommand}"
+                                                            CompletedCommand="{Ancestor ItemsControl, DataContext.DragCompletedCommand}"/>
+                                    </Border.Behaviors>
                                     <TextBlock Text="{Binding}" Foreground="#FFFFFFFF"/>
                                 </Border>
                             </DataTemplate>

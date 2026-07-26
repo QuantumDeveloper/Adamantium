@@ -59,6 +59,13 @@ public class AncestorBindingExpression : BindingExpressionBase
             visual.AttachedToVisualTreeEvent += OnVisualAttached;
             visual.DetachedFromVisualTreeEvent += OnVisualDetached;
         }
+        else
+        {
+            // Non-visual target (a Behavior): it has no visual node, so it re-resolves against its HOST's visual tree.
+            // AddLogicalChild (attach to the host) raises the logical-tree event - use that to (re)resolve.
+            Target.AttachedToLogicalTree += OnLogicalAttached;
+            Target.DetachedFromLogicalTree += OnLogicalDetached;
+        }
         _hooked = true;
     }
 
@@ -74,6 +81,11 @@ public class AncestorBindingExpression : BindingExpressionBase
         {
             visual.AttachedToVisualTreeEvent -= OnVisualAttached;
             visual.DetachedFromVisualTreeEvent -= OnVisualDetached;
+        }
+        else
+        {
+            Target.AttachedToLogicalTree -= OnLogicalAttached;
+            Target.DetachedFromLogicalTree -= OnLogicalDetached;
         }
         _hooked = false;
     }
@@ -113,7 +125,9 @@ public class AncestorBindingExpression : BindingExpressionBase
     }
 
     private bool IsTargetAttached()
-        => _def.Logical ? Target?.LogicalParent != null : (Target as IUIComponent)?.VisualParent != null;
+        => _def.Logical ? Target?.LogicalParent != null
+         : Target is IUIComponent visual ? visual.VisualParent != null
+         : Target?.LogicalParent != null;   // non-visual (a Behavior): attached once it has a host
 
     private void OnDetached()
     {
@@ -190,9 +204,14 @@ public class AncestorBindingExpression : BindingExpressionBase
                 if (Matches(cur) && skip-- <= 0) return cur;
             }
         }
-        else if (Target is IUIComponent visual)
+        else
         {
-            for (var cur = visual.VisualParent; cur != null; cur = cur.VisualParent)
+            // Default (visual) walk. For a visual target start at its VisualParent; for a NON-visual target (a Behavior)
+            // start at its host - the element it's attached to (its logical parent) - and walk that host's VISUAL tree.
+            // The visual tree crosses template boundaries, so this reaches an ItemsControl / Window ancestor that a
+            // logical walk (which stops at each container's template parts) never could.
+            var start = Target is IUIComponent visual ? visual.VisualParent : Target.LogicalParent as IUIComponent;
+            for (var cur = start; cur != null; cur = cur.VisualParent)
             {
                 if (_def.Stop != null && _def.Stop.IsInstanceOfType(cur)) return null;
                 if (Matches(cur) && skip-- <= 0) return cur;
