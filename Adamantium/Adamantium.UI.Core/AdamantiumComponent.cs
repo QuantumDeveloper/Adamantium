@@ -431,13 +431,13 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
         lock (values)
         {
-            if (property.IsAttached)
+            // An attached property has no pre-created slot (it isn't in this type's registered set), so ensure its
+            // ValueContainer EXISTS - but do NOT write the value here. RunSetValueSequence reads the OLD effective value
+            // first for change detection, then writes; pre-writing it made old == new, so PropertyChanged never fired for
+            // attached properties (breaking any binding / trigger / TemplateBinding observing an attached property).
+            if (property.IsAttached && !values.ContainsKey(property))
             {
-                if (!values.ContainsKey(property))
-                {
-                    values.Add(property, new ValueContainer());
-                }
-                values[property].SetValue(value, priority);
+                values.Add(property, new ValueContainer());
             }
 
             if (values.ContainsKey(property))
