@@ -133,8 +133,13 @@ public static class DragDrop
     private static AdornerLayer _indicatorLayer;
     private static ItemsControl _indicatorList;
     private static Rect _indicatorRect = Rect.Empty;
+    private static bool _indicatorFrame;   // frame (drop-into) vs caret - part of the "nothing moved" cache key
     private static int _insertIndex = -1;
     private static object _insertBefore;   // the item at the insertion point - insert BEFORE it (robust to same-list shifts)
+
+    // Hybrid tree-drop: the hovered node + where the drop lands relative to it (before/after sibling, or into as a child).
+    private static object _dropTarget;
+    private static DropPlacement _placement = DropPlacement.None;
 
     private static IVisualRenderer _renderer;
     private static IDragGhost _ghost;
@@ -222,29 +227,97 @@ public static class DragDrop
             return;
         }
 
+        if (list is TreeView tree)   // hierarchy: sibling-vs-child by the row zone (the hybrid tree-drop)
+        {
+            UpdateTreeDrop(tree, hit, host);
+            return;
+        }
+
+        // Flat list: a caret at the insertion seam; no hierarchical placement.
+        _placement = DropPlacement.None;
+        _dropTarget = null;
         var flow = ItemFlowOrientation(list);
         var index = ComputeInsertion(list, flow, out var caret);
         _insertIndex = index;
         _insertBefore = index >= 0 && index < (list.Items?.Count ?? 0) ? list.Items[index] : null;   // the item after the caret
+        // The bar runs PERPENDICULAR to the item flow.
+        var barOrientation = flow == Orientation.Vertical ? Orientation.Horizontal : Orientation.Vertical;
+        ShowIndicator(list, host, caret, barOrientation, frame: false);
+    }
 
+    // Hybrid tree drop: the row zone under the cursor decides sibling-vs-child. Top third -> caret ABOVE (Before), bottom
+    // third -> caret BELOW (After), middle -> a FRAME around the row (Into, as a child). DropTarget = the hovered node.
+    private static void UpdateTreeDrop(TreeView tree, IUIComponent hit, IAdornerHost host)
+    {
+        TreeViewItem container = null;
+        for (var c = hit; c != null && !ReferenceEquals(c, tree); c = c.VisualParent)
+        {
+            if (c is TreeViewItem tvi) { container = tvi; break; }
+        }
+
+        _insertIndex = -1;
+        _insertBefore = null;
+
+        if (container == null)   // empty area -> drop into the root, no cue
+        {
+            _placement = DropPlacement.Into;
+            _dropTarget = null;
+            ClearIndicatorVisual();
+            return;
+        }
+
+        const double thickness = 8.0;
+        var pItem = Mouse.GetPosition((IInputComponent)container);
+        var top = new Vector2(Mouse.GetPosition((IInputComponent)tree).X - pItem.X,
+                              Mouse.GetPosition((IInputComponent)tree).Y - pItem.Y);   // container top-left in tree coords
+        var size = container.RenderSize;
+        _dropTarget = container.DataContext;   // the node (BindRow sets DataContext = node)
+
+        Rect rect;
+        bool frame;
+        if (pItem.Y < size.Height / 3.0)
+        {
+            _placement = DropPlacement.Before;
+            rect = new Rect(top.X, top.Y - thickness / 2.0, size.Width, thickness);
+            frame = false;
+        }
+        else if (pItem.Y > size.Height * 2.0 / 3.0)
+        {
+            _placement = DropPlacement.After;
+            rect = new Rect(top.X, top.Y + size.Height - thickness / 2.0, size.Width, thickness);
+            frame = false;
+        }
+        else
+        {
+            _placement = DropPlacement.Into;
+            rect = new Rect(top.X, top.Y, size.Width, size.Height);
+            frame = true;
+        }
+
+        ShowIndicator(tree, host, rect, Orientation.Horizontal, frame);
+    }
+
+    // Create (or reuse) the themed cue and place it. Recreated only when the host, rect, or frame/caret mode changes.
+    private static void ShowIndicator(ItemsControl list, IAdornerHost host, Rect rect, Orientation orientation, bool frame)
+    {
         if (ReferenceEquals(list, _indicatorList) && ReferenceEquals(host.AdornerLayer, _indicatorLayer)
-            && caret == _indicatorRect && _indicator != null)
+            && rect == _indicatorRect && frame == _indicatorFrame && _indicator != null)
         {
             return;   // nothing moved
         }
 
-        ClearIndicator();
+        ClearIndicatorVisual();
         _indicatorList = list;
         _indicatorLayer = host.AdornerLayer;
-        _indicatorRect = caret;
+        _indicatorRect = rect;
+        _indicatorFrame = frame;
 
         // A real, themed control: its look is a ControlTemplate from the active theme (restyle the drop cue in the theme,
-        // not here). The bar orientation is PERPENDICULAR to the item flow; the theme template keys its end caps off it.
-        var barOrientation = flow == Orientation.Vertical ? Orientation.Horizontal : Orientation.Vertical;
-        var indicator = new DropInsertionIndicator { AdornedElement = list, Orientation = barOrientation };
+        // not here). Orientation drives the caret axis; IsFrame swaps the caret for a "drop into" outline.
+        var indicator = new DropInsertionIndicator { AdornedElement = list, Orientation = orientation, IsFrame = frame };
         if (UIApplication.Current?.ThemeManager is { CurrentTheme: { } theme } manager) manager.ApplyTheme(theme, indicator);
-        ((IMeasurableComponent)indicator).Measure(caret.Size, true);
-        ((IMeasurableComponent)indicator).Arrange(caret, true);
+        ((IMeasurableComponent)indicator).Measure(rect.Size, true);
+        ((IMeasurableComponent)indicator).Arrange(rect, true);
         _indicator = indicator;
         _indicatorLayer.Add(_indicator);
     }
@@ -347,15 +420,25 @@ public static class DragDrop
         return default;
     }
 
-    private static void ClearIndicator()
+    // Remove the cue adorner + reset its visual state, but KEEP the resolved drop target (the tree path clears the visual
+    // over empty space yet still wants Placement/DropTarget for the drop).
+    private static void ClearIndicatorVisual()
     {
         if (_indicator != null) _indicatorLayer?.Remove(_indicator);
         _indicator = null;
         _indicatorLayer = null;
         _indicatorList = null;
         _indicatorRect = Rect.Empty;
+        _indicatorFrame = false;
+    }
+
+    private static void ClearIndicator()
+    {
+        ClearIndicatorVisual();
         _insertIndex = -1;
         _insertBefore = null;
+        _dropTarget = null;
+        _placement = DropPlacement.None;
     }
 
     private static IUIComponent FindAllowDropAncestor(IUIComponent hit)
@@ -562,7 +645,9 @@ public static class DragDrop
         {
             Effects = target != null ? (ctrl ? DragDropEffects.Copy : DragDropEffects.Move) : DragDropEffects.None,
             InsertIndex = _insertIndex,     // where the insertion line was; -1 if not over an items host
-            InsertBefore = _insertBefore    // the item after the caret (survives the source removal - use for a stable reorder)
+            InsertBefore = _insertBefore,   // the item after the caret (survives the source removal - use for a stable reorder)
+            DropTarget = _dropTarget,       // hybrid tree-drop: the hovered node
+            Placement = _placement          // before/after sibling, or into as a child (None for a flat list)
         };
 
         // Order matters: the SOURCE removes (on Move) FIRST, then the TARGET adds. Dropping back into the SAME collection

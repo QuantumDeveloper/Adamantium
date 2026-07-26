@@ -12,11 +12,15 @@ public partial class DragTreeNode : AdamantiumViewModel
     public DragTreeNode(string title, params DragTreeNode[] children)
     {
         Title = title;
-        foreach (var child in children) Children.Add(child);
+        foreach (var child in children) { child.Parent = this; Children.Add(child); }
     }
 
     /// <summary>The node's label - also the drag payload when a node is dragged out.</summary>
     public string Title { get; }
+
+    /// <summary>The owning node, or null for a root node - so a sibling (before/after) drop knows which collection to
+    /// insert into. Maintained by whoever adds the node.</summary>
+    public DragTreeNode Parent { get; set; }
 
     /// <summary>Child nodes (empty = a leaf).</summary>
     public ObservableCollection<DragTreeNode> Children { get; } = [];
