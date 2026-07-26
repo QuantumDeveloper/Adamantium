@@ -43,7 +43,7 @@ public class Setter : ISetter, IEquatable<Setter>
                 self.Apply(component, Property);
                 break;
             default:
-                var prop = AdamantiumPropertyMap.FindRegistered(component.GetType(), Property);
+                var prop = AdamantiumPropertyMap.ResolveProperty(component.GetType(), Property);
                 if (prop == null)
                     return;
                 

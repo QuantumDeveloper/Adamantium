@@ -1,4 +1,5 @@
-﻿using System.Collections.Concurrent;
+﻿using System;
+using System.Collections.Concurrent;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
@@ -131,6 +132,53 @@ public static class AdamantiumPropertyMap
       }
       return null;
    }
+
+   /// <summary>
+   /// Resolve a property PATH to its <see cref="AdamantiumProperty"/>. A plain name (<c>Background</c>) is looked up on
+   /// <paramref name="componentType"/>; a dotted ATTACHED form (<c>ScrollViewer.HorizontalScrollBarVisibility</c>, optionally
+   /// wrapped in parentheses WPF-style) is resolved to the owner type's static <c>&lt;Name&gt;Property</c> field. Lets a
+   /// TemplateBinding or a Setter target an attached property, not just a plain one.
+   /// </summary>
+   public static AdamantiumProperty ResolveProperty(Type componentType, string path)
+   {
+      if (string.IsNullOrEmpty(path)) return null;
+      if (path.Length > 1 && path[0] == '(' && path[^1] == ')') path = path[1..^1];
+      var dot = path.IndexOf('.');
+      return dot < 0 ? FindRegistered(componentType, path) : ResolveAttached(path[..dot], path[(dot + 1)..]);
+   }
+
+   private static readonly ConcurrentDictionary<(string owner, string prop), AdamantiumProperty> AttachedByPath = new();
+
+   // owner short-name + attached property name -> the AdamantiumProperty declared as a static `<prop>Property` field on the
+   // owner type. The owner's DECLARING type is not stored on the property (attached props register OwnerType as the
+   // attaches-to base), so we reflect the field instead. Cached: the assembly scan + reflection runs once per path.
+   private static AdamantiumProperty ResolveAttached(string ownerName, string propName) =>
+      AttachedByPath.GetOrAdd((ownerName, propName), static key =>
+      {
+         var owner = ResolveOwnerType(key.owner);
+         if (owner == null) return null;
+         RuntimeHelpers.RunClassConstructor(owner.TypeHandle);   // ensure the static field is initialized
+         var field = owner.GetField(key.prop + "Property",
+            BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
+         return field?.GetValue(null) as AdamantiumProperty;
+      });
+
+   private static readonly ConcurrentDictionary<string, Type> OwnerTypeByName = new();
+
+   // A component type by its SHORT name, among loaded AdamantiumComponent-derived types. One-time scan per name (cached).
+   private static Type ResolveOwnerType(string name) => OwnerTypeByName.GetOrAdd(name, static n =>
+   {
+      foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+      {
+         Type[] types;
+         try { types = asm.GetTypes(); } catch { continue; }
+         foreach (var t in types)
+         {
+            if (t.Name == n && typeof(AdamantiumComponent).IsAssignableFrom(t)) return t;
+         }
+      }
+      return null;
+   });
 
    public static bool IsRegistered(object o, AdamantiumProperty property)
    {

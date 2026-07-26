@@ -26,7 +26,7 @@ public class TemplateBindingExpression : BindingExpressionBase
         // declared property (targetProperty). The generator passes propRef.Name (the part attribute) as targetProperty
         // and the markup arg as Path - so source resolves from Path, target from targetProperty. These differ for a
         // cross-name binding (e.g. ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}").
-        SourceProperty = source?.GetProperty(TemplateBinding.Path);
+        SourceProperty = source == null ? null : AdamantiumPropertyMap.ResolveProperty(source.GetType(), TemplateBinding.Path);
         SourcePropertyName = TemplateBinding.Path;
         Target = target;
         TargetProperty = target.GetProperty(targetProperty);
@@ -58,13 +58,13 @@ public class TemplateBindingExpression : BindingExpressionBase
     {
         Target.SetValue(TargetProperty, Source.GetValue(SourceProperty), ValuePriority.Template);
     }
-    
+
     private void Init()
     {
         Destroy();
-        if (SourceProperty == null)
+        if (SourceProperty == null && Source != null)
         {
-            SourceProperty = Source?.GetProperty(SourcePropertyName);
+            SourceProperty = AdamantiumPropertyMap.ResolveProperty(Source.GetType(), SourcePropertyName);
         }
         UpdateTarget();
         // Subscribe to the SOURCE INSTANCE's change event, not the property's global AdamantiumProperty.Changed. The
