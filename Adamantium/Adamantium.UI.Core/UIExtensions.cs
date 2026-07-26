@@ -36,6 +36,37 @@ public static class UIExtensions
       return visualComponent.VisualParent as T;
    }
 
+   // The logical parent, BRIDGING a template boundary via TemplatedParent. A template part has no LogicalParent (parts are
+   // attached visual-only - see TemplatedUIComponent.AddTemplateChild), so a raw LogicalParent walk dead-ends at every
+   // templated control. Hopping to TemplatedParent (set on every part by ControlTemplate.Build) crosses that island back
+   // to its host - the WPF LogicalTreeHelper model. This is what lets {Ancestor ..., Logical=True} reach an ItemsControl
+   // from inside a generated item's content, and gives resource lookup a continuous logical chain. See
+   // docs/TREE_MODEL_DESIGN.md.
+   public static IFundamentalUIComponent GetLogicalParentOrBridge(this IFundamentalUIComponent component)
+      => component.LogicalParent ?? component.TemplatedParent as IFundamentalUIComponent;
+
+   /// <summary>Enumerates the logical ancestors of a component, bridging template boundaries via TemplatedParent.</summary>
+   public static IEnumerable<IFundamentalUIComponent> GetLogicalAncestors(this IFundamentalUIComponent component)
+   {
+      component = component.GetLogicalParentOrBridge();
+
+      while (component != null)
+      {
+         yield return component;
+         component = component.GetLogicalParentOrBridge();
+      }
+   }
+
+   public static IEnumerable<IFundamentalUIComponent> GetSelfAndLogicalAncestors(this IFundamentalUIComponent component)
+   {
+      yield return component;
+
+      foreach (var ancestor in component.GetLogicalAncestors())
+      {
+         yield return ancestor;
+      }
+   }
+
    public static Vector2 PointToClient(this IUIComponent visualComponent, Vector2 point)
    {
       var pair = GetRootAndAbsolutePosition(visualComponent);

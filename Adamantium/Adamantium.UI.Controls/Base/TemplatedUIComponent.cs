@@ -116,6 +116,9 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent
         OnRemoveTemplate();
     }
     
+    // The template boundary is the crux of the two-tree model (docs/TREE_MODEL_DESIGN.md): parts are attached VISUAL-only,
+    // so the logical tree stays shallow and dead-ends here. Inheritance is bridged by InheritanceParent (below); an UP
+    // logical walk is bridged by TemplatedParent (UIExtensions.GetLogicalParentOrBridge), set on every part in ControlTemplate.Build.
     protected void AddTemplateChild(IUIComponent child)
     {
         // Template content inherits the templated control's inherited values (DataContext, FontFamily, ...) so a

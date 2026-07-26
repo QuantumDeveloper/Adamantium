@@ -106,8 +106,11 @@ public class ResourceManager : IResourceManager
         return FindResourceInScope(name, ResourceScope.Global);
     }
 
+    // Logical parent first (bridging a template boundary via TemplatedParent, so template content still sees resources
+    // declared on its host control), then the visual parent as a last resort for a node with neither. See
+    // docs/TREE_MODEL_DESIGN.md.
     private static IFundamentalUIComponent LogicalOrVisualParent(IFundamentalUIComponent node)
-        => node.LogicalParent ?? (node as IUIComponent)?.VisualParent;
+        => node.GetLogicalParentOrBridge() ?? (node as IUIComponent)?.VisualParent;
 
     public T FindResourceInScope<T>(string name, ResourceScope scope = ResourceScope.Local)
     {
