@@ -42,6 +42,15 @@ public class DragDropEventArgs : RoutedEventArgs
     /// <summary>What the target will do with the payload - set by the target; drives the cursor and the source's outcome.</summary>
     public DragDropEffects Effects { get; set; } = DragDropEffects.Move;
 
+    /// <summary>Overrides the drag cursor for this target: set it in <c>DragOver</c> and it wins over the shape the
+    /// engine picks from <see cref="Effects"/> (Copy/Move/No). Null - the default - keeps the standard feedback, which
+    /// is what nearly every target wants; reach for this when the shape has to say something the effect cannot ("drops
+    /// as a link here", a domain-specific tool cursor). Assign a <see cref="CursorType"/> straight to it
+    /// (<c>e.DragCursor = CursorType.Hand</c>) - naming the shape is enough, and costs no allocation. Ignored while the
+    /// OS owns the gesture (a drag to or from another application): the platform draws its own drag cursors there and an
+    /// override would only fight it.</summary>
+    public Cursor DragCursor { get; set; }
+
     /// <summary>Index in the target's collection where the payload should be inserted (the position the insertion line
     /// showed), or -1 to append. Set by the engine from the drop position over an items host. NB: this index is computed
     /// BEFORE the source removes its items, so in a same-list reorder it can be stale - prefer <see cref="InsertBefore"/>.</summary>

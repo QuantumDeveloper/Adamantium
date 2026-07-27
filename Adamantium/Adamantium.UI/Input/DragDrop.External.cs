@@ -200,7 +200,6 @@ public static partial class DragDrop
             InsertBefore = _insertBefore,
             DropTarget = _dropTarget,
             Placement = _placement,
-            RoutedEvent = DragDropEvents.DropEvent,
             OriginalSource = _hit,
         };
 
@@ -212,7 +211,7 @@ public static partial class DragDrop
 
         if (target != null && effects != DragDropEffects.None)
         {
-            ((IObservableComponent)target).RaiseEvent(args);
+            RaiseDragPair(target, args, DragDropEvents.PreviewDropEvent, DragDropEvents.DropEvent);
             var drop = GetDropCommand((AdamantiumComponent)target);
             if (!args.Handled && drop != null && drop.CanExecute(args)) drop.Execute(args);
         }
@@ -240,7 +239,8 @@ public static partial class DragDrop
         if (_currentTarget != null)
         {
             SetIsDragOver((AdamantiumComponent)_currentTarget, false);
-            RaiseDragEvent(_currentTarget, DragDropEvents.DragLeaveEvent);   // the drag ended/left - the target hears about it
+            // The drag ended or left - the target hears about it, so a control that lit up on DragEnter can put itself out.
+            RaiseDragEvent(_currentTarget, DragDropEvents.PreviewDragLeaveEvent, DragDropEvents.DragLeaveEvent);
         }
         _currentTarget = null;
         _hit = null;
