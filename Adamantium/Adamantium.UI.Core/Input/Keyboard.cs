@@ -5,6 +5,10 @@ namespace Adamantium.UI.Core.Input;
 
 public static class Keyboard
 {
+   /// <summary>The platform that answers live key-state queries, registered once at startup. Null before it is - key
+   /// state then comes from what our own events have tracked (see <see cref="KeyboardDevice.IsKeyDown"/>).</summary>
+   public static INativeKeyboard Platform { get; set; }
+
    public static readonly RoutedEvent KeyDownEvent = EventManager.RegisterRoutedEvent("KeyDown",
       RoutingStrategy.Bubble, typeof(KeyEventHandler), typeof(Keyboard));
 

@@ -263,14 +263,14 @@ public static partial class DragDrop
         else Mouse.OverrideCursor = CursorFor(effects);
     }
 
-    // Ctrl = Copy, otherwise Move (WPF/Explorer convention). The per-target DragOver can override this. Read the PHYSICAL
-    // key state (GetAsyncKeyState) - GetKeyState / Keyboard.Modifiers returns a stale value while the mouse is captured.
-    private const int VkControl = 0x11;
+    // Ctrl = Copy, otherwise Move (WPF/Explorer convention). The per-target DragOver can override this. The key query
+    // goes to the platform, which answers with the PHYSICAL state - the queue-synchronized one is stale while the mouse
+    // is captured, which is exactly when a drag asks.
     private static DragDropEffects DefaultEffects()
     {
         if (_externalActive) return ExternalDefaultEffects();
-        return (Adamantium.Win32.Win32Interop.GetAsyncKeyState(VkControl) & 0x8000) != 0
-            ? DragDropEffects.Copy : DragDropEffects.Move;
+        var control = Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl);
+        return control ? DragDropEffects.Copy : DragDropEffects.Move;
     }
 
     private static Cursor CursorFor(DragDropEffects effects) => effects switch

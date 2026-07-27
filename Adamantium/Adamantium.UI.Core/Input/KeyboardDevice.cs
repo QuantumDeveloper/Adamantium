@@ -1,17 +1,11 @@
-﻿using System.ComponentModel;
-using System.Runtime.InteropServices;
-using Adamantium.UI.Core.Input.Raw;
-using Adamantium.Win32;
+﻿using Adamantium.UI.Core.Input.Raw;
 
 namespace Adamantium.UI.Core.Input;
 
 public class KeyboardDevice
 {
-   private const int KEY_PRESSED = 0x8000;   // GetKeyState: the key is down when the HIGH-ORDER bit (0x8000) is set
-   private const int KEY_TOGGLED = 0x1;
-
-   private byte[] keyCodes = new byte[256];
-   private readonly Dictionary<Key, KeyParameters> keyStates = new Dictionary<Key, KeyParameters>();
+   // Live key state comes from the platform (Keyboard.Platform); nothing here caches an OS-shaped state array.
+   private readonly Dictionary<Key, KeyPressInfo> keyStates = new Dictionary<Key, KeyPressInfo>();
 
    private static KeyboardDevice currentDevice;
 
@@ -22,7 +16,6 @@ public class KeyboardDevice
    {
       get
       {
-         UpdateKeyStates();
          InputModifiers modifiers = InputModifiers.None;
          if (IsKeyDown(Key.LeftAlt))
          {
@@ -88,17 +81,7 @@ public class KeyboardDevice
 
    private void ClearState()
    {
-      Array.Clear(keyCodes, 0, keyCodes.Length);
       keyStates.Clear();
-   }
-
-   private void UpdateKeyStates()
-   {
-      if (!Win32Interop.GetKeyboardState(keyCodes))
-      {
-         int err = Marshal.GetLastWin32Error();
-         throw new Win32Exception(err);
-      }
    }
 
    /// <summary>
@@ -108,7 +91,10 @@ public class KeyboardDevice
    /// <returns></returns>
    public bool IsKeyDown(Key key)
    {
-      return Convert.ToBoolean(Win32Interop.GetKeyState((uint)key) & KEY_PRESSED);
+      // Ask the OS when we can (the live, physical state), and fall back to what our own events have tracked - which is
+      // right whenever messages are flowing, and the best we can do when no platform is registered.
+      if (Keyboard.Platform is { } platform) return platform.IsKeyDown(key);
+      return keyStates.TryGetValue(key, out var tracked) && tracked.CurrentState == KeyState.Down;
    }
 
    /// <summary>
@@ -148,9 +134,11 @@ public class KeyboardDevice
       if (keyStates.ContainsKey(key))
       {
          var parameters = keyStates[key];
-         if (parameters.CurrentState == KeyStates.Down)
+         if (parameters.CurrentState == KeyState.Down)
          {
-            return Win32Interop.GetTickCount64() - parameters.PressTime;
+            // Both sides are milliseconds since boot, but the press time arrives 32-bit (that is what a raw event
+            // carries), so subtract in 32-bit too - otherwise the answer goes wild once uptime passes the ~49-day wrap.
+            return unchecked((uint)Environment.TickCount64 - parameters.PressTime);
          }
       }
       return 0;
@@ -158,32 +146,31 @@ public class KeyboardDevice
 
    public bool IsKeyToggled(Key key)
    {
-      return Convert.ToBoolean(Win32Interop.GetKeyState((uint)key) & KEY_TOGGLED);
+      return Keyboard.Platform?.IsKeyToggled(key) ?? false;
    }
 
    public void ProcessEvent(RawInputEventArgs eventArgs)
    {
       if (FocusedComponent != null)
       {
-         UpdateKeyStates();
          if (eventArgs is RawKeyboardEventArgs e)
          {
             switch (e?.EventType)
             {
                case RawKeyboardEventType.KeyDown:
                case RawKeyboardEventType.KeyUp:
-                  var parameters = Messages.GetKeyParameters(e.LParam);
+                  var parameters = e.Press;
                   parameters.PressTime = e.Timestamp;
                   KeyEventArgs args = new KeyEventArgs(this, e.ChangedKey, e.InputModifiers,
                      e.Timestamp);
                   if (e.EventType == RawKeyboardEventType.KeyDown)
                   {
-                     parameters.CurrentState = KeyStates.Down;
+                     parameters.CurrentState = KeyState.Down;
                      args.RoutedEvent = Keyboard.PreviewKeyDownEvent;
                   }
                   else if (e.EventType == RawKeyboardEventType.KeyUp)
                   {
-                     parameters.CurrentState = KeyStates.Up;
+                     parameters.CurrentState = KeyState.Up;
                      args.RoutedEvent = Keyboard.PreviewKeyUpEvent;
                   }
                   UpdateKeyData(e.ChangedKey, parameters);
@@ -192,12 +179,12 @@ public class KeyboardDevice
 
                   if (e.EventType == RawKeyboardEventType.KeyDown)
                   {
-                     parameters.CurrentState = KeyStates.Down;
+                     parameters.CurrentState = KeyState.Down;
                      args.RoutedEvent = Keyboard.KeyDownEvent;
                   }
                   else if (e.EventType == RawKeyboardEventType.KeyUp)
                   {
-                     parameters.CurrentState = KeyStates.Up;
+                     parameters.CurrentState = KeyState.Up;
                      args.RoutedEvent = Keyboard.KeyUpEvent;
                   }
                   FocusedComponent.RaiseEvent(args);
@@ -221,7 +208,7 @@ public class KeyboardDevice
       }
    }
 
-   private void UpdateKeyData(Key key, KeyParameters parameters)
+   private void UpdateKeyData(Key key, KeyPressInfo parameters)
    {
       if (keyStates.ContainsKey(key))
       {

@@ -1,6 +1,5 @@
 ﻿using Adamantium.Mathematics;
 using Adamantium.UI.Core.Input.Raw;
-using Adamantium.Win32;
 
 namespace Adamantium.UI.Core.Input;
 
@@ -121,11 +120,9 @@ public class MouseDevice
 
     }
 
-    public Vector2 GetScreenPosition()
-    {
-        Win32Interop.GetCursorPos(out var point);
-        return point;
-    }
+    /// <summary>The pointer in PHYSICAL screen coordinates: the live OS position when a platform is registered, else the
+    /// last point an input event carried.</summary>
+    public Vector2 GetScreenPosition() => Mouse.Platform?.Position ?? Position;
 
     internal void UpdateButtonStates(InputModifiers buttons)
     {

@@ -1,6 +1,5 @@
 ﻿using Adamantium.Mathematics;
 using Adamantium.UI.Core.RoutedEvents;
-using Adamantium.Win32;
 
 namespace Adamantium.UI.Core.Input;
 
@@ -84,14 +83,19 @@ public static class Mouse
    public static MouseButtonState XButton1 => PrimaryDevice.XButton1;
    public static MouseButtonState XButton2 => PrimaryDevice.XButton2;
 
+   /// <summary>The platform that answers live pointer queries, registered once at startup. Null before it is - the
+   /// position then falls back to the last one an input event carried, which is right for everything except a query
+   /// made while ANOTHER application owns the pointer.</summary>
+   public static INativeMouse Platform { get; set; }
+
+   /// <summary>The pointer in PHYSICAL screen coordinates.</summary>
    public static Vector2 ScreenCoordinates
    {
-      get
+      get => Platform?.Position ?? PrimaryDevice.GetScreenPosition();
+      set
       {
-         Win32Interop.GetCursorPos(out var point);
-         return point;
+         if (Platform != null) Platform.Position = value;
       }
-      set => Win32Interop.SetCursorPos((int)value.X, (int)value.Y);
    }
 
    public static Vector2 GetPosition(IInputComponent component)
