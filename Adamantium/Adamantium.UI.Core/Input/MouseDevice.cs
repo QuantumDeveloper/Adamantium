@@ -113,7 +113,7 @@ public class MouseDevice
 
     public void SetCursor(Cursor cursor)
     {
-        Win32Interop.SetCursor(cursor.CursorHandle);
+        Cursor.Platform?.Apply(cursor);
     }
 
     public void UpdateCursor()

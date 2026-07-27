@@ -1,49 +1,44 @@
-﻿using Adamantium.Win32;
-
 namespace Adamantium.UI.Core.Input;
 
+/// <summary>The standard cursor catalog. Each is a shared, immutable description - the platform resolves it to a native
+/// shape once and caches that, so handing the same instance around costs nothing.</summary>
 public static class Cursors
 {
-   public static Cursor Arrow => new Cursor(Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.Arrow));
+    public static Cursor Arrow { get; } = new(CursorType.Arrow);
 
-   public static Cursor AppStarting => new Cursor(Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.AppStarting));
+    public static Cursor AppStarting { get; } = new(CursorType.AppStarting);
 
-   public static Cursor Crosshair => new Cursor(Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.Crosshair));
+    public static Cursor Crosshair { get; } = new(CursorType.Crosshair);
 
-   public static Cursor Hand => new Cursor(Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.Hand));
+    public static Cursor Hand { get; } = new(CursorType.Hand);
 
-   public static Cursor Help => new Cursor(Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.Help));
+    public static Cursor Help { get; } = new(CursorType.Help);
 
-   public static Cursor IBeam => new Cursor(Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.IBeam));
+    public static Cursor IBeam { get; } = new(CursorType.IBeam);
 
-   public static Cursor No => new Cursor(Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.No));
+    public static Cursor No { get; } = new(CursorType.No);
 
-   public static Cursor SizeAll => new Cursor(Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.SizeAll));
+    public static Cursor SizeAll { get; } = new(CursorType.SizeAll);
 
-   public static Cursor SizeNESW => new Cursor(Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.SizeNESW));
+    public static Cursor SizeNESW { get; } = new(CursorType.SizeNESW);
 
-   public static Cursor SizeNS => new Cursor(Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.SizeNS));
+    public static Cursor SizeNS { get; } = new(CursorType.SizeNS);
 
-   public static Cursor SizeNWSE => new Cursor(Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.SizeNWSE));
+    public static Cursor SizeNWSE { get; } = new(CursorType.SizeNWSE);
 
-   public static Cursor SizeEWE => new Cursor(Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.SizeEWE));
+    public static Cursor SizeEWE { get; } = new(CursorType.SizeEWE);
 
-   public static Cursor UpArrow => new Cursor(Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.UpArrow));
+    public static Cursor UpArrow { get; } = new(CursorType.UpArrow);
 
-   public static Cursor Wait => new Cursor(Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.Wait));
+    public static Cursor Wait { get; } = new(CursorType.Wait);
 
-   public static Cursor None => new Cursor(IntPtr.Zero);
+    /// <summary>No pointer at all (hidden while over the element).</summary>
+    public static Cursor None { get; } = new(CursorType.None);
 
-   // The drag-COPY cursor (arrow + green plus). Windows has no standard IDC_COPY, so it ships as a .cur next to the app
-   // (Adamantium.UI.Core/Resources/dragcopy.cur, copied to output) and is loaded once here; falls back to Arrow if absent.
-   private static Cursor _dragCopy;
-   public static Cursor DragCopy => _dragCopy ??= LoadFromFile("dragcopy.cur") ?? Arrow;
+    /// <summary>Drag feedback for a COPY. Windows has no standard shape for it, so the Win32 platform ships one as a
+    /// <c>.cur</c>; macOS has <c>dragCopyCursor</c> natively - which platform does what is the platform's business.</summary>
+    public static Cursor DragCopy { get; } = new(CursorType.DragCopy);
 
-   private static Cursor LoadFromFile(string fileName)
-   {
-      var path = System.IO.Path.Combine(AppContext.BaseDirectory, "Resources", fileName);
-      if (!System.IO.File.Exists(path)) return null;
-      var handle = Win32Interop.LoadCursorFromFile(path);
-      return handle != IntPtr.Zero ? new Cursor(handle) : null;
-   }
+    /// <summary>Drag feedback for a LINK.</summary>
+    public static Cursor DragLink { get; } = new(CursorType.DragLink);
 }

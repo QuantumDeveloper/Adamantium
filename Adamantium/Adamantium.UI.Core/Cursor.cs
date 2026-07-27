@@ -1,60 +1,35 @@
-﻿using System.ComponentModel;
-using System.Runtime.InteropServices;
-using Adamantium.MacOS;
-using Adamantium.Win32;
+using Adamantium.UI.Core.Input;
 
 namespace Adamantium.UI.Core;
 
 /// <summary>
-/// Represents class which holds an instance of Win32 cursor
+/// A pointer shape, described rather than realized: a <see cref="CursorType"/> (or a file, for a custom one). It holds
+/// NO native handle - the platform's <see cref="INativeCursors"/> resolves and caches that, so the same
+/// <c>Cursors.SizeNS</c> means the Win32 <c>IDC_SIZENS</c>, the macOS <c>resizeUpDownCursor</c> or an X11 theme shape
+/// without a control ever knowing which.
 /// </summary>
 public sealed class Cursor
 {
-   public IntPtr CursorHandle { get; private set; }
+    /// <summary>The platform that shows cursors, registered once at startup (Win32 / AppKit / X11). Null before it is -
+    /// setting a cursor is then simply a no-op, never a crash.</summary>
+    public static INativeCursors Platform { get; set; }
 
-   /// <summary>
-   /// Specifies a new instance of cursor class from a .cur or .ani file
-   /// </summary>
-   /// <param name="cursorFile"></param>
-   public Cursor(String cursorFile)
-   {
-      LoadCursorFromFile(cursorFile);
-   }
+    public Cursor(CursorType type)
+    {
+        Type = type;
+    }
 
-   internal Cursor(IntPtr cursorHandle)
-   {
-      CursorHandle = cursorHandle;
-   }
+    /// <summary>A custom cursor from a file (a Win32 <c>.cur</c>/<c>.ani</c>, or the platform's own image format).</summary>
+    public Cursor(string cursorFile)
+    {
+        Type = CursorType.Custom;
+        FilePath = cursorFile;
+    }
 
-   public static Cursor Default => New();
+    public CursorType Type { get; }
 
-   internal static Cursor New()
-   {
-      if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-      {
-         return new Cursor(Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.Arrow));
-      }
-      else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-      {
-         return new Cursor(MacOSInterop.Cursor.SetCursorType((uint)MacOSCursorType.CrosshairCursor));
-      }
-      throw new NotImplementedException($"Cursor is not implemented for {RuntimeInformation.OSDescription}");
-   }
+    /// <summary>Where the custom cursor is loaded from; null for a standard <see cref="CursorType"/>.</summary>
+    public string FilePath { get; }
 
-   internal void LoadCursorFromFile(String cursorFile)
-   {
-      if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-      {
-         CursorHandle = Win32Interop.LoadCursorFromFile(cursorFile);
-         if (CursorHandle == IntPtr.Zero)
-         {
-            var err = Marshal.GetLastWin32Error();
-            throw new Win32Exception(err);
-         }
-      }
-      else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-      {
-            
-      }
-   }
+    public static Cursor Default => Cursors.Arrow;
 }

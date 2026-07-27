@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading;
 using Adamantium.Core.DependencyInjection;
+using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
 using Adamantium.Win32;
 
@@ -19,6 +20,7 @@ public class WindowsPlatform : IApplicationPlatform
         window.AddHook(WndProc);
         dispatchMessage = Messages.RegisterWindowMessage("DispatcherProcessingMessage");
         Clipboard.Current = new WindowsClipboard();   // swap the in-process default for the real OS clipboard
+        Cursor.Platform = new WindowsCursors();       // IDC_* shapes for the neutral CursorType catalog
         WindowsOle.Initialize();   // OLE on THIS (the UI) thread - the precondition for OS drag-drop on every window
     }
 
