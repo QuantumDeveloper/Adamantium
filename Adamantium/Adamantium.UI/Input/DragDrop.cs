@@ -31,6 +31,8 @@ public static partial class DragDrop
 {
     // How far the pointer must travel before a press becomes a drag comes from the USER's own OS setting
     // (PlatformSettings.DragThreshold) - a click is not a drag, and where that line sits is their choice, not ours.
+    // How long the cursor must dwell over ANOTHER of our windows before it is raised to the front (see UpdateWindowRaise).
+    private const double WindowRaiseDwellMs = 600;
     // How long the cursor must dwell over a spring-loadable before it activates/expands.
     private const double SpringLoadDwellMs = 600;
     // Auto-scroll edge band (px), timer cadence, and default speed (px/sec) if a ScrollViewer doesn't set AutoScrollSpeed.
@@ -143,6 +145,8 @@ public static partial class DragDrop
 
     // Spring-loading: dwell over an ISpringLoadable (a tab, a tree node) and it activates/expands so you can drop into
     // content that isn't visible yet. The timer is armed on entry and fires once if the cursor is still over it.
+    private static IWindow _raiseCandidate;      // another of our windows the drag is dwelling over
+    private static DispatcherTimer _raiseTimer;
     private static ISpringLoadable _springTarget;
     private static DispatcherTimer _springTimer;
 
@@ -236,6 +240,7 @@ public static partial class DragDrop
         }
 
         UpdateSpringLoad(hit);
+        UpdateWindowRaise(window);
 
         if (!ReferenceEquals(target, _currentTarget))
         {
@@ -601,6 +606,31 @@ public static partial class DragDrop
         if (target != null) _springTimer.Start();
     }
 
+    // Dwell over ANOTHER of our windows and it comes to the front, so a drag can reach content hidden behind the window
+    // it started in. Raised WITHOUT focus (IWindow.BringToFront): taking the foreground would make the OS revoke the
+    // mouse capture and cancel the very drag doing the reaching. Dwell rather than instant, or windows would flap up as
+    // the pointer merely swept across them.
+    private static void UpdateWindowRaise(IWindow window)
+    {
+        var target = window != null && !ReferenceEquals(window, SourceWindow(_source as IUIComponent)) ? window : null;
+        if (ReferenceEquals(target, _raiseCandidate)) return;   // same window - let the running dwell continue
+        _raiseCandidate = target;
+        _raiseTimer ??= CreateRaiseTimer();
+        _raiseTimer.Stop();
+        if (target != null) _raiseTimer.Start();
+    }
+
+    private static DispatcherTimer CreateRaiseTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(WindowRaiseDwellMs) };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();   // one-shot per dwell
+            if (IsDragActive) _raiseCandidate?.BringToFront();
+        };
+        return timer;
+    }
+
     private static DispatcherTimer CreateSpringTimer()
     {
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(SpringLoadDwellMs) };
@@ -908,6 +938,15 @@ public static partial class DragDrop
         {
             var drop = GetDropCommand((AdamantiumComponent)target);
             if (drop != null && drop.CanExecute(args)) drop.Execute(args);              // target ADDS
+
+            // The payload landed in ANOTHER of our windows: now that the gesture is over it is safe to give that window
+            // focus, so the user carries on where their content went. Doing this DURING the drag would have cost the
+            // capture the drag runs on - which is why mid-drag we only raise the z-order (UpdateWindowRaise).
+            var dropWindow = DragWindow(DragScreenPoint);
+            if (dropWindow != null && !ReferenceEquals(dropWindow, SourceWindow(_source as IUIComponent)))
+            {
+                dropWindow.Activate();
+            }
         }
     }
 
@@ -927,13 +966,24 @@ public static partial class DragDrop
         return target;
     }
 
-    // The app window whose client area the physical-screen cursor is over. Iterates UIApplication.Windows; the ghost is a
-    // raw click-through Win32 window (not an IWindow), so it is never a candidate. NB: window ORDER, not OS z-order - fine
-    // for side-by-side windows; overlapping windows would need WindowFromPoint / a real z-order query (later).
+    // The app window the physical-screen cursor is over, by the OS's own z-order: only the platform knows which window
+    // is actually on top. Walking our own collection cannot - it would target whichever window comes first in the list
+    // when two overlap, and would claim a hit even when ANOTHER application's window covers ours. The drag ghost is
+    // click-through, so the OS never reports it. Falls back to client-bounds containment where no platform answers.
     private static IWindow WindowUnderCursor(Vector2 screen)
     {
         var app = UIApplication.Current;
         if (app == null) return null;
+
+        if (Platform?.WindowFromScreenPoint(screen) is { } handle && handle != IntPtr.Zero)
+        {
+            foreach (var w in app.Windows)
+            {
+                if (w.Handle == handle) return w;
+            }
+            return null;   // the window on top there belongs to someone else
+        }
+
         foreach (var w in app.Windows)
         {
             var client = w.PointToClient(screen);

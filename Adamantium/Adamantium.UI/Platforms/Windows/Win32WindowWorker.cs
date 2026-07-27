@@ -248,6 +248,15 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         Win32Interop.SetForegroundWindow(hwnd);
     }
 
+    // Z-order only, NO activation: SWP_NOACTIVATE is precisely what keeps the mouse capture alive, so a drag can raise
+    // the window it is heading for instead of being cancelled by the OS revoking capture on a foreground change.
+    public void RaiseWithoutActivation()
+    {
+        if (window == null || window.Handle == IntPtr.Zero) return;
+        Win32Interop.SetWindowPos(window.Handle, IntPtr.Zero, 0, 0, 0, 0,
+            SetWindowPosFlags.Nomove | SetWindowPosFlags.Nosize | SetWindowPosFlags.Noactivate | SetWindowPosFlags.Showwindow);
+    }
+
     public IUIContext UIContext { get; }
 
     private void WindowOnStateChanged(object sender, StateChangedEventArgs e)

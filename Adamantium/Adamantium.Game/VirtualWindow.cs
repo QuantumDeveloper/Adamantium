@@ -47,6 +47,16 @@ public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopu
         Visibility = Visibility.Collapsed;
     }
 
+    // A virtual window is drawn INSIDE a host surface - it has no OS window, so there is no foreground to take and no
+    // z-order to raise. Both are no-ops rather than throws: a drag crossing one must not blow up.
+    public void Activate()
+    {
+    }
+
+    public void BringToFront()
+    {
+    }
+
     public bool IsActive { get; }
     public IntPtr Handle { get; }
     public bool IsClosed { get; protected set; }

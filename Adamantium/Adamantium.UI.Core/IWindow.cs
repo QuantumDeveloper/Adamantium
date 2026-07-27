@@ -10,6 +10,13 @@ public interface IWindow : IRootVisualComponent, IContentControl
     void Show();
     void Close();
     void Hide();
+
+    /// <summary>Bring the window to the foreground and give it focus.</summary>
+    void Activate();
+
+    /// <summary>Raise the window above the others WITHOUT taking focus - safe to call mid-drag, unlike
+    /// <see cref="Activate"/>, which would make the OS revoke the capture the drag depends on.</summary>
+    void BringToFront();
         
     bool IsActive { get; }
 

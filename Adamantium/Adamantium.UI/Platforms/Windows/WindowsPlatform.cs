@@ -66,6 +66,9 @@ public class WindowsPlatform : IApplicationPlatform
 
     public event Action Signaled;
 
+    public IntPtr WindowFromScreenPoint(Adamantium.Mathematics.Vector2 point) =>
+        Win32Interop.WindowFromPoint(new Adamantium.Mathematics.NativePoint((int)point.X, (int)point.Y));
+
     public static void Initialize(IContainerRegistry resolver)
     {
         resolver.RegisterSingleton<IApplicationPlatform, WindowsPlatform>();

@@ -171,6 +171,11 @@ namespace Adamantium.Win32
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool GetCursorPos(out NativePoint lpPoint);
 
+        /// <summary>The window under a SCREEN point, honouring the real z-order. Hidden, disabled and click-through
+        /// (WS_EX_TRANSPARENT) windows are skipped - which is why the drag ghost never shadows the window behind it.</summary>
+        [DllImport("user32.dll")]
+        public static extern IntPtr WindowFromPoint(NativePoint point);
+
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         public static extern bool SetCursorPos(int x, int y);

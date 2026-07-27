@@ -64,6 +64,24 @@ public static partial class DragDrop
         }
     }
 
+    /// <summary>The platform service, for the queries only the OS can answer during a drag (which window is on top at a
+    /// given point). Null before the app is up, or where the platform has no answer - callers fall back.</summary>
+    private static Platforms.IApplicationPlatform Platform
+    {
+        get
+        {
+            if (_platformResolved) return _platform;
+            var container = UIApplication.Current?.Container;
+            if (container == null) return null;
+            _platformResolved = true;
+            if (container.IsRegistered<Platforms.IApplicationPlatform>()) _platform = container.Resolve<Platforms.IApplicationPlatform>();
+            return _platform;
+        }
+    }
+
+    private static Platforms.IApplicationPlatform _platform;
+    private static bool _platformResolved;
+
     /// <summary>True while ANY drag is in flight - ours or the OS's. Guards a second gesture and keeps the drag-only
     /// timers (spring-load, auto-scroll) alive for an external drag too.</summary>
     private static bool IsDragActive => _dragging || _externalActive;
@@ -220,6 +238,8 @@ public static partial class DragDrop
         _currentTarget = null;
         _springTimer?.Stop();
         _springTarget = null;
+        _raiseTimer?.Stop();
+        _raiseCandidate = null;
         StopAutoScroll();
         ClearIndicator();
     }

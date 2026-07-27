@@ -105,6 +105,12 @@ public class MacOSWindowWorker : AdamantiumComponent, IWindowWorkerService
     {
     }
 
+    // TODO(macOS): [NSWindow orderFront:] - raises WITHOUT making the window key, which is the point: taking focus
+    // mid-drag is what cancels the gesture. No-op until the macOS window pipeline lands.
+    public void RaiseWithoutActivation()
+    {
+    }
+
     // OS-level mouse capture so a press-drag keeps tracking once the pointer leaves the window (the shared "when" is in
     // MouseDevice.SyncOsMouseCapture - already wired here so macOS won't re-hit the Win32 capture bug once its mouse
     // input is implemented). TODO(macOS): NSWindow has no SetCapture; route drag tracking via the window's tracking
