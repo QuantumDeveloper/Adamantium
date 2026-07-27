@@ -1,4 +1,5 @@
 using Adamantium.Imaging;
+using Adamantium.UI.Core.Media.Imaging;
 using NUnit.Framework;
 
 namespace Adamantium.UITests;
@@ -28,5 +29,41 @@ public class AnimatedImageDecodeTests
         Assert.That(raw, Is.Not.Null, "GIF failed to load");
         TestContext.WriteLine($"GIF FramesCount = {raw.FramesCount}");
         Assert.That(raw.FramesCount, Is.GreaterThan(1), "GIF should decode multiple frames");
+    }
+
+    /// <summary>
+    /// Decoding frames is only half of it - the Image control walks them through BitmapImage, and the constructor that
+    /// takes an already-decoded bitmap (a drop, a stream, anything that is not a URI) chains to base() rather than
+    /// this(), so it used to leave the frame caches null. Every fetch threw, the control's catch swallowed it, and an
+    /// animated picture sat on frame 0 for ever.
+    /// </summary>
+    [Test]
+    public void BitmapImageFromDecodedBitmap_WalksItsFrames()
+    {
+        var raw = BitmapLoader.Load(TexturesDir + "infinity.gif");
+        var bitmap = new BitmapImage(raw);
+        bitmap.StartFrame = 0;
+        bitmap.EndFrame = bitmap.FrameCount;
+
+        Assert.That(bitmap.GetNextFrame(), Is.Not.Null, "first frame");
+        Assert.That(bitmap.GetNextFrame(), Is.Not.Null, "second frame");
+        Assert.That(bitmap.CurrentFrameIndex, Is.EqualTo(2), "playback must move off frame 0");
+    }
+
+    /// <summary>Walking past the last frame comes back to the first rather than running off the end.</summary>
+    [Test]
+    public void BitmapImageFromDecodedBitmap_WrapsAtTheEnd()
+    {
+        var raw = BitmapLoader.Load(TexturesDir + "infinity.gif");
+        var bitmap = new BitmapImage(raw);
+        bitmap.StartFrame = 0;
+        bitmap.EndFrame = bitmap.FrameCount;
+
+        for (var i = 0; i < bitmap.FrameCount + 1; i++)
+        {
+            Assert.That(bitmap.GetNextFrame(), Is.Not.Null, $"frame {i}");
+        }
+
+        Assert.That(bitmap.CurrentFrameIndex, Is.EqualTo(1), "the loop restarts at the start frame");
     }
 }
