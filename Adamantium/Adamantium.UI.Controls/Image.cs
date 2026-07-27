@@ -262,9 +262,11 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
 
    // One heartbeat tick of runtime playback. Returns true (done -> the heartbeat drops this ticker) when the source is no
    // longer animated or the image has left the tree; a hidden-but-attached image keeps the ticker but does not advance.
+   private bool _playbackFailed;
+
    private bool RuntimeTick(double deltaSeconds)
    {
-      if (!IsAttachedToVisualTree || _bitmap is not { FrameCount: > 1 })
+      if (_playbackFailed || !IsAttachedToVisualTree || _bitmap is not { FrameCount: > 1 })
       {
          _runtimePlaying = false;
          return true;
@@ -350,9 +352,13 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
             _currentReplayIteration++;
          }
       }
-      catch (Exception ex)
+      catch (Exception)
       {
-
+         // A frame that cannot be produced will not start producing itself on the next tick, so STOP instead of failing
+         // sixty times a second - swallowing silently is what let a null frame cache freeze every animation unnoticed.
+         // Letting it escape is not an option either: the heartbeat has no guard, so one bad image would kill every
+         // running animation.
+         _playbackFailed = true;
       }
    }
 
