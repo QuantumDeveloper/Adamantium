@@ -73,6 +73,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.XamlTests", "Tes
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.MVVM.Tests", "Tests\Adamantium.MVVM.Tests\Adamantium.MVVM.Tests.csproj", "{057205E1-4CF8-4C87-B465-C1D52F53D4B5}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Adamantium.ImagingTests", "Tests\Adamantium.ImagingTests\Adamantium.ImagingTests.csproj", "{59640781-21F0-45AB-8657-7B3538DFD642}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -491,6 +493,18 @@ Global
 		{057205E1-4CF8-4C87-B465-C1D52F53D4B5}.Release|x64.Build.0 = Release|x64
 		{057205E1-4CF8-4C87-B465-C1D52F53D4B5}.Release|x86.ActiveCfg = Release|x64
 		{057205E1-4CF8-4C87-B465-C1D52F53D4B5}.Release|x86.Build.0 = Release|x64
+		{59640781-21F0-45AB-8657-7B3538DFD642}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{59640781-21F0-45AB-8657-7B3538DFD642}.Debug|Any CPU.Build.0 = Debug|x64
+		{59640781-21F0-45AB-8657-7B3538DFD642}.Debug|x64.ActiveCfg = Debug|x64
+		{59640781-21F0-45AB-8657-7B3538DFD642}.Debug|x64.Build.0 = Debug|x64
+		{59640781-21F0-45AB-8657-7B3538DFD642}.Debug|x86.ActiveCfg = Debug|x64
+		{59640781-21F0-45AB-8657-7B3538DFD642}.Debug|x86.Build.0 = Debug|x64
+		{59640781-21F0-45AB-8657-7B3538DFD642}.Release|Any CPU.ActiveCfg = Release|x64
+		{59640781-21F0-45AB-8657-7B3538DFD642}.Release|Any CPU.Build.0 = Release|x64
+		{59640781-21F0-45AB-8657-7B3538DFD642}.Release|x64.ActiveCfg = Release|x64
+		{59640781-21F0-45AB-8657-7B3538DFD642}.Release|x64.Build.0 = Release|x64
+		{59640781-21F0-45AB-8657-7B3538DFD642}.Release|x86.ActiveCfg = Release|x64
+		{59640781-21F0-45AB-8657-7B3538DFD642}.Release|x86.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -504,5 +518,6 @@ Global
 		{B23BBEB6-4953-4C91-A606-8A5268114882} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{56BE44A5-3B44-48F2-9320-6A79787FC8F3} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{057205E1-4CF8-4C87-B465-C1D52F53D4B5} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{59640781-21F0-45AB-8657-7B3538DFD642} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

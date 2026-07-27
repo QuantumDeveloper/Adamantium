@@ -1,4 +1,4 @@
-﻿// Copyright (c) 2010-2014 SharpDX - Alexandre Mutel
+// Copyright (c) 2010-2014 SharpDX - Alexandre Mutel
 // 
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -1074,7 +1074,7 @@ namespace Adamantium.Imaging.Dds
             }
             else
             {
-                var destinationPixelBuffers = ImageHelper.CreatePixelBuffers(metadata, IntPtr.Zero, 0);
+                var destinationPixelBuffers = ImageHelper.CreatePixelBuffers(metadata, IntPtr.Zero, 0, out var destinationBlock);
 
                 ImageHelper.ScanlineFlags tflags = (convFlags & ConversionFlags.NoAlpha) != 0
                     ? ImageHelper.ScanlineFlags.SetAlpha
@@ -1157,11 +1157,14 @@ namespace Adamantium.Imaging.Dds
                 }
 
                 ConvertPixelBuffersToRawData(ddsImage, destinationPixelBuffers);
-                Utilities.FreeMemory(destinationPixelBuffers[0].DataPointer);
+                // The BLOCK we allocated - not buffers[0].DataPointer, which is merely where the first image starts.
+                Utilities.FreeMemory(destinationBlock);
             }
 
-            Utilities.FreeMemory(sourcePixelBuffers[0].DataPointer);
-            
+            // NOT freeing the source here, deliberately: sourcePixelBuffers point into the CALLER's buffer - the bytes
+            // handed to LoadFromMemory - which this method never allocated and does not own. Releasing it made every DDS
+            // decode a double free (the caller frees its own buffer too) and corrupted the process heap; the crash then
+            // surfaced somewhere else entirely, which is what made a dropped .dds kill the app.
             return ddsImage;
         }
 
