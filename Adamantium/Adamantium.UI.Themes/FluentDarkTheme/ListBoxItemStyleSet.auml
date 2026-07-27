@@ -20,10 +20,15 @@
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="CornerRadius" Value="4"/>
         <Setter Property="Padding" Value="10 6"/>
-        <!-- Stretch so item content fills the row (Fluent/WinUI default): a templated View/card spans the full width, and
-             plain text still reads left (a TextBlock left-aligns its text inside the stretched presenter). -->
+        <!-- Stretch on BOTH axes so item content fills the row (Fluent/WinUI default): a templated View/card spans the
+             full width, and plain text still reads left (a TextBlock left-aligns its text inside the stretched
+             presenter).
+             Vertically too, and that is the recoverable choice: content that wants to be centred says so about ITSELF
+             (VerticalAlignment="Center"), whereas content that wants the whole slot cannot get back height the
+             container never handed down. With Center here, a tile in a fixed-size slot (a WrapPanel with ItemHeight)
+             collapsed to its own desired height no matter what it asked for. -->
         <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
     </Style>
 
     <!-- Template (its own style). -->
