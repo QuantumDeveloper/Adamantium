@@ -15,6 +15,7 @@ public class MacOSPlatform : IApplicationPlatform
     {
         appDelegate = MacOSInterop.CreateApplicationDelegate();
         app = MacOSInterop.CreateApplication(appDelegate);
+        Cursor.Platform = new MacOSCursors();   // NSCursor shapes for the neutral CursorType catalog
     }
         
     public void Run(CancellationToken token)

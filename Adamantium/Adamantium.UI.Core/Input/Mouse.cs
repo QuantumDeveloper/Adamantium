@@ -107,7 +107,7 @@ public static class Mouse
       set
       {
          _cursor = value;
-         Win32Interop.SetCursor((OverrideCursor ?? value).CursorHandle);   // an active override wins over per-element cursors
+         Cursor.Platform?.Apply(OverrideCursor ?? value);   // an active override wins over per-element cursors
       }
    }
 
@@ -120,7 +120,7 @@ public static class Mouse
       set
       {
          PrimaryDevice.OverrideCursor = value;
-         Win32Interop.SetCursor((value ?? _cursor).CursorHandle);
+         Cursor.Platform?.Apply(value ?? _cursor);
       }
    }
 
