@@ -85,7 +85,17 @@ public partial class DragDropDemoViewModel : TabPageViewModel
     // OS interop (docs/DRAG_DROP_PLAN.md phases 5-6). Everything dropped in from ANOTHER application lands here, and the
     // "export" items below can be dragged OUT into one - both through the same commands an in-app drop uses.
     [Bindable] private ObservableCollection<string> _dropped = new();
-    [Bindable] private ObservableCollection<string> _exports = new(["Plain text note", "Another note", "A file (drag to Explorer)"]);
+
+    // Pictures dropped INTO the app, kept as the encoded bytes they arrived as - the view turns them into something
+    // showable through a converter. A file drop counts too: Explorer hands over PATHS, never a bitmap, so a dragged
+    // .png from a folder would otherwise be a picture the demo could not show.
+    [Bindable] private ObservableCollection<Models.DroppedPicture> _droppedPictures = new();
+    // One export per KIND of payload. The three pictures are stored as PNG, JPEG and GIF on disk and are handed over
+    // exactly as they are: the engine turns whatever it was given into what each target asks for, so all three behave
+    // identically on the way out. That is the point of them being here.
+    [Bindable] private ObservableCollection<string> _exports = new([
+        "Plain text note", "Another note", "A file (drag to Explorer)",
+        "A picture, PNG", "A picture, JPEG", "A picture, GIF", "A picture, BMP", "A picture, TGA"]);
 
     private readonly INavigationService _navigation;
 
@@ -100,6 +110,7 @@ public partial class DragDropDemoViewModel : TabPageViewModel
     private void DropExternal(object arg)
     {
         if (arg is not DragDropEventArgs e) return;
+        CollectPictures(e);
         // Land WHERE the drop happened: the engine reports the item the caret sat before (null = past the last one).
         // Appending regardless would throw away the insertion cue the user was aiming with.
         var at = e.InsertBefore is string before && Dropped.IndexOf(before) is var index and >= 0 ? index : Dropped.Count;
@@ -117,6 +128,18 @@ public partial class DragDropDemoViewModel : TabPageViewModel
         {
             return files.Select(file => $"file: {file}");
         }
+        if (e.Data?.Get(DataFormats.Image) is byte[] image)
+        {
+            return [$"image: PNG, {image.Length} bytes"];
+        }
+        if (e.Data?.Get(DataFormats.Html) is string html)
+        {
+            return [$"html: {html}"];
+        }
+        if (e.Data?.Get(DataFormats.Rtf) is string rtf)
+        {
+            return [$"rtf: {rtf}"];
+        }
         if (e.Data?.Get(DataFormats.Text) is string text)
         {
             return [$"text: {text}"];
@@ -124,24 +147,95 @@ public partial class DragDropDemoViewModel : TabPageViewModel
         return ItemsOf(e).Select(item => $"in-app: {item}");
     }
 
-    [Command]
-    private void ClearDropped() => Dropped.Clear();
+    // Anything picture-shaped in the drop, kept as bytes. Two sources, because the two are genuinely different drags:
+    // a browser or another app hands over the picture itself; Explorer only ever hands over file PATHS.
+    private void CollectPictures(DragDropEventArgs e)
+    {
+        // Land WHERE it was dropped, not at the end: the engine reports the item the insertion caret sat before
+        // (null = past the last one), and ignoring it throws away the position the user was aiming at.
+        var at = e.InsertBefore is Models.DroppedPicture before && DroppedPictures.IndexOf(before) is var index and >= 0
+            ? index
+            : DroppedPictures.Count;
 
-    // The export list's drag start: the last item exports a REAL file (written on demand), the others export their text.
-    // A bare string payload already crosses out as text on its own - this only shows the explicit, typed form.
+        if (e.Data?.Get(DataFormats.Image) is byte[] { Length: > 0 } picture)
+        {
+            DroppedPictures.Insert(Math.Min(at, DroppedPictures.Count), new Models.DroppedPicture(picture));
+            at++;
+        }
+
+        if (e.Data?.Get(DataFormats.Files) is not string[] files) return;
+        foreach (var file in files)
+        {
+            if (!PictureExtensions.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase)) continue;
+            try
+            {
+                DroppedPictures.Insert(Math.Min(at, DroppedPictures.Count), new Models.DroppedPicture(File.ReadAllBytes(file)));
+                at++;
+            }
+            catch (IOException)
+            {
+                // A file that vanished or is locked is not worth breaking the drop over.
+            }
+        }
+    }
+
+    private static readonly string[] PictureExtensions =
+        [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tga", ".tif", ".tiff", ".ico", ".dds"];
+
+    [Command]
+    private void ClearDropped()
+    {
+        Dropped.Clear();
+        DroppedPictures.Clear();
+    }
+
+    // The export list's drag start: what each item offers the outside world. A bare string payload already crosses out
+    // as text on its own - everything here is the explicit, typed form, one item per kind of payload.
     [Command]
     private void ExportStarted(object arg)
     {
         if (arg is not DragDropEventArgs e || e.Data?.Get<string>() is not { } item) return;
-        if (!item.StartsWith("A file"))
+
+        if (item.StartsWith("A picture"))
         {
-            e.Data.Set(DataFormats.Text, item);
+            // The SAME neutral format for every encoding: hand over the bytes as they sit on disk and let the engine
+            // render what each target wants (PNG for the modern ones, CF_DIB for the classic, a file for the many that
+            // take nothing else). The file rendering comes from the engine because Program.cs opted in. Deferred, so a
+            // drag that goes nowhere never touches the disk.
+            var file = item switch
+            {
+                "A picture, JPEG" => "texture.jpg",
+                "A picture, GIF" => "infinity.gif",
+                "A picture, BMP" => "AplhaTestBitmap.bmp",
+                // TGA is the interesting one: no target on the desktop accepts it, so every rendering the engine hands
+                // over - the bitmap, the PNG, the file - is a conversion. If this drops, the conversion path works.
+                "A picture, TGA" => "luxfon.tga",
+                _ => "texture.png",
+            };
+            e.Data.SetDeferred(DataFormats.Image,
+                () => File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "Textures", file)));
             return;
         }
 
-        var path = Path.Combine(Path.GetTempPath(), "adamantium-drag-demo.txt");
-        File.WriteAllText(path, "Dragged out of Adamantium.UI through the OS drag-drop bridge.");
-        e.Data.Set(DataFormats.Files, new[] { path });
+        if (item.StartsWith("A file"))
+        {
+            // DEFERRED: the file is written only if the drop actually lands, and only when the target asks for the
+            // format. Drag around, drop nowhere, and nothing was ever written to disk.
+            e.Data.SetDeferred(DataFormats.Files, () =>
+            {
+                var path = Path.Combine(Path.GetTempPath(), "adamantium-drag-demo.txt");
+                File.WriteAllText(path, $"Written on demand at {DateTime.Now:HH:mm:ss} - the drop asked for it.");
+                return new[] { path };
+            });
+            return;
+        }
+
+        // Three renderings of the same note, so the target picks what it understands: Notepad takes the text, WordPad
+        // and Word take the RTF or the HTML and keep the formatting. The engine wraps each in whatever the platform
+        // demands (on Windows, CF_HTML's byte-offset header) - the view-model just names the format.
+        e.Data.Set(DataFormats.Text, item);
+        e.Data.Set(DataFormats.Html, $"<b>{item}</b> — <i>dragged out of Adamantium.UI</i>");
+        e.Data.Set(DataFormats.Rtf, @"{\rtf1\ansi{\b " + item + @"}\i0 - dragged out of Adamantium.UI}");
     }
 
     // Opens the DEDICATED drag-drop window (its own ListBox) - drag items between it and these lists, both ways.

@@ -1,5 +1,7 @@
-<View xmlns="http://adamantium/ui"
-      xmlns:x="http://adamantium/ui/xaml/extensions">
+﻿<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters"
+      xmlns:behaviors="clr-namespace:Adamantium.Game.Sandbox.Behaviors">
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
     <StackPanel Orientation="Vertical" Margin="24">
 
@@ -222,6 +224,60 @@
                 </Grid>
             </Border>
 
+            <!-- The drop, made visible. Everything picture-shaped that lands anywhere on this page shows up here: the
+                 payload is bytes in whatever encoding the source had, and the converter is what turns that into
+                 something an Image can draw - decoding by content, so PNG, JPEG, GIF and the rest all just work. -->
+            <Border CornerRadius="8" Padding="12" Width="420" Height="360" MarginLeft="16" BorderThickness="2"
+                    DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropExternalCommand}">
+                <Border.Styles>
+                    <Style Selector="Border">
+                        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+                        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+                        <PropertyTrigger Property="DragDrop.IsDragOver" Value="True">
+                            <Setter Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+                            <Setter Property="BorderBrush" Value="{ResourceReference SystemFillColorSuccess}"/>
+                        </PropertyTrigger>
+                    </Style>
+                </Border.Styles>
+                <Grid RowDefinitions="Auto,Auto,*">
+                    <TextBlock Grid.Row="0" Text="Dropped pictures" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="6"/>
+                    <TextBlock Grid.Row="1"
+                               Text="Drop an image file here, or drag a picture straight out of a browser."
+                               FontSize="12"
+                               TextWrapping="WrapBySymbols"
+                               Foreground="{ResourceReference TextFillColorSecondary}"
+                               MarginBottom="8"/>
+                    <ListBox Grid.Row="2" ItemsSource="{Binding DroppedPictures}" Background="Transparent"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <ListBox.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel Orientation="Horizontal" ItemWidth="124" ItemHeight="124"/>
+                            </ItemsPanelTemplate>
+                        </ListBox.ItemsPanel>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <!-- The tile shows up the moment the drop happens, with its spinner; the behavior
+                                     decodes off-thread and fills the picture in when it is ready. -->
+                                <Border Background="{ResourceReference TileFillColorDefault}" CornerRadius="6" Padding="6"
+                                        MarginRight="6" MarginBottom="6">
+                                    <Grid>
+                                        <BusyIndicator IsActive="{Binding IsLoading}" Width="28" Height="28"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       Visibility="{Binding IsLoading, Converter={conv:BoolToVisibilityConverter}}"/>
+                                        <Image Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <Image.Behaviors>
+                                                <behaviors:AsyncPictureBehavior Picture="{Binding}"/>
+                                            </Image.Behaviors>
+                                        </Image>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
             <Border CornerRadius="8" Padding="12" Width="300" MinHeight="220" BorderThickness="2">
                 <Border.Styles>
                     <Style Selector="Border">
@@ -232,7 +288,7 @@
                 <Grid RowDefinitions="Auto,Auto,*">
                     <TextBlock Grid.Row="0" Text="Drag out to another app" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="6"/>
                     <TextBlock Grid.Row="1"
-                               Text="AllowExternalDrag hands the whole gesture to the OS, ghost image and all."
+                               Text="AllowExternalDrag hands the whole gesture to the OS, ghost image and all. The notes also carry HTML and RTF - drop one into WordPad and the formatting survives. The file is written only if the drop lands."
                                FontSize="12"
                                TextWrapping="WrapBySymbols"
                                Foreground="{ResourceReference TextFillColorSecondary}"
