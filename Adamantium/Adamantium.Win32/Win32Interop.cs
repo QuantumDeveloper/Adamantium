@@ -430,5 +430,68 @@ namespace Adamantium.Win32
 
         [DllImport("gdi32.dll")]
         public static extern bool DeleteObject(IntPtr hObject);
+
+        /*
+            OLE drag-drop (docs/DRAG_DROP_PLAN.md phases 5-6): the bridge to other applications.
+        */
+
+        /// <summary>Standard clipboard format ids (CF_UNICODETEXT sits with the clipboard block above). The drag payload
+        /// speaks these on the wire; the neutral names a view-model sees live in <c>DataFormats</c>.</summary>
+        public const uint CF_TEXT = 1;
+        public const uint CF_HDROP = 15;
+
+        /// <summary>Bring OLE up on the CALLING thread (it must be an STA). Required before RegisterDragDrop /
+        /// DoDragDrop; returns RPC_E_CHANGED_MODE when the thread is already an MTA.</summary>
+        [DllImport("ole32.dll")]
+        public static extern int OleInitialize(IntPtr reserved);
+
+        [DllImport("ole32.dll")]
+        public static extern void OleUninitialize();
+
+        /// <summary>Make an HWND a drop target. The interface is kept alive by the OS until RevokeDragDrop; the window
+        /// must belong to the calling thread.</summary>
+        [DllImport("ole32.dll")]
+        public static extern int RegisterDragDrop(IntPtr hwnd, [MarshalAs(UnmanagedType.Interface)] Ole.IDropTarget dropTarget);
+
+        [DllImport("ole32.dll")]
+        public static extern int RevokeDragDrop(IntPtr hwnd);
+
+        /// <summary>Run the modal OLE drag loop. BLOCKS the calling thread for the whole gesture and returns
+        /// DRAGDROP_S_DROP / DRAGDROP_S_CANCEL, with the effect the target applied in <paramref name="effect"/>.</summary>
+        [DllImport("ole32.dll")]
+        public static extern int DoDragDrop(
+            [MarshalAs(UnmanagedType.Interface)] System.Runtime.InteropServices.ComTypes.IDataObject data,
+            [MarshalAs(UnmanagedType.Interface)] Ole.IDropSource dropSource,
+            Ole.DropEffect allowedEffects,
+            out Ole.DropEffect effect);
+
+        [DllImport("ole32.dll")]
+        public static extern void ReleaseStgMedium(ref System.Runtime.InteropServices.ComTypes.STGMEDIUM medium);
+
+        [DllImport("ole32.dll")]
+        public static extern int CoCreateInstance(ref Guid clsid, IntPtr outer, uint context, ref Guid iid,
+            [MarshalAs(UnmanagedType.Interface)] out object instance);
+
+        /// <summary>CLSCTX_INPROC_SERVER - the shell's drag-image helper lives in-process.</summary>
+        public const uint ClsCtxInprocServer = 1;
+
+        /// <summary>CLSID_DragDropHelper: implements both IDragSourceHelper and IDropTargetHelper.</summary>
+        public static readonly Guid ClsidDragDropHelper = new("4657278A-411B-11D2-839A-00C04FD918D0");
+
+        /// <summary>Register (or look up) a private clipboard format by name - how a non-standard payload crosses
+        /// processes.</summary>
+        [DllImport("user32.dll", EntryPoint = "RegisterClipboardFormatW", CharSet = CharSet.Unicode, SetLastError = true)]
+        public static extern ushort RegisterClipboardFormat(string format);
+
+        /// <summary>Read a CF_HDROP block: index 0xFFFFFFFF returns the file COUNT, any other index fills
+        /// <paramref name="file"/> with that path.</summary>
+        [DllImport("shell32.dll", EntryPoint = "DragQueryFileW", CharSet = CharSet.Unicode)]
+        public static extern uint DragQueryFile(IntPtr drop, uint index, [Out] char[] file, uint charCount);
+
+        [DllImport("kernel32.dll")]
+        public static extern UIntPtr GlobalSize(IntPtr mem);
+
+        [DllImport("kernel32.dll")]
+        public static extern IntPtr GlobalFree(IntPtr mem);
     }
 }
