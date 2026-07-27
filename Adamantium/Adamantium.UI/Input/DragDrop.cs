@@ -81,6 +81,16 @@ public static partial class DragDrop
     }
     public static void SetAutoScrollSpeed(AdamantiumComponent e, double value) => e.SetValue(AutoScrollSpeedProperty, value);
 
+    // Drag-handle (the grip ≡): mark it INSIDE a source and only a press on it starts the drag - the rest of the row is
+    // left free for selecting, clicking, editing in place. Declaring a handle is itself the switch: a source with none
+    // drags by its whole body, exactly as every existing markup expects. One property, so there is no "marked the grip
+    // but forgot the flag" state to debug.
+    public static readonly AdamantiumProperty IsDragHandleProperty = AdamantiumProperty.RegisterAttached(
+        "IsDragHandle", typeof(bool), typeof(AdamantiumComponent), new PropertyMetadata(false));
+
+    public static bool GetIsDragHandle(AdamantiumComponent e) => e.GetValue<bool>(IsDragHandleProperty);
+    public static void SetIsDragHandle(AdamantiumComponent e, bool value) => e.SetValue(IsDragHandleProperty, value);
+
     public static bool GetAllowDrag(AdamantiumComponent e) => e.GetValue<bool>(AllowDragProperty);
     public static void SetAllowDrag(AdamantiumComponent e, bool value) => e.SetValue(AllowDragProperty, value);
 
@@ -202,11 +212,43 @@ public static partial class DragDrop
     private static void OnSourceDown(object sender, MouseButtonEventArgs e)
     {
         if (IsDragActive || sender is not IInputComponent input) return;
+        if (!PressedOnDragHandle(input)) return;   // the source has a grip and this press missed it
         _source = input;
         _startScreen = Mouse.ScreenCoordinates;
         // Track move/up only while a press is live - added here, removed on up. Move keeps arriving after capture.
         input.MouseMove += OnMove;
         input.MouseLeftButtonUp += OnUp;
+    }
+
+    // A press starts a drag when it landed on a drag handle - or when the source declares none at all, which is the
+    // whole-body behaviour everything had before handles existed. ONE walk answers both questions, so the common case
+    // (no handles) costs a scan of a single item template and nothing else.
+    // The handle's BOUNDS decide, not a hit-test: a press between the strokes of a ≡ glyph is still a press on the grip.
+    private static bool PressedOnDragHandle(IInputComponent input)
+    {
+        if (input is not IUIComponent source) return true;
+        var local = Mouse.GetPosition(input);
+        var declared = false;
+        foreach (var handle in DragHandles(source))
+        {
+            declared = true;
+            if (handle.TransformBoundsToVisual(source).Contains(local)) return true;
+        }
+        return !declared;
+    }
+
+    // A grip is either the DragHandle CONTROL (which switches itself off through IsActive - that is what a "drag only by
+    // the handle" toggle binds to) or any element carrying the attached property, for retrofitting a glyph or an icon.
+    private static IEnumerable<IUIComponent> DragHandles(IUIComponent element)
+    {
+        foreach (var child in element.VisualChildren)
+        {
+            if (child is IDragHandle { IsDragHandleActive: true } || GetIsDragHandle((AdamantiumComponent)child))
+            {
+                yield return child;
+            }
+            foreach (var nested in DragHandles(child)) yield return nested;
+        }
     }
 
     private static void OnMove(object sender, MouseEventArgs e)
@@ -249,13 +291,13 @@ public static partial class DragDrop
             if (_currentTarget != null)
             {
                 SetIsDragOver((AdamantiumComponent)_currentTarget, false);
-                RaiseDragEvent(_currentTarget, DragDropEvents.DragLeaveEvent);
+                RaiseDragEvent(_currentTarget, DragDropEvents.PreviewDragLeaveEvent, DragDropEvents.DragLeaveEvent);
             }
             _currentTarget = target;
             if (_currentTarget != null)
             {
                 SetIsDragOver((AdamantiumComponent)_currentTarget, true);
-                RaiseDragEvent(_currentTarget, DragDropEvents.DragEnterEvent);
+                RaiseDragEvent(_currentTarget, DragDropEvents.PreviewDragEnterEvent, DragDropEvents.DragEnterEvent);
             }
         }
 
@@ -265,18 +307,21 @@ public static partial class DragDrop
         // when there's no target; the target's DragOverCommand may DOWNGRADE it (e.g. to None: this payload can't land here
         // right now). The resulting effect drives the cursor AND the eventual drop.
         var effects = DragDropEffects.None;
+        Cursor cursor = null;
         if (target != null)
         {
-            var args = DragArgs(target, DragDropEvents.DragOverEvent);
-            ((IObservableComponent)target).RaiseEvent(args);   // controls first: one of them may own this drag entirely
+            // Controls first (they may own this drag entirely), then the view-model's command unless one of them handled it.
+            var args = RaiseDragPair(target, DragArgs(target, DragDropEvents.PreviewDragOverEvent),
+                DragDropEvents.PreviewDragOverEvent, DragDropEvents.DragOverEvent);
             if (!args.Handled && GetDragOverCommand((AdamantiumComponent)target) is { } over && over.CanExecute(args)) over.Execute(args);
             effects = args.Effects;
+            cursor = args.DragCursor;   // a target that wants to say something the effect cannot
         }
         _dragEffects = effects;
         // The OS owns the cursor for the whole of an OS-driven gesture (it draws the standard drag cursors from the
-        // effect we report back), so our override would only fight it.
+        // effect we report back), so our override - DragCursor included - would only fight it.
         if (_externalActive) _externalEffect = effects;
-        else Mouse.OverrideCursor = CursorFor(effects);
+        else Mouse.OverrideCursor = cursor ?? CursorFor(effects);
     }
 
     // The routed half of the drop API: the same argument the commands get, raised on the AllowDrop target so a CONTROL can
@@ -292,8 +337,21 @@ public static partial class DragDrop
 
     // Enter/leave are notifications that the target changed - what they set in Effects is not read, because the DragOver
     // that follows on the very same pass decides it.
-    private static void RaiseDragEvent(IUIComponent target, RoutedEvent routedEvent) =>
-        ((IObservableComponent)target).RaiseEvent(DragArgs(target, routedEvent));
+    private static void RaiseDragEvent(IUIComponent target, RoutedEvent preview, RoutedEvent bubble) =>
+        RaiseDragPair(target, DragArgs(target, preview), preview, bubble);
+
+    // Preview first (tunnels window -> target), then the plain event (bubbles back out) - ONE argument object for both,
+    // which is what makes a parent's Handled in the preview veto the bubbling handlers AND the command after them.
+    private static DragDropEventArgs RaiseDragPair(IUIComponent target, DragDropEventArgs args, RoutedEvent preview,
+        RoutedEvent bubble)
+    {
+        var observable = (IObservableComponent)target;
+        args.RoutedEvent = preview;
+        observable.RaiseEvent(args);
+        args.RoutedEvent = bubble;
+        observable.RaiseEvent(args);
+        return args;
+    }
 
     // Ctrl = Copy, otherwise Move (WPF/Explorer convention). The per-target DragOver can override this. The key query
     // goes to the platform, which answers with the PHYSICAL state - the queue-synchronized one is stale while the mouse
@@ -954,7 +1012,6 @@ public static partial class DragDrop
             InsertBefore = _insertBefore,   // the item after the caret (survives the source removal - use for a stable reorder)
             DropTarget = _dropTarget,       // hybrid tree-drop: the hovered node
             Placement = _placement,         // before/after sibling, or into as a child (None for a flat list)
-            RoutedEvent = DragDropEvents.DropEvent,
             OriginalSource = _hit,
         };
 
@@ -966,7 +1023,7 @@ public static partial class DragDrop
 
         if (target != null && effects != DragDropEffects.None)
         {
-            ((IObservableComponent)target).RaiseEvent(args);                            // controls first (Handled = they own it)
+            RaiseDragPair(target, args, DragDropEvents.PreviewDropEvent, DragDropEvents.DropEvent);   // controls first
             var drop = GetDropCommand((AdamantiumComponent)target);
             if (!args.Handled && drop != null && drop.CanExecute(args)) drop.Execute(args);   // target ADDS
 

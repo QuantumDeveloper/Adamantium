@@ -68,6 +68,48 @@ public class RoutedDragEventsTests
         Assert.That(reachedOuter, Is.False, "a handled drag must not reach the ancestors");
     }
 
+    // The Preview pair tunnels INWARDS before the plain event bubbles out, so a container sees the drag first.
+    [Test]
+    public void Preview_TunnelsToTarget_BeforeTheBubblingEvent()
+    {
+        var (inner, outer) = BuildTree();
+        var order = new List<string>();
+        outer.PreviewDragOver += (_, _) => order.Add("preview:outer");
+        inner.PreviewDragOver += (_, _) => order.Add("preview:inner");
+        inner.DragOver += (_, _) => order.Add("bubble:inner");
+        outer.DragOver += (_, _) => order.Add("bubble:outer");
+
+        var args = DragOverArgs(inner);
+        var observable = (IObservableComponent)inner;
+        args.RoutedEvent = DragDropEvents.PreviewDragOverEvent;
+        observable.RaiseEvent(args);
+        args.RoutedEvent = DragDropEvents.DragOverEvent;
+        observable.RaiseEvent(args);
+
+        Assert.That(order, Is.EqualTo(new[] { "preview:outer", "preview:inner", "bubble:inner", "bubble:outer" }));
+    }
+
+    // The point of the tunnel: a PARENT answers for its whole subtree. Its Handled must reach the bubbling handlers,
+    // which is only true because both events share ONE args object - the engine relies on it to skip the command too.
+    [Test]
+    public void ParentHandlingThePreview_VetoesTheBubblingEvent()
+    {
+        var (inner, outer) = BuildTree();
+        var reached = false;
+        outer.PreviewDragOver += (_, e) => e.Handled = true;
+        inner.DragOver += (_, _) => reached = true;
+
+        var args = DragOverArgs(inner);
+        var observable = (IObservableComponent)inner;
+        args.RoutedEvent = DragDropEvents.PreviewDragOverEvent;
+        observable.RaiseEvent(args);
+        args.RoutedEvent = DragDropEvents.DragOverEvent;
+        observable.RaiseEvent(args);
+
+        Assert.That(args.Handled, Is.True);
+        Assert.That(reached, Is.False, "a preview handled from above must veto the bubbling handlers");
+    }
+
     // Refusing a payload: a handler sets Effects.None and the engine picks that up from the same args object it raised.
     [Test]
     public void EffectsSetByHandler_IsVisibleToTheEngine()

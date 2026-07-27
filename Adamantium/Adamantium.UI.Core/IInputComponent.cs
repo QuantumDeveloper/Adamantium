@@ -130,6 +130,26 @@ public interface IInputComponent: IMeasurableComponent
    /// </summary>
    event DragDropEventHandler Drop;
 
+   /// <summary>
+   /// Tunnels ahead of <see cref="DragEnter"/> - a container hears about the drag before its content does.
+   /// </summary>
+   event DragDropEventHandler PreviewDragEnter;
+
+   /// <summary>
+   /// Tunnels ahead of <see cref="DragOver"/>; set <c>Handled</c> to answer for the whole subtree.
+   /// </summary>
+   event DragDropEventHandler PreviewDragOver;
+
+   /// <summary>
+   /// Tunnels ahead of <see cref="DragLeave"/>.
+   /// </summary>
+   event DragDropEventHandler PreviewDragLeave;
+
+   /// <summary>
+   /// Tunnels ahead of <see cref="Drop"/>.
+   /// </summary>
+   event DragDropEventHandler PreviewDrop;
+
    event RawMouseEventHandler RawMouseMove;
 
    event MouseButtonEventHandler RawMouseDown;

@@ -27,6 +27,7 @@
         <StyleInclude Source="{x:Type fluentDark:ListBoxStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ListBoxItemStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:DropInsertionIndicatorStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:DragHandleStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:SelectionAdornerStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:HoverAdornerStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:TilesHostStyleSet}"/>

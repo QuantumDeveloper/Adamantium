@@ -41,4 +41,30 @@ public static class Cursors
 
     /// <summary>Drag feedback for a LINK.</summary>
     public static Cursor DragLink { get; } = new(CursorType.DragLink);
+
+    /// <summary>The shared description for a standard shape - the way to turn a <see cref="CursorType"/> that arrived as
+    /// DATA (a setting, a view-model's choice) into a cursor without allocating one per read. Null for
+    /// <see cref="CursorType.Custom"/>: that one names a FILE, not a shape, so there is nothing shared to hand back -
+    /// build it with <c>new Cursor(path)</c>.</summary>
+    public static Cursor Of(CursorType type) => type switch
+    {
+        CursorType.None => None,
+        CursorType.Arrow => Arrow,
+        CursorType.AppStarting => AppStarting,
+        CursorType.Crosshair => Crosshair,
+        CursorType.Hand => Hand,
+        CursorType.Help => Help,
+        CursorType.IBeam => IBeam,
+        CursorType.No => No,
+        CursorType.SizeAll => SizeAll,
+        CursorType.SizeNESW => SizeNESW,
+        CursorType.SizeNS => SizeNS,
+        CursorType.SizeNWSE => SizeNWSE,
+        CursorType.SizeEWE => SizeEWE,
+        CursorType.UpArrow => UpArrow,
+        CursorType.Wait => Wait,
+        CursorType.DragCopy => DragCopy,
+        CursorType.DragLink => DragLink,
+        _ => null,
+    };
 }
