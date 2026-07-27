@@ -126,11 +126,11 @@ public class MouseDevice
 
     internal void UpdateButtonStates(InputModifiers buttons)
     {
-        LeftButton = (buttons & InputModifiers.LeftMouseButton) != 0 ? MouseButtonState.Pressed : MouseButtonState.Relesed;
-        RightButton = (buttons & InputModifiers.RightMouseButton) != 0 ? MouseButtonState.Pressed : MouseButtonState.Relesed;
-        MiddleButton = (buttons & InputModifiers.MiddleMouseButton) != 0 ? MouseButtonState.Pressed : MouseButtonState.Relesed;
-        XButton1 = (buttons & InputModifiers.X1MouseButton) != 0 ? MouseButtonState.Pressed : MouseButtonState.Relesed;
-        XButton2 = (buttons & InputModifiers.X2MouseButton) != 0 ? MouseButtonState.Pressed : MouseButtonState.Relesed;
+        LeftButton = (buttons & InputModifiers.LeftMouseButton) != 0 ? MouseButtonState.Pressed : MouseButtonState.Released;
+        RightButton = (buttons & InputModifiers.RightMouseButton) != 0 ? MouseButtonState.Pressed : MouseButtonState.Released;
+        MiddleButton = (buttons & InputModifiers.MiddleMouseButton) != 0 ? MouseButtonState.Pressed : MouseButtonState.Released;
+        XButton1 = (buttons & InputModifiers.X1MouseButton) != 0 ? MouseButtonState.Pressed : MouseButtonState.Released;
+        XButton2 = (buttons & InputModifiers.X2MouseButton) != 0 ? MouseButtonState.Pressed : MouseButtonState.Released;
     }
 
     public void ProcessEvent(RawMouseEventArgs e)
@@ -280,7 +280,7 @@ public class MouseDevice
     {
         if (FocusManager.Focused != null)
         {
-            MouseButtonEventArgs args = new MouseButtonEventArgs(this, button, MouseButtonState.Relesed, inputModifiers, timestamp);
+            MouseButtonEventArgs args = new MouseButtonEventArgs(this, button, MouseButtonState.Released, inputModifiers, timestamp);
             args.RoutedEvent = Mouse.RawMouseUpEvent;
             FocusManager.Focused.RaiseEvent(args);
         }
@@ -291,7 +291,7 @@ public class MouseDevice
     {
         if (FocusManager.Focused != null)
         {
-            MouseButtonEventArgs args = new MouseButtonEventArgs(this, button, MouseButtonState.Relesed, inputModifiers, timestamp);
+            MouseButtonEventArgs args = new MouseButtonEventArgs(this, button, MouseButtonState.Released, inputModifiers, timestamp);
             args.RoutedEvent = Mouse.RawMouseDownEvent;
             FocusManager.Focused.RaiseEvent(args);
         }
