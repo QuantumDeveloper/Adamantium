@@ -46,6 +46,10 @@ public sealed class BitmapImage : BitmapSource
       bitmap.GetRawPixels(0))
    {
       _rawBitmap = bitmap;
+      // Built from a bitmap that is ALREADY decoded, so it is ready the moment it exists. Without saying so the
+      // renderer skips it forever (it refuses to draw a BitmapImage that has not finished loading), which only the URI
+      // path used to announce - and an image handed over as bytes never drew at all.
+      IsLoaded = true;
    }
 
    public static readonly AdamantiumProperty UriSourceProperty = AdamantiumProperty.Register(nameof(UriSource),
