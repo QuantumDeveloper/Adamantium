@@ -33,4 +33,10 @@ internal sealed class WindowsInput : INativeMouse, INativeKeyboard, INativePlatf
     public bool IsKeyToggled(Key key) => (Win32Interop.GetKeyState((uint)key) & KeyToggled) != 0;
 
     public uint DoubleClickTime => Win32Interop.GetDoubleClickTime();
+
+    // SM_CXDRAG/SM_CYDRAG - the user's own "how far before it's a drag" setting (Control Panel / registry). Read live
+    // rather than cached: the user can change it while the app runs, and it is queried once per gesture, not per frame.
+    public Size DragThreshold => new(
+        Win32Interop.GetSystemMetrics(SystemMetrics.Cxdrag),
+        Win32Interop.GetSystemMetrics(SystemMetrics.Cydrag));
 }

@@ -161,7 +161,8 @@ public class ListBoxItem : ContentControl, ISelectable
         base.OnMouseMove(sender, e);
         if (!_deferSelect) return;
         var owner = OwnerListBox;
-        if (owner != null && (e.GetPosition(owner) - _downPoint).Length() > 4.0) _deferSelect = false;   // it's a drag - keep the selection
+        // Past the OS drag threshold this is a DRAG, not a click - keep the selection intact for it to carry.
+        if (owner != null && PlatformSettings.ExceedsDragThreshold(e.GetPosition(owner) - _downPoint)) _deferSelect = false;
     }
 
     protected override void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)

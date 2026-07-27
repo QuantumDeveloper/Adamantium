@@ -29,8 +29,8 @@ namespace Adamantium.UI.Input;
 /// </summary>
 public static partial class DragDrop
 {
-    // Pixels the pointer must travel before a press becomes a drag - a click is not a drag.
-    private const double DragThreshold = 4.0;
+    // How far the pointer must travel before a press becomes a drag comes from the USER's own OS setting
+    // (PlatformSettings.DragThreshold) - a click is not a drag, and where that line sits is their choice, not ours.
     // How long the cursor must dwell over a spring-loadable before it activates/expands.
     private const double SpringLoadDwellMs = 600;
     // Auto-scroll edge band (px), timer cadence, and default speed (px/sec) if a ScrollViewer doesn't set AutoScrollSpeed.
@@ -209,7 +209,7 @@ public static partial class DragDrop
         if (_source == null) return;
         if (!_dragging)
         {
-            if ((Mouse.ScreenCoordinates - _startScreen).Length() < DragThreshold) return;
+            if (!PlatformSettings.ExceedsDragThreshold(Mouse.ScreenCoordinates - _startScreen)) return;
             BeginDrag();
         }
         if (_externalCapable) return;   // the gesture belongs to the OS from here - it draws the ghost and reports the drop

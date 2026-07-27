@@ -233,7 +233,6 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
         Owner?.RequestClose(this);
     }
 
-    private const double DragThreshold = 4;   // px moved before a press becomes a reorder drag
     private Vector2 _pressPos;
     private bool _pressed;
     private bool _dragging;
@@ -263,7 +262,7 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
     {
         base.OnMouseMove(sender, e);
         if (!_pressed) return;
-        if (!_dragging && (e.GetPosition(this) - _pressPos).Length() > DragThreshold)
+        if (!_dragging && PlatformSettings.ExceedsDragThreshold(e.GetPosition(this) - _pressPos))
         {
             _dragging = true;
             CaptureMouse();   // now the drag must keep tracking even as the pointer leaves this tab
