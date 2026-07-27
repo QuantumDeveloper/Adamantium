@@ -153,6 +153,86 @@
 
         </StackPanel>
 
+        <TextBlock Text="Across applications (OS drag-drop)"
+                   FontSize="17"
+                   MarginTop="24"/>
+        <TextBlock Text="The same commands, now over the OS bridge: drop files or text from Explorer / an editor into the left card, and drag the right card's items OUT into Notepad or an Explorer folder. Payloads cross as neutral formats (DataFormats.Text / DataFormats.Files) - the view-model never sees a platform type."
+                   FontSize="13"
+                   Foreground="{ResourceReference TextFillColorSecondary}"
+                   MaxWidth="760"
+                   MarginBottom="12"/>
+
+        <StackPanel Orientation="Horizontal" MarginBottom="16">
+
+            <Border CornerRadius="8" Padding="12" Width="420" MinHeight="220" MarginRight="16" BorderThickness="2"
+                    DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropExternalCommand}">
+                <Border.Styles>
+                    <Style Selector="Border">
+                        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+                        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+                        <PropertyTrigger Property="DragDrop.IsDragOver" Value="True">
+                            <Setter Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+                            <Setter Property="BorderBrush" Value="{ResourceReference SystemFillColorSuccess}"/>
+                        </PropertyTrigger>
+                    </Style>
+                </Border.Styles>
+                <!-- Grid, not StackPanel: a stack hands every child its desired height and never shares out what is left,
+                     so the list has to sit in a STAR row to fill the card (which is itself stretched to the tallest sibling). -->
+                <Grid RowDefinitions="Auto,Auto,Auto,*">
+                    <TextBlock Grid.Row="0" Text="Drop from another app" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="6"/>
+                    <TextBlock Grid.Row="1"
+                               Text="Drag files here from Explorer, or selected text from an editor."
+                               FontSize="12"
+                               TextWrapping="WrapBySymbols"
+                               Foreground="{ResourceReference TextFillColorSecondary}"
+                               MarginBottom="8"/>
+                    <Button Grid.Row="2"
+                            Content="Clear"
+                            Command="{Binding ClearDroppedCommand}"
+                            Width="90"
+                            Height="28"
+                            HorizontalAlignment="Left"
+                            MarginBottom="8"/>
+                    <ListBox Grid.Row="3" ItemsSource="{Binding Dropped}" Background="Transparent"/>
+                </Grid>
+            </Border>
+
+            <Border CornerRadius="8" Padding="12" Width="300" MinHeight="220" BorderThickness="2">
+                <Border.Styles>
+                    <Style Selector="Border">
+                        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+                        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+                    </Style>
+                </Border.Styles>
+                <Grid RowDefinitions="Auto,Auto,*">
+                    <TextBlock Grid.Row="0" Text="Drag out to another app" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="6"/>
+                    <TextBlock Grid.Row="1"
+                               Text="AllowExternalDrag hands the whole gesture to the OS, ghost image and all."
+                               FontSize="12"
+                               TextWrapping="WrapBySymbols"
+                               Foreground="{ResourceReference TextFillColorSecondary}"
+                               MarginBottom="8"/>
+                    <ListBox Grid.Row="2" ItemsSource="{Binding Exports}" Background="Transparent">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{ResourceReference TileFillColorDefault}"
+                                        CornerRadius="6"
+                                        Padding="10"
+                                        MarginBottom="6"
+                                        DragDrop.AllowDrag="True"
+                                        DragDrop.AllowExternalDrag="True"
+                                        DragDrop.DragData="{Binding}"
+                                        DragDrop.DragStartedCommand="{Ancestor ItemsControl, DataContext.ExportStartedCommand}">
+                                    <TextBlock Text="{Binding}"/>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+        </StackPanel>
+
         <StackPanel Orientation="Horizontal" MarginTop="16">
             <Border CornerRadius="8" Padding="12" Width="300" MinHeight="280" BorderThickness="2"
                     DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropTreeCommand}">

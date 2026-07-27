@@ -8,6 +8,8 @@ namespace Adamantium.UI.Sandbox
 {
     class Program
     {
+        // OLE (the OS drag-drop bridge) requires the UI thread to be a single-threaded apartment.
+        [STAThread]
         static void Main(string[] args)
         {
             var app = new App();

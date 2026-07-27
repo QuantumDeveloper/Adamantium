@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Adamantium.MVVM;
@@ -60,11 +61,55 @@ public partial class DragDropDemoViewModel : TabPageViewModel
         new DragTreeNode("Loose item"),
     ]);
 
+    // OS interop (docs/DRAG_DROP_PLAN.md phases 5-6). Everything dropped in from ANOTHER application lands here, and the
+    // "export" items below can be dragged OUT into one - both through the same commands an in-app drop uses.
+    [Bindable] private ObservableCollection<string> _dropped = new();
+    [Bindable] private ObservableCollection<string> _exports = new(["Plain text note", "Another note", "A file (drag to Explorer)"]);
+
     private readonly INavigationService _navigation;
 
     public DragDropDemoViewModel(INavigationService navigation) : base("Drag & Drop")
     {
         _navigation = navigation;
+    }
+
+    // A drop from ANY source - Explorer, an editor, or one of our own lists. The view-model reads neutral formats and
+    // never learns which application (or which platform's clipboard machinery) it came from.
+    [Command]
+    private void DropExternal(object arg)
+    {
+        if (arg is not DragDropEventArgs e) return;
+        if (e.Data?.Get(DataFormats.Files) is string[] files && files.Length > 0)
+        {
+            foreach (var file in files) Dropped.Add($"file: {file}");
+            return;
+        }
+        if (e.Data?.Get(DataFormats.Text) is string text)
+        {
+            Dropped.Add($"text: {text}");
+            return;
+        }
+        foreach (var item in ItemsOf(e)) Dropped.Add($"in-app: {item}");
+    }
+
+    [Command]
+    private void ClearDropped() => Dropped.Clear();
+
+    // The export list's drag start: the last item exports a REAL file (written on demand), the others export their text.
+    // A bare string payload already crosses out as text on its own - this only shows the explicit, typed form.
+    [Command]
+    private void ExportStarted(object arg)
+    {
+        if (arg is not DragDropEventArgs e || e.Data?.Get<string>() is not { } item) return;
+        if (!item.StartsWith("A file"))
+        {
+            e.Data.Set(DataFormats.Text, item);
+            return;
+        }
+
+        var path = Path.Combine(Path.GetTempPath(), "adamantium-drag-demo.txt");
+        File.WriteAllText(path, "Dragged out of Adamantium.UI through the OS drag-drop bridge.");
+        e.Data.Set(DataFormats.Files, new[] { path });
     }
 
     // Opens the DEDICATED drag-drop window (its own ListBox) - drag items between it and these lists, both ways.
