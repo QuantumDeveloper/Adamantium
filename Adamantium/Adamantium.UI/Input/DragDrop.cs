@@ -163,7 +163,7 @@ public static partial class DragDrop
 
     // Timer-driven auto-scroll: the ScrollViewer being scrolled + how far (px, signed) to move each tick.
     private static ScrollViewer _autoScrollViewer;
-    private static double _autoScrollPerTick;
+    private static Vector2 _autoScrollPerTick;
     private static DispatcherTimer _autoScrollTimer;
 
     // The insertion cue: which items host, the caret's rect + orientation, and the resulting insert index handed to the drop.
@@ -281,7 +281,7 @@ public static partial class DragDrop
         {
             window = w;
             hit = root.HitTest(window.PointToClient(screen)) as IUIComponent;
-            AutoScroll(hit);
+            AutoScroll(hit, window, screen);
             target = FindAllowDropAncestor(hit);
         }
 
@@ -644,31 +644,89 @@ public static partial class DragDrop
     // Auto-scroll: when the cursor sits in the top/bottom edge band of the nearest ScrollViewer, scroll it steadily via a
     // TIMER (not per-move), so the speed is time-based (independent of how fast the mouse moves) and holding still at the
     // edge keeps scrolling. Speed = DragDrop.AutoScrollSpeed (px/sec) on the ScrollViewer, ramped by how deep into the band.
-    private static void AutoScroll(IUIComponent hit)
+    private static void AutoScroll(IUIComponent hit, IWindow window, Vector2 screen)
     {
-        ScrollViewer sv = null;
-        for (var c = hit; c != null; c = c.VisualParent)
+        var band = DragDropOptions.AutoScrollBand;
+
+        // Walk OUTWARDS through every scrollable area under the pointer and take the first that can actually move the
+        // way the edge is pulling. Taking the innermost one unconditionally is what makes a drag dead-end over a short
+        // or empty inner list: it swallows the pull and has nowhere to go, so the page behind it never scrolls. Chaining
+        // is the same contract the wheel already honours, and a container can opt out of it the same way
+        // (ScrollViewer.ScrollChaining="False" keeps the pull for itself).
+        foreach (var sv in ScrollablesUnder(hit, window, screen))
         {
-            if (c is ScrollViewer found) { sv = found; break; }
+            var local = Mouse.GetPosition((IInputComponent)sv);
+            var size = sv.RenderSize;
+            // Both axes: an area that scrolls sideways (a wrap flow, a tab strip) needs the edge to pull just as much as
+            // a vertical list does. Each axis is measured on its own, so a corner drags diagonally.
+            var pull = new Vector2(
+                (float)EdgePull(local.X, size.Width, band),
+                (float)EdgePull(local.Y, size.Height, band));
+            if (pull.X == 0 && pull.Y == 0) continue;
+
+            pull = new Vector2(CanScroll(sv, pull.X, horizontal: true) ? pull.X : 0,
+                               CanScroll(sv, pull.Y, horizontal: false) ? pull.Y : 0);
+            if (pull.X == 0 && pull.Y == 0)
+            {
+                if (!ScrollViewer.GetScrollChaining((AdamantiumComponent)sv)) break;   // opted out - the pull stops here
+                continue;                                                              // nothing to give: try the parent
+            }
+
+            var speed = GetAutoScrollSpeed((AdamantiumComponent)sv) * (AutoScrollTickMs / 1000.0);   // px/sec -> px/tick
+            _autoScrollViewer = sv;
+            _autoScrollPerTick = new Vector2((float)(pull.X * speed), (float)(pull.Y * speed));
+            _autoScrollTimer ??= CreateAutoScrollTimer();
+            if (!_autoScrollTimer.IsEnabled) _autoScrollTimer.Start();
+            return;
         }
 
-        if (sv == null) { StopAutoScroll(); return; }
+        StopAutoScroll();
+    }
 
-        var local = Mouse.GetPosition((IInputComponent)sv);
-        var height = sv.RenderSize.Height;
-        var band = DragDropOptions.AutoScrollBand;
-        double dir = local.Y < band ? -1 : local.Y > height - band ? 1 : 0;
-        if (dir == 0) { StopAutoScroll(); return; }
+    /// <summary>Is there room left to move this way? Extent must exceed the viewport, and the offset must not already be
+    /// against the edge the pull is heading for - exactly what the wheel checks before handing off to a parent.</summary>
+    private static bool CanScroll(ScrollViewer sv, double pull, bool horizontal)
+    {
+        if (pull == 0) return false;
+        var extent = horizontal ? sv.ExtentSize.Width : sv.ExtentSize.Height;
+        var viewport = horizontal ? sv.ViewportSize.Width : sv.ViewportSize.Height;
+        if (extent <= viewport + 0.5) return false;
 
-        // 0 at the band's inner edge → 1 at the very edge, so it eases in rather than jumping to full speed.
-        var depth = dir < 0 ? (band - local.Y) / band : (local.Y - (height - band)) / band;
-        depth = depth < 0 ? 0 : depth > 1 ? 1 : depth;
-        var speed = GetAutoScrollSpeed((AdamantiumComponent)sv);   // px/sec
+        var offset = horizontal ? sv.ScrollOffset.X : sv.ScrollOffset.Y;
+        return pull > 0 ? offset < extent - viewport - 0.5 : offset > 0.5;
+    }
 
-        _autoScrollViewer = sv;
-        _autoScrollPerTick = dir * speed * depth * (AutoScrollTickMs / 1000.0);
-        _autoScrollTimer ??= CreateAutoScrollTimer();
-        if (!_autoScrollTimer.IsEnabled) _autoScrollTimer.Start();
+    /// <summary>How hard one edge pulls along one axis: 0 outside the band, easing from 0 at its inner edge to ±1 at the
+    /// very edge, so the scroll eases in instead of jumping to full speed.</summary>
+    private static double EdgePull(double position, double extent, double band)
+    {
+        if (position < band) return -Math.Clamp((band - position) / band, 0, 1);
+        if (position > extent - band) return Math.Clamp((position - (extent - band)) / band, 0, 1);
+        return 0;
+    }
+
+    /// <summary>
+    /// The scrollable area the pointer is over. Walking up from the hit element covers the usual case, but the hit test
+    /// only reports INTERACTIVE elements - drag over the empty part of a page and there is nothing to walk up FROM, so
+    /// a plain ScrollViewer never scrolled while a list, whose rows are hit-testable, did. The fallback therefore asks
+    /// what VISUALS are under the point (that collector includes non-interactive ones) and takes the innermost
+    /// scrollable among them, which is what "auto-scroll works anywhere" actually requires.
+    /// </summary>
+    private static IEnumerable<ScrollViewer> ScrollablesUnder(IUIComponent hit, IWindow window, Vector2 screen)
+    {
+        var seen = new HashSet<ScrollViewer>();
+        for (var c = hit; c != null; c = c.VisualParent)
+        {
+            if (c is ScrollViewer found && seen.Add(found)) yield return found;
+        }
+
+        if (window is not IUIComponent root) yield break;
+        // Front-to-back, so the innermost comes first - the same order the ancestor walk produces, and the order the
+        // pull should be offered in.
+        foreach (var visual in root.GetVisualsAt(window.PointToClient(screen)))
+        {
+            if (visual is ScrollViewer found && seen.Add(found)) yield return found;
+        }
     }
 
     private static DispatcherTimer CreateAutoScrollTimer()
@@ -676,8 +734,12 @@ public static partial class DragDrop
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(AutoScrollTickMs) };
         timer.Tick += (_, _) =>
         {
-            if (!IsDragActive || _autoScrollViewer == null || _autoScrollPerTick == 0) { StopAutoScroll(); return; }
-            _autoScrollViewer.SetScrollOffset(_autoScrollViewer.ScrollOffset + new Vector2(0, _autoScrollPerTick));
+            if (!IsDragActive || _autoScrollViewer == null || (_autoScrollPerTick.X == 0 && _autoScrollPerTick.Y == 0))
+            {
+                StopAutoScroll();
+                return;
+            }
+            _autoScrollViewer.SetScrollOffset(_autoScrollViewer.ScrollOffset + _autoScrollPerTick);
         };
         return timer;
     }
@@ -686,7 +748,7 @@ public static partial class DragDrop
     {
         _autoScrollTimer?.Stop();
         _autoScrollViewer = null;
-        _autoScrollPerTick = 0;
+        _autoScrollPerTick = default;
     }
 
     // Spring-loading: find the nearest ISpringLoadable under the cursor. While the cursor rests over the SAME one the
@@ -799,6 +861,8 @@ public static partial class DragDrop
         var started = GetDragStartedCommand((AdamantiumComponent)_source);
         if (started != null && started.CanExecute(startArgs)) started.Execute(startArgs);
 
+        OfferPictureAsFile();
+
         // The ghost is a snapshot of every dragged element (the whole multi-selection), composited into a stack. Each bake
         // runs OFF the render thread (queued); the ghost appears once they've all arrived (a frame or two later).
         _dragCount = GetGhostElements(_source).Count;   // selection size -> the multi-drag count badge
@@ -819,6 +883,18 @@ public static partial class DragDrop
             Renderer?.RequestSnapshot(body[i], img => OnGhostPartReady(index, img));
         }
         if (badge != null) Renderer?.RequestSnapshot(badge, OnBadgeReady);
+    }
+
+    // Opt-in (DragDropOptions.OfferImagesAsFiles): a picture also travels as a FILE, because a great many targets ask
+    // only for a file list and never look at a bitmap. Added AFTER DragStarted, so the source has had its chance to put
+    // the picture there - and only when it did not offer files of its own, which would be the app's own decision to
+    // respect. Deferred, so the copy is written on the drop that asks for it and never on a drag that goes nowhere.
+    // Neutral by construction: this is one entry in the package, so every platform's bridge gets it for free.
+    private static void OfferPictureAsFile()
+    {
+        if (!DragDropOptions.OfferImagesAsFiles || _data is not { } package) return;
+        if (!package.Contains(DataFormats.Image) || package.Contains(DataFormats.Files)) return;
+        package.SetDeferred(DataFormats.Files, () => DragImageFile.Write(package.Get(DataFormats.Image) as byte[]));
     }
 
     // The device scale the snapshot bakes at = the source window's RenderScale (BuildLiveCache records at that density), so the
