@@ -54,6 +54,10 @@ public class MacOSWindowWorker : AdamantiumComponent, IWindowWorkerService
         MacOSInterop.AddWindowDidResizeCallback(windowDelegate,
             Marshal.GetFunctionPointerForDelegate(didResizeDelegate));
             
+        // Same seam as Win32: every window offers itself as a native drop target. A no-op until a macOS
+        // INativeDragDrop (NSDraggingDestination on the content view) is registered - the engine side is already done.
+        Input.DragDrop.RegisterNativeDropTarget(this.window);
+
         this.window.OnApplyTemplate();
         eventAggregator.GetEvent<WindowCreatedEvent>().Publish(this.window);
         this.window.OnSourceInitialized();

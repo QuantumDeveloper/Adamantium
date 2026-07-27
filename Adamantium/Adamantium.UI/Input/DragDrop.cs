@@ -27,7 +27,7 @@ namespace Adamantium.UI.Input;
 /// real layered OS window, <see cref="IDragGhost"/>); on release the target under the cursor gets the payload through its
 /// <c>DropCommand</c> - MVVM-first, no UI types in the VM (docs/DRAG_DROP_PLAN.md). App-global, one drag at a time.
 /// </summary>
-public static class DragDrop
+public static partial class DragDrop
 {
     // Pixels the pointer must travel before a press becomes a drag - a click is not a drag.
     private const double DragThreshold = 4.0;
@@ -113,6 +113,16 @@ public static class DragDrop
     public static DataTemplate GetDragTemplate(AdamantiumComponent e) => e.GetValue(DragTemplateProperty) as DataTemplate;
     public static void SetDragTemplate(AdamantiumComponent e, DataTemplate value) => e.SetValue(DragTemplateProperty, value);
 
+    // Opt-in escalation to the OS (docs/DRAG_DROP_PLAN.md phase 6): a source that declares this hands the WHOLE gesture
+    // to the platform drag loop the moment it starts, so the payload can be dropped into other applications (and files
+    // dragged out land in Explorer). Off by default - the in-app loop keeps the live CLR payload and costs no OLE.
+    // The choice is made ONCE at the start of the gesture, never mid-drag.
+    public static readonly AdamantiumProperty AllowExternalDragProperty = AdamantiumProperty.RegisterAttached(
+        "AllowExternalDrag", typeof(bool), typeof(AdamantiumComponent), new PropertyMetadata(false));
+
+    public static bool GetAllowExternalDrag(AdamantiumComponent e) => e.GetValue<bool>(AllowExternalDragProperty);
+    public static void SetAllowExternalDrag(AdamantiumComponent e, bool value) => e.SetValue(AllowExternalDragProperty, value);
+
     // ------------------------------------------------------------------ session state (one drag at a time, app-global)
     private static IInputComponent _source;      // the pressed source; armed until the threshold, then dragging
     private static Vector2 _startScreen;
@@ -186,7 +196,7 @@ public static class DragDrop
 
     private static void OnSourceDown(object sender, MouseButtonEventArgs e)
     {
-        if (_dragging || sender is not IInputComponent input) return;
+        if (IsDragActive || sender is not IInputComponent input) return;
         _source = input;
         _startScreen = Mouse.ScreenCoordinates;
         // Track move/up only while a press is live - added here, removed on up. Move keeps arriving after capture.
@@ -202,6 +212,7 @@ public static class DragDrop
             if ((Mouse.ScreenCoordinates - _startScreen).Length() < DragThreshold) return;
             BeginDrag();
         }
+        if (_externalCapable) return;   // the gesture belongs to the OS from here - it draws the ghost and reports the drop
         ShowOrMoveGhost();
         UpdateDragOver();
     }
@@ -210,11 +221,13 @@ public static class DragDrop
     // fire its DragOverCommand, and auto-scroll a scroll area the cursor is near the edge of.
     private static void UpdateDragOver()
     {
-        var screen = Mouse.ScreenCoordinates;
+        var screen = DragScreenPoint;
         IUIComponent target = null;
         IWindow window = null;
         IUIComponent hit = null;
-        if (WindowUnderCursor(screen) is { } w && w is IUIComponent root)
+        // An OS-driven drag names the window it is over (the drop target that was called), which is exact even with
+        // overlapping windows; our own loop finds it by screen coordinates.
+        if (DragWindow(screen) is { } w && w is IUIComponent root)
         {
             window = w;
             hit = root.HitTest(window.PointToClient(screen)) as IUIComponent;
@@ -244,15 +257,21 @@ public static class DragDrop
             effects = args.Effects;
         }
         _dragEffects = effects;
-        Mouse.OverrideCursor = CursorFor(effects);
+        // The OS owns the cursor for the whole of an OS-driven gesture (it draws the standard drag cursors from the
+        // effect we report back), so our override would only fight it.
+        if (_externalActive) _externalEffect = effects;
+        else Mouse.OverrideCursor = CursorFor(effects);
     }
 
     // Ctrl = Copy, otherwise Move (WPF/Explorer convention). The per-target DragOver can override this. Read the PHYSICAL
     // key state (GetAsyncKeyState) - GetKeyState / Keyboard.Modifiers returns a stale value while the mouse is captured.
     private const int VkControl = 0x11;
-    private static DragDropEffects DefaultEffects() =>
-        (Adamantium.Win32.Win32Interop.GetAsyncKeyState(VkControl) & 0x8000) != 0
+    private static DragDropEffects DefaultEffects()
+    {
+        if (_externalActive) return ExternalDefaultEffects();
+        return (Adamantium.Win32.Win32Interop.GetAsyncKeyState(VkControl) & 0x8000) != 0
             ? DragDropEffects.Copy : DragDropEffects.Move;
+    }
 
     private static Cursor CursorFor(DragDropEffects effects) => effects switch
     {
@@ -552,7 +571,7 @@ public static class DragDrop
         var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(AutoScrollTickMs) };
         timer.Tick += (_, _) =>
         {
-            if (!_dragging || _autoScrollViewer == null || _autoScrollPerTick == 0) { StopAutoScroll(); return; }
+            if (!IsDragActive || _autoScrollViewer == null || _autoScrollPerTick == 0) { StopAutoScroll(); return; }
             _autoScrollViewer.SetScrollOffset(_autoScrollViewer.ScrollOffset + new Vector2(0, _autoScrollPerTick));
         };
         return timer;
@@ -588,7 +607,7 @@ public static class DragDrop
         timer.Tick += (_, _) =>
         {
             timer.Stop();   // one-shot per dwell
-            if (_dragging) _springTarget?.SpringLoad();
+            if (IsDragActive) _springTarget?.SpringLoad();
         };
         return timer;
     }
@@ -597,6 +616,10 @@ public static class DragDrop
     {
         _dragging = true;
         _data = ResolveData((AdamantiumComponent)_source);
+        // Decided ONCE, here: an external-capable source runs the whole gesture through the OS drag loop (so it can be
+        // dropped into other applications), everything else stays on our own loop with its live CLR payload. Never
+        // switched mid-drag - the platform loop is modal and has to own the gesture from the start.
+        _externalCapable = GetAllowExternalDrag((AdamantiumComponent)_source) && Native is { IsAvailable: true };
         Mouse.Capture(_source);   // so move/up keep coming once the cursor leaves the source
         _source.LostMouseCapture += OnLostCapture;   // an external overlay (a screenshot tool) stealing capture must not hang the drag
 
@@ -652,7 +675,9 @@ public static class DragDrop
 
     private static void OnGlobalKeyDown(object sender, KeyEventArgs e)
     {
-        if (_dragging && e.Key == Key.Escape)
+        // A native drag cancels through the platform's own loop (it owns the keyboard for the gesture), so only our own
+        // in-app drag is cancelled here.
+        if (_dragging && !_nativeDragActive && e.Key == Key.Escape)
         {
             e.Handled = true;
             CancelDrag();
@@ -714,12 +739,23 @@ public static class DragDrop
     private static void ComposeGhost()
     {
         var parts = _ghostParts.Where(p => p.bgra != null).ToList();
-        if (parts.Count == 0) return;
-        var body = parts.Count == 1 ? parts[0] : DragGhostPixels.StackVertical(parts, 4);
-        var (fb, fw, fh) = _badgePart.bgra != null ? DragGhostPixels.WithCornerBadge(body, _badgePart) : body;
-        _ghostBgra = fb;
-        _ghostW = fw;
-        _ghostH = fh;
+        if (parts.Count > 0)
+        {
+            var body = parts.Count == 1 ? parts[0] : DragGhostPixels.StackVertical(parts, 4);
+            var (fb, fw, fh) = _badgePart.bgra != null ? DragGhostPixels.WithCornerBadge(body, _badgePart) : body;
+            _ghostBgra = fb;
+            _ghostW = fw;
+            _ghostH = fh;
+        }
+
+        // External-capable source: the bake was the last thing we owed the gesture - hand it, ghost and all, to the OS.
+        // (A failed bake is not fatal there; the drag just runs with the platform's plain cursor.)
+        if (_externalCapable)
+        {
+            StartNativeDrag();
+            return;
+        }
+        if (_ghostBgra == null) return;
         ShowOrMoveGhost();
     }
 
@@ -780,9 +816,7 @@ public static class DragDrop
     {
         if (!_dragging) return;
         Ghost?.Hide();
-        var completed = GetDragCompletedCommand((AdamantiumComponent)_source);
-        var cancelArgs = new DragDropEventArgs(_data, _source, default) { Effects = DragDropEffects.None };
-        if (completed != null && completed.CanExecute(cancelArgs)) completed.Execute(cancelArgs);
+        RunDragCompleted(new DragDropEventArgs(_data, _source, default) { Effects = DragDropEffects.None });
         Detach(_source);
         Reset();
     }
@@ -868,8 +902,7 @@ public static class DragDrop
         // then nets to a re-add (a no-op / reorder), not a delete - which the reverse order would cause (the target's add is
         // a no-op because the item is still there, then the source's remove would wipe it). This split is also what makes
         // cross-window / cross-VM Move work: the target can't touch a collection it doesn't own, so the source removes.
-        var completed = GetDragCompletedCommand((AdamantiumComponent)_source);
-        if (completed != null && completed.CanExecute(args)) completed.Execute(args);   // source REMOVES on Move
+        RunDragCompleted(args);   // source REMOVES on Move
 
         if (target != null && effects != DragDropEffects.None)
         {
@@ -885,8 +918,8 @@ public static class DragDrop
     private static IUIComponent HitTestDropTarget(out Vector2 positionInTarget)
     {
         positionInTarget = default;
-        var screen = Mouse.ScreenCoordinates;
-        if (WindowUnderCursor(screen) is not { } window || window is not IUIComponent root) return null;
+        var screen = DragScreenPoint;
+        if (DragWindow(screen) is not { } window || window is not IUIComponent root) return null;
 
         var pointInRoot = window.PointToClient(screen);   // physical screen -> logical client coords (DPI-scaled)
         var target = FindAllowDropAncestor(root.HitTest(pointInRoot) as IUIComponent);
@@ -913,13 +946,10 @@ public static class DragDrop
     {
         if (_dragging && ReferenceEquals(Mouse.Captured, _source)) Mouse.Capture(null);
         Mouse.OverrideCursor = null;   // restore normal per-element cursors
-        _dragEffects = DragDropEffects.None;
-        if (_currentTarget != null) SetIsDragOver((AdamantiumComponent)_currentTarget, false);
-        _currentTarget = null;
-        _springTimer?.Stop();
-        _springTarget = null;
-        StopAutoScroll();
-        ClearIndicator();
+        ResetDropFeedback();
+        _externalCapable = false;
+        _nativeDragActive = false;
+        _sourceCompleted = false;
         _source = null;
         _data = null;
         _dragging = false;

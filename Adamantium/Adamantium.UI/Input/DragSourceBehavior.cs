@@ -28,6 +28,14 @@ public class DragSourceBehavior : Behavior<AdamantiumComponent>
     public static readonly AdamantiumProperty DragTemplateProperty = AdamantiumProperty.Register(nameof(DragTemplate),
         typeof(Adamantium.UI.Core.Templates.DataTemplate), typeof(DragSourceBehavior), new PropertyMetadata(null, OnChanged));
 
+    public static readonly AdamantiumProperty AllowExternalDragProperty = AdamantiumProperty.Register(nameof(AllowExternalDrag),
+        typeof(bool), typeof(DragSourceBehavior), new PropertyMetadata(false, OnChanged));
+
+    /// <summary>Let this source be dragged INTO OTHER APPLICATIONS: the gesture is handed to the OS drag loop, and the
+    /// payload's <c>DataFormats.Text</c> / <c>DataFormats.Files</c> (or a plain string payload) cross the process
+    /// boundary. Off by default - the in-app path keeps the live CLR object and costs no OS machinery.</summary>
+    public bool AllowExternalDrag { get => GetValue<bool>(AllowExternalDragProperty); set => SetValue(AllowExternalDragProperty, value); }
+
     /// <summary>Whether the host can start a drag (default true).</summary>
     public bool AllowDrag { get => GetValue<bool>(AllowDragProperty); set => SetValue(AllowDragProperty, value); }
 
@@ -56,6 +64,7 @@ public class DragSourceBehavior : Behavior<AdamantiumComponent>
         DragDrop.SetDragStartedCommand(component, null);
         DragDrop.SetDragCompletedCommand(component, null);
         DragDrop.SetDragTemplate(component, null);
+        DragDrop.SetAllowExternalDrag(component, false);
     }
 
     private static void OnChanged(AdamantiumComponent b, AdamantiumPropertyChangedEventArgs e) => ((DragSourceBehavior)b).Sync();
@@ -69,5 +78,6 @@ public class DragSourceBehavior : Behavior<AdamantiumComponent>
         DragDrop.SetDragStartedCommand(c, StartedCommand);
         DragDrop.SetDragCompletedCommand(c, CompletedCommand);
         DragDrop.SetDragTemplate(c, DragTemplate);
+        DragDrop.SetAllowExternalDrag(c, AllowExternalDrag);
     }
 }
