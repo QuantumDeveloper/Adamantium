@@ -34,10 +34,25 @@ public static class WindowsMouseDeviceExtension
         return modifiers;
     }
 
+    /// <summary>Translate a Win32 mouse message into the neutral event type. EXPLICITLY, every case: this used to end in
+    /// <c>(RawMouseEventType)msg</c>, which only worked because the enum's values WERE the message numbers - a bargain
+    /// that quietly made a platform-neutral type Windows-shaped.</summary>
     public static RawMouseEventType EventTypeFromMessage(this WindowMessages msg, IntPtr wParam)
     {
         switch (msg)
         {
+            case WindowMessages.LeftButtondown:
+                return RawMouseEventType.LeftButtonDown;
+            case WindowMessages.LeftButtonup:
+                return RawMouseEventType.LeftButtonUp;
+            case WindowMessages.RightButtondown:
+                return RawMouseEventType.RightButtonDown;
+            case WindowMessages.RightButtonup:
+                return RawMouseEventType.RightButtonUp;
+            case WindowMessages.MiddleButtondown:
+                return RawMouseEventType.MiddleButtonDown;
+            case WindowMessages.MiddleButtonup:
+                return RawMouseEventType.MiddleButtonUp;
             case WindowMessages.Xbuttondown:
             {
                 var exactButton = Messages.GetMouseModifyKeys(msg, wParam);
@@ -63,8 +78,15 @@ public static class WindowsMouseDeviceExtension
                 var exactButton = Messages.GetMouseModifyKeys(msg, wParam);
                 return exactButton == MouseModifiers.XButton1 ? RawMouseEventType.X1ButtonDown : RawMouseEventType.X2ButtonDown;
             }
+            case WindowMessages.Mousemove:
+                return RawMouseEventType.MouseMove;
+            case WindowMessages.Mouseleave:
+                return RawMouseEventType.LeaveWindow;
+            case WindowMessages.MouseWheel:
+            case WindowMessages.MouseHwheel:
+                return RawMouseEventType.MouseWheel;
             default:
-                return (RawMouseEventType)msg;
+                return RawMouseEventType.MouseMove;
         }
     }
 }
