@@ -10,8 +10,16 @@
                    MaxWidth="760"
                    MarginBottom="12"/>
 
-        <Button Content="Open drop window (cross-window test)" Command="{Binding OpenDropWindowCommand}"
-                Width="280" Height="32" HorizontalAlignment="Left" MarginBottom="18"/>
+        <StackPanel Orientation="Horizontal" MarginBottom="18">
+            <Button Content="Open drop window (cross-window test)" Command="{Binding OpenDropWindowCommand}"
+                    Width="280" Height="32"/>
+            <!-- DragCursor: Animals' DragOverCommand overrides the shape the engine picks from Effects. Tick it, pick a
+                 shape, and drag anything over Animals - the whole standard catalogue is in the list. -->
+            <CheckBox Content="Override cursor over Animals" IsChecked="{Binding OverrideDragCursor, Mode=TwoWay}"
+                      MarginLeft="24" VerticalAlignment="Center"/>
+            <DropDown ItemsSource="{Binding CursorTypes}" SelectedItem="{Binding DragCursorType, Mode=TwoWay}"
+                      Width="150" MarginLeft="10" VerticalAlignment="Center"/>
+        </StackPanel>
 
         <StackPanel Orientation="Horizontal">
 
@@ -34,9 +42,12 @@
                         </PropertyTrigger>
                     </Style>
                 </Border.Styles>
-                <Grid RowDefinitions="Auto, *" >
-                    <TextBlock Text="Fruits" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="10"/>
-                    <ListBox Grid.Row="1" 
+                <Grid RowDefinitions="Auto,Auto,*">
+                    <TextBlock Text="Fruits" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="6"/>
+                    <!-- Off, and the grip goes inactive: the whole row drags again. The switch flips the SAME markup -
+                         nothing is added or removed from the tree. -->
+                    <CheckBox Grid.Row="1" Content="Drag by handle only" IsChecked="{Binding HandleOnlyDrag, Mode=TwoWay}" MarginBottom="8"/>
+                    <ListBox Grid.Row="2"
                              ItemsSource="{Binding Left}" 
                              SelectedItems="{Binding LeftSelection}"
                              SelectionMode="Extended" 
@@ -62,9 +73,16 @@
                                             </DragSourceBehavior.DragTemplate>
                                         </DragSourceBehavior>
                                     </Border.Behaviors>
-                                    <!-- No explicit Foreground: inherit it, so the ListBoxItem theme's ForegroundSelected
-                                         ({ThemeResource AccentForegroundColor}) gives contrast-correct text on the accent selection. -->
-                                    <TextBlock Text="{Binding}"/>
+                                    <!-- Drag-handle: with the grip active only IT starts the drag, so the rest of the row
+                                         stays free to click and select. Uncheck the switch above and the grip goes
+                                         inactive - the row drags by its whole body again, like Animals, which has none. -->
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <DragHandle IsActive="{Ancestor ItemsControl, DataContext.HandleOnlyDrag}"
+                                                    MarginRight="6" VerticalAlignment="Center"/>
+                                        <!-- No explicit Foreground: inherit it, so the ListBoxItem theme's ForegroundSelected
+                                             ({ThemeResource AccentForegroundColor}) gives contrast-correct text on the accent selection. -->
+                                        <TextBlock Grid.Column="1" Text="{Binding}" VerticalAlignment="Center"/>
+                                    </Grid>
                                 </Border>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
@@ -73,7 +91,8 @@
             </Border>
 
             <Border CornerRadius="8" Padding="12" Width="220" Height="300" BorderThickness="2"
-                    DragDrop.AllowDrop="{Binding AnimalsAcceptDrop}" DragDrop.DropCommand="{Binding DropRightCommand}">
+                    DragDrop.AllowDrop="{Binding AnimalsAcceptDrop}" DragDrop.DropCommand="{Binding DropRightCommand}"
+                    DragDrop.DragOverCommand="{Binding DragOverRightCommand}">
                 <Border.Styles>
                     <Style Selector="Border">
                         <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
