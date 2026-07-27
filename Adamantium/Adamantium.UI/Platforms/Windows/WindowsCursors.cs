@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.IO;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
@@ -16,8 +16,12 @@ internal sealed class WindowsCursors : INativeCursors
     // The drag-COPY shape has no IDC_* equivalent on Windows, so it ships as a .cur next to the app.
     private const string DragCopyFile = "dragcopy.cur";
 
-    private readonly Dictionary<CursorType, IntPtr> _standard = new();
-    private readonly Dictionary<string, IntPtr> _custom = new();
+    // CONCURRENT, and that is not a precaution: Apply runs on BOTH threads - the pump answers WM_SETCURSOR as the pointer
+    // hovers, while the loop sets the drag feedback. A plain Dictionary resized under that and threw
+    // "a concurrent update corrupted its state" out of the middle of a drag. Loading a shared IDC_* twice is harmless,
+    // so a racing factory call costs nothing.
+    private readonly ConcurrentDictionary<CursorType, IntPtr> _standard = new();
+    private readonly ConcurrentDictionary<string, IntPtr> _custom = new();
 
     public void Apply(Cursor cursor)
     {
@@ -33,10 +37,7 @@ internal sealed class WindowsCursors : INativeCursors
             return cursor.FilePath is { Length: > 0 } path ? LoadFile(path) : DefaultArrow;
         }
 
-        if (_standard.TryGetValue(cursor.Type, out var cached)) return cached;
-        var handle = Load(cursor.Type);
-        _standard[cursor.Type] = handle;
-        return handle;
+        return _standard.GetOrAdd(cursor.Type, Load);
     }
 
     private IntPtr Load(CursorType type) => type switch
@@ -73,14 +74,11 @@ internal sealed class WindowsCursors : INativeCursors
         return File.Exists(path) ? LoadFile(path) : DefaultArrow;
     }
 
-    private IntPtr LoadFile(string path)
+    private IntPtr LoadFile(string path) => _custom.GetOrAdd(path, static file =>
     {
-        if (_custom.TryGetValue(path, out var cached)) return cached;
-        var handle = Win32Interop.LoadCursorFromFile(path);
+        var handle = Win32Interop.LoadCursorFromFile(file);
         // A missing or broken file must not break input - fall back to the arrow, and remember that so we don't retry
         // the failing load on every mouse move.
-        if (handle == IntPtr.Zero) handle = DefaultArrow;
-        _custom[path] = handle;
-        return handle;
-    }
+        return handle == IntPtr.Zero ? DefaultArrow : handle;
+    });
 }
