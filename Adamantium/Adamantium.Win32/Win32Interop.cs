@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 using Adamantium.Mathematics;
-using Adamantium.Win32.RawInput;
 
 namespace Adamantium.Win32
 {
@@ -119,10 +118,6 @@ namespace Adamantium.Win32
         [DllImport("user32.dll")]
         public static extern short GetKeyState(uint key);
 
-        [DllImport("user32.dll", SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool GetKeyboardState(byte[] keys);
-
         [DllImport("user32.dll")]
         public static extern short GetAsyncKeyState(uint key);
 
@@ -226,44 +221,6 @@ namespace Adamantium.Win32
 
         [DllImport("Kernel32.dll")]
         public static extern UInt64 GetTickCount64();
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern Boolean RegisterRawInputDevices(
-            [MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 0)] InputDevice[] pInputDevices,
-            int uiNumDevices,
-            int cbSize);
-
-        [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-        public static extern uint GetRawInputDeviceList(
-            [In, Out] RawInputDeviceList[] rawInputDeviceList,
-            ref int numDevices,
-            int size /* = (uint)Marshal.SizeOf(typeof(RawInputDeviceList)) */);
-
-        [DllImport("user32.dll", SetLastError = true)]
-        public static extern uint GetRawInputDeviceInfo(
-            IntPtr hDevice,
-            RawInputDeviceInfoCommand uiCommand,
-            IntPtr pData,
-            ref int pcbSize);
-
-        /// <summary>
-        /// Function to retrieve raw input data.
-        /// </summary>
-        /// <param name="hRawInput">Handle to the raw input.</param>
-        /// <param name="uiCommand">Command to issue when retrieving data.</param>
-        /// <param name="pData">Raw input data.</param>
-        /// <param name="pcbSize">Number of bytes in the array.</param>
-        /// <param name="cbSizeHeader">Size of the header.</param>
-        /// <returns>0 if successful if pData is null, otherwise number of bytes if pData is not null.</returns>
-        [DllImport("user32.dll")]
-        public static extern int GetRawInputData(
-            IntPtr hRawInput,
-            RawInputCommand uiCommand,
-            out RawInputData pData,
-            ref int pcbSize,
-            int cbSizeHeader);
-
 
         [DllImport("user32.dll")]
         public static extern IntPtr BeginDeferWindowPos(int nNumWindows);
