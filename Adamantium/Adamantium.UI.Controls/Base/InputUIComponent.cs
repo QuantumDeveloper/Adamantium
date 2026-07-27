@@ -412,13 +412,37 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     public event MouseEventHandler MouseMove
     {
         add => AddHandler(Mouse.MouseMoveEvent, value);
-        remove => AddHandler(Mouse.MouseMoveEvent, value);
+        remove => RemoveHandler(Mouse.MouseMoveEvent, value);
     }
 
     public event MouseWheelEventHandler MouseWheel
     {
         add => AddHandler(Mouse.MouseWheelEvent, value);
-        remove => AddHandler(Mouse.MouseWheelEvent, value);
+        remove => RemoveHandler(Mouse.MouseWheelEvent, value);
+    }
+
+    public event DragDropEventHandler DragEnter
+    {
+        add => AddHandler(DragDropEvents.DragEnterEvent, value);
+        remove => RemoveHandler(DragDropEvents.DragEnterEvent, value);
+    }
+
+    public event DragDropEventHandler DragOver
+    {
+        add => AddHandler(DragDropEvents.DragOverEvent, value);
+        remove => RemoveHandler(DragDropEvents.DragOverEvent, value);
+    }
+
+    public event DragDropEventHandler DragLeave
+    {
+        add => AddHandler(DragDropEvents.DragLeaveEvent, value);
+        remove => RemoveHandler(DragDropEvents.DragLeaveEvent, value);
+    }
+
+    public event DragDropEventHandler Drop
+    {
+        add => AddHandler(DragDropEvents.DropEvent, value);
+        remove => RemoveHandler(DragDropEvents.DropEvent, value);
     }
 
     public event MouseButtonEventHandler MouseDown
