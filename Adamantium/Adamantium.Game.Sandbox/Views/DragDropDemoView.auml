@@ -15,7 +15,10 @@
 
         <StackPanel Orientation="Horizontal">
 
-            <Border CornerRadius="8" Padding="12" Width="220" MinHeight="300" MarginRight="16" BorderThickness="2">
+            <!-- Height, not MinHeight: the list below sits in a star row, and a star row inside an UNBOUNDED height
+                 (a vertical StackPanel in a ScrollViewer) hands the list everything it asks for - all 24 items - instead
+                 of the card's leftover. Bound the card and the star row means what it looks like it means. -->
+            <Border CornerRadius="8" Padding="12" Width="220" Height="300" MarginRight="16" BorderThickness="2">
                 <!-- Behaviors form: one DropTargetBehavior instead of the DragDrop.* attached properties. Its
                      {Binding} resolves because the behavior joins this Border's logical tree (shares its DataContext). -->
                 <Border.Behaviors>
@@ -31,10 +34,13 @@
                         </PropertyTrigger>
                     </Style>
                 </Border.Styles>
-                <StackPanel Orientation="Vertical">
+                <Grid RowDefinitions="Auto, *" >
                     <TextBlock Text="Fruits" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="10"/>
-                    <ListBox ItemsSource="{Binding Left}" SelectedItems="{Binding LeftSelection}"
-                             SelectionMode="Extended" Background="Transparent" MaxHeight="240">
+                    <ListBox Grid.Row="1" 
+                             ItemsSource="{Binding Left}" 
+                             SelectedItems="{Binding LeftSelection}"
+                             SelectionMode="Extended" 
+                             Background="Transparent">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Border Background="{ResourceReference TileFillColorDefault}" CornerRadius="6" Padding="10" MarginBottom="6">
@@ -63,10 +69,10 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
-                </StackPanel>
+                </Grid>
             </Border>
 
-            <Border CornerRadius="8" Padding="12" Width="220" MinHeight="300" BorderThickness="2"
+            <Border CornerRadius="8" Padding="12" Width="220" Height="300" BorderThickness="2"
                     DragDrop.AllowDrop="{Binding AnimalsAcceptDrop}" DragDrop.DropCommand="{Binding DropRightCommand}">
                 <Border.Styles>
                     <Style Selector="Border">
@@ -78,12 +84,12 @@
                         </PropertyTrigger>
                     </Style>
                 </Border.Styles>
-                <StackPanel Orientation="Vertical">
+                <Grid RowDefinitions="Auto,Auto,*">
                     <TextBlock Text="Animals" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="6"/>
                     <!-- Uncheck to reject drops here: dragging over Animals then shows the ⊘ no-drop cursor. -->
-                    <CheckBox Content="Accept drop" IsChecked="{Binding AnimalsAcceptDrop, Mode=TwoWay}" MarginBottom="8"/>
-                    <ListBox ItemsSource="{Binding Right}" SelectedItems="{Binding RightSelection}"
-                             SelectionMode="Extended" Background="Transparent" MaxHeight="240">
+                    <CheckBox Grid.Row="1" Content="Accept drop" IsChecked="{Binding AnimalsAcceptDrop, Mode=TwoWay}" MarginBottom="8"/>
+                    <ListBox Grid.Row="2" ItemsSource="{Binding Right}" SelectedItems="{Binding RightSelection}"
+                             SelectionMode="Extended" Background="Transparent">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Border Background="{ResourceReference TileFillColorDefault}" CornerRadius="6" Padding="10" MarginBottom="6"
@@ -97,10 +103,10 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
-                </StackPanel>
+                </Grid>
             </Border>
 
-            <Border CornerRadius="8" Padding="12" Width="340" MinHeight="300" MarginLeft="16" BorderThickness="2"
+            <Border CornerRadius="8" Padding="12" Width="340" Height="300" MarginLeft="16" BorderThickness="2"
                     DragDrop.AllowDrop="True" DragDrop.DropCommand="{Binding DropWrapCommand}">
                 <Border.Styles>
                     <Style Selector="Border">
@@ -112,15 +118,15 @@
                         </PropertyTrigger>
                     </Style>
                 </Border.Styles>
-                <StackPanel Orientation="Vertical">
+                <Grid RowDefinitions="Auto,Auto,*">
                     <TextBlock Text="Colors (WrapPanel)" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="6"/>
-                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" MarginBottom="10">
                         <TextBlock Text="Flow:" VerticalAlignment="Center" MarginRight="8"/>
                         <DropDown ItemsSource="{Binding Orientations}"
                                   SelectedItem="{Binding WrapOrientation, Mode=TwoWay}" Width="130"/>
                     </StackPanel>
-                    <ListBox ItemsSource="{Binding Wrap}" SelectedItems="{Binding WrapSelection}"
-                             SelectionMode="Extended" Background="Transparent" MaxHeight="240"
+                    <ListBox Grid.Row="2" ItemsSource="{Binding Wrap}" SelectedItems="{Binding WrapSelection}"
+                             SelectionMode="Extended" Background="Transparent"
                              ScrollViewer.HorizontalScrollBarVisibility="{Binding WrapHScroll}"
                              ScrollViewer.VerticalScrollBarVisibility="{Binding WrapVScroll}">
                         <ListBox.ItemsPanel>
@@ -148,7 +154,7 @@
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
-                </StackPanel>
+                </Grid>
             </Border>
 
         </StackPanel>
