@@ -265,6 +265,8 @@ public static partial class DragDrop
             : shift ? DragDropEffects.Move
             : _nativeDragActive ? DragDropEffects.Move : DragDropEffects.Copy;
 
+        // Our OWN native drag also honours what its source allowed; a drag from another app is bounded only by that app.
+        if (_nativeDragActive) wanted = Narrow(wanted);
         if ((wanted & _externalAllowed) != 0) return wanted;
         if ((_externalAllowed & DragDropEffects.Copy) != 0) return DragDropEffects.Copy;
         if ((_externalAllowed & DragDropEffects.Move) != 0) return DragDropEffects.Move;
@@ -290,8 +292,7 @@ public static partial class DragDrop
         // relationship our own floating ghost has.
         var ghost = new DragGhostImage(_ghostBgra, _ghostW, _ghostH, 0, 0);
         _nativeDragActive = true;
-        var allowed = DragDropEffects.Copy | DragDropEffects.Move;
-        if (Native?.BeginDrag(SourceWindow(source as IUIComponent), _data, allowed, ghost, OnNativeDragCompleted) == true) return;
+        if (Native?.BeginDrag(SourceWindow(source as IUIComponent), _data, _allowedEffects, ghost, OnNativeDragCompleted) == true) return;
 
         _nativeDragActive = false;
         CancelDrag();   // the platform refused to start - end the gesture cleanly instead of leaving it half-armed
