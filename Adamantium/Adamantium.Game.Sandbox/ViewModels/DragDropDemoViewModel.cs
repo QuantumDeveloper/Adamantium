@@ -79,17 +79,28 @@ public partial class DragDropDemoViewModel : TabPageViewModel
     private void DropExternal(object arg)
     {
         if (arg is not DragDropEventArgs e) return;
+        // Land WHERE the drop happened: the engine reports the item the caret sat before (null = past the last one).
+        // Appending regardless would throw away the insertion cue the user was aiming with.
+        var at = e.InsertBefore is string before && Dropped.IndexOf(before) is var index and >= 0 ? index : Dropped.Count;
+        foreach (var entry in Describe(e))
+        {
+            Dropped.Insert(at > Dropped.Count ? Dropped.Count : at, entry);
+            at++;
+        }
+    }
+
+    // One line per dropped thing, labelled by where it came from.
+    private static IEnumerable<string> Describe(DragDropEventArgs e)
+    {
         if (e.Data?.Get(DataFormats.Files) is string[] files && files.Length > 0)
         {
-            foreach (var file in files) Dropped.Add($"file: {file}");
-            return;
+            return files.Select(file => $"file: {file}");
         }
         if (e.Data?.Get(DataFormats.Text) is string text)
         {
-            Dropped.Add($"text: {text}");
-            return;
+            return [$"text: {text}"];
         }
-        foreach (var item in ItemsOf(e)) Dropped.Add($"in-app: {item}");
+        return ItemsOf(e).Select(item => $"in-app: {item}");
     }
 
     [Command]
