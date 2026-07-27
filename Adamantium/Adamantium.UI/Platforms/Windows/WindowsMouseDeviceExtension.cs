@@ -2,7 +2,6 @@
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Input.Raw;
 using Adamantium.Win32;
-using Adamantium.Win32.RawInput;
 
 namespace Adamantium.UI.Platforms.Windows;
 
@@ -29,34 +28,6 @@ public static class WindowsMouseDeviceExtension
             modifiers |= InputModifiers.X1MouseButton;
         }
         if (mouseButtons.HasFlag(MouseModifiers.XButton2))
-        {
-            modifiers |= InputModifiers.X2MouseButton;
-        }
-        return modifiers;
-    }
-
-    public static InputModifiers GetRawMouseModifiers(this RawMouse rawMouse)
-    {
-        InputModifiers modifiers = InputModifiers.None;
-
-        var buttons = rawMouse.Data.ButtonFlags;
-        if (buttons.HasFlag(RawMouseButtons.LeftDown))
-        {
-            modifiers |= InputModifiers.LeftMouseButton;
-        }
-        if (buttons.HasFlag(RawMouseButtons.MiddleDown))
-        {
-            modifiers |= InputModifiers.MiddleMouseButton;
-        }
-        if (buttons.HasFlag(RawMouseButtons.RightDown))
-        {
-            modifiers |= InputModifiers.RightMouseButton;
-        }
-        if (buttons.HasFlag(RawMouseButtons.Button4Down))
-        {
-            modifiers |= InputModifiers.X1MouseButton;
-        }
-        if (buttons.HasFlag(RawMouseButtons.Button5Down))
         {
             modifiers |= InputModifiers.X2MouseButton;
         }
