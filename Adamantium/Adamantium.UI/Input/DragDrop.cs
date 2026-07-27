@@ -139,8 +139,10 @@ public static partial class DragDrop
     private static (byte[] bgra, int w, int h)[] _ghostParts;
     private static int _ghostPending;
 
-    // The AllowDrop target currently under the cursor (live drag-over feedback).
+    // The AllowDrop target currently under the cursor (live drag-over feedback) + the element actually hit under the
+    // pointer, which the routed events carry as OriginalSource.
     private static IUIComponent _currentTarget;
+    private static IUIComponent _hit;
 
     // Spring-loading: dwell over an ISpringLoadable (a tab, a tree node) and it activates/expands so you can drop into
     // content that isn't visible yet. The timer is armed on entry and fires once if the cursor is still over it.
@@ -240,12 +242,21 @@ public static partial class DragDrop
 
         UpdateSpringLoad(hit);
         UpdateWindowRaise(window);
+        _hit = hit;
 
         if (!ReferenceEquals(target, _currentTarget))
         {
-            if (_currentTarget != null) SetIsDragOver((AdamantiumComponent)_currentTarget, false);
+            if (_currentTarget != null)
+            {
+                SetIsDragOver((AdamantiumComponent)_currentTarget, false);
+                RaiseDragEvent(_currentTarget, DragDropEvents.DragLeaveEvent);
+            }
             _currentTarget = target;
-            if (_currentTarget != null) SetIsDragOver((AdamantiumComponent)_currentTarget, true);
+            if (_currentTarget != null)
+            {
+                SetIsDragOver((AdamantiumComponent)_currentTarget, true);
+                RaiseDragEvent(_currentTarget, DragDropEvents.DragEnterEvent);
+            }
         }
 
         UpdateInsertionIndicator(target != null ? window : null, hit);
@@ -256,8 +267,9 @@ public static partial class DragDrop
         var effects = DragDropEffects.None;
         if (target != null)
         {
-            var args = new DragDropEventArgs(_data, _source, Mouse.GetPosition((IInputComponent)target)) { Effects = DefaultEffects() };
-            if (GetDragOverCommand((AdamantiumComponent)target) is { } over && over.CanExecute(args)) over.Execute(args);
+            var args = DragArgs(target, DragDropEvents.DragOverEvent);
+            ((IObservableComponent)target).RaiseEvent(args);   // controls first: one of them may own this drag entirely
+            if (!args.Handled && GetDragOverCommand((AdamantiumComponent)target) is { } over && over.CanExecute(args)) over.Execute(args);
             effects = args.Effects;
         }
         _dragEffects = effects;
@@ -266,6 +278,22 @@ public static partial class DragDrop
         if (_externalActive) _externalEffect = effects;
         else Mouse.OverrideCursor = CursorFor(effects);
     }
+
+    // The routed half of the drop API: the same argument the commands get, raised on the AllowDrop target so a CONTROL can
+    // react to the drag without a view-model. OriginalSource is the element actually under the pointer (the target is only
+    // the nearest AllowDrop ancestor of it), which is how a handler tells WHICH row the drag is over.
+    private static DragDropEventArgs DragArgs(IUIComponent target, RoutedEvent routedEvent) =>
+        new(_data, _source, Mouse.GetPosition((IInputComponent)target))
+        {
+            Effects = DefaultEffects(),
+            RoutedEvent = routedEvent,
+            OriginalSource = _hit,
+        };
+
+    // Enter/leave are notifications that the target changed - what they set in Effects is not read, because the DragOver
+    // that follows on the very same pass decides it.
+    private static void RaiseDragEvent(IUIComponent target, RoutedEvent routedEvent) =>
+        ((IObservableComponent)target).RaiseEvent(DragArgs(target, routedEvent));
 
     // Ctrl = Copy, otherwise Move (WPF/Explorer convention). The per-target DragOver can override this. The key query
     // goes to the platform, which answers with the PHYSICAL state - the queue-synchronized one is stale while the mouse
@@ -925,7 +953,9 @@ public static partial class DragDrop
             InsertIndex = _insertIndex,     // where the insertion line was; -1 if not over an items host
             InsertBefore = _insertBefore,   // the item after the caret (survives the source removal - use for a stable reorder)
             DropTarget = _dropTarget,       // hybrid tree-drop: the hovered node
-            Placement = _placement          // before/after sibling, or into as a child (None for a flat list)
+            Placement = _placement,         // before/after sibling, or into as a child (None for a flat list)
+            RoutedEvent = DragDropEvents.DropEvent,
+            OriginalSource = _hit,
         };
 
         // Order matters: the SOURCE removes (on Move) FIRST, then the TARGET adds. Dropping back into the SAME collection
@@ -936,8 +966,9 @@ public static partial class DragDrop
 
         if (target != null && effects != DragDropEffects.None)
         {
+            ((IObservableComponent)target).RaiseEvent(args);                            // controls first (Handled = they own it)
             var drop = GetDropCommand((AdamantiumComponent)target);
-            if (drop != null && drop.CanExecute(args)) drop.Execute(args);              // target ADDS
+            if (!args.Handled && drop != null && drop.CanExecute(args)) drop.Execute(args);   // target ADDS
 
             // The payload landed in ANOTHER of our windows: now that the gesture is over it is safe to give that window
             // focus, so the user carries on where their content went. Doing this DURING the drag would have cost the
@@ -961,7 +992,8 @@ public static partial class DragDrop
         if (DragWindow(screen) is not { } window || window is not IUIComponent root) return null;
 
         var pointInRoot = window.PointToClient(screen);   // physical screen -> logical client coords (DPI-scaled)
-        var target = FindAllowDropAncestor(root.HitTest(pointInRoot) as IUIComponent);
+        _hit = root.HitTest(pointInRoot) as IUIComponent;   // the routed Drop reports it as OriginalSource
+        var target = FindAllowDropAncestor(_hit);
         positionInTarget = pointInRoot;   // in the target window's client space (element-relative is a later nicety)
         return target;
     }

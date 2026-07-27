@@ -110,6 +110,26 @@ public interface IInputComponent: IMeasurableComponent
    /// </summary>
    event MouseWheelEventHandler MouseWheel;
 
+   /// <summary>
+   /// Occurs when a drag enters this element. Requires <c>DragDrop.AllowDrop="True"</c> - see <see cref="DragDropEvents"/>.
+   /// </summary>
+   event DragDropEventHandler DragEnter;
+
+   /// <summary>
+   /// Occurs on every move while a drag is over this element - set <c>Effects</c> to say what would happen.
+   /// </summary>
+   event DragDropEventHandler DragOver;
+
+   /// <summary>
+   /// Occurs when a drag leaves this element.
+   /// </summary>
+   event DragDropEventHandler DragLeave;
+
+   /// <summary>
+   /// Occurs when a payload is dropped on this element.
+   /// </summary>
+   event DragDropEventHandler Drop;
+
    event RawMouseEventHandler RawMouseMove;
 
    event MouseButtonEventHandler RawMouseDown;

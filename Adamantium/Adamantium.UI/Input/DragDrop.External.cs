@@ -199,7 +199,9 @@ public static partial class DragDrop
             InsertIndex = _insertIndex,
             InsertBefore = _insertBefore,
             DropTarget = _dropTarget,
-            Placement = _placement
+            Placement = _placement,
+            RoutedEvent = DragDropEvents.DropEvent,
+            OriginalSource = _hit,
         };
 
         if (_nativeDragActive && _source != null && effects != DragDropEffects.None)
@@ -210,8 +212,9 @@ public static partial class DragDrop
 
         if (target != null && effects != DragDropEffects.None)
         {
+            ((IObservableComponent)target).RaiseEvent(args);
             var drop = GetDropCommand((AdamantiumComponent)target);
-            if (drop != null && drop.CanExecute(args)) drop.Execute(args);
+            if (!args.Handled && drop != null && drop.CanExecute(args)) drop.Execute(args);
         }
 
         ClearExternalFeedback();
@@ -234,8 +237,13 @@ public static partial class DragDrop
     private static void ResetDropFeedback()
     {
         _dragEffects = DragDropEffects.None;
-        if (_currentTarget != null) SetIsDragOver((AdamantiumComponent)_currentTarget, false);
+        if (_currentTarget != null)
+        {
+            SetIsDragOver((AdamantiumComponent)_currentTarget, false);
+            RaiseDragEvent(_currentTarget, DragDropEvents.DragLeaveEvent);   // the drag ended/left - the target hears about it
+        }
         _currentTarget = null;
+        _hit = null;
         _springTimer?.Stop();
         _springTarget = null;
         _raiseTimer?.Stop();
