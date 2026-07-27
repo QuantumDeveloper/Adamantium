@@ -40,8 +40,9 @@
   texture-draw путь `DrawImage` (`RenderUnit.cs:737`: «RenderTargetImage also render»). **Полноценный
   `VisualBrush`-как-кисть (TexRectData/pass TexRect/bindless из TILE_BRUSH_PLAN) для призрака НЕ нужен.**
 - **Окно-призрак:** `WindowStyleEx` содержит `Layered` / `Transparent` / `Topmost` / `Noactivate`;
-  `Win32NativeWindowWrapper.CreateWindowExW` принимает ex-стиль. На обычных окнах уже стоит
-  `Acceptfiles` (частичный WM_DROPFILES — заменим полноценным OLE на уровне 3).
+  `Win32NativeWindowWrapper.CreateWindowExW` принимает ex-стиль.
+  *(Историческая заметка: раньше на обычных окнах стоял `Acceptfiles` — частичный WM_DROPFILES. Он УБРАН
+  в Фазе 5, вместо него полноценный OLE-drop-таргет.)*
 
 ---
 
@@ -117,25 +118,49 @@
 
 ## Компоненты (публичный API)
 
-- **`DragDrop`** (статический фасад): attached-свойства (`AllowDrag`, `DragData`, `AllowDrop`,
-  `DropCommand`, `DragOverCommand`, `DragTemplate`, `AllowExternalDrag`, read-only `IsDragOver`), метод
-  старта `DragDrop.DoDragDrop(source, data, effects)` для ручного/кодового старта, routed-события
-  (`DragEnter/DragOver/DragLeave/Drop`, `GiveFeedback`).
-- **`DragDropManager`** (app-global): держит активную сессию (payload, источник, эффект, окно-призрак);
-  на каждый move — hit-test по экранным координатам через все окна аппки, ведёт DragEnter/Over/Leave,
-  на up — Drop.
-- **`DragData` / `DataPackage`** : `IDataPackage`: `Get<T>()`, `Set(object)`, `Contains(format)`,
-  `GetFormats()`. In-app обёртка над CLR-объектом; OLE-обёртка над `IDataObject`.
-- **`IDragGhost`** (платформенный контракт): `Show(bitmap, screenPos)` / `Move(screenPos)` / `Hide()` над
-  ОДНИМ CPU RGBA-bitmap. Win32 = layered-окно + `UpdateLayeredWindow`; macOS = прозрачный `NSWindow` +
-  `CALayer.contents`. Bake + readback (элемент → RT → bitmap) — общий, платформенно-нейтральный.
-- **`DragSourceBehavior` / `DropTargetBehavior`** : Behaviors-обёртки над тем же ядром.
-- **`DragEventArgs`** : `Data`, `Source`, `GetPosition(relativeTo)`, `Effects` (Copy/Move/Link/None) —
-  таргет ставит его в `DragOver`, `DragCursor` (settable, перебивает дефолт-мапу курсора), `Handled`.
+_Сверено с кодом 2026-07-27. ✅ = есть в коде, ❌ = НЕТ (изначальный замысел, который не понадобился либо
+отложен). Не переписывай этот раздел по памяти — сверяй грепом._
+
+- ✅ **`DragDrop`** (`Adamantium.UI/Input/DragDrop.cs` + `DragDrop.External.cs`, ОДИН статический класс на два
+  файла): attached-свойства `AllowDrag`, `DragData`, `AllowDrop`, `DropCommand`, `DragOverCommand`,
+  `DragStartedCommand`, `DragCompletedCommand`, `DragTemplate`, `AllowExternalDrag`, `AutoScrollSpeed`,
+  `IsDragOver`.
+  - ❌ **метод `DragDrop.DoDragDrop(source, data, effects)` для кодового старта — НЕ реализован.** Драг
+    начинается только жестом (нажатие + порог). Понадобится для «начать перетаскивание из команды».
+  - ❌ **routed-события `DragEnter/DragOver/DragLeave/Drop` и `GiveFeedback` — НЕ реализованы.** Доставка
+    сейчас ТОЛЬКО через `ICommand` + подсветка через attached `IsDragOver`. Для контрол-уровня (написать
+    свой контрол, реагирующий на пролёт) их не хватает.
+- ❌ **`DragDropManager` — НЕ существует и НЕ будет.** Решение зафиксировано: сессия живёт прямо в статическом
+  `DragDrop` (он и так app-global). Раздел оставлен как история — не заводить.
+- ✅ **`DragData` / `DataPackage`** (`Adamantium.UI.Core/Input/`): `Get<T>()`, `Get(format)`, `Set(object)`,
+  `Set(format, value)`, `Contains(format)`, `Contains<T>()`, `GetFormats()`.
+- ✅ **`IDragGhost`** — Win32-реализация есть (`Win32DragGhost`, layered + `UpdateLayeredWindow`, + DPI-слежение).
+  ❌ macOS-реализации нет.
+- ✅ **`DragSourceBehavior` / `DropTargetBehavior`** — есть, включая `AllowExternalDrag` у источника.
+- **`DragDropEventArgs`** (имя такое, не `DragEventArgs` — тот занят `Thumb`):
+  ✅ `Data`, `Source`, `Position`, `Effects`, `SourceItemsSource`, `InsertIndex`, `InsertBefore`, `DropTarget`,
+  `Placement`.
+  ❌ `GetPosition(relativeTo)`, ❌ `DragCursor` (settable-переопределение курсора), ❌ `Handled` — НЕ реализованы.
 
 ---
 
 ## Фазы
+
+_Статус сверен с кодом 2026-07-27._
+
+| Фаза | Статус |
+|---|---|
+| 0 — `VisualRenderer` (слепок визуала) | ✅ сделана |
+| 1 — окно-призрак | ✅ сделана (Windows) |
+| 2 — движок in-window | ✅ сделана, **кроме routed-событий** (см. «Компоненты») |
+| 3 — кросс-оконный в одной аппке | ✅ сделана, с оговоркой по z-order (ниже) |
+| 4 — Behaviors + `DragTemplate` + `IsDragOver` | ✅ сделана |
+| 5 — приём из чужих приложений (OLE) | ✅ сделана (Windows) |
+| 6 — выдача наружу (OLE) | ✅ сделана (Windows) |
+
+**Оговорка по Фазе 3:** окно под курсором ищется перебором `UIApplication.Windows` в порядке коллекции, а
+НЕ по z-order ОС. Для окон бок о бок работает; для перекрывающихся окон нужен `WindowFromPoint` или реальный
+запрос z-order. (Внешние OLE-драги этим не задеты — там окно называет сама ОС.)
 
 - **Фаза 0 — общий `VisualRenderer` (переиспользуемый, НЕ частный под призрак).** Аналог UWP
   `RenderTargetBitmap` + `XamlReader`: `Render(IUIComponent visual | string aumlText, size?, scale)` →
@@ -232,37 +257,42 @@
 
 Что работает «просто так», когда повесил `AllowDrag`/`AllowDrop` — без ручной возни.
 
-### Дефолт (встроено)
-- **Коллекции (любой `ItemsControl`/`ListBox`)** — reorder внутри + перенос между списками (по индексу
-  вставки). Флагманский сценарий.
-- **Индикатор вставки (drop-line / зазор)** — линия/промежуток, показывающий КУДА ляжет айтем. Не опция —
-  половина ощущения «хорошего DnD».
-- **Автоскролл у краёв** — при удержании drag у края скроллируемой области (список / любой `ScrollViewer`)
-  скролл с рампой скорости (ближе к краю — быстрее).
-- **Подсветка drop-таргета** — через read-only `IsDragOver` (триггер-стейт; тема даёт рамку/заливку на
-  элементе под курсором).
-- **Copy vs Move по модификатору** — Ctrl зажат = Copy (где таргет разрешает), иначе Move → меняет
-  `Effects` → сразу курсор.
-- **Esc = отмена**, порог старта (клик ≠ drag).
-- **Призрак** — снимок элемента с небольшим оффсетом от курсора + полупрозрачность.
-- **Spring-loading (общий dwell-механизм)** — навёл-подержал во время drag → контейнер активируется/
-  раскрывается. Встроенные потребители: `TabItem` (авто-активация табы) и `TreeView` (авто-раскрытие узла);
-  экспандеры/аккордеоны через тот же `ISpringLoadable`.
+### Дефолт (встроено) — сверено с кодом 2026-07-27
+- ✅ **Коллекции (любой `ItemsControl`/`ListBox`/`TreeView`)** — reorder внутри + перенос между списками.
+  Позиция приезжает в `DragDropEventArgs` двумя полями: `InsertIndex` (номер) и `InsertBefore` (ССЫЛКА на
+  айтем, перед которым лечь). **Пользоваться надо `InsertBefore`** — индекс считается ДО удаления из
+  источника и в reorder'е внутри одного списка успевает протухнуть.
+- ✅ **Индикатор вставки** — `DropInsertionIndicator` (темизированный адорнер): каретка ПОПЕРЁК потока
+  айтемов (учитывает `WrapPanel`/`StackPanel.Orientation`), в дереве — режим рамки для «в дети».
+- ✅ **Автоскролл у краёв** — таймерный, с рампой по глубине захода в полосу; скорость настраивается
+  attached-свойством `DragDrop.AutoScrollSpeed` на `ScrollViewer`.
+- ✅ **Подсветка drop-таргета** — attached `IsDragOver` (используется в теме/триггерах).
+- ✅ **Copy vs Move по модификатору** — Ctrl = Copy, иначе Move; курсор меняется живьём.
+- ✅ **Esc = отмена** (class-handler на туннелирующем `PreviewKeyDown`), ✅ **порог старта** — берётся из
+  настройки ОС (`PlatformSettings.DragThreshold`, на Windows `SM_CXDRAG`/`SM_CYDRAG`), сравнение по-осевое.
+- ✅ **Призрак** — снимок элемента, с оффсетом +12px от курсора, в layered-окне с **попиксельной альфой**
+  (`AC_SRC_ALPHA` + `ULW_ALPHA`): прозрачность настоящая, DWM уважает альфу битмапа. Равномерного
+  приглушения всего призрака нет — `SourceConstantAlpha` = 255; если захочется «притушить» карточку целиком,
+  это одно значение в `Win32DragGhost`.
+- ✅ **Spring-loading** — `ISpringLoadable`, dwell 600 мс; потребители `TabItem` (активация табы) и
+  `TreeViewItem` (раскрытие узла).
+- ✅ **Мульти-выделение** — тащится всё выделение `ListBox`, на призраке бейдж-счётчик (реальный
+  темизированный контрол, снятый в битмап). *Здесь, а не в «опт-ин»: работает по умолчанию.*
+- ✅ **Кастомный вид призрака** — `DragTemplate` (attached + свойство у `DragSourceBehavior`).
 
 ### Опт-ин / позже (НЕ дефолт)
-- **Drag-handle (грип ≡)** — ограничить старт перетаскивания отдельной «ручкой» (когда айтем содержит
-  интерактив). Опт-ин.
-- **Мульти-выделение** — тащить всё выделение разом, на призраке бейдж-счётчик. Для Selector-коллекций,
-  фазой позже.
-- **Анимация раздвигания** — соседи плавно расступаются под точкой вставки (Figma/iOS). Вяжется с
-  layout-анимацией — позже.
-- **Drag наружу, в другие приложения** — уровень 3, опт-ин на источнике (`DragDrop.AllowExternalDrag`);
-  СДЕЛАНО на Windows. Приём (drop-in) наоборот включён всегда — окно принимает файлы/текст из коробки.
+- ❌ **Drag-handle (грип ≡)** — НЕ сделан. Старт драга нельзя ограничить отдельной «ручкой»; сейчас тащится
+  любой элемент с `AllowDrag`.
+- ❌ **Анимация раздвигания** — НЕ сделана (соседи не расступаются под точкой вставки).
+- ✅ **Drag наружу, в другие приложения** — опт-ин `DragDrop.AllowExternalDrag`, Windows. Приём (drop-in)
+  наоборот включён ВСЕГДА — окно принимает файлы/текст из коробки, ничего включать не нужно.
 
-### Движковый готча (заложить с Фазы 2)
-**Виртуализация** (`TreeView`/`ItemsControl` виртуализованы): индекс вставки и автоскролл считать **по
-ДАННЫМ** (модели коллекции), а НЕ по реализованным контейнерам — иначе на длинном виртуализованном списке
-вставка/скролл поедут.
+### Движковый готча
+**Виртуализация.** Замысел был «считать по ДАННЫМ». **Фактически** `ComputeInsertion` сканирует
+РЕАЛИЗОВАННЫЕ контейнеры (`ItemContainerGenerator.RealizedIndices`) — но результат отдаётся наружу как
+`InsertBefore` (ссылка на айтем данных), поэтому на виртуализованном списке позиция не едет: реализованы
+всегда те строки, что видны, а именно среди них и находится точка вставки. Держать в голове при правках:
+опираться на `InsertBefore`, а не на числовой индекс.
 
 ## Открытые вопросы
 
@@ -270,17 +300,42 @@
   Win = layered + `UpdateLayeredWindow` (несовместим со свопчейном именно он — потому без свопчейна),
   Mac = прозрачный `NSWindow` + `CALayer.contents`. Живой призрак (Win DComp / Mac CAMetalLayer) — отложено,
   т.к. развёл бы платформы. Фаза 1 подтвердит на практике.
-- **DPI слепка** — печь в device-масштабе элемента, пере-печь при смене DPI (зеркалит text-RT).
-- **Время жизни RT слепка** — RT живёт на время сессии, освобождается на Drop/Cancel.
-- **Порог старта** — `PlatformSettings` минимальная дистанция drag (как у Thumb), чтобы клик ≠ drag.
-- **Auto-scroll** — при удержании drag у края скроллируемого таргета (nice-to-have, Фаза 4+).
-- **Отмена** — `Esc` во время drag → Cancel (вернуть без Drop), снять capture, закрыть призрак.
-- **Touch/pen** — сейчас mouse-only; за будущей Pointer-абстракцией (см. input-pointer-multitouch).
+- **DPI слепка — ЗАКРЫТО.** Печём в `RenderScale` окна-источника (`_ghostBakeScale`), пере-масштабируем
+  СОБЫТИЙНО по `IDragGhost.DpiChanged` (хук `WM_DPICHANGED` через `WindowDpiWatcher`). Ключ, если полезешь
+  туда снова: ре-скейл считается ОТНОСИТЕЛЬНО масштаба бейка, иначе на high-DPI старте призрак раздувается
+  вдвое (bake × monitor).
+- **Время жизни RT слепка — ЗАКРЫТО.** Битмап освобождается в `Reset()` (Drop/Cancel/потеря capture).
+- **Порог старта — ЗАКРЫТО.** `PlatformSettings.DragThreshold` (Windows: `SM_CXDRAG`/`SM_CYDRAG`),
+  сравнение по-осевое; используют `DragDrop`, `TabItem`, `ListBoxItem`.
+- **Auto-scroll — ЗАКРЫТО** (таймерный, с рампой; скорость через `DragDrop.AutoScrollSpeed`).
+- **Отмена — ЗАКРЫТО.** `Esc` (class-handler на `PreviewKeyDown`) + потеря capture (скриншотилка, Alt-Tab)
+  → `CancelDrag`: без Drop, источнику приходит `DragCompleted` с `Effects=None`.
+- ❗ **Touch/pen — ОТКРЫТО.** По-прежнему mouse-only; за будущей Pointer-абстракцией.
 - **Mac-каталог стандартных курсоров — ЗАКРЫТО.** `Cursor` больше не носит нативный хэндл: он описывает
   `CursorType` (или файл), а платформа за `INativeCursors` резолвит и кэширует форму. `WindowsCursors` мапит
   на `IDC_*` (+ shipped `dragcopy.cur`, которого в Win32 нет), `MacOSCursors` — на `NSCursor` через
   `MacOSCursorType` (`operationNotAllowed` / `dragCopy` / `dragLink` там НАТИВНЫЕ; отсутствующие формы —
   Wait/Help/UpArrow/диагональные ресайзы — осознанно сведены к ближайшим, см. комментарий в файле).
   Регистрация — `Cursor.Platform = …` в ctor платформы, тем же приёмом, что `Clipboard.Current`.
-- **Мульти-монитор / DPI-per-monitor** — призрак и hit-test по экрану должны работать в физических
-  координатах с учётом попадания курсора на монитор с другим масштабом.
+- **Мульти-монитор / DPI-per-monitor — ЗАКРЫТО для призрака** (событийный ре-скейл при переходе на монитор
+  с другим масштабом, проверено вживую в обе стороны) и для hit-test'а (экранные координаты физические,
+  `PointToClient` делит на DPI-скейл окна).
+
+---
+
+## Что осталось (сводка по состоянию на 2026-07-27)
+
+Всё ниже — НЕ сделано. Порядок — по моей оценке пользы, но приоритет за тобой.
+
+1. **Routed-события `DragEnter/DragOver/DragLeave/Drop`.** Сейчас доставка только в `ICommand`. Без них
+   нельзя написать КОНТРОЛ, который сам реагирует на пролёт драга (только вьюмодель).
+2. **`DragDrop.DoDragDrop(...)` — старт драга из кода.** Сейчас драг начинается только жестом.
+3. **macOS / Linux-реализации** `INativeDragDrop`, `IDragGhost` (контракты и точки регистрации готовы).
+4. **Drag-handle** — старт драга только за «ручкой».
+5. **Форматы сверх `Text`/`Files`** (HTML, RTF, картинки, произвольные байты) + **deferred rendering**
+   (отдавать тяжёлый формат лениво, в момент дропа).
+6. **Анимация раздвигания соседей** под точкой вставки.
+7. **Touch/pen** — за Pointer-абстракцией.
+8. **Z-order при кросс-оконном драге** — перебор окон идёт в порядке коллекции, а не по z-order ОС
+   (перекрывающиеся окна).
+9. **`DragCursor` / `Handled` в `DragDropEventArgs`** — ручной override курсора и остановка обработки.
