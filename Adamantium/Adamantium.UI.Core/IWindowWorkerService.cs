@@ -14,6 +14,13 @@ public interface IWindowWorkerService
     /// window and to focus an already-open single-instance window on a repeat request.</summary>
     public void Activate();
 
+    /// <summary>Raise the window above the others WITHOUT giving it focus.
+    /// <para>The distinction matters during a drag: taking the foreground makes the OS revoke the mouse capture the
+    /// drag runs on (Win32 answers with WM_CAPTURECHANGED), which cancels the gesture the user is in the middle of.
+    /// Raising the z-order alone leaves the capture - and the drag - intact, which is how dragging onto a window that
+    /// sits behind is supposed to work.</para></summary>
+    public void RaiseWithoutActivation();
+
     /// <summary>Acquire (true) or release (false) the OS-level mouse capture for this window, so a press-drag keeps
     /// receiving move/up even when the pointer leaves the window. Platform-specific (Win32 SetCapture/ReleaseCapture).
     /// The shared logic that decides WHEN to call this lives in MouseDevice.SyncOsMouseCapture, so every platform gets

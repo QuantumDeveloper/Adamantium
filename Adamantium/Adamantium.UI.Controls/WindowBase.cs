@@ -477,6 +477,10 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     /// <summary>Bring this window to the foreground (restoring it if minimized). Platform-specific via the window worker.</summary>
     public void Activate() => WindowWorkerService?.Activate();
 
+    /// <summary>Raise this window above the others WITHOUT taking focus - the mid-drag-safe counterpart of
+    /// <see cref="Activate"/>, which would cost the drag its mouse capture.</summary>
+    public void BringToFront() => WindowWorkerService?.RaiseWithoutActivation();
+
     /// <summary>Enter/leave RELATIVE mouse mode (hidden, centred cursor + synthesized raw delta) for a hosted game's
     /// mouse-look. Driven by a <see cref="Panels.RenderTargetPanel"/> per its <c>MouseLookMode</c>; delegates to the
     /// platform worker.</summary>
