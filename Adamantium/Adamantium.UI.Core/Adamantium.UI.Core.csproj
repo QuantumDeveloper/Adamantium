@@ -14,9 +14,13 @@
     </ItemGroup>
 
     <ItemGroup>
-        <!-- Drag-copy cursor (arrow + green plus): no standard Win32 IDC_COPY exists, so ship a .cur and load it via
-             LoadCursorFromFile. Copied next to the app so Cursors.DragCopy can resolve it at AppContext.BaseDirectory. -->
+        <!-- Drag feedback cursors (arrow + green plus, arrow + link arrow): Windows has no IDC_* for either - the shapes
+             Explorer draws sit in ole32.dll's resources - so ship .cur files and load them via LoadCursorFromFile.
+             Copied next to the app so Cursors.DragCopy/DragLink resolve them at AppContext.BaseDirectory. -->
         <Content Include="Resources\dragcopy.cur">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </Content>
+        <Content Include="Resources\draglink.cur">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
         </Content>
     </ItemGroup>

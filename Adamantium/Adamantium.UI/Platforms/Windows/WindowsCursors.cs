@@ -13,8 +13,11 @@ namespace Adamantium.UI.Platforms.Windows;
 /// </summary>
 internal sealed class WindowsCursors : INativeCursors
 {
-    // The drag-COPY shape has no IDC_* equivalent on Windows, so it ships as a .cur next to the app.
+    // Windows has NO IDC_* for the drag feedback shapes - the ones Explorer draws live as cursor resources inside
+    // ole32.dll, undocumented and unreachable by name. So they ship as .cur files next to the app, the way WPF ships
+    // its own. Both are the same arrow with a different badge, so the pair reads as one family.
     private const string DragCopyFile = "dragcopy.cur";
+    private const string DragLinkFile = "draglink.cur";
 
     // CONCURRENT, and that is not a precaution: Apply runs on BOTH threads - the pump answers WM_SETCURSOR as the pointer
     // hovers, while the loop sets the drag feedback. A plain Dictionary resized under that and threw
@@ -43,7 +46,7 @@ internal sealed class WindowsCursors : INativeCursors
     private IntPtr Load(CursorType type) => type switch
     {
         CursorType.DragCopy => LoadShipped(DragCopyFile),
-        CursorType.DragLink => Win32Interop.LoadCursor(IntPtr.Zero, NativeCursors.Hand),   // no IDC_ shortcut shape
+        CursorType.DragLink => LoadShipped(DragLinkFile),
         _ => Win32Interop.LoadCursor(IntPtr.Zero, Native(type)),
     };
 
