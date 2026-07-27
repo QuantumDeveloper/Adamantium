@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -43,6 +44,26 @@ public partial class DragDropDemoViewModel : TabPageViewModel
     // Toggle the "Animals" panel as a drop target: uncheck it and dragging over Animals shows the ⊘ "no-drop" cursor
     // (the engine maps Effects.None -> Cursors.No) - a live check of the cursor feedback.
     [Bindable] private bool _animalsAcceptDrop = true;
+
+    // Bound to the DragHandle in every Fruits row: on, and only the grip starts a drag (the rest of the row just
+    // selects); off, and the grip goes inactive so the whole row drags, as it does everywhere without a handle.
+    [Bindable] private bool _handleOnlyDrag = true;
+
+    // DragCursor: a target's DragOver may override the shape the engine picks from Effects (Copy/Move/⊘). Pick one here
+    // and drag over Animals to see it - every standard shape the engine knows, so the whole platform catalog is visible.
+    public CursorType[] CursorTypes { get; } = Enum.GetValues<CursorType>();
+    [Bindable] private bool _overrideDragCursor;
+    [Bindable] private CursorType _dragCursorType = CursorType.Hand;
+
+    // Runs on every move while a drag is over Animals - the hook a target uses to say what would happen. Here it only
+    // swaps the cursor; leaving DragCursor null keeps the standard Copy/Move/⊘ feedback. The view-model names a SHAPE
+    // and nothing more - the enum converts to the shared cursor description on its own, so no UI object is built here.
+    [Command]
+    private void DragOverRight(object arg)
+    {
+        if (arg is not DragDropEventArgs e || !OverrideDragCursor) return;
+        e.DragCursor = DragCursorType;
+    }
 
     partial void OnWrapOrientationChanged(Orientation value)
     {
