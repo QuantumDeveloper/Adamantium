@@ -426,7 +426,18 @@ namespace Adamantium.Imaging
         }
 
         public static unsafe PixelBuffer[] CreatePixelBuffers(ImageDescription description, IntPtr dataPointer, ulong offset, PitchFlags pitchFlags = PitchFlags.None)
+            => CreatePixelBuffers(description, dataPointer, offset, out _, pitchFlags);
+
+        /// <summary>
+        /// As above, but also reports the block this call ALLOCATED (<see cref="IntPtr.Zero"/> when the caller supplied
+        /// the memory). A caller that owns the memory must free exactly this pointer - NOT
+        /// <c>buffers[0].DataPointer</c>, which is where the first image happens to start and is not the address the
+        /// allocator handed out. Freeing that instead corrupts the heap, and the process dies later at an unrelated
+        /// allocation; that is how a DDS cube map took the whole app down.
+        /// </summary>
+        public static unsafe PixelBuffer[] CreatePixelBuffers(ImageDescription description, IntPtr dataPointer, ulong offset, out IntPtr allocatedBlock, PitchFlags pitchFlags = PitchFlags.None)
         {
+            allocatedBlock = IntPtr.Zero;
             // Calculate mipmaps
             var mipMapToZIndex = Image.CalculateImageArray(description, pitchFlags, out var pixelBufferCount, out var totalSizeInBytes);
             var mipMapDescriptions = Image.CalculateMipMapDescription(description, pitchFlags);
@@ -442,6 +453,7 @@ namespace Adamantium.Imaging
             if (dataPointer == IntPtr.Zero)
             {
                 buffer = Utilities.AllocateMemory((int)totalSizeInBytes);
+                allocatedBlock = buffer;
                 offset = 0;
             }
 

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -14,10 +14,26 @@ namespace Adamantium.Core
 {
     public static class Utilities
     {
+        /// <summary>
+        /// Release memory obtained from <see cref="AllocateMemory(int, int)"/> or <see cref="AllocateMemory(nuint)"/>.
+        /// <para>
+        /// Must match the allocator EXACTLY, which is why both allocate through <c>NativeMemory</c> and this frees
+        /// through it - the MODERN allocator, which is where the engine is heading. It used to free with
+        /// <c>Marshal.FreeHGlobal</c> while one of the two overloads allocated with
+        /// <c>NativeMemory.Alloc</c> - handing a block from one heap to another allocator corrupts the process heap,
+        /// and the crash surfaces later at an unrelated allocation. That is what killed the app on a DDS cube map
+        /// (STATUS_HEAP_CORRUPTION, 0xC0000374), with the pixel buffers taking the <c>nuint</c> overload.
+        /// </para>
+        /// </summary>
         public static unsafe void FreeMemory(IntPtr pointer)
         {
             if (pointer == IntPtr.Zero) return;
+#if NET6_0_OR_GREATER
+            NativeMemory.Free(pointer.ToPointer());
+#else
+            // netstandard2.0 has no NativeMemory, so that target allocates through Marshal below and frees the same way.
             Marshal.FreeHGlobal(pointer);
+#endif
         }
 
         public static unsafe void ClearMemory(ref IntPtr dest, byte value, int sizeInBytesToClear)
@@ -37,19 +53,43 @@ namespace Adamantium.Core
         }
 
 #if NET6_0_OR_GREATER
+        /// <summary>
+        /// Allocate native memory. Goes through the SAME heap as every other allocation here, because
+        /// <see cref="FreeMemory"/> is the only release path and it cannot know which allocator a pointer came from.
+        /// <para>
+        /// This used to call <c>NativeMemory.Alloc</c> while <see cref="FreeMemory"/> released with
+        /// <c>Marshal.FreeHGlobal</c>. Handing a block from one allocator to another corrupts the process heap, and the
+        /// damage only surfaces later at some unrelated allocation - which is how a dropped DDS cube map killed the app
+        /// with STATUS_HEAP_CORRUPTION (0xC0000374). Callers passing a <c>uint</c> size bound to this overload, and the
+        /// image pixel buffers do exactly that.
+        /// </para>
+        /// </summary>
         public static unsafe IntPtr AllocateMemory(nuint sizeInBytes)
         {
-            var ptr = NativeMemory.Alloc(sizeInBytes);
-            return new IntPtr(ptr);
+            return new IntPtr(NativeMemory.Alloc(sizeInBytes));
         }
 #endif
-        public static IntPtr AllocateMemory(int sizeInBytes, int align = 1)
+        /// <summary>
+        /// Allocate native memory. <paramref name="align"/> is a MINIMUM the platform allocator already satisfies (it
+        /// hands back memory aligned for any primitive - 16 bytes on both x64 targets), so it needs no arithmetic here.
+        /// <para>
+        /// It used to over-allocate and return a pointer offset INTO the block to force alignment - which threw the
+        /// base address away, so the matching free released an address the allocator never handed out and corrupted the
+        /// heap. Nothing in the engine asks for more than 16.
+        /// </para>
+        /// </summary>
+        public static unsafe IntPtr AllocateMemory(int sizeInBytes, int align = 1)
         {
-            var allocatedMemory = Marshal.AllocHGlobal(sizeInBytes + align);
-            long baseAddress = allocatedMemory.ToInt64();
-            // align pointer
-            long alignedAddress = (baseAddress + align - 1) & ~(align - 1);
-            return new IntPtr(alignedAddress);
+            if (align > 16)
+            {
+                throw new ArgumentOutOfRangeException(nameof(align), align,
+                    "Alignment beyond what the platform allocator guarantees needs AlignedAlloc/AlignedFree, which this pair does not use.");
+            }
+#if NET6_0_OR_GREATER
+            return AllocateMemory((nuint)sizeInBytes);
+#else
+            return Marshal.AllocHGlobal(sizeInBytes);
+#endif
         }
 
         public static byte[] ReadStream(Stream stream)
@@ -118,18 +158,33 @@ namespace Adamantium.Core
             IntPtr source = AllocateMemory(SizeOf<T>());
             Marshal.StructureToPtr(value, source, false);
             CopyMemory(destination, source, size);
-            Marshal.FreeHGlobal(source);
+            FreeMemory(source);   // must match AllocateMemory above - not FreeHGlobal, which is a different heap
         }
 
+        /// <summary>
+        /// Copy <paramref name="count"/> elements starting at <paramref name="data"/>[<paramref name="offset"/>] to
+        /// <paramref name="destination"/>, and return the address just past what was written.
+        /// <para>
+        /// It used to ignore BOTH arguments and copy the whole array - so a caller asking for the first N elements of a
+        /// longer array wrote straight past the end of the destination allocation. That is a heap overrun: the process
+        /// dies later, at some unrelated allocation, with STATUS_HEAP_CORRUPTION. A dropped DDS cube map hit it through
+        /// the pixel-buffer flip, which allocates exactly one row-stride and passes a full-image array.
+        /// </para>
+        /// </summary>
         public static IntPtr Write<T>(IntPtr destination, T[] data, int offset, int count) where T : struct
         {
             var size = SizeOf<T>();
-            var startPos = IntPtr.Add(destination, offset);
             var source = GCHandle.Alloc(data, GCHandleType.Pinned);
-            CopyMemory(destination, source.AddrOfPinnedObject(), size * data.Length);
-            source.Free();
+            try
+            {
+                CopyMemory(destination, IntPtr.Add(source.AddrOfPinnedObject(), offset * size), (long)count * size);
+            }
+            finally
+            {
+                source.Free();
+            }
 
-            return IntPtr.Add(startPos, count * size);
+            return IntPtr.Add(destination, count * size);
         }
 
         public static T Read<T>(IntPtr source) where T : struct

@@ -54,6 +54,17 @@ namespace Adamantium.Imaging.Png
                 return state.Error;
             }
 
+            // A PngImage that came out of the DECODER holds its frames still encoded - the pixels AND the frame's size
+            // appear only when somebody asks for them. Everything below reads both, starting with the colour-mode
+            // choice, so ask first: encoding a picture straight after loading it (which is what transcoding does) was
+            // otherwise deciding on a zero-sized image and throwing IndexOutOfRangeException further down.
+            // ONLY when the pixels are genuinely missing: an image built from another format (a GIF, a JPEG) already
+            // carries them, and asking it to decode would send it looking for compressed data it never had.
+            for (uint i = 0; i < pngImage.Frames.Count; i++)
+            {
+                if (pngImage.Frames[(int)i].RawPixelBuffer is not { Length: > 0 }) pngImage.GetRawPixels(i);
+            }
+
             /* color convert and compute scanline filter types */
             PngInfo info = new PngInfo(state.InfoPng);
 
@@ -72,7 +83,8 @@ namespace Adamantium.Imaging.Png
                     PngColorMode mode16 = PngColorMode.Create(PngColorType.RGB, 16);
                     PngColorConversion.ConvertRGB(ref r, ref g, ref b, bgR, bgG, bgB, mode16, state.InfoPng.ColorMode);
                     var frame = pngImage.Frames[0];
-                    PngColorConversion.GetColorProfile(profile, frame.RawPixelBuffer, frame.EncodedWidth, frame.EncodedHeight, state.ColorModeRaw);
+                    var (profileWidth, profileHeight) = SizeOf(frame);
+                    PngColorConversion.GetColorProfile(profile, frame.RawPixelBuffer, profileWidth, profileHeight, state.ColorModeRaw);
                     profile.Add(r, g, b, ushort.MaxValue);
                     PngColorProfile.AutoChooseColorFromProfile(info.ColorMode, state.ColorModeRaw, profile);
                     error = PngColorConversion.ConvertRGB(ref info.BackgroundR, ref info.BackgroundG,
@@ -89,7 +101,11 @@ namespace Adamantium.Imaging.Png
                     {
                         frame = pngImage.Frames[0];
                     }
-                    PngColorProfile.AutoChooseColor(info.ColorMode, frame.RawPixelBuffer, frame.EncodedWidth, frame.EncodedHeight, state.ColorModeRaw);
+                    // The frame's size, NOT its APNG sub-rectangle: fed the zeros a plain PNG carries there, the chooser
+                    // inspects no pixels at all and leaves the colour mode at grey/bit-depth-0 - which then sizes every
+                    // buffer downstream to nothing and blows up inside the colour conversion.
+                    var (chooseWidth, chooseHeight) = SizeOf(frame);
+                    PngColorProfile.AutoChooseColor(info.ColorMode, frame.RawPixelBuffer, chooseWidth, chooseHeight, state.ColorModeRaw);
                     //state.InfoRaw.ColorType = info.ColorMode.ColorType;
                     //state.InfoRaw.BitDepth = info.ColorMode.BitDepth;
                     state.ColorModeRaw = info.ColorMode;
@@ -135,15 +151,20 @@ namespace Adamantium.Imaging.Png
             {
                 foreach (PngFrame frame in pngImage.Frames)
                 {
-                    long size = (frame.EncodedWidth * frame.EncodedHeight * PngColorConversion.GetBitsPerPixel(info.ColorMode) + 7) / 8;
+                    var (frameWidth, frameHeight) = SizeOf(frame);
+                    // PER SCANLINE, not for the image as a whole: PNG pads every row up to a byte boundary, so a
+                    // sub-byte depth (a palette, grey) at a width that is not a multiple of 8/bpp needs one extra byte
+                    // per row. Sizing it in one go came up short and the conversion wrote past the end of the buffer.
+                    var bitsPerPixel = PngColorConversion.GetBitsPerPixel(info.ColorMode);
+                    long size = (frameWidth * frameHeight * bitsPerPixel + 7) / 8;
                     var converted = new byte[size];
-                    state.Error = PngColorConversion.Convert(converted, frame.RawPixelBuffer, info.ColorMode, state.InfoPng.ColorMode, (int)frame.EncodedWidth, (int)frame.EncodedHeight);
+                    state.Error = PngColorConversion.Convert(converted, frame.RawPixelBuffer, info.ColorMode, state.InfoPng.ColorMode, (int)frameWidth, (int)frameHeight);
                     if (state.Error > 0)
                     {
                         throw new PngEncoderException(state.Error);
                     }
                     var compressedBuffer = new byte[0];
-                    state.Error = PreprocessScanlines(ref compressedBuffer, converted, frame.EncodedWidth, frame.EncodedHeight, info, state.EncoderSettings);
+                    state.Error = PreprocessScanlines(ref compressedBuffer, converted, frameWidth, frameHeight, info, state.EncoderSettings);
                     frame.FrameData = compressedBuffer;
                     if (state.Error > 0)
                     {
@@ -155,8 +176,9 @@ namespace Adamantium.Imaging.Png
             {
                 foreach (PngFrame frame in pngImage.Frames)
                 {
+                    var (frameWidth, frameHeight) = SizeOf(frame);
                     var compressedBuffer = Array.Empty<byte>();
-                    state.Error = PreprocessScanlines(ref compressedBuffer, frame.RawPixelBuffer, frame.EncodedWidth, frame.EncodedHeight, info, state.EncoderSettings);
+                    state.Error = PreprocessScanlines(ref compressedBuffer, frame.RawPixelBuffer, frameWidth, frameHeight, info, state.EncoderSettings);
                     frame.FrameData = compressedBuffer;
                     if (state.Error > 0)
                     {
@@ -301,6 +323,17 @@ namespace Adamantium.Imaging.Png
         */
         /*out must be buffer big enough to contain uncompressed IDAT chunk data, and in must contain the full image.
         return value is error**/
+        /// <summary>
+        /// The size to encode a frame at. <see cref="PngFrame.EncodedWidth"/> is the APNG SUB-FRAME rectangle and stays
+        /// ZERO for an ordinary single-image PNG - the decoder uses that zero to mean "not an animation frame". Reading
+        /// it blindly therefore produced a zero-sized buffer for every plain PNG, and encoding one threw
+        /// IndexOutOfRangeException on the empty array; the whole-image size lives in <see cref="PngFrame.Width"/>.
+        /// </summary>
+        private static (uint Width, uint Height) SizeOf(PngFrame frame) =>
+            frame.EncodedWidth != 0 && frame.EncodedHeight != 0
+                ? (frame.EncodedWidth, frame.EncodedHeight)
+                : (frame.Width, frame.Height);
+
         private unsafe uint PreprocessScanlines(ref byte[] outData, byte[] inData, uint width, uint height, PngInfo pngInfo, PngEncoderSettings settings)
         {
             uint error = 0;
