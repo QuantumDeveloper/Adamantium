@@ -183,6 +183,9 @@ public static partial class DragDrop
     // _dragEffects is the last effect the DragOver settled on - it drives BOTH the cursor feedback and whether the drop
     // actually lands (None = the payload can't go here).
     private static DragDropEffects _dragEffects = DragDropEffects.None;
+    // What THIS drag may end as. A gesture allows the pair the modifier can choose between; a code-started drag says so
+    // itself (DoDragDrop). Narrows the default - a target may narrow further, never widen.
+    private static DragDropEffects _allowedEffects = DragDropEffects.Copy | DragDropEffects.Move;
     private static int _dragCount = 1;   // how many items are being dragged - drives the multi-drag count badge on the ghost
     private static (byte[] bgra, int w, int h) _badgePart;   // the rendered count-badge snapshot (empty for a single-item drag)
 
@@ -360,7 +363,18 @@ public static partial class DragDrop
     {
         if (_externalActive) return ExternalDefaultEffects();
         var control = Keyboard.IsKeyDown(Key.LeftCtrl) || Keyboard.IsKeyDown(Key.RightCtrl);
-        return control ? DragDropEffects.Copy : DragDropEffects.Move;
+        return Narrow(control ? DragDropEffects.Copy : DragDropEffects.Move);
+    }
+
+    // The modifier's choice, kept inside what this drag allows. A drag that permits only Link (or only Copy) must not be
+    // turned into a Move by a modifier - so when the wanted effect is not on offer, the first allowed one stands in.
+    private static DragDropEffects Narrow(DragDropEffects wanted)
+    {
+        if ((wanted & _allowedEffects) != 0) return wanted;
+        if ((_allowedEffects & DragDropEffects.Move) != 0) return DragDropEffects.Move;
+        if ((_allowedEffects & DragDropEffects.Copy) != 0) return DragDropEffects.Copy;
+        if ((_allowedEffects & DragDropEffects.Link) != 0) return DragDropEffects.Link;
+        return DragDropEffects.None;
     }
 
     private static Cursor CursorFor(DragDropEffects effects) => effects switch
@@ -728,10 +742,45 @@ public static partial class DragDrop
         return timer;
     }
 
-    private static void BeginDrag()
+    /// <summary>
+    /// Starts a drag from CODE, without waiting for a press to cross the drag threshold - for the gestures the engine
+    /// cannot recognise on its own: a context menu's "Move to…", a keyboard/accessibility pick-up, a long tap, or a
+    /// source that is not an element at all (an object drawn on a canvas, a span of selected cells) and so has nowhere
+    /// to hang <c>AllowDrag</c>. Everything downstream is the ordinary gesture: ghost, targeting, spring-load,
+    /// auto-scroll, the drop and the source's <c>DragCompleted</c>.
+    /// <para>
+    /// Unlike WPF's <c>DoDragDrop</c> this does NOT block and cannot return the outcome: our drag runs on the event
+    /// loop, not a modal one. It answers whether the drag STARTED; the result arrives at the source's
+    /// <c>DragCompletedCommand</c> with the final <c>Effects</c>. The gesture ends the way any other does - the left
+    /// button coming up drops, Esc cancels - so calling it while the button is already held reads as one continuous
+    /// drag, and calling it with the button up gives a "pick up, move, click to drop" gesture.
+    /// </para>
+    /// </summary>
+    /// <param name="source">The element the drag belongs to: it holds the capture, is pictured by the ghost (unless it
+    /// declares a <c>DragTemplate</c>), and receives the DragStarted / DragCompleted commands.</param>
+    /// <param name="data">The payload. An <see cref="IDataPackage"/> is taken as-is; anything else is wrapped, exactly
+    /// as <c>DragDrop.DragData</c> would be. Null falls back to the source's own <c>DragData</c>.</param>
+    /// <param name="allowedEffects">What this drag may end as. The modifier still chooses within it (Ctrl = Copy,
+    /// otherwise Move); a target may narrow it further, never widen it.</param>
+    /// <returns>False when a drag is already in flight, or the source is null - never throws.</returns>
+    public static bool DoDragDrop(IInputComponent source, object data = null,
+        DragDropEffects allowedEffects = DragDropEffects.Copy | DragDropEffects.Move)
+    {
+        if (IsDragActive || source == null || allowedEffects == DragDropEffects.None) return false;
+        _source = source;
+        _startScreen = Mouse.ScreenCoordinates;
+        _allowedEffects = allowedEffects;
+        // The same two subscriptions a press makes, so the gesture ends through exactly one code path.
+        source.MouseMove += OnMove;
+        source.MouseLeftButtonUp += OnUp;
+        BeginDrag(data);
+        return true;
+    }
+
+    private static void BeginDrag(object data = null)
     {
         _dragging = true;
-        _data = ResolveData((AdamantiumComponent)_source);
+        _data = data != null ? AsPackage(data) : ResolveData((AdamantiumComponent)_source);
         // Decided ONCE, here: an external-capable source runs the whole gesture through the OS drag loop (so it can be
         // dropped into other applications), everything else stays on our own loop with its live CLR payload. Never
         // switched mid-drag - the platform loop is modal and has to own the gesture from the start.
@@ -1086,6 +1135,7 @@ public static partial class DragDrop
         if (_dragging && ReferenceEquals(Mouse.Captured, _source)) Mouse.Capture(null);
         Mouse.OverrideCursor = null;   // restore normal per-element cursors
         ResetDropFeedback();
+        _allowedEffects = DragDropEffects.Copy | DragDropEffects.Move;   // the gesture default; DoDragDrop sets its own
         _externalCapable = false;
         _nativeDragActive = false;
         _sourceCompleted = false;
@@ -1100,9 +1150,7 @@ public static partial class DragDrop
         _badgePart = default;
     }
 
-    private static IDataPackage ResolveData(AdamantiumComponent source)
-    {
-        var d = GetDragData(source);
-        return d as IDataPackage ?? new DataPackage(d);
-    }
+    private static IDataPackage ResolveData(AdamantiumComponent source) => AsPackage(GetDragData(source));
+
+    private static IDataPackage AsPackage(object data) => data as IDataPackage ?? new DataPackage(data);
 }
