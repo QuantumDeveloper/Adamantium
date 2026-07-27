@@ -635,18 +635,32 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         return new Vector2(1, 1);
     }
 
+    // Decode WM_KEY*'s bit-packed LPARAM HERE, so the neutral input layer receives what the press MEANS (was it already
+    // down, how many repeats) instead of a Win32 message parameter it would have to know how to unpack.
+    private static KeyPressInfo DecodePress(IntPtr lParam)
+    {
+        var parameters = Messages.GetKeyParameters(lParam);
+        return new KeyPressInfo
+        {
+            PreviousState = parameters.PreviousState == Adamantium.Win32.KeyStates.Down ? KeyState.Down : KeyState.Up,
+            RepeatCount = parameters.RepeatCount
+        };
+    }
+
     private IntPtr HandleKeyDown(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
+        var press = DecodePress(lParam);
         DispatchInput(() => KeyboardDevice.CurrentDevice.ProcessEvent(new RawKeyboardEventArgs((Key)Messages.GetKey(wParam),
-            RawKeyboardEventType.KeyDown, lParam, KeyboardDevice.CurrentDevice.Modifiers, GetTimeStamp())));
+            RawKeyboardEventType.KeyDown, press, KeyboardDevice.CurrentDevice.Modifiers, GetTimeStamp())));
         handled = true;
         return IntPtr.Zero;
     }
 
     private IntPtr HandleKeyUp(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
+        var press = DecodePress(lParam);
         DispatchInput(() => KeyboardDevice.CurrentDevice.ProcessEvent(new RawKeyboardEventArgs((Key)Messages.GetKey(wParam),
-            RawKeyboardEventType.KeyUp, lParam, KeyboardDevice.CurrentDevice.Modifiers, GetTimeStamp())));
+            RawKeyboardEventType.KeyUp, press, KeyboardDevice.CurrentDevice.Modifiers, GetTimeStamp())));
         handled = true;
         return IntPtr.Zero;
     }
