@@ -399,6 +399,12 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         if (!containerRegistry.IsRegistered<IDragGhost>() && OperatingSystem.IsWindows())
             containerRegistry.RegisterSingleton<IDragGhost, Win32DragGhost>();
 
+        // OS drag-drop bridge: a native drop target on every window (files/text from other apps) + the opt-in drag-out
+        // of our own payloads (DragDrop.AllowExternalDrag). Windows = OLE; other platforms leave it unregistered and
+        // only the in-app drag-drop runs.
+        if (!containerRegistry.IsRegistered<INativeDragDrop>() && OperatingSystem.IsWindows())
+            containerRegistry.RegisterSingleton<INativeDragDrop, WindowsDragDrop>();
+
         RegisterNavigationServices(containerRegistry);
     }
 

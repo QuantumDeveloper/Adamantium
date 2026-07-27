@@ -19,6 +19,7 @@ public class WindowsPlatform : IApplicationPlatform
         window.AddHook(WndProc);
         dispatchMessage = Messages.RegisterWindowMessage("DispatcherProcessingMessage");
         Clipboard.Current = new WindowsClipboard();   // swap the in-process default for the real OS clipboard
+        WindowsOle.Initialize();   // OLE on THIS (the UI) thread - the precondition for OS drag-drop on every window
     }
 
     public void Run(CancellationToken token)

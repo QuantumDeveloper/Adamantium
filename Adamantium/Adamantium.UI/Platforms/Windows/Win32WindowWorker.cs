@@ -126,7 +126,9 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         chromeMinHeight = !double.IsNaN(window.MinHeight) && window.MinHeight > 0 ? window.MinHeight : 120;
         this.window.Closed += OnWindowClosed;
         var classStyle = WindowClassStyle.OwnDC | WindowClassStyle.DoubleClicks; //| WindowClassStyle.VerticalRedraw | WindowClassStyle.HorizontalRedraw;
-        var wndStyleEx = WindowStyleEx.Appwindow | WindowStyleEx.Acceptfiles;
+        // No WS_EX_ACCEPTFILES: the partial WM_DROPFILES path is replaced by a full OLE drop target (registered below),
+        // which carries text and arbitrary formats too - and reports drag-over live instead of only the final drop.
+        var wndStyleEx = WindowStyleEx.Appwindow;
         var wndStyle = //WindowStyle.Popup |
             WindowStyle.Overlappedwindow | WindowStyle.Maximizebox | WindowStyle.Minimizebox |
             WindowStyle.Clipsiblings | WindowStyle.Clipchildren | WindowStyle.Sizeframe;
@@ -176,6 +178,10 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         // back up by RenderScale (= DpiScale); the projection + layout stay logical. On a 100% monitor this is identity.
         this.window.ClientWidth = client.Width / this.window.DpiScale.X;
         this.window.ClientHeight = client.Height / this.window.DpiScale.Y;
+
+        // Accept drops from OTHER applications for this window's whole life - registered here, on the thread that owns
+        // the HWND (OLE requires that), never per drag. Silently does nothing when the OS bridge is unavailable.
+        Input.DragDrop.RegisterNativeDropTarget(this.window);
 
         UIContext.ThemeContext.ApplyCurrentTheme(this.window);
         UIContext.UIApplication.AddWindow(this.window);
@@ -282,8 +288,15 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         // never-closing window. (The native SC_CLOSE path used to destroy inline; that is now consolidated here.)
         if (window.Handle != IntPtr.Zero)
         {
+            var closing = window;
             window.SetHandle(IntPtr.Zero);
-            _ = UIContext.UIApplication.ExecuteOnUIThreadAsync(() => source.Destroy());
+            // Revoke the OLE drop target on the SAME (HWND-owning) thread and before the window dies - revoking after
+            // DestroyWindow leaves the registration dangling on a handle the OS may hand to someone else.
+            _ = UIContext.UIApplication.ExecuteOnUIThreadAsync(() =>
+            {
+                Input.DragDrop.UnregisterNativeDropTarget(closing);
+                source.Destroy();
+            });
         }
     }
 

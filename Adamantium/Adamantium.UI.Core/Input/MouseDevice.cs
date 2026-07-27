@@ -98,6 +98,19 @@ public class MouseDevice
         return p;
     }
 
+    /// <summary>
+    /// Feed the pointer position from an OS-DRIVEN drag (a native drop target's DragOver). During such a drag the drag
+    /// SOURCE - another application - owns the mouse, so no move message reaches us and <see cref="Position"/> would
+    /// stay where the pointer last was: every <see cref="GetPosition"/> in the drop machinery (insertion caret,
+    /// auto-scroll, hit-test) would read a stale point. The native callback knows the real screen point, so it publishes
+    /// it here and the whole drag-over path keeps working unchanged. Call on the UI loop thread.
+    /// </summary>
+    public void SetExternalPosition(IInputComponent root, Vector2 screenPoint)
+    {
+        Position = screenPoint;
+        _positionRoot = root;
+    }
+
     public void SetCursor(Cursor cursor)
     {
         Win32Interop.SetCursor(cursor.CursorHandle);
