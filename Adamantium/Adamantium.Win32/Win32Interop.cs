@@ -400,6 +400,10 @@ namespace Adamantium.Win32
         /// <summary>Standard clipboard format ids (CF_UNICODETEXT sits with the clipboard block above). The drag payload
         /// speaks these on the wire; the neutral names a view-model sees live in <c>DataFormats</c>.</summary>
         public const uint CF_TEXT = 1;
+        /// <summary>A packed device-independent bitmap: BITMAPINFOHEADER immediately followed by the pixels, with no
+        /// file header. What the classic imaging applications (Paint, Word) accept - modern ones prefer the registered
+        /// "PNG" format.</summary>
+        public const uint CF_DIB = 8;
         public const uint CF_HDROP = 15;
 
         /// <summary>Bring OLE up on the CALLING thread (it must be an STA). Required before RegisterDragDrop /

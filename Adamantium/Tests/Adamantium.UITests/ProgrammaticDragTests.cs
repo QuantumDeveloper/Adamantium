@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using Adamantium.Core.Commands;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Base;
@@ -21,6 +22,11 @@ namespace Adamantium.UITests;
 public class ProgrammaticDragTests
 {
     private Border _source;
+
+    // A real 2x2 PNG: the file fallback only offers what it can recognise as a picture, so arbitrary bytes will not do.
+    private static readonly byte[] TinyPng = Convert.FromBase64String(
+        "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAAXNSR0IArs4c6QAAAARnQU1BAACxjwv8YQUAAAAJcEhZcwAADsMAAA7D" +
+        "AcdvqGQAAAATSURBVBhXY/jPwPAfDBkY/oMBAEnICfeW3k0uAAAAAElFTkSuQmCC");
 
     [SetUp]
     public void SetUp()
@@ -102,6 +108,71 @@ public class ProgrammaticDragTests
     public void DoDragDrop_RefusesAnEmptyEffectMask()
     {
         Assert.That(DragDrop.DoDragDrop(_source, "nothing allowed", DragDropEffects.None), Is.False);
+    }
+
+    // OfferImagesAsFiles: the opt-in that makes a dragged picture droppable on the many targets that ask only for a
+    // file list. The file must be a PROMISE - a drag that goes nowhere must not touch the disk.
+    [Test]
+    public void OfferImagesAsFiles_AddsAPromisedFile_WithoutWritingIt()
+    {
+        var directory = Path.Combine(Path.GetTempPath(), "Adamantium", "drag-tests");
+        var previous = (DragDropOptions.OfferImagesAsFiles, DragDropOptions.ImageFileDirectory);
+        DragDropOptions.OfferImagesAsFiles = true;
+        DragDropOptions.ImageFileDirectory = directory;
+        if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
+        try
+        {
+            var package = new DataPackage();
+            package.Set(DataFormats.Image, TinyPng);
+
+            DragDrop.DoDragDrop(_source, package);
+
+            Assert.That(package.Contains(DataFormats.Files), Is.True, "the picture must also be offered as a file");
+            Assert.That(package.IsDeferred(DataFormats.Files), Is.True);
+            Assert.That(Directory.Exists(directory), Is.False, "nothing may be written until a target asks");
+
+            var files = package.Get(DataFormats.Files) as string[];
+            Assert.That(files, Has.Length.EqualTo(1));
+            Assert.That(File.ReadAllBytes(files![0]), Is.EqualTo(TinyPng));
+            Assert.That(files[0], Does.EndWith(".png"), "the extension must match what the bytes actually are");
+        }
+        finally
+        {
+            (DragDropOptions.OfferImagesAsFiles, DragDropOptions.ImageFileDirectory) = previous;
+        }
+    }
+
+    // A source that already says which files it means owns that decision - the fallback must not overwrite it.
+    [Test]
+    public void OfferImagesAsFiles_LeavesAnExplicitFileListAlone()
+    {
+        var previous = DragDropOptions.OfferImagesAsFiles;
+        DragDropOptions.OfferImagesAsFiles = true;
+        try
+        {
+            var package = new DataPackage();
+            package.Set(DataFormats.Image, TinyPng);
+            package.Set(DataFormats.Files, new[] { @"C:\the-source-said-so.png" });
+
+            DragDrop.DoDragDrop(_source, package);
+
+            Assert.That(package.Get(DataFormats.Files), Is.EqualTo(new[] { @"C:\the-source-said-so.png" }));
+        }
+        finally
+        {
+            DragDropOptions.OfferImagesAsFiles = previous;
+        }
+    }
+
+    [Test]
+    public void WithoutTheOptIn_APictureCarriesNoFile()
+    {
+        var package = new DataPackage();
+        package.Set(DataFormats.Image, TinyPng);
+
+        DragDrop.DoDragDrop(_source, package);
+
+        Assert.That(package.Contains(DataFormats.Files), Is.False, "off by default - it writes to disk");
     }
 
     private sealed class TestCommand : ICommand
