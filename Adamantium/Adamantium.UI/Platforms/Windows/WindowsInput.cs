@@ -34,6 +34,16 @@ internal sealed class WindowsInput : INativeMouse, INativeKeyboard, INativePlatf
 
     public uint DoubleClickTime => Win32Interop.GetDoubleClickTime();
 
+    // SPI_GETMOUSEHOVERTIME. The call fills an int; if it fails we say 0 and the neutral layer falls back to its default.
+    public uint HoverTime
+    {
+        get
+        {
+            var value = new int[1];
+            return Win32Interop.SystemParametersInfo(SPI.GetMouseHoverTime, 0, value, 0) ? (uint)value[0] : 0;
+        }
+    }
+
     // SM_CXDRAG/SM_CYDRAG - the user's own "how far before it's a drag" setting (Control Panel / registry). Read live
     // rather than cached: the user can change it while the app runs, and it is queried once per gesture, not per frame.
     public Size DragThreshold => new(

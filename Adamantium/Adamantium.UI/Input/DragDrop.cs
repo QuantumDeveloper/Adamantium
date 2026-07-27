@@ -31,16 +31,10 @@ public static partial class DragDrop
 {
     // How far the pointer must travel before a press becomes a drag comes from the USER's own OS setting
     // (PlatformSettings.DragThreshold) - a click is not a drag, and where that line sits is their choice, not ours.
-    // How long the cursor must dwell over ANOTHER of our windows before it is raised to the front (see UpdateWindowRaise).
-    private const double WindowRaiseDwellMs = 600;
-    // How long the cursor must dwell over a spring-loadable before it activates/expands.
-    private const double SpringLoadDwellMs = 600;
-    // Auto-scroll edge band (px), timer cadence, and default speed (px/sec) if a ScrollViewer doesn't set AutoScrollSpeed.
-    private const double AutoScrollBand = 32;
+    // Everything tunable lives in DragDropOptions (ours) or PlatformSettings (the user's) - see those two for why the
+    // split matters. Only the auto-scroll CADENCE stays a constant here: it is a frame interval, not a preference, and
+    // letting it be set would just let someone make the scroll stutter.
     private const double AutoScrollTickMs = 16;
-    private const double AutoScrollDefaultSpeed = 450;
-    // Ghost sits down-right of the cursor so it doesn't hide it.
-    private const int GhostCursorOffset = 12;
 
     // ------------------------------------------------------------------ attached properties
     public static readonly AdamantiumProperty AllowDragProperty = AdamantiumProperty.RegisterAttached(
@@ -75,11 +69,16 @@ public static partial class DragDrop
         "DragCompletedCommand", typeof(ICommand), typeof(AdamantiumComponent), new PropertyMetadata(null));
 
     // Auto-scroll speed (px/sec) while a drag dwells in a ScrollViewer's edge band. Set it on a ScrollViewer to tune how
-    // fast that list auto-scrolls during a drop; default AutoScrollDefaultSpeed. The engine ramps it by band depth.
+    // fast that list auto-scrolls during a drop; the app-wide default is DragDropOptions.AutoScrollSpeed. Ramped by band depth.
     public static readonly AdamantiumProperty AutoScrollSpeedProperty = AdamantiumProperty.RegisterAttached(
-        "AutoScrollSpeed", typeof(double), typeof(AdamantiumComponent), new PropertyMetadata(AutoScrollDefaultSpeed));
+        "AutoScrollSpeed", typeof(double), typeof(AdamantiumComponent), new PropertyMetadata(0.0));
 
-    public static double GetAutoScrollSpeed(AdamantiumComponent e) => e.GetValue<double>(AutoScrollSpeedProperty);
+    /// <summary>Unset (0) means "use the app-wide default" - read LIVE from DragDropOptions, so changing it later works.</summary>
+    public static double GetAutoScrollSpeed(AdamantiumComponent e)
+    {
+        var value = e.GetValue<double>(AutoScrollSpeedProperty);
+        return value > 0 ? value : DragDropOptions.AutoScrollSpeed;
+    }
     public static void SetAutoScrollSpeed(AdamantiumComponent e, double value) => e.SetValue(AutoScrollSpeedProperty, value);
 
     public static bool GetAllowDrag(AdamantiumComponent e) => e.GetValue<bool>(AllowDragProperty);
@@ -557,11 +556,12 @@ public static partial class DragDrop
 
         var local = Mouse.GetPosition((IInputComponent)sv);
         var height = sv.RenderSize.Height;
-        double dir = local.Y < AutoScrollBand ? -1 : local.Y > height - AutoScrollBand ? 1 : 0;
+        var band = DragDropOptions.AutoScrollBand;
+        double dir = local.Y < band ? -1 : local.Y > height - band ? 1 : 0;
         if (dir == 0) { StopAutoScroll(); return; }
 
         // 0 at the band's inner edge → 1 at the very edge, so it eases in rather than jumping to full speed.
-        var depth = dir < 0 ? (AutoScrollBand - local.Y) / AutoScrollBand : (local.Y - (height - AutoScrollBand)) / AutoScrollBand;
+        var depth = dir < 0 ? (band - local.Y) / band : (local.Y - (height - band)) / band;
         depth = depth < 0 ? 0 : depth > 1 ? 1 : depth;
         var speed = GetAutoScrollSpeed((AdamantiumComponent)sv);   // px/sec
 
@@ -622,7 +622,7 @@ public static partial class DragDrop
 
     private static DispatcherTimer CreateRaiseTimer()
     {
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(WindowRaiseDwellMs) };
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(DragDropOptions.ResolveDwell(DragDropOptions.WindowRaiseDelayMs)) };
         timer.Tick += (_, _) =>
         {
             timer.Stop();   // one-shot per dwell
@@ -633,7 +633,7 @@ public static partial class DragDrop
 
     private static DispatcherTimer CreateSpringTimer()
     {
-        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(SpringLoadDwellMs) };
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(DragDropOptions.ResolveDwell(DragDropOptions.SpringLoadDelayMs)) };
         timer.Tick += (_, _) =>
         {
             timer.Stop();   // one-shot per dwell
@@ -855,7 +855,7 @@ public static partial class DragDrop
     {
         if (_ghostBgra == null) return;
         var s = Mouse.ScreenCoordinates;
-        int x = (int)s.X + GhostCursorOffset, y = (int)s.Y + GhostCursorOffset;
+        int x = (int)s.X + DragDropOptions.GhostCursorOffset, y = (int)s.Y + DragDropOptions.GhostCursorOffset;
         if (_ghostShown)
         {
             Ghost?.Move(x, y);                                  // same monitor -> cheap reposition; a DPI crossing re-scales via OnGhostDpiChanged
@@ -877,7 +877,7 @@ public static partial class DragDrop
         var scale = dpi / 96.0;
         if (Math.Abs(scale - _presentedScale) < 0.001) return;
         var s = Mouse.ScreenCoordinates;
-        int x = (int)s.X + GhostCursorOffset, y = (int)s.Y + GhostCursorOffset;
+        int x = (int)s.X + DragDropOptions.GhostCursorOffset, y = (int)s.Y + DragDropOptions.GhostCursorOffset;
         var (bgra, w, h) = ScaleGhost(scale);
         Ghost?.Show(bgra, w, h, x, y);
         _presentedScale = scale;

@@ -18,6 +18,11 @@ public static class PlatformSettings
    /// shaky hand or a high-DPI mouse doesn't turn every click into a drag. 4x4 is the desktop default.</summary>
    public static Size DragThreshold => Platform?.DragThreshold ?? new Size(4, 4);
 
+   /// <summary>How long the pointer must rest before it counts as a HOVER, in milliseconds - the user's dwell
+   /// preference, and the pace for every "hold still and it opens" gesture. 400 is the desktop default; a platform
+   /// reporting 0 (or none registered) falls back to it.</summary>
+   public static UInt32 HoverTime => Platform?.HoverTime is { } time and > 0 ? time : 400;
+
    /// <summary>True once the pointer has moved far enough from where it was pressed for the gesture to be a DRAG.
    /// Per-axis, not radial: that is what the OS setting means, and it is what every other application on the desktop
    /// does with it.</summary>
