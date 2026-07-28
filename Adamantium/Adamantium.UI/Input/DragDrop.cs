@@ -673,35 +673,9 @@ public static partial class DragDrop
         if (panel != null) panel.DropGapIndex = index;
     }
 
-    // The panel hosting the containers (the items host itself is not public API). A realized container names it in one
-    // step, but an EMPTY list has none - and that is exactly when a drop matters most - so fall back to walking down for
-    // it. Without the walk the first drop into an empty list silently got the caret while every later one got the card.
-    private static VirtualizingPanel HostPanel(ItemsControl list)
-    {
-        foreach (var i in list.ItemContainerGenerator.RealizedIndices)
-        {
-            if (list.ItemContainerGenerator.ContainerFromIndex(i) is IUIComponent c &&
-                c.VisualParent is VirtualizingPanel parent) return parent;
-        }
-
-        return FindItemsHost(list);
-    }
-
-    // A real descent, and it has to be: GetVisualDescendants returns the IMMEDIATE children despite its name, and the
-    // items host sits several levels down (template root -> scroll viewer -> presenter -> panel). No items-host test on
-    // the way (that flag is not public): a panel that is not one answers TryGetDropSlot with false.
-    private static VirtualizingPanel FindItemsHost(IUIComponent root)
-    {
-        var stack = new Stack<IUIComponent>();
-        stack.Push(root);
-        while (stack.Count > 0)
-        {
-            var current = stack.Pop();
-            if (current is VirtualizingPanel panel) return panel;
-            foreach (var child in current.GetVisualDescendants()) stack.Push(child);
-        }
-        return null;
-    }
+    // The list asks its own items host - no walking the tree for it, and it answers before anything is realized, which
+    // is what an EMPTY list needs (a drop into one is exactly when this matters).
+    private static VirtualizingPanel HostPanel(ItemsControl list) => list.ItemsHostPanel as VirtualizingPanel;
 
     private static void ClearIndicator()
     {

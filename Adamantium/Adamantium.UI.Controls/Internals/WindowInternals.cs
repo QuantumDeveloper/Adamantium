@@ -13,6 +13,22 @@ internal static class WindowInternals
         }
     }
 
+    public static void RaiseWindowMoving(this IWindow window)
+    {
+        if (window is IWindowInternals windowBase)
+        {
+            windowBase.RaiseWindowMoving();
+        }
+    }
+
+    public static void RaiseWindowMoveCompleted(this IWindow window)
+    {
+        if (window is IWindowInternals windowBase)
+        {
+            windowBase.RaiseWindowMoveCompleted();
+        }
+    }
+
     public static void SetSurfaceHandle(this IWindow window, IntPtr surfaceHandle)
     {
         if (window is IWindowInternals windowBase)

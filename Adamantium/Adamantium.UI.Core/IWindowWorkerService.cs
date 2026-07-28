@@ -6,6 +6,11 @@ public interface IWindowWorkerService
 
     public void SetTitle(string title);
 
+    /// <summary>Move the OS window so its top-left sits at these SCREEN coordinates. Backs <c>Window.Left</c>/<c>Top</c>,
+    /// which used to be managed values nobody acted on - assigning them changed a number and left the window where it
+    /// was. Size and z-order are untouched, and the window is not activated: moving a window is not focusing it.</summary>
+    public void SetPosition(double left, double top);
+
     public void ShowWindow(WindowState windowState);
 
     public void HideWindow();
