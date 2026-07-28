@@ -6,6 +6,7 @@ using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
 using Adamantium.ProceduralGeometry;
+using Adamantium.ProceduralGeometry.Shapes;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Media;
@@ -587,9 +588,12 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
     private static bool IsSdfBatchable(EllipsePayload p)
     {
         if (!EllipseBatchCollector.Enabled) return false;
-        if (p.Brush is not SolidColorBrush s || s.Color.A == 0) return false;
+        if (p.Brush is not (null or SolidColorBrush)) return false;
         if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
-        return p.StartAngle <= 0.0 && p.SweepAngle >= 360.0;
+        var hasFill = p.Brush is SolidColorBrush { Color.A: > 0 };
+        var hasStroke = p.Pen is { Brush: SolidColorBrush { Color.A: > 0 } };
+        if (!hasFill && !hasStroke) return false;
+        return p.StartAngle <= 0.0 && p.SweepAngle >= 360.0;   // arcs: see the TODO in EllipseBatchCollector.CanBatch
     }
 
     // A full ellipse the GRADIENT ellipse SDF batch will draw (linear/radial gradient fill). Like IsSdfBatchable it means

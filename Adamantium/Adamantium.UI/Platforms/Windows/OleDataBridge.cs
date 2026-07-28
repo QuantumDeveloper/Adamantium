@@ -69,10 +69,9 @@ internal static class OleDataBridge
     };
 
     /// <summary>
-    /// A picture from whatever the source happened to offer, handed on as the neutral PNG. Sources differ wildly - a
-    /// browser gives PNG, an older editor JPEG or TIFF, Paint only a raw CF_DIB - so everything but PNG is decoded and
-    /// re-encoded rather than refused. PNG itself is passed through untouched: it is already the neutral form, and a
-    /// needless decode/encode round trip would only cost time and (for a palette image) fidelity.
+    /// A picture in whatever encoding the source happened to offer, handed on as it came. Sources differ wildly - a
+    /// browser gives PNG, an older editor JPEG or TIFF, Paint only a raw CF_DIB - and the payload is "an encoded
+    /// picture", so each of them travels untouched and the receiving side decodes by content.
     /// </summary>
     private static byte[] ReadImage(ComTypes.IDataObject data)
     {

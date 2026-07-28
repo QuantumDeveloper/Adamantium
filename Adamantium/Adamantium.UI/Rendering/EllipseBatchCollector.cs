@@ -3,6 +3,7 @@ using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.EffectsFramework;
 using Adamantium.Mathematics;
+using Adamantium.ProceduralGeometry.Shapes;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Effects.Generated;
@@ -30,8 +31,19 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
     public bool CanBatch(EllipsePayload p)
     {
         if (!Enabled) return false;
-        if (p.Brush is not SolidColorBrush s || s.Color.A == 0) return false;
+        if (p.Brush is not (null or SolidColorBrush)) return false;
         if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
+        // Something to draw = a fill OR a stroke, the same rule the rect batch uses. Demanding a NON-TRANSPARENT fill was
+        // left over from when this batch could only fill; it strokes analytically now, so the demand only threw every
+        // RING (transparent fill + stroke - a spinner, a progress ring, an outlined dot) out to per-unit tessellation.
+        var hasFill = p.Brush is SolidColorBrush { Color.A: > 0 };
+        var hasStroke = p.Pen is { Brush: SolidColorBrush { Color.A: > 0 } };
+        if (!hasFill && !hasStroke) return false;
+        // An ARC is just an angular slice the pixel shader cuts out of the same field, so it batches like anything else.
+        // A SECTOR does not: it closes the wedge with two straight radial edges, which is a different outline and not
+        // something the ellipse field describes - that one keeps the tessellated path.
+        // TODO(arc): the shader can cut the wedge (EllipseData.Arc), but batching arcs currently loses the device -
+        // unfinished, so arcs still take the tessellated path. Re-enable together with the EdgeToEdge check.
         return p.StartAngle <= 0.0 && p.SweepAngle >= 360.0;
     }
 

@@ -325,12 +325,46 @@ public partial class RenderCache
         return m;
     }
 
+    // True when a matrix only scales and translates, so an axis-aligned rect stays one under it and the bake can fold it
+    // into the instance's bounds. Rotation or shear puts numbers in M12/M21, and no axis-aligned rect can carry those.
+    private static bool IsAxisAligned(in Matrix4x4F m)
+    {
+        const float eps = 1e-4f;   // same threshold the batch collectors use when they check a bake
+        return Math.Abs(m.M12) <= eps && Math.Abs(m.M21) <= eps;
+    }
+
     // A unit's bake transform + transform-table slot: node-local + the node's slot when under a motion node (matrix
-    // refreshed once per walk), else world + slot 0 (identity).
+    // refreshed once per walk), else world + slot 0 (identity), or its own slot when the world is not axis-aligned.
     private Matrix4x4F ResolveBake(IGraphicsDevice device, IUIComponent component, Matrix4x4F world, out int slot)
     {
         var node = NodeOf(component);
-        if (node == null) { slot = 0; return world; }
+        if (node == null)
+        {
+            // An AXIS-ALIGNED world folds into the instance's own bounds (slot 0 = the identity matrix) - the cheapest
+            // bake and what nearly everything is. A ROTATED or sheared one cannot: an instance's bounds are an
+            // axis-aligned rect, so the matrix has to reach the shader intact - this unit gets its OWN table slot and
+            // keeps its bounds local. The shader multiplies by the slot matrix either way and does not care which it is.
+            // Before this, a slot was handed out by ROLE (only a motion node had one), so a rotated element outside one
+            // had nowhere to put its rotation: the batch refused it and it fell back to a per-unit draw - which is why
+            // FlipTile had to declare itself a motion node by hand just to be able to turn.
+            if (IsAxisAligned(world)) { slot = 0; return world; }
+            slot = _transformTable.AcquireSlot(component.RenderId);
+            _transformTable.SetMatrix(device, slot, world);
+            return Matrix4x4F.Identity;
+        }
+        var rel = RelWorld(component);
+        // Rotated/sheared UNDER a motion node (a spinner inside a scrolling list): the node's slot carries the NODE's
+        // matrix, and node-local bounds would have to carry the rotation - which an axis-aligned rect cannot. Give this
+        // unit its own slot holding its FULL world instead, and tell the node it can no longer move everything by
+        // writing its own slot (this unit must be re-baked when the node moves, exactly as the per-unit path it replaces).
+        if (!IsAxisAligned(rel))
+        {
+            slot = _transformTable.AcquireSlot(component.RenderId);
+            _transformTable.SetMatrix(device, slot, World(component));
+            MarkNodeNotAware(component);
+            return Matrix4x4F.Identity;
+        }
+
         slot = _transformTable.AcquireSlot(node.RenderId);
         if (!_nodeRefreshed.TryGetValue(node, out var v) || v != _walkVersion)
         {
@@ -338,7 +372,7 @@ public partial class RenderCache
             _transformTable.SetMatrix(device, slot, World(node));
         }
         _nodeAllAware.TryAdd(node.RenderId, true);
-        return RelWorld(component);
+        return rel;
     }
 
     // A unit under a motion node drew a path its slot matrix can't move (world-baked text, per-unit, gradient for now) ->
