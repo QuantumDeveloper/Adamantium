@@ -50,6 +50,34 @@ public class AnimatedImageDecodeTests
         Assert.That(bitmap.CurrentFrameIndex, Is.EqualTo(2), "playback must move off frame 0");
     }
 
+    /// <summary>
+    /// Decoding frames ahead is SYNCHRONOUS however async its name looks: it returns an already-completed Task, so an
+    /// await on it continues inline on the calling thread. That is why playback must not do it - called from the thread
+    /// that owns layout (any non-URI source sets Source there), a long animation froze the UI, scrolling included.
+    /// </summary>
+    [Test]
+    public void DecodingFramesAhead_CompletesOnTheCallingThread()
+    {
+        var raw = BitmapLoader.Load(TexturesDir + "infinity.gif");
+        var bitmap = new BitmapImage(raw);
+
+        var task = bitmap.DecodeFramesTillAsync(bitmap.FrameCount);
+
+        Assert.That(task.IsCompleted, Is.True, "it does the work inline - awaiting it moves nothing off this thread");
+    }
+
+    /// <summary>A frame nobody decoded ahead of time is decoded when it is ASKED for - what playback relies on.</summary>
+    [Test]
+    public void FramesDecodeOnDemand_WithoutDecodingAhead()
+    {
+        var raw = BitmapLoader.Load(TexturesDir + "infinity.gif");
+        var bitmap = new BitmapImage(raw);
+
+        var last = bitmap.GetFrame(bitmap.FrameCount - 1);
+
+        Assert.That(last, Is.Not.Null, "the last frame, with nothing decoded before it");
+    }
+
     /// <summary>Walking past the last frame comes back to the first rather than running off the end.</summary>
     [Test]
     public void BitmapImageFromDecodedBitmap_WrapsAtTheEnd()
