@@ -48,10 +48,17 @@
                     <TextBlock Text="Fruits" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="6"/>
                     <!-- Off, and the grip goes inactive: the whole row drags again. The switch flips the SAME markup -
                          nothing is added or removed from the tree. -->
-                    <CheckBox Grid.Row="1" Content="Drag by handle only" IsChecked="{Binding HandleOnlyDrag, Mode=TwoWay}" MarginBottom="8"/>
+                    <StackPanel Grid.Row="1" 
+                                Orientation="Vertical" 
+                                MarginBottom="8">
+                        <CheckBox Content="Drag by handle only" IsChecked="{Binding HandleOnlyDrag, Mode=TwoWay}"/>
+                        <!-- Off = the plain insertion caret; on (the default) = a real hole with a placeholder card. -->
+                        <CheckBox x:Name="LeftGapToggle" Content="Spread" IsChecked="True"/>
+                    </StackPanel>
                     <ListBox Grid.Row="2"
-                             ItemsSource="{Binding Left}" 
+                             ItemsSource="{Binding Left}"
                              SelectedItems="{Binding LeftSelection}"
+                             DragDrop.UseDropGap="{Binding IsChecked, ElementName=LeftGapToggle}"
                              SelectionMode="Extended" 
                              Background="Transparent">
                         <ListBox.ItemTemplate>
@@ -141,12 +148,18 @@
                 </Border.Styles>
                 <Grid RowDefinitions="Auto,Auto,*">
                     <TextBlock Text="Colors (WrapPanel)" Foreground="{ThemeResource AccentFillColorDefault}" MarginBottom="6"/>
-                    <StackPanel Grid.Row="1" Orientation="Horizontal" MarginBottom="10">
+                    <StackPanel Grid.Row="1" 
+                                Orientation="Horizontal" 
+                                MarginBottom="10">
                         <TextBlock Text="Flow:" VerticalAlignment="Center" MarginRight="8"/>
                         <DropDown ItemsSource="{Binding Orientations}"
                                   SelectedItem="{Binding WrapOrientation, Mode=TwoWay}" Width="130"/>
+                        <!-- Off = the plain insertion caret; on (the default) = a real hole with a placeholder card. -->
+                        <CheckBox x:Name="WrapGapToggle" Content="Spread" IsChecked="True"
+                                  VerticalAlignment="Center" MarginLeft="12"/>
                     </StackPanel>
                     <ListBox Grid.Row="2" ItemsSource="{Binding Wrap}" SelectedItems="{Binding WrapSelection}"
+                             DragDrop.UseDropGap="{Binding IsChecked, ElementName=WrapGapToggle}"
                              SelectionMode="Extended" Background="Transparent"
                              ScrollViewer.HorizontalScrollBarVisibility="{Binding WrapHScroll}"
                              ScrollViewer.VerticalScrollBarVisibility="{Binding WrapVScroll}">

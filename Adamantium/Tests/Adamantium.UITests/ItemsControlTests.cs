@@ -141,6 +141,44 @@ public class ItemsControlTests
         });
     }
 
+    /// <summary>
+    /// The drop slot comes from the GRID, so an already-open gap cannot change it. Reading it off the containers instead
+    /// is what made the gap flicker: the gap moves the tiles, the moved tiles change which one is nearest the cursor,
+    /// that changes the gap - and on a slot boundary it swaps back and forth every frame.
+    /// </summary>
+    [Test]
+    public void DropSlot_ComesFromTheGrid_AndDoesNotMoveWhenTheGapDoes()
+    {
+        var items = Enumerable.Range(0, 12).Cast<object>().ToList();
+        var ic = new ItemsControl
+        {
+            ItemsSource = items,
+            ItemsPanel = new ItemsPanelTemplate(() => new TemplateResult
+            {
+                RootComponent = new WrapPanel { Orientation = Orientation.Horizontal, ItemWidth = 50, ItemHeight = 50 }
+            })
+        };
+        ic.Template = ItemsPresenterTemplate();
+        ic.Measure(new Size(200, 300));            // 4 columns of 50
+        ic.Arrange(new Rect(0, 0, 200, 300));
+
+        var panel = (VirtualizingPanel)ic.ItemsHostPanel;
+        var overSlot6 = new Vector2(110, 60);      // column 2, line 1
+
+        Assert.That(panel.TryGetDropSlot(overSlot6, out var before), Is.True);
+        Assert.That(before, Is.EqualTo(6), "column 2 of line 1");
+
+        foreach (var gap in new[] { 0, 5, 6, 7, 11 })
+        {
+            panel.DropGapIndex = gap;
+            panel.Measure(new Size(200, 300), true);
+            panel.Arrange(new Rect(0, 0, 200, 300), true);
+
+            Assert.That(panel.TryGetDropSlot(overSlot6, out var withGap), Is.True);
+            Assert.That(withGap, Is.EqualTo(before), $"the same point must answer the same slot with a gap at {gap}");
+        }
+    }
+
     [Test]
     public void VirtualizingWrapPanelRealizesOnlyVisibleGrid()
     {

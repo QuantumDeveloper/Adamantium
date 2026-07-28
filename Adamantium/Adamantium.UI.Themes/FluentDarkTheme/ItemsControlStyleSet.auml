@@ -32,6 +32,23 @@
          and one brush-change fan-out per frame instead of thousands (a screenful can be 4000+ cards; per-card pulses cost
          ~140 ms/frame of animation tick alone). {ObservableResource} (not {ResourceReference}) so a live theme swap
          re-points the pooled cards at the new palette's brush - the one the pulse then runs on. -->
+    <!-- The hole a drag opens at its insertion point. Reads as an OUTLINE, not as a filled card: a dashed accent frame
+         around empty space says "what you are holding goes here", where the skeleton's filled pulsing plate says
+         "content is loading". Keeping them visually distinct matters most when both are on screen at once - dropping
+         into a list that is still filling. -->
+    <Style Selector="ItemsControl">
+        <Setter Property="DropPlaceholderTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <!-- A Shape, not a Border: the dashes live on Shape.StrokeDashArray. -->
+                    <controls:Rectangle IsHitTestVisible="False" Fill="Transparent" StrokeThickness="2"
+                                        StrokeDashArray="4,3"
+                                        Stroke="{ThemeResource AccentFillColorDefault}"/>
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style Selector="ItemsControl">
         <Setter Property="ItemSkeletonTemplate">
             <Setter.Value>

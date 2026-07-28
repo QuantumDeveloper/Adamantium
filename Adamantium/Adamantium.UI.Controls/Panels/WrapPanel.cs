@@ -10,11 +10,31 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
 
    // A uniform grid derives every slot from an index, so opening a hole costs one addition per tile - and, unlike a
    // transform nudge, it makes the line genuinely REFLOW: a tile pushed past the end of its line wraps to the next.
-   // OFF until the insertion index stops being read off the SHIFTED containers: the gap moves the tiles, the moved tiles
-   // change which one is nearest the cursor, that changes the gap - and it oscillates. The index has to be derived from
-   // the grid arithmetic (cursor -> line/column -> slot) so it does not depend on the very layout it produces. The gap
-   // also needs its skeleton card and the motion between layouts before it beats the caret it replaces.
-   public override bool SupportsDropGap => false;
+   // The index that drives it comes from TryGetDropSlot - the GRID, never the shifted containers, or the gap would move
+   // the tiles, the moved tiles would change the index, and it would oscillate between two slots every frame.
+   public override bool SupportsDropGap => IsVirtualizing;
+
+   // The grid answers where a drop lands, from the SAME arithmetic the hit-test uses. The cell size, the column count and
+   // the origin are all unaffected by an open gap - only which item sits in which slot is - so the answer does not move
+   // when the gap does, and the feedback loop that made the gap flicker between two slots cannot form.
+   public override bool TryGetDropSlot(Vector2 point, out int index)
+   {
+      index = -1;
+      // A cell of 1 is the UNSEEDED value, not a real one: an empty list returns from measure before SeedCell runs, so
+      // there is no item to probe a cell from and the gap would be a single pixel. Say no, and the drag keeps its caret -
+      // which is the honest cue when we cannot say how big the thing being dropped will be.
+      if (!IsItemsHost || !IsVirtualizing || _cellFlow <= 1 || _cellScroll <= 1 || _columns <= 0) return false;
+
+      var horizontal = Orientation == Orientation.Horizontal;
+      var flow = Math.Max(0, horizontal ? point.X : point.Y);
+      var scroll = Math.Max(0, horizontal ? point.Y : point.X);
+      var col = Math.Min(_columns - 1, (int)(flow / _cellFlow));
+      var slot = (int)(scroll / _cellScroll) * _columns + col;
+
+      // Past the last item the drop appends - the grid keeps answering with empty slots beyond it.
+      index = Math.Clamp(slot, 0, Owner.Items?.Count ?? 0);
+      return true;
+   }
 
    // O(1) hit-test: the tile that a point can hit is the ONE at its grid slot (tiles are absolute + non-overlapping), so
    // resolve the slot by arithmetic and return just that container/skeleton - instead of the base walk visiting every
@@ -505,7 +525,12 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
       // Budget-deferred slots (generator.PendingIndices): show a pooled per-slot loading skeleton card at each (a fast
       // fling / cold fill shows pulsing placeholders instead of holes). Reconciled here (after the real tiles) since this
       // is where the slot geometry lives; the panel owns the cards' lifecycle.
-      ReconcileSkeletons(i =>
+      // After the tiles are in their final places: whatever layout MOVED slides there from where it was.
+      AnimateLayoutMoves(SlotRect);
+      ReconcileDropPlaceholder(SlotRect);
+      ReconcileSkeletons(SlotRect);
+
+      Rect SlotRect(int i)
       {
          var line = i / _columns;
          var col = i % _columns;
@@ -514,7 +539,7 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
          return horizontal
             ? new Rect(flowPos, scrollPos, _cellFlow, _cellScroll)
             : new Rect(scrollPos, flowPos, _cellScroll, _cellFlow);
-      });
+      }
    }
 
    // Seed the assumed uniform cell. Explicit ItemWidth/ItemHeight are taken as-is; an unspecified axis is probed from a

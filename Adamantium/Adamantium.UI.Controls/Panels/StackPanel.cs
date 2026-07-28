@@ -234,13 +234,15 @@ public class StackPanel : VirtualizingPanel
       _arrangeIndexBuf.Clear();
       _arrangeIndexBuf.AddRange(Owner.ItemContainerGenerator.RealizedIndices);
 
+      // SLOT, not index: while a drop gap is open everything from it on moves along by one, opening one item-sized hole.
+      Rect SlotRect(int slot) => vertical
+         ? new Rect(0, slot * _itemExtent, cross, _itemExtent)
+         : new Rect(slot * _itemExtent, 0, _itemExtent, cross);
+
       void ArrangeAt(int index)
       {
          if (Owner.ItemContainerGenerator.ContainerFromIndex(index) is not IMeasurableComponent container) return;
-         var main = index * _itemExtent;
-         container.Arrange(vertical
-            ? new Rect(0, main, cross, _itemExtent)
-            : new Rect(main, 0, _itemExtent, cross));
+         container.Arrange(SlotRect(SlotOf(index)));
       }
 
       // Each tile's slot is CONSTANT from its index (absolute stack, no cumulative dependency), so the tiles' Arrange are
@@ -253,5 +255,23 @@ public class StackPanel : VirtualizingPanel
             range => { for (var i = range.Item1; i < range.Item2; i++) ArrangeAt(_arrangeIndexBuf[i]); });
       else
          foreach (var index in _arrangeIndexBuf) ArrangeAt(index);
+
+      AnimateLayoutMoves(SlotRect);
+      ReconcileDropPlaceholder(SlotRect);
+   }
+
+   // A uniform stack derives every slot from an index, exactly as the grid does, so the hole is one multiplication.
+   public override bool SupportsDropGap => IsVirtualizing;
+
+   /// <summary>Which slot a drop lands in, from the STACK's own arithmetic rather than from where the containers
+   /// currently sit - the gap moves those, and an index read off them would chase itself. See VirtualizingPanel.</summary>
+   public override bool TryGetDropSlot(Vector2 point, out int index)
+   {
+      index = -1;
+      if (!IsItemsHost || !IsVirtualizing || _itemExtent <= 1) return false;
+
+      var main = Math.Max(0, Orientation == Orientation.Vertical ? point.Y : point.X);
+      index = Math.Clamp((int)(main / _itemExtent), 0, Owner.Items?.Count ?? 0);
+      return true;
    }
 }

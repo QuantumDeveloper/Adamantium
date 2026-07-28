@@ -49,6 +49,12 @@ public static partial class DragDrop
     public static readonly AdamantiumProperty DropCommandProperty = AdamantiumProperty.RegisterAttached(
         "DropCommand", typeof(ICommand), typeof(AdamantiumComponent), new PropertyMetadata(null));
 
+    /// <summary>Whether a list opens a real hole at the insertion point (default) or marks it with the caret. On by
+    /// default because it is the better cue where a panel can do it; false forces the caret everywhere - for a list
+    /// whose items are expensive to re-arrange, or simply where the quieter cue is wanted.</summary>
+    public static readonly AdamantiumProperty UseDropGapProperty = AdamantiumProperty.RegisterAttached(
+        "UseDropGap", typeof(bool), typeof(AdamantiumComponent), new PropertyMetadata(true));
+
     // Live drag feedback (set by the engine as the cursor moves over a drag): IsDragOver is true on the AllowDrop target
     // currently under the cursor - drive a highlight off it with a trigger. DragOverCommand fires on that target every move
     // so a view-model can decide "can THIS payload land here right now" (and later adjust the cursor).
@@ -99,6 +105,9 @@ public static partial class DragDrop
 
     public static bool GetAllowDrop(AdamantiumComponent e) => e.GetValue<bool>(AllowDropProperty);
     public static void SetAllowDrop(AdamantiumComponent e, bool value) => e.SetValue(AllowDropProperty, value);
+
+    public static bool GetUseDropGap(AdamantiumComponent e) => e.GetValue<bool>(UseDropGapProperty);
+    public static void SetUseDropGap(AdamantiumComponent e, bool value) => e.SetValue(UseDropGapProperty, value);
 
     public static ICommand GetDropCommand(AdamantiumComponent e) => e.GetValue(DropCommandProperty) as ICommand;
     public static void SetDropCommand(AdamantiumComponent e, ICommand value) => e.SetValue(DropCommandProperty, value);
@@ -427,11 +436,28 @@ public static partial class DragDrop
         // A panel that can open a real hole at the insertion point says so itself, and then the hole IS the cue: a caret
         // as well would mark the same place twice, and the two disagree the moment a line reflows. Everything else keeps
         // the caret.
-        var hostPanel = HostPanel(list);
-        if (hostPanel is { SupportsDropGap: true })
+        // An EMPTY list has no seam to mark: a caret says "between these two", and there are no two. It also had nothing
+        // to size itself from, so it stretched across the whole list. The target's own drag-over highlight is the cue
+        // here; the drop still lands at index 0.
+        if ((items?.Count ?? 0) == 0)
+        {
+            SetDropGap(null, -1);
+            ClearIndicatorVisual();
+            _insertIndex = 0;
+            _insertBefore = null;
+            return;
+        }
+
+        var hostPanel = GetUseDropGap(list) ? HostPanel(list) : null;
+        // The gap's index comes from the PANEL's own grid, not from ComputeInsertion: that one measures against the
+        // containers, and the gap moves them, so feeding it back would make the gap chase itself between two slots.
+        if (hostPanel is { SupportsDropGap: true } &&
+            hostPanel.TryGetDropSlot(Mouse.GetPosition((IInputComponent)hostPanel), out var slot))
         {
             ClearIndicatorVisual();
-            SetDropGap(hostPanel, index);
+            _insertIndex = slot;
+            _insertBefore = items != null && slot < items.Count ? items[slot] : null;
+            SetDropGap(hostPanel, slot);
             return;
         }
 
@@ -647,12 +673,32 @@ public static partial class DragDrop
         if (panel != null) panel.DropGapIndex = index;
     }
 
-    // The panel hosting the containers, reached through one of them (the items host itself is not public API).
+    // The panel hosting the containers (the items host itself is not public API). A realized container names it in one
+    // step, but an EMPTY list has none - and that is exactly when a drop matters most - so fall back to walking down for
+    // it. Without the walk the first drop into an empty list silently got the caret while every later one got the card.
     private static VirtualizingPanel HostPanel(ItemsControl list)
     {
         foreach (var i in list.ItemContainerGenerator.RealizedIndices)
         {
-            if (list.ItemContainerGenerator.ContainerFromIndex(i) is IUIComponent c) return c.VisualParent as VirtualizingPanel;
+            if (list.ItemContainerGenerator.ContainerFromIndex(i) is IUIComponent c &&
+                c.VisualParent is VirtualizingPanel parent) return parent;
+        }
+
+        return FindItemsHost(list);
+    }
+
+    // A real descent, and it has to be: GetVisualDescendants returns the IMMEDIATE children despite its name, and the
+    // items host sits several levels down (template root -> scroll viewer -> presenter -> panel). No items-host test on
+    // the way (that flag is not public): a panel that is not one answers TryGetDropSlot with false.
+    private static VirtualizingPanel FindItemsHost(IUIComponent root)
+    {
+        var stack = new Stack<IUIComponent>();
+        stack.Push(root);
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+            if (current is VirtualizingPanel panel) return panel;
+            foreach (var child in current.GetVisualDescendants()) stack.Push(child);
         }
         return null;
     }
