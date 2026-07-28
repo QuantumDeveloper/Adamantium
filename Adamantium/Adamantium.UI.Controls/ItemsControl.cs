@@ -78,6 +78,19 @@ public class ItemsControl : Control, IContainer
         set => SetValue(ItemTemplateProperty, value);
     }
 
+    /// <summary>The card shown in the hole a drag opens at its insertion point - "what you are holding lands here".
+    /// A DIFFERENT template from <see cref="ItemSkeletonTemplateProperty"/> on purpose: a loading skeleton says content
+    /// is on its way, and dressing the two the same would merge two different messages. It also stays out of
+    /// <see cref="IsLoadingItemsProperty"/>, so a drag never pulses the list as if it were fetching something.</summary>
+    public static readonly AdamantiumProperty DropPlaceholderTemplateProperty = AdamantiumProperty.Register(
+        nameof(DropPlaceholderTemplate), typeof(DataTemplate), typeof(ItemsControl), new PropertyMetadata(null));
+
+    public DataTemplate DropPlaceholderTemplate
+    {
+        get => GetValue<DataTemplate>(DropPlaceholderTemplateProperty);
+        set => SetValue(DropPlaceholderTemplateProperty, value);
+    }
+
     /// <summary>Placeholder template for a not-yet-bound virtualized slot (see <see cref="ItemSkeletonTemplateProperty"/>).</summary>
     public DataTemplate ItemSkeletonTemplate
     {

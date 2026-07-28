@@ -6,6 +6,8 @@ using Adamantium.Mathematics;
 using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Media;
+using Adamantium.UI.Core.Media.Animation;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.Core.Templates;
 
@@ -85,6 +87,17 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         // The gap changes where every following item sits, so the slots have to be recomputed - but only when it MOVES,
         // which is a rare event during a drag (a few times a gesture), not something that runs per mouse move.
         if (a is VirtualizingPanel panel) panel.InvalidateMeasure();
+    }
+
+    /// <summary>The slot a drop at <paramref name="point"/> (in this panel's own coordinates) would land in, or false when
+    /// the panel cannot say. It MUST NOT be derived from where the containers currently sit: the gap moves them, so an
+    /// index read off them changes the gap, which moves them again - on a slot boundary that oscillates every frame. A
+    /// panel with a regular grid answers from the grid itself, which the gap does not touch, so the answer is stable no
+    /// matter what the gap is currently doing.</summary>
+    public virtual bool TryGetDropSlot(Vector2 point, out int index)
+    {
+        index = -1;
+        return false;
     }
 
     /// <summary>Whether this panel actually opens <see cref="DropGapIndex"/> in its layout. False (the default) means the
@@ -437,6 +450,90 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
 
     // A card from the pool (already attached + pulsing) or a fresh one built from the theme's ItemSkeletonTemplate. The
     // panel owns no skeleton visual or animation - the card's whole look + breathe live in the template.
+    // Where each ITEM last sat. Keyed by the DATA ITEM, never by the container: containers are recycled onto other items
+    // as the window scrolls, so "where this container was last time" is a different item's position and would fling
+    // tiles in from wherever the recycled container came from.
+    private readonly Dictionary<object, Vector2> _lastItemPos = new();
+    private int _animatedGap = -1;   // the gap the last animated pass ran for
+    private static readonly TimeSpan LayoutMoveDuration = TimeSpan.FromSeconds(0.18);
+
+    /// <summary>Animates the tiles that layout just MOVED, from where they were to where they now are. Layout stays the
+    /// authority - it has already put everything in its final place, including a line that reflowed around the drop gap -
+    /// and this only interpolates the difference on the render transform, which is why a wrapping panel can open a hole
+    /// without tiles sliding over each other. Nothing animates the first time an item is seen (it has no previous place),
+    /// and scrolling moves nothing, since the grid is absolute and an item's slot does not change when the view does.</summary>
+    protected void AnimateLayoutMoves(Func<int, Rect> slotRect)
+    {
+        var items = Owner?.Items;
+        if (items == null) return;
+
+        // Only a MOVED DROP GAP animates. Layout moves tiles for other reasons too - a resize reflows the whole grid, a
+        // narrower window changes the column count - and sliding hundreds of tiles into place then is both expensive and
+        // visually noisy. Those passes still record where everything ended up, so the next gap move measures from the
+        // truth rather than from a position two layouts old.
+        var animate = DropGapIndex != _animatedGap;
+        _animatedGap = DropGapIndex;
+
+        foreach (var index in Owner.ItemContainerGenerator.RealizedIndices)
+        {
+            if (index < 0 || index >= items.Count) continue;
+            var item = items[index];
+            if (item == null) continue;
+
+            var now = slotRect(SlotOf(index)).Location;
+            var moved = _lastItemPos.TryGetValue(item, out var before) && before != now;
+            _lastItemPos[item] = now;
+            if (!moved || !animate) continue;
+
+            if (Owner.ItemContainerGenerator.ContainerFromIndex(index) is not UIComponent container) continue;
+            if (container.RenderTransform is not { } transform)
+            {
+                transform = new Transform();
+                container.RenderTransform = transform;
+            }
+
+            // Start where it WAS and run to zero: the element is already arranged at its new place, so the transform only
+            // carries the leftover distance. FillBehavior.Stop leaves nothing behind once it lands.
+            transform.BeginAnimation(Transform.TranslateXProperty,
+                new DoubleAnimation { From = before.X - now.X, To = 0, Duration = LayoutMoveDuration, FillBehavior = FillBehavior.Stop });
+            transform.BeginAnimation(Transform.TranslateYProperty,
+                new DoubleAnimation { From = before.Y - now.Y, To = 0, Duration = LayoutMoveDuration, FillBehavior = FillBehavior.Stop });
+        }
+    }
+
+    private UIComponent _gapCard;   // the drop placeholder; separate from the skeleton pool ON PURPOSE - see below
+
+    /// <summary>Puts the drop PLACEHOLDER in the open gap - the card that says "what you are holding lands here".
+    /// Deliberately NOT a loading skeleton, and kept out of the skeleton pool and out of <c>IsLoadingItems</c>: a
+    /// skeleton means "content is on its way", it pulses the whole list while it is up, and it waits several frames
+    /// before appearing so a quick fill does not flash. All three are wrong for a placeholder that has to appear under
+    /// the cursor at once and must not tell the user about work that is not happening. Called from ArrangeVirtualized;
+    /// <paramref name="slotRect"/> is the same geometry the tiles use.</summary>
+    protected void ReconcileDropPlaceholder(Func<int, Rect> slotRect)
+    {
+        var gap = DropGapIndex;
+        var template = Owner?.DropPlaceholderTemplate;
+        if (gap < 0 || template == null)
+        {
+            if (_gapCard != null) _gapCard.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        if (_gapCard == null)
+        {
+            _gapCard = template.Build(this).RootComponent as UIComponent;
+            if (_gapCard == null) return;
+            _skeletonSet.Add(_gapCard);   // same "not a container" exemption the skeleton cards get
+            AddVisualChild(_gapCard);
+        }
+
+        _gapCard.Visibility = Visibility.Visible;
+        var rect = slotRect(gap).Deflate(ItemMargin());
+        var measurable = (IMeasurableComponent)_gapCard;
+        measurable.Measure(new Size(rect.Width, rect.Height));
+        measurable.Arrange(rect);
+    }
+
     private UIComponent RentSkeleton(DataTemplate template)
     {
         if (_skeletonPool.Count > 0)
