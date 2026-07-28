@@ -97,11 +97,19 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         RoutingStrategy.Direct, typeof(StateChangedHandler), typeof(WindowBase));
 
 
+    // Left/Top MOVE the window - they are not just remembered. Without the callback, assigning them changed a managed
+    // number and the window stayed where it was, which is not what a window API means anywhere.
     public static readonly AdamantiumProperty LeftProperty = AdamantiumProperty.Register(nameof(Left),
-        typeof(Double), typeof(WindowBase), new PropertyMetadata(0d));
-        
+        typeof(Double), typeof(WindowBase), new PropertyMetadata(0d, PositionChangedCallback));
+
     public static readonly AdamantiumProperty TopProperty = AdamantiumProperty.Register(nameof(Top),
-        typeof(Double), typeof(WindowBase), new PropertyMetadata(0d));
+        typeof(Double), typeof(WindowBase), new PropertyMetadata(0d, PositionChangedCallback));
+
+    private static void PositionChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        // Before the OS window exists the value is simply remembered - it is read when the window is created.
+        if (a is WindowBase window) window.WindowWorkerService?.SetPosition(window.Left, window.Top);
+    }
         
     public static readonly AdamantiumProperty TitleProperty = AdamantiumProperty.Register(nameof(Title),
         typeof(String), typeof(WindowBase), new PropertyMetadata(String.Empty, TitleChangedCallback));
@@ -194,6 +202,19 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     // Caption background for the ACTIVE (focused) and INACTIVE window - the default template paints the TitleBar with
     // InactiveTitleBarBackground and swaps to TitleBarBackground while IsActive. Theme sets the defaults (accent / neutral);
     // a user can override either on the window (e.g. a brand colour when focused, a custom dim when not).
+    /// <summary>Height of the custom-chrome caption. The WINDOW owns this number and the theme's title bar measures
+    /// itself by it - not the other way round: code that needs the caption (positioning a window under the cursor that
+    /// grabbed it, hit-testing the drag area) must not have to reach into a template part, and a restyle must not be
+    /// able to drift away from what the window believes its caption to be.</summary>
+    public static readonly AdamantiumProperty TitleBarHeightProperty = AdamantiumProperty.Register(nameof(TitleBarHeight),
+        typeof(double), typeof(WindowBase), new PropertyMetadata(36.0, PropertyMetadataOptions.AffectsMeasure));
+
+    public double TitleBarHeight
+    {
+        get => GetValue<double>(TitleBarHeightProperty);
+        set => SetValue(TitleBarHeightProperty, value);
+    }
+
     public static readonly AdamantiumProperty TitleBarBackgroundProperty = AdamantiumProperty.Register(nameof(TitleBarBackground),
         typeof(Brush), typeof(WindowBase), new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
 
@@ -548,6 +569,18 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     {
         IsActive = isActive;
     }
+
+    /// <summary>The OS is moving this window, once per step of its move loop. The only signal available during a caption
+    /// drag: the platform's loop owns the mouse, so no managed move or button-up arrives until it ends. A docking host
+    /// listens here to decide where the window would land.</summary>
+    public event EventHandler WindowMoving;
+
+    /// <summary>The move loop ended - the button is up and the window has settled. Where a drop is committed.</summary>
+    public event EventHandler WindowMoveCompleted;
+
+    public void RaiseWindowMoving() => WindowMoving?.Invoke(this, EventArgs.Empty);
+
+    public void RaiseWindowMoveCompleted() => WindowMoveCompleted?.Invoke(this, EventArgs.Empty);
 
     protected void OnClosed()
     {

@@ -29,16 +29,23 @@
                     <controls:Border x:Name="PART_WindowBorder" Background="{TemplateBinding Background}"
                             BorderThickness="1" BorderBrush="{ResourceReference ControlStrokeColorDefault}">
                         <controls:Grid RowDefinitions="Auto,*">
+                            <!-- The caption's height comes from the WINDOW (Window.TitleBarHeight), so code that needs
+                                 it reads one property instead of measuring a template part. -->
                             <controls:TitleBar x:Name="PART_TitleBar" Grid.Row="0"
+                                    Height="{TemplateBinding TitleBarHeight}"
                                     Background="{TemplateBinding InactiveTitleBarBackground}"
                                     Foreground="{TemplateBinding InactiveTitleBarForeground}"
                                     Title="{TemplateBinding Title}"
                                     Icon="{TemplateBinding Icon}"
                                     LeftWindowCommands="{TemplateBinding LeftWindowCommands}"
                                     RightWindowCommands="{TemplateBinding RightWindowCommands}"/>
+                            <!-- The SELECTOR travels too, not just the single template: a window given only a selector
+                                 (one template per content type - the usual shape for a view-model host) had nothing to
+                                 build with and fell back to showing Content.ToString(). -->
                             <controls:ContentPresenter x:Name="PART_ContentPresenter" Grid.Row="1"
                                     Content="{TemplateBinding Content}"
-                                    ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                                    ContentTemplate="{TemplateBinding ContentTemplate}"
+                                    ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
                             <controls:ResizeGripper x:Name="PART_ResizeGripper" Grid.Row="1"
                                     HorizontalAlignment="Right" VerticalAlignment="Bottom"
                                     Width="26" Height="26" Visibility="Collapsed"/>

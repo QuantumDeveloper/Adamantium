@@ -50,10 +50,9 @@ public sealed class WindowNavigationBackend : IWindowNavigationBackend
             // detached: it misses the theme pass and its layout invalidations are orphaned (unthemed, never laid out).
             // No AddWindow here: SetWindow (inside init) publishes WindowCreatedEvent, and the app creates the render
             // service + tracks the window off that. Calling AddWindow too would create the render service twice.
-            shell?.AttachContextAndInitialize(_application.UIContext);
+            window.Show();   // attaches + initializes if needed, and activates itself on first display (Window.Show)
             if (shell != null)
                 shell.Content = _viewLocator.ResolveView(contentViewModel);   // load the chosen content into the live shell
-            window.Show();   // the window activates itself on first display (Window.Show); no explicit Activate needed here
             _windows[contentViewModel] = window;
             // Untrack on close (including the OS title-bar X, which never routes through CloseWindow) - otherwise a stale
             // entry makes a single-instance re-open just "activate" a dead window instead of opening a fresh one.

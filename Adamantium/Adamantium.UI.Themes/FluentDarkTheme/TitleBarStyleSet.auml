@@ -11,6 +11,8 @@
     <Style Selector="TitleBar">
         <Setter Property="Background" Value="{ResourceReference SolidBackgroundFillColorBase}"/>
         <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
+        <!-- A standalone TitleBar's own height. Inside a Window the template binds it to Window.TitleBarHeight, which
+             wins over this - the window is the one that has to know how tall its caption is. -->
         <Setter Property="Height" Value="36"/>
         <Setter Property="FontSize" Value="13"/>
     </Style>

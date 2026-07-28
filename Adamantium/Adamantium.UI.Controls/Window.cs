@@ -1,3 +1,5 @@
+using Adamantium.UI.Core;
+
 namespace Adamantium.UI.Controls;
 
 public class Window : WindowBase
@@ -17,9 +19,19 @@ public class Window : WindowBase
 
     public override void Show()
     {
-        if (Handle == IntPtr.Zero) 
+        // A window built in code has no OS window yet, and showing one is exactly the moment it needs one - so attach it
+        // to the running application and initialize it HERE instead of making every caller remember to. Leaving that to
+        // callers meant `new Window { ... }.Show()` - the thing a window API is expected to mean - silently did nothing:
+        // no handle, so the guard below returned and no window ever appeared. A caller that wants the window live before
+        // it is shown still calls AttachContextAndInitialize itself; this only fills in the gap.
+        if (Handle == IntPtr.Zero && UIContext == null && UIAppContext.Current?.UIContext is { } context)
+        {
+            AttachContextAndInitialize(context);
+        }
+
+        if (Handle == IntPtr.Zero)
             return;
-        
+
         VerifyAccess();
         if (Renderer is not { FirstFrameProcessed: true })
         {

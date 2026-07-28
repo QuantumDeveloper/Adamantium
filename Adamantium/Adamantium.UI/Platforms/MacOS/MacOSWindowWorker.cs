@@ -87,7 +87,13 @@ public class MacOSWindowWorker : AdamantiumComponent, IWindowWorkerService
 
     public void SetTitle(string title)
     {
-        
+
+    }
+
+    // NSWindow.setFrameOrigin: goes here, remembering that Cocoa's origin is the BOTTOM-left of the main screen.
+    public void SetPosition(double left, double top)
+    {
+
     }
 
     public void ShowWindow(WindowState windowState)

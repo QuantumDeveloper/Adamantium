@@ -40,9 +40,9 @@ public sealed class WindowDialogHost : IDialogHost
             shell.ClientWidth = aware is { Width: > 0 } ? aware.Width : 440;
             shell.ClientHeight = aware is { Height: > 0 } ? aware.Height : 260;
 
-            // Initialize the window FIRST (builds its tree + render service + theme), THEN load the content, so the view
-            // joins a live, themed, context-attached window (same order as WindowNavigationBackend).
-            shell.AttachContextAndInitialize(_application.UIContext);
+            // Show FIRST (it attaches the window to the application and builds its tree + render service + theme), THEN
+            // load the content, so the view joins a live, themed window (same order as WindowNavigationBackend).
+            shell.Show();
             shell.Content = _viewLocator.ResolveView(dialogViewModel);
 
             var closed = false;

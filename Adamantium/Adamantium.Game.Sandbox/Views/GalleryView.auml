@@ -3,6 +3,7 @@
       xmlns:vm="clr-namespace:Adamantium.Game.Sandbox.ViewModels"
       xmlns:nav="clr-namespace:Adamantium.UI.Controls.Navigation;assembly=Adamantium.UI.Controls"
       xmlns:controls="clr-namespace:Adamantium.UI.Controls;assembly=Adamantium.UI.Controls"
+      xmlns:behaviors="clr-namespace:Adamantium.Game.Sandbox.Behaviors"
       x:ViewModel="{x:Type vm:GalleryViewModel}">
 
     <Grid RowDefinitions="Auto,*" Margin="16">
@@ -28,6 +29,10 @@
                     TabStripPlacement="{Binding TabPlacement}"
                     ContentTransition="{Binding SlideMode}"
                     ShowCloseButton="True">
+            <!-- Drag a tab AWAY from the strip (across it, not along it) and let go: it gets its own window. -->
+            <TabControl.Behaviors>
+                <behaviors:TabTearOffBehavior/>
+            </TabControl.Behaviors>
             <TabControl.ItemTemplate>
                 <DataTemplate>
                     <TextBlock Text="{Binding Header}" VerticalTextAlignment="Center"/>

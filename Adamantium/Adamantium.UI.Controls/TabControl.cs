@@ -284,6 +284,7 @@ public class TabControl : Selector
     internal void BeginDrag(TabItem tab, double along)
     {
         _dragVertical = TabStripPlacement is TabStripPlacement.Left or TabStripPlacement.Right;
+        IsTearingOff = false;   // per-gesture state: left set, it kills the indicator and every later tear-off
         _dragged = tab;
         _dragStartIndex = _targetIndex = ItemContainerGenerator.IndexFromContainer(tab);
         _grabOffset = along - SlotStart(tab);
@@ -299,6 +300,77 @@ public class TabControl : Selector
         if (ItemsHostPanel is not { } panel) return;
         var pos = e.GetPosition(panel);
         UpdateDrag(tab, _dragVertical ? pos.Y : pos.X);
+
+        // How far the pointer has left the strip ACROSS its axis. Dragging ALONG the strip - reordering - keeps this at
+        // zero however fast or far it goes, which is what makes a tear-off impossible to trigger by accident: the two
+        // gestures are told apart by direction, not by a guessed speed or a timeout. See UpdateTearOff.
+        var size = panel.RenderSize;
+        var across = _dragVertical ? pos.X : pos.Y;
+        var extent = _dragVertical ? size.Width : size.Height;
+        var outside = across < 0 ? -across : across > extent ? across - extent : 0;
+        UpdateTearOff(tab, outside, across < 0 ? -1 : 1);
+    }
+
+    /// <summary>How far past the tab strip the pointer must go, ACROSS the strip's axis, before the drag becomes a
+    /// tear-off. Zero (the default) means the strip's own edge: leave it and the tab leaves with you. Reordering runs
+    /// ALONG the strip and keeps this at zero however far it goes, so the two gestures still cannot be confused - raise
+    /// it only to demand a deliberate pull-away.</summary>
+    public static readonly AdamantiumProperty TearOffDistanceProperty = AdamantiumProperty.Register(
+        nameof(TearOffDistance), typeof(double), typeof(TabControl), new PropertyMetadata(0.0));
+
+    public double TearOffDistance
+    {
+        get => GetValue<double>(TearOffDistanceProperty);
+        set => SetValue(TearOffDistanceProperty, value);
+    }
+
+    /// <summary>True while the current drag has pulled far enough off the strip to mean "into its own window".</summary>
+    public bool IsTearingOff { get; private set; }
+
+    /// <summary>Raised when a tab is dropped while torn off: the item left this control and wants a window of its own.
+    /// The CONTROL does not open one - what kind of window a torn-off tab deserves (its chrome, its size, whether it
+    /// keeps a tab strip at all) is the application's decision, and a docking host will answer it differently from a
+    /// plain tabbed view. Handled = the item was taken; unhandled leaves it where it was, so a control with nobody
+    /// listening simply behaves as it always did.</summary>
+    public event EventHandler<TabTearOffEventArgs> TabTornOff;
+
+    // Crossing the threshold IS the tear-off - the tab becomes a window there and then, it does not hover half-out of the
+    // strip waiting for the button to come up. Anything else is incoherent: the strip would go on holding a slot and
+    // sliding its neighbours aside for something that has already left, and the window a docking gesture needs to aim at
+    // would not exist until after the aiming was over.
+    private void UpdateTearOff(TabItem tab, double outside, int side)
+    {
+        if (IsTearingOff || outside <= TearOffDistance) return;
+
+        IsTearingOff = true;
+        var args = new TabTearOffEventArgs(tab.DataContext, tab, Mouse.ScreenCoordinates);
+        TabTornOff?.Invoke(this, args);
+        if (!args.Handled)
+        {
+            IsTearingOff = false;   // nobody took it: carry on reordering, exactly as before
+            return;
+        }
+
+        // Taken. The strip closes over the space it held and stops tracking: the WINDOW carries the gesture from here,
+        // through the platform's own move loop (WindowBase.DragMove), so nothing here recomputes a position per move.
+        CancelDrag(tab);
+    }
+
+    // End the drag WITHOUT the reorder EndDrag would commit: the tab is not ours to move any more.
+    private void CancelDrag(TabItem tab)
+    {
+        _dragged = null;
+        // Clear the gap the reorder had opened: the remaining tabs go back to their own slots and layout closes over the
+        // one that left (removing the item is what actually closes it - this only drops the transforms that were holding
+        // its neighbours aside).
+        for (var i = 0; i < Items.Count; i++)
+        {
+            if (ItemContainerGenerator.ContainerFromIndex(i) is TabItem other) SetOffset(other, 0);
+        }
+
+        _dragStartIndex = _targetIndex = -1;
+        tab.ZIndex = 0;
+        if (tab.IsMouseCaptured) tab.ReleaseMouseCapture();
     }
 
     internal void UpdateDrag(TabItem tab, double along)
@@ -308,8 +380,11 @@ public class TabControl : Selector
         SetOffset(tab, along - _grabOffset - SlotStart(tab));   // Bounds are stable during the drag -> exact follow
 
         // The dragged tab IS the selected one; it moves by RenderTransform (no layout pass), so PlaceIndicator won't
-        // fire - drive the indicator here so the accent bar rides along with the tab under the cursor.
-        UpdateIndicator(animate: false);
+        // fire - drive the indicator here so the accent bar rides along with the tab under the cursor. NOT while the
+        // tab is torn off, though: the bar marks which tab is selected IN THE STRIP, and a tab on its way out of the
+        // strip has it chasing the pointer across a control it no longer belongs to.
+        if (!IsTearingOff) 
+            UpdateIndicator(animate: false);
 
         // Target index = how far the dragged tab's centre has passed the OTHER tabs' (stable) centres.
         var centre = along - _grabOffset + _draggedExtent / 2;

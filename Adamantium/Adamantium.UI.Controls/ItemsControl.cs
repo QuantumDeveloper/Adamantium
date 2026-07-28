@@ -64,7 +64,10 @@ public class ItemsControl : Control, IContainer
     public ItemContainerGenerator ItemContainerGenerator { get; }
 
     /// <summary>The realized items host panel (from the template's ItemsPresenter), or null before the template is applied.</summary>
-    internal Panel ItemsHostPanel => _presenter?.Panel;
+    /// <summary>The panel that actually lays the item containers out, or null before the template is applied. Public
+    /// because anything positioning against the items - a drag deciding where a drop lands, a dock target offering a
+    /// slot - has to ask it, and while it was internal each of them reached it by walking the visual tree instead.</summary>
+    public Panel ItemsHostPanel => _presenter?.Panel;
 
     public IEnumerable ItemsSource
     {

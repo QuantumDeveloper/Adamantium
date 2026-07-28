@@ -62,6 +62,8 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         messageTable[(uint)WindowMessages.Nccalcsize] = HandleNcCalcSize;
         messageTable[(uint)WindowMessages.Getminmaxinfo] = HandleGetMinMaxInfo;
         messageTable[(uint)WindowMessages.Size] = HandleResize;
+        messageTable[(uint)WindowMessages.Moving] = HandleMoving;
+        messageTable[(uint)WindowMessages.Exitsizemove] = HandleExitSizeMove;
         messageTable[(uint)WindowMessages.Dpichanged] = HandleDpiChanged;
         messageTable[(uint)WindowMessages.Keydown] = HandleKeyDown;
         messageTable[(uint)WindowMessages.Syskeydown] = HandleKeyDown;
@@ -210,8 +212,19 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     public void SetTitle(string title)
     {
         if (window == null) return;
-        
+
         Win32Interop.SetWindowText(window.Handle, title);
+    }
+
+    public void SetPosition(double left, double top)
+    {
+        if (window == null) return;
+
+        // Nosize keeps the current size, Nozorder the current stacking, Noactivate the current focus - a move is only a
+        // move. CreateWindowExW placed this window by the same origin (the WINDOW rect, non-client included), so the
+        // coordinates mean here exactly what they meant there.
+        Win32Interop.SetWindowPos(window.Handle, IntPtr.Zero, (int)Math.Round(left), (int)Math.Round(top), 0, 0,
+            SetWindowPosFlags.Nosize | SetWindowPosFlags.Nozorder | SetWindowPosFlags.Noactivate);
     }
 
     public void ShowWindow(WindowState windowState)
@@ -347,6 +360,25 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         return new Vector2(physicalClient.X / dpi.X, physicalClient.Y / dpi.Y);
     }
 
+
+    // The OS move loop (a caption drag, ours included via BeginMoveDrag) runs INSIDE the window procedure and swallows
+    // the mouse - no managed move/up arrives while it lasts. These two messages are the only view we get of a gesture
+    // that is otherwise invisible to us: WM_MOVING on every step, WM_EXITSIZEMOVE when the button comes up. That is what
+    // lets a torn-off window be dropped back onto a tab strip - the drop is decided from where the window is, not from
+    // input we cannot see. Marshalled to the loop thread like every other handler here: they reach the visual tree.
+    private IntPtr HandleMoving(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
+    {
+        DispatchInput(() => window.RaiseWindowMoving());
+        handled = false;   // let DefWindowProc go on moving the window
+        return IntPtr.Zero;
+    }
+
+    private IntPtr HandleExitSizeMove(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
+    {
+        DispatchInput(() => window.RaiseWindowMoveCompleted());
+        handled = false;
+        return IntPtr.Zero;
+    }
 
     private IntPtr HandleActivate(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
