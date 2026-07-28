@@ -177,6 +177,9 @@ public sealed class BitmapImage : BitmapSource
       return frame;
    }
 
+   /// <summary>Decodes frames up to <paramref name="frameIndex"/> AHEAD of time. Despite the name it does the work
+   /// SYNCHRONOUSLY on the calling thread and hands back a completed Task - awaiting it does not move anything off that
+   /// thread. Playback does not need it (frames decode on demand); call it only to pay the cost somewhere deliberate.</summary>
    public Task DecodeFramesTillAsync(uint frameIndex)
    {
       if (frameIndex > FrameCount) frameIndex = FrameCount;

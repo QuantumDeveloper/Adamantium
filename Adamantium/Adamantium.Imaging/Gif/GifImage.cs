@@ -35,14 +35,22 @@ namespace Adamantium.Imaging.Gif
         
         public byte[] DecodeFrame(uint frameIndex)
         {
-            var frame = frameIndex >= frames.Count ? frames.LastOrDefault() : frames[(int)frameIndex];
-            
-            if (!frame.IsDecoded)
+            var last = (uint)frames.Count - 1;
+            var index = frameIndex > last ? last : frameIndex;
+
+            // A GIF frame is a DELTA over the one before it - GetImageFromIndexStream composes it onto the PREVIOUS
+            // frame's index stream - so a frame asked for out of order used to throw on a predecessor that was never
+            // decoded. Decode whatever is still missing up to it. Sequential playback finds them already done, so it
+            // pays nothing; this is only what makes asking for frame N directly work at all.
+            for (uint i = 0; i <= index; i++)
             {
-                frame.IndexData = LZW.Decompress(frame.CompressedData.ToArray(), frame.LzwMinimumCodeSize);
-                GetImageFromIndexStream(frame, frameIndex);
+                var f = frames[(int)i];
+                if (f.IsDecoded) continue;
+                f.IndexData = LZW.Decompress(f.CompressedData.ToArray(), f.LzwMinimumCodeSize);
+                GetImageFromIndexStream(f, i);
             }
-            return frame.RawPixels;
+
+            return frames[(int)index].RawPixels;
         }
 
         private void GetImageFromIndexStream(GifFrame frame, uint frameIndex)

@@ -196,7 +196,11 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
          await bitmap.EnsureLoadedAsync();
          if (!ReferenceEquals(_bitmap, bitmap)) return;   // Source changed mid-load -> this result is stale
 
-         await DecodeBitmapFramesAsync(EndFrame);
+         // Frames are decoded ON DEMAND - GetFrameFromCache decodes and caches a frame the first time it is asked for.
+         // Decoding every frame here only LOOKED asynchronous: DecodeFramesTillAsync runs a plain loop and hands back an
+         // already-completed Task, so the await continued INLINE, on whatever thread set Source - which for anything that
+         // is not a URI (a drop, a stream) is the loop thread that owns layout. A 200-frame GIF therefore froze the whole
+         // UI, scrolling included, for as long as it took to decode all of it - and decoded frames nobody may ever see.
          var endFrame = EndFrame > _bitmap.FrameCount ? _bitmap.FrameCount : EndFrame;
          if (StartFrame > endFrame)
          {
@@ -228,11 +232,6 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
          InvalidateMeasure();
          InvalidateRender(false);
       }
-   }
-
-   private async Task DecodeBitmapFramesAsync(uint endFrame)
-   {
-      await _bitmap.DecodeFramesTillAsync(endFrame);
    }
 
    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
