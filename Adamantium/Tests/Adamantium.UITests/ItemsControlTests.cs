@@ -99,6 +99,48 @@ public class ItemsControlTests
         });
     }
 
+    /// <summary>
+    /// The drop gap is a REAL empty slot in the layout, not a nudge applied on top of it: everything from the insertion
+    /// index on moves along by one, so a tile pushed past the end of its line WRAPS to the next one. That is the whole
+    /// point of putting the gap in layout - a transform-only "spread" cannot make a line reflow, so tiles at a line
+    /// boundary would slide over their neighbours instead.
+    /// </summary>
+    [Test]
+    public void DropGap_OpensARealSlot_AndTheLineReflows()
+    {
+        var items = Enumerable.Range(0, 12).Cast<object>().ToList();
+        var ic = new ItemsControl
+        {
+            ItemsSource = items,
+            ItemsPanel = new ItemsPanelTemplate(() => new TemplateResult
+            {
+                RootComponent = new WrapPanel { Orientation = Orientation.Horizontal, ItemWidth = 50, ItemHeight = 50 }
+            })
+        };
+        ic.Template = ItemsPresenterTemplate();
+        ic.Measure(new Size(200, 300));            // 4 columns
+        ic.Arrange(new Rect(0, 0, 200, 300));
+
+        var gen = ic.ItemContainerGenerator;
+        Rect RectOf(int i) => ((IUIComponent)gen.ContainerFromIndex(i)).Bounds;
+
+        Assert.That(RectOf(3).Y, Is.EqualTo(0).Within(0.5), "index 3 ends the first line before any gap");
+
+        var panel = (VirtualizingPanel)ic.ItemsHostPanel;
+        panel.DropGapIndex = 1;
+        panel.Measure(new Size(200, 300), true);
+        panel.Arrange(new Rect(0, 0, 200, 300), true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(RectOf(0).X, Is.EqualTo(0).Within(0.5), "items BEFORE the gap do not move");
+            Assert.That(RectOf(0).Y, Is.EqualTo(0).Within(0.5));
+            Assert.That(RectOf(1).X, Is.EqualTo(100).Within(0.5), "the item at the gap moves one slot along");
+            Assert.That(RectOf(3).Y, Is.EqualTo(50).Within(0.5), "and the one pushed off the line WRAPS to the next");
+            Assert.That(RectOf(3).X, Is.EqualTo(0).Within(0.5), "landing at the start of it, not overlapping anyone");
+        });
+    }
+
     [Test]
     public void VirtualizingWrapPanelRealizesOnlyVisibleGrid()
     {

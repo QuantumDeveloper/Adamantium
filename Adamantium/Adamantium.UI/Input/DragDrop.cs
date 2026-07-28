@@ -424,6 +424,18 @@ public static partial class DragDrop
         if (items != null)
             for (int i = index; i >= 0 && i < items.Count; i++)
                 if (dragged?.Contains(items[i]) != true) { _insertBefore = items[i]; break; }
+        // A panel that can open a real hole at the insertion point says so itself, and then the hole IS the cue: a caret
+        // as well would mark the same place twice, and the two disagree the moment a line reflows. Everything else keeps
+        // the caret.
+        var hostPanel = HostPanel(list);
+        if (hostPanel is { SupportsDropGap: true })
+        {
+            ClearIndicatorVisual();
+            SetDropGap(hostPanel, index);
+            return;
+        }
+
+        SetDropGap(null, -1);
         // The bar runs PERPENDICULAR to the item flow.
         var barOrientation = flow == Orientation.Vertical ? Orientation.Horizontal : Orientation.Vertical;
         ShowIndicator(list, host, caret, barOrientation, frame: false);
@@ -623,8 +635,31 @@ public static partial class DragDrop
         _indicatorFrame = false;
     }
 
+    // The panel currently holding a drop gap open, so it can be closed again from anywhere the cue is dropped.
+    private static VirtualizingPanel _gapPanel;
+
+    // A gap belongs to ONE panel at a time: moving to another list has to close the first, or a list the cursor left
+    // would keep a hole in it for the rest of the gesture.
+    private static void SetDropGap(VirtualizingPanel panel, int index)
+    {
+        if (!ReferenceEquals(_gapPanel, panel) && _gapPanel != null) _gapPanel.DropGapIndex = -1;
+        _gapPanel = panel;
+        if (panel != null) panel.DropGapIndex = index;
+    }
+
+    // The panel hosting the containers, reached through one of them (the items host itself is not public API).
+    private static VirtualizingPanel HostPanel(ItemsControl list)
+    {
+        foreach (var i in list.ItemContainerGenerator.RealizedIndices)
+        {
+            if (list.ItemContainerGenerator.ContainerFromIndex(i) is IUIComponent c) return c.VisualParent as VirtualizingPanel;
+        }
+        return null;
+    }
+
     private static void ClearIndicator()
     {
+        SetDropGap(null, -1);
         ClearIndicatorVisual();
         _insertIndex = -1;
         _insertBefore = null;
