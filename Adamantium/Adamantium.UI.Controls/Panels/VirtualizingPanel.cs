@@ -66,6 +66,43 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         set => SetValue(IsVirtualizingProperty, value);
     }
 
+    /// <summary>Index a dropped item would land at, or -1 (the default) for no drop in progress. A panel that honours it
+    /// leaves a REAL empty slot there - items from that index on move along by one, so a wrapped line genuinely reflows
+    /// instead of tiles sliding over each other - and fills the freed slot with the same skeleton card a not-yet-bound
+    /// item gets. Layout stays the authority on where everything ends up; the motion between two of its answers is what
+    /// gets animated, which is the only way a gap can open in a wrapping panel without lying about the result.</summary>
+    public static readonly AdamantiumProperty DropGapIndexProperty = AdamantiumProperty.Register(nameof(DropGapIndex),
+        typeof(int), typeof(VirtualizingPanel), new PropertyMetadata(-1, OnDropGapChanged));
+
+    public int DropGapIndex
+    {
+        get => GetValue<int>(DropGapIndexProperty);
+        set => SetValue(DropGapIndexProperty, value);
+    }
+
+    private static void OnDropGapChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        // The gap changes where every following item sits, so the slots have to be recomputed - but only when it MOVES,
+        // which is a rare event during a drag (a few times a gesture), not something that runs per mouse move.
+        if (a is VirtualizingPanel panel) panel.InvalidateMeasure();
+    }
+
+    /// <summary>Whether this panel actually opens <see cref="DropGapIndex"/> in its layout. False (the default) means the
+    /// drag shows its insertion caret instead - the two are alternatives, never both, since they mark the same place.</summary>
+    public virtual bool SupportsDropGap => false;
+
+    /// <summary>The slot an item at <paramref name="index"/> occupies once the drop gap is accounted for: everything from
+    /// the gap on shifts along by one, opening exactly one item-sized hole. Identical to the index when no drop is in
+    /// progress.</summary>
+    protected int SlotOf(int index)
+    {
+        var gap = DropGapIndex;
+        return gap >= 0 && index >= gap ? index + 1 : index;
+    }
+
+    /// <summary>How many slots the panel lays out: one more than the item count while a drop gap is open.</summary>
+    protected int SlotCount(int itemCount) => DropGapIndex >= 0 ? itemCount + 1 : itemCount;
+
     public override void InvalidateArrange()
     {
         if (_inLayout) return;

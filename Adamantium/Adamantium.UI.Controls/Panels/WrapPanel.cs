@@ -8,6 +8,14 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
 {
    private readonly IUIComponent[] _hitOne = new IUIComponent[1];   // reused single-child hit-test result (no per-move alloc)
 
+   // A uniform grid derives every slot from an index, so opening a hole costs one addition per tile - and, unlike a
+   // transform nudge, it makes the line genuinely REFLOW: a tile pushed past the end of its line wraps to the next.
+   // OFF until the insertion index stops being read off the SHIFTED containers: the gap moves the tiles, the moved tiles
+   // change which one is nearest the cursor, that changes the gap - and it oscillates. The index has to be derived from
+   // the grid arithmetic (cursor -> line/column -> slot) so it does not depend on the very layout it produces. The gap
+   // also needs its skeleton card and the motion between layouts before it beats the caret it replaces.
+   public override bool SupportsDropGap => false;
+
    // O(1) hit-test: the tile that a point can hit is the ONE at its grid slot (tiles are absolute + non-overlapping), so
    // resolve the slot by arithmetic and return just that container/skeleton - instead of the base walk visiting every
    // realized tile's whole subtree (thousands of nodes) on every mouse move (the second-monitor freeze). `local` is in
@@ -446,7 +454,9 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
       if (Owner.ItemContainerGenerator.PendingIndices.Count > 0)
          LayoutManager.For(this).InvalidateMeasureNextPass(this);
 
-      var totalLines = (count + _columns - 1) / _columns;
+      // Slots, not items: an open drop gap adds one, which can push the grid onto another line - the extent has to say so
+      // or the last line would fall outside the scrollable area.
+      var totalLines = (SlotCount(count) + _columns - 1) / _columns;
       var flowExtent = _columns * _cellFlow;
       var scrollExtent = totalLines * _cellScroll;
       return horizontal ? new Size(flowExtent, scrollExtent) : new Size(scrollExtent, flowExtent);
@@ -469,8 +479,11 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
       void ArrangeAt(int index)
       {
          if (Owner.ItemContainerGenerator.ContainerFromIndex(index) is not IMeasurableComponent container) return;
-         var line = index / _columns;
-         var col = index % _columns;
+         // SLOT, not index: while a drop gap is open everything from it on moves along by one, so a tile pushed past the
+         // end of its line genuinely wraps to the next one. That is the whole reason the gap lives in layout.
+         var slot = SlotOf(index);
+         var line = slot / _columns;
+         var col = slot % _columns;
          var flowPos = col * _cellFlow;
          var scrollPos = line * _cellScroll;
          container.Arrange(horizontal
