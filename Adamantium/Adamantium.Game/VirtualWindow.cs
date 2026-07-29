@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Adamantium.Game.Core;
 using Adamantium.Graphics;
@@ -37,14 +37,14 @@ public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopu
         Visibility = Visibility.Visible;
     }
 
-    public void Close()
-    {
-        IsClosed = true;
-    }
-
     public void Hide()
     {
         Visibility = Visibility.Collapsed;
+    }
+    
+    public void Close()
+    {
+        IsClosed = true;
     }
 
     // A virtual window is drawn INSIDE a host surface - it has no OS window, so there is no foreground to take and no
@@ -57,22 +57,175 @@ public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopu
     {
     }
 
-    public bool IsActive { get; }
+    // Everything a view can see or bind is a registered property, exactly as on a real window - a virtual window is a
+    // control in somebody's tree, and half of it being plain fields is a trap: the half that is plain silently refuses
+    // bindings, styles and animation with no error to explain why.
+    //
+    // The two HANDLES stay plain fields on purpose. They are interop identity, read on the render and message paths,
+    // and a property read takes the component lock and boxes - nothing binds to an HWND, so the cost would buy nothing.
+
+    public static readonly AdamantiumProperty IsActiveProperty = AdamantiumProperty.Register(nameof(IsActive),
+        typeof(bool), typeof(VirtualWindow), new PropertyMetadata(false));
+
+    public static readonly AdamantiumProperty IsClosedProperty = AdamantiumProperty.Register(nameof(IsClosed),
+        typeof(bool), typeof(VirtualWindow), new PropertyMetadata(false));
+
+    public static readonly AdamantiumProperty ClientWidthProperty = AdamantiumProperty.Register(nameof(ClientWidth),
+        typeof(double), typeof(VirtualWindow), new PropertyMetadata(0.0));
+
+    public static readonly AdamantiumProperty ClientHeightProperty = AdamantiumProperty.Register(nameof(ClientHeight),
+        typeof(double), typeof(VirtualWindow), new PropertyMetadata(0.0));
+
+    public static readonly AdamantiumProperty UIContextProperty = AdamantiumProperty.Register(nameof(UIContext),
+        typeof(IUIContext), typeof(VirtualWindow), new PropertyMetadata(null));
+
+    public static readonly AdamantiumProperty LeftProperty = AdamantiumProperty.Register(nameof(Left),
+        typeof(double), typeof(VirtualWindow), new PropertyMetadata(0.0));
+
+    public static readonly AdamantiumProperty TopProperty = AdamantiumProperty.Register(nameof(Top),
+        typeof(double), typeof(VirtualWindow), new PropertyMetadata(0.0));
+
+    public static readonly AdamantiumProperty TitleProperty = AdamantiumProperty.Register(nameof(Title),
+        typeof(string), typeof(VirtualWindow), new PropertyMetadata(string.Empty));
+
+    public static readonly AdamantiumProperty MSAALevelProperty = AdamantiumProperty.Register(nameof(MSAALevel),
+        typeof(MSAALevel), typeof(VirtualWindow), new PropertyMetadata(MSAALevel.None));
+
+    public static readonly AdamantiumProperty AnalyticAntialiasingProperty = AdamantiumProperty.Register(
+        nameof(AnalyticAntialiasing), typeof(bool), typeof(VirtualWindow), new PropertyMetadata(true));
+
+    public static readonly AdamantiumProperty StateProperty = AdamantiumProperty.Register(nameof(State),
+        typeof(WindowState), typeof(VirtualWindow), new PropertyMetadata(WindowState.Normal));
+
+    public bool IsActive
+    {
+        get => GetValue<bool>(IsActiveProperty);
+        protected set => SetValue(IsActiveProperty, value);
+    }
+
     public IntPtr Handle { get; }
-    public bool IsClosed { get; protected set; }
-    public double ClientWidth { get; set; }
-    public double ClientHeight { get; set; }
-    public IUIContext UIContext { get; private set; }
+
+    public bool IsClosed
+    {
+        get => GetValue<bool>(IsClosedProperty);
+        protected set => SetValue(IsClosedProperty, value);
+    }
+
+    public double ClientWidth
+    {
+        get => GetValue<double>(ClientWidthProperty);
+        set => SetValue(ClientWidthProperty, value);
+    }
+
+    public double ClientHeight
+    {
+        get => GetValue<double>(ClientHeightProperty);
+        set => SetValue(ClientHeightProperty, value);
+    }
+
+    public IUIContext UIContext
+    {
+        get => GetValue<IUIContext>(UIContextProperty);
+        private set => SetValue(UIContextProperty, value);
+    }
+
     public IntPtr SurfaceHandle { get; }
-    public double Left { get; set; }
-    public double Top { get; set; }
-    public string Title { get; set; }
-    public MSAALevel MSAALevel { get; set; }
-    public bool AnalyticAntialiasing { get; set; } = true;
-    public WindowState State { get; set; }
+
+    public double Left
+    {
+        get => GetValue<double>(LeftProperty);
+        set => SetValue(LeftProperty, value);
+    }
+
+    public double Top
+    {
+        get => GetValue<double>(TopProperty);
+        set => SetValue(TopProperty, value);
+    }
+
+    public string Title
+    {
+        get => GetValue<string>(TitleProperty);
+        set => SetValue(TitleProperty, value);
+    }
+
+    public MSAALevel MSAALevel
+    {
+        get => GetValue<MSAALevel>(MSAALevelProperty);
+        set => SetValue(MSAALevelProperty, value);
+    }
+
+    public bool AnalyticAntialiasing
+    {
+        get => GetValue<bool>(AnalyticAntialiasingProperty);
+        set => SetValue(AnalyticAntialiasingProperty, value);
+    }
+
+    public WindowState State
+    {
+        get => GetValue<WindowState>(StateProperty);
+        set => SetValue(StateProperty, value);
+    }
     // A virtual (in-game/designer) window has no OS frame, so custom chrome is moot here.
     public bool UseCustomChrome => false;
     public WindowResizeMode ResizeMode => WindowResizeMode.NoResize;
+
+    // Overlay traits. Registered properties, like everything else a view can bind, style or animate - a virtual window
+    // is a control in somebody's tree, so these have to be reachable from markup. Nothing here ACTS on them: a virtual
+    // window has no z-order among desktop windows, no focus of its own and nothing composing it.
+    public static readonly AdamantiumProperty TopmostProperty = AdamantiumProperty.Register(nameof(Topmost),
+        typeof(bool), typeof(VirtualWindow), new PropertyMetadata(false));
+
+    public static readonly AdamantiumProperty TransparentToInputProperty = AdamantiumProperty.Register(nameof(TransparentToInput),
+        typeof(bool), typeof(VirtualWindow), new PropertyMetadata(false));
+
+    public static readonly AdamantiumProperty ActivateOnShowProperty = AdamantiumProperty.Register(nameof(ActivateOnShow),
+        typeof(bool), typeof(VirtualWindow), new PropertyMetadata(true));
+
+    public static readonly AdamantiumProperty UseTransparentCompositionProperty = AdamantiumProperty.Register(nameof(UseTransparentComposition),
+        typeof(bool), typeof(VirtualWindow), new PropertyMetadata(false));
+
+    public static readonly AdamantiumProperty ShowWindowBorderProperty = AdamantiumProperty.Register(nameof(ShowWindowBorder),
+        typeof(bool), typeof(VirtualWindow), new PropertyMetadata(true));
+
+    public bool ShowWindowBorder
+    {
+        get => GetValue<bool>(ShowWindowBorderProperty);
+        set => SetValue(ShowWindowBorderProperty, value);
+    }
+
+    public static readonly AdamantiumProperty WindowOpacityProperty = AdamantiumProperty.Register(nameof(WindowOpacity),
+        typeof(double), typeof(VirtualWindow), new PropertyMetadata(1.0));
+
+    public bool Topmost
+    {
+        get => GetValue<bool>(TopmostProperty);
+        set => SetValue(TopmostProperty, value);
+    }
+
+    public bool TransparentToInput
+    {
+        get => GetValue<bool>(TransparentToInputProperty);
+        set => SetValue(TransparentToInputProperty, value);
+    }
+
+    public bool ActivateOnShow
+    {
+        get => GetValue<bool>(ActivateOnShowProperty);
+        set => SetValue(ActivateOnShowProperty, value);
+    }
+
+    public bool UseTransparentComposition
+    {
+        get => GetValue<bool>(UseTransparentCompositionProperty);
+        set => SetValue(UseTransparentCompositionProperty, value);
+    }
+
+    public double WindowOpacity
+    {
+        get => GetValue<double>(WindowOpacityProperty);
+        set => SetValue(WindowOpacityProperty, value);
+    }
     public Rect CaptionDragRect { get; set; }
     public Rect ResizeGripRect { get; set; }
     public IWindowRenderer DefaultRenderer { get; set; }

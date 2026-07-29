@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Adamantium.Core;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Presentation;
@@ -133,7 +133,9 @@ public abstract class WindowRendererBase : IWindowRenderer
             Window.MSAALevel
         )
         {
-            HInstanceHandle = Process.GetCurrentProcess().Handle
+            HInstanceHandle = Process.GetCurrentProcess().Handle,
+            // A see-through window is a property of the WINDOW, so it travels from there to the surface that composes it.
+            TransparentComposition = Window.UseTransparentComposition
         };
 
         Presenter = GraphicsPresenter.Create(GraphicsDevice, Parameters, "Window_presenter");

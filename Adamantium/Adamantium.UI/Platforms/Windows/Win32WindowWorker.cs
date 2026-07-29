@@ -134,6 +134,17 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         var wndStyle = //WindowStyle.Popup |
             WindowStyle.Overlappedwindow | WindowStyle.Maximizebox | WindowStyle.Minimizebox |
             WindowStyle.Clipsiblings | WindowStyle.Clipchildren | WindowStyle.Sizeframe;
+
+        // Overlay traits, read here with the rest: native styles are fixed at creation.
+        if (window.WindowOpacity < 1.0) wndStyleEx |= WindowStyleEx.Layered;
+        if (window.Topmost) wndStyleEx |= WindowStyleEx.Topmost;
+        if (window.TransparentToInput) wndStyleEx |= WindowStyleEx.Transparent;
+        if (!window.ActivateOnShow)
+        {
+            // Toolwindow as well: an overlay has no business in the task bar or the Alt-Tab list.
+            wndStyleEx |= WindowStyleEx.Noactivate | WindowStyleEx.Toolwindow;
+            wndStyleEx &= ~WindowStyleEx.Appwindow;
+        }
         source = new Win32NativeWindowWrapper(
             classStyle,
             wndStyleEx,
@@ -149,7 +160,9 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
             return;
         
         this.window.SetSurfaceHandle(source.Handle);
-                
+
+        ApplyTransparency();
+
         source.AddHook(CustomWndProc);
 
         // The HWND was created BEFORE our hook was attached, so our WM_NCCALCSIZE never ran during creation. For custom
@@ -160,17 +173,23 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
                 SetWindowPosFlags.Nomove | SetWindowPosFlags.Nosize | SetWindowPosFlags.Nozorder |
                 SetWindowPosFlags.Noactivate | SetWindowPosFlags.Framechanged);
 
-            // Real OS drop shadow on the borderless window: extend the DWM frame 1px into the client. With WM_NCCALCSIZE
-            // keeping the window client-only, this is the standard WindowChrome trick - DWM draws the window's ambient
-            // shadow (and Aero Snap preview) around it without a visible frame.
-            var shadowMargins = new Margins { Left = 1, Right = 1, Top = 1, Bottom = 1 };
-            Win32Interop.DwmExtendFrameIntoClientArea(source.Handle, ref shadowMargins);
+            // The shadow and the accent outline are what a WINDOW looks like, and not every window wants to look like
+            // one. Asked of the property that MEANS this, not inferred from how the window happens to be composed:
+            // see-through and framed, or opaque and frameless, are both things somebody may want.
+            if (window.ShowWindowBorder)
+            {
+                // Real OS drop shadow on the borderless window: extend the DWM frame 1px into the client. With
+                // WM_NCCALCSIZE keeping the window client-only, this is the standard WindowChrome trick - DWM draws the
+                // window's ambient shadow (and Aero Snap preview) around it without a visible frame.
+                var shadowMargins = new Margins { Left = 1, Right = 1, Top = 1, Bottom = 1 };
+                Win32Interop.DwmExtendFrameIntoClientArea(source.Handle, ref shadowMargins);
 
-            // Windows 11 native accent border: DWMWA_BORDER_COLOR (34) = a COLORREF (0x00BBGGRR). DWM draws a crisp 1px
-            // border around the window in that colour - no extra windows, resize-free. A no-op on Windows 10 (the call
-            // just returns a failing HRESULT, which we ignore). Colour follows the THEME accent, not a hardcoded value.
-            var accentBorder = AccentColorRef();
-            Win32Interop.DwmSetWindowAttribute(source.Handle, 34, ref accentBorder, sizeof(int));
+                // Windows 11 native accent border: DWMWA_BORDER_COLOR (34) = a COLORREF (0x00BBGGRR). DWM draws a crisp
+                // 1px border around the window in that colour - no extra windows, resize-free. A no-op on Windows 10
+                // (the call just returns a failing HRESULT, which we ignore). Colour follows the THEME accent.
+                var accentBorder = AccentColorRef();
+                Win32Interop.DwmSetWindowAttribute(source.Handle, 34, ref accentBorder, sizeof(int));
+            }
         }
 
         this.window.DpiScale = ReadDpiScale(source.Handle);   // initial per-monitor DPI (PMv2)
@@ -227,9 +246,69 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
             SetWindowPosFlags.Nosize | SetWindowPosFlags.Nozorder | SetWindowPosFlags.Noactivate);
     }
 
+    /// <summary>Puts the current overlay traits onto the live window: the extended styles are rewritten, the z-order
+    /// band is set, and the layered attributes are pushed again. Everything here works on an open window, which is the
+    /// point - these are properties, not construction arguments.</summary>
+    public void UpdateOverlayTraits()
+    {
+        if (source == null || source.Handle == IntPtr.Zero) return;
+
+        var style = (WindowStyleEx)Win32Interop.GetWindowLong(source.Handle, WindowLongType.Exstyle).ToInt64();
+
+        style = Set(style, WindowStyleEx.Topmost, window.Topmost);
+        style = Set(style, WindowStyleEx.Transparent, window.TransparentToInput);
+        style = Set(style, WindowStyleEx.Layered, window.WindowOpacity < 1.0);
+        style = Set(style, WindowStyleEx.Noactivate | WindowStyleEx.Toolwindow, !window.ActivateOnShow);
+        style = Set(style, WindowStyleEx.Appwindow, window.ActivateOnShow);
+
+        Win32Interop.SetWindowLong(source.Handle, WindowLongType.Exstyle, new IntPtr((long)style));
+
+        // The topmost BAND is not part of the style - it is a z-order position, and only SetWindowPos moves a window
+        // between bands. Setting WS_EX_TOPMOST alone leaves an open window exactly where it was.
+        Win32Interop.SetWindowPos(source.Handle, window.Topmost ? HwndTopmost : HwndNoTopmost, 0, 0, 0, 0,
+            SetWindowPosFlags.Nomove | SetWindowPosFlags.Nosize | SetWindowPosFlags.Noactivate |
+            SetWindowPosFlags.Framechanged);
+
+        ApplyTransparency();
+        ApplyBorder();
+    }
+
+    /// <summary>Extends the DWM frame into the client (shadow + accent outline) or retracts it. Live, so the border can
+    /// be turned off after the window is open instead of only before it exists.</summary>
+    private void ApplyBorder()
+    {
+        if (source == null || source.Handle == IntPtr.Zero || !chromeCustom) return;
+
+        var edge = window.ShowWindowBorder ? 1 : 0;
+        var margins = new Margins { Left = edge, Right = edge, Top = edge, Bottom = edge };
+        Win32Interop.DwmExtendFrameIntoClientArea(source.Handle, ref margins);
+
+        // DWMWA_BORDER_COLOR = 34; 0xFFFFFFFE is DWMWA_COLOR_NONE - "draw no border at all".
+        var border = window.ShowWindowBorder ? AccentColorRef() : unchecked((int)0xFFFFFFFE);
+        Win32Interop.DwmSetWindowAttribute(source.Handle, 34, ref border, sizeof(int));
+    }
+
+    private static readonly IntPtr HwndTopmost = new(-1);
+    private static readonly IntPtr HwndNoTopmost = new(-2);
+
+    private static WindowStyleEx Set(WindowStyleEx style, WindowStyleEx bits, bool on)
+        => on ? style | bits : style & ~bits;
+
+    private void ApplyTransparency()
+    {
+        if (source == null || source.Handle == IntPtr.Zero) return;
+
+        if (window.WindowOpacity >= 1.0) return;
+
+        var alpha = (byte)Math.Clamp(window.WindowOpacity * 255, 0, 255);
+        Win32Interop.SetLayeredWindowAttributes(source.Handle, 0, alpha, Win32Interop.LWA_ALPHA);
+    }
+
     public void ShowWindow(WindowState windowState)
     {
-        var windowShowStyle = WindowShowStyle.Show;
+        // An overlay must not take focus: showing it the ordinary way activates it, and activating something else in the
+        // middle of a drag ends the drag it was put on screen to help with.
+        var windowShowStyle = window.ActivateOnShow ? WindowShowStyle.Show : WindowShowStyle.ShowNoActivate;
         switch (windowState)
         {
             case WindowState.Maximized:

@@ -1,4 +1,4 @@
-using Adamantium.Graphics.Core;
+﻿using Adamantium.Graphics.Core;
 using Adamantium.UI.Controls.Adorners;
 using Adamantium.UI.Controls.Buttons;
 using Adamantium.UI.Core;
@@ -145,6 +145,83 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     // so flip it in markup/ctor before the window is shown.
     public static readonly AdamantiumProperty UseCustomChromeProperty = AdamantiumProperty.Register(nameof(UseCustomChrome),
         typeof(bool), typeof(WindowBase), new PropertyMetadata(true));
+
+    // --- Overlay window traits ------------------------------------------------------------------------------------
+    // What an OVERLAY needs and an ordinary window does not: to float above everything, to let clicks through to what is
+    // underneath, never to take focus, and to have a background that is not there. A docking compass needs all four - it
+    // must sit above the window being DRAGGED, which nothing living inside a window can ever do.
+    // Read ONCE by the platform worker at create time, along with the chrome flags: native window styles are fixed then.
+
+    // Each of these re-applies itself to the LIVE window, so they behave as properties rather than as arguments that
+    // only matter before the window exists.
+    private static void OverlayTraitChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        (component as WindowBase)?.WindowWorkerService?.UpdateOverlayTraits();
+    }
+
+    /// <summary>Stays above other windows.</summary>
+    public static readonly AdamantiumProperty TopmostProperty = AdamantiumProperty.Register(nameof(Topmost),
+        typeof(bool), typeof(WindowBase), new PropertyMetadata(false, OverlayTraitChanged));
+
+    /// <summary>Clicks pass straight through to whatever is behind. The window is seen and never touched.</summary>
+    public static readonly AdamantiumProperty TransparentToInputProperty = AdamantiumProperty.Register(nameof(TransparentToInput),
+        typeof(bool), typeof(WindowBase), new PropertyMetadata(false, OverlayTraitChanged));
+
+    /// <summary>False to show without taking focus - an overlay that stole activation would end the very drag it is
+    /// there to help with. Read when the window is shown.</summary>
+    public static readonly AdamantiumProperty ActivateOnShowProperty = AdamantiumProperty.Register(nameof(ActivateOnShow),
+        typeof(bool), typeof(WindowBase), new PropertyMetadata(true, OverlayTraitChanged));
+
+    /// <summary>The OS frame around the window: the ambient drop shadow and the accent outline. On by default - it is
+    /// what makes a window look like a window. An overlay turns it off.</summary>
+    public static readonly AdamantiumProperty ShowWindowBorderProperty = AdamantiumProperty.Register(nameof(ShowWindowBorder),
+        typeof(bool), typeof(WindowBase), new PropertyMetadata(true, OverlayTraitChanged));
+
+    public bool ShowWindowBorder
+    {
+        get => GetValue<bool>(ShowWindowBorderProperty);
+        set => SetValue(ShowWindowBorderProperty, value);
+    }
+
+    /// <summary>Per-pixel transparency: the window's rendering is composed by the desktop WITH its alpha, so translucent
+    /// brushes and antialiased edges show what is behind them. Read when the surface is created.</summary>
+    public static readonly AdamantiumProperty UseTransparentCompositionProperty = AdamantiumProperty.Register(nameof(UseTransparentComposition),
+        typeof(bool), typeof(WindowBase), new PropertyMetadata(false));
+
+    /// <summary>Uniform translucency of the whole window, 0..1. Composed by the desktop, so the content underneath
+    /// shows through live - which is what a docking preview rectangle is.</summary>
+    public static readonly AdamantiumProperty WindowOpacityProperty = AdamantiumProperty.Register(nameof(WindowOpacity),
+        typeof(double), typeof(WindowBase), new PropertyMetadata(1.0, OverlayTraitChanged));
+
+    public bool Topmost
+    {
+        get => GetValue<bool>(TopmostProperty);
+        set => SetValue(TopmostProperty, value);
+    }
+
+    public bool TransparentToInput
+    {
+        get => GetValue<bool>(TransparentToInputProperty);
+        set => SetValue(TransparentToInputProperty, value);
+    }
+
+    public bool ActivateOnShow
+    {
+        get => GetValue<bool>(ActivateOnShowProperty);
+        set => SetValue(ActivateOnShowProperty, value);
+    }
+
+    public bool UseTransparentComposition
+    {
+        get => GetValue<bool>(UseTransparentCompositionProperty);
+        set => SetValue(UseTransparentCompositionProperty, value);
+    }
+
+    public double WindowOpacity
+    {
+        get => GetValue<double>(WindowOpacityProperty);
+        set => SetValue(WindowOpacityProperty, value);
+    }
 
     public static readonly AdamantiumProperty ResizeModeProperty = AdamantiumProperty.Register(nameof(ResizeMode),
         typeof(WindowResizeMode), typeof(WindowBase), new PropertyMetadata(WindowResizeMode.CanResize, ResizeModeChangedCallback));

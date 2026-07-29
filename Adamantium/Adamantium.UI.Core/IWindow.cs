@@ -42,6 +42,33 @@ public interface IWindow : IRootVisualComponent, IContentControl
     /// <summary>How the user may resize the window (honoured by the custom-chrome hit-test). Default CanResize.</summary>
     WindowResizeMode ResizeMode { get; }
 
+    // Overlay traits. Settable, and they take effect on a window that is already open: a property that can only be set
+    // before the window exists is one that silently does nothing afterwards, which is worse than not having it.
+
+    /// <summary>Stays above other windows.</summary>
+    bool Topmost { get; set; }
+
+    /// <summary>Clicks pass through to whatever is behind.</summary>
+    bool TransparentToInput { get; set; }
+
+    /// <summary>False shows the window without giving it focus. Read when the window is shown.</summary>
+    bool ActivateOnShow { get; set; }
+
+    /// <summary>Uniform translucency of the whole window, 0..1.</summary>
+    double WindowOpacity { get; set; }
+
+    /// <summary>Whether the window has the OS frame around it - the ambient drop shadow and the 1px accent outline the
+    /// desktop draws. Its OWN property because it is its own decision: a window can be see-through and still framed, or
+    /// opaque and frameless. Tying it to how the window is composed makes one of those impossible to ask for.</summary>
+    bool ShowWindowBorder { get; set; }
+
+    /// <summary>Per-pixel transparency: the window's own rendering is composed by the desktop WITH its alpha, so a
+    /// translucent brush or a rounded, antialiased edge shows what is behind it. Read when the surface is created.
+    /// <para>This is the honest version of a see-through window - not a colour key with its exact-match fringing, and
+    /// not a bitmap pushed at the OS. Needs the surface to offer pre-multiplied composition; when it does not, the
+    /// window is simply opaque and says so.</para></summary>
+    bool UseTransparentComposition { get; set; }
+
     /// <summary>The ONE draggable caption region (client DIP): the bounds of the title bar's drag-area element. A point
     /// inside it is HTCAPTION (native window drag + Aero Snap); everything else - commands, buttons - stays HTCLIENT and
     /// clickable. A TitleBar publishes this on layout; the platform worker reads it (a plain Rect, thread-safe) from the
