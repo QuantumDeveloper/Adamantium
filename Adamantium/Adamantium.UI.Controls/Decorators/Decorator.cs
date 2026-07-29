@@ -35,6 +35,14 @@ public abstract class Decorator : InputUIComponent, IContainer
       }
    }
 
+   // A decorator lays out from the Child PROPERTY, so that is where a child taken by another parent has to go: dropping
+   // it from the visual children alone would leave the property pointing at a control this decorator no longer owns.
+   protected internal override void DisownVisualChild(IUIComponent child)
+   {
+      if (ReferenceEquals(Child, child)) Child = null;
+      base.DisownVisualChild(child);
+   }
+
    public Thickness Padding
    {
       get => GetValue<Thickness>(PaddingProperty);
