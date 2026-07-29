@@ -76,9 +76,6 @@ public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopu
     public static readonly AdamantiumProperty ClientHeightProperty = AdamantiumProperty.Register(nameof(ClientHeight),
         typeof(double), typeof(VirtualWindow), new PropertyMetadata(0.0));
 
-    public static readonly AdamantiumProperty UIContextProperty = AdamantiumProperty.Register(nameof(UIContext),
-        typeof(IUIContext), typeof(VirtualWindow), new PropertyMetadata(null));
-
     public static readonly AdamantiumProperty LeftProperty = AdamantiumProperty.Register(nameof(Left),
         typeof(double), typeof(VirtualWindow), new PropertyMetadata(0.0));
 
@@ -123,11 +120,9 @@ public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopu
         set => SetValue(ClientHeightProperty, value);
     }
 
-    public IUIContext UIContext
-    {
-        get => GetValue<IUIContext>(UIContextProperty);
-        private set => SetValue(UIContextProperty, value);
-    }
+    /// <summary>The application context this window was attached to. A plain property on purpose: it is not window
+    /// STATE that anything animates, binds to or styles - it is the ambient context, handed over once at attach.</summary>
+    public IUIContext UIContext { get; private set; }
 
     public IntPtr SurfaceHandle { get; }
 
