@@ -53,6 +53,13 @@ public class TabPanel : Panel
             ? Math.Min(finalSize.Height, DesiredSize.Height)
             : Math.Min(finalSize.Width, DesiredSize.Width);
 
+        if (Docking.DockingArea.LogDocking)
+        {
+            var text = $"[TabPanel #{GetHashCode()} arrange {Children.Count} children final={finalSize.Width:F0}]";
+            foreach (var c in Children) text += $" d={c.DesiredSize.Width:F0}";
+            Console.WriteLine(text);
+        }
+
         double main = 0;
         foreach (var child in Children)
         {

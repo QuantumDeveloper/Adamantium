@@ -87,17 +87,38 @@ public class TabStripScroller : InputUIComponent, IContainer
 
     /// <summary>Pan just enough to bring <paramref name="element"/> (a tab) fully into view - the overflow menu calls this
     /// when a hidden tab is picked. No-op if it is already visible.</summary>
-    public void ScrollIntoView(IUIComponent element)
+    /// <summary>Scrolls the element into view. Returns true when it was ALREADY fully visible, so a caller can keep
+    /// asking until it settles.
+    /// <para>One scroll is not enough: the overflow button sits in an Auto column beside this scroller and its
+    /// visibility is decided AFTER a layout pass, so the moment it appears the star column - this viewport - gets
+    /// narrower than it was when the offset was computed, and the tail of the tab (its close button) ends up past the
+    /// new edge.</para></summary>
+    public bool ScrollIntoView(IUIComponent element)
     {
-        if (element == null || Child is not IUIComponent child) return;
+        if (element == null || Child is not IUIComponent child) return true;
+
         double start = 0;
         for (var n = element; n != null && !ReferenceEquals(n, child); n = n.VisualParent)
             start += IsHorizontal ? n.Bounds.X : n.Bounds.Y;
+
         var size = IsHorizontal ? element.Bounds.Width : element.Bounds.Height;
         var max = Math.Max(0, _extent - _viewport);
-        if (start < _offset) _offset = Math.Clamp(start, 0, max);
-        else if (start + size > _offset + _viewport) _offset = Math.Clamp(start + size - _viewport, 0, max);
+
+        if (start < _offset)
+        {
+            _offset = Math.Clamp(start, 0, max);
+        }
+        else if (start + size > _offset + _viewport)
+        {
+            _offset = Math.Clamp(start + size - _viewport, 0, max);
+        }
+        else
+        {
+            return true;   // nothing to do - it is all visible
+        }
+
         InvalidateArrange();
+        return false;
     }
 
     /// <summary>Raised when <see cref="CanScrollBack"/>/<see cref="CanScrollForward"/> change, so an owner (TabControl) can

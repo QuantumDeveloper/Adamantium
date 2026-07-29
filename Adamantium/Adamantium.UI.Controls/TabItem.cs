@@ -275,6 +275,15 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
     {
         base.OnMouseLeftButtonUp(sender, e);
         if (_dragging) Owner?.EndDrag(this);
+        AbandonDrag();
+    }
+
+    /// <summary>Forget the gesture in progress. Called when the drag ends somewhere OTHER than this tab's button-up -
+    /// a tear-off, where the platform's move loop takes the button and the up never arrives here.
+    /// <para>Without it these flags stay true for the life of the control: dock the pane back and the first mouse move
+    /// over it, with nothing pressed, walks straight into the drag path and tears it out again.</para></summary>
+    internal void AbandonDrag()
+    {
         if (IsMouseCaptured) ReleaseMouseCapture();
         _pressed = false;
         _dragging = false;

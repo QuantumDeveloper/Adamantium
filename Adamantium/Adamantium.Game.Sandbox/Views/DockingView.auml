@@ -1,0 +1,42 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:docking="clr-namespace:Adamantium.UI.Controls.Docking;assembly=Adamantium.UI.Controls">
+    <Grid RowDefinitions="Auto,*" Margin="24">
+
+        <TextBlock Grid.Row="0" MarginBottom="12" MaxWidth="820"
+                   Text="An editor-shaped arrangement written as ZONES only. Nothing here says what share of what a group takes - the author writes WHERE (centre, right, bottom) and the split tree is derived from that. Drag the grips between the areas: they rewrite the layout's own shares, which is the number a save would read."
+                   Foreground="{ResourceReference TextFillColorSecondary}"/>
+
+        <!-- Square corners on purpose: areas meet each other along the splitters, and a rounded corner there leaves a
+             notch of background at every junction instead of a clean seam. -->
+        <Border Grid.Row="1" BorderThickness="1"
+                BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                Background="{ResourceReference CardBackgroundFillColorDefault}">
+            <docking:DockingArea DividerThickness="6">
+
+                <!-- Declared first, so it is innermost: the documents. -->
+                <docking:PaneGroup Name="documents" Zone="Center">
+                    <docking:Pane Header="Scene">
+                        <TextBlock Text="Scene" Margin="16" Opacity="0.7"/>
+                    </docking:Pane>
+                    <docking:Pane Header="Game">
+                        <TextBlock Text="Game" Margin="16" Opacity="0.7"/>
+                    </docking:Pane>
+                </docking:PaneGroup>
+
+                <docking:PaneGroup Name="inspector" Zone="Right" Size="240">
+                    <docking:Pane Header="Inspector" MinSize="120">
+                        <TextBlock Text="Inspector" Margin="16" Opacity="0.7"/>
+                    </docking:Pane>
+                </docking:PaneGroup>
+
+                <!-- Declared last, so it is OUTERMOST: the console spans the full width beneath everything above. -->
+                <docking:PaneGroup Name="console" Zone="Bottom" Size="160">
+                    <docking:Pane Header="Console">
+                        <TextBlock Text="Console" Margin="16" Opacity="0.7"/>
+                    </docking:Pane>
+                </docking:PaneGroup>
+
+            </docking:DockingArea>
+        </Border>
+    </Grid>
+</View>
