@@ -126,6 +126,12 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         chromeState = window.State;
         chromeMinWidth = !double.IsNaN(window.MinWidth) && window.MinWidth > 0 ? window.MinWidth : 320;
         chromeMinHeight = !double.IsNaN(window.MinHeight) && window.MinHeight > 0 ? window.MinHeight : 120;
+        // What the caller ASKED for, in logical units, kept before creation overwrites it. The window has to be created
+        // before its monitor - and so its scale - is known, so the geometry is asked for again once it is (below).
+        var requestedLeft = window.Left;
+        var requestedTop = window.Top;
+        var requestedClientWidth = window.ClientWidth;
+        var requestedClientHeight = window.ClientHeight;
         this.window.Closed += OnWindowClosed;
         var classStyle = WindowClassStyle.OwnDC | WindowClassStyle.DoubleClicks; //| WindowClassStyle.VerticalRedraw | WindowClassStyle.HorizontalRedraw;
         // No WS_EX_ACCEPTFILES: the partial WM_DROPFILES path is replaced by a full OLE drop target (registered below),
@@ -194,6 +200,14 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 
         this.window.DpiScale = ReadDpiScale(source.Handle);   // initial per-monitor DPI (PMv2)
 
+        // The window was created with the requested geometry handed straight to Win32 - which reads it as PHYSICAL
+        // pixels, while a window's position and size are LOGICAL. On a scaled display that made every window come out
+        // 1/scale too small and too close to the origin, and the line below then quietly rewrote ClientWidth to match, so
+        // the number the caller asked for simply vanished. The real scale is known only now (it belongs to the monitor
+        // the window landed on), so ask again with it. A no-op at 100%, where the two units are the same number.
+        SetPosition(requestedLeft, requestedTop);
+        SetSize(requestedClientWidth, requestedClientHeight);
+
         Win32Interop.GetClientRect(window.Handle, out var client);
         // ClientWidth/Height are LOGICAL (DIP) = physical px / DPI scale (per-axis). The renderer sizes the swapchain
         // back up by RenderScale (= DpiScale); the projection + layout stay logical. On a 100% monitor this is identity.
@@ -242,8 +256,47 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         // Nosize keeps the current size, Nozorder the current stacking, Noactivate the current focus - a move is only a
         // move. CreateWindowExW placed this window by the same origin (the WINDOW rect, non-client included), so the
         // coordinates mean here exactly what they meant there.
+        // PHYSICAL desktop pixels, deliberately - unlike the size, which is logical. A window's position has no scale of
+        // its own to be logical in: the scale belongs to the monitor the point falls on, and which monitor that is can
+        // only be known once the point is physical. Measured: a torn-off window placed in logical units was born at the
+        // origin (primary monitor, 100%), took ITS scale, and landed at cursor/1.5 on a 4K display - far to the left.
         Win32Interop.SetWindowPos(window.Handle, IntPtr.Zero, (int)Math.Round(left), (int)Math.Round(top), 0, 0,
             SetWindowPosFlags.Nosize | SetWindowPosFlags.Nozorder | SetWindowPosFlags.Noactivate);
+    }
+
+    // True only while the OS's own size is being written onto the window (see HandleResize): those writes report, they
+    // do not request, and answering them is how a window ends up arguing with itself.
+    private bool _reportingOsSize;
+
+    public void SetSize(double clientWidth, double clientHeight)
+    {
+        if (window == null || _reportingOsSize || double.IsNaN(clientWidth) || double.IsNaN(clientHeight)) return;
+
+        // Maximized or minimized, the size is the OS's to decide - and it reports it back as ClientWidth/Height, which
+        // arrives here. Answering would be arguing with the state the user just asked for.
+        if (window.State != WindowState.Normal) return;
+
+        // Logical (DIP) in, physical client px out - the same scale WM_SIZE divides by on the way back.
+        var width = (int)Math.Round(clientWidth * window.DpiScale.X);
+        var height = (int)Math.Round(clientHeight * window.DpiScale.Y);
+        if (width <= 0 || height <= 0) return;
+
+        // Already that size? Then say nothing. The OS reports every resize back as ClientWidth/Height, which lands here
+        // again - and a SetWindowPos per echo would recreate the swapchain for a size that never changed.
+        Win32Interop.GetClientRect(window.Handle, out var client);
+        if (client.Width == width && client.Height == height) return;
+
+        // SetWindowPos speaks WINDOW rects, so the client size has to be grown by whatever sits around it. MEASURED off
+        // this very window (window rect minus client rect), never computed from its styles: a window with custom chrome
+        // answers WM_NCCALCSIZE so that its client area IS the whole window, while AdjustWindowRect - which only knows
+        // the styles - still swears there is a caption and a border. Adding that phantom frame made the window a few
+        // pixels bigger, the OS reported the new size back, and it grew again on the next frame, every frame.
+        Win32Interop.GetWindowRect(window.Handle, out var outer);
+        var frameWidth = outer.Width - client.Width;
+        var frameHeight = outer.Height - client.Height;
+
+        Win32Interop.SetWindowPos(window.Handle, IntPtr.Zero, 0, 0, width + frameWidth, height + frameHeight,
+            SetWindowPosFlags.Nomove | SetWindowPosFlags.Nozorder | SetWindowPosFlags.Noactivate);
     }
 
     /// <summary>Puts the current overlay traits onto the live window: the extended styles are rewritten, the z-order
@@ -705,10 +758,15 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         {
             window.Width = w;
             window.Height = h;
+            // These writes REPORT what the OS did; they do not ask for anything. Say so, or SetSize takes them for a
+            // request and pushes them back - and since they are marshalled here (a frame or more after the message), the
+            // number it pushes is already stale, the OS resizes to it, reports THAT, and the window shakes for good.
+            _reportingOsSize = true;
             // ClientWidth/Height logical (DIP) = physical / DPI. DpiScale is read on the loop thread (where it's updated
             // by the marshalled WM_DPICHANGED handler), so a DPI change that precedes this resize is already applied.
             window.ClientWidth = cw / window.DpiScale.X;
             window.ClientHeight = ch / window.DpiScale.Y;
+            _reportingOsSize = false;
 
             if (osState.HasValue && window.State != osState.Value)
             {

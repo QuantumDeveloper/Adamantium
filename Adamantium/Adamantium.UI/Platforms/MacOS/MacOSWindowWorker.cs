@@ -96,6 +96,11 @@ public class MacOSWindowWorker : AdamantiumComponent, IWindowWorkerService
 
     }
 
+    public void SetSize(double clientWidth, double clientHeight)
+    {
+
+    }
+
     public void ShowWindow(WindowState windowState)
     {
         

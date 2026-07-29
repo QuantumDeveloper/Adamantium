@@ -184,9 +184,24 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     }
 
     /// <summary>Per-pixel transparency: the window's rendering is composed by the desktop WITH its alpha, so translucent
-    /// brushes and antialiased edges show what is behind them. Read when the surface is created.</summary>
+    /// brushes and antialiased edges show what is behind them.
+    /// <para>Settable at any time. The swapchain picks its composite-alpha mode when it is CREATED, so changing this
+    /// cannot take effect in place - it marks the renderer stale and the swapchain is rebuilt at the next frame
+    /// boundary, which is the same path a resize takes.</para></summary>
     public static readonly AdamantiumProperty UseTransparentCompositionProperty = AdamantiumProperty.Register(nameof(UseTransparentComposition),
-        typeof(bool), typeof(WindowBase), new PropertyMetadata(false));
+        typeof(bool), typeof(WindowBase), new PropertyMetadata(false, TransparentCompositionChanged));
+
+    // Never rebuild from the setter: it is called on whatever thread set the property, while the render thread may be
+    // mid-frame with the swapchain it is about to destroy. Marking it stale hands the rebuild to BeginDraw, which runs
+    // before the frame draws and is serialized with submit/present.
+    private static void TransparentCompositionChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        // The metadata callback fires on EVERY write, not only on a change of value - and a rebuild costs a device-idle
+        // wait plus every render target, so a write that said nothing must not buy one.
+        if (Equals(e.OldValue, e.NewValue)) return;
+
+        (component as WindowBase)?.Renderer?.InvalidatePresenter();
+    }
 
     /// <summary>Uniform translucency of the whole window, 0..1. Composed by the desktop, so the content underneath
     /// shows through live - which is what a docking preview rectangle is.</summary>
@@ -380,9 +395,14 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         // walk re-recorded all ~20 000 components on every one of them - 100-200 ms per frame of the heaviest thing the app
         // does. Theme and DPI swaps still force (they rebuild templates through paths no mark can name).
 
+        // Tell the OS window, exactly as a Left/Top change does. Without this the client size was a managed number the
+        // window itself never followed: it kept whatever it was created with, so nothing could be resized from code
+        // after it opened (found on the docking compass overlay, which is re-sized to the area it covers).
+        component.WindowWorkerService?.SetSize(component.ClientWidth, component.ClientHeight);
+
         old.Width = (double) e.OldValue;
         old.Height = component.Height;
-            
+
         var newSize = new Size((double)e.NewValue, component.Height);
         var args = new SizeChangedEventArgs(old, newSize, true, false);
         args.RoutedEvent = ClientSizeChangedEvent;
@@ -397,6 +417,8 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
 
         // No forced full walks - see ClientWidthChangedCallBack: the resize settle marks honestly now, so it splices.
 
+        component.WindowWorkerService?.SetSize(component.ClientWidth, component.ClientHeight);
+
         var old = new Size(component.Width, (double)e.OldValue);
         var newSize = new Size(component.Width, (double)e.NewValue);
         var args = new SizeChangedEventArgs(old, newSize, false, true);
@@ -404,6 +426,13 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         component?.RaiseEvent(args);
     }
 
+    /// <summary>Where the window's top-left sits on the desktop, in PHYSICAL pixels - the same units as
+    /// <see cref="PointToScreen"/> and <c>Mouse.ScreenCoordinates</c>, so a window can be put where a cursor is without
+    /// a conversion in between.
+    /// <para>Deliberately NOT logical, unlike <see cref="ClientWidth"/>. A window's SIZE has one scale - its monitor's.
+    /// Its POSITION does not: the scale belongs to the monitor the point lands on, and which monitor that is can only be
+    /// known once the point is physical. Measured: a torn-off window placed in logical units was born at the origin, on
+    /// the primary monitor, took its 100% scale, and landed at a third of the way to the cursor on a 4K display.</para></summary>
     public Double Left
     {
         get => GetValue<Double>(LeftProperty);
@@ -553,6 +582,9 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         return new Vector2(point.X / DpiScale.X, point.Y / DpiScale.Y);
     }
 
+    /// <summary>A point of this window's client area (LOGICAL) to a desktop point (PHYSICAL). The asymmetry is the
+    /// desktop's: monitors can differ in scale, so a screen point has no one scale to be logical in. Convert with the
+    /// scale of the window the point concerns - see <see cref="Left"/>.</summary>
     public Vector2 ClientToScreen(Vector2 p)
     {
         // p is logical DIP -> back to physical client px before handing to Win32; the returned screen coords stay physical.

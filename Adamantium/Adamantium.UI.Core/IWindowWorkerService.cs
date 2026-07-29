@@ -11,6 +11,12 @@ public interface IWindowWorkerService
     /// was. Size and z-order are untouched, and the window is not activated: moving a window is not focusing it.</summary>
     public void SetPosition(double left, double top);
 
+    /// <summary>Resize the OS window so its CLIENT area becomes this big, in logical (DIP) units. Backs
+    /// <c>Window.ClientWidth</c>/<c>ClientHeight</c>, which - unlike Left/Top - used to be managed values nobody acted
+    /// on: assigning them changed a number and left the window the size it was created. Position and z-order are
+    /// untouched, and the window is not activated.</summary>
+    public void SetSize(double clientWidth, double clientHeight);
+
     /// <summary>Re-apply the window's overlay traits - topmost, click-through, transparency - to the live OS window.
     /// Called whenever one of them changes, so setting <c>Topmost</c> on an open window actually raises it instead of
     /// changing a number nobody reads again.</summary>

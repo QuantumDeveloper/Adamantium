@@ -159,8 +159,25 @@ public abstract class WindowRendererBase : IWindowRenderer
 
     public void ResizePresenter(uint width, uint height)
     {
+        // Re-read the window's transparency HERE rather than trusting the value captured when this renderer was built:
+        // composite-alpha is chosen while the swapchain is created, so a rebuild is the only moment a toggle can land -
+        // and this is the rebuild. Costs one field read on a path that is already tearing the swapchain down.
+        if (Window != null && Presenter != null)
+        {
+            Presenter.Description.TransparentComposition = Window.UseTransparentComposition;
+            Parameters.TransparentComposition = Window.UseTransparentComposition;
+        }
+
         Presenter.Resize(width, height);
         IsRendererUpToDate = true;
+    }
+
+    /// <summary>The presenter no longer matches its window: rebuild it at the next frame boundary. The frame loop
+    /// already recreates a stale presenter in BeginDraw, before the frame draws and on the render thread - so a toggle
+    /// simply joins the queue a resize is in, instead of destroying a swapchain someone may be drawing into.</summary>
+    public void InvalidatePresenter()
+    {
+        IsRendererUpToDate = false;
     }
 
     public virtual void OnFrameEnded()
