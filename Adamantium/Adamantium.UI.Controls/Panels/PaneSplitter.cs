@@ -7,11 +7,14 @@ using Adamantium.UI.Core.Input;
 namespace Adamantium.UI.Controls.Panels;
 
 /// <summary>
-/// The grip between two neighbours in a <see cref="PaneHost"/>. Dragging it moves the boundary by rewriting the two
-/// neighbours' SHARES - the model's own numbers - rather than any size of its own.
+/// The grip between two neighbours in a <see cref="PaneHost"/>. Dragging it moves the boundary by fixing both
+/// neighbours at the PIXELS they now occupy - the layout's own numbers - rather than any size of its own.
+/// <para>Pixels because a drag is a statement about size: the user put that boundary exactly there. Written as a share
+/// it would silently mean something else the moment the row gained or lost a pane. The pair keeps the same total, so
+/// nobody else in the row moves.</para>
 /// <para>That is the point of not building this on a Grid: a GridSplitter writes lengths into row/column definitions,
 /// which then have to be mirrored back into the layout that gets saved. Here there is one number, and the drag edits
-/// it in place.</para>
+/// it in place - the area copies it back into the model after the pass, so a rebuild cannot undo the drag.</para>
 /// </summary>
 public class PaneSplitter : Thumb
 {
@@ -39,20 +42,14 @@ public class PaneSplitter : Thumb
 
         if (VisualParent is not PaneHost host) return;
 
-        // Settle the whole host onto ONE kind of number before touching anything: authored pixel hints become the shares
-        // that currently reproduce them. Nothing moves, and from here a pixel of mouse is a pixel of boundary.
-        host.FreezeShares();
-
         var (before, after) = Neighbours();
         if (before == null || after == null) return;
 
-        // Remember where the shares STARTED. Thumb reports a CUMULATIVE change, so every delta must be measured from
-        // here - adding it to the current share instead compounds it and runs the splitter ahead of the pointer.
-        _originBefore = PaneHost.GetFraction(before);
-        _originAfter = PaneHost.GetFraction(after);
-
-        // The pixels a whole share is worth, so a pixel delta can be turned into a share delta.
-        _extent = host.ContentExtent;
+        // Where the two neighbours START, in PIXELS - which is also what the drag will write. A pixel of mouse is a
+        // pixel of boundary, with no basis to convert to and nothing to compound: Thumb reports a CUMULATIVE change, so
+        // every delta is measured from here rather than added to whatever the last one produced.
+        _originBefore = host.PixelsOf(before);
+        _originAfter = host.PixelsOf(after);
     }
 
     protected override void OnDragDelta(DragEventArgs e)
@@ -60,40 +57,29 @@ public class PaneSplitter : Thumb
         base.OnDragDelta(e);
 
         var (before, after) = Neighbours();
-        if (before == null || after == null || _extent <= 0) return;
+        if (before == null || after == null) return;
 
         var moved = Orientation == Orientation.Horizontal ? e.Change.X : e.Change.Y;
-        var shift = moved / _extent;
+        var total = _originBefore + _originAfter;
 
         // Neither side may be squeezed past what it says it needs - that MinSize is also what stops the tree from
         // being split into slivers, so the two rules are the same rule.
-        var floor = VisualParent is PaneHost host ? host.MinFraction : 0;
-        var minBefore = Math.Max(floor, MinShare(before));
-        var minAfter = Math.Max(floor, MinShare(after));
-        var total = _originBefore + _originAfter;
-        shift = Math.Clamp(shift, minBefore - _originBefore, total - minAfter - _originBefore);
+        var floor = VisualParent is PaneHost host ? Math.Max(0, host.MinFraction) * total : 0;
+        var minBefore = Math.Max(floor, MinPixelsOf(before));
+        var minAfter = Math.Max(floor, MinPixelsOf(after));
+        moved = Math.Clamp(moved, minBefore - _originBefore, total - minAfter - _originBefore);
 
-        // Writing the shares is all this does - the host re-lays itself out when they change (PaneHost.FractionChanged),
-        // so a drag and a programmatic change take the same road.
-        PaneHost.SetFraction(before, _originBefore + shift);
-        PaneHost.SetFraction(after, _originAfter - shift);
+        // The boundary moves, so BOTH neighbours become fixed at what they now are: the pair keeps the same total, and
+        // everyone else in the row is untouched. Writing pixels is the whole point - a drag is a statement about size,
+        // and a size stated in pixels cannot drift when the row later gains or loses a pane.
+        PaneHost.SetPaneLength(before, PaneLength.Pixels(_originBefore + moved));
+        PaneHost.SetPaneLength(after, PaneLength.Pixels(_originAfter - moved));
 
         if (PaneHost.LogLayout)
         {
-            Console.WriteLine($"[PaneSplitter {Orientation}] moved={moved:F1} extent={_extent:F1} shift={shift:F3} " +
-                              $"origin={_originBefore:F3}/{_originAfter:F3} min={minBefore:F3}/{minAfter:F3} " +
-                              $"-> {_originBefore + shift:F3}/{_originAfter - shift:F3}");
+            Console.WriteLine($"[PaneSplitter {Orientation}] moved={moved:F1} origin={_originBefore:F1}/{_originAfter:F1} " +
+                              $"min={minBefore:F1}/{minAfter:F1} -> {_originBefore + moved:F1}/{_originAfter - moved:F1}");
         }
-    }
-
-    /// <summary>What the neighbour's minimum is worth as a share of the host's extent.</summary>
-    private double MinShare(IUIComponent neighbour)
-    {
-        if (_extent <= 0) return 0;
-
-        var min = MinPixelsOf(neighbour);
-        if (min <= 0) return 0;
-        return Math.Min(min / _extent, _originBefore + _originAfter);
     }
 
     /// <summary>The smallest this neighbour may become, in pixels. An explicit MinWidth/MinHeight wins; otherwise the

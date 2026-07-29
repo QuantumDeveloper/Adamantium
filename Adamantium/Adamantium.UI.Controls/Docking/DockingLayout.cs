@@ -44,7 +44,6 @@ public class DockingLayout
         foreach (var declaration in declarations)
         {
             var group = declaration.Group;
-            group.DesiredSize = declaration.Size;
 
             if (root.Content == null)
             {
@@ -65,10 +64,23 @@ public class DockingLayout
             }
 
             layout.Split(root.Content, declaration.Zone is DockZone.Center or DockZone.Floating ? DockZone.Right : declaration.Zone, group);
+
+            // AFTER the split, which hands both sides a share of what the target held - that is right for a pane being
+            // dropped, and wrong for one the author sized. A number in markup is PIXELS along the zone's own axis ("the
+            // inspector starts 240 wide"); saying nothing leaves it taking a share of whatever is left, like the centre.
+            if (!double.IsNaN(declaration.Size)) group.Length = PaneLength.Pixels(declaration.Size);
         }
 
         layout.Normalize();
         return layout;
+    }
+
+    /// <summary>Cuts a length in two: the target keeps <paramref name="keep"/> of it, the arrival the rest. Whatever the
+    /// pair is worth together is exactly what the one of them was worth, so the row around them does not move.</summary>
+    private static PaneLength Halve(PaneLength length, double keep, out PaneLength arrivals)
+    {
+        arrivals = new PaneLength(length.Value * (1 - keep), length.Unit);
+        return new PaneLength(length.Value * keep, length.Unit);
     }
 
     /// <summary>Splits <paramref name="target"/>, putting <paramref name="inserted"/> on the given side of it and
@@ -83,19 +95,28 @@ public class DockingLayout
         if (target.Parent is { } parent && parent.Orientation == (vertical ? Orientation.Vertical : Orientation.Horizontal))
         {
             var at = parent.Children.IndexOf(target);
-            inserted.Fraction = fraction;
-            target.Fraction *= 1 - fraction;
+
+            // The two of them share what the TARGET had, and nobody else in the row moves - whatever kind of length it
+            // was. Splitting the target's own length keeps the pair worth exactly what the one of them was worth: a
+            // fixed 160 becomes 80 and 80, a weight of 2 becomes 1 and 1. Giving the arrival a share of the WHOLE row
+            // instead made it take far more than the half it was dropped on, and squeezed the neighbours to pay for it.
+            target.Length = Halve(target.Length, 1 - fraction, out var arrivals);
+            inserted.Length = arrivals;
+
             parent.Insert(before ? at : at + 1, inserted);
-            parent.NormalizeFractions();
             return;
         }
 
         var split = new PaneSplitNode { Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal };
         var host = target.Parent;
 
-        inserted.Fraction = fraction;
-        var kept = target.Fraction;
-        target.Fraction = 1 - fraction;
+        // The new split stands exactly where the target stood, so it inherits the target's claim on the OUTER row -
+        // "the console area is 160 tall" still holds when that area is two panes side by side. Inside it the pair simply
+        // shares, in weights: a pixel number stated for one axis says nothing about the other, and spending it there
+        // charged a height as a width.
+        var kept = target.Length;
+        target.Length = PaneLength.Stars(1 - fraction);
+        inserted.Length = PaneLength.Stars(fraction);
 
         if (host != null)
         {
@@ -110,7 +131,8 @@ public class DockingLayout
             }
         }
 
-        split.Fraction = kept;
+        split.Length = kept;
+
         if (before)
         {
             split.Add(inserted);
@@ -254,9 +276,13 @@ public class DockingLayout
                     // Same orientation -> take its children as our own instead of keeping the level.
                     if (normalized is PaneSplitNode inner && inner.Orientation == split.Orientation)
                     {
+                        // Flattened INTO this row, so each grandchild's share of the inner row becomes its share of this
+                        // one. Only weights compose that way; a fixed length is already an answer in pixels and stays
+                        // exactly what it was.
                         foreach (var grandChild in inner.Children)
                         {
-                            grandChild.Fraction *= normalized.Fraction;
+                            if (grandChild.Length.IsStar && normalized.Length.IsStar)
+                                grandChild.Length = PaneLength.Stars(grandChild.Length.Value * normalized.Length.Value);
                             kept.Add(grandChild);
                         }
                         continue;
@@ -272,12 +298,12 @@ public class DockingLayout
                 if (split.Children.Count == 1)
                 {
                     var only = split.Children[0];
-                    only.Fraction = split.Fraction;   // the survivor stands in the space the split held
+                    only.Length = split.Length;   // the survivor stands in the space the split held
                     only.Parent = split.Parent;
                     return only;
                 }
 
-                split.NormalizeFractions();
+                split.NormalizeLengths();
                 return split;
             }
 

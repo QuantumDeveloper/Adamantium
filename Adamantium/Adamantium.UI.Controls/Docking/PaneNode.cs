@@ -9,17 +9,16 @@ namespace Adamantium.UI.Controls.Docking;
 /// </summary>
 public abstract class PaneNode
 {
-    /// <summary>Share of the parent split this node takes, 0..1. Meaningless (and ignored) on a root.
-    /// <para>The fraction lives on the CHILD rather than in a list on the parent so that it travels with the node it
-    /// describes: moving a child around cannot leave it wearing its neighbour's size.</para></summary>
-    public double Fraction { get; set; } = 1.0;
+    /// <summary>How much of its parent split this node takes - so many pixels, or a weight in what is left over.
+    /// Meaningless (and ignored) on a root, which takes everything.
+    /// <para>ONE number, deliberately. It used to be two - a fraction AND a pixel hint - and every bug in this layout
+    /// came from the seam between them: they had to be kept in step across splits, moves, rebuilds and divider drags,
+    /// and each of those was a place they drifted. A pane whose fraction said half while its hint said 160 looked
+    /// correct right up until the hint stopped applying, and then jumped to half the window.</para>
+    /// <para>It lives on the CHILD rather than in a list on the parent so it travels with the node it describes: moving
+    /// a child around cannot leave it wearing its neighbour's size.</para></summary>
+    public Panels.PaneLength Length { get; set; } = Panels.PaneLength.Star;
 
     /// <summary>The split this node hangs from, or null for a root's top node.</summary>
     public PaneSplitNode Parent { get; internal set; }
-
-    /// <summary>Initial size in PIXELS, or NaN. Only a hint, and only for the first layout: the author says "the
-    /// inspector starts about 220 wide" without knowing the window's size, and the first arrange turns it into a
-    /// fraction. From then on the fraction is the truth - the pixel number would be a lie the moment the window
-    /// resizes or the user drags a divider.</summary>
-    public double DesiredSize { get; set; } = double.NaN;
 }

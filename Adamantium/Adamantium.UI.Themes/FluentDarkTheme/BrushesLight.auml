@@ -20,16 +20,28 @@
          white card - which is exactly why a tile must not borrow it.) -->
     <SolidColorBrush x:Key="TileFillColorDefault" Color="#0F000000"/>
 
-    <!-- Control fills (subtle dark translucent over the light background) -->
+    <!-- Control fills. Default is the RESTING face of a filled control - white-ish, so a button reads as raised off the
+         grey window base. Secondary/Tertiary are its hover/pressed, and here they part company with WinUI's values
+         (#80F9F9F9 / #4DF9F9F9): those are washes of WHITE, which have somewhere to go only over a white card. Measured
+         over the window base (#F3F3F3) the hover landed on #F6F6F6 - three units, invisible - so every hover in the light
+         theme was a no-op, and the same wash used as a Slider/ProgressBar track left the track invisible too. Hover in a
+         light theme DARKENS; these are the mirror of the dark palette's 6%/10% white lifts. -->
     <SolidColorBrush x:Key="ControlFillColorDefault" Color="#B3FFFFFF"/>
-    <SolidColorBrush x:Key="ControlFillColorSecondary" Color="#80F9F9F9"/>
-    <SolidColorBrush x:Key="ControlFillColorTertiary" Color="#4DF9F9F9"/>
+    <SolidColorBrush x:Key="ControlFillColorSecondary" Color="#0F000000"/>
+    <SolidColorBrush x:Key="ControlFillColorTertiary" Color="#1A000000"/>
     <SolidColorBrush x:Key="ControlFillColorDisabled" Color="#4DF9F9F9"/>
 
     <!-- Subtle fills (WinUI tokens): hover/press washes for chrome-less items - menu rows, title-bar buttons. Missing
          counterparts of the dark palette's entries (a {ResourceReference} miss is a silent no-op - see Brushes.auml). -->
     <SolidColorBrush x:Key="SubtleFillColorSecondary" Color="#09000000"/>
     <SolidColorBrush x:Key="SubtleFillColorTertiary" Color="#06000000"/>
+
+    <!-- Dock compass - see Brushes.auml. Inverted, but NOT white: a white plate over white content is only its outline,
+         and an outline alone reads as a wireframe rather than a target. A light grey face carries the shape itself and
+         the edge sharpens it. -->
+    <SolidColorBrush x:Key="DockCompassFillColor" Color="#F2E0E0E0"/>
+    <SolidColorBrush x:Key="DockCompassStrokeColor" Color="#73000000"/>
+    <SolidColorBrush x:Key="DockCompassPreviewColor" Color="#4D005FB8"/>
 
     <!-- Control strokes -->
     <!-- Control outlines. WinUI's light values (6% / 16% black) are deliberately faint because WinUI leans on SHADOWS and

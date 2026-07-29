@@ -1,3 +1,4 @@
+using System.Linq;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Docking;
 using Adamantium.UI.Core;
@@ -62,6 +63,67 @@ public class DockingAreaTests
 
         Assert.That(right.Bounds.X + right.Bounds.Width, Is.EqualTo(506).Within(0.5),
             "the far edge is still reached exactly - the divider comes out of the middle, not off the end");
+    }
+
+    /// <summary>
+    /// An authored pixel size is stated along the ZONE's axis - "the console starts about 160 tall". Drop something
+    /// beside it and that group is now in a row running the other way, where the number says nothing: the two must
+    /// simply share the row. Spending it anyway squeezed the console to 160 WIDE and gave the newcomer everything else.
+    /// </summary>
+    [Test]
+    public void APixelSizeStatedForOneAxis_IsNotSpentOnTheOther()
+    {
+        var area = new DockingArea { DividerThickness = 0 };
+        var centre = Group("scene", DockZone.Center);
+        centre.Items.Add(new Pane { Header = "game", Id = "game" });
+        var console = Group("console", DockZone.Bottom, size: 160);
+        area.Children.Add(centre);
+        area.Children.Add(console);
+
+        area.Measure(new Size(1000, 800));
+        area.Arrange(new Rect(0, 0, 1000, 800));
+
+        // "game" joins the console's row, to its right - the bottom row now runs HORIZONTALLY.
+        Assert.That(area.Layout.MovePane("game", area.Layout.FindGroup("console"), DockZone.Right), Is.True);
+        area.Rebuild();
+
+        area.Measure(new Size(1000, 800));
+        area.Arrange(new Rect(0, 0, 1000, 800));
+
+        // Asserted on what is on SCREEN, not on the model's fractions: the hint is spent by the host during layout, so
+        // the model can be perfectly halved while the arranged widths are 160 and the rest.
+        var consoleWidth = GroupControl(area, "console").Bounds.Width;
+        var gameWidth = GroupControl(area, "game").Bounds.Width;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(consoleWidth, Is.EqualTo(500).Within(1), "they share the row they now both live in");
+            Assert.That(gameWidth, Is.EqualTo(500).Within(1));
+
+            // And the number the author DID state still holds: the area is 160 tall, now shared by two panes instead of
+            // one. Only the axis that was split may change.
+            Assert.That(GroupControl(area, "console").Bounds.Height, Is.EqualTo(160).Within(1),
+                "the height the author asked for survives a split across the other axis");
+            Assert.That(GroupControl(area, "game").Bounds.Height, Is.EqualTo(160).Within(1));
+        });
+    }
+
+    // The group control holding a given pane, found in the visual tree the area built. By the group's ITEMS rather than
+    // by walking up from the pane: with no theme here a group has no template, so its panes are never realized into the
+    // visual tree - but the group itself is.
+    private static PaneGroup GroupControl(DockingArea area, string paneId)
+    {
+        return Descendants(area).OfType<PaneGroup>()
+            .FirstOrDefault(g => g.Items.OfType<Pane>().Any(p => p.Id == paneId));
+    }
+
+    private static System.Collections.Generic.IEnumerable<IUIComponent> Descendants(IUIComponent root)
+    {
+        foreach (var child in root.VisualChildren)
+        {
+            yield return child;
+            foreach (var nested in Descendants(child)) yield return nested;
+        }
     }
 
     [Test]

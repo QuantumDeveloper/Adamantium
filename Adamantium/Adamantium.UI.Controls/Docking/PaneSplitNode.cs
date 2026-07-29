@@ -39,28 +39,21 @@ public class PaneSplitNode : PaneNode
         var index = Children.IndexOf(oldChild);
         if (index < 0) return;
 
-        newChild.Fraction = oldChild.Fraction;   // the replacement stands in the same space
+        newChild.Length = oldChild.Length;   // the replacement stands in the same space
         newChild.Parent = this;
         oldChild.Parent = null;
         Children[index] = newChild;
     }
 
-    /// <summary>Scales the children's shares so they add up to 1. Every operation that adds or removes a child ends
-    /// here: shares that do not sum to one leave the layout with a gap or an overlap, and the error accumulates.</summary>
-    public void NormalizeFractions()
+    /// <summary>Gives every child that has nothing to say a share of its own. Lengths do NOT have to add up to anything -
+    /// fixed ones take their pixels and the starred ones divide what is left, which is what makes a row survive a pane
+    /// arriving or leaving without everyone shuffling. The only thing to repair is a child left with no length at all.
+    /// </summary>
+    public void NormalizeLengths()
     {
-        if (Children.Count == 0) return;
-
-        var total = 0.0;
-        foreach (var child in Children) total += child.Fraction;
-
-        if (total <= 0)
+        foreach (var child in Children)
         {
-            var even = 1.0 / Children.Count;
-            foreach (var child in Children) child.Fraction = even;
-            return;
+            if (child.Length.Value <= 0) child.Length = PaneLength.Star;
         }
-
-        foreach (var child in Children) child.Fraction /= total;
     }
 }

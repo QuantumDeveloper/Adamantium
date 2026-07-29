@@ -47,6 +47,12 @@ public class DockCompass : Panel
         nameof(IndicatorGap), typeof(double), typeof(DockCompass),
         new PropertyMetadata(6.0, PropertyMetadataOptions.AffectsArrange));
 
+    /// <summary>Width of the outline around each indicator. A target floating over arbitrary content needs an EDGE to be
+    /// aimed at; without one there is only a translucent fill, which over a light background is nothing at all.</summary>
+    public static readonly AdamantiumProperty IndicatorStrokeThicknessProperty = AdamantiumProperty.Register(
+        nameof(IndicatorStrokeThickness), typeof(double), typeof(DockCompass),
+        new PropertyMetadata(1.0, PropertyMetadataOptions.AffectsArrange));
+
     public static readonly AdamantiumProperty IndicatorBrushProperty = AdamantiumProperty.Register(
         nameof(IndicatorBrush), typeof(Brush), typeof(DockCompass), new PropertyMetadata(null));
 
@@ -67,6 +73,12 @@ public class DockCompass : Panel
     {
         get => GetValue<double>(IndicatorGapProperty);
         set => SetValue(IndicatorGapProperty, value);
+    }
+
+    public double IndicatorStrokeThickness
+    {
+        get => GetValue<double>(IndicatorStrokeThicknessProperty);
+        set => SetValue(IndicatorStrokeThicknessProperty, value);
     }
 
     public Brush IndicatorBrush
@@ -212,6 +224,9 @@ public class DockCompass : Panel
             indicator.Visibility = aiming ? Visibility.Visible : Visibility.Collapsed;
             indicator.Background = Zones[i] == _armed ? ActiveBrush : IndicatorBrush;
             indicator.BorderBrush = IndicatorStroke;
+            // Without a thickness the brush above draws nothing: Border's default is zero, so the outline that separates
+            // a target from whatever it floats over was never there at all.
+            indicator.BorderThickness = new Thickness(IndicatorStrokeThickness);
             indicator.Arrange(SlotOf(Zones[i], cx, cy, step, size));
         }
 

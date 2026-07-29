@@ -48,7 +48,20 @@ public class DockingArea : Panel
 
         var area = new Rect(0, 0, finalSize.Width, finalSize.Height);
         foreach (var child in Children) child.Arrange(area);
+
+        SyncLengthsToModel();
         return finalSize;
+    }
+
+    /// <summary>Copies the lengths the controls now carry back into the model.
+    /// <para>A divider drag writes onto the CONTROLS - that is what makes the boundary move under the pointer. Without
+    /// this the model never learned of it, so the next rebuild (any drop, any tear-off) handed the controls the sizes
+    /// from before the drag and everything the user had arranged with the mouse was silently undone. The model is what
+    /// gets saved, so it has to be the one that knows.</para></summary>
+    private void SyncLengthsToModel()
+    {
+        foreach (var pair in _groupsByNode) pair.Key.Length = PaneHost.GetPaneLength(pair.Value);
+        foreach (var pair in _hostsByNode) pair.Key.Length = PaneHost.GetPaneLength(pair.Value);
     }
 
     /// <summary>Regenerates the visual tree from the model. Every change to the layout ends here.</summary>
@@ -124,6 +137,8 @@ public class DockingArea : Panel
     /// unreachable, so there was nowhere to put an edge anchor.</para></summary>
     private void ShowOverlay()
     {
+        // Position PHYSICAL (a desktop point, like PointToScreen answers), size LOGICAL - see WindowBase.Left for why
+        // those two differ.
         var origin = this.PointToScreen(Vector2.Zero);
         var bounds = new Rect(0, 0, RenderSize.Width, RenderSize.Height);
 
@@ -162,11 +177,13 @@ public class DockingArea : Panel
     private DockTarget Resolve(Vector2 point)
     {
         var origin = this.PointToScreen(Vector2.Zero);
+        var scale = DpiScale;
 
         foreach (var pair in _groupsByNode)
         {
             var group = pair.Value;
-            var at = group.PointToScreen(Vector2.Zero) - origin;
+            // Physical difference back to LOGICAL, to be in the same units as the point and the group's own size.
+            var at = (group.PointToScreen(Vector2.Zero) - origin) / scale;
             var size = group.RenderSize;
             if (point.X < at.X || point.Y < at.Y || point.X > at.X + size.Width || point.Y > at.Y + size.Height) continue;
 
@@ -222,9 +239,11 @@ public class DockingArea : Panel
 
             // The cursor is read HERE, live: it has moved on since the threshold was crossed, and aiming at where it
             // WAS is what puts the caption out from under the pointer.
+            // Both sides PHYSICAL: the cursor is a desktop point and so is a window's position (see WindowBase.Left).
+            // The caption height is logical, so it - and only it - is converted.
             var cursor = Mouse.ScreenCoordinates;
             window.Left = cursor.X - grabX;
-            window.Top = cursor.Y - window.TitleBarHeight / 2;
+            window.Top = cursor.Y - window.TitleBarHeight * DpiScale.Y / 2;
 
             window.WindowMoving += (_, _) => TrackWindow(window);
             window.WindowMoveCompleted += (_, _) => DropWindow(window, pane.Id, root);
@@ -245,8 +264,16 @@ public class DockingArea : Panel
     /// from the window is what froze the compass where the drag began.</para></summary>
     private Vector2 PointerIn()
     {
-        return Mouse.ScreenCoordinates - this.PointToScreen(Vector2.Zero);
+        // Screen coordinates are PHYSICAL pixels and so is what PointToScreen answers, while everything this area
+        // measures itself in - RenderSize, a group's bounds, the compass geometry - is LOGICAL. They are the same number
+        // only at 100%; on a scaled display the difference put the pointer nowhere near where it actually was, which is
+        // why the compass could not be aimed at all on a 4K monitor. Divide once, here, at the boundary.
+        return (Mouse.ScreenCoordinates - this.PointToScreen(Vector2.Zero)) / DpiScale;
     }
+
+    /// <summary>Physical pixels per logical unit for the window this area is in. One when it has no window yet (nothing
+    /// to convert against) or on an unscaled display.</summary>
+    private Vector2 DpiScale => RootVisual is IWindow window ? window.DpiScale : Vector2.One;
 
     private void TrackWindow(WindowBase window)
     {
@@ -358,10 +385,7 @@ public class DockingArea : Panel
 
                 var control = GroupFor(group);
                 FillPanes(control, group);
-                PaneHost.SetFraction(control, group.Fraction);
-                // The authored pixel hint travels to the host, which spends it against the extent of the moment - the
-                // author said "about 240 wide", and that stays true whatever size the window settles at.
-                PaneHost.SetDesiredSizeHint(control, group.DesiredSize);
+                PaneHost.SetPaneLength(control, group.Length);
                 return control;
             }
 
@@ -374,7 +398,7 @@ public class DockingArea : Panel
                 var host = HostFor(split);
                 host.Orientation = split.Orientation;
                 host.DividerThickness = DividerThickness;
-                PaneHost.SetFraction(host, split.Fraction);
+                PaneHost.SetPaneLength(host, split.Length);
 
                 var wanted = new List<IMeasurableComponent>();
                 foreach (var child in split.Children)
