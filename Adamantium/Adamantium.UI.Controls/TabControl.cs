@@ -4,7 +4,6 @@ using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Primitives;
 using Adamantium.UI.Core;
-using Adamantium.UI.Core.Data;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Media.Animation;
@@ -822,6 +821,18 @@ public class TabControl : Selector
         set => SetValue(CloseButtonTemplateProperty, value);
     }
 
+    /// <summary>How every tab's <see cref="TabItem.Icon"/> is drawn - one template for the whole strip, which each tab
+    /// may override with its own. Icons are DATA (see TabItem.Icon), so the same icon is free to appear in the strip and
+    /// in the overflow flyout at once: each place builds its own visual from this.</summary>
+    public static readonly AdamantiumProperty IconTemplateProperty = AdamantiumProperty.Register(
+        nameof(IconTemplate), typeof(DataTemplate), typeof(TabControl), new PropertyMetadata(null));
+
+    public DataTemplate IconTemplate
+    {
+        get => GetValue<DataTemplate>(IconTemplateProperty);
+        set => SetValue(IconTemplateProperty, value);
+    }
+
     // --- Tab-strip overflow menu ----------------------------------------------------------------------------------
     // When the headers overflow the strip (wheel to scroll them), a ▾ overflow button appears listing every tab, the
     // current one highlighted - pick any (even a hidden one) to switch to it. PART_TabStrip is the TabStripScroller; its
@@ -866,12 +877,12 @@ public class TabControl : Selector
         }
         if (_overflowList != null)
         {
-            // The flyout mirrors the tabs; two-way selection with ours, so the current tab is highlighted and picking one
-            // (even a hidden one) selects it - SelectionChanged then closes the flyout + scrolls it into view.
-            _overflowList.ItemsSource = Items;
-            _overflowList.ItemTemplate = ItemTemplate;
-            _overflowList.SetBinding(Selector.SelectedItemProperty,
-                new Binding(nameof(SelectedItem)) { Source = this, Mode = BindingMode.TwoWay });
+            // The flyout mirrors the tabs BY PROJECTION, not by sharing the item list - see BuildOverflowRows. Selection
+            // is therefore mapped by position: picking a row (even one whose tab is scrolled out of sight) selects that
+            // tab, and TabControl's own SelectionChanged then scrolls it into view. The rows' LOOK is the theme's
+            // (ListBox.TabOverflowList), so nothing is assigned here that would outrank it.
+            _overflowList.SelectionChanged -= OnOverflowRowPicked;
+            _overflowList.SelectionChanged += OnOverflowRowPicked;
         }
         RefreshTabStripAffordances();
     }
@@ -880,7 +891,67 @@ public class TabControl : Selector
     // the height + scrolling, so there is nothing to size here.
     private void OnOverflowToggled(object sender, RoutedEventArgs e)
     {
-        if (_overflowPopup != null) _overflowPopup.IsOpen = _overflow?.IsChecked == true;
+        var opening = _overflow?.IsChecked == true;
+        if (opening) FillOverflowList();   // built fresh on each open, so it needs no subscription and cannot go stale
+        if (_overflowPopup != null) 
+            _overflowPopup.IsOpen = opening;
+    }
+
+    /// <summary>
+    /// What the overflow flyout lists: what each tab SAYS, never the tab itself. An authored TabItem is a live control,
+    /// and a list handed it as an item hosts it as a row's content - which takes it out of the tab strip. The strip then
+    /// correctly gives it up, so opening the flyout emptied the whole strip and left only the selected tab's body.
+    /// <para>A data-bound tab's item is plain data and goes in as it is, so the flyout presents it through the very same
+    /// ItemTemplate the strip uses. LIMITATION: a tab whose Header is itself a control cannot be shown twice either, so
+    /// such a header is listed as text.</para>
+    /// </summary>
+    internal IReadOnlyList<object> BuildOverflowRows()
+    {
+        var rows = new List<object>(Items.Count);
+        for (var i = 0; i < Items.Count; i++)
+        {
+            var item = Items[i];
+            var tab = item as TabItem ?? ItemContainerGenerator.ContainerFromIndex(i) as TabItem;
+
+            // An authored tab is named by its header; a data-bound one by the item itself, drawn through the very
+            // template the strip uses. A header that is ITSELF a control cannot be shown in two places any more than the
+            // tab can, so it is listed as text - which is the reason Icon is data and not a control.
+            var header = item is TabItem authored
+                ? authored.Header is IUIComponent visual ? visual.ToString() : authored.Header
+                : item;
+
+            rows.Add(new TabOverflowItem(this, tab, header, ItemTemplate));
+        }
+        return rows;
+    }
+
+    /// <summary>Picking row <paramref name="index"/> selects the tab at that position - the rows are a projection, so the
+    /// mapping back is positional. Out of range selects nothing (the list can outlive a tab that was just closed).</summary>
+    internal void SelectOverflowRow(int index)
+    {
+        if (index < 0 || index >= Items.Count) return;
+        SelectedIndex = index;
+    }
+
+    private bool _fillingOverflow;
+
+    private void FillOverflowList()
+    {
+        if (_overflowList == null) return;
+
+        _fillingOverflow = true;   // our own write must not read back as the user picking a row (which closes the flyout)
+        _overflowList.ItemsSource = BuildOverflowRows();
+        _overflowList.SelectedIndex = SelectedIndex;
+        _fillingOverflow = false;
+    }
+
+    private void OnOverflowRowPicked(object sender, EventArgs e)
+    {
+        if (_fillingOverflow || _overflowList == null) return;
+
+        SelectOverflowRow(_overflowList.SelectedIndex);
+        if (_overflow != null) 
+            _overflow.IsChecked = false;   // picking one closes the flyout
     }
 
     // The popup light-dismissed (a click outside it) - un-press the ▾ so its NEXT click reopens, not just un-presses.

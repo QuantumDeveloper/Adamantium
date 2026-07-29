@@ -31,6 +31,13 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             Padding="{TemplateBinding Padding}">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <!-- What marks the tab, drawn from DATA by IconTemplate. Nothing is reserved when there is no
+                                 icon: an empty presenter measures to nothing, so a tab without one is unchanged. -->
+                            <ContentPresenter x:Name="PART_Icon"
+                                    VerticalAlignment="Center"
+                                    Margin="0 0 6 0"
+                                    Content="{TemplateBinding Icon}"
+                                    ContentTemplate="{TemplateBinding IconTemplate}"/>
                             <ContentPresenter
                                     x:Name="PART_ContentPresenter"
                                     HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
