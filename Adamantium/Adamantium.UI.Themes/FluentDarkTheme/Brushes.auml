@@ -31,6 +31,15 @@
          REFERENCED by MenuStyleSet/TitleBarStyleSet but missing from the palette, so those hovers silently never applied
          (a {ResourceReference} that fails to resolve is a silent no-op). -->
     <SolidColorBrush x:Key="SubtleFillColorSecondary" Color="#0FFFFFFF"/>
+
+    <!-- Dock compass. Its own tokens rather than the control ramp's: those are tuned to sit ON the window base, while a
+         compass floats over WHATEVER is being docked onto - a document, an image, another panel. A 6%-white control fill
+         over that is invisible, which is exactly what it was. Strong plate, clearly drawn edge. -->
+    <SolidColorBrush x:Key="DockCompassFillColor" Color="#E62F2F2F"/>
+    <SolidColorBrush x:Key="DockCompassStrokeColor" Color="#59FFFFFF"/>
+    <!-- The translucent rectangle showing where the pane would land. Accent-tinted, and translucent on purpose: it covers
+         the very content it describes. -->
+    <SolidColorBrush x:Key="DockCompassPreviewColor" Color="#592D7FF9"/>
     <SolidColorBrush x:Key="SubtleFillColorTertiary" Color="#0AFFFFFF"/>
 
     <!-- Control strokes -->

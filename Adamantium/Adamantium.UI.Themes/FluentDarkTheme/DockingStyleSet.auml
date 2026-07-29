@@ -35,10 +35,10 @@
     <!-- The compass shown while a pane is being dragged. Its brushes live here rather than in the control: which of the
          five targets is armed is said with COLOUR, and colour is the theme's business. -->
     <Style Selector="DockCompass">
-        <Setter Property="IndicatorBrush" Value="{ResourceReference ControlFillColorDefault}"/>
-        <Setter Property="IndicatorStroke" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="IndicatorBrush" Value="{ResourceReference DockCompassFillColor}"/>
+        <Setter Property="IndicatorStroke" Value="{ResourceReference DockCompassStrokeColor}"/>
         <Setter Property="ActiveBrush" Value="{ResourceReference AccentFillColorDefault}"/>
-        <Setter Property="PreviewBrush" Value="#592D7FF9"/>
+        <Setter Property="PreviewBrush" Value="{ResourceReference DockCompassPreviewColor}"/>
     </Style>
 
     <!-- Both overlays are WINDOWS, so they arrive with a window's look - a title bar, a border, a resize grip. An

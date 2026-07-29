@@ -7,25 +7,34 @@ using NUnit.Framework;
 namespace Adamantium.UITests;
 
 /// <summary>
-/// PaneHost's whole job is arithmetic, so it is checked as arithmetic - rectangles, no GPU. This is the panel the
-/// docking layout stands on, and the reason it is not a Grid: the share lives in ONE place and this only spends it.
+/// PaneHost's whole job is arithmetic, so it is checked as arithmetic - rectangles, no GPU. Each child states ONE
+/// length: so many pixels, or a weight in what is left over. That is a Grid's rule, and it is here for a Grid's reason -
+/// a size described by two numbers at once (a share AND a pixel hint) has to be kept in step through every split, move
+/// and drag, and each of those is a place the two drift apart.
 /// </summary>
 [TestFixture]
 public class PaneHostTests
 {
-    private static Border Child(double fraction)
+    private static Border Star(double weight = 1)
     {
         var border = new Border();
-        if (!double.IsNaN(fraction)) PaneHost.SetFraction(border, fraction);
+        PaneHost.SetPaneLength(border, PaneLength.Stars(weight));
+        return border;
+    }
+
+    private static Border Fixed(double pixels)
+    {
+        var border = new Border();
+        PaneHost.SetPaneLength(border, PaneLength.Pixels(pixels));
         return border;
     }
 
     [Test]
-    public void ChildrenTakeTheirShare_MinusTheDividers()
+    public void StarredChildrenSplitWhatIsLeft_MinusTheDividers()
     {
         var split = new PaneHost { Orientation = Orientation.Horizontal, DividerThickness = 4 };
-        var left = Child(0.75);
-        var right = Child(0.25);
+        var left = Star(0.75);
+        var right = Star(0.25);
         split.Children.Add(left);
         split.Children.Add(right);
 
@@ -47,9 +56,9 @@ public class PaneHostTests
     {
         var split = new PaneHost { Orientation = Orientation.Horizontal, DividerThickness = 0 };
         // Thirds: any per-child rounding leaves a sliver at the right edge.
-        split.Children.Add(Child(1.0 / 3));
-        split.Children.Add(Child(1.0 / 3));
-        var last = Child(1.0 / 3);
+        split.Children.Add(Star());
+        split.Children.Add(Star());
+        var last = Star();
         split.Children.Add(last);
 
         split.Measure(new Size(100, 50));
@@ -62,8 +71,8 @@ public class PaneHostTests
     public void VerticalSplit_StacksAlongTheOtherAxis()
     {
         var split = new PaneHost { Orientation = Orientation.Vertical, DividerThickness = 0 };
-        var top = Child(0.25);
-        var bottom = Child(0.75);
+        var top = Star(0.25);
+        var bottom = Star(0.75);
         split.Children.Add(top);
         split.Children.Add(bottom);
 
@@ -83,9 +92,9 @@ public class PaneHostTests
     public void SplitterSitsInTheGap_WithoutTakingAShare()
     {
         var split = new PaneHost { Orientation = Orientation.Horizontal, DividerThickness = 8 };
-        var left = Child(0.5);
+        var left = Star();
         var splitter = new PaneSplitter();
-        var right = Child(0.5);
+        var right = Star();
         split.Children.Add(left);
         split.Children.Add(splitter);
         split.Children.Add(right);
@@ -104,15 +113,13 @@ public class PaneHostTests
         });
     }
 
-    /// <summary>"The console starts 160 tall" has to mean 160 - not 160 measured against whatever height the window
-    /// happened to have on some pass chosen to be the final one.</summary>
+    /// <summary>"The console is 160 tall" means 160 - taken off the top, with what remains going to the stars.</summary>
     [Test]
-    public void PixelHint_IsHonouredExactly_AndWhatIsLeftGoesToTheRest()
+    public void AFixedChild_TakesItsPixels_AndTheStarsShareTheRest()
     {
         var split = new PaneHost { Orientation = Orientation.Vertical, DividerThickness = 0 };
-        var documents = Child(0.5);
-        var console = Child(0.5);
-        PaneHost.SetDesiredSizeHint(console, 160);
+        var documents = Star();
+        var console = Fixed(160);
         split.Children.Add(documents);
         split.Children.Add(console);
 
@@ -121,22 +128,20 @@ public class PaneHostTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(console.Bounds.Height, Is.EqualTo(160).Within(0.5), "the authored number, not a share of it");
+            Assert.That(console.Bounds.Height, Is.EqualTo(160).Within(0.5), "the number that was stated, not a share of it");
             Assert.That(documents.Bounds.Height, Is.EqualTo(340).Within(0.5));
         });
     }
 
-    /// <summary>A sibling asking for a pixel size must not cost the others their OWN shares - if it did, a splitter
-    /// drag between two of them would write shares that the layout then ignored, and the boundary would not follow the
-    /// pointer at all.</summary>
+    /// <summary>The stars keep their own weights against each other while a fixed sibling takes its pixels - the fixed
+    /// one is not a third equal party.</summary>
     [Test]
-    public void HintedSibling_DoesNotFlattenTheOthersIntoEqualSlices()
+    public void AFixedSibling_DoesNotFlattenTheStarsIntoEqualSlices()
     {
         var split = new PaneHost { Orientation = Orientation.Horizontal, DividerThickness = 0 };
-        var left = Child(0.25);
-        var centre = Child(0.75);
-        var inspector = Child(double.NaN);
-        PaneHost.SetDesiredSizeHint(inspector, 100);
+        var left = Star(0.25);
+        var centre = Star(0.75);
+        var inspector = Fixed(100);
         split.Children.Add(left);
         split.Children.Add(centre);
         split.Children.Add(inspector);
@@ -152,46 +157,91 @@ public class PaneHostTests
         });
     }
 
-    /// <summary>Freezing is what a drag does before its first pixel of movement, and it must be invisible: the shares it
-    /// writes have to lay out to exactly what the hints were already producing. Otherwise the boundary jumps away from
-    /// the cursor the moment the mouse moves.</summary>
+    /// <summary>
+    /// THE reason for fixed lengths: resizing the window must not resize a docked panel. An inspector told to be 240
+    /// wide stays 240 wide while the centre absorbs everything the window gains or loses - which is what every editor
+    /// does, and what a pure share can never do.
+    /// </summary>
     [Test]
-    public void FreezingShares_ReproducesTheSameLayout()
+    public void ResizingTheHost_MovesTheStars_AndLeavesTheFixedAlone()
     {
-        var split = new PaneHost { Orientation = Orientation.Vertical, DividerThickness = 0 };
-        var documents = Child(0.5);
-        var console = Child(0.5);
-        PaneHost.SetDesiredSizeHint(console, 160);
+        var split = new PaneHost { Orientation = Orientation.Horizontal, DividerThickness = 0 };
+        var documents = Star();
+        var inspector = Fixed(240);
         split.Children.Add(documents);
-        split.Children.Add(console);
+        split.Children.Add(inspector);
 
-        split.Measure(new Size(300, 500));
-        split.Arrange(new Rect(0, 0, 300, 500));
+        split.Measure(new Size(1000, 100));
+        split.Arrange(new Rect(0, 0, 1000, 100));
 
-        split.FreezeShares();
-        split.Measure(new Size(300, 500));
-        split.Arrange(new Rect(0, 0, 300, 500));
+        split.Measure(new Size(1400, 100));
+        split.Arrange(new Rect(0, 0, 1400, 100));
 
         Assert.Multiple(() =>
         {
-            Assert.That(console.Bounds.Height, Is.EqualTo(160).Within(0.5), "nothing moved");
-            Assert.That(PaneHost.GetFraction(console), Is.EqualTo(0.32).Within(1e-6), "and the size now lives in the share");
-            Assert.That(PaneHost.GetDesiredSizeHint(console), Is.NaN, "the hint has been spent");
+            Assert.That(inspector.Bounds.Width, Is.EqualTo(240).Within(0.5), "the panel keeps the width it was given");
+            Assert.That(documents.Bounds.Width, Is.EqualTo(1160).Within(0.5), "the centre takes the whole difference");
         });
     }
 
+    /// <summary>
+    /// And the other half of it: taking a pane OUT of the row must not resize the ones that stay fixed. The space it
+    /// leaves goes to the stars - the panes that said they would take whatever is left.
+    /// </summary>
     [Test]
-    public void ChildWithoutAShare_GetsAnEqualSlice()
+    public void RemovingAChild_GivesItsSpaceToTheStars_NotToTheFixed()
     {
         var split = new PaneHost { Orientation = Orientation.Horizontal, DividerThickness = 0 };
-        var a = Child(double.NaN);
-        var b = Child(double.NaN);
+        var documents = Star();
+        var inspector = Fixed(240);
+        var console = Star();
+        split.Children.Add(documents);
+        split.Children.Add(inspector);
+        split.Children.Add(console);
+
+        split.Measure(new Size(1000, 100));
+        split.Arrange(new Rect(0, 0, 1000, 100));
+
+        split.Children.Remove(console);
+        split.Measure(new Size(1000, 100));
+        split.Arrange(new Rect(0, 0, 1000, 100));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(inspector.Bounds.Width, Is.EqualTo(240).Within(0.5), "the fixed panel did not move an inch");
+            Assert.That(documents.Bounds.Width, Is.EqualTo(760).Within(0.5), "the star took what was freed");
+        });
+    }
+
+    /// <summary>A fixed child cannot eat the whole row: the stars keep standing room, or there would be no edge left to
+    /// grab and drag them back out.</summary>
+    [Test]
+    public void AFixedChildBiggerThanTheRow_IsCutBackToLeaveTheStarsStandingRoom()
+    {
+        var split = new PaneHost { Orientation = Orientation.Horizontal, DividerThickness = 0, MinFraction = 0.1 };
+        var documents = Star();
+        var greedy = Fixed(5000);
+        split.Children.Add(documents);
+        split.Children.Add(greedy);
+
+        split.Measure(new Size(1000, 100));
+        split.Arrange(new Rect(0, 0, 1000, 100));
+
+        Assert.That(documents.Bounds.Width, Is.EqualTo(100).Within(0.5), "a tenth of the row is left to stand in");
+    }
+
+    [Test]
+    public void ChildrenThatSaidNothing_ShareEqually()
+    {
+        var split = new PaneHost { Orientation = Orientation.Horizontal, DividerThickness = 0 };
+        var a = new Border();
+        var b = new Border();
         split.Children.Add(a);
         split.Children.Add(b);
 
         split.Measure(new Size(300, 100));
         split.Arrange(new Rect(0, 0, 300, 100));
 
-        Assert.That(a.Bounds.Width, Is.EqualTo(150).Within(0.5), "no share declared still has to land somewhere sane");
+        Assert.That(a.Bounds.Width, Is.EqualTo(150).Within(0.5), "saying nothing means one share of the leftovers");
     }
 }

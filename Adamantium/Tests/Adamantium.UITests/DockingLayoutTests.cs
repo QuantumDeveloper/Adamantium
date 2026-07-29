@@ -60,7 +60,7 @@ public class DockingLayoutTests
             Assert.That(split.Orientation, Is.EqualTo(Orientation.Vertical));
             Assert.That(((PaneGroupNode)split.Children[0]).PaneIds, Is.EqualTo(new[] { "scene" }), "the pane left its old group");
             Assert.That(((PaneGroupNode)split.Children[1]).PaneIds, Is.EqualTo(new[] { "game" }));
-            Assert.That(split.Children.Sum(c => c.Fraction), Is.EqualTo(1.0).Within(1e-9));
+            Assert.That(split.Children.All(c => c.Length.IsStar), Is.True, "nobody was pinned to pixels by a split");
         });
     }
 
@@ -111,8 +111,8 @@ public class DockingLayoutTests
             Assert.That(split.Orientation, Is.EqualTo(Orientation.Horizontal), "left/right splits run horizontally");
             Assert.That(((PaneGroupNode)split.Children[0]).PaneIds, Is.EqualTo(new[] { "scene" }), "the target keeps its side");
             Assert.That(((PaneGroupNode)split.Children[1]).PaneIds, Is.EqualTo(new[] { "inspector" }), "the newcomer is on the right");
-            Assert.That(split.Children[1].Fraction, Is.EqualTo(0.25).Within(1e-9));
-            Assert.That(split.Children.Sum(c => c.Fraction), Is.EqualTo(1.0).Within(1e-9), "shares always add up to one");
+            Assert.That(split.Children[1].Length, Is.EqualTo(PaneLength.Stars(0.25)), "the newcomer takes the quarter it was given");
+            Assert.That(split.Children.Sum(c => c.Length.Value), Is.EqualTo(1.0).Within(1e-9), "the pair is worth what the one of them was");
         });
     }
 
@@ -130,7 +130,7 @@ public class DockingLayoutTests
         {
             Assert.That(split.Children, Has.Count.EqualTo(3), "one split of three, not a split inside a split");
             Assert.That(split.Children.All(c => c is PaneGroupNode), Is.True, "every child is a leaf");
-            Assert.That(split.Children.Sum(c => c.Fraction), Is.EqualTo(1.0).Within(1e-9));
+            Assert.That(split.Children.All(c => c.Length.IsStar), Is.True, "nobody was pinned to pixels by a split");
         });
     }
 
@@ -147,7 +147,7 @@ public class DockingLayoutTests
         {
             Assert.That(layout.Main.Content, Is.InstanceOf<PaneGroupNode>(), "a split dividing one child is not a split");
             Assert.That(((PaneGroupNode)layout.Main.Content).PaneIds, Is.EqualTo(new[] { "scene" }));
-            Assert.That(layout.Main.Content.Fraction, Is.EqualTo(1.0).Within(1e-9), "and it takes the whole space back");
+            Assert.That(layout.Main.Content.Length, Is.EqualTo(PaneLength.Star), "and it takes the whole space back");
         });
     }
 
@@ -156,7 +156,7 @@ public class DockingLayoutTests
     {
         // Built by hand the way a careless caller might: a horizontal split holding another horizontal split.
         var outer = new PaneSplitNode { Orientation = Orientation.Horizontal };
-        var inner = new PaneSplitNode { Orientation = Orientation.Horizontal, Fraction = 0.5 };
+        var inner = new PaneSplitNode { Orientation = Orientation.Horizontal, Length = PaneLength.Stars(0.5) };
         inner.Add(Group("a"));
         inner.Add(Group("b"));
         outer.Add(Group("c"));
@@ -170,7 +170,7 @@ public class DockingLayoutTests
         {
             Assert.That(split.Children, Has.Count.EqualTo(3), "three siblings, not two with one of them a split");
             Assert.That(split.Children.All(c => c is PaneGroupNode), Is.True);
-            Assert.That(split.Children.Sum(c => c.Fraction), Is.EqualTo(1.0).Within(1e-9));
+            Assert.That(split.Children.All(c => c.Length.IsStar), Is.True, "nobody was pinned to pixels by a split");
         });
     }
 
@@ -231,7 +231,7 @@ public class DockingLayoutTests
             Assert.That(inner.Orientation, Is.EqualTo(Orientation.Horizontal), "right docks along the horizontal axis");
             Assert.That(((PaneGroupNode)inner.Children[0]).PaneIds, Is.EqualTo(new[] { "scene" }));
             Assert.That(((PaneGroupNode)inner.Children[1]).PaneIds, Is.EqualTo(new[] { "inspector" }));
-            Assert.That(inner.Children[1].DesiredSize, Is.EqualTo(220), "the pixel hint travels with the node");
+            Assert.That(inner.Children[1].Length, Is.EqualTo(PaneLength.Pixels(220)), "the pixels the author wrote travel with the node");
         });
     }
 
@@ -259,6 +259,61 @@ public class DockingLayoutTests
         {
             Assert.That(layout.FindGroup("inspector"), Is.Not.Null, "a floating root is searched like any other");
             Assert.That(layout.FindGroup("nobody"), Is.Null);
+        });
+    }
+
+    /// <summary>
+    /// Dropping beside a group SPLITS THAT GROUP: the two of them share what the one of them had, and nobody else moves.
+    /// The share is halved twice over - the target keeps half of its own, and the arrival takes the other half of its
+    /// own - which is not the same as the arrival taking half of the whole row.
+    /// <para>The editor case: a wide centre next to a narrow inspector. Drop a pane on the centre's right and the centre
+    /// splits down the middle; the inspector is not involved and does not change width.</para>
+    /// </summary>
+    [Test]
+    public void MovePane_BesideAGroupInAnAlreadySplitRow_HalvesThatGroupAndLeavesTheOthers()
+    {
+        var scene = Group("scene");
+        var inspector = Group("inspector", "console");   // the console starts as one of the inspector's tabs
+
+        var layout = LayoutWith(scene);
+        layout.Split(scene, DockZone.Right, inspector, 0.25);   // one horizontal row: centre 0.75 | inspector 0.25
+
+        var sceneShare = scene.Length.Value;
+        var inspectorShare = inspector.Length.Value;
+
+        Assert.That(layout.MovePane("console", scene, DockZone.Right), Is.True);
+
+        var row = scene.Parent;
+        var arrived = (PaneGroupNode)row.Children[row.Children.IndexOf(scene) + 1];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(arrived.PaneIds, Is.EqualTo(new[] { "console" }), "it landed to the RIGHT of the group it was dropped on");
+            Assert.That(scene.Length.Value, Is.EqualTo(sceneShare / 2).Within(1e-6), "the group dropped on keeps half of its own share");
+            Assert.That(arrived.Length.Value, Is.EqualTo(sceneShare / 2).Within(1e-6), "and the arrival takes the other half OF THAT GROUP");
+            Assert.That(inspector.Length.Value, Is.EqualTo(inspectorShare).Within(1e-6), "an uninvolved neighbour is not touched at all");
+            
+        });
+    }
+
+    /// <summary>The same halving when the drop makes a NEW split (the target's row runs the other way), so both routes
+    /// through Split agree on what "beside" means.</summary>
+    [Test]
+    public void MovePane_BesideAGroupInANewSplit_HalvesThatGroup()
+    {
+        var scene = Group("scene");
+        var console = Group("console");
+        var layout = LayoutWith(scene);
+        layout.Split(scene, DockZone.Bottom, console, 0.25);   // a vertical row; a Right drop must nest a new one
+
+        Assert.That(layout.MovePane("console", scene, DockZone.Right), Is.True);
+
+        var split = (PaneSplitNode)layout.Main.Content;
+        Assert.Multiple(() =>
+        {
+            Assert.That(split.Orientation, Is.EqualTo(Orientation.Horizontal));
+            Assert.That(split.Children[0].Length.Value, Is.EqualTo(0.5).Within(1e-6));
+            Assert.That(split.Children[1].Length.Value, Is.EqualTo(0.5).Within(1e-6));
         });
     }
 }
