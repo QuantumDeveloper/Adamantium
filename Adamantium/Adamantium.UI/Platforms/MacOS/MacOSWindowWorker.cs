@@ -106,6 +106,11 @@ public class MacOSWindowWorker : AdamantiumComponent, IWindowWorkerService
         throw new NotImplementedException();
     }
 
+    public void UpdateOverlayTraits()
+    {
+        throw new NotImplementedException();
+    }
+
     // TODO(macOS): NSApplication.activate + [NSWindow makeKeyAndOrderFront:]. No-op until the macOS window pipeline lands.
     public void Activate()
     {

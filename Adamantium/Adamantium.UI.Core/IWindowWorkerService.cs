@@ -11,6 +11,11 @@ public interface IWindowWorkerService
     /// was. Size and z-order are untouched, and the window is not activated: moving a window is not focusing it.</summary>
     public void SetPosition(double left, double top);
 
+    /// <summary>Re-apply the window's overlay traits - topmost, click-through, transparency - to the live OS window.
+    /// Called whenever one of them changes, so setting <c>Topmost</c> on an open window actually raises it instead of
+    /// changing a number nobody reads again.</summary>
+    public void UpdateOverlayTraits();
+
     public void ShowWindow(WindowState windowState);
 
     public void HideWindow();

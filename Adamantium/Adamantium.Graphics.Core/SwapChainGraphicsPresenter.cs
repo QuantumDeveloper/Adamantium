@@ -110,7 +110,23 @@ namespace Adamantium.Graphics.Core
             }
 
             createInfo.PreTransform = swapChainSupport.Capabilities.CurrentTransform;
-            createInfo.CompositeAlpha = CompositeAlphaFlagBitsKHR.OpaqueBitKhr;
+
+            // What the SURFACE says it can do, not what we assume: composite alpha is a property of the surface, and in
+            // one measured run two surfaces in the SAME process answered differently - one offered pre-multiplied, the
+            // other opaque only. So it is asked for, checked, and fallen back on out loud.
+            var supportedAlpha = swapChainSupport.Capabilities.SupportedCompositeAlpha;
+            var wantsAlpha = Description.TransparentComposition;
+            var canDoAlpha = supportedAlpha.HasFlag(CompositeAlphaFlagBitsKHR.PreMultipliedBitKhr);
+
+            createInfo.CompositeAlpha = wantsAlpha && canDoAlpha
+                ? CompositeAlphaFlagBitsKHR.PreMultipliedBitKhr
+                : CompositeAlphaFlagBitsKHR.OpaqueBitKhr;
+
+            if (wantsAlpha && !canDoAlpha)
+            {
+                Console.WriteLine("[Swapchain] transparency requested but this surface only offers " +
+                                  $"{supportedAlpha} - the window will be opaque.");
+            }
             createInfo.PresentMode = presentMode;
             createInfo.Clipped = true;
 

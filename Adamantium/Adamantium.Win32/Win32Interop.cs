@@ -362,6 +362,16 @@ namespace Adamantium.Win32
         */
 
         public const int ULW_ALPHA = 0x00000002;
+
+        // Uniform translucency for a window that renders ITSELF (no bitmap pushed at the OS): the DWM composites the
+        // whole window at one alpha. Per-pixel transparency does not come from here - it comes from the swapchain
+        // asking for pre-multiplied composition.
+        public const uint LWA_ALPHA = 0x00000002;
+
+        [DllImport("user32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
+
         public const byte AC_SRC_OVER = 0x00;
         public const byte AC_SRC_ALPHA = 0x01;
         public const uint BI_RGB = 0;
