@@ -1,0 +1,65 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions"
+          xmlns:controls="http://adamantium/ui">
+
+    <!-- Docking. Style matching is by EXACT type here, so a derived control inherits nothing by default - that is why
+         each of these says BasedOn explicitly instead of quietly relying on its base. A pane group IS a tab control and
+         a pane IS a tab item, so they take those looks whole; the splitter needs its own, because a Thumb has no look
+         at all - and a control with no template renders nothing and cannot be hit, which is exactly what makes a grip
+         that refuses to be dragged. -->
+
+    <Style Selector="PaneGroup" BasedOn="TabControl"/>
+
+    <Style Selector="Pane" BasedOn="TabItem"/>
+
+    <!-- The grip between two areas. Same shape as GridSplitter's: a thin subtle bar that lights up accent under the
+         pointer, so it is visible ENOUGH to aim at without drawing attention when it is not wanted. -->
+    <Style Selector="PaneSplitter">
+        <Setter Property="Background" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="PaneSplitter">
+                    <controls:Border Background="{TemplateBinding Background}"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="PaneSplitter">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter Property="Background" Value="{ResourceReference AccentFillColorDefault}"/>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- The compass shown while a pane is being dragged. Its brushes live here rather than in the control: which of the
+         five targets is armed is said with COLOUR, and colour is the theme's business. -->
+    <Style Selector="DockCompass">
+        <Setter Property="IndicatorBrush" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="IndicatorStroke" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="ActiveBrush" Value="{ResourceReference AccentFillColorDefault}"/>
+        <Setter Property="PreviewBrush" Value="#592D7FF9"/>
+    </Style>
+
+    <!-- Both overlays are WINDOWS, so they arrive with a window's look - a title bar, a border, a resize grip. An
+         overlay has none of that: it is a plate that appears over everything for the length of a drag. Hence a bare
+         template of its own rather than the one Window carries. -->
+    <!-- This window covers the WHOLE docking area, so it must have nothing of its own: no caption, no border, and a
+         background that is not there. Anything opaque here would black out the very layout the compass points at. -->
+    <Style Selector="DockCompassWindow">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DockCompassWindow">
+                    <!-- The Content binding is NOT optional: without it the presenter presents nothing, the window lays
+                         itself out and its content never does. Measured - the window arranged 8 times at the right size
+                         while the compass inside it arranged zero. -->
+                    <controls:ContentPresenter x:Name="PART_ContentPresenter"
+                            Content="{TemplateBinding Content}"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>
+

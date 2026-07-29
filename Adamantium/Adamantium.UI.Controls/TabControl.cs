@@ -144,11 +144,13 @@ public class TabControl : Selector
             // PlaceIndicator, which authoritatively places the bar from the next arrange pass (see _reselecting).
             // The same gate covers the scroll-into-view: bring the selected tab (possibly hidden - e.g. picked from the
             // overflow flyout) into view; a no-op when it is already visible.
-            if (!_reselecting)
-            {
-                UpdateIndicator(animate: true);
-                _tabStrip?.ScrollIntoView(ItemContainerGenerator.ContainerFromIndex(SelectedIndex) as IUIComponent);
-            }
+            // The selected tab has to become VISIBLE however the selection was made - by a click, from the overflow
+            // flyout, or by a view-model assignment. Recorded as pending rather than done here: a view-model can select
+            // before the template exists, before the container is generated and before anything is laid out, and a
+            // scroll attempted then simply does nothing and is never retried. See ScrollSelectedIntoView.
+            _scrollPending = true;
+
+            if (!_reselecting) UpdateIndicator(animate: true);
             if (_overflow?.IsChecked == true) _overflow.IsChecked = false;   // a pick from the flyout closes it
         };
         Items.CollectionChanged += OnItemsChanged;
@@ -308,15 +310,23 @@ public class TabControl : Selector
         var across = _dragVertical ? pos.X : pos.Y;
         var extent = _dragVertical ? size.Width : size.Height;
         var outside = across < 0 ? -across : across > extent ? across - extent : 0;
-        UpdateTearOff(tab, outside, across < 0 ? -1 : 1);
+
+        // How far off the strip counts as "away". Unset means the strip's OWN extent - pull a whole strip-height clear
+        // of it and the tab leaves. Derived rather than a number picked by hand, so it scales with the theme and the
+        // DPI; and it is what makes reordering usable, since a hand that wanders a few pixels vertically while dragging
+        // ALONG the strip must not tear the tab out.
+        var threshold = double.IsNaN(TearOffDistance) ? extent : TearOffDistance;
+        UpdateTearOff(tab, outside, threshold, across < 0 ? -1 : 1);
     }
 
     /// <summary>How far past the tab strip the pointer must go, ACROSS the strip's axis, before the drag becomes a
-    /// tear-off. Zero (the default) means the strip's own edge: leave it and the tab leaves with you. Reordering runs
-    /// ALONG the strip and keeps this at zero however far it goes, so the two gestures still cannot be confused - raise
-    /// it only to demand a deliberate pull-away.</summary>
+    /// tear-off. NaN (the default) means the strip's own extent: pull a whole strip-height clear of it and the tab goes
+    /// with you.
+    /// <para>Not zero. Zero means the strip's very edge, and a hand that wanders a pixel or two vertically while
+    /// dragging ALONG the strip then tears the tab out instead of reordering it - the two gestures are told apart by
+    /// direction, but only if leaving takes a deliberate movement. Set a number to demand more or less.</para></summary>
     public static readonly AdamantiumProperty TearOffDistanceProperty = AdamantiumProperty.Register(
-        nameof(TearOffDistance), typeof(double), typeof(TabControl), new PropertyMetadata(0.0));
+        nameof(TearOffDistance), typeof(double), typeof(TabControl), new PropertyMetadata(double.NaN));
 
     public double TearOffDistance
     {
@@ -338,9 +348,9 @@ public class TabControl : Selector
     // strip waiting for the button to come up. Anything else is incoherent: the strip would go on holding a slot and
     // sliding its neighbours aside for something that has already left, and the window a docking gesture needs to aim at
     // would not exist until after the aiming was over.
-    private void UpdateTearOff(TabItem tab, double outside, int side)
+    private void UpdateTearOff(TabItem tab, double outside, double threshold, int side)
     {
-        if (IsTearingOff || outside <= TearOffDistance) return;
+        if (IsTearingOff || outside <= threshold) return;
 
         IsTearingOff = true;
         var args = new TabTearOffEventArgs(tab.DataContext, tab, Mouse.ScreenCoordinates);
@@ -370,7 +380,16 @@ public class TabControl : Selector
 
         _dragStartIndex = _targetIndex = -1;
         tab.ZIndex = 0;
-        if (tab.IsMouseCaptured) tab.ReleaseMouseCapture();
+
+        // The TAB's own gesture state has to go too, not just this control's. It is cleared on button-up, and a torn-off
+        // tab never sees one - the platform's move loop has the button - so it would stay "mid-drag" forever and tear
+        // itself out again on the first mouse move after being docked back.
+        tab.AbandonDrag();
+
+        // Drop the indicator's position cache, exactly as EndDrag does after a reorder. It holds where the dragged tab
+        // was under the cursor; leaving it means PlaceIndicator short-circuits on "along == _lastAlong" and the bar
+        // stays at the slot of a tab that has just left the strip.
+        _lastAlong = _lastExtent = double.NaN;
     }
 
     internal void UpdateDrag(TabItem tab, double along)
@@ -615,13 +634,41 @@ public class TabControl : Selector
         }
     }
 
-    private void OnLayoutSettled(object sender, EventArgs e) => PlaceIndicator();
+    private void OnLayoutSettled(object sender, EventArgs e)
+    {
+        PlaceIndicator();
+        ScrollSelectedIntoView();
+    }
 
     protected override Size ArrangeOverride(Size finalSize)
     {
         var size = base.ArrangeOverride(finalSize);
         PlaceIndicator();
         return size;
+    }
+
+    private bool _scrollPending;
+
+    /// <summary>Brings the selected tab into view once everything it needs exists. Stays PENDING until then, and that is
+    /// the whole point: a selection assigned by a view-model arrives before the template is applied, before the
+    /// container is generated and before the strip is laid out, so a scroll issued at that moment silently does nothing.
+    /// Retried once layout has SETTLED, never from inside an arrange pass: scrolling invalidates arrange, and an
+    /// arrange scheduled mid-arrange runs without a measure - the tab panel then stacks every tab on DesiredSize zero,
+    /// which is all of them at x=0, on top of each other. Measured, twice.</summary>
+    private void ScrollSelectedIntoView()
+    {
+        if (!_scrollPending) return;
+        if (_tabStrip == null || SelectedIndex < 0) return;
+
+        if (ItemContainerGenerator.ContainerFromIndex(SelectedIndex) is not IUIComponent container) return;
+        // Not laid out yet - scrolling to a tab with no bounds scrolls to nowhere. The next pass will find it placed.
+        if (container.Bounds.Width <= 0 && container.Bounds.Height <= 0) return;
+
+        // Cleared only once the tab is ALL the way in view. The overflow button's visibility is decided after a layout
+        // pass, and when it appears the strip's viewport narrows - so an offset computed before that leaves the tail of
+        // the tab, its close button, just past the new edge. Retrying until nothing needs moving converges in a pass or
+        // two and cannot strand a clipped tail.
+        _scrollPending = !_tabStrip.ScrollIntoView(container);
     }
 
     private void PlaceIndicator()
