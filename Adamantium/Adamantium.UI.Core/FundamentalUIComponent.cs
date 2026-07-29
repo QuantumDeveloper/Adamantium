@@ -415,25 +415,28 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
             return;
 
         // Re-theming must undo what the PREVIOUS set left behind (a theme swap re-applies without a preceding detach, and
-        // its activators carry live subscriptions) - but ONLY what is genuinely leaving. Detaching everything up front
-        // used to drop each setter's value for the length of the call, and a property that falls back to its default and
+        // its activators carry live subscriptions) - but ONLY what is genuinely LEAVING. Detaching everything up front
+        // dropped each setter's value for the length of the call, and a property that falls back to its default and
         // returns is a property that CHANGED, twice, with every callback firing both times.
         // That is not academic: the applicable set does not change when a control is merely RE-PARENTED (selectors match
         // on type/id/class - never on the ancestor chain), yet SetParent re-themes. Measured in docking - one dock-back
         // put a group's ItemsPanel through theme -> default -> theme, and each write rebuilt the items panel, so the tabs
         // ended up in a panel the layout pass no longer descends into, wearing the positions of their previous life.
-        // So: apply first, then remove only the styles the new set does not contain. Removal is keyed BY STYLE (a setter
-        // undoes its own contribution and nothing else), which is what makes that order safe.
-        var previous = _attachedStyles.ToArray();
-        _attachedStyles.Clear();   // tracking only - nothing is undone here; the leftovers are detached below
+        //
+        // The leavers still go FIRST, before the incoming set is applied. Applying first and cleaning up afterwards looks
+        // tidier and is wrong: a marker setter ({Binding}, {ThemeResource}, {Ancestor}, {Self}) is undone by property
+        // alone, with no style key, so the outgoing theme's teardown would tear out the incoming theme's live link.
+        var incoming = UIAppContext.Current.ThemeManager?.FindStylesForComponent(this);
+        foreach (var style in _attachedStyles.ToArray())
+        {
+            if (incoming != null && Array.IndexOf(incoming, style) >= 0) continue;
+            if (Styles.Contains(style)) continue;   // an author's own style stays; it is re-applied below either way
+
+            DetachStyles(style);
+        }
 
         UIAppContext.Current.UIContext.ThemeContext.ApplyCurrentTheme(this);
         UIAppContext.Current.UIContext.ThemeContext.ApplyExternalStyles(this, Styles.ToArray());
-
-        foreach (var style in previous)
-        {
-            if (!_attachedStyles.Contains(style)) style.Detach(this);
-        }
 
         IsStyleApplied = true;
     }

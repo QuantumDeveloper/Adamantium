@@ -414,9 +414,7 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             return AdamantiumProperty.UnsetValue;
         }
         
-        var previousValue = styleValues[propertyName].RemoveAndGetPreviousValue(style);
-        
-        return previousValue;
+        return styleValues[propertyName].RemoveAndGetEffectiveValue(style);
     }
 
     /// <summary>
