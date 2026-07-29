@@ -22,21 +22,22 @@ internal class StyleValueContainer
         }
     }
 
-    public object RemoveAndGetPreviousValue(Style style)
+    /// <summary>Takes one style's contribution out and answers with the value in force AFTER it is gone - the last of
+    /// the contributions still standing, since the last one applied is the one that wins.
+    /// <para>It used to answer with the entry sitting immediately BEFORE the removed one, which is the same thing only
+    /// while styles are taken off in exact reverse order of application. A theme swap does not oblige: it applies the
+    /// incoming set and then drops the outgoing one, so the entry removed is the one at the BOTTOM - and "the entry
+    /// before it" is nothing at all. That nothing was then written into the property, wiping the incoming theme's
+    /// Template and Background: the window rendered blank white.</para></summary>
+    public object RemoveAndGetEffectiveValue(Style style)
     {
         var entry = _values.FirstOrDefault(x => x.Style == style);
         if (entry == null) return AdamantiumProperty.UnsetValue;
 
-        object prevValue = AdamantiumProperty.UnsetValue;
-        var index = _values.IndexOf(entry);
-        if (index > 0)
-        {
-            prevValue = _values[index - 1].Value;
-        }
         _values.Remove(entry);
         _styleHash.Remove(style);
 
-        return prevValue;
+        return _values.Count > 0 ? _values[^1].Value : AdamantiumProperty.UnsetValue;
     }
 
     public object GetValue(Style style)
