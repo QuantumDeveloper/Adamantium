@@ -443,9 +443,29 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         if (visuals == null) return;
         foreach (UIComponent visual in visuals)
         {
+            // Take it off whoever had it FIRST. A component belongs to one parent, but nothing about being handed to a
+            // new one used to reach the old one's child collection - so the previous parent went on listing it, and went
+            // on measuring and arranging it. Two parents placing one control means its position is decided by whichever
+            // of them the layout pass reaches last, which is an accident of tree order.
+            // Measured through docking: a tab moved into another group kept the bounds of its old strip and so sat on
+            // top of a neighbour. Every control-level move takes this path - an items presenter refilling a rebuilt
+            // panel with the containers the previous one still holds, a docking rebuild moving tabs between groups.
+            if (visual.VisualParent is UIComponent previous && !ReferenceEquals(previous, this))
+            {
+                previous.DisownVisualChild(visual);
+            }
+
             visual.SetVisualParent(this);
             VisualTreeNotifications.RaiseAttached(visual);
         }
+    }
+
+    /// <summary>Give up a child that another parent has taken. The base drops it from the visual children; a container
+    /// that lays out from a collection of its OWN (a panel's Children) overrides to remove it there, because that is the
+    /// collection its measure and arrange walk.</summary>
+    protected internal virtual void DisownVisualChild(IUIComponent child)
+    {
+        VisualChildrenCollection.Remove(child);
     }
 
     private static void Detach(System.Collections.IList visuals)

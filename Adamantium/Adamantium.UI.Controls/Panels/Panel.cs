@@ -78,6 +78,14 @@ public abstract class Panel: InputUIComponent, IContainer
    // a panel (or any element) intentionally pass-through - e.g. a transparent overlay covering interactive siblings
    // behind it - set IsHitTestVisible="False" explicitly; that is the one, discoverable opt-out.
 
+   // A panel measures and arranges from Children, so that is where a child taken by another parent has to be removed:
+   // dropping it from the visual collection alone would leave the panel still laying out a control it no longer owns.
+   protected internal override void DisownVisualChild(IUIComponent child)
+   {
+      if (child is IMeasurableComponent measurable) Children.Remove(measurable);
+      base.DisownVisualChild(child);
+   }
+
    public void AddOrSetChildComponent(object component)
    {
       if (component is IMeasurableComponent measurable)

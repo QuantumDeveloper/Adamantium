@@ -414,13 +414,26 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         if (UIAppContext.Current == null)
             return;
 
-        // Drop the previously-applied theme + external styles first, so re-theming (a theme swap re-applies via the
-        // style queue, without a preceding detach) tears the old activators/subscriptions down instead of stacking a
-        // second set on top. No-op on the first apply (nothing tracked yet).
-        DetachStyles();
+        // Re-theming must undo what the PREVIOUS set left behind (a theme swap re-applies without a preceding detach, and
+        // its activators carry live subscriptions) - but ONLY what is genuinely leaving. Detaching everything up front
+        // used to drop each setter's value for the length of the call, and a property that falls back to its default and
+        // returns is a property that CHANGED, twice, with every callback firing both times.
+        // That is not academic: the applicable set does not change when a control is merely RE-PARENTED (selectors match
+        // on type/id/class - never on the ancestor chain), yet SetParent re-themes. Measured in docking - one dock-back
+        // put a group's ItemsPanel through theme -> default -> theme, and each write rebuilt the items panel, so the tabs
+        // ended up in a panel the layout pass no longer descends into, wearing the positions of their previous life.
+        // So: apply first, then remove only the styles the new set does not contain. Removal is keyed BY STYLE (a setter
+        // undoes its own contribution and nothing else), which is what makes that order safe.
+        var previous = _attachedStyles.ToArray();
+        _attachedStyles.Clear();   // tracking only - nothing is undone here; the leftovers are detached below
 
         UIAppContext.Current.UIContext.ThemeContext.ApplyCurrentTheme(this);
         UIAppContext.Current.UIContext.ThemeContext.ApplyExternalStyles(this, Styles.ToArray());
+
+        foreach (var style in previous)
+        {
+            if (!_attachedStyles.Contains(style)) style.Detach(this);
+        }
 
         IsStyleApplied = true;
     }
