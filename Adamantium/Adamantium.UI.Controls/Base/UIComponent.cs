@@ -443,26 +443,18 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         if (visuals == null) return;
         foreach (UIComponent visual in visuals)
         {
-            // Take it off whoever had it FIRST. A component belongs to one parent, but nothing about being handed to a
-            // new one used to reach the old one's child collection - so the previous parent went on listing it, and went
-            // on measuring and arranging it. Two parents placing one control means its position is decided by whichever
-            // of them the layout pass reaches last, which is an accident of tree order.
-            // Measured through docking: a tab moved into another group kept the bounds of its old strip and so sat on
-            // top of a neighbour. Every control-level move takes this path - an items presenter refilling a rebuilt
-            // panel with the containers the previous one still holds, a docking rebuild moving tabs between groups.
-            if (visual.VisualParent is UIComponent previous && !ReferenceEquals(previous, this))
-            {
-                previous.DisownVisualChild(visual);
-            }
-
             visual.SetVisualParent(this);
             VisualTreeNotifications.RaiseAttached(visual);
         }
     }
 
-    /// <summary>Give up a child that another parent has taken. The base drops it from the visual children; a container
-    /// that lays out from a collection of its OWN (a panel's Children) overrides to remove it there, because that is the
-    /// collection its measure and arrange walk.</summary>
+    /// <summary>Give up a child another parent has taken. The base drops it from the visual children; a container that
+    /// lays out from a collection of its OWN - a panel's Children, a decorator's Child - overrides to drop it there too,
+    /// because that is what its measure and arrange actually walk.
+    /// <para>Deliberately NOT routed through <see cref="IContainer"/>, tempting as that is: that interface is about
+    /// AUTHORED markup children (it is what the designer edits incrementally), not about what a control lays out. Asking
+    /// it here reached an ItemsControl's Items and a ContentControl's Content - the model, not the visual tree - so a
+    /// control merely moving to another parent would have deleted the item or the content it was showing.</para></summary>
     protected internal virtual void DisownVisualChild(IUIComponent child)
     {
         VisualChildrenCollection.Remove(child);
@@ -684,6 +676,15 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         }
 
         var old = VisualParent;
+
+        // Moving to a new parent while another still holds it: take it off the old one, exactly as SetParent does for
+        // the logical tree. A component belongs to one parent, but nothing here used to reach the previous parent's
+        // child collection - so it went on listing the component, and went on measuring and arranging it. Two parents
+        // placing one control means its position is decided by whichever the layout pass reaches last, which is an
+        // accident of tree order. Measured through docking: a tab moved into another group kept the bounds of its old
+        // strip and so sat on top of a neighbour.
+        if (old != null && parent != null) (old as UIComponent)?.DisownVisualChild(this);
+
         VisualParent = parent;
 
         if (IsAttachedToVisualTree)

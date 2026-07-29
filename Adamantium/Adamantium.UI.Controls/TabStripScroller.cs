@@ -45,6 +45,15 @@ public class TabStripScroller : InputUIComponent, IContainer
         MouseWheel += OnMouseWheel;
     }
 
+    // Lays out from the Child property, so a child taken by another parent has to be dropped there - see
+    // UIComponent.DisownVisualChild. Leaving the property set would keep this host measuring and arranging a control it
+    // no longer owns, and two parents placing one control is decided by whichever the layout pass reaches last.
+    protected internal override void DisownVisualChild(IUIComponent child)
+    {
+        if (ReferenceEquals(Child, child)) Child = null;
+        base.DisownVisualChild(child);
+    }
+
     [Content]
     public IMeasurableComponent Child
     {

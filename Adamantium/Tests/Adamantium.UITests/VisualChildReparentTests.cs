@@ -1,5 +1,6 @@
 using System.Linq;
 using Adamantium.Mathematics;
+using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.Decorators;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
@@ -43,6 +44,73 @@ public class VisualChildReparentTests
             Assert.That(moved.VisualParent, Is.SameAs(to), "the new parent owns it");
             Assert.That(from.Children, Does.Not.Contain(moved), "and the old one no longer lists it");
             Assert.That(from.VisualChildren, Does.Not.Contain(moved));
+        });
+    }
+
+    /// <summary>A decorator holds its one child in a PROPERTY, not a collection - and lays out from that property. So
+    /// dropping the stolen child from its visual children is not enough: the property would still point at it and it
+    /// would still be measured and arranged.</summary>
+    [Test]
+    public void ADecoratorGivesUpAChildTakenFromIt()
+    {
+        var moved = new Border { Width = 50, Height = 20 };
+        var from = new Border { Child = moved };
+        from.Measure(new Size(400, 200));
+        from.Arrange(new Rect(0, 0, 400, 200));
+
+        var to = Laid();
+        to.Children.Add(moved);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(moved.VisualParent, Is.SameAs(to));
+            Assert.That(from.Child, Is.Null, "the decorator no longer claims a child it does not have");
+            Assert.That(from.VisualChildren, Does.Not.Contain(moved));
+        });
+    }
+
+    /// <summary>Same question of the other single-child hosts, which are not decorators but hold their one child the
+    /// same way - in a property they lay out from.</summary>
+    [Test]
+    public void ATabStripScrollerGivesUpAChildTakenFromIt()
+    {
+        var moved = new Border { Width = 50, Height = 20 };
+        var from = new TabStripScroller { Child = moved };
+        from.Measure(new Size(400, 200));
+        from.Arrange(new Rect(0, 0, 400, 200));
+
+        Laid().Children.Add(moved);
+
+        Assert.That(from.Child, Is.Null, "it no longer claims a child it does not have");
+    }
+
+    // Popup is deliberately NOT here: it takes its child as a LOGICAL child only - the popup layer is what hosts it
+    // visually - so it is never the visual parent this question is about.
+
+    /// <summary>Same question of a content presenter, which hosts the authored element itself and lays out the root it
+    /// remembers.</summary>
+    [Test]
+    public void AContentPresenterGivesUpAChildTakenFromIt()
+    {
+        var moved = new Border { Width = 50, Height = 20 };
+        var from = new ContentPresenter { Content = moved };
+        from.Measure(new Size(400, 200));
+        from.Arrange(new Rect(0, 0, 400, 200));
+
+        var to = Laid(new Border { Width = 30, Height = 20 });
+        to.Children.Add(moved);   // second in the strip, so it belongs at x=30
+
+        // The presenter laid out LAST: if it still claims the child, its placement is the one left standing.
+        to.Measure(new Size(400, 200));
+        to.Arrange(new Rect(0, 0, 400, 200));
+        from.Measure(new Size(400, 200));
+        from.Arrange(new Rect(0, 0, 400, 200));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(moved.VisualParent, Is.SameAs(to));
+            Assert.That(from.VisualChildren, Does.Not.Contain(moved));
+            Assert.That(moved.Bounds.X, Is.EqualTo(30).Within(0.5), "only its real parent places it");
         });
     }
 
