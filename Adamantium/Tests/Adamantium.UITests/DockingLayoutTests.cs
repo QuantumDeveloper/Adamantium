@@ -296,6 +296,108 @@ public class DockingLayoutTests
         });
     }
 
+    /// <summary>
+    /// An EDGE ANCHOR - "along the whole left side of the area" - is not a second kind of docking. It is the same move
+    /// aimed at the ROOT instead of at a group, which is why there is no second verb and no new zone for it: the root is
+    /// a node like any other. The pane must end up spanning the full side, above every existing split.
+    /// </summary>
+    [Test]
+    public void MovePane_AgainstTheRoot_SpansTheWholeSide()
+    {
+        var scene = Group("scene", "game");
+        var inspector = Group("inspector");
+        var layout = LayoutWith(scene);
+        layout.Split(scene, DockZone.Right, inspector, 0.25);   // [scene | inspector]
+
+        Assert.That(layout.MovePane("game", layout.Main.Content, DockZone.Left), Is.True);
+
+        var row = (PaneSplitNode)layout.Main.Content;
+        Assert.Multiple(() =>
+        {
+            Assert.That(row.Orientation, Is.EqualTo(Orientation.Horizontal));
+            Assert.That(row.Children, Has.Count.EqualTo(3), "the same row, one wider - not a split wrapping a split");
+            Assert.That(((PaneGroupNode)row.Children[0]).PaneIds, Is.EqualTo(new[] { "game" }), "the newcomer holds the whole left side");
+            Assert.That(((PaneGroupNode)row.Children[1]).PaneIds, Is.EqualTo(new[] { "scene" }));
+            Assert.That(((PaneGroupNode)row.Children[2]).PaneIds, Is.EqualTo(new[] { "inspector" }));
+        });
+    }
+
+    /// <summary>
+    /// An edge anchor is a SIDE PANEL, not a half-split: the newcomer takes a band of the size asked for and everything
+    /// else absorbs the rest. Half the area is what a drop BESIDE A GROUP means, and it is far too much for "dock this
+    /// against the left edge" - an inspector is a couple of hundred pixels wide, not half the editor.
+    /// </summary>
+    [Test]
+    public void MovePane_AgainstTheRoot_WithASize_TakesThatBandAndLeavesTheRestAlone()
+    {
+        var scene = Group("scene", "game");
+        var layout = LayoutWith(scene);
+        layout.Split(scene, DockZone.Right, Group("inspector"), 0.25);
+
+        Assert.That(layout.MovePane("game", layout.Main.Content, DockZone.Left, size: PaneLength.Pixels(240)), Is.True);
+
+        var row = (PaneSplitNode)layout.Main.Content;
+        var arrived = row.Children[0];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(((PaneGroupNode)arrived).PaneIds, Is.EqualTo(new[] { "game" }));
+            Assert.That(arrived.Length, Is.EqualTo(PaneLength.Pixels(240)), "the band it was given, in pixels");
+            Assert.That(row.Children[1].Length.IsStar, Is.True, "and everything else takes what is left");
+        });
+    }
+
+    /// <summary>The same drop ACROSS the root's own axis: the pane spans the full width above everything, and the whole
+    /// existing layout becomes the other half. This is the case a group-relative drop cannot express at all.</summary>
+    [Test]
+    public void MovePane_AgainstTheRoot_AcrossItsAxis_PutsTheWholeLayoutBeside()
+    {
+        var scene = Group("scene", "game");
+        var inspector = Group("inspector");
+        var layout = LayoutWith(scene);
+        layout.Split(scene, DockZone.Right, inspector, 0.25);
+
+        Assert.That(layout.MovePane("game", layout.Main.Content, DockZone.Top), Is.True);
+
+        var outer = (PaneSplitNode)layout.Main.Content;
+        Assert.Multiple(() =>
+        {
+            Assert.That(outer.Orientation, Is.EqualTo(Orientation.Vertical), "a top anchor stacks");
+            Assert.That(((PaneGroupNode)outer.Children[0]).PaneIds, Is.EqualTo(new[] { "game" }), "the newcomer is the top band");
+            Assert.That(outer.Children[1], Is.InstanceOf<PaneSplitNode>(), "and everything that was there is the rest");
+        });
+    }
+
+    /// <summary>A root that is a single group has no "whole side" distinct from that group's side - and the answer is
+    /// the same either way, which is what makes one verb enough.</summary>
+    [Test]
+    public void MovePane_AgainstARootThatIsOneGroup_SplitsIt()
+    {
+        var only = Group("scene", "game");
+        var layout = LayoutWith(only);
+
+        Assert.That(layout.MovePane("game", layout.Main.Content, DockZone.Left), Is.True);
+
+        var row = (PaneSplitNode)layout.Main.Content;
+        Assert.Multiple(() =>
+        {
+            Assert.That(((PaneGroupNode)row.Children[0]).PaneIds, Is.EqualTo(new[] { "game" }));
+            Assert.That(((PaneGroupNode)row.Children[1]).PaneIds, Is.EqualTo(new[] { "scene" }));
+        });
+    }
+
+    /// <summary>There is nothing to tab into but a group, so a centre drop on anything else is refused rather than
+    /// invented.</summary>
+    [Test]
+    public void MovePane_IntoTheCentreOfASplit_IsRefused()
+    {
+        var scene = Group("scene", "game");
+        var layout = LayoutWith(scene);
+        layout.Split(scene, DockZone.Right, Group("inspector"), 0.25);
+
+        Assert.That(layout.MovePane("game", layout.Main.Content, DockZone.Center), Is.False);
+    }
+
     /// <summary>The same halving when the drop makes a NEW split (the target's row runs the other way), so both routes
     /// through Split agree on what "beside" means.</summary>
     [Test]

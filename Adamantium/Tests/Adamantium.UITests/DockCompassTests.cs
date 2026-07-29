@@ -117,6 +117,59 @@ public class DockCompassTests
         });
     }
 
+    // The area the compass covers, which is where the edge anchors live - as opposed to Target, the group under the
+    // pointer, which is where the cross lives.
+    private static readonly Rect Area = new(0, 0, 1000, 800);
+    private const double Inset = 12;
+
+    /// <summary>
+    /// The four EDGE anchors: "along that whole side of the area". They sit centred on each side, inset from it, and
+    /// they are the area's - unlike the cross, which follows whichever group the pointer is over.
+    /// </summary>
+    [Test]
+    public void EachEdgeAnchor_SitsCentredOnItsOwnSide()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(DockCompass.EdgeZoneAt(Area, new Vector2(Inset + Size / 2, 400), Size, Inset), Is.EqualTo(DockZone.Left));
+            Assert.That(DockCompass.EdgeZoneAt(Area, new Vector2(1000 - Inset - Size / 2, 400), Size, Inset), Is.EqualTo(DockZone.Right));
+            Assert.That(DockCompass.EdgeZoneAt(Area, new Vector2(500, Inset + Size / 2), Size, Inset), Is.EqualTo(DockZone.Top));
+            Assert.That(DockCompass.EdgeZoneAt(Area, new Vector2(500, 800 - Inset - Size / 2), Size, Inset), Is.EqualTo(DockZone.Bottom));
+        });
+    }
+
+    /// <summary>Between and around them there is nothing, exactly as with the cross - the whole point of aiming at an
+    /// indicator is that what does something has visible edges.</summary>
+    [Test]
+    public void AwayFromEveryEdgeAnchor_ThereIsNoTarget()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(DockCompass.EdgeZoneAt(Area, new Vector2(500, 400), Size, Inset), Is.EqualTo(DockZone.None),
+                "the middle of the area is not an edge");
+            Assert.That(DockCompass.EdgeZoneAt(Area, new Vector2(2, 400), Size, Inset), Is.EqualTo(DockZone.None),
+                "nor is the very edge - the anchor is inset from it");
+            Assert.That(DockCompass.EdgeZoneAt(Area, new Vector2(Inset + Size / 2, 60), Size, Inset), Is.EqualTo(DockZone.None),
+                "the left anchor is centred, not a strip running the whole side");
+        });
+    }
+
+    /// <summary>An edge drop takes half of the WHOLE AREA, not half of whatever group the pointer happened to be over.
+    /// Same arithmetic as the cross's preview, asked about a different rectangle - which is the whole difference between
+    /// the two, and the reason neither needs a zone of its own.</summary>
+    [Test]
+    public void AnEdgePreview_TakesHalfTheAreaOnThatSide()
+    {
+        var left = DockCompass.PreviewOf(Area, DockZone.Left);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(left.Width, Is.EqualTo(500).Within(1e-9));
+            Assert.That(left.Height, Is.EqualTo(800).Within(1e-9), "a left anchor spans the full height of the area");
+            Assert.That(left.X, Is.EqualTo(0).Within(1e-9));
+        });
+    }
+
     /// <summary>Joining the tabs does not carve the group up, so the preview is the whole of it.</summary>
     [Test]
     public void TheCentrePreview_IsTheWholeGroup()
