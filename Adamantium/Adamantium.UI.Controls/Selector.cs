@@ -103,8 +103,15 @@ public abstract class Selector : ItemsControl
         // run during construction - before ItemsControl's ctor has created the generator. Nothing to reflect yet.
         if (ItemContainerGenerator == null) return;
         foreach (var index in ItemContainerGenerator.RealizedIndices.ToList())
+        {
+            // An index the item list no longer has: the realized set can be a step behind the collection (an item was
+            // removed and the generator has not been told yet), and there is nothing to reflect onto a container that
+            // stands for nothing. It used to read straight through and take the whole app down on a closed tab.
+            if (index < 0 || index >= Items.Count) continue;
+
             if (ItemContainerGenerator.ContainerFromIndex(index) is ISelectable selectable)
                 selectable.IsSelected = IsItemSelected(Items[index]);
+        }
     }
 
     /// <summary>Reflects the selection onto ONE container - called from a subclass's PrepareContainer so a new or recycled

@@ -69,6 +69,39 @@
         </Setter>
     </Style>
 
+    <!-- A row of the flyout: icon, name, close. Its item is a TabOverflowItem - a VIEW of a tab, never the tab, which is
+         a live control and cannot be in the strip and in here at once. Everything it shows is data plus the template that
+         draws it, so both places build their own visual from the same tab. -->
+    <Style Selector="ListBox.TabOverflowList">
+        <Setter Property="ItemTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <Grid ColumnDefinitions="Auto,*,Auto" MinWidth="160">
+                        <ContentPresenter Grid.Column="0"
+                                VerticalAlignment="Center" Margin="0 0 8 0"
+                                Content="{Binding Icon}"
+                                ContentTemplate="{Binding IconTemplate}"/>
+                        <ContentPresenter Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Content="{Binding Header}"
+                                ContentTemplate="{Binding HeaderTemplate}"/>
+                        <!-- Closes through the tab's own path, so a TabCloseRequested handler can veto it here too. -->
+                        <Button Grid.Column="2"
+                                Margin="8 0 0 0" MinWidth="0" MinHeight="0" Padding="4 0"
+                                VerticalAlignment="Center"
+                                Background="Transparent" BorderThickness="0"
+                                Command="{Binding Close}"
+                                Visibility="{Binding CloseVisibility}">
+                            <TextBlock Text="×" FontSize="14"
+                                       Foreground="{ResourceReference TextFillColorSecondary}"
+                                       HorizontalTextAlignment="Center" VerticalTextAlignment="Center"/>
+                        </Button>
+                    </Grid>
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Top (default): strip in the Auto row, content fills below. -->
     <Style Selector="TabControl[TabStripPlacement=Top]">
         <Setter Property="Template">

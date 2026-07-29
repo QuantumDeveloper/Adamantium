@@ -57,6 +57,20 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
     public static readonly AdamantiumProperty ForegroundSelectedProperty = AdamantiumProperty.Register(
         nameof(ForegroundSelected), typeof(Brush), typeof(TabItem), new PropertyMetadata(default(Brush)));
 
+    /// <summary>What the tab is marked with, next to its header - DATA, not a control: a key, a glyph, a view model, an
+    /// image source. <see cref="IconTemplate"/> says how to draw it.
+    /// <para>Data on purpose. The same tab is drawn in more than one place at once - the strip and the overflow flyout -
+    /// and a control can only ever be in one of them; handing the same instance to both takes it out of the first. Data
+    /// plus a template builds a fresh visual per place, so an icon can appear in as many as it likes.</para></summary>
+    public static readonly AdamantiumProperty IconProperty = AdamantiumProperty.Register(nameof(Icon),
+        typeof(object), typeof(TabItem), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure));
+
+    /// <summary>How to draw <see cref="Icon"/>. An EFFECTIVE value pulled from the owning
+    /// <see cref="TabControl.IconTemplate"/>, so one template serves every tab in a strip; set it here to override it
+    /// for a single tab.</summary>
+    public static readonly AdamantiumProperty IconTemplateProperty = AdamantiumProperty.Register(nameof(IconTemplate),
+        typeof(DataTemplate), typeof(TabItem), new PropertyMetadata(null));
+
     // Close button (see TabControl.ShowCloseButton). IsClosable is the per-tab opt-out (author it False to keep a pinned
     // tab open). ShowCloseButton + CloseButtonTemplate are EFFECTIVE values pulled from the owning TabControl on attach
     // (so authored + generated tabs behave alike); the tab template binds the button's visibility/look to them.
@@ -95,6 +109,22 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
     {
         get => GetValue<DataTemplate>(HeaderTemplateProperty);
         set => SetValue(HeaderTemplateProperty, value);
+    }
+
+    /// <summary>What marks this tab, drawn by <see cref="IconTemplate"/>. Data rather than a control - see the property
+    /// declaration for why.</summary>
+    public object Icon
+    {
+        get => GetValue(IconProperty);
+        set => SetValue(IconProperty, value);
+    }
+
+    /// <summary>How <see cref="Icon"/> is drawn. Comes from the owning <see cref="TabControl.IconTemplate"/> unless set
+    /// here.</summary>
+    public DataTemplate IconTemplate
+    {
+        get => GetValue<DataTemplate>(IconTemplateProperty);
+        set => SetValue(IconTemplateProperty, value);
     }
 
     /// <summary>Picks the header template per item (from the owning <see cref="TabControl.ItemTemplateSelector"/>).</summary>
@@ -190,6 +220,7 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
             _closeOwner = owner;
             _closeOwner.PropertyChanged += OnOwnerPropertyChanged;
             SyncCloseButton();
+            SyncIconTemplate();
         }
     }
 
@@ -217,6 +248,8 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
     {
         if (e.Property == TabControl.ShowCloseButtonProperty || e.Property == TabControl.CloseButtonTemplateProperty)
             SyncCloseButton();
+        else if (e.Property == TabControl.IconTemplateProperty)
+            SyncIconTemplate();
     }
 
     // Effective button state = owner shows close buttons AND this tab is closable; the look comes from the owner.
@@ -225,6 +258,13 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
         var owner = _closeOwner ?? Owner;
         ShowCloseButton = owner is { ShowCloseButton: true } && IsClosable;
         CloseButtonTemplate = owner?.CloseButtonTemplate;
+    }
+
+    // One icon template for the whole strip, taken from the owner - unless this tab was given its own.
+    private void SyncIconTemplate()
+    {
+        var owner = _closeOwner ?? Owner;
+        if (owner?.IconTemplate != null) IconTemplate = owner.IconTemplate;
     }
 
     private void OnCloseButtonClick(object sender, RoutedEventArgs e)
