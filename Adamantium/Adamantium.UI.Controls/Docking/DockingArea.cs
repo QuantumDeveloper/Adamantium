@@ -178,6 +178,7 @@ public class DockingArea : Panel
     {
         var origin = this.PointToScreen(Vector2.Zero);
         var scale = DpiScale;
+        var area = new Rect(0, 0, RenderSize.Width, RenderSize.Height);
 
         foreach (var pair in _groupsByNode)
         {
@@ -188,6 +189,15 @@ public class DockingArea : Panel
             if (point.X < at.X || point.Y < at.Y || point.X > at.X + size.Width || point.Y > at.Y + size.Height) continue;
 
             var bounds = new Rect(at.X, at.Y, size.Width, size.Height);
+
+            // The EDGE anchors first. They belong to the area and sit at its sides, the cross belongs to whichever group
+            // is under the pointer - and where the two could overlap, the edge is the more specific answer. An edge drop
+            // is aimed at the ROOT, which is what makes it span the whole side; it is the same move, not another kind.
+            var edge = DockCompass.EdgeZoneAt(area, point, _compass.IndicatorSize, _compass.EdgeIndicatorInset);
+            if (edge != DockZone.None)
+                return new DockTarget(RootContent, bounds, edge,
+                    DockCompass.PreviewOf(area, edge, EdgeDockSize), isEdge: true);
+
             var zone = DockCompass.ZoneAt(bounds, point, _compass.IndicatorSize, _compass.IndicatorGap);
             return new DockTarget(pair.Key, bounds, zone, DockCompass.PreviewOf(bounds, zone));
         }
@@ -288,7 +298,7 @@ public class DockingArea : Panel
         // The window covers the area, so it is touched only when the pointer crosses in or out of it - and touching a
         // window is UI-thread work while this runs on the LOOP thread (WindowMoving arrives through LoopSignal.Drain,
         // not from the message pump: measured, every Show from here threw a DispatcherException).
-        var inside = target.Group != null;
+        var inside = target.Node != null;
         if (inside != _overlayShown)
         {
             _overlayShown = inside;
@@ -301,12 +311,12 @@ public class DockingArea : Panel
 
         // The group's rectangle in the AREA's coordinates, which are the compass's own: it covers the whole area.
         if (!inside) _compass.Clear();
-        else _compass.AimAt(target.Bounds, target.Zone);
+        else _compass.AimAt(target.Bounds, target.Zone, target.IsEdge, EdgeDockSize);
 
         if (LogDocking)
         {
             System.Console.WriteLine($"[DockTrack] mouse={Mouse.ScreenCoordinates} area=({point.X:F0},{point.Y:F0}) " +
-                                     $"size=({size.Width:F0}x{size.Height:F0}) group={_target.Group != null} zone={_target.Zone}");
+                                     $"size=({size.Width:F0}x{size.Height:F0}) node={_target.Node != null} edge={_target.IsEdge} zone={_target.Zone}");
         }
     }
 
@@ -327,7 +337,8 @@ public class DockingArea : Panel
         // Hand the content back before the pane is re-hosted: it belongs to the window's tree until this line.
         window.Content = null;
 
-        if (!Layout.MovePane(paneId, target.Group, target.Zone)) return;
+        if (!Layout.MovePane(paneId, target.Node, target.Zone,
+                size: target.IsEdge ? PaneLength.Pixels(EdgeDockSize) : null)) return;
 
         Layout.Roots.Remove(root);
         Rebuild();
@@ -497,6 +508,19 @@ public class DockingArea : Panel
 
     /// <summary>Space left between two neighbours for the divider that will sit there.</summary>
     public double DividerThickness { get; set; } = 4.0;
+
+    /// <summary>How wide a pane docked to an EDGE of the area starts out, in pixels along that edge's axis.
+    /// <para>A band, not half the area: an edge anchor is a side panel, and half the editor is a partition rather than
+    /// an anchor. In pixels because a side panel should keep its width while the window resizes around it - it stays
+    /// freely draggable, that is what the divider is for; pixels only mean it does not scale with the window.</para></summary>
+    public static readonly AdamantiumProperty EdgeDockSizeProperty = AdamantiumProperty.Register(
+        nameof(EdgeDockSize), typeof(double), typeof(DockingArea), new PropertyMetadata(240.0));
+
+    public double EdgeDockSize
+    {
+        get => GetValue<double>(EdgeDockSizeProperty);
+        set => SetValue(EdgeDockSizeProperty, value);
+    }
 
     private bool _layoutBuilt;
 

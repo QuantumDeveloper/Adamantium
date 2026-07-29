@@ -149,14 +149,25 @@ public class DockingLayout
     /// Moves a pane to <paramref name="target"/>: into it as another tab (<see cref="DockZone.Center"/>), or beside it
     /// by splitting. THE operation every gesture ends in - the compass, a dropped floating window and a view-model
     /// setting <c>Zone</c> all arrive here, so there is one place where a move can be got wrong and one place to fix it.
+    /// <para>The target is any NODE, which is what makes an edge anchor - "along the whole left side of the area" -
+    /// the same operation rather than a second one: aim it at the root instead of at a group. There is deliberately no
+    /// second verb and no extra zone for it, because there is no second concept: the root is a node like any other, and
+    /// splitting it is what spanning the whole side means. Only a group can be tabbed INTO, so a centre drop on
+    /// anything else is refused rather than invented.</para>
     /// </summary>
     /// <param name="index">Where among the target's tabs it lands, or -1 for last. Only meaningful for the centre.</param>
-    public bool MovePane(string paneId, PaneGroupNode target, DockZone zone, int index = -1)
+    /// <param name="size">How much of the split the newcomer takes; null means half, which is what "beside this group"
+    /// means. An EDGE anchor passes a band instead - a side panel is a couple of hundred pixels wide, and half the
+    /// editor is not an anchor but a partition.</param>
+    public bool MovePane(string paneId, PaneNode target, DockZone zone, int index = -1, PaneLength? size = null)
     {
         if (target == null) return false;
 
         var source = FindGroup(paneId);
         if (source == null) return false;
+
+        var group = target as PaneGroupNode;
+        if (zone is DockZone.Center or DockZone.Floating && group == null) return false;
 
         // Splitting a group off from itself when it holds nothing else: the target would be emptied by the removal and
         // the split would then be made against a node that is no longer in the tree. Nothing was being asked for anyway.
@@ -166,14 +177,23 @@ public class DockingLayout
 
         if (zone is DockZone.Center or DockZone.Floating)
         {
-            if (index < 0) target.Add(paneId);
-            else target.Insert(index, paneId);
+            if (index < 0) group.Add(paneId);
+            else group.Insert(index, paneId);
         }
         else
         {
             var moved = new PaneGroupNode();
             moved.Add(paneId);
             Split(target, zone, moved);
+
+            // A band was asked for: the newcomer takes exactly it and its neighbour goes back to taking what is left.
+            // Both halves matter - a fixed newcomer beside a fixed neighbour would leave the row unable to absorb a
+            // resize at all.
+            if (size is { } band)
+            {
+                moved.Length = band;
+                target.Length = PaneLength.Star;
+            }
         }
 
         Normalize();

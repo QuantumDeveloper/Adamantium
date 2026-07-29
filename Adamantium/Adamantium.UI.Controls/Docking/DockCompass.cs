@@ -19,10 +19,16 @@ public class DockCompass : Panel
 {
     private readonly Border _preview = new();
     private readonly Border[] _indicators = new Border[5];
+    private readonly Border[] _edges = new Border[4];
 
     // The order the sides are stored in, and the only place that order is written down.
     private static readonly DockZone[] Zones =
         [DockZone.Center, DockZone.Left, DockZone.Top, DockZone.Right, DockZone.Bottom];
+
+    /// <summary>The four EDGE anchors, in the same order the sides above are - "along that whole side of the area",
+    /// as opposed to the cross, which is about the one group under the pointer.</summary>
+    private static readonly DockZone[] EdgeZones =
+        [DockZone.Left, DockZone.Top, DockZone.Right, DockZone.Bottom];
 
     public DockCompass()
     {
@@ -33,6 +39,12 @@ public class DockCompass : Panel
         {
             _indicators[i] = new Border();
             Children.Add(_indicators[i]);
+        }
+
+        for (var i = 0; i < _edges.Length; i++)
+        {
+            _edges[i] = new Border();
+            Children.Add(_edges[i]);
         }
     }
 
@@ -46,6 +58,13 @@ public class DockCompass : Panel
     public static readonly AdamantiumProperty IndicatorGapProperty = AdamantiumProperty.Register(
         nameof(IndicatorGap), typeof(double), typeof(DockCompass),
         new PropertyMetadata(6.0, PropertyMetadataOptions.AffectsArrange));
+
+    /// <summary>How far the edge anchors sit from the area's own edge. Not flush against it: a target touching the
+    /// screen edge is easy to overshoot, and a little inset also says it belongs to the AREA rather than to whatever
+    /// the pointer happens to be over.</summary>
+    public static readonly AdamantiumProperty EdgeIndicatorInsetProperty = AdamantiumProperty.Register(
+        nameof(EdgeIndicatorInset), typeof(double), typeof(DockCompass),
+        new PropertyMetadata(12.0, PropertyMetadataOptions.AffectsArrange));
 
     /// <summary>Width of the outline around each indicator. A target floating over arbitrary content needs an EDGE to be
     /// aimed at; without one there is only a translucent fill, which over a light background is nothing at all.</summary>
@@ -81,6 +100,12 @@ public class DockCompass : Panel
         set => SetValue(IndicatorStrokeThicknessProperty, value);
     }
 
+    public double EdgeIndicatorInset
+    {
+        get => GetValue<double>(EdgeIndicatorInsetProperty);
+        set => SetValue(EdgeIndicatorInsetProperty, value);
+    }
+
     public Brush IndicatorBrush
     {
         get => GetValue<Brush>(IndicatorBrushProperty);
@@ -112,6 +137,8 @@ public class DockCompass : Panel
 
     private DockZone _armed = DockZone.None;
     private Rect _group;
+    private bool _armedIsEdge;
+    private double _edgeExtent = double.NaN;
 
     /// <summary>Aims at the group under the pointer - its rectangle in THIS control's own coordinates - and lights up the
     /// indicator the pointer is on, or <see cref="DockZone.None"/> between them.
@@ -120,12 +147,17 @@ public class DockCompass : Panel
     /// changing under it. Sizing the window to the GROUP instead meant the rectangle and the surface were two separate
     /// updates racing each other - measured, the overlay had already resized to the next group while the compass was
     /// still laid out at the previous size, so the cross was built around a centre it was nowhere near.</para></summary>
-    public void AimAt(Rect group, DockZone armed)
+    /// <param name="isEdge">The armed indicator is one of the four EDGE anchors rather than one of the cross - which is
+    /// what decides whether the preview covers part of the group or part of the whole area.</param>
+    /// <param name="edgeExtent">How wide the band an edge anchor would take is, so the preview shows what the drop does.</param>
+    public void AimAt(Rect group, DockZone armed, bool isEdge = false, double edgeExtent = double.NaN)
     {
-        if (_group == group && _armed == armed) return;
+        if (_group == group && _armed == armed && _armedIsEdge == isEdge && _edgeExtent.Equals(edgeExtent)) return;
 
         _group = group;
         _armed = armed;
+        _armedIsEdge = isEdge;
+        _edgeExtent = edgeExtent;
         InvalidateArrange();
     }
 
@@ -153,8 +185,61 @@ public class DockCompass : Panel
         return DockZone.None;
     }
 
+    /// <summary>Which EDGE anchor a point falls on for an area occupying <paramref name="area"/>, or
+    /// <see cref="DockZone.None"/>. Asked before <see cref="ZoneAt"/>: the edges belong to the area and the cross to
+    /// whichever group is under the pointer, and an edge anchor is the more specific answer where they meet.</summary>
+    public static DockZone EdgeZoneAt(Rect area, Vector2 point, double indicatorSize, double inset)
+    {
+        for (var i = 0; i < EdgeZones.Length; i++)
+        {
+            var slot = EdgeSlotOf(EdgeZones[i], area, indicatorSize, inset);
+            if (point.X >= slot.X && point.X <= slot.X + slot.Width &&
+                point.Y >= slot.Y && point.Y <= slot.Y + slot.Height)
+            {
+                return EdgeZones[i];
+            }
+        }
+
+        return DockZone.None;
+    }
+
+    /// <summary>Where an edge anchor sits: centred on its side of the area, inset from it.</summary>
+    private static Rect EdgeSlotOf(DockZone zone, Rect area, double size, double inset)
+    {
+        var cx = area.X + area.Width / 2 - size / 2;
+        var cy = area.Y + area.Height / 2 - size / 2;
+
+        return zone switch
+        {
+            DockZone.Left => new Rect(area.X + inset, cy, size, size),
+            DockZone.Right => new Rect(area.X + area.Width - inset - size, cy, size, size),
+            DockZone.Top => new Rect(cx, area.Y + inset, size, size),
+            _ => new Rect(cx, area.Y + area.Height - inset - size, size, size)
+        };
+    }
+
     /// <summary>Where a pane dropped in <paramref name="zone"/> would end up inside <paramref name="target"/>. A side
-    /// takes half; the centre joins the tabs and so covers the whole group.</summary>
+    /// takes half by default; the centre joins the tabs and so covers the whole group.
+    /// <para><paramref name="extent"/> overrides how much the newcomer takes along the split axis - an EDGE anchor is a
+    /// side panel, a band of a couple of hundred pixels, not half the editor. Same function for the preview and for what
+    /// the drop then does, so the two cannot disagree.</para></summary>
+    public static Rect PreviewOf(Rect target, DockZone zone, double extent)
+    {
+        if (double.IsNaN(extent) || extent <= 0) return PreviewOf(target, zone);
+
+        var width = Math.Min(extent, target.Width);
+        var height = Math.Min(extent, target.Height);
+
+        return zone switch
+        {
+            DockZone.Left => new Rect(target.X, target.Y, width, target.Height),
+            DockZone.Right => new Rect(target.X + target.Width - width, target.Y, width, target.Height),
+            DockZone.Top => new Rect(target.X, target.Y, target.Width, height),
+            DockZone.Bottom => new Rect(target.X, target.Y + target.Height - height, target.Width, height),
+            _ => target
+        };
+    }
+
     public static Rect PreviewOf(Rect target, DockZone zone)
     {
         var halfWidth = target.Width / 2;
@@ -205,29 +290,45 @@ public class DockCompass : Panel
     {
         if (DockingArea.LogDocking) LogArrange(finalSize);
 
+        var area = new Rect(0, 0, finalSize.Width, finalSize.Height);
         var aiming = _group.Width > 0 && _group.Height > 0;
+        var size = IndicatorSize;
 
+        // An edge anchor takes half of the WHOLE area, a cross target half of the group - the preview says which of the
+        // two was aimed at, so the same rectangle is previewed and then occupied.
         _preview.Background = PreviewBrush;
         _preview.Visibility = aiming && _armed != DockZone.None ? Visibility.Visible : Visibility.Collapsed;
-        _preview.Arrange(PreviewOf(_group, _armed));
+        _preview.Arrange(_armedIsEdge ? PreviewOf(area, _armed, _edgeExtent) : PreviewOf(_group, _armed));
 
         // The cross sits at the centre of the group - the same centre ZoneAt measures its indicators from, so what is
         // drawn and what is hit are one arrangement.
         var cx = _group.X + _group.Width / 2;
         var cy = _group.Y + _group.Height / 2;
-        var size = IndicatorSize;
         var step = size + IndicatorGap;
 
         for (var i = 0; i < _indicators.Length; i++)
         {
             var indicator = _indicators[i];
             indicator.Visibility = aiming ? Visibility.Visible : Visibility.Collapsed;
-            indicator.Background = Zones[i] == _armed ? ActiveBrush : IndicatorBrush;
+            indicator.Background = !_armedIsEdge && Zones[i] == _armed ? ActiveBrush : IndicatorBrush;
             indicator.BorderBrush = IndicatorStroke;
             // Without a thickness the brush above draws nothing: Border's default is zero, so the outline that separates
             // a target from whatever it floats over was never there at all.
             indicator.BorderThickness = new Thickness(IndicatorStrokeThickness);
             indicator.Arrange(SlotOf(Zones[i], cx, cy, step, size));
+        }
+
+        // The edge anchors belong to the AREA, so they are placed from finalSize and stay where they are whichever group
+        // the pointer wanders over. Shown whenever the compass is up at all - they are aimable even between groups.
+        var inset = EdgeIndicatorInset;
+        for (var i = 0; i < _edges.Length; i++)
+        {
+            var edge = _edges[i];
+            edge.Visibility = aiming ? Visibility.Visible : Visibility.Collapsed;
+            edge.Background = _armedIsEdge && EdgeZones[i] == _armed ? ActiveBrush : IndicatorBrush;
+            edge.BorderBrush = IndicatorStroke;
+            edge.BorderThickness = new Thickness(IndicatorStrokeThickness);
+            edge.Arrange(EdgeSlotOf(EdgeZones[i], area, size, inset));
         }
 
         return finalSize;
