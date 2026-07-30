@@ -573,8 +573,23 @@ public class CodeGenerationContext
                     // rest) exactly like a regular property. Emitting the raw text only ever compiled for the int-typed
                     // ones (Grid.Column="0"); a string like ToolTip="hint" broke as bare C# identifiers.
                     var expr = BuildValueExpression(prop.GetTextValue(), resolvedType);
-                    TextGenerator.WriteLine(
-                        $"{propRef.OwnerType.GetFullTypeName()}.Set{propRef.Name}({CurrentParent}, {expr});");
+
+                    // Inside a ControlTemplate the value belongs to the TEMPLATE, not to the element, so write it at
+                    // Template priority - exactly as a regular property is written above. The static CLR setter writes at
+                    // LOCAL priority, which OUTRANKS Trigger, so a trigger could never override an attached value the
+                    // template had stated: a trigger moving a part to another Grid cell lost to the template's own cell
+                    // and silently did nothing at all.
+                    if (CurrentTemplate != null)
+                    {
+                        TextGenerator.WriteLine(
+                            $"{CurrentParent}.SetValue({propRef.OwnerType.GetFullTypeName()}.{propRef.Name}Property, " +
+                            $"{expr}, Adamantium.UI.Core.ValuePriority.Template);");
+                    }
+                    else
+                    {
+                        TextGenerator.WriteLine(
+                            $"{propRef.OwnerType.GetFullTypeName()}.Set{propRef.Name}({CurrentParent}, {expr});");
+                    }
                 }
                 // A collection populated by CHILD ELEMENTS (<Grid.RowDefinitions><RowDefinition/>...) -> new + Add per
                 // child. The STRING form (StrokeDashArray="10,6", RowDefinitions="Auto,*") is a text node, so `!IsTextNode`

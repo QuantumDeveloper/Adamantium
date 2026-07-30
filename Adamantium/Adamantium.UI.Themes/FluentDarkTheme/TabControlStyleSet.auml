@@ -26,17 +26,19 @@
         <Setter Property="CloseButtonTemplate">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="CloseBg" Width="20" Height="20" CornerRadius="4" Background="Transparent">
-                        <TextBlock x:Name="CloseGlyph" Text="×" FontSize="14"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   HorizontalTextAlignment="Center" VerticalTextAlignment="Center"
-                                   Foreground="{ResourceReference TextFillColorSecondary}"/>
+                    <!-- 24 square, not 20: this is a target a finger has to hit, and a close button is the one place
+                         where missing costs the most. The cross is DRAWN - a glyph is only as reliable as the font
+                         underneath it. -->
+                    <Border x:Name="CloseBg" Width="24" Height="24" CornerRadius="4" Background="Transparent">
+                        <Path x:Name="CloseGlyph" Data="M0,0 L8,8 M8,0 L0,8"
+                              Stroke="{ResourceReference TextFillColorSecondary}" StrokeThickness="1"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <!-- Highlight the button itself on hover so it clearly reacts. -->
                         <PropertyTrigger Property="IsMouseOver" Value="true">
                             <Setter TargetName="CloseBg" Property="Background" Value="{ResourceReference ControlFillColorSecondary}"/>
-                            <Setter TargetName="CloseGlyph" Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
+                            <Setter TargetName="CloseGlyph" Property="Stroke" Value="{ResourceReference TextFillColorPrimary}"/>
                         </PropertyTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -87,14 +89,15 @@
                                 ContentTemplate="{Binding HeaderTemplate}"/>
                         <!-- Closes through the tab's own path, so a TabCloseRequested handler can veto it here too. -->
                         <Button Grid.Column="2"
-                                Margin="8 0 0 0" MinWidth="0" MinHeight="0" Padding="4 0"
+                                Margin="8 0 0 0" Width="24" Height="24" MinWidth="0" MinHeight="0" Padding="0"
                                 VerticalAlignment="Center"
+                                HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                 Background="Transparent" BorderThickness="0"
                                 Command="{Binding Close}"
                                 Visibility="{Binding CloseVisibility}">
-                            <TextBlock Text="×" FontSize="14"
-                                       Foreground="{ResourceReference TextFillColorSecondary}"
-                                       HorizontalTextAlignment="Center" VerticalTextAlignment="Center"/>
+                            <Path Data="M0,0 L8,8 M8,0 L0,8"
+                                  Stroke="{ResourceReference TextFillColorSecondary}" StrokeThickness="1"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Button>
                     </Grid>
                 </DataTemplate>

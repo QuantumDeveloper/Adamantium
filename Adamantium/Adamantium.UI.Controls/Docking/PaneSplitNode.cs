@@ -53,7 +53,11 @@ public class PaneSplitNode : PaneNode
     {
         foreach (var child in Children)
         {
-            if (child.Length.Value <= 0) child.Length = PaneLength.Star;
+            // Only a STAR needs a weight. Auto carries no number by design - "as much as I need" has nothing to be
+            // zero about - so testing the value alone turned every collapsed pane back into a star, and it sprang open
+            // again on the next drop or tear-off. A pixel length of zero is likewise the caller's business, not this
+            // method's; the only thing repaired here is a weight nobody set.
+            if (child.Length.IsStar && child.Length.Value <= 0) child.Length = PaneLength.Star;
         }
     }
 }

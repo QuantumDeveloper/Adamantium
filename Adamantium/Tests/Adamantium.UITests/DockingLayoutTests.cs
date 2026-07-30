@@ -219,19 +219,63 @@ public class DockingLayoutTests
             new ZoneDeclaration(DockZone.Bottom, Group("console"), 180)
         });
 
-        // Last declared is outermost: the bottom strip spans under everything above it.
+        // A SIDE is outermost: it takes the full height of the window. The bottom band is INSIDE the centre column, so it
+        // runs under the documents only and stops where the side begins - the layout every editor uses.
         var outer = (PaneSplitNode)layout.Main.Content;
         Assert.Multiple(() =>
         {
-            Assert.That(outer.Orientation, Is.EqualTo(Orientation.Vertical), "bottom docks along the vertical axis");
+            Assert.That(outer.Orientation, Is.EqualTo(Orientation.Horizontal), "the side splits the whole layout");
             Assert.That(outer.Children, Has.Count.EqualTo(2));
-            Assert.That(((PaneGroupNode)outer.Children[1]).PaneIds, Is.EqualTo(new[] { "console" }));
+            Assert.That(((PaneGroupNode)outer.Children[1]).PaneIds, Is.EqualTo(new[] { "inspector" }), "and sits at its edge");
+            Assert.That(outer.Children[1].Length, Is.EqualTo(PaneLength.Pixels(220)), "the pixels the author wrote travel with the node");
 
-            var inner = (PaneSplitNode)outer.Children[0];
-            Assert.That(inner.Orientation, Is.EqualTo(Orientation.Horizontal), "right docks along the horizontal axis");
-            Assert.That(((PaneGroupNode)inner.Children[0]).PaneIds, Is.EqualTo(new[] { "scene" }));
-            Assert.That(((PaneGroupNode)inner.Children[1]).PaneIds, Is.EqualTo(new[] { "inspector" }));
-            Assert.That(inner.Children[1].Length, Is.EqualTo(PaneLength.Pixels(220)), "the pixels the author wrote travel with the node");
+            var column = (PaneSplitNode)outer.Children[0];
+            Assert.That(column.Orientation, Is.EqualTo(Orientation.Vertical), "the band divides that column");
+            Assert.That(((PaneGroupNode)column.Children[0]).PaneIds, Is.EqualTo(new[] { "scene" }));
+            Assert.That(((PaneGroupNode)column.Children[1]).PaneIds, Is.EqualTo(new[] { "console" }), "under the documents, not under the side");
+        });
+    }
+
+    /// <summary>And it holds whichever order the author writes them in: the rule is about what a zone MEANS, not about
+    /// which declaration happened to come first.</summary>
+    [Test]
+    public void FromZones_BottomDeclaredBeforeASide_StillStopsAtIt()
+    {
+        var layout = DockingLayout.FromZones(new[]
+        {
+            new ZoneDeclaration(DockZone.Center, Group("scene")),
+            new ZoneDeclaration(DockZone.Bottom, Group("console"), 180),
+            new ZoneDeclaration(DockZone.Right, Group("inspector"), 220)
+        });
+
+        var outer = (PaneSplitNode)layout.Main.Content;
+        Assert.Multiple(() =>
+        {
+            Assert.That(outer.Orientation, Is.EqualTo(Orientation.Horizontal));
+            Assert.That(((PaneGroupNode)outer.Children[1]).PaneIds, Is.EqualTo(new[] { "inspector" }), "the side is still outermost");
+
+            var column = (PaneSplitNode)outer.Children[0];
+            Assert.That(((PaneGroupNode)column.Children[1]).PaneIds, Is.EqualTo(new[] { "console" }));
+        });
+    }
+
+    /// <summary>Two bands stack inside the same centre column rather than nesting one inside the other's split.</summary>
+    [Test]
+    public void FromZones_TwoBands_ShareTheCentreColumn()
+    {
+        var layout = DockingLayout.FromZones(new[]
+        {
+            new ZoneDeclaration(DockZone.Center, Group("scene")),
+            new ZoneDeclaration(DockZone.Bottom, Group("console")),
+            new ZoneDeclaration(DockZone.Bottom, Group("errors"))
+        });
+
+        var column = (PaneSplitNode)layout.Main.Content;
+        Assert.Multiple(() =>
+        {
+            Assert.That(column.Orientation, Is.EqualTo(Orientation.Vertical));
+            Assert.That(column.Children, Has.Count.EqualTo(3), "both bands are siblings in the column");
+            Assert.That(((PaneGroupNode)column.Children[2]).PaneIds, Is.EqualTo(new[] { "errors" }), "the later band is the lower one");
         });
     }
 

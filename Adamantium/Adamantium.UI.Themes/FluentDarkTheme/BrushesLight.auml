@@ -39,6 +39,15 @@
     <!-- Dock compass - see Brushes.auml. Inverted, but NOT white: a white plate over white content is only its outline,
          and an outline alone reads as a wireframe rather than a target. A light grey face carries the shape itself and
          the edge sharpens it. -->
+    <!-- Same state layer as the dark palette: the bar underneath is the ACCENT in either theme, so the overlay follows the
+         accent, not the window base. -->
+    <SolidColorBrush x:Key="OnAccentOverlayPointerOver" Color="#40FFFFFF"/>
+    <SolidColorBrush x:Key="OnAccentOverlayPressed" Color="#73FFFFFF"/>
+
+    <!-- The strip of a PUT-AWAY panel - see the dark palette for why it is its own token. Inverted here: a dark veil
+         over a light surface, because a white one over white is no mark at all. -->
+    <SolidColorBrush x:Key="DockFoldedStripFill" Color="#14000000"/>
+
     <SolidColorBrush x:Key="DockCompassFillColor" Color="#F2E0E0E0"/>
     <SolidColorBrush x:Key="DockCompassStrokeColor" Color="#73000000"/>
     <SolidColorBrush x:Key="DockCompassPreviewColor" Color="#4D005FB8"/>

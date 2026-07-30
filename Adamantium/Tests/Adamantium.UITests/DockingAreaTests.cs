@@ -1,3 +1,7 @@
+using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.Panels;
+using Adamantium.UI.Core.Input;
+using Adamantium.UI.Core.RoutedEvents;
 using System.Linq;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Docking;
@@ -23,7 +27,7 @@ public class DockingAreaTests
     }
 
     [Test]
-    public void ZonesBecomeRectangles_AndTheLastDeclaredIsOutermost()
+    public void ZonesBecomeRectangles_SidesFullHeight_BandInsideTheCentreColumn()
     {
         var area = new DockingArea { DividerThickness = 0 };
         var centre = Group("scene", DockZone.Center);
@@ -38,15 +42,19 @@ public class DockingAreaTests
 
         Assert.Multiple(() =>
         {
-            // Bottom was declared last, so it spans the full width under everything else.
-            Assert.That(bottom.Bounds.Width, Is.EqualTo(1000).Within(0.5), "the outermost split runs the whole way");
+            // The SIDE takes the full height of the area: it is the outermost split, whatever order the zones were
+            // declared in. A tool docked at an edge belongs to the window, not to the space above the bottom band.
+            Assert.That(right.Bounds.Height, Is.EqualTo(800).Within(0.5), "the side runs the whole height");
+            Assert.That(right.Bounds.Y, Is.EqualTo(0).Within(0.5), "from the very top");
+            Assert.That(right.Bounds.X + right.Bounds.Width, Is.EqualTo(1000).Within(0.5), "and ends at the edge");
+
+            // The band lives INSIDE the centre column: under the documents, stopping where the side begins.
+            Assert.That(bottom.Bounds.X, Is.EqualTo(0).Within(0.5));
+            Assert.That(bottom.Bounds.Width, Is.EqualTo(right.Bounds.X).Within(0.5), "it stops at the side, not under it");
             Assert.That(bottom.Bounds.Y + bottom.Bounds.Height, Is.EqualTo(800).Within(0.5), "and reaches the bottom edge");
 
-            // Above it, centre and right share the width.
             Assert.That(centre.Bounds.X, Is.EqualTo(0).Within(0.5));
-            Assert.That(right.Bounds.X, Is.GreaterThan(centre.Bounds.X), "the inspector is to the RIGHT of the scene");
-            Assert.That(right.Bounds.X + right.Bounds.Width, Is.EqualTo(1000).Within(0.5), "and it ends at the edge");
-            Assert.That(centre.Bounds.Height, Is.EqualTo(right.Bounds.Height).Within(0.5), "both stop above the console");
+            Assert.That(centre.Bounds.Width, Is.EqualTo(bottom.Bounds.Width).Within(0.5), "documents and band share one column");
         });
     }
 
@@ -124,6 +132,61 @@ public class DockingAreaTests
             yield return child;
             foreach (var nested in Descendants(child)) yield return nested;
         }
+    }
+
+    /// <summary>A REVEALED panel is a glance at a tool: a press anywhere outside it puts it away again, and only pinning
+    /// keeps it. A press INSIDE it changes nothing - that is someone using the panel.</summary>
+    [Test]
+    public void PressingOutsideARevealedPanel_PutsItAway()
+    {
+        var area = new DockingArea { DividerThickness = 0 };
+        var centre = Group("scene", DockZone.Center);
+        var right = Group("inspector", DockZone.Right, 240);
+        area.Children.Add(centre);
+        area.Children.Add(right);
+
+        var root = new TestWindowRoot { Width = 1000, Height = 800, ClientWidth = 1000, ClientHeight = 800 };
+        root.Children.Add(area);
+        root.Measure(new Size(1000, 800));
+        root.Arrange(new Rect(0, 0, 1000, 800));
+
+        var node = area.Layout.FindGroup("inspector");
+        Assert.That(area.Layout.CollapseGroup(node), Is.True);
+        area.Rebuild();
+        Assert.That(area.Layout.RevealGroup(node), Is.True);
+        area.Rebuild();
+        area.Measure(new Size(1000, 800));
+        area.Arrange(new Rect(0, 0, 1000, 800));
+
+        PressOn(right);
+        Assert.That(node.State, Is.EqualTo(PaneGroupState.Revealed), "a press inside the panel is someone using it");
+
+        PressOn(centre);
+        Assert.That(node.State, Is.EqualTo(PaneGroupState.Collapsed), "a press outside puts the glance away");
+    }
+
+    private static void PressOn(IUIComponent target)
+    {
+        var args = new MouseButtonEventArgs(Mouse.PrimaryDevice, MouseButtons.Left, MouseButtonState.Pressed,
+            InputModifiers.LeftMouseButton, 0)
+        {
+            RoutedEvent = Mouse.PreviewMouseDownEvent,
+            OriginalSource = target
+        };
+        ((IObservableComponent)target).RaiseEvent(args);
+    }
+
+    private sealed class TestWindowRoot : Grid, IRootVisualComponent
+    {
+        public Vector2 PointToClient(Vector2 point) => point;
+        public Vector2 PointToScreen(Vector2 point) => point;
+        public void AttachContextAndInitialize(IUIContext context) { }
+        public double Left { get; set; }
+        public double Top { get; set; }
+        public string Title { get; set; }
+        public double ClientWidth { get; set; }
+        public double ClientHeight { get; set; }
+        public IUIContext UIContext => null;
     }
 
     [Test]

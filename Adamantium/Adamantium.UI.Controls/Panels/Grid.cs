@@ -9,17 +9,23 @@ namespace Adamantium.UI.Controls.Panels;
 
 public class Grid: Panel
 {
+   // Which cell a child occupies is consumed by the GRID, never by the child - so a change here has to re-run the
+   // PARENT's layout. Without that the grid stays measure-valid at an unchanged constraint, early-returns, and the child
+   // keeps the cell it was last put in: a trigger that moved a part to another cell appeared to do nothing at all.
+   private const PropertyMetadataOptions CellOptions =
+      PropertyMetadataOptions.AffectsParentMeasure | PropertyMetadataOptions.AffectsParentArrange;
+
    public static readonly AdamantiumProperty ColumnProperty = AdamantiumProperty.RegisterAttached("Column",
-      typeof(Int32), typeof(AdamantiumComponent));
+      typeof(Int32), typeof(AdamantiumComponent), new PropertyMetadata(0, CellOptions));
 
    public static readonly AdamantiumProperty ColumnSpanProperty = AdamantiumProperty.RegisterAttached("ColumnSpan",
-      typeof(Int32), typeof(AdamantiumComponent), new PropertyMetadata(1));
+      typeof(Int32), typeof(AdamantiumComponent), new PropertyMetadata(1, CellOptions));
 
    public static readonly AdamantiumProperty RowProperty = AdamantiumProperty.RegisterAttached("Row",
-      typeof(Int32), typeof(AdamantiumComponent));
+      typeof(Int32), typeof(AdamantiumComponent), new PropertyMetadata(0, CellOptions));
 
    public static readonly AdamantiumProperty RowSpanProperty = AdamantiumProperty.RegisterAttached("RowSpan",
-      typeof(Int32), typeof(AdamantiumComponent), new PropertyMetadata(1));
+      typeof(Int32), typeof(AdamantiumComponent), new PropertyMetadata(1, CellOptions));
 
    public static readonly AdamantiumProperty ShowGridLinesProperty =
       AdamantiumProperty.Register(nameof(ShowGridLines), typeof(Boolean), typeof(Grid),

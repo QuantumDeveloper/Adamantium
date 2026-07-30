@@ -64,8 +64,38 @@ public abstract class Selector : ItemsControl
     /// <summary>SelectedIndex was set from OUTSIDE (binding / code). Default = single-select that index.</summary>
     protected virtual void OnSelectedIndexSet(int index) => SelectSingle(index);
 
+    /// <summary>A selection named before the items existed. Bindings are established before an ItemsSource has produced
+    /// anything, so a view-model that names its own selected item states it while the collection is still empty - and
+    /// discarding it there does not merely lose it: the discard is written BACK through a TwoWay binding, so the source
+    /// loses its own choice and whatever ends up first wins instead.</summary>
+    private object _pendingSelection;
+
     /// <summary>SelectedItem was set from OUTSIDE (binding / code). Default = single-select that item.</summary>
-    protected virtual void OnSelectedItemSet(object item) => SelectSingle(IndexOfItem(item));
+    protected virtual void OnSelectedItemSet(object item)
+    {
+        var index = IndexOfItem(item);
+
+        // Named, but not here yet - remember it and write nothing: nothing has been decided.
+        if (index < 0 && item != null && Items.Count == 0)
+        {
+            _pendingSelection = item;
+            return;
+        }
+
+        _pendingSelection = null;
+        SelectSingle(index);
+    }
+
+    /// <summary>The index of a selection named before the items existed, now that they have arrived - or -1 if there was
+    /// none, or the named item is still not among them. Consumed on success, so it answers once.</summary>
+    protected int TakePendingSelectionIndex()
+    {
+        if (_pendingSelection == null) return -1;
+
+        var index = IndexOfItem(_pendingSelection);
+        if (index >= 0) _pendingSelection = null;
+        return index;
+    }
 
     /// <summary>Makes exactly <paramref name="index"/> the selection (or clears it when out of range), writes the primary
     /// selection properties (guarded), reflects onto the containers, and raises <see cref="SelectionChanged"/> on change.</summary>
@@ -82,12 +112,16 @@ public abstract class Selector : ItemsControl
         if (changed) RaiseSelectionChanged();
     }
 
-    /// <summary>Writes SelectedIndex/SelectedItem without re-triggering the external-change callbacks.</summary>
+    /// <summary>Writes SelectedIndex/SelectedItem without re-triggering the external-change callbacks.
+    /// <para>SetCurrentValue, not the CLR setters: those write at Local priority, which OUTRANKS a binding - so the
+    /// control's own housekeeping (auto-selecting the first item when the collection fills) permanently masked a
+    /// <c>SelectedItem="{Binding}"</c>, and the source could never state the selection it wanted. This writes the value
+    /// where the binding writes it, so establishing the binding still overrules the default.</para></summary>
     protected void SetSelectedProperties(int index, object item)
     {
         SyncingSelection = true;
-        SelectedIndex = index;
-        SelectedItem = item;
+        SetCurrentValue(SelectedIndexProperty, index);
+        SetCurrentValue(SelectedItemProperty, item);
         SyncingSelection = false;
     }
 

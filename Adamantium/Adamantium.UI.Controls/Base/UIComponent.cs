@@ -619,10 +619,35 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
             // reserved for its bounding box (ArrangeCore set RenderSize to the inner size, Bounds to the outer one).
             var layoutTransform = LayoutTransform;
             if (layoutTransform != null)
-                localTransform = (Matrix4x4F)layoutTransform.Matrix * localTransform;
+            {
+                var matrix = (Matrix4x4F)layoutTransform.Matrix;
+
+                // ...and then brought back to the corner of that box. Layout reserved a BOUNDING BOX, so the content has
+                // to start where the box starts. Scaling about the origin lands there by itself, which is why this was
+                // never missed; rotation does not - a quarter turn sends the content a full width to the left of the
+                // space set aside for it (measured: drawn across -50..0 where the box was 0..50).
+                var (offsetX, offsetY) = TopLeftOf(matrix, RenderSize);
+                localTransform = matrix * Matrix4x4F.Translation((float)-offsetX, (float)-offsetY, 0) * localTransform;
+            }
 
             return localTransform;
         }
+    }
+
+    /// <summary>The top-left corner of a rectangle of <paramref name="size"/> once <paramref name="matrix"/> has been
+    /// applied to it - which is what has to be subtracted to bring the transformed content back to the origin of the
+    /// box layout reserved for it. Only the two axes matter here; the four corners are checked because a rotation can
+    /// put any of them leftmost.</summary>
+    private static (double X, double Y) TopLeftOf(Matrix4x4F matrix, Size size)
+    {
+        var w = size.Width;
+        var h = size.Height;
+
+        // The origin maps to itself for a linear transform, so it is one of the four and needs no arithmetic.
+        var x = Math.Min(0, Math.Min(w * matrix.M11, Math.Min(h * matrix.M21, w * matrix.M11 + h * matrix.M21)));
+        var y = Math.Min(0, Math.Min(w * matrix.M12, Math.Min(h * matrix.M22, w * matrix.M12 + h * matrix.M22)));
+
+        return (x, y);
     }
 
     public virtual Matrix4x4F WorldTransform

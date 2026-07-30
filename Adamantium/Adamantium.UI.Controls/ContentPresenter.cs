@@ -29,11 +29,14 @@ public class ContentPresenter : InputUIComponent
     public static readonly AdamantiumProperty ContentProperty = AdamantiumProperty.Register(nameof(Content),
         typeof(object), typeof(ContentPresenter), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, OnContentPropertyChanged));
 
+    // AffectsMeasure like Content, and for the same reason: the visual is (re)built inside MeasureOverride, so a template
+    // swap that leaves measure valid is never picked up - the property holds the new template while the screen keeps the
+    // visual built from the old one (a tab label whose template turns on its side stayed lying flat forever).
     public static readonly AdamantiumProperty ContentTemplateProperty = AdamantiumProperty.Register(nameof(ContentTemplate),
-        typeof(DataTemplate), typeof(ContentPresenter), new PropertyMetadata(null, OnContentTemplateChanged));
+        typeof(DataTemplate), typeof(ContentPresenter), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, OnContentTemplateChanged));
 
     public static readonly AdamantiumProperty ContentTemplateSelectorProperty = AdamantiumProperty.Register(nameof(ContentTemplateSelector),
-        typeof(DataTemplateSelector), typeof(ContentPresenter), new PropertyMetadata(null, OnContentTemplateSelectorChanged));
+        typeof(DataTemplateSelector), typeof(ContentPresenter), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, OnContentTemplateSelectorChanged));
 
     public static readonly AdamantiumProperty ContentTransitionProperty = AdamantiumProperty.Register(nameof(ContentTransition),
         typeof(ContentTransition), typeof(ContentPresenter), new PropertyMetadata(ContentTransition.None));
@@ -283,6 +286,8 @@ public class ContentPresenter : InputUIComponent
     protected override Size MeasureOverride(Size availableSize)
     {
         _lastContentRebuilt = UpdateVisualContent(Content);
+
+        var sizeBefore = DesiredSize;
         // Data-only reuse (a virtualized list rebinding a recycled container): the visual is kept and only its bound data
         // changed, so the subtree's SIZE is unchanged - skip re-walking it. If the reused child's OWN size actually changed
         // (a string's text, an AffectsMeasure binding), it invalidated ITSELF, so IsMeasureValid is false and we fall
@@ -295,7 +300,32 @@ public class ContentPresenter : InputUIComponent
             && PreviousMeasureConstraint == availableSize
             && LayoutTransform == null)
             return DesiredSize;
-        return base.MeasureOverride(availableSize);
+
+        var size = base.MeasureOverride(availableSize);
+
+        // A REBUILT content is very often a different size than the one the PARENT measured us at - and the rebuild
+        // happens inside our own measure, which may have been requested directly (a tab strip measures a header with an
+        // infinite axis to find its natural size) rather than through the parent. The parent then keeps a size derived
+        // from content that no longer exists, and nothing ever asks it again.
+        // Measured: a folded tab's turned label reported 17x54 here while its tab still carried the 78x29 it had when the
+        // label was lying flat - so three tabs in a column were laid out 29 apart and drew on top of each other.
+        if (_lastContentRebuilt)
+        {
+            (VisualParent as IMeasurableComponent)?.InvalidateMeasure();
+        }
+
+        if (Docking.DockingArea.LogDocking && ContentTemplate != null)
+        {
+            System.Console.WriteLine($"[CP #{GetHashCode()}] tmpl=#{ContentTemplate.GetHashCode()}" +
+                                     $" rebuilt={_lastContentRebuilt}" +
+                                     $" was={sizeBefore.Width:F0}x{sizeBefore.Height:F0}" +
+                                     $" now={size.Width:F0}x{size.Height:F0}" +
+                                     $" parent={VisualParent?.GetType().Name}#{VisualParent?.GetHashCode()}" +
+                                     $" parentValid={(VisualParent as IMeasurableComponent)?.IsMeasureValid}" +
+                                     $" avail={availableSize.Width:F0}x{availableSize.Height:F0}");
+        }
+
+        return size;
     }
 
     protected override Size ArrangeOverride(Size finalSize)

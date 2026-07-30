@@ -11,6 +11,9 @@
     <ItemGroup>
         <InternalsVisibleTo Include="Adamantium.UI.Controls"/>
         <InternalsVisibleTo Include="Adamantium.UI"/>
+        <!-- So a test can put the mouse DEVICE in a state (a button held) instead of only fabricating events about it -
+             input behaviour that depends on the live button state is otherwise untestable. -->
+        <InternalsVisibleTo Include="Adamantium.UITests"/>
     </ItemGroup>
 
     <ItemGroup>

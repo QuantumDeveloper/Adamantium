@@ -1902,5 +1902,41 @@ namespace Adamantium.UITests
          g.Measure(new Size(Double.PositiveInfinity, Double.PositiveInfinity));
          Assert.AreEqual(new Size(350, 440), g.DesiredSize);
       }
+
+      // Moving a child to another CELL must move it on screen. The cell index is read by the grid during its own measure,
+      // so the change has to invalidate the GRID - invalidating only the child leaves the grid measure-valid at an
+      // unchanged constraint, early-returning, and the child stays exactly where it was last put. That is what made a
+      // trigger which re-cells a template part (a folded tab strip moving to the edge column) appear to do nothing.
+      [Test]
+      public void MovingAChildToAnotherCell_MovesIt()
+      {
+         var grid = new Grid();
+         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100, GridUnitType.Pixel) });
+         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100, GridUnitType.Pixel) });
+         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(50, GridUnitType.Pixel) });
+         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(50, GridUnitType.Pixel) });
+
+         var child = new Canvas();
+         grid.Children.Add(child);
+
+         var slot = new Rect(0, 0, 200, 100);
+         grid.Measure(slot.Size);
+         grid.Arrange(slot);
+         Assert.That(child.Bounds.X, Is.EqualTo(0).Within(0.5), "starts in the first cell");
+
+         Grid.SetColumn(child, 1);
+         Grid.SetRow(child, 1);
+
+         grid.Measure(slot.Size);      // the SAME constraint - only the cell changed
+         grid.Arrange(slot);
+
+         Assert.Multiple(() =>
+         {
+            Assert.That(child.Bounds.X, Is.EqualTo(100).Within(0.5), "moved to the second column");
+            Assert.That(child.Bounds.Y, Is.EqualTo(50).Within(0.5), "and the second row");
+         });
+      }
+
+
    }
 }

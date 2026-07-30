@@ -1,6 +1,8 @@
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Buttons;
+using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.Decorators;
+using Panels = Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Controls;
 using Adamantium.UI.Core.Data;
@@ -206,6 +208,45 @@ public class StyleTriggerTests
             }
         }
         public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
+    }
+
+    // A trigger must be able to set an ATTACHED property, exactly as a style setter can: the property is named in markup
+    // (`Grid.Row`), and resolving that name is one job with one answer. It was two - the style path read the owner off the
+    // dotted name and the trigger path did not - so a trigger that moved a part to another grid cell silently did nothing
+    // (the folded tab strip stayed under the body instead of beside it), and clearing it did nothing either.
+    [Test]
+    public void PropertyTrigger_CanSetAndClearAnAttachedProperty()
+    {
+        var host = new Border { Child = new Border() };
+        var part = (Border)host.Child;
+
+        var trigger = new PropertyTrigger { Property = "IsEnabled", Value = false };
+        trigger.Add(new Setter { Property = "Grid.Row", Value = "2" });
+        trigger.Apply(new FixedTargetContext(host, part));
+
+        host.IsEnabled = false;
+        Assert.That(Panels.Grid.GetRow(part), Is.EqualTo(2), "the trigger moved the part to another row");
+
+        host.IsEnabled = true;
+        Assert.That(Panels.Grid.GetRow(part), Is.EqualTo(0), "and leaving the trigger put it back");
+    }
+
+    // A context whose every TargetName resolves to one given part - the trigger machinery only needs FindTarget, and a
+    // real template would drag in an items/parts setup this question does not depend on.
+    private sealed class FixedTargetContext : ITriggerExecutionContext
+    {
+        private readonly IFundamentalUIComponent _host;
+        private readonly IAdamantiumComponent _target;
+
+        public FixedTargetContext(IFundamentalUIComponent host, IAdamantiumComponent target)
+        {
+            _host = host;
+            _target = target;
+        }
+
+        public IFundamentalUIComponent HostComponent => _host;
+        public ITheme Theme => null;
+        public IAdamantiumComponent FindTarget(string targetName) => _target;
     }
 
     private static ControlTemplate NamedPartTemplate(string partName)
