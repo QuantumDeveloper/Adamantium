@@ -164,6 +164,30 @@ public class DockCompass : Panel
     /// <summary>Nothing is aimed at - draw neither the indicators nor the preview.</summary>
     public void Clear() => AimAt(default, DockZone.None);
 
+    /// <summary>Which zones the panes being dragged are ALLOWED to land in - the rest are not drawn at all.
+    /// <para>Not drawn rather than drawn-and-inert: an indicator is a promise that dropping there does something, and one
+    /// that quietly declines is worse than none - you aim at it, nothing happens, and there is no way to tell a refusal
+    /// from a missed target. What CANNOT be shown this way is the application's veto (DockingArea.PaneDocking), which is
+    /// asked on the drop: the compass shows what the ZONES allow, which is data, and a veto is an exception to it.</para>
+    /// <para>Deliberately NOT an AdamantiumProperty, unlike the brushes and sizes beside it. Those are looks and belong to
+    /// the theme; this is the state of the gesture in progress, like the aimed-at rectangle - it comes from the panes
+    /// being dragged and nobody else has an opinion worth having. Made settable from markup, a theme could say "All" and
+    /// get indicators that decline, since the real check lives in DockingArea.Resolve.</para>
+    /// </summary>
+    public DockZone AllowedZones
+    {
+        get => _allowed;
+        set
+        {
+            if (_allowed == value) return;
+
+            _allowed = value;
+            InvalidateArrange();
+        }
+    }
+
+    private DockZone _allowed = DockZone.All;
+
     /// <summary>Which indicator a point falls on for a group occupying <paramref name="target"/>, or
     /// <see cref="DockZone.None"/>. Static and pure: this is what the drop asks too, so the two can never disagree.</summary>
     public static DockZone ZoneAt(Rect target, Vector2 point, double indicatorSize, double gap)
@@ -309,7 +333,7 @@ public class DockCompass : Panel
         for (var i = 0; i < _indicators.Length; i++)
         {
             var indicator = _indicators[i];
-            indicator.Visibility = aiming ? Visibility.Visible : Visibility.Collapsed;
+            indicator.Visibility = aiming && (_allowed & Zones[i]) != 0 ? Visibility.Visible : Visibility.Collapsed;
             indicator.Background = !_armedIsEdge && Zones[i] == _armed ? ActiveBrush : IndicatorBrush;
             indicator.BorderBrush = IndicatorStroke;
             // Without a thickness the brush above draws nothing: Border's default is zero, so the outline that separates
@@ -324,7 +348,7 @@ public class DockCompass : Panel
         for (var i = 0; i < _edges.Length; i++)
         {
             var edge = _edges[i];
-            edge.Visibility = aiming ? Visibility.Visible : Visibility.Collapsed;
+            edge.Visibility = aiming && (_allowed & EdgeZones[i]) != 0 ? Visibility.Visible : Visibility.Collapsed;
             edge.Background = _armedIsEdge && EdgeZones[i] == _armed ? ActiveBrush : IndicatorBrush;
             edge.BorderBrush = IndicatorStroke;
             edge.BorderThickness = new Thickness(IndicatorStrokeThickness);

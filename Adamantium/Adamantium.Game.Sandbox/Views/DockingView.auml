@@ -1,17 +1,33 @@
 <View xmlns="http://adamantium/ui"
+      xmlns:behaviors="clr-namespace:Adamantium.Game.Sandbox.Behaviors"
       xmlns:docking="clr-namespace:Adamantium.UI.Controls.Docking;assembly=Adamantium.UI.Controls">
-    <Grid RowDefinitions="Auto,*" Margin="24">
+    <Grid RowDefinitions="Auto,Auto,*" Margin="24">
 
         <TextBlock Grid.Row="0" MarginBottom="12" MaxWidth="820"
                    Text="An editor-shaped arrangement written as ZONES only. Nothing here says what share of what a group takes - the author writes WHERE (centre, right, bottom) and the split tree is derived from that. Drag the grips between the areas: they rewrite the layout's own shares, which is the number a save would read."
                    Foreground="{ResourceReference TextFillColorSecondary}"/>
 
+        <!-- The application answering the two questions the area asks. Both rules here are about the STATE OF THE
+             LAYOUT AT THIS MOMENT, which is exactly what a set of zones cannot express and therefore what the events
+             are for: no more than three tabs in one panel, and the last tab of a panel may not be pulled out. Where a
+             pane may go AT ALL is data instead - see Pane.Allowed on Errors below, which the compass reads BEFORE the
+             drag, so forbidden indicators are never drawn. -->
+        <Border Grid.Row="1" MarginBottom="12" Padding="10 6 10 6"
+                Background="{ResourceReference ControlFillColorDefault}"
+                BorderBrush="{ResourceReference ControlStrokeColorDefault}" BorderThickness="1">
+            <TextBlock Text="{Binding LastAnswer}"
+                       Foreground="{ResourceReference TextFillColorSecondary}"/>
+        </Border>
+
         <!-- Square corners on purpose: areas meet each other along the splitters, and a rounded corner there leaves a
              notch of background at every junction instead of a clean seam. -->
-        <Border Grid.Row="1" BorderThickness="1"
+        <Border Grid.Row="2" BorderThickness="1"
                 BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                 Background="{ResourceReference CardBackgroundFillColorDefault}">
             <docking:DockingArea DividerThickness="6">
+                <docking:DockingArea.Behaviors>
+                    <behaviors:DockingPolicyBehavior MaxPanesPerGroup="3" KeepLastPane="True"/>
+                </docking:DockingArea.Behaviors>
 
                 <!-- Declared first, so it is innermost: the documents. -->
                 <docking:PaneGroup Name="documents" Zone="Center">
@@ -43,8 +59,12 @@
                     <docking:Pane Header="Output" Kind="Tool">
                         <TextBlock Text="Output" Margin="16" Opacity="0.7"/>
                     </docking:Pane>
-                    <docking:Pane Header="Errors" Kind="Tool">
-                        <TextBlock Text="Errors" Margin="16" Opacity="0.7"/>
+                    <!-- Allowed is the OTHER half of the vocabulary: where a pane may go at all, in data. Drag this one
+                         and the compass draws only the EDGES - no centre indicator, no tearing it off - because an
+                         indicator that quietly declines is worse than no indicator. -->
+                    <docking:Pane Header="Errors" Kind="Tool" Allowed="Center,Top,Bottom,Floating">
+                        <TextBlock Text="Errors - centre, top or bottom only; never the sides (Pane.Allowed)"
+                                   Margin="16" Opacity="0.7"/>
                     </docking:Pane>
                 </docking:PaneGroup>
 
