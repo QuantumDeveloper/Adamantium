@@ -465,6 +465,34 @@ public class DockingArea : Panel
         return new DockTarget(node, bounds, zone, DockCompass.PreviewOf(bounds, zone));
     }
 
+    // --- Asking the application ----------------------------------------------------------------------------------------
+    // The control SPARES the application from having to fight it: rather than reaching inside to intercept, it says "no"
+    // here and the gesture ends as if it had never crossed its threshold. Two events, not one, because refusing a move
+    // inside the window and refusing a window of its own are different statements about a pane.
+    // Raised on the ACTION, never per mouse move: what an application does in a handler is its own business, and a
+    // question asked hundreds of times a second is not one anybody can answer honestly.
+
+    /// <summary>Raised before panes are docked somewhere. Cancel to refuse the move.</summary>
+    public event EventHandler<PaneDockingEventArgs> PaneDocking;
+
+    /// <summary>Raised before panes leave for a window of their own. Cancel to refuse the tear-off.</summary>
+    public event EventHandler<PaneTearingOffEventArgs> PaneTearingOff;
+
+    /// <summary>Asks the application, on the OWNER, and answers whether it said no. On the owner because a floating area
+    /// is the same docking system in another window - an application wires one set of handlers, not one per window it
+    /// never asked to be opened.</summary>
+    private bool Refuses(PaneDockingEventArgs args)
+    {
+        Owner.PaneDocking?.Invoke(Owner, args);
+        return args.Cancel;
+    }
+
+    private bool Refuses(PaneTearingOffEventArgs args)
+    {
+        Owner.PaneTearingOff?.Invoke(Owner, args);
+        return args.Cancel;
+    }
+
     /// <summary>
     /// A pane was dragged clear of this area: it becomes a window of its own. Owned HERE rather than left to the
     /// application, because a floating pane is not a loose window that happens to hold a panel - it is another ROOT of
@@ -475,7 +503,9 @@ public class DockingArea : Panel
         // A pane that is not allowed to float does not tear off at all: the strip keeps it and goes on reordering, which
         // is exactly what happened before anybody listened to the event.
         if (pane == null || (pane.Allowed & DockZone.Floating) == 0) return false;
-        if (pane.Id == null || !Layout.RemovePane(pane.Id)) return false;
+        if (pane.Id == null) return false;
+        if (Refuses(new PaneTearingOffEventArgs([pane.Id], isWholePanel: false))) return false;
+        if (!Layout.RemovePane(pane.Id)) return false;
 
         var node = new PaneGroupNode();
         node.Add(pane.Id);
@@ -511,6 +541,7 @@ public class DockingArea : Panel
         var node = NodeOf(control);
         if (node == null) return false;
         if ((AllowedFor(node) & DockZone.Floating) == 0) return false;   // one pane refusing to float holds the panel
+        if (Refuses(new PaneTearingOffEventArgs([..node.PaneIds], isWholePanel: true))) return false;
 
         var title = control.Title?.ToString() ?? "Panel";
         var grabX = screenPosition.X - control.PointToScreen(Vector2.Zero).X;
@@ -558,8 +589,9 @@ public class DockingArea : Panel
         var root = area._root;
 
         // What the travelling panes permit, read once: it cannot change while the drag runs, and asking per mouse move
-        // would walk the tree hundreds of times a second.
-        _dragAllowed = AllowedFor(root.Content);
+        // would walk the tree hundreds of times a second. Kept on the OWNER, because the drag is aimed at every area of
+        // the family and any of them may be the one that answers.
+        Owner._dragAllowed = AllowedFor(root.Content);
 
         // Showing a window belongs to the UI thread while the gesture runs on the loop thread, where the visual tree
         // lives. InvokeAsync, not Invoke: blocking into the pump would stall the very frame the drag is still in.
@@ -631,7 +663,7 @@ public class DockingArea : Panel
             var size = area.RenderSize;
             if (at.X < 0 || at.Y < 0 || at.X > size.Width || at.Y > size.Height) continue;
 
-            var resolved = area.Resolve(at, _dragAllowed);
+            var resolved = area.Resolve(at, Owner._dragAllowed);
             if (resolved.Node == null) continue;
 
             hit = area;
@@ -674,6 +706,10 @@ public class DockingArea : Panel
             UIAppContext.Current.Dispatcher.InvokeAsync(ShowOverlay);
         }
 
+        // Only the zones these panes may actually land in are drawn. An indicator is a promise that dropping there does
+        // something, so one that quietly declines is worse than none: you aim at it, nothing happens, and a refusal is
+        // indistinguishable from a missed target.
+        _compass.AllowedZones = Owner._dragAllowed;
         _compass.AimAt(target.Bounds, target.Zone, target.IsEdge, EdgeDockSize);
     }
 
@@ -699,6 +735,11 @@ public class DockingArea : Panel
         area?.ClearAim();
 
         if (!target.IsValid || area == null) return;
+
+        // Asked BEFORE the model is touched, and asked of the area that is receiving: refusing has to leave the window
+        // exactly where it is, and a veto discovered afterwards would mean undoing a move that has already happened.
+        if (area.Refuses(new PaneDockingEventArgs([..DockingLayout.PanesIn(root.Content)], target.Node, target.Zone))) return;
+
         if (!Layout.MoveNode(root.Content, target.Node, target.Zone,
                 size: target.IsEdge ? PaneLength.Pixels(EdgeDockSize) : null)) return;
 

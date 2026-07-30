@@ -831,12 +831,36 @@ public class CodeGenerationContext
         TextGenerator.WriteLine($"{symbolName} = {BuildValueExpression(valueText, member)};");
     }
 
+    // An enum value, which may be a LIST of flags: Allowed="Center,Bottom" is Center | Bottom, exactly as the .NET
+    // parsers read it and as the framework's own runtime conversion does. Emitting the text as written produced
+    // "DockZone.Center,Bottom" - not a diagnostic but a syntax error inside generated code, which lands on the user as
+    // CS1002 pointing at a file they never wrote.
+    // Not gated on [Flags]: a comma only means one thing here, and a non-flags enum written with one is a mistake worth
+    // reporting as "Bottom is not a member" rather than as a missing semicolon.
+    private static string BuildEnumExpression(string valueText, IResolvedType member)
+    {
+        if (valueText.IndexOf(',') < 0) return $"{member.FullName}.{valueText}";
+
+        var parts = valueText.Split(',');
+        var terms = new List<string>(parts.Length);
+
+        foreach (var part in parts)
+        {
+            var name = part.Trim();
+            if (name.Length == 0) continue;
+
+            terms.Add($"{member.FullName}.{name}");
+        }
+
+        return terms.Count == 0 ? $"{member.FullName}.{valueText}" : string.Join(" | ", terms);
+    }
+
     // The C# expression for a literal attribute value, typed as the property's type (so it can be assigned directly OR
     // boxed for a priority-aware SetValue without losing its type, e.g. Opacity="0" must be (double)0, not a boxed int).
     private string BuildValueExpression(string valueText, IResolvedType member)
     {
         if (member.TypeKind == ResolvedTypeKind.Enum)
-            return $"{member.FullName}.{valueText}";
+            return BuildEnumExpression(valueText, member);
 
         // Floating "specials" are not valid C# numeric literals - emit the framework constant instead (mirrors the
         // runtime TypeCastFactory, which maps "Auto" -> NaN). Lets a markup double carry them, e.g. an animation's
