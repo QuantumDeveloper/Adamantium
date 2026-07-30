@@ -745,8 +745,13 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
 
     public virtual void InvalidateMeasure()
     {
-        if (!IsMeasureValid) return;
-
+        // NO early return for an already-invalid node. The flag and the QUEUE are two different things: a node marked
+        // invalid at a moment when it could not be enqueued - detached (the dirty queue belongs to the visual root), or
+        // mid-pass - stays flagged forever, and returning here on the strength of that flag means the request to measure
+        // it is dropped and nobody ever measures it again. Re-stating the request is cheap (the manager's queue is a set),
+        // and it is the difference between a stale size healing on the next pass and never healing at all.
+        // Measured: a folded tab whose label had been turned kept the footprint it had lying flat through every later
+        // pass - its measure count simply stopped growing - while its own header presenter reported the turned size.
         IsMeasureValid = false;
         IsArrangeValid = false;
         IsGeometryValid = false;
@@ -825,9 +830,18 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     {
         base.OnAttachedToVisualTree(e);
 
-        if (!IsMeasureValid && _previousMeasure != null) 
+        if (!IsMeasureValid && _previousMeasure != null)
             LayoutManager.For(this).InvalidateMeasure(this);
-        else if (!IsArrangeValid && _previousArrange != null) 
+        else if (!IsArrangeValid && _previousArrange != null)
             LayoutManager.For(this).InvalidateArrange(this);
+
+        // And make the PARENT re-read us. A size worked out while this subtree was DETACHED could not be published: the
+        // propagation of a changed DesiredSize travels through the dirty queue, the queue belongs to the visual root, and
+        // there was none - so the parent kept a size computed from the size we USED to have. Re-registering ourselves does
+        // not repair that: we re-measure to the same answer, nothing changed, and nothing propagates. The parent has to be
+        // told once, here, where re-attachment is known.
+        // Measured: a folded tab's label row reported the turned 17x55 while the tab above it kept the 78x29 it had when
+        // the label lay flat - through every later pass, because the row's size never changed AGAIN.
+        (VisualParent as IMeasurableComponent)?.InvalidateMeasure();
     }
 }

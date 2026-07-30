@@ -106,6 +106,19 @@ public class PaneHost : Panel, IPaneMinimum
         var across = horizontal ? availableSize.Height : availableSize.Width;
 
         var along = SpaceForChildren(total);
+
+        // An Auto child is asked how much it needs BEFORE the space is handed out, because its answer is what it gets -
+        // exactly as a Grid measures an Auto row first. Reading DesiredSize without this asks about the PREVIOUS pass,
+        // so a pane that has just been collapsed keeps the height it had until something else forces another layout.
+        foreach (var child in Children)
+        {
+            if (child is PaneSplitter || !GetPaneLength(child).IsAuto) continue;
+
+            child.Measure(horizontal
+                ? new Size(double.PositiveInfinity, across)
+                : new Size(across, double.PositiveInfinity));
+        }
+
         Distribute(along);
 
         var placed = 0;
@@ -212,13 +225,25 @@ public class PaneHost : Panel, IPaneMinimum
         var starWeight = 0.0;
         var stars = 0;
 
+        var horizontal = Orientation == Orientation.Horizontal;
+
         for (var i = 0; i < _content.Count; i++)
         {
             var length = GetPaneLength(_content[i]);
-            if (length.IsPixel)
+            if (length.IsPixel || length.IsAuto)
             {
-                _sizes[i] = length.Value;
-                fixedTotal += length.Value;
+                // Auto asks the child how much it needs - which is the whole point of it: a COLLAPSED pane is shrunk to
+                // its own tab strip, and how tall a strip is is measured, never typed. Off the top like any other fixed
+                // length, since a pane that says "only what I need" is not competing for the leftovers.
+                var size = length.Value;
+                if (length.IsAuto)
+                {
+                    var desired = _content[i] is IMeasurableComponent measurable ? measurable.DesiredSize : default;
+                    size = horizontal ? desired.Width : desired.Height;
+                }
+
+                _sizes[i] = size;
+                fixedTotal += size;
                 continue;
             }
 

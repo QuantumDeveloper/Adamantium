@@ -14,7 +14,10 @@
         <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="CornerRadius" Value="4 4 0 0"/>
-        <Setter Property="Padding" Value="12 6"/>
+        <!-- All four sides stated: Thickness(a b) here means (leftTop, rightBottom), NOT (horizontal, vertical), so the
+             two-value form padded a tab 12 on the left AND top against 6 on the right and bottom. Invisible in a wide
+             strip; on a turned label in a narrow column it read as text pushed off-centre. -->
+        <Setter Property="Padding" Value="12 6 12 6"/>
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -31,10 +34,12 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             Padding="{TemplateBinding Padding}">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <!-- What marks the tab, drawn from DATA by IconTemplate. Nothing is reserved when there is no
-                                 icon: an empty presenter measures to nothing, so a tab without one is unchanged. -->
+                            <!-- What marks the tab, drawn from DATA by IconTemplate. Collapsed by default and revealed by
+                                 the HasIcon trigger below: an empty presenter measures to nothing, but its MARGIN is
+                                 reserved regardless, and that gap is what pushed a turned label off-centre. -->
                             <ContentPresenter x:Name="PART_Icon"
                                     VerticalAlignment="Center"
+                                    Visibility="Collapsed"
                                     Margin="0 0 6 0"
                                     Content="{TemplateBinding Icon}"
                                     ContentTemplate="{TemplateBinding IconTemplate}"/>
@@ -65,6 +70,10 @@
     <Style Selector="TabItem">
         <PropertyTrigger Property="IsMouseOver" Value="true">
             <Setter TargetName="TabBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+        </PropertyTrigger>
+        <!-- The icon slot exists only when there is an icon to put in it (see PART_Icon above). -->
+        <PropertyTrigger Property="HasIcon" Value="true">
+            <Setter TargetName="PART_Icon" Property="Visibility" Value="Visible"/>
         </PropertyTrigger>
         <PropertyTrigger Property="IsSelected" Value="true">
             <Setter TargetName="TabBorder" Property="Background" Value="{TemplateBinding BackgroundSelected}"/>

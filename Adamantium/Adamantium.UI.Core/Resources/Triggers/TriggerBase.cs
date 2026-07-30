@@ -37,7 +37,13 @@ public abstract class TriggerBase : ITrigger
                 self.Apply(component, setterProperty, ValuePriority.Trigger);
                 break;
             default:
-                var prop = AdamantiumPropertyMap.FindRegistered(component.GetType(), setterProperty);
+                // ResolveProperty, not FindRegistered: a property NAMED IN MARKUP may be attached (`Grid.Row`), and only
+                // the former reads the owner off the dotted name. A style setter has always resolved both - a trigger
+                // silently did nothing for the attached half, which is how a strip that was supposed to move to another
+                // grid cell stayed where it was.
+                var prop = AdamantiumPropertyMap.ResolveProperty(component.GetType(), setterProperty);
+                if (prop == null) return;
+
                 var value = TypeCastFactory.CastFromString(setterValue, prop.PropertyType);
                 component.SetValue(prop, value, ValuePriority.Trigger);
                 break;

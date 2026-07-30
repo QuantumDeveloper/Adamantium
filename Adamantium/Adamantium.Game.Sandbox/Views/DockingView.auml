@@ -24,15 +24,27 @@
                 </docking:PaneGroup>
 
                 <docking:PaneGroup Name="inspector" Zone="Right" Size="240">
-                    <docking:Pane Header="Inspector" MinSize="120">
+                    <docking:Pane Header="Inspector" Kind="Tool" MinSize="120">
                         <TextBlock Text="Inspector" Margin="16" Opacity="0.7"/>
+                    </docking:Pane>
+                    <docking:Pane Header="Hierarchy" Kind="Tool" MinSize="120">
+                        <TextBlock Text="Hierarchy" Margin="16" Opacity="0.7"/>
+                    </docking:Pane>
+                    <docking:Pane Header="Properties" Kind="Tool" MinSize="120">
+                        <TextBlock Text="Properties" Margin="16" Opacity="0.7"/>
                     </docking:Pane>
                 </docking:PaneGroup>
 
                 <!-- Declared last, so it is OUTERMOST: the console spans the full width beneath everything above. -->
                 <docking:PaneGroup Name="console" Zone="Bottom" Size="160">
-                    <docking:Pane Header="Console">
+                    <docking:Pane Header="Console" Kind="Tool">
                         <TextBlock Text="Console" Margin="16" Opacity="0.7"/>
+                    </docking:Pane>
+                    <docking:Pane Header="Output" Kind="Tool">
+                        <TextBlock Text="Output" Margin="16" Opacity="0.7"/>
+                    </docking:Pane>
+                    <docking:Pane Header="Errors" Kind="Tool">
+                        <TextBlock Text="Errors" Margin="16" Opacity="0.7"/>
                     </docking:Pane>
                 </docking:PaneGroup>
 

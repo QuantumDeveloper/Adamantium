@@ -16,6 +16,21 @@ public class PaneGroupNode : PaneNode
 
     public bool IsEmpty => PaneIds.Count == 0;
 
+    /// <summary>Docked, put away, or being looked at (see <see cref="PaneGroupState"/>). Both unpinned states take only
+    /// the room the strip needs - which is measured, not stated (see <see cref="Panels.PaneUnit.Auto"/>).
+    /// <para>Folded IN PLACE rather than off to a strip on the root, because that is what an unpinned panel IS here: the
+    /// tabs stay where the panel was, so clicking one brings back exactly what was hidden and nothing has to remember
+    /// where that was.</para></summary>
+    public PaneGroupState State { get; set; } = PaneGroupState.Docked;
+
+    /// <summary>Whether the group owns a length of its own - true unless it is put away, where the length is
+    /// <see cref="Panels.PaneUnit.Auto"/>: the strip and nothing more, a value that belongs to the fold rather than to
+    /// anything the user dragged.</summary>
+    public bool OwnsLength => State != PaneGroupState.Collapsed;
+
+    /// <summary>What it was worth before collapsing, so expanding it again is not a fresh guess at a size.</summary>
+    public Panels.PaneLength RestoreLength { get; set; } = Panels.PaneLength.Star;
+
     public void Add(string paneId)
     {
         PaneIds.Add(paneId);

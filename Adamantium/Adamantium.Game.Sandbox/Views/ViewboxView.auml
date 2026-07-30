@@ -105,6 +105,41 @@
                 </Border>
             </StackPanel>
 
+            <TextBlock Text="LayoutTransform, ROTATION — B is the same 100×50 turned 90°, so its footprint is 50×100 and C starts at x=150. A turned label is what a collapsed docking panel is made of." FontSize="18" Margin="0,24,0,12"/>
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
+                <Border Width="100" Height="50" Background="#334155" VerticalAlignment="Top">
+                    <TextBlock Text="A" Foreground="White" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <Border Width="100" Height="50" Background="#22C55E" VerticalAlignment="Top">
+                    <Border.LayoutTransform>
+                        <Transform RotationAngle="90"/>
+                    </Border.LayoutTransform>
+                    <TextBlock Text="B 90°" Foreground="White" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <Border Width="100" Height="50" Background="#334155" VerticalAlignment="Top">
+                    <TextBlock Text="C" Foreground="White" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+            </StackPanel>
+
+            <TextBlock Text="The same turn on TEXT, stacked down a column - which is exactly a collapsed tool strip: the column is as wide as the text is TALL, not as long as the words." FontSize="18" Margin="0,24,0,12"/>
+            <StackPanel Orientation="Vertical" HorizontalAlignment="Left" Background="#1F2937">
+                <ContentPresenter Content="Inspector" Margin="4">
+                    <ContentPresenter.LayoutTransform>
+                        <Transform RotationAngle="-90"/>
+                    </ContentPresenter.LayoutTransform>
+                </ContentPresenter>
+                <ContentPresenter Content="Hierarchy" Margin="4">
+                    <ContentPresenter.LayoutTransform>
+                        <Transform RotationAngle="-90"/>
+                    </ContentPresenter.LayoutTransform>
+                </ContentPresenter>
+                <ContentPresenter Content="Properties" Margin="4">
+                    <ContentPresenter.LayoutTransform>
+                        <Transform RotationAngle="-90"/>
+                    </ContentPresenter.LayoutTransform>
+                </ContentPresenter>
+            </StackPanel>
+
         </StackPanel>
     </ScrollViewer>
 </View>

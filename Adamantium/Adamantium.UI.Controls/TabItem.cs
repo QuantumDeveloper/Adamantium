@@ -25,7 +25,23 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
     // flows its ItemTemplate/ItemTemplateSelector here for generated (data-bound) tabs, so a header VM renders as a
     // proper visual (e.g. a TextBlock bound to its Header) instead of ToString(). Null = the header hosts as-is.
     public static readonly AdamantiumProperty HeaderTemplateProperty = AdamantiumProperty.Register(nameof(HeaderTemplate),
-        typeof(DataTemplate), typeof(TabItem), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure));
+        typeof(DataTemplate), typeof(TabItem),
+        new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, OnHeaderTemplateChanged));
+
+    /// <summary>Dirty the header PRESENTER, not just this tab. The presenter learns of the new template through a
+    /// {TemplateBinding}, and those are flushed in a batch - so on the tab's next measure the presenter is still
+    /// measure-VALID, holding the size of a visual built from the OLD template, and the row simply reuses it. Only a
+    /// LATER direct measure of the presenter rebuilds it, and by then this tab has already answered.
+    /// <para>Measured, folding a tool strip: the presenter reported the turned label at 17x54 while its tab kept the
+    /// 78x29 it had lying flat, three measures deep - and the one tab that happened to get a fourth measure was the only
+    /// one that came out right.</para></summary>
+    private static void OnHeaderTemplateChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is TabItem tab && tab.GetTemplateChild("PART_ContentPresenter") is IMeasurableComponent presenter)
+        {
+            presenter.InvalidateMeasure();
+        }
+    }
 
     public static readonly AdamantiumProperty HeaderTemplateSelectorProperty = AdamantiumProperty.Register(nameof(HeaderTemplateSelector),
         typeof(DataTemplateSelector), typeof(TabItem), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure));
@@ -63,7 +79,22 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
     /// and a control can only ever be in one of them; handing the same instance to both takes it out of the first. Data
     /// plus a template builds a fresh visual per place, so an icon can appear in as many as it likes.</para></summary>
     public static readonly AdamantiumProperty IconProperty = AdamantiumProperty.Register(nameof(Icon),
-        typeof(object), typeof(TabItem), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure));
+        typeof(object), typeof(TabItem), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, OnIconChanged));
+
+    /// <summary>Whether this tab has an icon at all - the one thing a template needs to know about
+    /// <see cref="Icon"/> that a template binding cannot answer (a presenter fed nothing still reserves its own margin,
+    /// which is 6px of dead space in every tab without one, and it shows the moment the strip turns narrow). Folded here
+    /// like <see cref="ShowCloseButton"/>, so the theme collapses the icon slot with a plain trigger.</summary>
+    public static readonly AdamantiumProperty HasIconProperty = AdamantiumProperty.Register(nameof(HasIcon),
+        typeof(bool), typeof(TabItem), new PropertyMetadata(false));
+
+    private static void OnIconChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is TabItem tab)
+        {
+            tab.HasIcon = e.NewValue != null;
+        }
+    }
 
     /// <summary>How to draw <see cref="Icon"/>. An EFFECTIVE value pulled from the owning
     /// <see cref="TabControl.IconTemplate"/>, so one template serves every tab in a strip; set it here to override it
@@ -117,6 +148,13 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
     {
         get => GetValue(IconProperty);
         set => SetValue(IconProperty, value);
+    }
+
+    /// <summary>True when <see cref="Icon"/> is set. Read it in a template trigger; it is maintained from Icon.</summary>
+    public bool HasIcon
+    {
+        get => GetValue<bool>(HasIconProperty);
+        private set => SetValue(HasIconProperty, value);
     }
 
     /// <summary>How <see cref="Icon"/> is drawn. Comes from the owning <see cref="TabControl.IconTemplate"/> unless set
@@ -302,6 +340,20 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
     {
         base.OnMouseMove(sender, e);
         if (!_pressed) return;
+
+        // Whether the button is DOWN is the device's to answer, not ours to remember. The flag above is only where the
+        // gesture started; kept as the sole authority it goes stale - pressing a folded strip re-templates the tree
+        // under the cursor (the group expands), the button-up lands in the new tree and never reaches this tab, and the
+        // flag stays latched for the life of the control. After that a plain hover, with nothing held down, walked
+        // straight into the drag path and slid the tabs away.
+        if (e.MouseDevice.LeftButton != MouseButtonState.Pressed)
+        {
+            AbandonDrag();
+            return;
+        }
+
+        if (!_dragging && Owner is { AllowTabDrag: false }) return;
+
         if (!_dragging && PlatformSettings.ExceedsDragThreshold(e.GetPosition(this) - _pressPos))
         {
             _dragging = true;

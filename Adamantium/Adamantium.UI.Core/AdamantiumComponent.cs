@@ -222,7 +222,10 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
     public void ClearValue(string propertyName, ValuePriority priority = ValuePriority.Local)
     {
-        var property = AdamantiumPropertyMap.FindRegistered(GetType(), propertyName);
+        // ResolveProperty: the name comes from markup, so it may be attached (`Grid.Row`). This is the paired operation
+        // for a trigger's setter - resolving less here than the setter did would leave the value it wrote standing when
+        // the trigger goes away.
+        var property = AdamantiumPropertyMap.ResolveProperty(GetType(), propertyName);
         if (property == null) return;
         
         ClearValue(property, priority);
@@ -353,12 +356,12 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
     public AdamantiumProperty GetProperty(string propertyName)
     {
-        return AdamantiumPropertyMap.FindRegistered(GetType(), propertyName);
+        return AdamantiumPropertyMap.ResolveProperty(GetType(), propertyName);
     }
     
     public void SetTriggerValue(string propertyName, object value, object token)
     {
-        var property = AdamantiumPropertyMap.FindRegistered(GetType(), propertyName);
+        var property = AdamantiumPropertyMap.ResolveProperty(GetType(), propertyName);
         SetTriggerValue(property, value, token);
     }
 
@@ -382,7 +385,7 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
     public void SetStyleValue(string propertyName, object value, Style style)
     {
-        var property = AdamantiumPropertyMap.FindRegistered(GetType(), propertyName);
+        var property = AdamantiumPropertyMap.ResolveProperty(GetType(), propertyName);
         SetStyleValue(property, value, style);
     }
 
@@ -473,7 +476,7 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     {
         if (string.IsNullOrEmpty(property)) return;
 
-        var adamantiumProperty = AdamantiumPropertyMap.FindRegistered(GetType(), property);
+        var adamantiumProperty = AdamantiumPropertyMap.ResolveProperty(GetType(), property);
         if (adamantiumProperty == null)
             return;
 
@@ -525,7 +528,17 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             values.Add(property, new ValueContainer());
         }
         values[property].SetValue(value, priority);
-        metadata.PropertyChangedCallback?.Invoke(this, args);
+
+        // A write that leaves the EFFECTIVE value where it was is not a change, so it must not run the changed-callback.
+        // Running it anyway is how two properties that assign each other close a cycle with no exit: a presenter whose
+        // Content is bound to its own DataContext writes back the object it already sits on, the callback re-assigns the
+        // same DataContext, that refreshes the bindings, which writes Content again - the app died of a stack overflow.
+        // The equal-effective check below guards only invalidation and events, which is why the cycle ran above it.
+        var effectiveAfterWrite = GetOrCalculateEffectiveValue(property);
+        if (!Equals(oldEffectiveValue, effectiveAfterWrite))
+        {
+            metadata.PropertyChangedCallback?.Invoke(this, args);
+        }
 
         // Implicit transitions: let an animatable element turn this base-value change into a smooth animation. Skipped
         // for animation-priority writes (those ARE the transition) so there is no recursion. May start an animation
@@ -553,6 +566,24 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             else if (metadata.AffectsArrange)
             {
                 measurable.InvalidateArrange();
+            }
+
+            // The value belongs to the PARENT's layout, not to this element's own size: a Grid cell index, a figure's
+            // segments. Invalidating only this element leaves it exactly where the parent last put it - the parent's
+            // measure is measure-valid at an unchanged constraint, so it early-returns and never re-reads the value.
+            // Until now these two options were declared in metadata and acted on NOWHERE, so anything relying on them
+            // silently did nothing (see the note in PaneHost, which worked around it by hand).
+            if (element.VisualParent is IMeasurableComponent parent)
+            {
+                if (metadata.AffectsParentMeasure)
+                {
+                    parent.InvalidateMeasure();
+                    parent.InvalidateArrange();
+                }
+                else if (metadata.AffectsParentArrange)
+                {
+                    parent.InvalidateArrange();
+                }
             }
         }
 

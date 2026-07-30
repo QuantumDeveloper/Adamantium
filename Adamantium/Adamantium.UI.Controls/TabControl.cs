@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Specialized;
 using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Controls.Base;
+using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Controls.Primitives;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
@@ -229,8 +230,14 @@ public class TabControl : Selector
         // and SelectedItem stayed on the removed tab - the content host kept showing the closed tab's body while the
         // indicator slid to the neighbour. SelectSingle re-derives the item at the index, updates SelectedItem + the
         // container highlight and raises SelectionChanged (-> UpdateSelectedContent + UpdateIndicator) when it changed.
+        // A tab named before the strip had any (a view-model that opens on its own tab) is honoured ahead of "the first
+        // one": auto-selecting index 0 over it would write that back through a TwoWay SelectedItem binding and overrule
+        // the source that asked first.
+        var pending = TakePendingSelectionIndex();
+
         var index = Items.Count == 0 ? -1
-            : SelectedIndex < 0 ? 0
+            : pending >= 0 ? pending
+            : SelectedIndex < 0 ? (RequiresSelection ? 0 : -1)
             : SelectedIndex >= Items.Count ? Items.Count - 1
             : SelectedIndex;
         // Snap (don't slide) the indicator for this reselection: the strip is about to reflow, so a slide would target the
@@ -273,18 +280,26 @@ public class TabControl : Selector
 
     private static readonly IEasingFunction DefaultReorderEasing = new CubicEasing { Mode = EasingMode.Out };
 
+    /// <summary>Which way the strip runs, asked of the panel that actually lays the tabs out rather than deduced from
+    /// <see cref="TabStripPlacement"/>. The two disagree: a tool group folded against a side edge keeps its placement
+    /// (its tabs still belong at the Bottom of the panel) and turns its PANEL on its side, so a drag that trusted the
+    /// placement slid the tabs sideways out of the narrow column that was left. Placement answers only when the panel
+    /// has no orientation of its own to state.</summary>
+    private bool StripIsVertical => ItemsHostPanel is TabPanel panel
+        ? panel.Orientation == Orientation.Vertical
+        : TabStripPlacement is TabStripPlacement.Left or TabStripPlacement.Right;
+
     internal void BeginDrag(TabItem tab, MouseEventArgs e)
     {
         if (ItemsHostPanel is not { } panel) return;
-        var vertical = TabStripPlacement is TabStripPlacement.Left or TabStripPlacement.Right;
         var pos = e.GetPosition(panel);
-        BeginDrag(tab, vertical ? pos.Y : pos.X);
+        BeginDrag(tab, StripIsVertical ? pos.Y : pos.X);
     }
 
     // Core (position given as the coordinate ALONG the strip axis, in the items-host panel's space) - unit-testable.
     internal void BeginDrag(TabItem tab, double along)
     {
-        _dragVertical = TabStripPlacement is TabStripPlacement.Left or TabStripPlacement.Right;
+        _dragVertical = StripIsVertical;
         IsTearingOff = false;   // per-gesture state: left set, it kills the indicator and every later tear-off
         _dragged = tab;
         _dragStartIndex = _targetIndex = ItemContainerGenerator.IndexFromContainer(tab);
@@ -331,6 +346,32 @@ public class TabControl : Selector
     {
         get => GetValue<double>(TearOffDistanceProperty);
         set => SetValue(TearOffDistanceProperty, value);
+    }
+
+    /// <summary>Whether this strip insists on having a tab selected. True (a normal tab control) means the selection never
+    /// dangles: emptying it, or filling a strip that had none, picks the first tab. False allows NO selection - which is
+    /// what a strip whose panel is put away needs, since a highlighted tab there would claim a panel is open when none
+    /// is.</summary>
+    public static readonly AdamantiumProperty RequiresSelectionProperty = AdamantiumProperty.Register(
+        nameof(RequiresSelection), typeof(bool), typeof(TabControl), new PropertyMetadata(true));
+
+    public bool RequiresSelection
+    {
+        get => GetValue<bool>(RequiresSelectionProperty);
+        set => SetValue(RequiresSelectionProperty, value);
+    }
+
+    /// <summary>Whether tabs in this strip may be picked up at all - to reorder them, or to tear one off. False leaves
+    /// them selectable and nothing more, which is what a strip reduced to a row of buttons wants: a tool panel folded
+    /// against an edge shows its tabs only so you can bring it back, and a strip you cannot see the panel behind is not
+    /// one you can meaningfully rearrange in.</summary>
+    public static readonly AdamantiumProperty AllowTabDragProperty = AdamantiumProperty.Register(
+        nameof(AllowTabDrag), typeof(bool), typeof(TabControl), new PropertyMetadata(true));
+
+    public bool AllowTabDrag
+    {
+        get => GetValue<bool>(AllowTabDragProperty);
+        set => SetValue(AllowTabDragProperty, value);
     }
 
     /// <summary>True while the current drag has pulled far enough off the strip to mean "into its own window".</summary>
@@ -691,7 +732,12 @@ public class TabControl : Selector
     private bool TryGetIndicatorTarget(out double along, out double extent, out bool vertical)
     {
         along = extent = 0;
-        vertical = TabStripPlacement is TabStripPlacement.Left or TabStripPlacement.Right;
+
+        // The panel that lays the tabs out decides which way the bar runs - the same one rule the drag uses (StripIsVertical).
+        // Read from TabStripPlacement instead, a folded tool strip (placement Bottom, panel turned vertical) got a bar
+        // stretched along the WRONG axis: sized to the tab's width, it made the Auto column as wide as a flat label and
+        // the narrow strip stopped being narrow.
+        vertical = StripIsVertical;
         if (_indicator == null || _indicator.VisualParent == null) return false;
         if (ItemContainerGenerator.ContainerFromIndex(SelectedIndex) is not TabItem container) return false;
 
@@ -733,6 +779,22 @@ public class TabControl : Selector
         var transform = EnsureTransform(_indicator);
         var posProp = vertical ? Transform.TranslateYProperty : Transform.TranslateXProperty;
         var scaleProp = vertical ? Transform.ScaleYProperty : Transform.ScaleXProperty;
+
+        // The bar is a 1px rectangle STRETCHED along the strip by this transform, so a strip that TURNED leaves the other
+        // axis stretched by the extent it had before: a 3x1 bar still scaled 79 along X draws as a block covering the tab,
+        // not as a line beside it. Placement has to describe both axes, not just the one currently in use.
+        if (vertical)
+        {
+            transform.CancelAnimation(Transform.ScaleXProperty);
+            transform.ScaleX = 1;
+            transform.TranslateX = 0;
+        }
+        else
+        {
+            transform.CancelAnimation(Transform.ScaleYProperty);
+            transform.ScaleY = 1;
+            transform.TranslateY = 0;
+        }
 
         if (animate && _indicatorPlaced)
         {
@@ -993,9 +1055,18 @@ public class TabControl : Selector
         TabCloseRequested?.Invoke(this, args);
         if (args.Cancel) return;
 
+        if (!RemoveOnClose(tab, index)) return;
+
         if (ItemsSource is IList { IsReadOnly: false, IsFixedSize: false } src && index < src.Count)
             src.RemoveAt(index);
         else
             Items.RemoveAt(index);
     }
+
+    /// <summary>Whether closing a tab means taking it out of THIS strip. True for a plain tab control, where the strip IS
+    /// the truth about what is open.
+    /// <para>A docking group says no: there the layout is the truth and the strip is a view of it, so closing goes through
+    /// the model and the strip follows on the next rebuild. Removing it here as well would take the pane out twice - once
+    /// from a collection that is about to be rebuilt from a model that still lists it.</para></summary>
+    protected virtual bool RemoveOnClose(TabItem tab, int index) => true;
 }

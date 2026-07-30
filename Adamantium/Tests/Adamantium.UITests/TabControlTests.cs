@@ -26,6 +26,62 @@ public class TabControlTests
         return tc;
     }
 
+    // The order a real data-bound strip is built in: the SelectedItem binding is established while the ItemsSource has
+    // not produced anything yet, so the view-model names its tab against an EMPTY collection. That name must survive
+    // until the items arrive - it was discarded on the spot, and because the binding is TwoWay the discard went back to
+    // the source, so the app opened on whatever tab happened to be first instead of the one asked for.
+    [Test]
+    public void ATabNamedBeforeTheItemsArrive_IsTheOneSelected()
+    {
+        var vm = new TabsVm();
+        vm.Tabs.Add("A");
+        vm.Tabs.Add("B");
+        vm.Tabs.Add("C");
+        vm.Selected = "C";
+
+        var tc = new TabControl { DataContext = vm };
+        tc.SetBinding("SelectedItem", new Binding("Selected") { Mode = BindingMode.TwoWay });
+        tc.SetBinding("ItemsSource", new Binding("Tabs"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(tc.SelectedItem, Is.EqualTo("C"), "the strip opened on the tab the source named");
+            Assert.That(tc.SelectedIndex, Is.EqualTo(2));
+            Assert.That(vm.Selected, Is.EqualTo("C"), "and the source was never overwritten with the first tab");
+        });
+    }
+
+    // The other order markup can produce - ItemsSource first, so the strip has already auto-selected its first tab by the
+    // time the SelectedItem binding is established. The binding must still win: the control's own housekeeping wrote at
+    // Local priority, which outranks a binding, and the source's choice could then never take effect at all.
+    [Test]
+    public void ASelectionBinding_OverrulesTheAutoSelectedFirstTab()
+    {
+        var vm = new TabsVm();
+        vm.Tabs.Add("A");
+        vm.Tabs.Add("B");
+        vm.Tabs.Add("C");
+        vm.Selected = "C";
+
+        var tc = new TabControl { DataContext = vm };
+        tc.SetBinding("ItemsSource", new Binding("Tabs"));
+        Assert.That(tc.SelectedItem, Is.EqualTo("A"), "nothing stated yet -> the first tab, as ever");
+
+        tc.SetBinding("SelectedItem", new Binding("Selected") { Mode = BindingMode.TwoWay });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(tc.SelectedItem, Is.EqualTo("C"), "the binding overrules the default selection");
+            Assert.That(tc.SelectedIndex, Is.EqualTo(2));
+        });
+    }
+
+    private sealed class TabsVm
+    {
+        public System.Collections.ObjectModel.ObservableCollection<string> Tabs { get; } = new();
+        public string Selected { get; set; }
+    }
+
     [Test]
     public void FirstTab_IsAutoSelected()
     {

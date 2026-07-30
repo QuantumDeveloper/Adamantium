@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Adamantium.UI.Core;
 
 namespace Adamantium.UI.Controls.Docking;

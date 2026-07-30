@@ -14,7 +14,11 @@ public enum PaneUnit
     Star,
 
     /// <summary>Exactly this many pixels, along the row's own axis.</summary>
-    Pixel
+    Pixel,
+
+    /// <summary>As much as the pane ITSELF needs - its desired extent, measured. What a COLLAPSED pane takes: it is
+    /// shrunk to its own tab strip, and how tall a strip is is not a number anyone should be typing.</summary>
+    Auto
 }
 
 /// <summary>A pane's length in its row - see <see cref="PaneUnit"/>.</summary>
@@ -34,8 +38,13 @@ public readonly struct PaneLength : IEquatable<PaneLength>
 
     public bool IsStar => Unit == PaneUnit.Star;
 
+    public bool IsAuto => Unit == PaneUnit.Auto;
+
     /// <summary>One share of the leftovers - what a pane takes when nobody said anything about it.</summary>
     public static PaneLength Star => new(1, PaneUnit.Star);
+
+    /// <summary>As much as the pane needs and no more.</summary>
+    public static PaneLength Auto => new(0, PaneUnit.Auto);
 
     public static PaneLength Pixels(double value) => new(value, PaneUnit.Pixel);
 
@@ -70,7 +79,10 @@ public readonly struct PaneLength : IEquatable<PaneLength>
 
     public static bool operator !=(PaneLength left, PaneLength right) => !left.Equals(right);
 
-    public override string ToString() => IsPixel
-        ? Value.ToString(CultureInfo.InvariantCulture)
-        : Value == 1 ? "*" : Value.ToString(CultureInfo.InvariantCulture) + "*";
+    public override string ToString() => Unit switch
+    {
+        PaneUnit.Auto => "Auto",
+        PaneUnit.Pixel => Value.ToString(CultureInfo.InvariantCulture),
+        _ => Value == 1 ? "*" : Value.ToString(CultureInfo.InvariantCulture) + "*"
+    };
 }

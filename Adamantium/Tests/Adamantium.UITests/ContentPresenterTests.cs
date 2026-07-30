@@ -6,6 +6,7 @@ using Adamantium.UI.Controls.Decorators;
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Data;
+using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Templates;
 using NUnit.Framework;
 
@@ -51,6 +52,105 @@ public class ContentPresenterRebindTests
         cp.Measure(Size.Infinity);
         Assert.That(cp.DesiredSize, Is.EqualTo(new Size(50, 40)),
             "replacing content with a bigger element must re-measure and resize the presenter");
+    }
+
+    // The visual is (re)built inside MeasureOverride, so a template swap that does not invalidate measure is never
+    // picked up: the property holds the new template while the screen keeps the old visual forever.
+    [Test]
+    public void ContentTemplateSwap_RebuildsTheVisual()
+    {
+        var flat = new DataTemplate(() => new TemplateResult { RootComponent = new Border { Width = 60, Height = 20 } });
+        var turned = new DataTemplate(() => new TemplateResult { RootComponent = new Border { Width = 20, Height = 60 } });
+
+        var cp = new ContentPresenter { ContentTemplate = flat, Content = new object() };
+        cp.Measure(Size.Infinity);
+        cp.Arrange(new Rect(0, 0, 60, 20));
+        Assert.That(cp.DesiredSize, Is.EqualTo(new Size(60, 20)));
+
+        cp.ContentTemplate = turned;
+        Assert.That(cp.IsMeasureValid, Is.False, "swapping ContentTemplate must invalidate measure");
+
+        cp.Measure(Size.Infinity);
+        Assert.That(cp.DesiredSize, Is.EqualTo(new Size(20, 60)),
+            "the presenter must show the NEW template, not keep the visual built from the old one");
+    }
+
+    // The same swap through a SELECTOR, which is the other way a header/body template arrives.
+    [Test]
+    public void ContentTemplateSelectorSwap_RebuildsTheVisual()
+    {
+        var cp = new ContentPresenter { Content = new object() };
+        cp.Measure(Size.Infinity);
+        cp.Arrange(new Rect(0, 0, 10, 10));
+
+        cp.ContentTemplateSelector = new FixedTemplateSelector(
+            new DataTemplate(() => new TemplateResult { RootComponent = new Border { Width = 20, Height = 60 } }));
+        Assert.That(cp.IsMeasureValid, Is.False, "swapping ContentTemplateSelector must invalidate measure");
+
+        cp.Measure(Size.Infinity);
+        Assert.That(cp.DesiredSize, Is.EqualTo(new Size(20, 60)));
+    }
+
+    // A template root that binds its Content to its own DataContext (`Content="{Binding}"` - the item itself, no path)
+    // writes back the very object the presenter already sits on. Re-assigning DataContext to what it already holds runs
+    // the whole DataContext cascade again - refresh bindings, write Content, assign DataContext... - and that closes a
+    // cycle with no exit: the app died of a stack overflow the moment such a template was built.
+    [Test]
+    public void ContentBoundToItsOwnDataContext_DoesNotReassignDataContext()
+    {
+        var item = new object();
+        var cp = new ContentPresenter { DataContext = item };
+
+        var changes = 0;
+        cp.DataContextChanged += (_, _) => changes++;
+        cp.Content = item;   // exactly what a pathless {Binding} pushes back into Content
+
+        Assert.That(changes, Is.Zero, "the presenter already sits on that object - re-assigning it re-enters the cascade");
+    }
+
+    // What a docking panel folded against a side edge is made of: the tab label's template is swapped for one whose root
+    // is turned a quarter turn, so the strip must become as wide as the label is TALL.
+    [Test]
+    public void HeaderTemplateSwappedForATurnedOne_TurnsTheFootprint()
+    {
+        var flat = new DataTemplate(() => new TemplateResult { RootComponent = new Border { Width = 80, Height = 24 } });
+        var turned = new DataTemplate(() => new TemplateResult
+        {
+            RootComponent = new Border
+            {
+                Width = 80,
+                Height = 24,
+                LayoutTransform = new Transform { RotationAngle = -90 }
+            }
+        });
+
+        var cp = new ContentPresenter { ContentTemplate = flat, Content = new object() };
+        cp.Measure(Size.Infinity);
+        cp.Arrange(new Rect(0, 0, 80, 24));
+
+        cp.ContentTemplate = turned;
+        cp.Measure(Size.Infinity);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(cp.DesiredSize.Width, Is.EqualTo(24).Within(0.001), "turned label: the strip is as wide as the text is tall");
+            Assert.That(cp.DesiredSize.Height, Is.EqualTo(80).Within(0.001));
+        });
+    }
+}
+
+internal class FixedTemplateSelector : DataTemplateSelector
+{
+    private readonly DataTemplate _template;
+
+    public FixedTemplateSelector(DataTemplate template)
+    {
+        _template = template;
+    }
+
+    public override DataTemplate SelectTemplate(object item, AdamantiumComponent container)
+    {
+        return _template;
     }
 }
 

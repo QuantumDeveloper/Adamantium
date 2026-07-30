@@ -35,6 +35,19 @@
     <!-- Dock compass. Its own tokens rather than the control ramp's: those are tuned to sit ON the window base, while a
          compass floats over WHATEVER is being docked onto - a document, an image, another panel. A 6%-white control fill
          over that is invisible, which is exactly what it was. Strong plate, clearly drawn edge. -->
+    <!-- State layer for a button sitting ON an accent bar (a tool panel's caption). The control ramp is no use there: its
+         fills are tuned against the window base, and the accent ramp only darkens the SAME hue by 12/24%, which on a
+         28px square over that hue is not visible at all. A translucent overlay reads instantly on any accent - override
+         these two if a theme's accent is pale enough to want a dark overlay instead. -->
+    <SolidColorBrush x:Key="OnAccentOverlayPointerOver" Color="#40FFFFFF"/>
+    <SolidColorBrush x:Key="OnAccentOverlayPressed" Color="#73FFFFFF"/>
+
+    <!-- The strip of a PUT-AWAY panel. A folded panel is nothing but its tabs, and without a fill of its own it reads as
+         a row of labels floating on the background - there is no way to tell "this panel is put away" from "these are
+         just some tabs". Its own token rather than a control fill: it sits against the docking area, not against a
+         control, and it has to stay distinguishable from the panels around it in either palette. -->
+    <SolidColorBrush x:Key="DockFoldedStripFill" Color="#14FFFFFF"/>
+
     <SolidColorBrush x:Key="DockCompassFillColor" Color="#E62F2F2F"/>
     <SolidColorBrush x:Key="DockCompassStrokeColor" Color="#59FFFFFF"/>
     <!-- The translucent rectangle showing where the pane would land. Accent-tinted, and translucent on purpose: it covers
