@@ -186,8 +186,25 @@ public class DockAutoHideTests
         Assert.Multiple(() =>
         {
             Assert.That(inspector.State, Is.EqualTo(PaneGroupState.Revealed), "showing, but still not docked");
-            Assert.That(inspector.Length, Is.EqualTo(PaneLength.Pixels(240)), "the body gets the room the panel had");
+            Assert.That(inspector.Length, Is.EqualTo(PaneLength.Auto),
+                "in the TREE it is still just its strip - the body is a flyout over the neighbours, not a share of the row");
+            Assert.That(inspector.RestoreLength, Is.EqualTo(PaneLength.Pixels(240)),
+                "and what it is worth docked is remembered - that is how wide the flyout opens");
         });
+    }
+
+    /// <summary>Glancing at a tool does not move the layout about. Measured before rule 3.10: revealing gave the panel
+    /// its docked length back, so every look at a tool shoved its neighbours aside and then back again.</summary>
+    [Test]
+    public void RevealingAGroup_DoesNotDisturbItsNeighbours()
+    {
+        var (layout, documents, inspector) = Editor();
+        layout.CollapseGroup(inspector);
+        var documentsLength = documents.Length;
+
+        layout.RevealGroup(inspector);
+
+        Assert.That(documents.Length, Is.EqualTo(documentsLength));
     }
 
     /// <summary>And putting it away again leaves the strip, with the room it was just given remembered.</summary>

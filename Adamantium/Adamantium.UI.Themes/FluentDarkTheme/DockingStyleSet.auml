@@ -128,8 +128,10 @@
                                 Background="{TemplateBinding Background}"
                                 Padding="{TemplateBinding Padding}"
                                 ClipToBounds="True">
+                            <!-- DockedContent, not SelectedContent: while the panel is revealed its body lives in the
+                                 flyout, and one piece of content belongs to one tree. -->
                             <controls:ContentPresenter x:Name="PART_SelectedContentHost"
-                                    Content="{TemplateBinding SelectedContent}"
+                                    Content="{TemplateBinding DockedContent}"
                                     ContentTemplate="{TemplateBinding ContentTemplate}"
                                     ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
                         </controls:Border>
@@ -154,6 +156,74 @@
                                                     IsHitTestVisible="False"/>
                             </controls:Grid>
                         </TabStripScroller>
+
+                        <!-- The FLYOUT of a revealed panel. Only the panel's BODY travels here - its tabs stay on the
+                             edge, because that is what a revealed panel is: a strip you are glancing behind. It is a
+                             popup so that it draws OVER the neighbours instead of pushing them aside (rule 3.10); the
+                             strip is what it is placed against, so it opens exactly where the panel would have been.
+                             Its own caption, because the docked one is not on screen in this state - and a flyout you
+                             cannot pin is a panel you can only look at. -->
+                        <controls:Popup x:Name="PART_RevealFlyout" Grid.Row="2" Grid.Column="1"
+                                PlacementTarget="{Binding ElementName=PART_TabStrip}"
+                                Placement="Top" KeepOpen="False">
+                            <!-- The size lives on the CONTENT, never on the popup: a popup is an element of this tree
+                                 whether it is open or not, and a 240-wide one sat in the strip's own cell and took that
+                                 room out of the layout even while shut. -->
+                            <controls:Border x:Name="FlyoutRoot"
+                                    Background="{ResourceReference SolidBackgroundFillColorBase}"
+                                    BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                    BorderThickness="1">
+                                <controls:Grid RowDefinitions="Auto,*">
+                                    <controls:Border Grid.Row="0"
+                                            Background="{ThemeResource AccentFillColorDefault}"
+                                            Padding="8 2 8 2">
+                                        <controls:Grid ColumnDefinitions="*,Auto,Auto">
+                                            <controls:ContentPresenter Grid.Column="0" VerticalAlignment="Center"
+                                                    Content="{TemplateBinding Title}"
+                                                    Foreground="{ThemeResource AccentForegroundColor}"/>
+                                            <controls:Button x:Name="PART_FlyoutPinButton" Grid.Column="1"
+                                                    Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0"
+                                                    Classes="CaptionButton"
+                                                    BackgroundPointerOver="{ResourceReference OnAccentOverlayPointerOver}"
+                                                    BackgroundPressed="{ResourceReference OnAccentOverlayPressed}"
+                                                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                                    VerticalAlignment="Center">
+                                                <!-- Hollow: this panel is NOT pinned - that is the whole reason it is a
+                                                     flyout. Pressing it is what docks it, and the tack fills in. -->
+                                                <controls:Path Data="M5,2 L9,2 L9,4 L11,6 L11,7 L8,7 L8,10 L7,12 L6,10 L6,7 L3,7 L3,6 L5,4 Z"
+                                                        Stroke="{ThemeResource AccentForegroundColor}" StrokeThickness="1"
+                                                        Fill="Transparent"
+                                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </controls:Button>
+                                            <controls:Button x:Name="PART_FlyoutCloseButton" Grid.Column="2"
+                                                    Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0"
+                                                    Classes="CaptionButton CloseButton"
+                                                    BackgroundPointerOver="{ResourceReference OnAccentOverlayPointerOver}"
+                                                    BackgroundPressed="{ResourceReference OnAccentOverlayPressed}"
+                                                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                                    VerticalAlignment="Center">
+                                                <controls:Path Data="M0,0 L10,10 M10,0 L0,10"
+                                                        Stroke="{ThemeResource AccentForegroundColor}" StrokeThickness="1"
+                                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </controls:Button>
+                                        </controls:Grid>
+                                    </controls:Border>
+
+                                    <!-- The body itself. The DOCKED presenter is emptied while this is open (see the
+                                         Revealed trigger): one piece of content belongs to one tree, and a presenter
+                                         holds its child even with the body hidden. -->
+                                    <controls:Border Grid.Row="1" x:Name="FlyoutBody"
+                                            Background="{TemplateBinding Background}"
+                                            Padding="{TemplateBinding Padding}"
+                                            ClipToBounds="True">
+                                        <controls:ContentPresenter x:Name="PART_FlyoutContentHost"
+                                                Content="{TemplateBinding FlyoutContent}"
+                                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                                    </controls:Border>
+                                </controls:Grid>
+                            </controls:Border>
+                        </controls:Popup>
                     </controls:Grid>
                     </controls:Border>
                     <ControlTemplate.Triggers>
@@ -181,6 +251,44 @@
                              a pin that has no edge left to fold against. -->
                         <PropertyTrigger Property="IsFloatingRoot" Value="true">
                             <Setter TargetName="PART_Header" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <!-- REVEALED: in the tree this panel is still just its strip - the same as put away - and its
+                             body is shown in the flyout OVER the neighbours. Emptying the docked presenter is not
+                             cosmetic: one piece of content belongs to one tree, and a presenter goes on holding its
+                             child even when the body around it is hidden, so the flyout would be handed an element
+                             that already has a parent. -->
+                        <PropertyTrigger Property="State" Value="Revealed">
+                            <Setter TargetName="PART_Header" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="Body" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="Chrome" Property="BorderThickness" Value="0"/>
+                            <Setter TargetName="StripFill" Property="Background" Value="{ResourceReference DockFoldedStripFill}"/>
+                            <!-- IsOpen is driven by the control (PaneGroup.SyncFold), not from here: a trigger has to be
+                                 UNDONE to close the popup, and undoing it left the property Unset. -->
+
+                        </PropertyTrigger>
+                        <!-- Which way the flyout opens, and how big it is: OUT of the edge the strip is on, as far across
+                             as the panel is worth docked (RevealExtent) and as long as the strip itself (RevealLength).
+                             Stated per edge because "out of" is a different direction on each side. Harmless while the
+                             panel is docked - the popup is shut. -->
+                        <PropertyTrigger Property="Edge" Value="Left">
+                            <Setter TargetName="PART_RevealFlyout" Property="Placement" Value="Right"/>
+                            <Setter TargetName="FlyoutRoot" Property="Width" Value="{TemplateBinding RevealExtent}"/>
+                            <Setter TargetName="FlyoutRoot" Property="Height" Value="{TemplateBinding RevealLength}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="Edge" Value="Right">
+                            <Setter TargetName="PART_RevealFlyout" Property="Placement" Value="Left"/>
+                            <Setter TargetName="FlyoutRoot" Property="Width" Value="{TemplateBinding RevealExtent}"/>
+                            <Setter TargetName="FlyoutRoot" Property="Height" Value="{TemplateBinding RevealLength}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="Edge" Value="Top">
+                            <Setter TargetName="PART_RevealFlyout" Property="Placement" Value="Bottom"/>
+                            <Setter TargetName="FlyoutRoot" Property="Height" Value="{TemplateBinding RevealExtent}"/>
+                            <Setter TargetName="FlyoutRoot" Property="Width" Value="{TemplateBinding RevealLength}"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="Edge" Value="Bottom">
+                            <Setter TargetName="PART_RevealFlyout" Property="Placement" Value="Top"/>
+                            <Setter TargetName="FlyoutRoot" Property="Height" Value="{TemplateBinding RevealExtent}"/>
+                            <Setter TargetName="FlyoutRoot" Property="Width" Value="{TemplateBinding RevealLength}"/>
                         </PropertyTrigger>
                         <PropertyTrigger Property="State" Value="Collapsed">
                             <Setter TargetName="PART_Header" Property="Visibility" Value="Collapsed"/>

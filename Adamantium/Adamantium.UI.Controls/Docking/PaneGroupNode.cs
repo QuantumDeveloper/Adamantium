@@ -23,10 +23,11 @@ public class PaneGroupNode : PaneNode
     /// where that was.</para></summary>
     public PaneGroupState State { get; set; } = PaneGroupState.Docked;
 
-    /// <summary>Whether the group owns a length of its own - true unless it is put away, where the length is
+    /// <summary>Whether the group owns a length of its own - true only while DOCKED. In both folded states the length is
     /// <see cref="Panels.PaneUnit.Auto"/>: the strip and nothing more, a value that belongs to the fold rather than to
-    /// anything the user dragged.</summary>
-    public bool OwnsLength => State != PaneGroupState.Collapsed;
+    /// anything the user dragged. A revealed panel is no exception - its body is a flyout over the neighbours, so in the
+    /// tree it is still only a strip.</summary>
+    public bool OwnsLength => State == PaneGroupState.Docked;
 
     /// <summary>What it was worth before collapsing, so expanding it again is not a fresh guess at a size.</summary>
     public Panels.PaneLength RestoreLength { get; set; } = Panels.PaneLength.Star;

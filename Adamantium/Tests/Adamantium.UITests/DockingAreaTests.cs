@@ -134,10 +134,15 @@ public class DockingAreaTests
         }
     }
 
-    /// <summary>A REVEALED panel is a glance at a tool: a press anywhere outside it puts it away again, and only pinning
-    /// keeps it. A press INSIDE it changes nothing - that is someone using the panel.</summary>
+    /// <summary>
+    /// A REVEALED panel is a glance at a tool: a press anywhere outside it puts it away again, and only pinning keeps it.
+    /// <para>Dismissal itself now belongs to the FLYOUT (a Popup with KeepOpen=false), because the revealed body lives in
+    /// the window's popup layer - outside this group's own subtree - so the area's "was the press inside the group?" test
+    /// would count a press on the panel's own content as a press elsewhere. What is asserted here is the half that is
+    /// still the area's: that being dismissed puts the panel away rather than leaving it half-shown.</para>
+    /// </summary>
     [Test]
-    public void PressingOutsideARevealedPanel_PutsItAway()
+    public void DismissingARevealedPanel_PutsItAway()
     {
         var area = new DockingArea { DividerThickness = 0 };
         var centre = Group("scene", DockZone.Center);
@@ -158,22 +163,16 @@ public class DockingAreaTests
         area.Measure(new Size(1000, 800));
         area.Arrange(new Rect(0, 0, 1000, 800));
 
-        PressOn(right);
-        Assert.That(node.State, Is.EqualTo(PaneGroupState.Revealed), "a press inside the panel is someone using it");
+        Assert.That(node.State, Is.EqualTo(PaneGroupState.Revealed), "showing, but not pinned");
 
-        PressOn(centre);
-        Assert.That(node.State, Is.EqualTo(PaneGroupState.Collapsed), "a press outside puts the glance away");
-    }
+        // What the flyout's light dismiss calls when it closes itself.
+        area.Hide(right);
 
-    private static void PressOn(IUIComponent target)
-    {
-        var args = new MouseButtonEventArgs(Mouse.PrimaryDevice, MouseButtons.Left, MouseButtonState.Pressed,
-            InputModifiers.LeftMouseButton, 0)
+        Assert.Multiple(() =>
         {
-            RoutedEvent = Mouse.PreviewMouseDownEvent,
-            OriginalSource = target
-        };
-        ((IObservableComponent)target).RaiseEvent(args);
+            Assert.That(node.State, Is.EqualTo(PaneGroupState.Collapsed), "the glance is over");
+            Assert.That(node.RestoreLength, Is.EqualTo(PaneLength.Pixels(240)), "and what it is worth docked survives");
+        });
     }
 
     private sealed class TestWindowRoot : Grid, IRootVisualComponent

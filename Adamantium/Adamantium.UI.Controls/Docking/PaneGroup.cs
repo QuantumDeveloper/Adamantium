@@ -73,6 +73,12 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
 
         SelectionChanged += (_, _) => SyncChrome();
 
+        // Which host holds the body follows the CONTENT as well as the state - the selected pane changes under both.
+        PropertyChanged += (_, e) =>
+        {
+            if (e.Property == SelectedContentProperty) SyncContentHost();
+        };
+
         // SyncFold as well as SyncChrome: the fold pushes each pane's label rotation, and a rebuild ADDS the panes after
         // the state/edge that caused the fold was set - so a pane arriving later never learned it was in a folded strip
         // and kept measuring itself for a label lying flat. Measured: of three tabs in a folded column only the last was
@@ -157,6 +163,11 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
     protected override Size ArrangeOverride(Size finalSize)
     {
         var size = base.ArrangeOverride(finalSize);
+
+        // How long the flyout runs ALONG its edge: exactly as long as the strip, which is the panel's own share of the
+        // area. Taken here because this is where that number exists - the theme cannot ask a control about its own size,
+        // and the docking area would have to guess at a share the split tree has already worked out.
+        RevealLength = Edge is DockZone.Left or DockZone.Right ? size.Height : size.Width;
 
         if (DockingArea.LogDocking) Log();
 
@@ -335,6 +346,8 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         RequiresSelection = State != PaneGroupState.Collapsed;
         if (State == PaneGroupState.Collapsed) SelectedIndex = -1;
 
+        SyncContentHost();
+
         var rotation = IsFolded
             ? Edge switch
             {
@@ -349,9 +362,89 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
             pane.LabelRotation = rotation;
         }
 
+        // The flyout follows the state, and it is driven from HERE rather than by a trigger in the template. A trigger
+        // has to be UNDONE to close the popup, and undoing it went through ClearValue - which leaves the property Unset,
+        // so the next reader (GetValue<bool>) threw and took the rest of this method with it. Measured: the panel docked
+        // with its tab labels still turned on their side, because the line above never ran.
+        // LAST in this method, after everything that must happen whatever the popup does.
+        if (_flyout != null)
+        {
+            _flyout.IsOpen = State == PaneGroupState.Revealed;
+        }
+
         // Which way the tabs QUEUE is the theme's to say (a trigger on IsFolded + Edge). Writing ItemsPanel from here
         // would set it LOCALLY, which outranks the theme and never gives it back - and an ItemsPanel written twice is
         // what throws the live strip away and builds another.
+    }
+
+    /// <summary>How far the flyout of a REVEALED panel reaches across its edge, in pixels - the room the panel is worth
+    /// docked. Pushed from the model, where that number lives (<see cref="PaneGroupNode.RestoreLength"/>); a star length
+    /// is turned into pixels against the docking area, because a flyout is placed, not shared out.
+    /// <para>Only the flyout uses it. In the tree a revealed panel is still just its strip - it draws OVER its
+    /// neighbours rather than pushing them aside (rule 3.10).</para></summary>
+    public static readonly AdamantiumProperty RevealExtentProperty = AdamantiumProperty.Register(nameof(RevealExtent),
+        typeof(double), typeof(PaneGroup), new PropertyMetadata(240.0));
+
+    public double RevealExtent
+    {
+        get => GetValue<double>(RevealExtentProperty);
+        set => SetValue(RevealExtentProperty, value);
+    }
+
+    // WHERE the active pane's content is hosted - in the panel's own body, or in the flyout. Exactly one of them holds it
+    // at a time, because one piece of content belongs to one tree: a presenter goes on holding its child even when the
+    // body around it is hidden, so handing the same element to the flyout would give it a second parent.
+    // Two properties rather than a trigger that nulls the presenter's Content: a local write would outrank the template
+    // binding and never give it back.
+
+    public static readonly AdamantiumProperty DockedContentProperty = AdamantiumProperty.Register(nameof(DockedContent),
+        typeof(object), typeof(PaneGroup), new PropertyMetadata(null));
+
+    /// <summary>The active pane's content while the panel is DOCKED (or put away, where nothing shows it) - null while it
+    /// is revealed, because the flyout has it then.</summary>
+    public object DockedContent
+    {
+        get => GetValue(DockedContentProperty);
+        private set => SetValue(DockedContentProperty, value);
+    }
+
+    public static readonly AdamantiumProperty FlyoutContentProperty = AdamantiumProperty.Register(nameof(FlyoutContent),
+        typeof(object), typeof(PaneGroup), new PropertyMetadata(null));
+
+    /// <summary>The active pane's content while the panel is REVEALED, and null at every other time.</summary>
+    public object FlyoutContent
+    {
+        get => GetValue(FlyoutContentProperty);
+        private set => SetValue(FlyoutContentProperty, value);
+    }
+
+    private void SyncContentHost()
+    {
+        var revealed = State == PaneGroupState.Revealed;
+
+        // The old host is emptied BEFORE the new one is filled: the other order gives the content two parents for as
+        // long as it takes the next line to run.
+        if (revealed)
+        {
+            DockedContent = null;
+            FlyoutContent = SelectedContent;
+        }
+        else
+        {
+            FlyoutContent = null;
+            DockedContent = SelectedContent;
+        }
+    }
+
+    /// <summary>How long the flyout runs ALONG its edge - the strip's own length, which is this panel's share of the
+    /// area. Measured in <see cref="ArrangeOverride"/>, because that is where the number exists.</summary>
+    public static readonly AdamantiumProperty RevealLengthProperty = AdamantiumProperty.Register(nameof(RevealLength),
+        typeof(double), typeof(PaneGroup), new PropertyMetadata(0.0));
+
+    public double RevealLength
+    {
+        get => GetValue<double>(RevealLengthProperty);
+        private set => SetValue(RevealLengthProperty, value);
     }
 
     /// <summary>What the header shows: the active pane's own header. One title, not a list - the tabs below already say
@@ -374,6 +467,25 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
 
     private ButtonBase _pinButton;
     private ButtonBase _closeButton;
+    private ButtonBase _flyoutPinButton;
+    private ButtonBase _flyoutCloseButton;
+    private Popup _flyout;
+
+    /// <summary>The flyout light-dismissed itself (a press outside it), which for a revealed panel means "put it away".
+    /// <para>The popup owns this rather than the docking area: the flyout lives in the window's popup layer, OUTSIDE this
+    /// group's own subtree, so an area-level "was the press inside the group?" test would count a press on the panel's
+    /// own body as a press elsewhere and shut it the moment it was used.</para>
+    /// <para>The local IsOpen the popup wrote is cleared, or it would outrank the template trigger and the panel could
+    /// never be revealed again.</para></summary>
+    private void OnFlyoutPropertyChanged(object sender, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (e.Property != Popup.IsOpenProperty || _flyout is not { IsOpen: false }) return;
+        if (State != PaneGroupState.Revealed) return;
+
+        // Just put it away: the state is what drives IsOpen (see SyncFold), so nothing here has to undo the popup's own
+        // write - putting the panel away is the whole answer.
+        Area?.Hide(this);
+    }
 
     /// <summary>The caption, which is what the panel is dragged by. A PART because the gesture needs to know where it
     /// is: a press anywhere else in the group belongs to a tab or to the body.</summary>
@@ -388,13 +500,34 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         // is a click that goes nowhere anyone can see.
         if (_pinButton != null) _pinButton.Click -= OnPinClicked;
         if (_closeButton != null) _closeButton.Click -= OnCloseClicked;
+        if (_flyoutPinButton != null) _flyoutPinButton.Click -= OnPinClicked;
+        if (_flyoutCloseButton != null) _flyoutCloseButton.Click -= OnCloseClicked;
 
         _pinButton = GetTemplateChild("PART_PinButton") as ButtonBase;
         _closeButton = GetTemplateChild("PART_CloseButton") as ButtonBase;
         _caption = GetTemplateChild("PART_Header") as IUIComponent;
 
+        // The flyout carries its own pair of them: while a panel is revealed its docked caption is not on screen, and a
+        // flyout you cannot pin is a panel you can only look at.
+        _flyoutPinButton = GetTemplateChild("PART_FlyoutPinButton") as ButtonBase;
+        _flyoutCloseButton = GetTemplateChild("PART_FlyoutCloseButton") as ButtonBase;
+
+        if (_flyout != null)
+        {
+            _flyout.PropertyChanged -= OnFlyoutPropertyChanged;
+        }
+
+        _flyout = GetTemplateChild("PART_RevealFlyout") as Popup;
+
+        if (_flyout != null)
+        {
+            _flyout.PropertyChanged += OnFlyoutPropertyChanged;
+        }
+
         if (_pinButton != null) _pinButton.Click += OnPinClicked;
         if (_closeButton != null) _closeButton.Click += OnCloseClicked;
+        if (_flyoutPinButton != null) _flyoutPinButton.Click += OnPinClicked;
+        if (_flyoutCloseButton != null) _flyoutCloseButton.Click += OnCloseClicked;
 
         if (DockingArea.LogDocking && _pinButton != null)
         {

@@ -5,7 +5,7 @@ using Adamantium.UI.Core.Templates;
 
 namespace Adamantium.UI.Controls.Base;
 
-public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent
+public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent, ITemplateHost
 {
     private TemplateResult templateResult;
     private ControlTemplate appliedTemplate;

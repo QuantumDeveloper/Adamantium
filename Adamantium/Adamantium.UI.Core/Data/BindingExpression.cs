@@ -203,6 +203,14 @@ public class BindingExpression : BindingExpressionBase
    private object ResolveElementName()
    {
       if (string.IsNullOrEmpty(Binding.ElementName) || Target is not IUIComponent target) return null;
+
+      // The TEMPLATE first, when this binding was written inside one. A template is its own namescope - its names belong
+      // to the control that applied it, not to the window - so they are not on the visual tree under Name and the walk
+      // below cannot see them. Without this an ElementName inside a ControlTemplate silently resolved to nothing, which
+      // is a binding that never reports a problem and simply never has a value.
+      if (target.TemplatedParent is ITemplateHost host && host.GetTemplateChild(Binding.ElementName) is IUIComponent inTemplate)
+         return inTemplate;
+
       var root = target;
       while (root.VisualParent is { } parent) root = parent;
       return FindByName(root, Binding.ElementName);
