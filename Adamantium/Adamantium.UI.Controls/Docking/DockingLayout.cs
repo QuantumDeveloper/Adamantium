@@ -277,8 +277,10 @@ public class DockingLayout
     {
         if (group is not { State: PaneGroupState.Collapsed }) return false;
 
+        // The LENGTH does not change: in the tree a revealed panel is still just its strip. Its body is shown OVER the
+        // neighbours (a flyout), not by pushing them aside - see rule 3.10. Giving it back its docked length here is what
+        // made it shove the layout about every time anyone glanced at a tool.
         group.State = PaneGroupState.Revealed;
-        group.Length = group.RestoreLength;
         return true;
     }
 
@@ -287,9 +289,9 @@ public class DockingLayout
     {
         if (group is not { State: PaneGroupState.Revealed }) return false;
 
+        // Only the state: the length has been Auto throughout, and RestoreLength still holds what the panel is worth
+        // docked. Copying the current length into it here would overwrite that with Auto.
         group.State = PaneGroupState.Collapsed;
-        group.RestoreLength = group.Length;
-        group.Length = PaneLength.Auto;
         return true;
     }
 

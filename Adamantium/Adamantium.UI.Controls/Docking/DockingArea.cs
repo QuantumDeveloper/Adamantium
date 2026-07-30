@@ -150,79 +150,11 @@ public class DockingArea : Panel
         if (node != null && Layout.HideGroup(node)) Rebuild();
     }
 
-    // Click-outside-to-put-away, the same shape a Popup uses (see Popup.HookLightDismiss): a revealed panel is a GLANCE at
-    // a tool, so the moment attention goes elsewhere it goes away again - and only PINNING keeps it. The handler lives on
-    // the window, because the press that dismisses it is by definition not inside this panel; it is unhooked as soon as
-    // nothing is revealed, so a docked layout pays nothing for it.
-    private MouseButtonEventHandler _lightDismiss;
-    private IInputComponent _dismissHost;
-
-    private void SyncLightDismiss()
-    {
-        var wanted = false;
-        foreach (var node in _groupsByNode.Keys)
-        {
-            if (node.State == PaneGroupState.Revealed) wanted = true;
-        }
-
-        if (wanted) HookLightDismiss();
-        else UnhookLightDismiss();
-    }
-
-    private void HookLightDismiss()
-    {
-        if (_dismissHost != null) return;
-        if (WindowRoot() is not { } root) return;
-
-        _lightDismiss ??= OnGlobalPreviewDown;
-        _dismissHost = root;
-        root.AddHandler(Mouse.PreviewMouseDownEvent, _lightDismiss, handledEventsToo: true);
-    }
-
-    private void UnhookLightDismiss()
-    {
-        if (_dismissHost == null) return;
-
-        _dismissHost.RemoveHandler(Mouse.PreviewMouseDownEvent, _lightDismiss);
-        _dismissHost = null;
-    }
-
-    private void OnGlobalPreviewDown(object sender, MouseButtonEventArgs e)
-    {
-        var source = e.OriginalSource as IUIComponent;
-
-        // Collected first: putting one away rebuilds the tree, and the dictionary must not be walked while that happens.
-        List<PaneGroup> leaving = null;
-        foreach (var pair in _groupsByNode)
-        {
-            if (pair.Key.State != PaneGroupState.Revealed) continue;
-            if (source != null && IsWithin(source, pair.Value)) continue;   // pressed inside the panel itself - keep it
-
-            leaving ??= [];
-            leaving.Add(pair.Value);
-        }
-
-        if (leaving == null) return;
-        foreach (var group in leaving) Hide(group);
-    }
-
-    private static bool IsWithin(IUIComponent node, IUIComponent ancestor)
-    {
-        for (var n = node; n != null; n = n.VisualParent)
-        {
-            if (ReferenceEquals(n, ancestor)) return true;
-        }
-        return false;
-    }
-
-    /// <summary>The window this area sits in - the topmost visual ancestor, which is where a press anywhere can be seen
-    /// from.</summary>
-    private IInputComponent WindowRoot()
-    {
-        IUIComponent node = this;
-        while (node.VisualParent != null) node = node.VisualParent;
-        return node as IInputComponent;
-    }
+    // Click-outside-to-put-away belongs to the FLYOUT now (a Popup with KeepOpen=false - see
+    // PaneGroup.OnFlyoutPropertyChanged). It used to be handled here by asking whether the press landed inside the group,
+    // and that stopped being the right question the moment the revealed body moved into the window's popup layer: a press
+    // on the panel's own content is then outside this group's subtree, so the panel would shut itself the instant it was
+    // used.
 
     // --- Closing: what it MEANS differs by pane -----------------------------------------------------------------------
     // A document closed is gone - it was part of the session, and the file may not even exist next time. A tool closed is
@@ -370,7 +302,6 @@ public class DockingArea : Panel
 
         // Every model change ends here, so this is the one place where "is anything revealed?" is always true or false
         // for the whole area - hooking it at each gesture instead left a reveal made by any other route undismissable.
-        SyncLightDismiss();
         SyncWindowTitle();
     }
 
@@ -592,7 +523,10 @@ public class DockingArea : Panel
         // The group CONTROL travels with its node, so the panel keeps its tabs, its selection and its scroll position -
         // and its panes never have to be taken out of one items panel and put into another.
         _groupsByNode.Remove(node, out var moved);
-        if (moved != null) area._groupsByNode[node] = moved;
+        if (moved != null)
+        {
+            area._groupsByNode[node] = moved;
+        }
 
         Rebuild();   // detaches it from this tree, so the floating area can take it
         Show(area, window, grabX);
@@ -893,6 +827,7 @@ public class DockingArea : Panel
                 // centre is dressed as a document - it has no edge there to fold against, so a caption with a pin on it
                 // would be a button that cannot do anything.
                 control.Kind = isWell ? PaneKind.Document : PaneKind.Tool;
+                control.RevealExtent = FlyoutExtent(group);
 
                 FillPanes(control, group);
                 PaneHost.SetPaneLength(control, group.Length);
@@ -970,6 +905,25 @@ public class DockingArea : Panel
     /// <summary>A panel that is put away answers for its own size (its strip, and nothing else), so nobody may state one
     /// for it.</summary>
     private static bool IsPutAway(PaneNode node) => node is PaneGroupNode { State: PaneGroupState.Collapsed };
+
+    /// <summary>How far a revealed panel's flyout reaches across its edge, in PIXELS. The model says what the panel is
+    /// worth docked, and that is either a band of pixels - which is the answer already - or a share of a row. A share
+    /// means nothing to a flyout: it is placed over the layout, not laid out inside it, so the share is spent against the
+    /// area's own size along that axis.</summary>
+    private double FlyoutExtent(PaneGroupNode group)
+    {
+        var length = group.RestoreLength;
+        if (length.IsPixel) return length.Value;
+
+        var across = DockingLayout.EdgeOf(group) is DockZone.Left or DockZone.Right
+            ? RenderSize.Width
+            : RenderSize.Height;
+
+        // A star of 0.25 in a row that sums to 1 is a quarter of the area. Nothing to go on yet (the first pass, before
+        // the area has a size) falls back to the edge band every side panel starts at.
+        var wanted = across * length.Value;
+        return wanted > 1 ? wanted : EdgeDockSize;
+    }
 
     private readonly Dictionary<PaneSplitNode, PaneHost> _hostsByNode = new();
 
