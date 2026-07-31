@@ -171,7 +171,6 @@ public class PaneHost : Panel, IPaneMinimum
             offset += size + DividerThickness;
         }
 
-        if (LogLayout) Log(along);
         return finalSize;
     }
 
@@ -354,21 +353,4 @@ public class PaneHost : Panel, IPaneMinimum
         return Math.Max(0, total - dividers);
     }
 
-    /// <summary>Set ADAMANTIUM_DOCK_LOG=1 to have every host print what it handed out. Off by default: this runs on
-    /// every layout pass.</summary>
-    internal static readonly bool LogLayout = Environment.GetEnvironmentVariable("ADAMANTIUM_DOCK_LOG") == "1";
-
-    private void Log(double along)
-    {
-        var text = $"[PaneHost {Orientation} along={along:F1}]";
-        for (var i = 0; i < _content.Count; i++)
-        {
-            var child = _content[i];
-            var name = child is IName named && !string.IsNullOrEmpty(named.Name) ? named.Name : child.GetType().Name;
-            var got = Orientation == Orientation.Horizontal ? child.Bounds.Width : child.Bounds.Height;
-            var min = child is IPaneMinimum owner ? owner.MinimumExtent(Orientation) : 0;
-            text += $" {name}(len={GetPaneLength(child)} -> gave {_sizes[i]:F1} got {got:F1} min {min:F1})";
-        }
-        Console.WriteLine(text);
-    }
 }

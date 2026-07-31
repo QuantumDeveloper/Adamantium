@@ -109,17 +109,4 @@ public class Pane : TabItem
     /// half works.</para></summary>
     public string RestoreKey { get; set; }
 
-    /// <summary>How many times this pane has actually measured itself, and the size it worked out last time. Diagnostics:
-    /// a tab whose turned label never resized it is either never ASKED again (the count stops) or asked and answering the
-    /// same (the count rises), and only that tells which layer is at fault. Printed by the docking log.</summary>
-    internal int MeasureCount { get; private set; }
-
-    internal Size LastMeasureConstraint { get; private set; }
-
-    protected override Size MeasureOverride(Size availableSize)
-    {
-        MeasureCount++;
-        LastMeasureConstraint = availableSize;
-        return base.MeasureOverride(availableSize);
-    }
 }

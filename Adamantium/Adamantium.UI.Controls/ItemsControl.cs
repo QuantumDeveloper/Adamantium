@@ -173,12 +173,6 @@ public class ItemsControl : Control, IContainer
 
     private static void OnItemsPanelChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
-        if (Docking.DockingArea.LogDocking)
-        {
-            System.Console.WriteLine($"[ItemsPanel changed] on {a.GetType().Name}#{a.GetHashCode()} " +
-                                     $"old=#{e.OldValue?.GetHashCode()} new=#{e.NewValue?.GetHashCode()}");
-        }
-
         // Rebuilding throws the live items panel away and builds an identical replacement - the containers follow the
         // new one while the visual tree carries on arranging the old. So only do it when the template ACTUALLY changed:
         // re-applying a style re-assigns this property, and the same template arriving twice must not cost a panel.

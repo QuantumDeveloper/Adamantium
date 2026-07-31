@@ -191,14 +191,29 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
 
     public Adamantium.Navigation.INavigationService Navigation { get; private set; }
 
+    /// <summary>A window has been created and wants to be part of the application. QUEUED rather than registered here:
+    /// this is called from the PUMP thread (the platform worker, as the OS window comes up), while the LOOP thread is
+    /// walking the very collections it would join. The loop takes it at the start of the next frame.
+    /// <para>Measured before the queue was used: restoring a saved layout opens several windows at once and the frame
+    /// record threw "collection was modified".</para></summary>
     public void AddWindow(IWindow window)
     {
-        OnWindowAdded(window);
+        lock (applicationLocker)
+        {
+            addedWindows.Add(window);
+        }
+
+        LoopSignal.Request();   // the next frame is what registers it - do not wait for the idle timeout
     }
 
     public void RemoveWindow(IWindow window)
     {
-        OnWindowRemoved(window);
+        lock (applicationLocker)
+        {
+            closedWindows.Add(window);
+        }
+
+        LoopSignal.Request();
     }
 
     public void SetActiveWindow(IWindow window)
@@ -562,6 +577,10 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
                 // Nothing to do -> this BLOCKS on the loop pipe until something wants a frame. Everything below therefore runs
                 // only because there is work: the frame does not begin until the loop is woken.
                 WaitForWork();
+
+                // Windows join and leave HERE, on the loop thread, before anything walks them. They are asked for from
+                // the pump thread, which is why this is a queue and not a direct call.
+                ProcessPendingWindows();
 
                 var frameTime = preciseTimer.GetElapsedTime();
                 if (IsFixedTimeStep)

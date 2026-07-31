@@ -25,19 +25,6 @@ public class DockCompassWindow : Window
         ActivateOnShow = false;      // taking focus mid-drag would end the drag it is there to serve
     }
 
-    // Does this window lay out at all? Its CONTENT provably does not - DockCompass.ArrangeOverride ran zero times across
-    // a whole drag - so the question is whether the pass reaches the window and stops there, or never reaches it.
-    protected override Size ArrangeOverride(Size finalSize)
-    {
-        if (DockingArea.LogDocking)
-        {
-            System.Console.WriteLine($"[DockCompassWindow] arrange=({finalSize.Width:F0}x{finalSize.Height:F0}) " +
-                                     $"client=({ClientWidth:F0}x{ClientHeight:F0}) visibility={Visibility} " +
-                                     $"renderer={Renderer != null} content={Content != null} closed={IsClosed}");
-        }
-
-        return base.ArrangeOverride(finalSize);
-    }
 }
 
 

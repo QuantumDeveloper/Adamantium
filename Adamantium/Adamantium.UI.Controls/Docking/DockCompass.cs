@@ -318,19 +318,8 @@ public class DockCompass : Panel
         return availableSize;
     }
 
-    // Whether this control is laid out at all, and whether its style ever reached it - the two things that decide if
-    // anything appears. Printed from INSIDE the layout pass, which is the only place that can tell "not yet" from "never".
-    private void LogArrange(Size finalSize)
-    {
-        System.Console.WriteLine($"[DockCompass] arrange=({finalSize.Width:F0}x{finalSize.Height:F0}) " +
-                                 $"group=({_group.X:F0},{_group.Y:F0} {_group.Width:F0}x{_group.Height:F0}) armed={_armed} " +
-                                 $"indicatorBrush={IndicatorBrush != null} activeBrush={ActiveBrush != null} " +
-                                 $"previewBrush={PreviewBrush != null} visibility={Visibility}");
-    }
-
     protected override Size ArrangeOverride(Size finalSize)
     {
-        if (DockingArea.LogDocking) LogArrange(finalSize);
 
         var area = new Rect(0, 0, finalSize.Width, finalSize.Height);
         var aiming = _group.Width > 0 && _group.Height > 0;

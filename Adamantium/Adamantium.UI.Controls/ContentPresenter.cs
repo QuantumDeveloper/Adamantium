@@ -314,17 +314,6 @@ public class ContentPresenter : InputUIComponent
             (VisualParent as IMeasurableComponent)?.InvalidateMeasure();
         }
 
-        if (Docking.DockingArea.LogDocking && ContentTemplate != null)
-        {
-            System.Console.WriteLine($"[CP #{GetHashCode()}] tmpl=#{ContentTemplate.GetHashCode()}" +
-                                     $" rebuilt={_lastContentRebuilt}" +
-                                     $" was={sizeBefore.Width:F0}x{sizeBefore.Height:F0}" +
-                                     $" now={size.Width:F0}x{size.Height:F0}" +
-                                     $" parent={VisualParent?.GetType().Name}#{VisualParent?.GetHashCode()}" +
-                                     $" parentValid={(VisualParent as IMeasurableComponent)?.IsMeasureValid}" +
-                                     $" avail={availableSize.Width:F0}x{availableSize.Height:F0}");
-        }
-
         return size;
     }
 

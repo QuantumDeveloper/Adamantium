@@ -802,16 +802,6 @@ public class DockingArea : Panel
         _compassWindow.ClientWidth = bounds.Width;
         _compassWindow.ClientHeight = bounds.Height;
         _compassWindow.Show();
-
-        if (LogDocking)
-        {
-            System.Console.WriteLine($"[DockOverlay] at=({_compassWindow.Left:F0},{_compassWindow.Top:F0}) " +
-                                     $"size=({bounds.Width:F0}x{bounds.Height:F0}) " +
-                                     $"winTemplate={_compassWindow.Template != null} " +
-                                     $"compassSize=({_compass.RenderSize.Width:F0}x{_compass.RenderSize.Height:F0}) " +
-                                     $"indicatorBrush={_compass.IndicatorBrush != null} " +
-                                     $"previewBrush={_compass.PreviewBrush != null}");
-        }
     }
 
     private void HideOverlay() => _compassWindow?.Hide();
@@ -1219,13 +1209,6 @@ public class DockingArea : Panel
         _target = target;
         hit?.Aim(target);
         SpringLoad(hit, target, point);
-
-        if (LogDocking)
-        {
-            System.Console.WriteLine($"[DockTrack] mouse={Mouse.ScreenCoordinates} area=({point.X:F0},{point.Y:F0}) " +
-                                     $"hit={(hit == null ? "none" : hit == Owner ? "main" : "floating")} " +
-                                     $"node={_target.Node != null} edge={_target.IsEdge} zone={_target.Zone}");
-        }
     }
 
     private DockingArea _targetArea;   // the area whose compass is up; held by the area DRIVING the drag
@@ -1434,7 +1417,6 @@ public class DockingArea : Panel
         }
     }
 
-    internal static readonly bool LogDocking = System.Environment.GetEnvironmentVariable("ADAMANTIUM_DOCK_LOG") == "1";
 
     // Forgets the controls of nodes the layout no longer holds, or they would be emptied on every rebuild forever.
     // Asked of the MODEL: whether a control has a parent yet depends on timing, and a timing-dependent rule eventually
@@ -1639,9 +1621,6 @@ public class DockingArea : Panel
 
         var created = new PaneGroup();
         Track(node, created);
-
-        if (LogDocking) System.Console.WriteLine($"[DockingArea] NEW PaneGroup #{created.GetHashCode()} for node #{node.GetHashCode()}");
-
         return created;
     }
 
