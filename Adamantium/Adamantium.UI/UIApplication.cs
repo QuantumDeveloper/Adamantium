@@ -57,7 +57,6 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
     private IWindow mainWindow;
     private AdamantiumCollection<IWindow> windowsCollection;
     private List<IWindow> addedWindows;
-    private List<IWindow> closedWindows;
     private bool firstWindowAdded;
     private Thread applicationLoopThread;
     private CancellationTokenSource cancellationTokenSource;
@@ -97,7 +96,6 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         ShutDownMode = ShutDownMode.OnMainWindowClosed;
         windowToSystem = new Dictionary<IWindow, WindowRenderService>();
         addedWindows = new List<IWindow>();
-        closedWindows = new List<IWindow>();
         windowsCollection = new AdamantiumCollection<IWindow>();
         
         preciseTimer = new PreciseTimer();
@@ -206,14 +204,15 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         LoopSignal.Request();   // the next frame is what registers it - do not wait for the idle timeout
     }
 
+    /// <summary>A window has gone. Handled RIGHT HERE, never queued: the OS surface dies with the window, and this is
+    /// what parks the render thread (<c>_renderGate</c> in <see cref="OnWindowRemoved"/>) while its device resources
+    /// are torn down. Deferred by even one frame, the render thread draws into a swapchain whose surface is already
+    /// gone - measured: SurfaceLostKHR, then a pipeline barrier on a VK_NULL_HANDLE image, then an access violation.
+    /// <para>The asymmetry with <see cref="AddWindow"/> is the point: arriving is only a bookkeeping change the loop
+    /// must not see half-done, while LEAVING is a teardown that must finish before the window does.</para></summary>
     public void RemoveWindow(IWindow window)
     {
-        lock (applicationLocker)
-        {
-            closedWindows.Add(window);
-        }
-
-        LoopSignal.Request();
+        OnWindowRemoved(window);
     }
 
     public void SetActiveWindow(IWindow window)
@@ -863,22 +862,22 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         }
     }
 
+    // Only ARRIVALS are queued - see RemoveWindow for why a departure may not be. Under the lock the queue is emptied
+    // into a local first: registering a window runs application code, and a handler that opens another window would
+    // otherwise deadlock on the very lock it is holding.
     private void ProcessPendingWindows()
     {
+        IWindow[] arrived;
         lock (applicationLocker)
         {
-            for (int i = 0; i < closedWindows.Count; ++i)
-            {
-                OnWindowRemoved(closedWindows[i]);
-            }
-            closedWindows.Clear();
+            if (addedWindows.Count == 0) return;
 
-            for (int i = 0; i < addedWindows.Count; ++i)
-            {
-                OnWindowAdded(addedWindows[i]);
-            }
+            arrived = addedWindows.ToArray();
             addedWindows.Clear();
         }
+
+        foreach (var window in arrived) 
+            OnWindowAdded(window);
     }
 
     protected void CheckExitConditions()
