@@ -90,6 +90,26 @@ public sealed class DockingAreaRegionAdapter : IRegionAdapter
             syncing = false;
         };
 
+        // A saved layout names panes this region opened, and at start-up none of them exist yet. The key written with
+        // them is the view model's TYPE, so the region can make the very same thing again, put it back in itself, and
+        // hand the area the pane - which the layout then finds by id like any other.
+        area.PaneRestoring += (_, e) =>
+        {
+            if (e.Pane != null || string.IsNullOrEmpty(e.RestoreKey)) return;
+
+            var viewModel = Recreate(e.RestoreKey, e.PaneId);
+            if (viewModel == null) return;
+
+            syncing = true;                       // the pane is being made for a layout, not opened into one
+            region.Add(viewModel);
+            syncing = false;
+
+            var pane = PaneFor(viewModel);
+            pane.Id = e.PaneId;
+            panesByViewModel[viewModel] = e.PaneId;
+            e.Pane = pane;
+        };
+
         // Closing a pane is the user saying that view is done with, so the region must forget it too. Otherwise the
         // region still holds the view model, the next navigation to it REUSES that instance, sees it already "open"
         // and opens nothing at all - a name that can never be reached again once it has been closed.
@@ -143,6 +163,20 @@ public sealed class DockingAreaRegionAdapter : IRegionAdapter
 
     /// <summary>Wraps a view model in a pane. The BODY is resolved by the view locator - the pane holds the view model
     /// itself and lets the template selector turn it into a view, which is what keeps the region free of UI types.</summary>
+    // Makes a view model again from what was saved with its pane. The key is the type; anything the instance itself
+    // knew (which page it was showing, say) it restores from its own id - see IRestorablePane.
+    private static object Recreate(string restoreKey, string paneId)
+    {
+        var type = Type.GetType(restoreKey, throwOnError: false);
+        if (type == null) return null;
+
+        var context = UIAppContext.Current?.UIContext;
+        var viewModel = context != null ? context.Resolve(type) : Activator.CreateInstance(type);
+
+        (viewModel as IRestorablePane)?.RestoreFrom(paneId);
+        return viewModel;
+    }
+
     private Pane PaneFor(object viewModel)
     {
         var placement = viewModel as IDockablePane;
@@ -152,6 +186,10 @@ public sealed class DockingAreaRegionAdapter : IRegionAdapter
             Id = placement?.PaneId ?? viewModel.GetType().Name,
             Header = placement?.PaneTitle ?? (object)viewModel,
             Allowed = placement?.PaneAllowed ?? DockZone.All,
+
+            // What it takes to make this one again if a saved layout is loaded when it does not exist: its TYPE. The
+            // instance restores the rest of itself from its own id.
+            RestoreKey = viewModel.GetType().AssemblyQualifiedName,
             Content = viewModel,
             ContentTemplateSelector = new ViewLocatorTemplateSelector(_viewLocator)
         };

@@ -108,7 +108,34 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     private static void PositionChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
         // Before the OS window exists the value is simply remembered - it is read when the window is created.
-        if (a is WindowBase window) window.WindowWorkerService?.SetPosition(window.Left, window.Top);
+        if (a is WindowBase window && !window._positionFromPlatform)
+        {
+            window.WindowWorkerService?.SetPosition(window.Left, window.Top);
+        }
+    }
+
+    private bool _positionFromPlatform;
+
+    /// <summary>The window was moved by the PLATFORM - a caption drag, Aero Snap, a monitor going away - and says where
+    /// it ended up. Without this Left/Top only ever hold what WE last assigned: the OS move loop swallows the gesture,
+    /// so after any drag the window's own idea of its position was wherever it was put programmatically, which is what
+    /// a saved layout then wrote down.
+    /// <para>Assigned without moving the window again: the position is already true, and echoing it back to the OS
+    /// mid-drag fights the move loop.</para></summary>
+    public void UpdatePositionFromPlatform(double left, double top)
+    {
+        if (Left.Equals(left) && Top.Equals(top)) return;
+
+        _positionFromPlatform = true;
+        try
+        {
+            Left = left;
+            Top = top;
+        }
+        finally
+        {
+            _positionFromPlatform = false;
+        }
     }
         
     public static readonly AdamantiumProperty TitleProperty = AdamantiumProperty.Register(nameof(Title),

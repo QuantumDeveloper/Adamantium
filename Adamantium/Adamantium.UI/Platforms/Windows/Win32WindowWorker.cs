@@ -507,7 +507,16 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 
     private IntPtr HandleExitSizeMove(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
-        DispatchInput(() => window.RaiseWindowMoveCompleted());
+        // Where the OS actually left it. Left/Top otherwise still hold whatever WE last assigned - the move loop is
+        // invisible to managed code - so anything that reads a window's position afterwards (a saved layout, say)
+        // wrote down where it USED to be.
+        Win32Interop.GetWindowRect(window.Handle, out var rect);
+        DispatchInput(() =>
+        {
+            window.UpdatePositionFromPlatform(rect.Left, rect.Top);
+            window.RaiseWindowMoveCompleted();
+        });
+
         handled = false;
         return IntPtr.Zero;
     }

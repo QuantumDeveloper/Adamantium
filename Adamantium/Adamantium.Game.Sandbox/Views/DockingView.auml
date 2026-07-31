@@ -2,7 +2,7 @@
       xmlns:behaviors="clr-namespace:Adamantium.Game.Sandbox.Behaviors"
       xmlns:nav="clr-namespace:Adamantium.UI.Controls.Navigation;assembly=Adamantium.UI.Controls"
       xmlns:docking="clr-namespace:Adamantium.UI.Controls.Docking;assembly=Adamantium.UI.Controls">
-    <Grid RowDefinitions="Auto,Auto,Auto,*" Margin="24">
+    <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" Margin="24">
 
         <TextBlock Grid.Row="0" MarginBottom="12" MaxWidth="820"
                    Text="An editor-shaped arrangement written as ZONES only. Nothing here says what share of what a group takes - the author writes WHERE (centre, right, bottom) and the split tree is derived from that. Drag the grips between the areas: they rewrite the layout's own shares, which is the number a save would read."
@@ -36,15 +36,26 @@
                       Width="120" MarginRight="14"/>
 
             <Button Content="Navigate" Command="{Binding NavigateCommand}" Width="100" Height="32" MarginRight="8"/>
-            <Button Content="New pane" Command="{Binding NewTabCommand}" Width="100" Height="32"/>
+            <Button Content="New pane" Command="{Binding NewTabCommand}" Width="100" Height="32" MarginRight="24"/>
+
+            <!-- The arrangement is state, so it belongs to the VIEW MODEL: it owns a DockingWorkspace, the area is
+                 pointed at it below, and these commands save and restore through it. The control is never told where a
+                 layout is kept - that is the application's business. -->
+            <Button Content="Save layout" Command="{Binding SaveLayoutCommand}" Width="110" Height="32" MarginRight="8"/>
+            <Button Content="Restore" Command="{Binding RestoreLayoutCommand}" Width="90" Height="32" MarginRight="8"/>
+            <Button Content="Forget" Command="{Binding ForgetLayoutCommand}" Width="80" Height="32"/>
         </StackPanel>
+
+        <TextBlock Grid.Row="3" Text="{Binding LayoutState}" MarginBottom="12" MaxWidth="900"
+                   Foreground="{ResourceReference TextFillColorSecondary}"/>
 
         <!-- Square corners on purpose: areas meet each other along the splitters, and a rounded corner there leaves a
              notch of background at every junction instead of a clean seam. -->
-        <Border Grid.Row="3" BorderThickness="1"
+        <Border Grid.Row="4" BorderThickness="1"
                 BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                 Background="{ResourceReference CardBackgroundFillColorDefault}">
-            <docking:DockingArea DividerThickness="6" nav:RegionManager.RegionName="docking">
+            <docking:DockingArea DividerThickness="6" nav:RegionManager.RegionName="docking"
+                    Workspace="{Binding Workspace}">
                 <docking:DockingArea.Behaviors>
                     <behaviors:DockingPolicyBehavior KeepLastPane="True"/>
                 </docking:DockingArea.Behaviors>

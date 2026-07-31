@@ -101,6 +101,14 @@ public class Pane : TabItem
     /// data, and there would be nothing left to serialise.</summary>
     public string Id { get; set; }
 
+    /// <summary>What the application needs in order to MAKE this pane again - saved beside the id and handed back to
+    /// <see cref="DockingArea.PaneRestoring"/> when a layout is loaded. Null for a pane the markup declares: it exists
+    /// before any layout is read, so nothing has to recreate it.
+    /// <para>A layout is a list of ids, and an id alone cannot conjure a pane that was opened by code. Without this,
+    /// everything a region or a command opened was silently dropped on restore - which looks like a layout that only
+    /// half works.</para></summary>
+    public string RestoreKey { get; set; }
+
     /// <summary>How many times this pane has actually measured itself, and the size it worked out last time. Diagnostics:
     /// a tab whose turned label never resized it is either never ASKED again (the count stops) or asked and answering the
     /// same (the count rises), and only that tells which layer is at fault. Printed by the docking log.</summary>

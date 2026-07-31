@@ -23,6 +23,28 @@ public static class PlatformSettings
    /// reporting 0 (or none registered) falls back to it.</summary>
    public static UInt32 HoverTime => Platform?.HoverTime is { } time and > 0 ? time : 400;
 
+   /// <summary>Every monitor as one rectangle, in PHYSICAL pixels, or an empty one when the platform does not say.
+   /// Used to check that a remembered window position still exists - see <see cref="IsOnScreen"/>.</summary>
+   public static Rect VirtualScreen => Platform?.VirtualScreen ?? default;
+
+   /// <summary>Whether enough of a remembered rectangle still falls on a monitor for a window there to be reachable.
+   /// A layout saved with a panel on a second screen is loaded on a machine that no longer has one, and a window put
+   /// back at those coordinates is a window nobody can get to - not even to close it.
+   /// <para>"Enough" is its top-left corner plus a grabbable strip: a window is usable as long as some of its caption
+   /// is on a screen, and demanding the whole rectangle would reject a window the user themselves left half off the
+   /// edge. With no platform answer everything passes, which is what happened before the question was asked.</para></summary>
+   public static bool IsOnScreen(Rect bounds)
+   {
+      var screen = VirtualScreen;
+      if (screen.Width <= 0 || screen.Height <= 0) return true;
+
+      const double grabbable = 48;
+      return bounds.X + bounds.Width - grabbable > screen.X
+             && bounds.X + grabbable < screen.X + screen.Width
+             && bounds.Y + grabbable < screen.Y + screen.Height
+             && bounds.Y + bounds.Height > screen.Y;
+   }
+
    /// <summary>True once the pointer has moved far enough from where it was pressed for the gesture to be a DRAG.
    /// Per-axis, not radial: that is what the OS setting means, and it is what every other application on the desktop
    /// does with it.</summary>

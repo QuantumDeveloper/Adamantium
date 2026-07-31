@@ -9,7 +9,7 @@ namespace Adamantium.Game.Sandbox.ViewModels;
 /// for a name that is already open reuses this instance (<see cref="IsNavigationTarget"/>), which is what makes the
 /// region activate the existing tab instead of opening a second one just like it.</summary>
 [ViewModel]
-public partial class DockPageViewModel : INavigationAware, IDockablePane
+public partial class DockPageViewModel : INavigationAware, IDockablePane, IRestorablePane
 {
     public const string PageKey = "page";
     public const string ZoneKey = "zone";
@@ -42,6 +42,14 @@ public partial class DockPageViewModel : INavigationAware, IDockablePane
 
     public void OnNavigatedFrom(NavigationContext context)
     {
+    }
+
+    /// <summary>Back from a saved layout: the name IS the identity here, so the pane's id is the whole of what this
+    /// page has to remember. Where it lands is the layout's business, not its own.</summary>
+    public void RestoreFrom(string paneId)
+    {
+        Title = paneId;
+        OpenedAt = "restored with the layout";
     }
 
     public bool IsNavigationTarget(NavigationContext context)

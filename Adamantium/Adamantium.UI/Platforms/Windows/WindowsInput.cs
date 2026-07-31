@@ -1,4 +1,5 @@
 using Adamantium.Mathematics;
+using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
 using Adamantium.Win32;
 
@@ -49,4 +50,13 @@ internal sealed class WindowsInput : INativeMouse, INativeKeyboard, INativePlatf
     public Size DragThreshold => new(
         Win32Interop.GetSystemMetrics(SystemMetrics.Cxdrag),
         Win32Interop.GetSystemMetrics(SystemMetrics.Cydrag));
+
+    // SM_XVIRTUALSCREEN & co - every monitor as one rectangle, which starts at a negative origin when a second screen
+    // sits to the left of the primary. Read live: monitors are plugged in and unplugged while an application runs, and
+    // that is precisely the case this answers.
+    public Rect VirtualScreen => new(
+        Win32Interop.GetSystemMetrics(SystemMetrics.Xvirtualscreen),
+        Win32Interop.GetSystemMetrics(SystemMetrics.Yvirtualscreen),
+        Win32Interop.GetSystemMetrics(SystemMetrics.CxVirtualscreen),
+        Win32Interop.GetSystemMetrics(SystemMetrics.CyVirtualscreen));
 }

@@ -17,6 +17,12 @@ public interface IWindow : IRootVisualComponent, IContentControl
     /// <summary>Raise the window above the others WITHOUT taking focus - safe to call mid-drag, unlike
     /// <see cref="Activate"/>, which would make the OS revoke the capture the drag depends on.</summary>
     void BringToFront();
+
+    /// <summary>The PLATFORM moved the window - a caption drag, Aero Snap, a monitor going away - and reports where it
+    /// ended up, WITHOUT the window moving itself again in response. The OS move loop is invisible to managed code, so
+    /// without this Left/Top only ever hold what was last assigned to them, and anything that reads a window's
+    /// position afterwards (a layout being saved) writes down where it used to be.</summary>
+    void UpdatePositionFromPlatform(double left, double top);
         
     bool IsActive { get; }
 
