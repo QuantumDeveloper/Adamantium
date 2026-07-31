@@ -1281,39 +1281,53 @@ public class DockingArea : Panel
     // Forgets the controls of nodes the layout no longer holds, or they would be emptied on every rebuild forever.
     // Asked of the MODEL: whether a control has a parent yet depends on timing, and a timing-dependent rule eventually
     // deletes a live group. Only THIS area's root counts - a group that moved to a floating window is that area's now.
+    // How many model nodes this area still holds a control for. Tests only: a layout that keeps growing these after
+    // panels have come and gone is holding controls for nodes that no longer exist.
+    internal int TrackedGroups => _groupsByNode.Count;
+    internal int TrackedHosts => _hostsByNode.Count;
+
     private void Prune()
     {
-        var alive = new HashSet<PaneGroupNode>();
-        CollectGroups(RootContent, alive);
+        var groups = new HashSet<PaneGroupNode>();
+        var splits = new HashSet<PaneSplitNode>();
+        CollectNodes(RootContent, groups, splits);
 
         // PUT-AWAY panels are alive too, just not in the tree (rule 3b) - asking only the tree threw away their tabs.
         if ((_root ?? Layout.Main) is { } root)
         {
             foreach (var bar in root.Bars.Values)
             {
-                foreach (var node in bar) alive.Add(node);
+                foreach (var node in bar) groups.Add(node);
             }
         }
 
-        List<PaneGroupNode> gone = null;
-        foreach (var node in _groupsByNode.Keys)
+        Forget(_groupsByNode, groups);
+        Forget(_hostsByNode, splits);   // splits die too: one collapses away every time a row is left with one child
+    }
+
+    private static void Forget<TNode, TControl>(Dictionary<TNode, TControl> known, HashSet<TNode> alive)
+    {
+        List<TNode> gone = null;
+        foreach (var node in known.Keys)
         {
             if (!alive.Contains(node)) (gone ??= []).Add(node);
         }
 
         if (gone == null) return;
-        foreach (var node in gone) _groupsByNode.Remove(node);
+        foreach (var node in gone) known.Remove(node);
     }
 
-    private static void CollectGroups(PaneNode node, HashSet<PaneGroupNode> into)
+    private static void CollectNodes(PaneNode node, HashSet<PaneGroupNode> groups, HashSet<PaneSplitNode> splits)
     {
         switch (node)
         {
             case PaneGroupNode group:
-                into.Add(group);
+                groups.Add(group);
                 break;
             case PaneSplitNode split:
-                foreach (var child in split.Children) CollectGroups(child, into);
+                splits.Add(split);
+                foreach (var child in split.Children) 
+                    CollectNodes(child, groups, splits);
                 break;
         }
     }
