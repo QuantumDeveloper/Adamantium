@@ -1,4 +1,6 @@
+using System;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Threading.Tasks;
 using Adamantium.MVVM;
 using Adamantium.Navigation;
@@ -22,6 +24,9 @@ public partial class DockingViewModel : TabPageViewModel
     {
         _navigation = navigation;
         _navigation.Regions.GetOrCreateRegion(RegionName);
+
+        Workspace = new DockingWorkspace();
+        Workspace.Ready += OnWorkspaceReady;
     }
 
     /// <summary>What the application last answered when the docking area asked it (see
@@ -69,5 +74,78 @@ public partial class DockingViewModel : TabPageViewModel
         return Region.NavigateToAsync<DockPageViewModel>(new NavigationParameters()
             .Add(DockPageViewModel.PageKey, page)
             .Add(DockPageViewModel.ZoneKey, SelectedPlace));
+    }
+
+    // --- The arrangement, owned by the VIEW MODEL --------------------------------------------------------------------
+    // The view points the area at this object (docking:Workspace.Source); everything else happens here. The control
+    // never learns where a layout is kept - a file, a setting, a server - which is the application's business.
+
+    /// <summary>The docking area's arrangement. The view binds the area to it; these commands drive it.</summary>
+    public DockingWorkspace Workspace { get; }
+
+    [Bindable] private string _layoutState = "";
+
+    /// <summary>Where this application keeps its window layout - beside its other settings, per user. The CONTROL has
+    /// no opinion about this: it hands out text and reads text back, and where that lives is the application's
+    /// business (a file here, a settings store or a server elsewhere).</summary>
+    private static string LayoutFile => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Adamantium", "Sandbox", "docking-layout.json");
+
+    // Restoring happens the moment the view exists, not in the constructor: before that there is no area to restore
+    // into, and a view model deliberately cannot see the view.
+    private void OnWorkspaceReady(object sender, System.EventArgs e)
+    {
+        if (!File.Exists(LayoutFile))
+        {
+            LayoutState = $"No saved layout yet ({LayoutFile}). Rearrange the panels and press Save.";
+            return;
+        }
+
+        LayoutState = Workspace.Load(File.ReadAllText(LayoutFile))
+            ? $"Restored the layout saved in {LayoutFile}."
+            : "The saved layout could not be read - starting from the arrangement in the markup.";
+    }
+
+    /// <summary>Writes where the panels are right now: the tree, the edge bars, which panel is put away, which tab is
+    /// on top and every floating window's place on screen.</summary>
+    [Command]
+    private void SaveLayout()
+    {
+        var state = Workspace.Save();
+        if (state == null)
+        {
+            LayoutState = "Nothing to save - the area is not on screen yet.";
+            return;
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(LayoutFile)!);
+        File.WriteAllText(LayoutFile, state);
+
+        LayoutState = $"Saved to {LayoutFile}. Rearrange things and press Restore - or restart the app, it survives that.";
+    }
+
+    /// <summary>Puts the saved arrangement back, floating windows and all.</summary>
+    [Command]
+    private void RestoreLayout()
+    {
+        if (!File.Exists(LayoutFile))
+        {
+            LayoutState = "Nothing saved yet - press Save first.";
+            return;
+        }
+
+        LayoutState = Workspace.Load(File.ReadAllText(LayoutFile))
+            ? "Restored. Documents are NOT part of it: Pane.Restore says they belong to a session, not to the workspace."
+            : "The saved text names nothing this area still has.";
+    }
+
+    /// <summary>What a real application's "reset window layout" does.</summary>
+    [Command]
+    private void ForgetLayout()
+    {
+        if (File.Exists(LayoutFile)) File.Delete(LayoutFile);
+
+        LayoutState = "Forgotten. Next start gives you the arrangement written in the markup.";
     }
 }

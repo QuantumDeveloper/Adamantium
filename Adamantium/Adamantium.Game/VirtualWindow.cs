@@ -57,6 +57,12 @@ public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopu
     {
     }
 
+    // Nothing outside moves a virtual window: it is drawn inside a host surface, and its position is whatever the host
+    // gave it. Assigning it here would be the window arguing with its own host.
+    public void UpdatePositionFromPlatform(double left, double top)
+    {
+    }
+
     // Everything a view can see or bind is a registered property, exactly as on a real window - a virtual window is a
     // control in somebody's tree, and half of it being plain fields is a trap: the half that is plain silently refuses
     // bindings, styles and animation with no error to explain why.

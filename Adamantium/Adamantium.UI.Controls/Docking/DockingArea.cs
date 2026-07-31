@@ -487,6 +487,140 @@ public class DockingArea : Panel
         FloatNew(id, pane.Header?.ToString() ?? "Panel");
     }
 
+    // --- Saving and restoring the arrangement -----------------------------------------------------------------------
+
+    /// <summary>The whole arrangement as text: the tree, the edge bars, which panel is put away, which tab is on top,
+    /// and where each floating window sits. Panes that say they do not come back (<see cref="Pane.Restore"/> - a
+    /// document belongs to a session, not to the workspace) are left out, and so are the groups they emptied.</summary>
+    public string SaveLayout()
+    {
+        EnsureLayout();
+        SyncBoundsToModel();
+
+        return DockingLayoutSerializer.Save(Layout,
+            keepPane: id => PaneById(id)?.Restore != false,
+            restoreKeyOf: id => PaneById(id)?.RestoreKey);
+    }
+
+    /// <summary>The view model's handle on this area's arrangement: <c>Workspace="{Binding Workspace}"</c>. The view
+    /// model owns the object and calls Save/Load on it; the area never learns WHERE a layout is kept, which is the
+    /// application's business.</summary>
+    public static readonly AdamantiumProperty WorkspaceProperty = AdamantiumProperty.Register(nameof(Workspace),
+        typeof(DockingWorkspace), typeof(DockingArea), new PropertyMetadata(null, OnWorkspaceChanged));
+
+    public DockingWorkspace Workspace
+    {
+        get => GetValue<DockingWorkspace>(WorkspaceProperty);
+        set => SetValue(WorkspaceProperty, value);
+    }
+
+    private static void OnWorkspaceChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is not DockingArea area) return;
+
+        (e.OldValue as DockingWorkspace)?.Detach(area);
+        (e.NewValue as DockingWorkspace)?.Attach(area);
+    }
+
+    /// <summary>Raised while a layout is being loaded, for every pane it names that this area does not have. The
+    /// application makes the pane from the key it saved, or leaves it null and the layout is applied without it.
+    /// <para>Panes opened by CODE - a navigation region, an "open this tool" command - do not exist at start-up, so
+    /// without this everything but the authored panels quietly vanished from a restored arrangement.</para></summary>
+    public event EventHandler<PaneRestoringEventArgs> PaneRestoring;
+
+    /// <summary>Puts a saved arrangement back. False for text this version cannot read or that names no pane this area
+    /// has - the caller then keeps whatever is on screen, which is the authored arrangement on a first run.
+    /// <para>Only panes this area already knows are placed: a layout names ids, and an id whose pane does not exist is
+    /// dropped rather than conjured. Panes it knows that the file does NOT name stay out of the layout - a saved
+    /// arrangement is the whole answer, not a suggestion to merge with.</para></summary>
+    public bool LoadLayout(string state)
+    {
+        EnsureLayout();
+
+        // The panes the file expects but this area has not got are asked for FIRST, so that by the time the tree is
+        // applied every id in it stands for something. Asking afterwards would mean applying a layout with holes in it
+        // and then patching them, which is two arrangements where there should be one.
+        RestoreMissingPanes(state);
+
+        var loaded = DockingLayoutSerializer.Load(state, _panesById.ContainsKey);
+        if (loaded?.Main == null) return false;
+
+        // Every window of the OLD arrangement goes first: its roots are about to be replaced, and a satellite left
+        // behind would be showing a tree that is no longer part of any layout.
+        foreach (var area in Owner._satellites.ToArray())
+        {
+            var window = area._window;
+            area._window = null;
+            area.Release();
+
+            if (window != null) UIAppContext.Current.Dispatcher.InvokeAsync(window.Close);
+        }
+
+        Owner._satellites.Clear();
+        _groupsByNode.Clear();
+        _hostsByNode.Clear();
+        Children.Clear();
+        _tree = null;
+
+        Layout = loaded;
+        Layout.Normalize();
+
+        Rebuild();
+
+        // The floating roots come back as windows, each where it was last seen.
+        foreach (var root in Layout.Roots)
+        {
+            if (root.IsMain) continue;
+
+            OpenWindowFor(root, TitleOf(root), root.Bounds);
+        }
+
+        return true;
+    }
+
+    // Asks the application for every pane the file names and this area has not got. A pane it makes is registered here
+    // and nowhere else - the layout that follows refers to it by id like any other.
+    private void RestoreMissingPanes(string state)
+    {
+        if (PaneRestoring == null && Owner.PaneRestoring == null) return;
+
+        foreach (var pair in DockingLayoutSerializer.ReadRestoreKeys(state))
+        {
+            if (_panesById.ContainsKey(pair.Key)) continue;
+
+            var args = new PaneRestoringEventArgs(pair.Key, pair.Value);
+            Owner.PaneRestoring?.Invoke(Owner, args);
+
+            if (args.Pane == null) continue;
+
+            args.Pane.Id = pair.Key;   // the layout refers to it by THIS id, whatever the maker called it
+            RegisterPane(pair.Key, args.Pane);
+        }
+    }
+
+    private string TitleOf(DockingRoot root)
+    {
+        foreach (var id in DockingLayout.PanesIn(root.Content))
+        {
+            if (_panesById.TryGetValue(id, out var pane)) return pane.Header?.ToString() ?? id;
+        }
+
+        return "Panel";
+    }
+
+    // Where each floating window is NOW - the one piece of absolute geometry a layout keeps, and the reason a panel
+    // left on a second monitor comes back to that monitor. Read at save time, because a window moves without the model
+    // hearing about it (the platform's own move loop owns the gesture).
+    private void SyncBoundsToModel()
+    {
+        foreach (var area in Owner._satellites)
+        {
+            if (area._window is not { } window || area._root == null) continue;
+
+            area._root.Bounds = new Rect(window.Left, window.Top, window.ClientWidth, window.ClientHeight);
+        }
+    }
+
     /// <summary>The pane a given id stands for, or null.</summary>
     public Pane PaneById(string paneId)
     {
@@ -560,12 +694,16 @@ public class DockingArea : Panel
                 {
                     if (node.IsEmpty) continue;
 
+                    // STATE FIRST, panes second - the same order BuildVisual uses, and for the same reason: filling a
+                    // strip that does not yet know it is folded makes it insist on a selection, which is written back
+                    // into the model as the active pane. Measured on a RESTORED layout: a panel saved looking at its
+                    // second tab came back looking at the first.
                     var strip = GroupFor(node);
-                    FillPanes(strip, node);
                     strip.State = node.State;
                     strip.Edge = bar.Key;
                     strip.Kind = PaneKind.Tool;
                     strip.RevealExtent = FlyoutExtent(node);
+                    FillPanes(strip, node);
                     wanted.Add(strip);
                 }
             }
@@ -915,7 +1053,21 @@ public class DockingArea : Panel
         var root = new DockingRoot(group, isMain: false);
         Layout.Roots.Add(root);
 
-        var area = Float(root, title, out var window);
+        OpenWindowFor(root, title, default);
+        RebuildFamily();
+    }
+
+    // Puts a floating ROOT on screen. Shared by "open this in its own window" and by a restored layout, so a window
+    // that comes back from a saved file is wired exactly like one that was just torn off - it can be dragged, docked
+    // back and closed the same way.
+    // at = where it was last seen (a saved layout knows); default cascades off this area's corner instead.
+    private void OpenWindowFor(DockingRoot root, string title, Rect at)
+    {
+        // A remembered place is only worth using while it still exists: a layout saved with a panel on a second monitor
+        // is opened on a machine that no longer has one, and a window put back there is one nobody can reach - not even
+        // to close it. Then it cascades, exactly like a window that was never anywhere.
+        var placed = at.Width > 0 && at.Height > 0 && PlatformSettings.IsOnScreen(at);
+        var area = Float(root, title, out var window, placed ? new Size(at.Width, at.Height) : default);
 
         UIAppContext.Current.Dispatcher.InvokeAsync(() =>
         {
@@ -923,19 +1075,25 @@ public class DockingArea : Panel
             window.Show();
             area.Rebuild();
 
-            // Off the area's corner and cascaded, so two of them do not stack exactly. Physical pixels: a window's
-            // position is a desktop point.
-            var origin = this.PointToScreen(Vector2.Zero);
-            var step = 32 * Owner._satellites.Count;
-            window.Left = origin.X + 60 + step;
-            window.Top = origin.Y + 60 + step;
+            // Physical pixels either way: a window's position is a desktop point. Without a remembered place they
+            // cascade off this area's corner, so two of them do not stack exactly.
+            if (placed)
+            {
+                window.Left = at.X;
+                window.Top = at.Y;
+            }
+            else
+            {
+                var origin = this.PointToScreen(Vector2.Zero);
+                var step = 32 * Owner._satellites.Count;
+                window.Left = origin.X + 60 + step;
+                window.Top = origin.Y + 60 + step;
+            }
 
             // Without this it would be a window that can never come back: dragged by its caption it aims and docks.
             window.WindowMoving += (_, _) => TrackWindow(window, root);
             window.WindowMoveCompleted += (_, _) => DropWindow(window, root);
         });
-
-        RebuildFamily();
     }
 
     /// <summary>How big a floating window starts when the pane has no size to inherit - one opened from code, never

@@ -301,7 +301,7 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
     private void OnWindowAdded(IWindow window)
     {
         CreateWindowService(window);
-        
+
         windowsCollection.Add(window);
 
         if (!firstWindowAdded)
@@ -678,8 +678,16 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         // (at startup it never is, until the swapchain exists) records NOTHING - and clearing regardless threw away marks that
         // were never recorded. Nothing re-marks an already-clean component, so whatever the layout pass had built by then was
         // simply never drawn: that is why the first tab's content came up blank while every later tab was fine.
+        // A SNAPSHOT, not the live collection: recording a frame runs managed code, and a window opened while it runs
+        // (a restored layout puts several up at once) would otherwise break the walk mid-way.
+        // Deliberately NOT under _renderGate: that gate is held by the RENDER thread for the length of a frame, so
+        // taking it here - on the loop thread, every frame - serialises the two threads and the application stops
+        // drawing entirely.
         var recordedAll = true;
-        foreach (var service in windowToSystem.Values)
+        var services = new WindowRenderService[windowToSystem.Count];
+        windowToSystem.Values.CopyTo(services, 0);
+
+        foreach (var service in services)
             recordedAll &= service.RecordFrame();
         _recordedThisFrame = recordedAll;
 

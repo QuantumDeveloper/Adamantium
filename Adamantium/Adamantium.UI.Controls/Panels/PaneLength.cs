@@ -58,6 +58,12 @@ public readonly struct PaneLength : IEquatable<PaneLength>
 
         text = text.Trim();
         if (text == "*") return Star;
+
+        // ToString writes "Auto", so Parse has to read it back - a round trip that loses a collapsed panel's length is
+        // a saved layout that springs open when it is loaded.
+        if (text.Equals("Auto", StringComparison.OrdinalIgnoreCase)) 
+            return Auto;
+        
         if (text.EndsWith('*'))
         {
             var weight = text[..^1];
