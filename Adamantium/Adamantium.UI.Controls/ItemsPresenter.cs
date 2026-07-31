@@ -32,12 +32,6 @@ public class ItemsPresenter : InputUIComponent
     /// <summary>Rebuilds the items panel (e.g. the ItemsPanel template changed) and refills it.</summary>
     internal void Rebuild()
     {
-        if (Docking.DockingArea.LogDocking)
-        {
-            System.Console.WriteLine($"[ItemsPresenter #{GetHashCode()}] Rebuild: old panel #{_panel?.GetHashCode()} " +
-                                     $"owner={_owner?.GetType().Name}#{_owner?.GetHashCode()}");
-        }
-
         if (_panel != null)
         {
             RemoveVisualChild(_panel);
@@ -83,12 +77,6 @@ public class ItemsPresenter : InputUIComponent
     internal void Refresh()
     {
         if (_owner == null || _panel == null) return;
-
-        if (Docking.DockingArea.LogDocking)
-        {
-            System.Console.WriteLine($"[ItemsPresenter #{GetHashCode()}] Refresh into panel #{_panel.GetHashCode()} " +
-                                     $"items={_owner.Items.Count} owner=#{_owner.GetHashCode()}");
-        }
 
         _panel.Children.Clear();
         var generator = _owner.ItemContainerGenerator;

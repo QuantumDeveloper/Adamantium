@@ -57,8 +57,6 @@ public partial class GalleryViewModel
         // Docking owns a navigation region too (its area IS a region), so it comes from DI as well - put back where it
         // stands in the list above, ahead of Tiles.
         Tabs.Insert(Tabs.IndexOf(Tabs.First(t => t is TilesViewModel)), resolver.Resolve<DockingViewModel>());
-        // Start on Docking while it is being built - it is the tab being worked on, and paging to it every launch is
-        // pure friction.
-        SelectedTab = Tabs.FirstOrDefault(t => t is DockingViewModel) ?? Tabs[2];
+        SelectedTab = Tabs[2];
     }
 }

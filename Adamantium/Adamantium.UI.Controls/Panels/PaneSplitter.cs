@@ -104,12 +104,6 @@ public class PaneSplitter : Thumb
             PaneHost.SetPaneLength(after, PaneLength.Pixels(newAfter));
         }
 
-        if (PaneHost.LogLayout)
-        {
-            Console.WriteLine($"[PaneSplitter {Orientation}] moved={moved:F1} origin={_originBefore:F1}/{_originAfter:F1} " +
-                              $"min={minBefore:F1}/{minAfter:F1} -> {newBefore:F1}/{newAfter:F1} " +
-                              $"units={PaneHost.GetPaneLength(before)}/{PaneHost.GetPaneLength(after)}");
-        }
     }
 
     /// <summary>A share's weight, treating an unstated one as a single share - the same reading the host uses.</summary>

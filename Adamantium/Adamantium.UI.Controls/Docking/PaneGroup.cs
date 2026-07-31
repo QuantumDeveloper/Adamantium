@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using Adamantium.UI.Core;
 using Adamantium.UI.Controls.Primitives;
 using Adamantium.UI.Core.Input;
@@ -173,79 +173,6 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         return false;
     }
 
-    protected override Size ArrangeOverride(Size finalSize)
-    {
-        var size = base.ArrangeOverride(finalSize);
-
-        if (DockingArea.LogDocking) Log();
-
-        return size;
-    }
-
-    // What this group and its tabs are doing, from inside the layout pass (ADAMANTIUM_DOCK_LOG=1). Overlapping tabs
-    // mean either two slots at one position or a leftover drag transform, and only the numbers tell which.
-    private void Log()
-    {
-        var first = Items.OfType<Pane>().FirstOrDefault();
-        var rotation = first == null ? "-" : first.LabelRotation.ToString();
-        var hasHeaderTemplate = first?.HeaderTemplate != null;
-
-        var panelKind = ItemsHostPanel is Panels.TabPanel tabPanel
-            ? $"TabPanel/{tabPanel.Orientation}"
-            : ItemsHostPanel?.GetType().Name ?? "none";
-
-        var strip = GetTemplateChild("PART_TabStrip") as IMeasurableComponent;
-        var stripCell = strip == null
-            ? "strip=none"
-            : $"strip=r{Panels.Grid.GetRow((IAdamantiumComponent)strip)}c{Panels.Grid.GetColumn((IAdamantiumComponent)strip)} at {strip.Bounds} want={strip.DesiredSize.Width:F0}x{strip.DesiredSize.Height:F0} stripValid={strip.IsMeasureValid} stripOrient={(strip as TabStripScroller)?.Orientation}" +
-              (GetTemplateChild("PART_SelectionIndicator") is Base.MeasurableUIComponent ind
-                  ? $" ind={ind.Width:F0}x{ind.Height:F0} at {ind.Bounds.Width:F0}x{ind.Bounds.Height:F0} hAlign={ind.HorizontalAlignment}"
-                  : " ind=none");
-
-        var text2 = "";
-        if (GetTemplateChild("PART_PinButton") is Buttons.Button pin)
-        {
-            text2 = $" pinOver={(pin.BackgroundPointerOver == null ? "null" : "set")} pinPressed={(pin.BackgroundPressed == null ? "null" : "set")}" +
-                    $" over={pin.IsMouseOver} pressed={pin.IsPressed} focusable={pin.Focusable}";
-        }
-
-        // Template identity beside panel identity: a new panel with the SAME template means the rebuild came from
-        // somewhere other than a template change.
-        var text = $"[PaneGroup #{GetHashCode()} {Items.Count} tabs {stripCell}" +
-                   $" gWant={DesiredSize.Width:F0}x{DesiredSize.Height:F0} gAt={Bounds.Width:F0}x{Bounds.Height:F0}" +
-                   $" host=#{ItemsHostPanel?.GetHashCode()} panel={panelKind}" +
-                   $" tmpl=#{Template?.GetHashCode()}" +
-                   $" parent={VisualParent?.GetType().Name}" +
-                   $" kind={Kind} edge={Edge} state={State}" +
-                   $" rot={rotation} hdrTmpl={hasHeaderTemplate}]";
-
-        for (var i = 0; i < Items.Count; i++)
-        {
-            if (ItemContainerGenerator.ContainerFromIndex(i) is not TabItem tab) continue;
-
-            var offset = tab.RenderTransform is Core.Media.Transform transform ? transform.TranslateX : 0;
-
-            // Actually IN the strip's panel? A container that never got re-attached draws at the bounds of its previous
-            // life, which looks exactly like an overlap.
-            var panel = ItemsHostPanel as Panels.Panel;
-            var inChildren = panel != null && panel.Children.Contains(tab);
-
-            // The template the TAB carries versus the one that reached its header presenter: a turned label that never
-            // resized means one of those links is stale.
-            var ownTemplate = tab.HeaderTemplate?.GetHashCode();
-            var headerHost = tab.GetTemplateChild("PART_ContentPresenter") as ContentPresenter;
-            var presenterTemplate = headerHost?.ContentTemplate?.GetHashCode();
-            var presenterDesired = headerHost == null ? "-" : $"{headerHost.DesiredSize.Width:F0}x{headerHost.DesiredSize.Height:F0}";
-
-            text += $" [{i}] x={tab.Bounds.X:F0} w={tab.Bounds.Width:F0}" +
-                    $" desired={tab.DesiredSize.Width:F0}x{tab.DesiredSize.Height:F0}" +
-                    $" rot={(tab as Pane)?.LabelRotation} hdr=#{ownTemplate} cp=#{presenterTemplate} cpSize={presenterDesired}" +
-                    $" m={(tab as Pane)?.MeasureCount} at={(tab as Pane)?.LastMeasureConstraint.Width:F0}x{(tab as Pane)?.LastMeasureConstraint.Height:F0}" +
-                    $" dx={offset:F0} inChildren={inChildren} vis={tab.Visibility}";
-        }
-
-        System.Console.WriteLine(text + text2);
-    }
 
     /// <summary>The docking area this group lives in, or null when it is used as a plain tab control.</summary>
     private DockingArea Area
@@ -609,17 +536,6 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         if (_closeButton != null) _closeButton.Click += OnCloseClicked;
         if (_flyoutPinButton != null) _flyoutPinButton.Click += OnPinClicked;
         if (_flyoutCloseButton != null) _flyoutCloseButton.Click += OnCloseClicked;
-
-        if (DockingArea.LogDocking && _pinButton != null)
-        {
-            _pinButton.PropertyChanged += (_, e) =>
-            {
-                if (e.Property?.Name is not ("IsMouseOver" or "IsPressed")) return;
-                var inner = _pinButton?.GetTemplateChild("InnerBorder") as Decorators.Border;
-                var fill = inner?.Background is Core.Media.SolidColorBrush b ? b.Color.ToString() : inner?.Background?.GetType().Name ?? "null";
-                System.Console.WriteLine($"[PIN] {e.Property.Name}={e.NewValue} inner={inner?.GetType().Name} fill={fill}");
-            };
-        }
 
         SyncChrome();
     }
