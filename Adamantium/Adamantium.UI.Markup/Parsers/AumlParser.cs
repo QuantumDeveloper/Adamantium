@@ -118,7 +118,14 @@ public class ParserContext
                     isAttachedProperty = true;
                     var names = propName.Split('.');
                     propName = names[1];
-                    ownerType = new AumlAstXmlTypeReference(element.ToLineInfo(), targetType.Namespace, names[0]);
+
+                    // The owner is named by the ATTRIBUTE's prefix, not the element's: nav:RegionManager.RegionName on a
+                    // docking:DockingArea means the RegionManager of the nav namespace. Taking the element's namespace
+                    // made an attached property resolvable only on elements that happened to live in the same namespace
+                    // as its owner. An unprefixed attribute (Grid.Row="0") carries no namespace of its own in XML, so
+                    // there the element's still stands in.
+                    var ownerNamespace = string.IsNullOrEmpty(ns) ? targetType.Namespace : ns;
+                    ownerType = new AumlAstXmlTypeReference(element.ToLineInfo(), ownerNamespace, names[0]);
                 }
 
                 var propertyNode = new AumlAstPropertyNode(element.ToLineInfo(), 

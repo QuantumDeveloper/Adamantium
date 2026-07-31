@@ -1,6 +1,3 @@
-using System.Collections.Generic;
-using System.Linq;
-using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
@@ -11,41 +8,27 @@ namespace Adamantium.UI.Controls.Docking;
 /// <summary>
 /// The area panes are docked in: it owns the layout and lays its groups out by it.
 /// <para>The author writes WHERE, never how much - groups declare a <see cref="PaneGroup.Zone"/> and the split tree is
-/// derived from them (<see cref="DockingLayout.FromZones"/>). A share written by hand would be a share of a split the
-/// author cannot see, and would stop being true the first time a divider is dragged.</para>
-/// <para>The layout is DATA and lives in <see cref="Layout"/>: it can be built, changed and asserted on without a
-/// window, which is why the model is a separate thing from these controls. The controls are a VIEW of it - change the
-/// model and call <see cref="Rebuild"/>, and the visual tree follows. No gesture edits controls directly, or the model
-/// and the screen would be two answers to the same question.</para>
+/// derived from them (<see cref="DockingLayout.FromZones"/>).</para>
+/// <para>The layout is DATA (<see cref="Layout"/>) and these controls are a VIEW of it: change the model and call
+/// <see cref="Rebuild"/>. No gesture edits controls directly, or the model and the screen become two answers to one
+/// question.</para>
 /// </summary>
 public class DockingArea : Panel
 {
-    /// <summary>The layout this area shows. Rebuilt from the authored zones when they change; from then on it is what
-    /// gestures edit and what a save writes.</summary>
+    /// <summary>The layout this area shows - what gestures edit and what a save writes.</summary>
     public DockingLayout Layout { get; private set; } = new();
 
-    /// <summary>Every pane this area knows, by id. The model refers to panes by id and nothing else, so this is the one
-    /// place an id turns back into a control.
-    /// <para>A pane torn into a window is still the SAME control and stays registered here, which is what lets it be
-    /// found again when the window is docked back. SHARED with every floating area of the same layout, for exactly that
-    /// reason: a pane that moved between two windows must not be two entries.</para></summary>
+    // Panes by id - the one place an id turns back into a control. Shared with every floating area of the layout: a
+    // pane that moved between two windows must not be two entries.
     private readonly Dictionary<string, Pane> _panesById;
 
-    /// <summary>The root this area shows: the layout's main one, or - for a floating window's area - the root that was
-    /// torn off into it.
-    /// <para>This is what makes a floating panel dockable INTO. The model was always a forest of roots and never knew
-    /// about windows; giving each root an area of its own means a floating window has a tab strip, a compass and the same
-    /// gestures as the main one, instead of being a box with a panel in it.</para></summary>
+    // The root this area shows: the layout's main one, or the one torn off into this floating window. Giving each root
+    // an area of its own is what makes a floating panel dockable INTO.
     private readonly DockingRoot _root;
 
-    /// <summary>The main area, when this is a floating one. The family shares a layout, a pane registry and a drag.</summary>
-    private readonly DockingArea _owner;
-
-    /// <summary>The floating areas opened from this one. Only the main area has any.</summary>
+    private readonly DockingArea _owner;              // the main area, when this is a floating one
     private readonly List<DockingArea> _satellites = [];
-
-    /// <summary>The window a floating area lives in, so it can be closed when its root is docked away.</summary>
-    private WindowBase _window;
+    private WindowBase _window;                       // the window a floating area lives in
 
     public DockingArea() => _panesById = new Dictionary<string, Pane>();
 
@@ -55,19 +38,17 @@ public class DockingArea : Panel
         _root = root;
         Layout = owner.Layout;
         _panesById = owner._panesById;
-        // SetCurrentValue, not the setter: a plain write is LOCAL and would outrank a theme or a binding the owner's own
-        // value came from, so a floating area could never be restyled with the rest of them.
+        // SetCurrentValue: a plain write is LOCAL and would outrank the theme or binding the owner's own value came from.
         SetCurrentValue(EdgeDockSizeProperty, owner.EdgeDockSize);
         DividerThickness = owner.DividerThickness;
 
-        // Its content came from a tear-off, not from authored children - there are no zones here to build a layout from.
-        _layoutBuilt = true;
+        _layoutBuilt = true;   // its content came from a tear-off - there are no authored zones to build from
     }
 
     private DockingArea Owner => _owner ?? this;
 
-    /// <summary>Every area of this layout, FLOATING ONES FIRST. A floating window sits over the main one, so where both
-    /// could claim the pointer the floating one is the answer.</summary>
+    /// <summary>Every area of this layout, FLOATING ONES FIRST: a floating window sits over the main one, so where both
+    /// could claim the pointer the floating one wins.</summary>
     private IEnumerable<DockingArea> Family
     {
         get
@@ -80,15 +61,27 @@ public class DockingArea : Panel
 
     private PaneNode RootContent => (_root ?? Layout.Main)?.Content;
 
-    /// <summary>The control showing each group node. Kept ACROSS rebuilds so a group that merely moved keeps its own
-    /// control - and with it its selection and its scroll position, which a freshly built one would lose.</summary>
+    // The control per group node, kept ACROSS rebuilds: a group that merely moved keeps its selection and scroll.
     private readonly Dictionary<PaneGroupNode, PaneGroup> _groupsByNode = new();
+
+    // The area is TWO things: the split tree in the middle, and the four strips of PUT-AWAY panels along its edges. The
+    // strips are not in the tree (rule 3b), so they are laid out around it and nothing inside the tree can move them.
 
     protected override Size MeasureOverride(Size availableSize)
     {
         EnsureLayout();
 
-        foreach (var child in Children) child.Measure(availableSize);
+        // Strips first, each asked what it needs across its own edge; the rest is the tree's.
+        var left = MeasureBar(DockZone.Left, availableSize);
+        var right = MeasureBar(DockZone.Right, availableSize);
+        var top = MeasureBar(DockZone.Top, availableSize);
+        var bottom = MeasureBar(DockZone.Bottom, availableSize);
+
+        var middle = new Size(
+            System.Math.Max(0, availableSize.Width - left - right),
+            System.Math.Max(0, availableSize.Height - top - bottom));
+
+        _tree?.Measure(middle);
         return availableSize;
     }
 
@@ -96,23 +89,149 @@ public class DockingArea : Panel
     {
         EnsureLayout();
 
-        var area = new Rect(0, 0, finalSize.Width, finalSize.Height);
-        foreach (var child in Children) child.Arrange(area);
+        // Sides take the FULL height, bands what is left between them - the order the layout itself uses (rule 2.3).
+        var left = BarExtent(DockZone.Left);
+        var right = BarExtent(DockZone.Right);
+        var top = BarExtent(DockZone.Top);
+        var bottom = BarExtent(DockZone.Bottom);
+
+        var bandWidth = System.Math.Max(0, finalSize.Width - left - right);
+
+        // TREE first: a strip's flyout is placed from the zone it would come back to, which is a control inside the tree.
+        _tree?.Arrange(new Rect(left, top, bandWidth,
+            System.Math.Max(0, finalSize.Height - top - bottom)));
+
+        ArrangeBar(DockZone.Left, new Rect(0, 0, left, finalSize.Height));
+        ArrangeBar(DockZone.Right, new Rect(finalSize.Width - right, 0, right, finalSize.Height));
+        ArrangeBar(DockZone.Top, new Rect(left, 0, bandWidth, top));
+        ArrangeBar(DockZone.Bottom, new Rect(left, finalSize.Height - bottom, bandWidth, bottom));
 
         return finalSize;
     }
 
-    /// <summary>Copies the lengths the controls now carry back into the model - called when a DIVIDER DRAG ends, and at
-    /// no other time.
-    /// <para>A drag writes onto the controls, because that is what moves the boundary under the pointer, and the model
-    /// has to learn of it or the next rebuild would hand back the sizes from before the drag. But ONLY then: the model
-    /// is the truth and the controls are a view of it, so copying every layout pass let the view answer back - and a
-    /// freshly built control still carrying the default Star wrote that default over a real size. Measured: after a
-    /// tear-off the console went from a 160-pixel band to a star and took two thirds of the window.</para></summary>
+    /// <summary>The visual for the split tree - one child among the strips, and the only one that grows.</summary>
+    private IMeasurableComponent _tree;
+
+    private double MeasureBar(DockZone edge, Size availableSize)
+    {
+        var across = 0.0;
+
+        foreach (var group in BarControls(edge))
+        {
+            group.Measure(availableSize);
+            var wanted = edge is DockZone.Left or DockZone.Right ? group.DesiredSize.Width : group.DesiredSize.Height;
+            across = System.Math.Max(across, wanted);
+        }
+
+        return across;
+    }
+
+    private double BarExtent(DockZone edge)
+    {
+        var across = 0.0;
+
+        foreach (var group in BarControls(edge))
+        {
+            across = System.Math.Max(across, edge is DockZone.Left or DockZone.Right
+                ? group.DesiredSize.Width
+                : group.DesiredSize.Height);
+        }
+
+        return across;
+    }
+
+    /// <summary>Stacks the strips of one edge ALONG it, each taking what it asked for - two put-away panels on the same
+    /// side sit one after the other, exactly as their tabs would.</summary>
+    private void ArrangeBar(DockZone edge, Rect bounds)
+    {
+        var vertical = edge is DockZone.Left or DockZone.Right;
+        var offset = 0.0;
+
+        foreach (var group in BarControls(edge))
+        {
+            var along = vertical ? group.DesiredSize.Height : group.DesiredSize.Width;
+
+            group.Arrange(vertical
+                ? new Rect(bounds.X, bounds.Y + offset, bounds.Width, along)
+                : new Rect(bounds.X + offset, bounds.Y, along, bounds.Height));
+
+            // The flyout takes the shape of the ZONE THE PANEL WOULD COME BACK TO - not of this strip (as long as its
+            // few captions) and not of the whole edge (which runs under the side panels and off the window).
+            var zone = ZoneBounds(edge);
+            var thickness = vertical ? bounds.Width : bounds.Height;
+            var extent = FlyoutExtent(NodeOf(group));
+
+            group.RevealLength = vertical ? zone.Height : zone.Width;
+
+            // Placed from the strip's own corner, both axes stated outright (see PaneGroup.RevealOffsetX): ALONG the
+            // edge it lines up with the zone, and ACROSS it opens away from the edge - past the strip on a Left/Top,
+            // back by its own size on a Right/Bottom.
+            group.RevealOffsetX = edge switch
+            {
+                DockZone.Left => thickness,
+                DockZone.Right => -extent,
+                _ => zone.X - (bounds.X + offset)
+            };
+
+            group.RevealOffsetY = edge switch
+            {
+                DockZone.Top => thickness,
+                DockZone.Bottom => -extent,
+                _ => zone.Y - (bounds.Y + offset)
+            };
+
+            offset += along;
+        }
+    }
+
+    // Where a put-away panel would come back to, in this area's coordinates: the centre column for a band, the whole
+    // tree for a side - the same targets ExpandGroup pins against, so the flyout shows the shape it will take.
+    private Rect ZoneBounds(DockZone edge)
+    {
+        var root = _root ?? Layout.Main;
+        if (root == null) return default;
+
+        var node = edge is DockZone.Top or DockZone.Bottom ? Layout.BandTarget(root) : root.Content;
+
+        if (VisualOf(node) is not IUIComponent visual || visual.RenderSize.Width <= 0) return default;
+
+        var at = (visual.PointToScreen(Vector2.Zero) - this.PointToScreen(Vector2.Zero)) / DpiScale;
+        return new Rect(at.X, at.Y, visual.RenderSize.Width, visual.RenderSize.Height);
+    }
+
+    private IMeasurableComponent VisualOf(PaneNode node)
+    {
+        switch (node)
+        {
+            case PaneSplitNode split when _hostsByNode.TryGetValue(split, out var host):
+                return host;
+
+            case PaneGroupNode group when _groupsByNode.TryGetValue(group, out var control):
+                return control;
+
+            default:
+                return _tree;
+        }
+    }
+
+    private IEnumerable<PaneGroup> BarControls(DockZone edge)
+    {
+        var root = _root ?? Layout.Main;
+        if (root == null) yield break;
+
+        foreach (var node in root.Bars[edge])
+        {
+            if (_groupsByNode.TryGetValue(node, out var control)) yield return control;
+        }
+    }
+
+    // Copies the controls' lengths back into the model - when a DIVIDER DRAG ENDS and at no other time. Copying every
+    // layout pass let the view answer back: a freshly built control still carrying the default Star wrote it over a
+    // real size (measured: the console went from a 160px band to two thirds of the window after a tear-off).
     private void SyncLengthsToModel()
     {
-        // A folded group's length is Auto and belongs to the fold, not to anything the user dragged - copying it back
-        // would overwrite the size it is supposed to return to.
+        // A folded group's length is Auto and belongs to the fold, not to a drag - copying it back overwrites what it
+        // is supposed to return to.
         foreach (var pair in _groupsByNode)
         {
             if (pair.Key.OwnsLength) pair.Key.Length = PaneHost.GetPaneLength(pair.Value);
@@ -120,9 +239,7 @@ public class DockingArea : Panel
         foreach (var pair in _hostsByNode) pair.Key.Length = PaneHost.GetPaneLength(pair.Value);
     }
 
-    /// <summary>The pin button: puts a docked group away to its strip, or pins a folded one (from either folded state)
-    /// back into the layout. Like every other gesture this edits the MODEL and rebuilds - which state a panel is in is
-    /// part of a layout, and the layout is what gets saved.</summary>
+    /// <summary>The pin button: puts a docked group away to its strip, or pins a folded one back into the layout.</summary>
     internal void TogglePinned(PaneGroup group)
     {
         var node = NodeOf(group);
@@ -150,16 +267,12 @@ public class DockingArea : Panel
         if (node != null && Layout.HideGroup(node)) Rebuild();
     }
 
-    // Click-outside-to-put-away belongs to the FLYOUT now (a Popup with KeepOpen=false - see
-    // PaneGroup.OnFlyoutPropertyChanged). It used to be handled here by asking whether the press landed inside the group,
-    // and that stopped being the right question the moment the revealed body moved into the window's popup layer: a press
-    // on the panel's own content is then outside this group's subtree, so the panel would shut itself the instant it was
-    // used.
+    // Click-outside-to-put-away belongs to the FLYOUT (a Popup with KeepOpen=false, see PaneGroup): once the revealed
+    // body lives in the window's popup layer, "was the press inside this group" is no longer the right question.
 
-    // --- Closing: what it MEANS differs by pane -----------------------------------------------------------------------
-    // A document closed is gone - it was part of the session, and the file may not even exist next time. A tool closed is
-    // PUT AWAY: it is part of the workspace, and every editor brings it back from a menu. One button, two verbs, and the
-    // pane's own Kind is what says which - that is policy, and policy belongs to the pane (rule 1.5).
+    // --- Closing: what it MEANS differs by pane ---------------------------------------------------------------------
+    // A document closed is gone; a tool closed is PUT AWAY and comes back from a menu. One button, two verbs, and the
+    // pane's own Kind says which (rule 1.5).
 
     /// <summary>Where a put-away tool was standing, so it can be brought back to the same place.</summary>
     private readonly struct HiddenSpot
@@ -181,9 +294,14 @@ public class DockingArea : Panel
 
     private readonly Dictionary<string, HiddenSpot> _hidden = new();
 
-    /// <summary>Tools that have been put away and can be brought back. The application shows them in a "Windows" menu -
-    /// without such a list a closed tool is unreachable, which is why closing one may not simply delete it.</summary>
+    /// <summary>Tools put away and bringable back - what an application lists in a "Windows" menu. Without such a list
+    /// a closed tool is unreachable, which is why closing one does not delete it.</summary>
     public IReadOnlyCollection<string> HiddenPanes => Owner._hidden.Keys;
+
+    /// <summary>Raised after a pane has been closed. Anything keeping its own account of what is open (a navigation
+    /// region, a "Windows" menu) has to hear it, or a region still believing a closed pane open reuses its view model
+    /// on the next navigation and opens nothing.</summary>
+    public event EventHandler<PaneClosedEventArgs> PaneClosed;
 
     internal void ClosePane(Pane pane)
     {
@@ -192,7 +310,8 @@ public class DockingArea : Panel
         var group = Layout.FindGroup(id);
         if (group == null) return;
 
-        if (pane.Kind == PaneKind.Tool)
+        var isTool = pane.Kind == PaneKind.Tool;
+        if (isTool)
         {
             Owner._hidden[id] = new HiddenSpot(group, group.PaneIds.IndexOf(id), pane.Zone);
         }
@@ -204,6 +323,9 @@ public class DockingArea : Panel
 
         Layout.RemovePane(id);
         RebuildFamily();
+
+        // On the OWNER: a pane can be closed in any window of the layout, and listeners attached to the area.
+        Owner.PaneClosed?.Invoke(Owner, new PaneClosedEventArgs(id, isTool));
     }
 
     /// <summary>Brings a put-away tool back - to the group it was in, or, if that group has since died, to the zone its
@@ -225,13 +347,172 @@ public class DockingArea : Panel
         {
             var group = new PaneGroupNode();
             group.Add(paneId);
-            Layout.Split(RootContent, spot.Zone is DockZone.None or DockZone.Center ? DockZone.Right : spot.Zone, group);
+            Layout.DockBeside(RootContent, spot.Zone is DockZone.None or DockZone.Center ? DockZone.Right : spot.Zone,
+                group, PaneLength.Pixels(EdgeDockSize));
         }
 
         Layout.Normalize();
         RebuildFamily();
         return true;
     }
+
+    // --- Opening and closing panes from CODE ------------------------------------------------------------------------
+    // The same operations the gestures use, reachable by a view model - there is deliberately no second path in.
+
+    /// <summary>Puts a pane into the layout: the DOCUMENT WELL for <see cref="DockZone.Center"/>, the panel already on
+    /// that side otherwise, or a new one there. Returns the pane's id.</summary>
+    public string AddPane(Pane pane, DockZone zone = DockZone.Center)
+    {
+        if (pane == null) return null;
+
+        EnsureLayout();
+
+        var id = EnsureId(pane);
+        RegisterPane(id, pane);
+
+        // Already here: opening it again ACTIVATES it rather than making a second copy of the same thing.
+        if (Layout.FindGroup(id) is { } existing)
+        {
+            Activate(id);
+            return id;
+        }
+
+        // A pane that may not be docked cannot START docked: the group holding it inherits the refusal and becomes
+        // undockable itself (a group goes only where every pane in it may). It opens in a window of its own instead.
+        if (zone is DockZone.Floating || (pane.Allowed & (DockZone.Center | DockZone.Edges)) == 0)
+        {
+            FloatNew(id, pane.Header?.ToString() ?? "Panel");
+            return id;
+        }
+
+        // No room for a band down that side and no panel there to join: the well takes it. A place that always exists
+        // beats carving a sliver out of a centre already at its floor (rule 7.6).
+        if (zone is not DockZone.Center && (RoomFor() & zone) == 0
+            && Layout.GroupAt(_root ?? Layout.Main, zone) == null)
+        {
+            zone = DockZone.Center;
+        }
+
+        if (zone is DockZone.Center && Layout.DocumentWell is { } well)
+        {
+            well.Add(id);
+            well.ActiveIndex = well.PaneIds.Count - 1;
+        }
+        else if (Layout.GroupAt(_root ?? Layout.Main, zone) is { } side)
+        {
+            // That side already has a panel: this becomes a TAB in it. Opening from code cannot see what a new column
+            // would cost, and each one took its band off the centre until the layout was a row of slivers.
+            side.Add(id);
+            side.ActiveIndex = side.PaneIds.Count - 1;
+
+            // A panel that silently gains a tab nobody can see has opened nothing.
+            if (side.State == PaneGroupState.Collapsed) Layout.RevealGroup(side);
+        }
+        else
+        {
+            var group = new PaneGroupNode();
+            group.Add(id);
+
+            var target = RootContent;
+            if (target == null)
+            {
+                Layout.Main.Content = group;
+                Layout.DocumentWell ??= group;
+            }
+            else
+            {
+                // Aimed at the ROOT, so whichever side was docked LAST is the outer one - the layout's own history,
+                // and what Telerik does. A band, not half the area (rule 7.6).
+                Layout.DockBeside(target, zone is DockZone.Center or DockZone.None ? DockZone.Right : zone, group,
+                    PaneLength.Pixels(EdgeDockSize));
+            }
+
+            Layout.Normalize();
+        }
+
+        RebuildFamily();
+        return id;
+    }
+
+    /// <summary>Brings a pane to the front of whatever group it is in, revealing that group if it is put away.</summary>
+    public bool Activate(string paneId)
+    {
+        if (Layout.FindGroup(paneId) is not { } group) return false;
+
+        group.ActiveIndex = group.PaneIds.IndexOf(paneId);
+
+        // Shown, not pinned back: navigating to a tool is a glance at it, like clicking its tab on the strip.
+        if (group.State == PaneGroupState.Collapsed) Layout.RevealGroup(group);
+
+        RebuildFamily();
+        return true;
+    }
+
+    /// <summary>Takes a pane out of the layout entirely, by id. What a region removing a view model means.</summary>
+    public bool RemovePane(string paneId)
+    {
+        if (paneId == null || !Layout.RemovePane(paneId)) return false;
+
+        _panesById.Remove(paneId);
+        RebuildFamily();
+        return true;
+    }
+
+    // The one place a pane becomes known by id, and where the layout starts listening to it: Allowed is an ordinary
+    // property and can be set - or bound - at any moment, including while the pane sits docked.
+    private void RegisterPane(string id, Pane pane)
+    {
+        _panesById[id] = pane;
+
+        // Idempotent: the same pane is registered again on every rebuild that touches it.
+        pane.PropertyChanged -= Owner.OnPanePropertyChanged;
+        pane.PropertyChanged += Owner.OnPanePropertyChanged;
+    }
+
+    private void OnPanePropertyChanged(object sender, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (e.Property != Pane.AllowedProperty || sender is not Pane pane) return;
+        if ((pane.Allowed & (DockZone.Center | DockZone.Edges)) != 0) return;   // still dockable somewhere
+        if (pane.Id == null || Layout.FindGroup(pane.Id) == null) return;       // not in the tree: nothing to undo
+
+        // Just said it may not be docked, and it IS docked - so out, the same answer markup and AddPane give. Left
+        // alone it would make its whole panel undockable: pullable out, never puttable back.
+        var id = pane.Id;
+        if (!Layout.RemovePane(id)) return;
+
+        System.Console.WriteLine($"[DockingArea] '{pane.Header}' is now allowed to float and nothing else, so it cannot " +
+                                 "stay docked - moving it to a window of its own.");
+
+        RebuildFamily();
+        FloatNew(id, pane.Header?.ToString() ?? "Panel");
+    }
+
+    /// <summary>The pane a given id stands for, or null.</summary>
+    public Pane PaneById(string paneId)
+    {
+        return paneId != null && _panesById.TryGetValue(paneId, out var pane) ? pane : null;
+    }
+
+    /// <summary>Every pane the layout holds, in tree order - across floating windows too, since they are roots of the
+    /// same forest.</summary>
+    public IEnumerable<Pane> Panes
+    {
+        get
+        {
+            foreach (var root in Layout.Roots)
+            {
+                foreach (var id in DockingLayout.PanesIn(root.Content))
+                {
+                    if (_panesById.TryGetValue(id, out var pane)) yield return pane;
+                }
+            }
+        }
+    }
+
+    /// <summary>Raised when the pane shown in the document well changes - what a region calls its current view.</summary>
+    public event EventHandler ActivePaneChanged;
+
+    internal void RaiseActivePaneChanged() => ActivePaneChanged?.Invoke(this, EventArgs.Empty);
 
     /// <summary>The model node a group control stands for.</summary>
     private PaneGroupNode NodeOf(PaneGroup group)
@@ -247,12 +528,13 @@ public class DockingArea : Panel
     /// <summary>Regenerates the visual tree from the model. Every change to the layout ends here.</summary>
     public void Rebuild()
     {
-        // Take the LEAVERS out of every group first: a pane is one control and can only be in one group, so a group
-        // must not still be holding a pane another is about to receive.
-        // Removed one by one, never with Clear(). Clear() raises a Reset, and on a Reset the items control rebuilds its
-        // items panel wholesale - the tabs then go into a brand-new panel while the visual tree carries on arranging
-        // the old one. Measured by object identity: the arranged panel (#66552671, two tabs) was never the panel the
-        // group reported holding three.
+        // A tool docking beside the well is worth the same band an edge anchor takes - one number, so a drop makes the
+        // band its preview drew.
+        Layout.BandLength = PaneLength.Pixels(EdgeDockSize);
+
+        // LEAVERS out of every group first: a pane is one control and lives in one group.
+        // One by one, never Clear(): a Reset rebuilds the items panel wholesale, so the tabs go into a brand-new panel
+        // while the visual tree carries on arranging the old one (measured by object identity).
         foreach (var pair in _groupsByNode)
         {
             var items = pair.Value.Items;
@@ -264,29 +546,46 @@ public class DockingArea : Panel
 
         var visual = BuildVisual(RootContent);
 
-        // Only swap the top of the tree when it actually changed; an unchanged root must not be torn down and rebuilt.
-        var current = Children.Count == 1 ? Children[0] : null;
-        if (!ReferenceEquals(current, visual))
+        // The children are the TREE plus the put-away panels of the four edges. Rebuilt as one list, because a panel
+        // moves between the two by being put away or pinned, and the two must never both hold it.
+        var wanted = new List<IMeasurableComponent>();
+        if (visual != null) wanted.Add(visual);
+
+        var root = _root ?? Layout.Main;
+        if (root != null)
+        {
+            foreach (var bar in root.Bars)
+            {
+                foreach (var node in bar.Value)
+                {
+                    if (node.IsEmpty) continue;
+
+                    var strip = GroupFor(node);
+                    FillPanes(strip, node);
+                    strip.State = node.State;
+                    strip.Edge = bar.Key;
+                    strip.Kind = PaneKind.Tool;
+                    strip.RevealExtent = FlyoutExtent(node);
+                    wanted.Add(strip);
+                }
+            }
+        }
+
+        _tree = visual;
+
+        // Only touch the children when they actually differ - an unchanged area must not be torn down and rebuilt.
+        if (!SameChildren(Children, wanted))
         {
             Children.Clear();
-            if (visual != null) Children.Add(visual);
+            foreach (var child in wanted) Children.Add(child);
         }
 
         Prune();
 
-        // Invalidate the groups AFTER the tree is back together. The panel does mark itself when a child is added, but
-        // FillPanes runs while this subtree is detached, and a dirty mark raised then is lost - the dirty queue belongs
-        // to the visual root, and re-attaching does not re-register anything.
-        // Measured: three tabs, all in the panel's children, all visible, desired widths 52/64/52 - laid out at 0/0/52,
-        // which is the arrangement of the TWO tabs the panel had when it was last measured.
-        // The STRIP PANEL as well as the group. Invalidating only the group is not enough: the group re-arranges, but
-        // its size has not changed, so the pass never descends into a panel that is not itself marked - and that panel
-        // is exactly the thing holding the new tab. Measured: the group's own ArrangeOverride ran while the third tab
-        // kept the bounds of its previous life.
-        // And the TABS themselves, for the same reason one level down: a fold changes each pane's label rotation, which
-        // changes its header template and so its own size - and that mark is raised while the pane is detached, so it is
-        // lost exactly like the panel's was. Measured: in a folded column of three, only the last tab carried the turned
-        // footprint (41x70); the first two kept the 78x29 they had lying flat and the three drew on top of each other.
+        // Invalidate AFTER the tree is back together: FillPanes runs while this subtree is detached, and a dirty mark
+        // raised then is lost - the dirty queue belongs to the visual root and re-attaching re-registers nothing.
+        // Three levels, each measured: the GROUP; its STRIP PANEL (an unmarked panel is never descended into, so a new
+        // tab kept the bounds of its previous life); and the TABS (a fold changes each label's rotation and size).
         foreach (var group in _groupsByNode.Values)
         {
             group.InvalidateMeasure();
@@ -300,18 +599,13 @@ public class DockingArea : Panel
 
         InvalidateMeasure();
 
-        // Every model change ends here, so this is the one place where "is anything revealed?" is always true or false
-        // for the whole area - hooking it at each gesture instead left a reveal made by any other route undismissable.
         SyncWindowTitle();
     }
 
-    /// <summary>The group whose name the floating window is currently wearing, so it can be let go of when another takes
-    /// over.</summary>
-    private PaneGroup _titleSource;
+    private PaneGroup _titleSource;   // the group whose name the floating window wears, so it can be let go of
 
-    /// <summary>A floating window showing ONE panel is named by that panel - the panel has given up its own caption for
-    /// exactly this, so the title bar is now the only thing saying which it is. It follows the ACTIVE tab: with several
-    /// panes in the group, a title fixed at the tear-off would name whichever happened to be showing then.</summary>
+    // A floating window showing ONE panel is named by it - the panel gave up its own caption for exactly this. Follows
+    // the ACTIVE tab: a title fixed at the tear-off would name whichever pane happened to be showing then.
     private void SyncWindowTitle()
     {
         if (_window == null) return;
@@ -338,35 +632,24 @@ public class DockingArea : Panel
     private readonly DockCompass _compass = new();
     private DockCompassWindow _compassWindow;
 
-    /// <summary>Whether the overlay is up. It covers the WHOLE area and is shown for as long as the pointer is inside
-    /// it, so this is the only thing that ever changes about it during a drag.</summary>
     private bool _overlayShown;
 
-    /// <summary>The compass shown during a docking drag. Exposed so a theme can style it - it is a control, not an
-    /// internal drawing.</summary>
+    /// <summary>The compass shown during a docking drag - a control, so a theme can style it.</summary>
     public DockCompass Compass => _compass;
 
     private DockTarget _target;
 
-    /// <summary>Builds the two overlay windows, once, WITHOUT showing them. Constructed here, on the UI thread, while it
-    /// is still ours - the drag that uses them runs inside the platform's move loop, which owns that thread.
-    /// <para>Deliberately not shown-then-hidden to "warm them up": that leaves two full-size windows on screen for as
-    /// long as it takes the hide to land, which is exactly long enough to see.</para></summary>
-    /// <summary>Puts the overlay window over the WHOLE area and shows it. Everything the gesture draws lives inside as
-    /// ordinary controls, in the area's own coordinates.
-    /// <para>One window for the area, not one per group: it is put up when the pointer enters and taken down when it
-    /// leaves, and in between it neither moves nor resizes. A window sized to the aimed-at GROUP had to be moved and
-    /// resized mid-gesture, which raced the compass laid out inside it - and it also made the area's own edges
-    /// unreachable, so there was nowhere to put an edge anchor.</para></summary>
+    // The overlay covers the WHOLE area, one window for all of it: put up when the pointer enters, taken down when it
+    // leaves, and in between it neither moves nor resizes. Sized to the aimed-at GROUP instead, it raced the compass
+    // laid out inside it and left the area's own edges unreachable, so an edge anchor had nowhere to go.
     private void ShowOverlay()
     {
-        // Position PHYSICAL (a desktop point, like PointToScreen answers), size LOGICAL - see WindowBase.Left for why
-        // those two differ.
+        // Position PHYSICAL (a desktop point), size LOGICAL - see WindowBase.Left.
         var origin = this.PointToScreen(Vector2.Zero);
         var bounds = new Rect(0, 0, RenderSize.Width, RenderSize.Height);
 
-        // Built at its FULL size, before Show. A window sized after creation was never laid out at all - measured:
-        // DockCompass.ArrangeOverride ran zero times across a whole drag while the window was placed nine times.
+        // Built at FULL size before Show: a window sized after creation was never laid out at all (measured -
+        // DockCompass.ArrangeOverride ran zero times across a whole drag).
         _compassWindow ??= new DockCompassWindow
         {
             Content = _compass,
@@ -395,13 +678,14 @@ public class DockingArea : Panel
 
     private void HideOverlay() => _compassWindow?.Hide();
 
-    /// <summary>What the thing currently being dragged is allowed to do. Read once when its window is put up, because it
-    /// cannot change during the drag - and asking it per mouse move would walk the tree hundreds of times a second.</summary>
+    // What the current drag may do, read once per DRAG - asking per mouse move would walk the tree hundreds of times a
+    // second - and re-read when a DIFFERENT window is picked up: a floating window can be grabbed by its caption at any
+    // time, well away from the code that reads permissions, and a float-only panel was then judged by the last drag's.
     private DockZone _dragAllowed = DockZone.All;
+    private WindowBase _draggedWindow;
 
     /// <summary>Where a node may be docked: what EVERY pane in it allows. One pane forbidding a side forbids it for the
-    /// panel - dropping the group would put that pane there too, and a permission that is ignored when the pane travels
-    /// with company is not a permission.</summary>
+    /// panel - dropping the group would put that pane there too.</summary>
     private DockZone AllowedFor(PaneNode node)
     {
         var allowed = DockZone.All;
@@ -426,15 +710,12 @@ public class DockingArea : Panel
 
         foreach (var pair in _groupsByNode)
         {
-            // A PUT-AWAY panel is not a place to drop into: all that is left of it is a strip of buttons, and there is no
-            // body there to be tabbed into or split. Worse, those strips sit along the edges - exactly where the real
-            // panel behind them is being aimed at - so a cross drawn on the strip lands on top of the cross of the panel
-            // it covers, and neither of them says any more where the drop would go.
+            // A PUT-AWAY panel is no place to drop into: only its strip is left, and those strips sit exactly where the
+            // real panel behind them is being aimed at, so both crosses would land on top of each other (rule 2.6).
             if (pair.Key.State == PaneGroupState.Collapsed) continue;
 
             var group = pair.Value;
-            // Physical difference back to LOGICAL, to be in the same units as the point and the group's own size.
-            var at = (group.PointToScreen(Vector2.Zero) - origin) / scale;
+            var at = (group.PointToScreen(Vector2.Zero) - origin) / scale;   // physical back to LOGICAL
             var size = group.RenderSize;
             if (point.X < at.X || point.Y < at.Y || point.X > at.X + size.Width || point.Y > at.Y + size.Height) continue;
 
@@ -443,34 +724,42 @@ public class DockingArea : Panel
             break;
         }
 
-        // The EDGE anchors first. They belong to the AREA and sit at its sides, the cross belongs to whichever group is
-        // under the pointer - and where the two could overlap, the edge is the more specific answer. An edge drop is
-        // aimed at the ROOT, which is what makes it span the whole side; it is the same move, not another kind.
-        // Asked of the area rather than from inside the group loop: the edges are exactly where the put-away strips are,
-        // so tying the anchors to "found a group under the pointer" made the area's own edge unreachable behind one.
+        // EDGE anchors first: they belong to the AREA and win where they could overlap a group's cross. Asked of the
+        // area, not from inside the group loop - the edges are where the put-away strips are, and tying anchors to
+        // "found a group here" hid the area's own edge behind one. Offered only while the centre can pay (rule 7.6).
         var edge = DockCompass.EdgeZoneAt(area, point, _compass.IndicatorSize, _compass.EdgeIndicatorInset);
-        if (edge != DockZone.None && (allowed & edge) != 0)
-            return new DockTarget(RootContent, bounds, edge,
+        if (edge != DockZone.None && (allowed & edge) != 0 && (RoomFor() & edge) != 0)
+        {
+            // A SIDE anchor splits the whole root; a TOP/BOTTOM band splits the centre column only, so it does not run
+            // under the sides (rule 2.3).
+            var anchor = edge is DockZone.Top or DockZone.Bottom
+                ? Layout.BandTarget(_root ?? Layout.Main)
+                : RootContent;
+
+            return new DockTarget(anchor, bounds, edge,
                 DockCompass.PreviewOf(area, edge, EdgeDockSize), isEdge: true);
+        }
 
         if (node == null) return default;
 
         var zone = DockCompass.ZoneAt(bounds, point, _compass.IndicatorSize, _compass.IndicatorGap);
 
-        // A zone the panes forbid arms nothing: the indicator does not light up and the drop does nothing, because
-        // DockTarget is only valid with a zone. A permission that merely un-does the move AFTER it happened would
-        // show the user a landing that is not going to be honoured.
+        // A forbidden zone arms nothing - DockTarget is only valid with a zone - so no indicator promises a landing
+        // that would then be undone.
         if ((allowed & zone) == 0) zone = DockZone.None;
+
+        // Splitting the CENTRE costs the centre; splitting a tool panel costs that panel, which the centre's floor has
+        // no say in. Asking the floor about both left a panel undroppable beside ANY panel once the centre was at its
+        // minimum.
+        if (ReferenceEquals(node, Layout.DocumentWell) && (RoomFor() & zone) == 0) zone = DockZone.None;
 
         return new DockTarget(node, bounds, zone, DockCompass.PreviewOf(bounds, zone));
     }
 
-    // --- Asking the application ----------------------------------------------------------------------------------------
-    // The control SPARES the application from having to fight it: rather than reaching inside to intercept, it says "no"
-    // here and the gesture ends as if it had never crossed its threshold. Two events, not one, because refusing a move
-    // inside the window and refusing a window of its own are different statements about a pane.
-    // Raised on the ACTION, never per mouse move: what an application does in a handler is its own business, and a
-    // question asked hundreds of times a second is not one anybody can answer honestly.
+    // --- Asking the application -------------------------------------------------------------------------------------
+    // Two events, not one: refusing a move inside the window and refusing a window of its own are different statements
+    // about a pane. Raised on the ACTION, never per mouse move - a question asked hundreds of times a second is not one
+    // anybody can answer honestly.
 
     /// <summary>Raised before panes are docked somewhere. Cancel to refuse the move.</summary>
     public event EventHandler<PaneDockingEventArgs> PaneDocking;
@@ -478,9 +767,8 @@ public class DockingArea : Panel
     /// <summary>Raised before panes leave for a window of their own. Cancel to refuse the tear-off.</summary>
     public event EventHandler<PaneTearingOffEventArgs> PaneTearingOff;
 
-    /// <summary>Asks the application, on the OWNER, and answers whether it said no. On the owner because a floating area
-    /// is the same docking system in another window - an application wires one set of handlers, not one per window it
-    /// never asked to be opened.</summary>
+    // Asked on the OWNER: a floating area is the same docking system in another window, and an application wires one
+    // set of handlers, not one per window it never asked to be opened.
     private bool Refuses(PaneDockingEventArgs args)
     {
         Owner.PaneDocking?.Invoke(Owner, args);
@@ -493,18 +781,23 @@ public class DockingArea : Panel
         return args.Cancel;
     }
 
-    /// <summary>
-    /// A pane was dragged clear of this area: it becomes a window of its own. Owned HERE rather than left to the
-    /// application, because a floating pane is not a loose window that happens to hold a panel - it is another ROOT of
-    /// this same layout, and the layout is what has to know about it in order to save it or dock it back.
-    /// </summary>
+    /// <summary>A pane dragged clear of this area becomes a window of its own - another ROOT of this same layout, which
+    /// is what lets it be saved and docked back.</summary>
     internal bool TearOff(Pane pane, TabTearOffEventArgs e)
     {
-        // A pane that is not allowed to float does not tear off at all: the strip keeps it and goes on reordering, which
-        // is exactly what happened before anybody listened to the event.
+        // Not allowed to float: the strip keeps it and goes on reordering.
         if (pane == null || (pane.Allowed & DockZone.Floating) == 0) return false;
         if (pane.Id == null) return false;
         if (Refuses(new PaneTearingOffEventArgs([pane.Id], isWholePanel: false))) return false;
+
+        // A REVEALED panel is put away first: the glance is over the moment something is carried off it.
+        if (Layout.FindGroup(pane.Id) is { State: PaneGroupState.Revealed } showing) Layout.HideGroup(showing);
+
+        // What the panel it is leaving occupies, read while it still has a size: the window opens at exactly that.
+        var was = Layout.FindGroup(pane.Id) is { } home && _groupsByNode.TryGetValue(home, out var homeControl)
+            ? homeControl.RenderSize
+            : default;
+
         if (!Layout.RemovePane(pane.Id)) return false;
 
         var node = new PaneGroupNode();
@@ -512,20 +805,16 @@ public class DockingArea : Panel
         var root = new DockingRoot(node, isMain: false);
         Layout.Roots.Add(root);
 
-        // How far along its own tab the pointer took hold. Read BEFORE the rebuild, while the tab is still in the tree
-        // and has a position at all - the window is then placed so the pointer keeps that same grip on its caption,
-        // instead of jumping to the middle of a window it never grabbed there.
+        // How far along its tab the pointer took hold, read BEFORE the rebuild - the window is then placed so the grip
+        // on its caption is the same one, instead of jumping to the middle of a window nobody grabbed there.
         var grabX = e.ScreenPosition.X - pane.PointToScreen(Vector2.Zero).X;
 
-        // This area first: the pane must leave the tree it is in before the floating area claims it, or one component
-        // would have two parents for as long as it took the window to appear.
-        Rebuild();
+        Rebuild();   // the pane leaves this tree before the floating area claims it: one component, one parent
 
-        var floating = Float(root, pane.Header?.ToString() ?? "Pane", out var pieceWindow);
+        var floating = Float(root, pane.Header?.ToString() ?? "Pane", out var pieceWindow, was);
         Show(floating, pieceWindow, grabX);
 
-        // The pane may have been the LAST one in a floating window - that window has nothing left to show and goes.
-        Owner.CloseEmptyWindows();
+        Owner.CloseEmptyWindows();   // it may have been the last pane of a floating window
 
         e.TornWindow = pieceWindow;
         return true;
@@ -546,13 +835,16 @@ public class DockingArea : Panel
         var title = control.Title?.ToString() ?? "Panel";
         var grabX = screenPosition.X - control.PointToScreen(Vector2.Zero).X;
 
+        // The panel keeps the size it was docked at - read before it leaves the tree.
+        var was = control.RenderSize;
+
         var root = Layout.TearOffGroup(node);
         if (root == null) return false;
 
-        var area = Float(root, title, out var window);
+        var area = Float(root, title, out var window, was);
 
-        // The group CONTROL travels with its node, so the panel keeps its tabs, its selection and its scroll position -
-        // and its panes never have to be taken out of one items panel and put into another.
+        // The group CONTROL travels with its node: the panel keeps its tabs, selection and scroll, and its panes are
+        // never moved between two items panels.
         _groupsByNode.Remove(node, out var moved);
         if (moved != null)
         {
@@ -565,93 +857,180 @@ public class DockingArea : Panel
         return true;
     }
 
-    /// <summary>Opens a floating window for a root of this layout, showing it through an AREA of its own.</summary>
-    private DockingArea Float(DockingRoot root, string title, out Window window)
+    // Opens a floating window for a root, shown through an AREA of its own. size = what the panel occupied where it
+    // came from, so the tear-off feels like picking that panel up; zero falls back to the authored default.
+    private DockingArea Float(DockingRoot root, string title, out DockingWindow window, Size size = default)
     {
         var area = new DockingArea(Owner, root);
         Owner._satellites.Add(area);
 
-        window = new Window
+        // A DockingWindow, not a bare Window: what a floating panel's window looks like belongs in one selector.
+        window = new DockingWindow
         {
             Title = title,
-            ClientWidth = 480,
-            ClientHeight = 360
+            ClientWidth = size.Width > 0 ? size.Width : FloatingWindowWidth,
+            ClientHeight = size.Height > 0 ? size.Height : FloatingWindowHeight,
+            Area = area
         };
+
+        // Closed by its own button, the window takes its panes with it - otherwise they stay in the MODEL with no
+        // window to show them, and navigating to one activates a pane that is nowhere on screen.
+        window.Closed += (_, _) => CloseRoot(root);
 
         area._window = window;
         return area;
     }
 
-    /// <summary>Puts the floating window on screen under the pointer and hands the still-held button to the platform's
-    /// own move loop. <paramref name="grabX"/> is how far along the caption the pointer took hold.</summary>
-    private void Show(DockingArea area, Window window, double grabX)
+    // Closes everything a floating root holds and drops the root. Each pane closes as it would on its own button, so
+    // closing the window and closing its panes one by one are the same statement to everything that listens.
+    private void CloseRoot(DockingRoot root)
     {
-        var root = area._root;
+        if (root == null || !Layout.Roots.Contains(root)) return;
 
-        // What the travelling panes permit, read once: it cannot change while the drag runs, and asking per mouse move
-        // would walk the tree hundreds of times a second. Kept on the OWNER, because the drag is aimed at every area of
-        // the family and any of them may be the one that answers.
-        Owner._dragAllowed = AllowedFor(root.Content);
+        // Collected BEFORE anything closes - closing a pane edits the tree this walks. Edge bars count: a put-away
+        // panel is still in that window, just folded to its strip (rule 3b).
+        var ids = new List<string>(DockingLayout.PanesIn(root.Content));
+        foreach (var bar in root.Bars.Values)
+        {
+            foreach (var group in bar) ids.AddRange(group.PaneIds);
+        }
 
-        // Showing a window belongs to the UI thread while the gesture runs on the loop thread, where the visual tree
-        // lives. InvokeAsync, not Invoke: blocking into the pump would stall the very frame the drag is still in.
+        foreach (var id in ids)
+        {
+            if (_panesById.TryGetValue(id, out var pane)) ClosePane(pane);
+        }
+
+        Layout.Roots.Remove(root);
+        RebuildFamily();
+    }
+
+    // A pane opened in a window of its OWN with no gesture behind it - DockZone.Floating from code. Same window, wiring
+    // and root a tear-off makes, so it can be dragged back in; it is placed rather than grabbed.
+    private void FloatNew(string id, string title)
+    {
+        var group = new PaneGroupNode();
+        group.Add(id);
+        group.ActiveIndex = 0;
+
+        var root = new DockingRoot(group, isMain: false);
+        Layout.Roots.Add(root);
+
+        var area = Float(root, title, out var window);
+
         UIAppContext.Current.Dispatcher.InvokeAsync(() =>
         {
-            // The window holds an AREA, not the bare content: that is the whole reason a floating panel can be docked
-            // INTO. It is a docking area with its own root, its own tab strip and its own compass, so a tab dragged out
-            // of any other window can land in it.
             window.Content = area;
             window.Show();
             area.Rebuild();
 
-            // Nothing is aimed at yet. Clearing the AREA rather than just this flag: after the family was introduced the
-            // compass that is up may belong to another window, and dropping the flag alone would leave it on screen.
+            // Off the area's corner and cascaded, so two of them do not stack exactly. Physical pixels: a window's
+            // position is a desktop point.
+            var origin = this.PointToScreen(Vector2.Zero);
+            var step = 32 * Owner._satellites.Count;
+            window.Left = origin.X + 60 + step;
+            window.Top = origin.Y + 60 + step;
+
+            // Without this it would be a window that can never come back: dragged by its caption it aims and docks.
+            window.WindowMoving += (_, _) => TrackWindow(window, root);
+            window.WindowMoveCompleted += (_, _) => DropWindow(window, root);
+        });
+
+        RebuildFamily();
+    }
+
+    /// <summary>How big a floating window starts when the pane has no size to inherit - one opened from code, never
+    /// laid out anywhere. A tear-off uses what the panel occupied instead.</summary>
+    public static readonly AdamantiumProperty FloatingWindowWidthProperty = AdamantiumProperty.Register(
+        nameof(FloatingWindowWidth), typeof(double), typeof(DockingArea), new PropertyMetadata(480.0));
+
+    public double FloatingWindowWidth
+    {
+        get => GetValue<double>(FloatingWindowWidthProperty);
+        set => SetValue(FloatingWindowWidthProperty, value);
+    }
+
+    public static readonly AdamantiumProperty FloatingWindowHeightProperty = AdamantiumProperty.Register(
+        nameof(FloatingWindowHeight), typeof(double), typeof(DockingArea), new PropertyMetadata(360.0));
+
+    public double FloatingWindowHeight
+    {
+        get => GetValue<double>(FloatingWindowHeightProperty);
+        set => SetValue(FloatingWindowHeightProperty, value);
+    }
+
+    // Puts the floating window under the pointer and hands the still-held button to the platform's move loop. grabX is
+    // how far along the caption the pointer took hold.
+    private void Show(DockingArea area, DockingWindow window, double grabX)
+    {
+        var root = area._root;
+
+        // Read once per drag, and kept on the OWNER: the drag is aimed at every area of the family.
+        Owner._dragAllowed = AllowedFor(root.Content);
+
+        // Showing a window is UI-thread work while the gesture runs on the loop thread. InvokeAsync, not Invoke:
+        // blocking into the pump would stall the very frame the drag is in.
+        UIAppContext.Current.Dispatcher.InvokeAsync(() =>
+        {
+            // The window holds an AREA, not the bare content - that is why a floating panel can be docked INTO: it has
+            // its own root, tab strip and compass.
+            window.Content = area;
+            window.Show();
+            area.Rebuild();
+
+            // Clearing the AREA, not just the flag: the compass that is up may belong to another window.
             _targetArea?.ClearAim();
             _targetArea = null;
 
-            // The cursor is read HERE, live: it has moved on since the threshold was crossed, and aiming at where it
-            // WAS is what puts the caption out from under the pointer.
-            // Both sides PHYSICAL: the cursor is a desktop point and so is a window's position (see WindowBase.Left).
-            // The caption height is logical, so it - and only it - is converted.
+            // The cursor is read HERE, live - it has moved on since the threshold was crossed. Both sides PHYSICAL (see
+            // WindowBase.Left); the caption height is logical, so only it is converted.
             var cursor = Mouse.ScreenCoordinates;
             window.Left = cursor.X - grabX;
             window.Top = cursor.Y - window.TitleBarHeight * DpiScale.Y / 2;
 
-            window.WindowMoving += (_, _) => TrackWindow(window);
+            window.WindowMoving += (_, _) => TrackWindow(window, root);
             window.WindowMoveCompleted += (_, _) => DropWindow(window, root);
 
-            // Hand the still-held button to the platform's own move loop, so the window rides under the cursor with
-            // Aero Snap intact instead of a position recomputed per mouse event.
+            // The platform's own move loop: the window rides under the cursor with Aero Snap intact.
             window.DragMove();
         });
     }
 
-    /// <summary>Where the pointer is, in this area's coordinates, while a floating window is being dragged.
-    /// <para>Taken from the MOUSE, not from the window's position. Measured: during the platform's move loop
-    /// <c>WindowMoving</c> fires for every step, but the window's own Left/Top stay at the value they had when the loop
-    /// started - 813 events, one unchanging position - while the screen cursor tracks perfectly. Deriving the pointer
-    /// from the window is what froze the compass where the drag began.</para></summary>
+    // Where the pointer is, in this area's coordinates, during a window drag. From the MOUSE, not the window: measured,
+    // WindowMoving fires per step while the window's own Left/Top stay where the loop started (813 events, one
+    // position), which froze the compass at the start of the drag.
+    // PHYSICAL to LOGICAL once, here at the boundary - the two are equal only at 100%, and on a scaled display the
+    // difference is why the compass could not be aimed at all on 4K.
     private Vector2 PointerIn()
     {
-        // Screen coordinates are PHYSICAL pixels and so is what PointToScreen answers, while everything this area
-        // measures itself in - RenderSize, a group's bounds, the compass geometry - is LOGICAL. They are the same number
-        // only at 100%; on a scaled display the difference put the pointer nowhere near where it actually was, which is
-        // why the compass could not be aimed at all on a 4K monitor. Divide once, here, at the boundary.
         return (Mouse.ScreenCoordinates - this.PointToScreen(Vector2.Zero)) / DpiScale;
     }
 
-    /// <summary>Physical pixels per logical unit for the window this area is in. One when it has no window yet (nothing
-    /// to convert against) or on an unscaled display.</summary>
     private Vector2 DpiScale => RootVisual is IWindow window ? window.DpiScale : Vector2.One;
 
-    /// <summary>Which area of the family the pointer is over, and what a drop there would do. EVERY area is asked, not
-    /// just this one - that is what lets a panel be dropped into a floating window as well as into the main one, and it
-    /// is the same question in each of them because they are areas of the same layout.</summary>
-    private void TrackWindow(WindowBase window)
+    // Which area of the family the pointer is over, and what a drop there would do. EVERY area is asked: that is what
+    // lets a panel be dropped into a floating window as well as into the main one.
+    private void TrackWindow(WindowBase window, DockingRoot root)
     {
         DockingArea hit = null;
         var target = default(DockTarget);
         var point = Vector2.Zero;
+
+        // First move of THIS window: read what its panes permit. Once per drag, not per move.
+        if (!ReferenceEquals(Owner._draggedWindow, window))
+        {
+            Owner._draggedWindow = window;
+            Owner._dragAllowed = AllowedFor(root.Content);
+        }
+
+        // Nowhere to dock AT ALL (a float-only pane): no compass anywhere. A cross whose every petal then declines
+        // reads as a broken control rather than as a rule.
+        if ((Owner._dragAllowed & (DockZone.Center | DockZone.Edges)) == 0)
+        {
+            _targetArea?.ClearAim();
+            _targetArea = null;
+            _target = default;
+            return;
+        }
 
         foreach (var area in Family)
         {
@@ -681,6 +1060,7 @@ public class DockingArea : Panel
 
         _target = target;
         hit?.Aim(target);
+        SpringLoad(hit, target, point);
 
         if (LogDocking)
         {
@@ -690,27 +1070,124 @@ public class DockingArea : Panel
         }
     }
 
-    /// <summary>The area currently aimed at, which is the one whose compass is up. Held by the area DRIVING the drag.</summary>
-    private DockingArea _targetArea;
+    private DockingArea _targetArea;   // the area whose compass is up; held by the area DRIVING the drag
 
-    /// <summary>Puts this area's compass up (once) and points it at the target. The bounds are in this area's own
-    /// coordinates, which are the compass's own: it covers the whole area.</summary>
+    // --- Spring loading --------------------------------------------------------------------------------------------
+    // Dwelling over someone else's TAB brings that pane forward, so its body can be dropped into. Without it a pane can
+    // only be dropped into whatever happened to be showing when the drag started.
+
+    private Pane _springTarget;
+    private System.DateTime _springSince;
+
+    /// <summary>How long a drag must dwell over a tab before it is brought forward, in ms. A delay, not an instant
+    /// swap: a drag CROSSES the strip on its way to the compass, and the layout would flicker through every pane.</summary>
+    public static readonly AdamantiumProperty SpringLoadDelayProperty = AdamantiumProperty.Register(
+        nameof(SpringLoadDelay), typeof(double), typeof(DockingArea), new PropertyMetadata(600.0));
+
+    public double SpringLoadDelay
+    {
+        get => GetValue<double>(SpringLoadDelayProperty);
+        set => SetValue(SpringLoadDelayProperty, value);
+    }
+
+    private void SpringLoad(DockingArea area, DockTarget target, Vector2 point)
+    {
+        PaneGroup group = null;
+        if (area != null && target.Node is PaneGroupNode node) area._groupsByNode.TryGetValue(node, out group);
+
+        // A dragged window pans a strip exactly as a dragged TAB does, or a pane scrolled out of sight is unreachable.
+        if (group != null) area.AutoScrollStrip(group, point);
+
+        var pane = group != null ? area.PaneAt(group, point) : null;
+
+        // Moved to a different tab (or off the strip): the clock starts again. Dwelling is about ONE tab.
+        if (!ReferenceEquals(pane, _springTarget))
+        {
+            _springTarget = pane;
+            _springSince = System.DateTime.UtcNow;
+            return;
+        }
+
+        if (pane == null || pane.IsSelected) return;
+        if ((System.DateTime.UtcNow - _springSince).TotalMilliseconds < Owner.SpringLoadDelay) return;
+
+        pane.SpringLoad();
+
+        // Restart the clock, don't clear the target: the pointer is still over this tab, and it would otherwise be
+        // re-activated on every move for as long as it stayed there.
+        _springSince = System.DateTime.UtcNow;
+    }
+
+    // Pans a group's strip when the drag is held near its edge. The rule lives in the strip - a dragged tab and a
+    // dragged window must feel the same.
+    private void AutoScrollStrip(PaneGroup group, Vector2 point)
+    {
+        if (group.GetTemplateChild("PART_TabStrip") is not TabStripScroller strip) return;
+
+        var at = (strip.PointToScreen(Vector2.Zero) - this.PointToScreen(Vector2.Zero)) / DpiScale;
+        var along = strip.Orientation == Orientation.Vertical ? point.Y - at.Y : point.X - at.X;
+
+        strip.PanNear(along, strip.AutoScrollMargin, strip.AutoScrollRate);
+    }
+
+    // The pane whose TAB is under a point, in this area's coordinates - or null between tabs.
+    private Pane PaneAt(PaneGroup group, Vector2 point)
+    {
+        var origin = this.PointToScreen(Vector2.Zero);
+        var scale = DpiScale;
+
+        for (var i = 0; i < group.Items.Count; i++)
+        {
+            if (group.ItemContainerGenerator.ContainerFromIndex(i) is not Pane pane) continue;
+            if (pane.Visibility != Visibility.Visible) continue;
+
+            var at = (pane.PointToScreen(Vector2.Zero) - origin) / scale;
+            var size = pane.RenderSize;
+            if (point.X < at.X || point.Y < at.Y || point.X > at.X + size.Width || point.Y > at.Y + size.Height) continue;
+
+            return pane;
+        }
+
+        return null;
+    }
+
+    // Puts this area's compass up (once) and points it at the target, in the area's own coordinates.
     private void Aim(DockTarget target)
     {
-        // The window covers the area, so it is touched only when the pointer crosses in or out of it - and touching a
-        // window is UI-thread work while this runs on the LOOP thread (WindowMoving arrives through LoopSignal.Drain,
-        // not from the message pump: measured, every Show from here threw a DispatcherException).
+        // Touched only when the pointer crosses in or out: showing a window is UI-thread work while this runs on the
+        // LOOP thread (measured - every Show from here threw a DispatcherException).
         if (!_overlayShown)
         {
             _overlayShown = true;
             UIAppContext.Current.Dispatcher.InvokeAsync(ShowOverlay);
         }
 
-        // Only the zones these panes may actually land in are drawn. An indicator is a promise that dropping there does
-        // something, so one that quietly declines is worse than none: you aim at it, nothing happens, and a refusal is
-        // indistinguishable from a missed target.
-        _compass.AllowedZones = Owner._dragAllowed;
+        // The same answers Resolve arms the drop with, so no indicator promises what a drop then declines. The floor
+        // speaks only for what the CENTRE pays: every edge anchor, and a side of the centre itself.
+        var room = RoomFor();
+        _compass.AllowedZones = Owner._dragAllowed
+            & (ReferenceEquals(target.Node, Layout.DocumentWell) ? room : DockZone.All);
+        _compass.AllowedEdgeZones = Owner._dragAllowed & room;
         _compass.AimAt(target.Bounds, target.Zone, target.IsEdge, EdgeDockSize);
+    }
+
+    // Which zones there is still ROOM for: a side is not offered once it would push the centre under DocumentMinSize
+    // (rule 7.6). Tabbing into a group and floating cost the centre nothing, so they are always on offer.
+    private DockZone RoomFor()
+    {
+        var well = Layout.DocumentWell;
+        if (well == null || !_groupsByNode.TryGetValue(well, out var group)) return DockZone.All;
+
+        // The arrival costs only the DIVIDER, not its whole band: a band that does not fit is squeezed, not refused
+        // (PaneHost hands every child its minimum first). Charging the full band left top and bottom never on offer on
+        // a normal-height window, and a panel sent there quietly opened in the well instead.
+        var cost = DividerThickness;
+        var zones = DockZone.Center | DockZone.Floating;
+
+        if (group.Bounds.Width - cost > DocumentMinSize) zones |= DockZone.Left | DockZone.Right;
+        if (group.Bounds.Height - cost > DocumentMinSize) zones |= DockZone.Top | DockZone.Bottom;
+
+        return zones;
     }
 
     private void ClearAim()
@@ -722,29 +1199,28 @@ public class DockingArea : Panel
         UIAppContext.Current.Dispatcher.InvokeAsync(HideOverlay);
     }
 
-    /// <summary>The floating window was let go. If it was over an indicator, WHATEVER it holds - a single pane, a panel,
-    /// or a whole split built up inside it - comes back into the tree it was dropped on and the window closes.</summary>
+    // The floating window was let go: over an indicator, WHATEVER it holds - a pane, a panel, a whole split - comes
+    // back into the tree it was dropped on and the window closes.
     private void DropWindow(WindowBase window, DockingRoot root)
     {
-        TrackWindow(window);
+        TrackWindow(window, root);
 
         var target = _target;
         var area = _targetArea;
         _target = default;
         _targetArea = null;
+        Owner._draggedWindow = null;   // this drag is over; the next one re-reads what its panes permit
         area?.ClearAim();
 
         if (!target.IsValid || area == null) return;
 
-        // Asked BEFORE the model is touched, and asked of the area that is receiving: refusing has to leave the window
-        // exactly where it is, and a veto discovered afterwards would mean undoing a move that has already happened.
+        // BEFORE the model is touched, and of the RECEIVING area: a veto found afterwards would mean undoing a move.
         if (area.Refuses(new PaneDockingEventArgs([..DockingLayout.PanesIn(root.Content)], target.Node, target.Zone))) return;
 
         if (!Layout.MoveNode(root.Content, target.Node, target.Zone,
                 size: target.IsEdge ? PaneLength.Pixels(EdgeDockSize) : null)) return;
 
-        // The controls the window was showing are given up BEFORE anything rebuilds: their panes are about to be built
-        // into the target area's tree, and a component belongs to one tree.
+        // The window gives up its controls BEFORE anything rebuilds: their panes are about to join another tree.
         window.Content = null;
         FloatingArea(window)?.Release();
 
@@ -760,8 +1236,8 @@ public class DockingArea : Panel
         return null;
     }
 
-    /// <summary>Gives up every control this area holds. Called when its root has been docked into another area: the panes
-    /// in those controls are about to be built into that area's tree, and a component belongs to ONE tree.</summary>
+    // Gives up every control this area holds - its root has been docked into another area, and a component belongs to
+    // ONE tree.
     private void Release()
     {
         foreach (var pair in _groupsByNode)
@@ -775,9 +1251,8 @@ public class DockingArea : Panel
         Children.Clear();
     }
 
-    /// <summary>Rebuilds every area of the layout and closes the floating windows whose roots have gone. One drop can
-    /// change two windows - the one the panel left and the one it landed in - so both are rebuilt from the model rather
-    /// than one of them being patched.</summary>
+    // Rebuilds every area and closes windows whose roots have gone: one drop changes two windows, and both are rebuilt
+    // from the model rather than one of them patched.
     private void RebuildFamily()
     {
         foreach (var area in Family) area.Rebuild();
@@ -803,17 +1278,22 @@ public class DockingArea : Panel
 
     internal static readonly bool LogDocking = System.Environment.GetEnvironmentVariable("ADAMANTIUM_DOCK_LOG") == "1";
 
-    /// <summary>Forgets the controls of nodes the layout no longer contains. Groups die - the last pane is dragged out
-    /// of one, or two centre groups are merged into one on load - and holding their controls would keep emptying them
-    /// on every rebuild forever.</summary>
+    // Forgets the controls of nodes the layout no longer holds, or they would be emptied on every rebuild forever.
+    // Asked of the MODEL: whether a control has a parent yet depends on timing, and a timing-dependent rule eventually
+    // deletes a live group. Only THIS area's root counts - a group that moved to a floating window is that area's now.
     private void Prune()
     {
-        // Asked of the MODEL, not of the visual tree: whether a control has a parent yet depends on when attachment
-        // happens, and a rule that depends on timing is a rule that will one day delete a live group.
-        // Only THIS area's root counts: a group that moved to a floating window belongs to that window's area now, and
-        // holding its control here would empty it on every rebuild of a tree it has left.
         var alive = new HashSet<PaneGroupNode>();
         CollectGroups(RootContent, alive);
+
+        // PUT-AWAY panels are alive too, just not in the tree (rule 3b) - asking only the tree threw away their tabs.
+        if ((_root ?? Layout.Main) is { } root)
+        {
+            foreach (var bar in root.Bars.Values)
+            {
+                foreach (var node in bar) alive.Add(node);
+            }
+        }
 
         List<PaneGroupNode> gone = null;
         foreach (var node in _groupsByNode.Keys)
@@ -838,10 +1318,8 @@ public class DockingArea : Panel
         }
     }
 
-    /// <summary>Turns a node into controls: a split becomes a <see cref="PaneHost"/> holding its children with a
-    /// <see cref="PaneSplitter"/> in every gap, a group becomes a <see cref="PaneGroup"/> holding its panes. Building
-    /// real controls (rather than arranging the groups by hand from the model) is what makes the boundaries draggable -
-    /// the splitter needs neighbours in a panel to resize.</summary>
+    // Turns a node into controls: a split becomes a PaneHost with a PaneSplitter in every gap, a group becomes a
+    // PaneGroup holding its panes. Real controls rather than hand-arranged groups is what makes boundaries draggable.
     private IMeasurableComponent BuildVisual(PaneNode node)
     {
         switch (node)
@@ -855,18 +1333,15 @@ public class DockingArea : Panel
 
                 var control = GroupFor(group);
 
-                // STATE FIRST, panes second. Filling them decides the selection, and whether a strip may have none is
-                // part of the state (RequiresSelection follows the fold). Done the other way round, a folding panel had
-                // its selection cleared while the control still insisted on having one - so the strip put the highlight
-                // back on the FIRST tab, and that answer was then written into the model as the active pane. Pinning the
-                // panel open afterwards duly restored it: whichever tab you revealed, you got the first one back.
+                // STATE FIRST, panes second: filling them decides the selection, and whether a strip may have none is
+                // part of the state. The other way round, a folding panel's strip put the highlight back on the FIRST
+                // tab and wrote that into the model - so whichever tab you revealed, pinning gave you the first one.
                 control.State = group.State;
                 control.Edge = DockingLayout.EdgeOf(group);
                 control.IsFloatingRoot = _root is { IsMain: false } && ReferenceEquals(RootContent, group);
 
-                // Looks follow the PLACE: the well is the documents, everything else is a tool. A tool dropped into the
-                // centre is dressed as a document - it has no edge there to fold against, so a caption with a pin on it
-                // would be a button that cannot do anything.
+                // Looks follow the PLACE (rule 1.2): a tool dropped into the centre is dressed as a document - it has no
+                // edge there to fold against, so a pin would be a button that cannot do anything.
                 control.Kind = isWell ? PaneKind.Document : PaneKind.Tool;
                 control.RevealExtent = FlyoutExtent(group);
 
@@ -877,10 +1352,8 @@ public class DockingArea : Panel
 
             case PaneSplitNode split:
             {
-                // The host for this NODE, kept across rebuilds like the groups are. Building a fresh one every time
-                // re-parents every group under it, and re-attaching a control re-applies its template: the group then
-                // ends up with a NEW items panel holding the tabs while the visual tree still arranges the old one.
-                // Measured: the panel being arranged (#40088089, 2 children) was never the one the group reported.
+                // Kept across rebuilds like the groups: a fresh host re-parents every group under it, re-applying
+                // templates, so the group gets a NEW items panel while the tree still arranges the old one (measured).
                 var host = HostFor(split);
                 host.Orientation = split.Orientation;
                 host.DividerThickness = DividerThickness;
@@ -896,16 +1369,13 @@ public class DockingArea : Panel
 
                     if (wanted.Count > 0)
                     {
-                        // The one moment the controls get to answer back: a finished drag is the user stating a size, and
-                        // the model is what a save reads. See SyncLengthsToModel for why it is not done every pass.
+                        // The one moment the controls answer back: a finished drag is the user stating a size.
                         var grip = new PaneSplitter();
                         grip.DragCompleted += (_, _) => SyncLengthsToModel();
 
-                        // A divider next to a PUT-AWAY panel does not drag. That panel's size is MEASURED - its strip and
-                        // nothing more - not assigned, so a drag writes pixels onto a control whose model still says Auto;
-                        // the model refuses them (see SyncLengthsToModel), nothing rebuilds, and the panel simply stays
-                        // stretched at whatever it was dragged to, caption and body still hidden. The gap stays for the
-                        // seam; it just is not a handle.
+                        // A divider beside a PUT-AWAY panel does not drag: that panel's size is MEASURED (its strip), so
+                        // the model refuses the dragged pixels and the panel just stays stretched. The gap is a seam,
+                        // not a handle.
                         grip.IsHitTestVisible = !IsPutAway(previous) && !IsPutAway(child);
 
                         wanted.Add(grip);
@@ -925,9 +1395,9 @@ public class DockingArea : Panel
                 }
                 else
                 {
-                    // The live splitters are KEPT (SameChildren treats them as interchangeable - they carry no identity,
-                    // only a position), so the one thing that does change about them has to be carried across: folding a
-                    // panel leaves the split's shape untouched, and without this its divider stayed draggable.
+                    // Live splitters are KEPT (interchangeable - they carry a position, not an identity), so the one
+                    // thing that does change is carried across: folding leaves the shape untouched, and the divider of
+                    // a folded panel stayed draggable without this.
                     for (var i = 0; i < wanted.Count; i++)
                     {
                         if (wanted[i] is PaneSplitter fresh && host.Children[i] is PaneSplitter live)
@@ -943,14 +1413,11 @@ public class DockingArea : Panel
         }
     }
 
-    /// <summary>A panel that is put away answers for its own size (its strip, and nothing else), so nobody may state one
-    /// for it.</summary>
+    // A put-away panel answers for its own size (its strip), so nobody may state one for it.
     private static bool IsPutAway(PaneNode node) => node is PaneGroupNode { State: PaneGroupState.Collapsed };
 
-    /// <summary>How far a revealed panel's flyout reaches across its edge, in PIXELS. The model says what the panel is
-    /// worth docked, and that is either a band of pixels - which is the answer already - or a share of a row. A share
-    /// means nothing to a flyout: it is placed over the layout, not laid out inside it, so the share is spent against the
-    /// area's own size along that axis.</summary>
+    // How far a revealed flyout reaches across its edge, in PIXELS. A share means nothing to a flyout - it is placed
+    // OVER the layout, not laid out inside it - so a share is spent against the area's own size along that axis.
     private double FlyoutExtent(PaneGroupNode group)
     {
         var length = group.RestoreLength;
@@ -960,8 +1427,7 @@ public class DockingArea : Panel
             ? RenderSize.Width
             : RenderSize.Height;
 
-        // A star of 0.25 in a row that sums to 1 is a quarter of the area. Nothing to go on yet (the first pass, before
-        // the area has a size) falls back to the edge band every side panel starts at.
+        // A star of 0.25 in a row summing to 1 is a quarter of the area; nothing to go on yet falls back to the band.
         var wanted = across * length.Value;
         return wanted > 1 ? wanted : EdgeDockSize;
     }
@@ -978,21 +1444,23 @@ public class DockingArea : Panel
     }
 
     private static bool SameChildren(PaneHost host, List<IMeasurableComponent> wanted)
+        => SameChildren(host.Children, wanted);
+
+    private static bool SameChildren(IList<IMeasurableComponent> children, List<IMeasurableComponent> wanted)
     {
-        if (host.Children.Count != wanted.Count) return false;
+        if (children.Count != wanted.Count) return false;
 
         for (var i = 0; i < wanted.Count; i++)
         {
             // Splitters are interchangeable - they carry no identity, only a position between two neighbours.
-            if (wanted[i] is PaneSplitter && host.Children[i] is PaneSplitter) continue;
-            if (!ReferenceEquals(host.Children[i], wanted[i])) return false;
+            if (wanted[i] is PaneSplitter && children[i] is PaneSplitter) continue;
+            if (!ReferenceEquals(children[i], wanted[i])) return false;
         }
 
         return true;
     }
 
-    /// <summary>The control for a group node - the one it already had, or a new one. A node created by a split has no
-    /// control yet, and that is the only case where one is made.</summary>
+    // The control for a group node - the one it already had, or a new one for a node a split has just created.
     private PaneGroup GroupFor(PaneGroupNode node)
     {
         if (_groupsByNode.TryGetValue(node, out var existing)) return existing;
@@ -1005,30 +1473,28 @@ public class DockingArea : Panel
         return created;
     }
 
-    /// <summary>Registers a group control against its node - the ONE place a pair is made, so that everything a pair
-    /// needs is done exactly once and in both cases: a node created by a split, and a group written in markup.
-    /// <para>Which tab is active is part of the LAYOUT, so picking one has to reach the model - every rebuild reads the
-    /// selection back out of it (see FillPanes). Missing it for authored groups meant the model kept whatever it was
-    /// built with: reveal a put-away panel by clicking its third tab, press the pin, and the first one came back.</para>
-    /// <para>Closed over the node rather than looked up: the control travels WITH its node into a floating window, and
-    /// this area's dictionary no longer knows either of them by then. And a -1 is not an opinion about which tab is
-    /// active - it is a folded panel saying none is - so it is not recorded, and the panel returns to the tab it was
-    /// last showing.</para></summary>
+    // Pairs a group control with its node - the ONE place, so both cases (a node from a split, a group from markup) get
+    // everything. Which tab is active is part of the LAYOUT and has to reach the model, or a revealed third tab came
+    // back as the first one on pin. Closed over the node: the control travels WITH it into a floating window, where
+    // this dictionary knows neither. A -1 is a folded panel saying "none", not an opinion, so it is not recorded.
     private void Track(PaneGroupNode node, PaneGroup control)
     {
         _groupsByNode[node] = control;
 
         control.SelectionChanged += (_, _) =>
         {
-            if (control.SelectedIndex >= 0) node.ActiveIndex = control.SelectedIndex;
+            if (control.SelectedIndex >= 0)
+            {
+                node.ActiveIndex = control.SelectedIndex;
+            }
+
+            Owner.RaiseActivePaneChanged();
         };
     }
 
     private void FillPanes(PaneGroup control, PaneGroupNode node)
     {
-        // Bring the group's tabs to exactly the model's order, moving only what is out of place. Whatever is already
-        // where it belongs is left untouched - the panel keeps its children, and its identity, and so does everything
-        // measured against them.
+        // To the model's order, moving only what is out of place: the panel keeps its children and its identity.
         for (var i = 0; i < node.PaneIds.Count; i++)
         {
             if (!_panesById.TryGetValue(node.PaneIds[i], out var pane)) continue;
@@ -1047,10 +1513,9 @@ public class DockingArea : Panel
 
         if (control.Items.Count > 0)
         {
-            // A PUT-AWAY panel has no selection: its strip is a row of buttons, and a highlighted one would claim a panel
-            // is open when none is. Said HERE as well as in SyncFold, because a rebuild that does not CHANGE the state
-            // does not re-run the fold - and this line would then put the selection straight back. Measured: a folded
-            // strip kept its accent bar under the first tab after any later rebuild.
+            // A PUT-AWAY panel has no selection - a highlighted tab would claim a panel is open when none is. Said here
+            // as well as in SyncFold: a rebuild that does not CHANGE the state never re-runs the fold, and this line
+            // would put the highlight straight back (measured).
             control.SelectedIndex = node.State == PaneGroupState.Collapsed
                 ? -1
                 : System.Math.Clamp(node.ActiveIndex, 0, control.Items.Count - 1);
@@ -1062,10 +1527,8 @@ public class DockingArea : Panel
     /// <summary>Space left between two neighbours for the divider that will sit there.</summary>
     public double DividerThickness { get; set; } = 4.0;
 
-    /// <summary>How wide a pane docked to an EDGE of the area starts out, in pixels along that edge's axis.
-    /// <para>A band, not half the area: an edge anchor is a side panel, and half the editor is a partition rather than
-    /// an anchor. In pixels because a side panel should keep its width while the window resizes around it - it stays
-    /// freely draggable, that is what the divider is for; pixels only mean it does not scale with the window.</para></summary>
+    /// <summary>How wide a pane docked to an EDGE starts out, in pixels along that edge's axis. A band, not half the
+    /// area; in pixels so a side panel keeps its width while the window resizes around it.</summary>
     public static readonly AdamantiumProperty EdgeDockSizeProperty = AdamantiumProperty.Register(
         nameof(EdgeDockSize), typeof(double), typeof(DockingArea), new PropertyMetadata(240.0));
 
@@ -1075,10 +1538,21 @@ public class DockingArea : Panel
         set => SetValue(EdgeDockSizeProperty, value);
     }
 
+    /// <summary>The floor under the DOCUMENT WELL along either axis (rule 7.6): the centre pays for every tool that
+    /// docks against it, and without a floor enough of them squeeze it out of existence.</summary>
+    public static readonly AdamantiumProperty DocumentMinSizeProperty = AdamantiumProperty.Register(
+        nameof(DocumentMinSize), typeof(double), typeof(DockingArea), new PropertyMetadata(200.0));
+
+    public double DocumentMinSize
+    {
+        get => GetValue<double>(DocumentMinSizeProperty);
+        set => SetValue(DocumentMinSizeProperty, value);
+    }
+
     private bool _layoutBuilt;
 
-    /// <summary>Builds the layout from the authored groups, once. Everything after that is the layout's own history -
-    /// rebuilding it from markup later would throw away what the user arranged.</summary>
+    // Builds the layout from the authored groups ONCE - everything after that is the layout's own history, and
+    // rebuilding from markup would throw away what the user arranged.
     private void EnsureLayout()
     {
         if (_layoutBuilt) return;
@@ -1086,19 +1560,29 @@ public class DockingArea : Panel
 
         var declarations = new List<ZoneDeclaration>();
 
+        // Panes the author docked but whose own rules forbid docking: one of them makes the whole panel undockable, so
+        // they are taken out and opened where they ARE allowed to be - a window of their own.
+        var floatOnly = new List<(PaneGroup Group, Pane Pane)>();
+
         foreach (var child in Children)
         {
             if (child is not PaneGroup group) continue;
 
-            // A group node holds the ids of its PANES, not the group's own name: a gesture moves one pane, so a pane is
-            // the smallest thing the model has to be able to name.
+            // A group node holds the ids of its PANES: a gesture moves one pane, so a pane is the smallest nameable
+            // thing in the model.
             var node = new PaneGroupNode();
             foreach (var item in group.Items)
             {
                 if (item is not Pane pane) continue;
 
+                if ((pane.Allowed & (DockZone.Center | DockZone.Edges)) == 0)
+                {
+                    floatOnly.Add((group, pane));
+                    continue;
+                }
+
                 var id = EnsureId(pane);
-                _panesById[id] = pane;
+                RegisterPane(id, pane);
                 node.Add(id);
             }
 
@@ -1108,20 +1592,36 @@ public class DockingArea : Panel
             declarations.Add(new ZoneDeclaration(group.Zone, node, group.Size));
         }
 
+        // Said out loud, not thrown: a layout that refuses to appear over one misplaced pane helps nobody, and a pane
+        // that silently vanished helps less.
+        foreach (var (group, pane) in floatOnly)
+        {
+            group.Items.Remove(pane);
+            System.Console.WriteLine($"[DockingArea] '{pane.Header}' is allowed to float and nothing else, so it cannot " +
+                                     "be authored inside a docked panel - opening it in a window of its own instead.");
+        }
+
         if (declarations.Count == 0) return;
 
         Layout = DockingLayout.FromZones(declarations);
 
-        // The authored groups are children of THIS panel until now; the built tree is about to take them, and a
-        // component belongs to one visual tree. Cleared here rather than inside Rebuild, which must not tear the tree
-        // down on later calls - that is what re-applies templates and orphans the items panel.
+        // The built tree is about to take the authored groups, and a component belongs to one visual tree. Here rather
+        // than in Rebuild, which must not tear the tree down later: that re-applies templates and orphans items panels.
         Children.Clear();
 
         Rebuild();
+
+        // After the tree exists, so the windows open beside a layout rather than instead of one.
+        foreach (var (_, pane) in floatOnly)
+        {
+            var id = EnsureId(pane);
+            RegisterPane(id, pane);
+            FloatNew(id, pane.Header?.ToString() ?? "Panel");
+        }
     }
 
-    /// <summary>A pane's id, made from its header when the author did not give one. Derived from the header rather than
-    /// from its position, because a saved layout has to survive the panes being declared in a different order.</summary>
+    // A pane's id, made from its header when the author gave none - from the header, not the position, so a saved
+    // layout survives the panes being declared in a different order.
     private string EnsureId(Pane pane)
     {
         if (!string.IsNullOrEmpty(pane.Id)) return pane.Id;

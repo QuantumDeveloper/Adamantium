@@ -11,24 +11,18 @@ namespace Adamantium.Game.Sandbox.Behaviors;
 /// questions and writes down what it answered, so the demo can show it.
 /// <para>Deliberately a behaviour rather than code inside the view: this is exactly how an application is meant to plug
 /// its own rules in - without reaching inside the control or subclassing it.</para>
-/// <para><see cref="Pane.Allowed"/> already covers "where may this pane go at all", in data that serialises. What is
-/// left for an event is the rule a set of zones cannot express, and the demo uses the plainest such rule there is: this
-/// named pane stays in this window.</para>
+/// <para><see cref="Pane.Allowed"/> already covers "where may this pane go at all", in data that serialises - including
+/// the one restriction docking libraries actually ship (Telerik's FloatingOnly): a pane allowed only
+/// <see cref="DockZone.Floating"/> leaves for a window of its own and cannot be docked back. What is left for an EVENT
+/// is the rule a set of zones cannot express, because it is about the state of the layout right now - here: the last
+/// tab of a panel may not be pulled out.</para>
+/// <para>There was a second rule here once - a cap on tabs per group - and it was a bad example: no docking control
+/// anywhere limits how many tabs a group may hold (overflow is a scrolling strip and a menu, not a refusal), and it
+/// read as a broken drop rather than as a policy.</para>
 /// </summary>
 public class DockingPolicyBehavior : Behavior<DockingArea>
 {
-    /// <summary>Most tabs a group may hold. A rule about the STATE OF THE TARGET, which is exactly what a set of zones
-    /// cannot say - and therefore what the event is for.</summary>
-    public static readonly AdamantiumProperty MaxPanesPerGroupProperty = AdamantiumProperty.Register(nameof(MaxPanesPerGroup),
-        typeof(int), typeof(DockingPolicyBehavior), new PropertyMetadata(0));
-
-    public int MaxPanesPerGroup
-    {
-        get => GetValue<int>(MaxPanesPerGroupProperty);
-        set => SetValue(MaxPanesPerGroupProperty, value);
-    }
-
-    /// <summary>Refuse to tear out the LAST tab of a group, which would take the group with it. Again a rule about the
+    /// <summary>Refuse to tear out the LAST tab of a group, which would take the group with it. A rule about the
     /// state of the layout at this moment, not about where a pane is allowed to live.</summary>
     public static readonly AdamantiumProperty KeepLastPaneProperty = AdamantiumProperty.Register(nameof(KeepLastPane),
         typeof(bool), typeof(DockingPolicyBehavior), new PropertyMetadata(false));
@@ -83,15 +77,6 @@ public class DockingPolicyBehavior : Behavior<DockingArea>
 
     private void OnDocking(object sender, PaneDockingEventArgs e)
     {
-        // Only a CENTRE drop adds tabs to an existing group; every other zone makes a group of its own.
-        if (MaxPanesPerGroup > 0 && e.Zone is DockZone.Center && e.Target is PaneGroupNode group
-            && group.PaneIds.Count + e.Panes.Count > MaxPanesPerGroup)
-        {
-            e.Cancel = true;
-            Answer($"REFUSED: that panel already holds {group.PaneIds.Count} tabs, and {MaxPanesPerGroup} is the limit here.");
-            return;
-        }
-
         Answer($"Docking {string.Join(", ", e.Panes)} to the {e.Zone} - allowed.");
     }
 }

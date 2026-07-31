@@ -43,6 +43,10 @@ public class TabStripScroller : InputUIComponent, IContainer
     {
         ClipToBounds = true;
         MouseWheel += OnMouseWheel;
+
+        // A drag crossing the strip pans it - but that is driven by the drag itself (DragDrop.AutoScroll), not by a
+        // handler here: drop events only reach a DROP TARGET, and a strip that declared itself one would start
+        // answering for payloads it has no business with.
     }
 
     // Lays out from the Child property, so a child taken by another parent has to be dropped there - see
@@ -94,6 +98,64 @@ public class TabStripScroller : InputUIComponent, IContainer
         InvalidateArrange();
     }
 
+    /// <summary>Pan by an arbitrary amount, clamped to what there is to scroll. Returns whether anything moved.
+    /// <para>Used by a DRAG held near the strip's edge: a tab that is off-screen cannot be reordered past, or dropped
+    /// onto, unless the strip comes to meet the pointer. <see cref="LineScroll"/> is no use there - it steps half a
+    /// viewport at a time, which during a drag jumps the tabs out from under the hand.</para></summary>
+    public bool Pan(double delta)
+    {
+        var max = Math.Max(0, _extent - _viewport);
+        if (max <= 0) return false;
+
+        var next = Math.Clamp(_offset + delta, 0, max);
+        if (next.Equals(_offset)) return false;
+
+        _offset = next;
+        InvalidateArrange();
+        return true;
+    }
+
+    /// <summary>How close to an edge a drag must come before the strip pans, in pixels. On the STRIP rather than on the
+    /// tab control: three different drags pan it - a tab being reordered, a window being docked, and a payload being
+    /// dragged over - and one of them does not belong to a tab control at all.</summary>
+    public static readonly AdamantiumProperty AutoScrollMarginProperty = AdamantiumProperty.Register(
+        nameof(AutoScrollMargin), typeof(double), typeof(TabStripScroller), new PropertyMetadata(48.0));
+
+    public double AutoScrollMargin
+    {
+        get => GetValue<double>(AutoScrollMarginProperty);
+        set => SetValue(AutoScrollMarginProperty, value);
+    }
+
+    /// <summary>How much of the overshoot becomes panning, per move. One would track the pointer exactly and overshoot
+    /// wildly, since moves arrive far faster than the eye follows.</summary>
+    public static readonly AdamantiumProperty AutoScrollRateProperty = AdamantiumProperty.Register(
+        nameof(AutoScrollRate), typeof(double), typeof(TabStripScroller), new PropertyMetadata(0.35));
+
+    public double AutoScrollRate
+    {
+        get => GetValue<double>(AutoScrollRateProperty);
+        set => SetValue(AutoScrollRateProperty, value);
+    }
+
+    /// <summary>Pans when a drag is held near an EDGE of the strip, by how far past that edge's margin it is. One rule
+    /// in one place, because three things drag over a strip - a tab being reordered, a whole window being docked, and a
+    /// payload being dragged over - and they must feel the same.</summary>
+    /// <param name="along">Where the pointer is along the strip's own axis, in the strip's coordinates.</param>
+    public bool PanNear(double along, double margin, double rate)
+    {
+        var extent = IsHorizontal ? RenderSize.Width : RenderSize.Height;
+        if (extent <= 0) return false;
+
+        // A margin that would meet in the middle is not a margin - it would pan whatever the pointer did.
+        var edge = Math.Min(margin, extent / 3);
+        var overshoot = along < edge ? along - edge
+            : along > extent - edge ? along - (extent - edge)
+            : 0;
+
+        return overshoot != 0 && Pan(overshoot * rate);
+    }
+
     /// <summary>Pan just enough to bring <paramref name="element"/> (a tab) fully into view - the overflow menu calls this
     /// when a hidden tab is picked. No-op if it is already visible.</summary>
     /// <summary>Scrolls the element into view. Returns true when it was ALREADY fully visible, so a caller can keep
@@ -112,6 +174,20 @@ public class TabStripScroller : InputUIComponent, IContainer
 
         var size = IsHorizontal ? element.Bounds.Width : element.Bounds.Height;
         var max = Math.Max(0, _extent - _viewport);
+
+        // A tab WIDER than the viewport can never be "fully visible", so the caller's retry loop had nothing to settle
+        // on and the two answers alternated forever - measured at 55,262 calls, the offset flipping 0 <-> 24 for a 69px
+        // tab in a 45px strip, which is the text visibly sliding back and forth. Show its START and call it done.
+        if (size >= _viewport)
+        {
+            var wanted = Math.Clamp(start, 0, max);
+            if (!wanted.Equals(_offset))
+            {
+                _offset = wanted;
+                InvalidateArrange();
+            }
+            return true;
+        }
 
         if (start < _offset)
         {

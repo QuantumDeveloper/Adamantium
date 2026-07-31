@@ -213,8 +213,13 @@ public class TextLayout : DisposableObject
         }
 
         _wordData = glyphsData;
-        height = _wordData.Max(x => x.Rect.Bottom);
-        
+        // The block's height is a FONT metric - the last line's baseline - NOT the ink extremes. Ink differs per
+        // string (descenders, round overshoot), so measuring it made "Output" measure taller than "Errors" at the
+        // same size, and same-size text changed height as its content changed. Descenders hang below the box, which
+        // is exactly how ArrangeText centres the block (an ascent-to-baseline reference, no descent reserve).
+        var lastBaseline = height + baseLine;
+        height = lastBaseline;
+
         CalculateRealTextDimensions();
         
         var maxX = _wordData.Max(x => x.Rect.Right);
@@ -345,7 +350,6 @@ public class TextLayout : DisposableObject
             var minX = _wordData.Min(x => x.Rect.Left);
             var maxX = _wordData.Max(x => x.Rect.Right);
             var minY = _wordData.Min(x => x.Rect.Top);
-            var maxY = _wordData.Max(x => x.Rect.Bottom);
             switch (renderingParameters.HorizontalTextAlignment)
             {
                 case HorizontalTextAlignment.Center:
@@ -470,9 +474,11 @@ public class TextLayout : DisposableObject
                 break;
                 case VerticalTextAlignment.Bottom:
                 {
-                    // Drop the block so its lowest point sits on the area's bottom edge. (Top is the default
+                    // Sit the last line's BASELINE on the area's bottom edge - a glyph-independent reference, like
+                    // Center uses. Dropping the lowest INK pixel there instead made a string with a descender ride
+                    // higher than one without at the same size (visible between inline Runs). (Top is the default
                     // no-op layout.)
-                    var diff = finalRect.Height - maxY;
+                    var diff = finalRect.Height - lastBaseline;
                     foreach (var glyphWordData in _wordData)
                     {
                         var rect = glyphWordData.Rect;

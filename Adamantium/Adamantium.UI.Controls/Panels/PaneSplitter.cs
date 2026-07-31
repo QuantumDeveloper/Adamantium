@@ -69,18 +69,51 @@ public class PaneSplitter : Thumb
         var minAfter = Math.Max(floor, MinPixelsOf(after));
         moved = Math.Clamp(moved, minBefore - _originBefore, total - minAfter - _originBefore);
 
-        // The boundary moves, so BOTH neighbours become fixed at what they now are: the pair keeps the same total, and
-        // everyone else in the row is untouched. Writing pixels is the whole point - a drag is a statement about size,
-        // and a size stated in pixels cannot drift when the row later gains or loses a pane.
-        PaneHost.SetPaneLength(before, PaneLength.Pixels(_originBefore + moved));
-        PaneHost.SetPaneLength(after, PaneLength.Pixels(_originAfter - moved));
+        var newBefore = _originBefore + moved;
+        var newAfter = _originAfter - moved;
+
+        var lengthBefore = PaneHost.GetPaneLength(before);
+        var lengthAfter = PaneHost.GetPaneLength(after);
+
+        // The boundary moves, and the pair keeps the same total, so everyone else in the row is untouched. What each of
+        // them is STATED IN does not change, though: a share stays a share and a fixed size stays fixed.
+        // Writing pixels into both - which is what this did - turned the document area's share into a number. The row's
+        // lengths then no longer added up to the row (measured: 370px stated across 682px of host), the last pane
+        // swallowed the difference, and the layout stopped growing with the window: after one drag the panels were
+        // pinned to the sizes the window happened to have, and the grip could not move them any more.
+        if (lengthBefore.IsStar && lengthAfter.IsStar)
+        {
+            // Two shares of one pool: divide their COMBINED weight the way the pixels now divide, so the pair is worth
+            // what it was worth together.
+            var weight = Weight(lengthBefore) + Weight(lengthAfter);
+            PaneHost.SetPaneLength(before, PaneLength.Stars(weight * newBefore / total));
+            PaneHost.SetPaneLength(after, PaneLength.Stars(weight * newAfter / total));
+        }
+        else if (lengthBefore.IsStar)
+        {
+            // A share takes whatever is left over, so moving this boundary is entirely the FIXED one's business.
+            PaneHost.SetPaneLength(after, PaneLength.Pixels(newAfter));
+        }
+        else if (lengthAfter.IsStar)
+        {
+            PaneHost.SetPaneLength(before, PaneLength.Pixels(newBefore));
+        }
+        else
+        {
+            PaneHost.SetPaneLength(before, PaneLength.Pixels(newBefore));
+            PaneHost.SetPaneLength(after, PaneLength.Pixels(newAfter));
+        }
 
         if (PaneHost.LogLayout)
         {
             Console.WriteLine($"[PaneSplitter {Orientation}] moved={moved:F1} origin={_originBefore:F1}/{_originAfter:F1} " +
-                              $"min={minBefore:F1}/{minAfter:F1} -> {_originBefore + moved:F1}/{_originAfter - moved:F1}");
+                              $"min={minBefore:F1}/{minAfter:F1} -> {newBefore:F1}/{newAfter:F1} " +
+                              $"units={PaneHost.GetPaneLength(before)}/{PaneHost.GetPaneLength(after)}");
         }
     }
+
+    /// <summary>A share's weight, treating an unstated one as a single share - the same reading the host uses.</summary>
+    private static double Weight(PaneLength length) => length.Value > 0 ? length.Value : 1;
 
     /// <summary>The smallest this neighbour may become, in pixels. An explicit MinWidth/MinHeight wins; otherwise the
     /// neighbour is asked what it needs - and a docking area answers with its own policy, so a group cannot be squeezed
