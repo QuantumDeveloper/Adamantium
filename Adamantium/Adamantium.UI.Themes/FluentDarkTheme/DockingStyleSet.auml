@@ -9,14 +9,21 @@
          at all - and a control with no template renders nothing and cannot be hit, which is exactly what makes a grip
          that refuses to be dragged. -->
 
+    <!-- A floating panel's window looks like any other window. Stated explicitly because matching here is by EXACT type:
+         without this line a DockingWindow gets no template at all - and a window with no template is a frame with
+         nothing in it, not a window that merely looks plain. -->
+    <Style Selector="DockingWindow" BasedOn="Window"/>
+
     <Style Selector="PaneGroup" BasedOn="TabControl"/>
 
     <Style Selector="Pane" BasedOn="TabItem"/>
 
     <!-- A tab whose panel has folded down against a SIDE: the label lies on its side, because the strip that is left is
-         a narrow column. Left reads upwards and right downwards, so the text always faces out of the panel it belongs
-         to. Two styles with a literal angle each rather than one with a bound angle - a Transform is not a component and
-         cannot be a binding target at all, and a value with exactly two states is clearer written twice. -->
+         a narrow column. BOTH sides turn the same way - top to bottom - so a glance down one edge reads the same as a
+         glance down the other; every editor does it this way. Facing the text out of its own panel (up on the left,
+         down on the right) sounded symmetrical and reads as two different conventions in one window.
+         Two styles with a literal angle each rather than one with a bound angle - a Transform is not a component and
+         cannot be a binding target at all. -->
     <Style Selector="Pane[LabelRotation=Left]">
         <Setter Property="HeaderTemplate">
             <Setter.Value>
@@ -26,7 +33,7 @@
                     <controls:ContentPresenter Content="{Binding}"
                             HorizontalAlignment="Center" VerticalAlignment="Center">
                         <controls:ContentPresenter.LayoutTransform>
-                            <Transform RotationAngle="-90"/>
+                            <Transform RotationAngle="90"/>
                         </controls:ContentPresenter.LayoutTransform>
                     </controls:ContentPresenter>
                 </DataTemplate>
@@ -53,6 +60,13 @@
          HEADER carrying its name and the two things you do to a tool and never to a document - pin it away and close it -
          while its tabs sit along the BOTTOM. A document has many siblings and no caption of its own; a tool has few and
          is part of the workspace rather than of the work. Every editor draws this distinction; until now we drew none. -->
+    <!-- A DOCUMENT is closed from its own tab: it has no caption to hang a button on, and a document you cannot close
+         without the keyboard is not a document. A tool keeps its caption button instead (below), so its tabs stay
+         plain - closing a tool means putting the PANEL away, which is a statement about the panel, not about the tab. -->
+    <Style Selector="PaneGroup[Kind=Document]">
+        <Setter Property="ShowCloseButton" Value="True"/>
+    </Style>
+
     <Style Selector="PaneGroup[Kind=Tool]">
         <Setter Property="TabStripPlacement" Value="Bottom"/>
         <Setter Property="Template">
@@ -132,8 +146,8 @@
                                  flyout, and one piece of content belongs to one tree. -->
                             <controls:ContentPresenter x:Name="PART_SelectedContentHost"
                                     Content="{TemplateBinding DockedContent}"
-                                    ContentTemplate="{TemplateBinding ContentTemplate}"
-                                    ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                                    ContentTemplate="{TemplateBinding SelectedContentTemplate}"
+                                    ContentTemplateSelector="{TemplateBinding SelectedContentTemplateSelector}"/>
                         </controls:Border>
 
                         <!-- Tabs BELOW the content, which is where a tool window keeps them while it is docked. -->
@@ -163,8 +177,12 @@
                              strip is what it is placed against, so it opens exactly where the panel would have been.
                              Its own caption, because the docked one is not on screen in this state - and a flyout you
                              cannot pin is a panel you can only look at. -->
+                        <!-- Placed against the GROUP, not the tab strip inside it: the strip sits at whatever inset the
+                             chrome gives it, and a flyout lined up with the strip carried that inset along - so it
+                             started left of the panel and ran off the far end. The group is what the docking area puts
+                             on the edge, so it is what the area's offsets are measured against. -->
                         <controls:Popup x:Name="PART_RevealFlyout" Grid.Row="2" Grid.Column="1"
-                                PlacementTarget="{Binding ElementName=PART_TabStrip}"
+                                PlacementTarget="{Binding ElementName=Chrome}"
                                 Placement="Top" KeepOpen="False">
                             <!-- The size lives on the CONTENT, never on the popup: a popup is an element of this tree
                                  whether it is open or not, and a 240-wide one sat in the strip's own cell and took that
@@ -174,7 +192,9 @@
                                     BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                                     BorderThickness="1">
                                 <controls:Grid RowDefinitions="Auto,*">
-                                    <controls:Border Grid.Row="0"
+                                    <!-- A PART, because this is the caption a revealed panel is dragged by: while the
+                                         flyout is up it is the only caption the panel has on screen. -->
+                                    <controls:Border x:Name="PART_FlyoutHeader" Grid.Row="0"
                                             Background="{ThemeResource AccentFillColorDefault}"
                                             Padding="8 2 8 2">
                                         <controls:Grid ColumnDefinitions="*,Auto,Auto">
@@ -218,8 +238,8 @@
                                             ClipToBounds="True">
                                         <controls:ContentPresenter x:Name="PART_FlyoutContentHost"
                                                 Content="{TemplateBinding FlyoutContent}"
-                                                ContentTemplate="{TemplateBinding ContentTemplate}"
-                                                ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                                                ContentTemplate="{TemplateBinding SelectedContentTemplate}"
+                                                ContentTemplateSelector="{TemplateBinding SelectedContentTemplateSelector}"/>
                                     </controls:Border>
                                 </controls:Grid>
                             </controls:Border>
@@ -231,7 +251,6 @@
                              rearrange - there is no docked panel here to rearrange in. The CAPTION stays: a revealed
                              panel still has to say which panel it is. -->
                         <PropertyTrigger Property="IsFolded" Value="true">
-                            <Setter Property="AllowTabDrag" Value="false"/>
                             <!-- Unpinned: the thumbtack is an OUTLINE. Pinned it is SOLID - that filled/hollow pair is how
                                  every editor shows the state of the pin, and it is the button telling you what it did. -->
                             <Setter TargetName="PinGlyph" Property="Fill" Value="Transparent"/>
@@ -252,6 +271,12 @@
                         <PropertyTrigger Property="IsFloatingRoot" Value="true">
                             <Setter TargetName="PART_Header" Property="Visibility" Value="Collapsed"/>
                         </PropertyTrigger>
+                        <!-- One tab in a window of its own is not a choice, so there is no strip to make it with: the
+                             window's title bar already says what this is, and a row of one button only takes room from
+                             the thing being looked at. Dock a second panel in and the strip is back. -->
+                        <PropertyTrigger Property="ShowTabStrip" Value="false">
+                            <Setter TargetName="PART_TabStrip" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
                         <!-- REVEALED: in the tree this panel is still just its strip - the same as put away - and its
                              body is shown in the flyout OVER the neighbours. Emptying the docked presenter is not
                              cosmetic: one piece of content belongs to one tree, and a presenter goes on holding its
@@ -271,26 +296,36 @@
                              Stated per edge because "out of" is a different direction on each side. Harmless while the
                              panel is docked - the popup is shut. -->
                         <PropertyTrigger Property="Edge" Value="Left">
-                            <Setter TargetName="PART_RevealFlyout" Property="Placement" Value="Right"/>
+                            <Setter TargetName="PART_RevealFlyout" Property="Placement" Value="Relative"/>
+                            <Setter TargetName="PART_RevealFlyout" Property="HorizontalOffset" Value="{TemplateBinding RevealOffsetX}"/><Setter TargetName="PART_RevealFlyout" Property="VerticalOffset" Value="{TemplateBinding RevealOffsetY}"/>
                             <Setter TargetName="FlyoutRoot" Property="Width" Value="{TemplateBinding RevealExtent}"/>
                             <Setter TargetName="FlyoutRoot" Property="Height" Value="{TemplateBinding RevealLength}"/>
                         </PropertyTrigger>
                         <PropertyTrigger Property="Edge" Value="Right">
-                            <Setter TargetName="PART_RevealFlyout" Property="Placement" Value="Left"/>
+                            <Setter TargetName="PART_RevealFlyout" Property="Placement" Value="Relative"/>
+                            <Setter TargetName="PART_RevealFlyout" Property="HorizontalOffset" Value="{TemplateBinding RevealOffsetX}"/><Setter TargetName="PART_RevealFlyout" Property="VerticalOffset" Value="{TemplateBinding RevealOffsetY}"/>
                             <Setter TargetName="FlyoutRoot" Property="Width" Value="{TemplateBinding RevealExtent}"/>
                             <Setter TargetName="FlyoutRoot" Property="Height" Value="{TemplateBinding RevealLength}"/>
                         </PropertyTrigger>
                         <PropertyTrigger Property="Edge" Value="Top">
-                            <Setter TargetName="PART_RevealFlyout" Property="Placement" Value="Bottom"/>
+                            <Setter TargetName="PART_RevealFlyout" Property="Placement" Value="Relative"/>
+                            <Setter TargetName="PART_RevealFlyout" Property="HorizontalOffset" Value="{TemplateBinding RevealOffsetX}"/><Setter TargetName="PART_RevealFlyout" Property="VerticalOffset" Value="{TemplateBinding RevealOffsetY}"/>
                             <Setter TargetName="FlyoutRoot" Property="Height" Value="{TemplateBinding RevealExtent}"/>
                             <Setter TargetName="FlyoutRoot" Property="Width" Value="{TemplateBinding RevealLength}"/>
                         </PropertyTrigger>
                         <PropertyTrigger Property="Edge" Value="Bottom">
-                            <Setter TargetName="PART_RevealFlyout" Property="Placement" Value="Top"/>
+                            <Setter TargetName="PART_RevealFlyout" Property="Placement" Value="Relative"/>
+                            <Setter TargetName="PART_RevealFlyout" Property="HorizontalOffset" Value="{TemplateBinding RevealOffsetX}"/><Setter TargetName="PART_RevealFlyout" Property="VerticalOffset" Value="{TemplateBinding RevealOffsetY}"/>
                             <Setter TargetName="FlyoutRoot" Property="Height" Value="{TemplateBinding RevealExtent}"/>
                             <Setter TargetName="FlyoutRoot" Property="Width" Value="{TemplateBinding RevealLength}"/>
                         </PropertyTrigger>
                         <PropertyTrigger Property="State" Value="Collapsed">
+                            <!-- Only a PUT-AWAY strip is a row of buttons rather than a strip you rearrange in: there is
+                                 no panel open here to rearrange. A REVEALED panel IS open - its body is showing in the
+                                 flyout - so its tabs reorder and tear off like any other. Keyed on Collapsed rather than
+                                 on IsFolded, which covers both states and so switched dragging off for a panel that was
+                                 open in front of the user. -->
+                            <Setter Property="AllowTabDrag" Value="false"/>
                             <Setter TargetName="PART_Header" Property="Visibility" Value="Collapsed"/>
                             <Setter TargetName="Body" Property="Visibility" Value="Collapsed"/>
                             <!-- No frame around a put-away panel: a border encloses an AREA, and all that is left here is

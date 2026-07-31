@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
           xmlns:x="http://adamantium/ui/xaml/extensions">
 
@@ -155,8 +155,8 @@
                                 ClipToBounds="True">
                             <ContentPresenter x:Name="PART_SelectedContentHost"
                                               Content="{TemplateBinding SelectedContent}"
-                                              ContentTemplate="{TemplateBinding ContentTemplate}"
-                                              ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"
+                                              ContentTemplate="{TemplateBinding SelectedContentTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding SelectedContentTemplateSelector}"
                                               ContentTransition="{TemplateBinding ContentTransition}"
                                               TransitionDuration="{TemplateBinding ContentTransitionDuration}"/>
                         </Border>
@@ -181,8 +181,8 @@
                                 ClipToBounds="True">
                             <ContentPresenter x:Name="PART_SelectedContentHost"
                                               Content="{TemplateBinding SelectedContent}"
-                                              ContentTemplate="{TemplateBinding ContentTemplate}"
-                                              ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"
+                                              ContentTemplate="{TemplateBinding SelectedContentTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding SelectedContentTemplateSelector}"
                                               ContentTransition="{TemplateBinding ContentTransition}"
                                               TransitionDuration="{TemplateBinding ContentTransitionDuration}"/>
                         </Border>
@@ -273,8 +273,8 @@
                                 ClipToBounds="True">
                             <ContentPresenter x:Name="PART_SelectedContentHost"
                                               Content="{TemplateBinding SelectedContent}"
-                                              ContentTemplate="{TemplateBinding ContentTemplate}"
-                                              ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"
+                                              ContentTemplate="{TemplateBinding SelectedContentTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding SelectedContentTemplateSelector}"
                                               ContentTransition="{TemplateBinding ContentTransition}"
                                               TransitionDuration="{TemplateBinding ContentTransitionDuration}"/>
                         </Border>
@@ -306,8 +306,8 @@
                                 ClipToBounds="True">
                             <ContentPresenter x:Name="PART_SelectedContentHost"
                                               Content="{TemplateBinding SelectedContent}"
-                                              ContentTemplate="{TemplateBinding ContentTemplate}"
-                                              ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"
+                                              ContentTemplate="{TemplateBinding SelectedContentTemplate}"
+                                              ContentTemplateSelector="{TemplateBinding SelectedContentTemplateSelector}"
                                               ContentTransition="{TemplateBinding ContentTransition}"
                                               TransitionDuration="{TemplateBinding ContentTransitionDuration}"/>
                         </Border>

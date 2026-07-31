@@ -1,0 +1,8 @@
+<View xmlns="http://adamantium/ui">
+    <StackPanel Margin="16">
+        <TextBlock Text="{Binding Title}" FontSize="18" MarginBottom="6"/>
+        <TextBlock Text="{Binding OpenedAt}" Opacity="0.7"/>
+        <TextBlock MarginTop="12" Opacity="0.7" MaxWidth="420"
+                   Text="Opened by the region, not by the markup. Navigating to this name again activates this very tab - wherever it has been dragged to since."/>
+    </StackPanel>
+</View>

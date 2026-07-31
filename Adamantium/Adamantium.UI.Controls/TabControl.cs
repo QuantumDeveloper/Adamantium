@@ -36,6 +36,17 @@ public class TabControl : Selector
     public static readonly AdamantiumProperty ContentTemplateSelectorProperty = AdamantiumProperty.Register(nameof(ContentTemplateSelector),
         typeof(DataTemplateSelector), typeof(TabControl), new PropertyMetadata(null));
 
+    // What the content host actually renders SelectedContent with: the SELECTED TAB's template when it carries one,
+    // this control's otherwise. A body belongs to the tab that holds it, so the template that turns it into a view
+    // belongs there too - a tab whose content is a navigated view model brings its own. Binding the host straight to
+    // ContentTemplate/Selector meant only a template stated once for the whole strip was ever used, and such a tab
+    // rendered as its type name.
+    public static readonly AdamantiumProperty SelectedContentTemplateProperty = AdamantiumProperty.Register(
+        nameof(SelectedContentTemplate), typeof(DataTemplate), typeof(TabControl), new PropertyMetadata(null));
+
+    public static readonly AdamantiumProperty SelectedContentTemplateSelectorProperty = AdamantiumProperty.Register(
+        nameof(SelectedContentTemplateSelector), typeof(DataTemplateSelector), typeof(TabControl), new PropertyMetadata(null));
+
     // How the selected tab's body animates when the selection changes; flows to the content host's ContentPresenter
     // (which owns the slide). Default None so it is opt-in per usage/theme.
     public static readonly AdamantiumProperty ContentTransitionProperty = AdamantiumProperty.Register(nameof(ContentTransition),
@@ -179,6 +190,22 @@ public class TabControl : Selector
         set => SetValue(ContentTemplateSelectorProperty, value);
     }
 
+    /// <summary>The template <see cref="SelectedContent"/> is actually rendered with: the selected tab's own when it has
+    /// one, this control's <see cref="ContentTemplate"/> otherwise. What a theme's content host binds.</summary>
+    public DataTemplate SelectedContentTemplate
+    {
+        get => GetValue<DataTemplate>(SelectedContentTemplateProperty);
+        private set => SetValue(SelectedContentTemplateProperty, value);
+    }
+
+    /// <summary>The selector <see cref="SelectedContent"/> is actually rendered through - the selected tab's own when it
+    /// has one, this control's otherwise.</summary>
+    public DataTemplateSelector SelectedContentTemplateSelector
+    {
+        get => GetValue<DataTemplateSelector>(SelectedContentTemplateSelectorProperty);
+        private set => SetValue(SelectedContentTemplateSelectorProperty, value);
+    }
+
     /// <summary>How the selected tab's body animates on selection change (default None). E.g. SlideLeft/SlideRight.</summary>
     public ContentTransition ContentTransition
     {
@@ -252,7 +279,12 @@ public class TabControl : Selector
     {
         var item = SelectedItem;
         // An authored TabItem carries its own body in Content; a data item IS the body (shown via the host's ContentTemplate).
-        SelectedContent = item is TabItem tab ? tab.Content : item;
+        var tab = item as TabItem;
+        SelectedContent = tab != null ? tab.Content : item;
+
+        // ...and with the TAB's template when it brought one: the body and the template that renders it belong together.
+        SelectedContentTemplate = tab?.ContentTemplate ?? ContentTemplate;
+        SelectedContentTemplateSelector = tab?.ContentTemplateSelector ?? ContentTemplateSelector;
     }
 
     /// <summary>Selects the tab hosted by <paramref name="container"/> (called when its header is clicked).</summary>
@@ -331,6 +363,22 @@ public class TabControl : Selector
         // ALONG the strip must not tear the tab out.
         var threshold = double.IsNaN(TearOffDistance) ? extent : TearOffDistance;
         UpdateTearOff(tab, outside, threshold, across < 0 ? -1 : 1);
+
+        AutoScrollStrip(e);
+    }
+
+    /// <summary>Pans the strip when a REORDER drag nears its edge. The thresholds live on the strip - it is panned by
+    /// three different drags and only one of them is a tab's.</summary>
+    private void AutoScrollStrip(MouseEventArgs e)
+    {
+        // The FIELD, not another GetTemplateChild: the part is found once when the template is applied, and asking again
+        // mid-drag answered nothing at all - measured, this method never got past this line.
+        if (_tabStrip is not { } strip) return;
+
+        // Measured in the SCROLLER's own space, not the items panel's: the panel is as long as all the tabs together,
+        // so "near the edge" there is a point the pointer never reaches.
+        var point = e.GetPosition(strip);
+        strip.PanNear(_dragVertical ? point.Y : point.X, strip.AutoScrollMargin, strip.AutoScrollRate);
     }
 
     /// <summary>How far past the tab strip the pointer must go, ACROSS the strip's axis, before the drag becomes a

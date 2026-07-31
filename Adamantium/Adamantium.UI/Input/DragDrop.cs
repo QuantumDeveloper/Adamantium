@@ -703,6 +703,19 @@ public static partial class DragDrop
     {
         var band = DragDropOptions.AutoScrollBand;
 
+        // A TAB STRIP is a scroll area too, and the only one that matters here: a tab scrolled out of sight cannot be
+        // dropped onto at all, because a drag cannot be put down to scroll and picked back up. Tried before the
+        // ScrollViewers because it is the innermost thing under the pointer when the pointer is over a strip - and
+        // asked FIRST for the same reason a strip is asked first for the wheel.
+        for (var node = hit; node != null; node = node.VisualParent)
+        {
+            if (node is not Controls.TabStripScroller strip) continue;
+
+            var at = Mouse.GetPosition(strip);
+            var along = strip.Orientation == Controls.Panels.Orientation.Horizontal ? at.X : at.Y;
+            if (strip.PanNear(along, band, strip.AutoScrollRate)) return;
+        }
+
         // Walk OUTWARDS through every scrollable area under the pointer and take the first that can actually move the
         // way the edge is pulling. Taking the innermost one unconditionally is what makes a drag dead-end over a short
         // or empty inner list: it swallows the pull and has nowhere to go, so the page behind it never scrolls. Chaining

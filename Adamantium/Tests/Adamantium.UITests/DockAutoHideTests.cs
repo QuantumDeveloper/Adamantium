@@ -1,3 +1,4 @@
+using System.Linq;
 using Adamantium.UI.Controls.Docking;
 using Adamantium.UI.Controls.Panels;
 using NUnit.Framework;
@@ -34,7 +35,7 @@ public class DockAutoHideTests
     }
 
     [Test]
-    public void CollapsingAGroup_LeavesItInPlace_TakingOnlyWhatItNeeds()
+    public void CollapsingAGroup_MovesItOutOfTheTreeAndOntoItsEdge()
     {
         var (layout, _, inspector) = Editor();
 
@@ -43,9 +44,10 @@ public class DockAutoHideTests
         Assert.Multiple(() =>
         {
             Assert.That(inspector.State, Is.EqualTo(PaneGroupState.Collapsed));
-            Assert.That(inspector.Length, Is.EqualTo(PaneLength.Auto), "as much as its strip needs, and no more");
-            Assert.That(layout.FindGroup("inspector"), Is.SameAs(inspector), "still exactly where it was");
+            Assert.That(inspector.Parent, Is.Null, "out of the split tree entirely (rule 3b)");
+            Assert.That(layout.Main.EdgeOfBarred(inspector), Is.EqualTo(DockZone.Right), "and onto the edge it was on");
             Assert.That(inspector.PaneIds, Is.EqualTo(new[] { "inspector" }), "with its panes still in it");
+            Assert.That(inspector.RestoreLength, Is.EqualTo(PaneLength.Pixels(240)), "and what it is worth docked");
         });
     }
 
@@ -263,14 +265,17 @@ public class DockAutoHideTests
         });
     }
 
-    /// <summary>A folded panel torn off comes back DOCKED: the fold described an edge it no longer sits against.</summary>
+    /// <summary>An UNPINNED panel torn off comes back DOCKED: the fold described an edge it no longer sits against. Both
+    /// folded states travel - a revealed panel is dragged by the caption of its flyout, which is the only caption it has
+    /// on screen.</summary>
     [Test]
-    public void TearingOffAFoldedGroup_UnfoldsIt()
+    public void TearingOffAnUnpinnedGroup_UnfoldsIt()
     {
         var (layout, _, inspector) = Editor();
         layout.CollapseGroup(inspector);
+        layout.RevealGroup(inspector);
 
-        layout.TearOffGroup(inspector);
+        Assert.That(layout.TearOffGroup(inspector), Is.Not.Null);
 
         Assert.Multiple(() =>
         {
@@ -485,36 +490,67 @@ public class DockAutoHideTests
     /// the bottom and no title.</para>
     /// </summary>
     [Test]
-    public void APutAwayPanel_UnfoldsWhenSomethingDocksOutsideIt()
-    {
-        var (layout, _, inspector) = Editor();
-        layout.CollapseGroup(inspector);
-
-        // What dropping on the right-hand EDGE anchor does: a new group outside everything, against the edge itself.
-        layout.MovePane("game", layout.Main.Content, DockZone.Right, size: PaneLength.Pixels(240));
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(DockingLayout.EdgeOf(inspector), Is.EqualTo(DockZone.None), "it is not on an edge any more");
-            Assert.That(inspector.State, Is.EqualTo(PaneGroupState.Docked), "so it is not folded either");
-            Assert.That(inspector.Length, Is.EqualTo(PaneLength.Pixels(240)), "with the room it had before it folded");
-        });
-    }
-
-    /// <summary>And one that IS still against its edge stays put away - the rule is about the edge, not about anything
-    /// having happened.</summary>
-    [Test]
-    public void APutAwayPanel_StaysFoldedWhileItIsStillOnItsEdge()
+    public void APutAwayPanel_IsUntouchedByAnythingThatHappensInTheTree()
     {
         var (layout, documents, inspector) = Editor();
         layout.CollapseGroup(inspector);
 
+        // Every kind of drop, one after another: beside the documents, on the edge the panel is folded against, and a
+        // band across the bottom. None of them is aimed at the panel, and none of them may reach it.
         layout.MovePane("game", documents, DockZone.Bottom);
+        layout.MovePane("scene", layout.Main.Content, DockZone.Right, size: PaneLength.Pixels(240));
 
         Assert.Multiple(() =>
         {
-            Assert.That(DockingLayout.EdgeOf(inspector), Is.EqualTo(DockZone.Right));
-            Assert.That(inspector.State, Is.EqualTo(PaneGroupState.Collapsed));
+            Assert.That(layout.Main.EdgeOfBarred(inspector), Is.EqualTo(DockZone.Right), "still on its edge");
+            Assert.That(inspector.State, Is.EqualTo(PaneGroupState.Collapsed), "still put away");
+            Assert.That(inspector.Parent, Is.Null, "and still not part of the tree");
+            Assert.That(inspector.RestoreLength, Is.EqualTo(PaneLength.Pixels(240)), "with its docked size intact");
+        });
+    }
+
+    /// <summary>Opening the same thing twice does not make two of it - what "navigate to an already-open document"
+    /// must mean, or every "go to file" leaves a trail of copies.</summary>
+    [Test]
+    public void AddingAPaneThatIsAlreadyOpen_ActivatesItInstead()
+    {
+        var (layout, documents, _) = Authored();
+
+        // What DockingArea.AddPane does to the model when the pane is already somewhere.
+        Assert.That(layout.FindGroup("scene"), Is.SameAs(documents));
+
+        documents.ActiveIndex = 0;
+        layout.RevealGroup(documents);   // refused: it is docked, not folded - nothing to reveal
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(documents.PaneIds.Count(id => id == "scene"), Is.EqualTo(1), "still one of it");
+            Assert.That(documents.State, Is.EqualTo(PaneGroupState.Docked));
+        });
+    }
+
+    /// <summary>A band dropped on the BOTTOM edge anchor splits the centre column, not the whole window - so the side
+    /// panels keep their full height and a put-away strip stays on the edge it is folded against.
+    /// <para>Measured before the rule: the band was aimed at the root, which cut the right-hand strip off at the band's
+    /// top edge - and a strip pushed off its edge is no longer a strip on an edge (rule 2.3).</para></summary>
+    [Test]
+    public void ABandDroppedOnTheBottomAnchor_DoesNotRunUnderTheSides()
+    {
+        var (layout, documents, inspector) = Authored();
+        layout.CollapseGroup(inspector);
+
+        var console = Group("console");
+        var target = layout.BandTarget(layout.Main);
+
+        Assert.That(target, Is.SameAs(documents), "the centre column is what a band splits");
+
+        layout.Split(target, DockZone.Bottom, console);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(layout.Main.EdgeOfBarred(inspector), Is.EqualTo(DockZone.Right), "the side is still on its edge");
+            Assert.That(inspector.State, Is.EqualTo(PaneGroupState.Collapsed), "and still put away");
+            Assert.That(DockingLayout.EdgeOf(console), Is.EqualTo(DockZone.Bottom));
         });
     }
 

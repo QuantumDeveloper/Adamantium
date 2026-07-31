@@ -274,8 +274,69 @@ public class PaneHost : Panel, IPaneMinimum
             _sizes[i] = starWeight > 0 ? remaining * weight / starWeight : remaining / stars;
         }
 
+        EnforceMinimums(along);
         return _content.Count;
     }
+
+    /// <summary>Holds every child at or above what it says it may shrink to (<see cref="IPaneMinimum"/>). A share knows
+    /// nothing of minimums, so enough splits down one side drove a neighbour to a few pixels while it was asking for
+    /// 200 - measured: the document column was handed 60 against a minimum of 200. Whoever is under its minimum is
+    /// pinned AT it and the cost comes out of those still above theirs, in proportion to the slack each has.
+    /// <para>Until now the minimums were a SPLITTER's business alone, so only a drag respected them - and every other
+    /// way a size changes (a panel docked, a layout loaded, the window resized) walked straight past them.</para>
+    /// <para>When the minimums do not all fit, everyone is scaled down together: there is no distribution that honours
+    /// them, and refusing to lay out is not one of the options.</para></summary>
+    private void EnforceMinimums(double along)
+    {
+        if (_minimums.Length < _content.Count) _minimums = new double[_content.Count];
+
+        var needed = 0.0;
+        for (var i = 0; i < _content.Count; i++)
+        {
+            _minimums[i] = _content[i] is IPaneMinimum owner ? Math.Max(0, owner.MinimumExtent(Orientation)) : 0;
+            needed += _minimums[i];
+        }
+
+        if (needed <= 0) return;
+
+        if (needed >= along)
+        {
+            var scale = along / needed;
+            for (var i = 0; i < _content.Count; i++) _sizes[i] = _minimums[i] * scale;
+            return;
+        }
+
+        // Paying for one child's minimum can push its payer under its own, so this repeats. Each pass pins at least one
+        // more child, so it cannot run longer than there are children.
+        for (var pass = 0; pass < _content.Count; pass++)
+        {
+            var deficit = 0.0;
+            var slack = 0.0;
+            for (var i = 0; i < _content.Count; i++)
+            {
+                if (_sizes[i] < _minimums[i]) deficit += _minimums[i] - _sizes[i];
+                else slack += _sizes[i] - _minimums[i];
+            }
+
+            if (deficit <= Tolerance) return;
+
+            for (var i = 0; i < _content.Count; i++)
+            {
+                if (_sizes[i] < _minimums[i])
+                {
+                    _sizes[i] = _minimums[i];
+                    continue;
+                }
+
+                if (slack <= 0) continue;
+
+                _sizes[i] -= deficit * (_sizes[i] - _minimums[i]) / slack;
+            }
+        }
+    }
+
+    private const double Tolerance = 0.01;
+    private double[] _minimums = [];
 
     /// <summary>What this child is currently laid out at, in pixels along the row - what a drag starts from.</summary>
     internal double PixelsOf(IUIComponent child)

@@ -188,6 +188,24 @@ public class DockCompass : Panel
 
     private DockZone _allowed = DockZone.All;
 
+    /// <summary>Which EDGE anchors may be drawn. Separate from <see cref="AllowedZones"/> because the two answer
+    /// different questions with the same four bits: Left in the cross means "split the panel under the pointer", which
+    /// that panel pays for, while Left on the rim means "a band down the whole side", which the DOCUMENT AREA pays for.
+    /// One mask for both drew rim anchors the centre had no room left for - aim, drop, nothing happens.</summary>
+    public DockZone AllowedEdgeZones
+    {
+        get => _allowedEdges;
+        set
+        {
+            if (_allowedEdges == value) return;
+
+            _allowedEdges = value;
+            InvalidateArrange();
+        }
+    }
+
+    private DockZone _allowedEdges = DockZone.All;
+
     /// <summary>Which indicator a point falls on for a group occupying <paramref name="target"/>, or
     /// <see cref="DockZone.None"/>. Static and pure: this is what the drop asks too, so the two can never disagree.</summary>
     public static DockZone ZoneAt(Rect target, Vector2 point, double indicatorSize, double gap)
@@ -348,7 +366,7 @@ public class DockCompass : Panel
         for (var i = 0; i < _edges.Length; i++)
         {
             var edge = _edges[i];
-            edge.Visibility = aiming && (_allowed & EdgeZones[i]) != 0 ? Visibility.Visible : Visibility.Collapsed;
+            edge.Visibility = aiming && (_allowedEdges & EdgeZones[i]) != 0 ? Visibility.Visible : Visibility.Collapsed;
             edge.Background = _armedIsEdge && EdgeZones[i] == _armed ? ActiveBrush : IndicatorBrush;
             edge.BorderBrush = IndicatorStroke;
             edge.BorderThickness = new Thickness(IndicatorStrokeThickness);

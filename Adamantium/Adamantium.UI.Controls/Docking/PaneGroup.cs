@@ -14,20 +14,21 @@ namespace Adamantium.UI.Controls.Docking;
 public class PaneGroup : TabControl, Panels.IPaneMinimum
 {
     /// <summary>How small this group may become along one axis: the largest <see cref="Pane.MinSize"/> among its panes,
-    /// and never less than its own tab strip needs - an area shorter than its strip has its headers clipped, and there
-    /// is nothing left to grab or click. The answer comes from the panes' own policy, not from a number invented here.
-    /// </summary>
+    /// and never less than its own chrome - an area shorter than that has nothing left to grab or click.</summary>
     public double MinimumExtent(Panels.Orientation orientation)
     {
         var min = MinSizeAppliesAlong(orientation) ? LargestPaneMinimum() : 0;
-        return System.Math.Max(min, StripExtent(orientation));
+        min = System.Math.Max(min, StripExtent(orientation));
+
+        // The DOCUMENT area has a floor of its own along both axes (rule 7.6): it pays for every tool docked against
+        // it, and its panes cannot state this - documents come and go, the centre outlives all of them.
+        if (Kind == PaneKind.Document && Area is { } area) min = System.Math.Max(min, area.DocumentMinSize);
+
+        return min;
     }
 
-    /// <summary>A pane's <see cref="Pane.MinSize"/> is its smallest useful size ALONG THE AXIS IT IS DOCKED ON, so it
-    /// only answers for that axis. "The inspector is never narrower than 180" is a statement about width; letting it
-    /// answer for height too meant the inspector's width forbade the console below it from being dragged taller - a
-    /// limit nobody wrote and nothing explains. A group in the centre has no single axis, so its panes speak for
-    /// both.</summary>
+    // A pane's MinSize is its smallest useful size ALONG THE AXIS IT IS DOCKED ON. Letting it answer for both meant the
+    // inspector's width forbade the console below from being dragged taller. A centre group has no single axis.
     private bool MinSizeAppliesAlong(Panels.Orientation orientation)
     {
         return Zone switch
@@ -50,21 +51,33 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         return min;
     }
 
-    /// <summary>What the tab strip needs - measured, not assumed - and only along the axis it actually stacks against.
-    /// A strip across the top is a floor on HEIGHT; it says nothing about how narrow the group may be.</summary>
+    // What the panel's CHROME needs - measured, not assumed - along the axis it stacks against: the tab strip, plus the
+    // caption a tool wears above its body. Measured with the strip alone, a squeezed console got 27px and its caption
+    // drew past the bottom of the layout, which looks like a panel sliding off the window.
     private double StripExtent(Panels.Orientation orientation)
     {
-        if (ItemsHostPanel is not { } panel) return 0;
+        var strip = 0.0;
+        if (ItemsHostPanel is { } panel)
+        {
+            strip = TabStripPlacement is TabStripPlacement.Left or TabStripPlacement.Right
+                ? orientation == Panels.Orientation.Horizontal ? panel.DesiredSize.Width : 0
+                : orientation == Panels.Orientation.Vertical ? panel.DesiredSize.Height : 0;
+        }
 
-        return TabStripPlacement is TabStripPlacement.Left or TabStripPlacement.Right
-            ? orientation == Panels.Orientation.Horizontal ? panel.DesiredSize.Width : 0
-            : orientation == Panels.Orientation.Vertical ? panel.DesiredSize.Height : 0;
+        // A caption along the top is a floor on HEIGHT - it sits across the body, not along it.
+        if (orientation == Panels.Orientation.Vertical
+            && _caption is IMeasurableComponent { Visibility: Visibility.Visible } caption)
+        {
+            strip += caption.DesiredSize.Height;
+        }
+
+        return strip;
     }
 
     public PaneGroup()
     {
-        // A torn-off pane is the docking area's business, not the application's: it becomes another root of the same
-        // layout. Without a handler the strip would simply put the tab back, which is exactly what it did before.
+        // A torn-off pane becomes another ROOT of this layout - the area's business, not the application's. Without a
+        // handler the strip simply puts the tab back.
         TabTornOff += (_, e) =>
         {
             if (Area is not { } area || e.Container is not Pane pane) return;
@@ -79,10 +92,9 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
             if (e.Property == SelectedContentProperty) SyncContentHost();
         };
 
-        // SyncFold as well as SyncChrome: the fold pushes each pane's label rotation, and a rebuild ADDS the panes after
-        // the state/edge that caused the fold was set - so a pane arriving later never learned it was in a folded strip
-        // and kept measuring itself for a label lying flat. Measured: of three tabs in a folded column only the last was
-        // 41x70; the first two stayed 78x29 and the three drew on top of each other.
+        // SyncFold too: a rebuild ADDS panes after the state that caused the fold was set, so a pane arriving later
+        // never learned it was in a folded strip and kept measuring for a label lying flat (measured: of three tabs,
+        // only the last carried the turned footprint and all three drew on top of each other).
         Items.CollectionChanged += (_, _) =>
         {
             SyncChrome();
@@ -94,18 +106,16 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         AddHandler(Mouse.PreviewMouseDownEvent, new MouseButtonEventHandler(OnPreviewDown), handledEventsToo: true);
     }
 
-    // A click on a put-away strip REVEALS the panel - it does not pin it back. The strip stays where it is and the body
-    // appears over the neighbours; only the pin button puts the panel back into the layout. That is the whole difference
-    // between glancing at a tool and keeping it open, and it is why this is three states and not a flag.
+    // A click on a put-away strip REVEALS the panel; only the pin puts it back. Glancing at a tool and keeping it open
+    // are different things, which is why this is three states and not a flag.
     private void OnPreviewDown(object sender, MouseButtonEventArgs e)
     {
         if (State == PaneGroupState.Collapsed) Area?.Reveal(this);
     }
 
-    // --- Tearing the PANEL off by its caption ------------------------------------------------------------------------
-    // Dragging a TAB moves one pane; dragging the CAPTION moves the panel, with every pane in it. Two gestures, told
-    // apart by where the press landed - not by how many tabs happen to be open, which would make the same drag mean
-    // different things at different times.
+    // --- Tearing the PANEL off by its caption -----------------------------------------------------------------------
+    // A TAB drag moves one pane, a CAPTION drag moves the panel with every pane in it - told apart by where the press
+    // landed, not by how many tabs happen to be open.
 
     private Vector2 _captionPress;
     private bool _captionPressed;
@@ -115,8 +125,14 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         base.OnMouseLeftButtonDown(sender, e);
 
         // Handled means a child took it - the pin and close buttons do, which is why they are not torn off by a wobble.
-        if (e.Handled || _caption == null) return;
-        if (e.OriginalSource is not IUIComponent source || !IsWithin(source, _caption)) return;
+        if (e.Handled) return;
+        if (e.OriginalSource is not IUIComponent source) return;
+
+        // EITHER caption: the docked one, or the flyout's while the panel is revealed.
+        var onCaption = (_caption != null && IsWithin(source, _caption))
+                        || (_flyoutCaption is IUIComponent flyout && IsWithin(source, flyout));
+
+        if (!onCaption) return;
 
         _captionPress = e.GetPosition(this);
         _captionPressed = true;
@@ -127,8 +143,8 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         base.OnMouseMove(sender, e);
         if (!_captionPressed) return;
 
-        // Whether the button is still down is the device's to answer, not ours to remember - see TabItem.OnMouseMove for
-        // what a latched flag does when the up lands in a tree that has been rebuilt underneath it.
+        // Whether the button is down is the DEVICE's to answer: a latched flag never clears when the up lands in a tree
+        // that has been rebuilt underneath it (see TabItem.OnMouseMove).
         if (e.MouseDevice.LeftButton != MouseButtonState.Pressed)
         {
             _captionPressed = false;
@@ -137,8 +153,7 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
 
         if (!PlatformSettings.ExceedsDragThreshold(e.GetPosition(this) - _captionPress)) return;
 
-        // Crossing the threshold IS the tear-off, exactly as it is for a tab: the panel becomes a window here and then,
-        // and the platform's own move loop carries the gesture from there.
+        // Crossing the threshold IS the tear-off, as for a tab: the platform's move loop carries it from here.
         _captionPressed = false;
         Area?.TearOffGroup(this, Mouse.ScreenCoordinates);
     }
@@ -158,24 +173,17 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         return false;
     }
 
-    // Where each tab actually ended up, and what render offset it still carries. Overlapping tabs mean either two slots
-    // at one position or a leftover drag transform, and only the numbers tell which.
     protected override Size ArrangeOverride(Size finalSize)
     {
         var size = base.ArrangeOverride(finalSize);
-
-        // How long the flyout runs ALONG its edge: exactly as long as the strip, which is the panel's own share of the
-        // area. Taken here because this is where that number exists - the theme cannot ask a control about its own size,
-        // and the docking area would have to guess at a share the split tree has already worked out.
-        RevealLength = Edge is DockZone.Left or DockZone.Right ? size.Height : size.Width;
 
         if (DockingArea.LogDocking) Log();
 
         return size;
     }
 
-    /// <summary>What this group is and what its tabs are doing, printed from inside the layout pass. Set
-    /// ADAMANTIUM_DOCK_LOG=1 to see it.</summary>
+    // What this group and its tabs are doing, from inside the layout pass (ADAMANTIUM_DOCK_LOG=1). Overlapping tabs
+    // mean either two slots at one position or a leftover drag transform, and only the numbers tell which.
     private void Log()
     {
         var first = Items.OfType<Pane>().FirstOrDefault();
@@ -201,8 +209,8 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
                     $" over={pin.IsMouseOver} pressed={pin.IsPressed} focusable={pin.Focusable}";
         }
 
-        // Template identity next to panel identity: a NEW panel with the SAME template means the rebuild came from
-        // somewhere other than a template change; a new template means the theme handed out a fresh instance.
+        // Template identity beside panel identity: a new panel with the SAME template means the rebuild came from
+        // somewhere other than a template change.
         var text = $"[PaneGroup #{GetHashCode()} {Items.Count} tabs {stripCell}" +
                    $" gWant={DesiredSize.Width:F0}x{DesiredSize.Height:F0} gAt={Bounds.Width:F0}x{Bounds.Height:F0}" +
                    $" host=#{ItemsHostPanel?.GetHashCode()} panel={panelKind}" +
@@ -217,13 +225,13 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
 
             var offset = tab.RenderTransform is Core.Media.Transform transform ? transform.TranslateX : 0;
 
-            // Is this tab actually IN the strip's panel? A container that never got re-attached keeps drawing at the
-            // bounds of its previous life - which looks exactly like an overlap and is nothing of the kind.
+            // Actually IN the strip's panel? A container that never got re-attached draws at the bounds of its previous
+            // life, which looks exactly like an overlap.
             var panel = ItemsHostPanel as Panels.Panel;
             var inChildren = panel != null && panel.Children.Contains(tab);
 
-            // Which template the TAB carries versus which one actually reached its header presenter: a turned label that
-            // never resized means one of those two links is stale, and only their identities say which.
+            // The template the TAB carries versus the one that reached its header presenter: a turned label that never
+            // resized means one of those links is stale.
             var ownTemplate = tab.HeaderTemplate?.GetHashCode();
             var headerHost = tab.GetTemplateChild("PART_ContentPresenter") as ContentPresenter;
             var presenterTemplate = headerHost?.ContentTemplate?.GetHashCode();
@@ -252,15 +260,10 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         }
     }
 
-    /// <summary>Document group or tool group. A group of tools wears a header with the active pane's name and its
-    /// buttons, and carries its tabs along the bottom; a group of documents wears tabs on top and nothing else.
-    /// <para>Taken from WHERE THE GROUP STANDS, not from the panes in it: the document well is a document group and
-    /// everything outside it is a tool group. That is what makes a tool dropped into the centre behave like a document -
-    /// which it has to, because the zones for tools are the EDGES, and a panel in the centre has no edge to fold against.
-    /// Reading it off the first pane instead put a caption with a pin button in the middle of the editing area.</para>
-    /// <para>Pushed from the model on every rebuild, like <see cref="Edge"/>. The pane's own <see cref="Pane.Kind"/>
-    /// stays what it is - it is policy (what closing means, whether it comes back with a saved layout), not looks.</para>
-    /// </summary>
+    /// <summary>Document group or tool group: a tool wears a caption and keeps its tabs at the bottom, a document wears
+    /// tabs on top and nothing else. Taken from WHERE THE GROUP STANDS (rule 1.2), not from the panes in it - reading
+    /// it off the first pane put a caption with a pin in the middle of the editing area. The pane's own
+    /// <see cref="Pane.Kind"/> is unaffected: that is policy, not looks.</summary>
     public static readonly AdamantiumProperty KindProperty = AdamantiumProperty.Register(nameof(Kind),
         typeof(PaneKind), typeof(PaneGroup), new PropertyMetadata(PaneKind.Document));
 
@@ -283,10 +286,8 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         set => SetValue(StateProperty, value);
     }
 
-    /// <summary>Whether the panel is folded to its strip - true in BOTH unpinned states, because a revealed panel keeps
-    /// its strip against the edge exactly as a put-away one does; what differs is only whether the body is showing, and
-    /// the body is not in this template at all. Folded here rather than compared in the theme so a style needs one plain
-    /// trigger (the <see cref="TabItem.ShowCloseButton"/> idiom).</summary>
+    /// <summary>Whether the panel is folded to its strip - true in BOTH unpinned states: a revealed panel keeps its
+    /// strip against the edge exactly as a put-away one does. Folded here so a style needs one plain trigger.</summary>
     public static readonly AdamantiumProperty IsFoldedProperty = AdamantiumProperty.Register(nameof(IsFolded),
         typeof(bool), typeof(PaneGroup), new PropertyMetadata(false));
 
@@ -296,15 +297,17 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         private set => SetValue(IsFoldedProperty, value);
     }
 
-    /// <summary>Whether this group is the WHOLE of a floating window. Such a panel wears no caption of its own: the
-    /// window's title bar already names it, and its own header would say the same word twice - with a pin that has no
-    /// edge to fold against and a close button beside the system's own.
-    /// <para>Pushed from the model on every rebuild, like <see cref="Edge"/>: dock a second panel beside it inside that
-    /// window and it stops being the whole of it, at which point the captions are what tell the two apart and are how
-    /// each is dragged.</para></summary>
+    /// <summary>Whether this group is the WHOLE of a floating window. Such a panel wears no caption: the title bar
+    /// already names it, and a pin there would have no edge to fold against. Dock a second panel into that window and
+    /// it stops being the whole of it - the captions are then what tell the two apart.</summary>
     public static readonly AdamantiumProperty IsFloatingRootProperty = AdamantiumProperty.Register(
         nameof(IsFloatingRoot), typeof(bool), typeof(PaneGroup),
-        new PropertyMetadata(false, PropertyMetadataOptions.AffectsMeasure));
+        new PropertyMetadata(false, PropertyMetadataOptions.AffectsMeasure, OnFloatingRootChanged));
+
+    // Being the whole of a window (or ceasing to be) decides whether the strip is drawn at all - and it changes without
+    // the panes changing, when something else is docked into that window beside this panel.
+    private static void OnFloatingRootChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+        => (a as PaneGroup)?.SyncChrome();
 
     public bool IsFloatingRoot
     {
@@ -436,15 +439,39 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         }
     }
 
-    /// <summary>How long the flyout runs ALONG its edge - the strip's own length, which is this panel's share of the
-    /// area. Measured in <see cref="ArrangeOverride"/>, because that is where the number exists.</summary>
+    /// <summary>How long the flyout runs ALONG its edge - the length of the EDGE, not of this strip. A strip is as long
+    /// as its own few tab captions; the panel behind it is a panel. Pushed by the docking area, which is what knows how
+    /// long an edge is.</summary>
     public static readonly AdamantiumProperty RevealLengthProperty = AdamantiumProperty.Register(nameof(RevealLength),
         typeof(double), typeof(PaneGroup), new PropertyMetadata(0.0));
 
     public double RevealLength
     {
         get => GetValue<double>(RevealLengthProperty);
-        private set => SetValue(RevealLengthProperty, value);
+        set => SetValue(RevealLengthProperty, value);
+    }
+
+    /// <summary>Where the flyout sits relative to this strip's top-left corner - both axes, in pixels.
+    /// <para>The popup is placed <see cref="PlacementMode.Relative"/> to the strip and moved by these, rather than by one
+    /// of the named placements: those CENTRE the popup on its target (right for a tooltip, which is what they were built
+    /// for), and a flyout seven times wider than the strip it belongs to ended up half a window to the left of it. The
+    /// docking area knows exactly where the panel should appear, so it says so outright.</para></summary>
+    public static readonly AdamantiumProperty RevealOffsetXProperty = AdamantiumProperty.Register(nameof(RevealOffsetX),
+        typeof(double), typeof(PaneGroup), new PropertyMetadata(0.0));
+
+    public double RevealOffsetX
+    {
+        get => GetValue<double>(RevealOffsetXProperty);
+        set => SetValue(RevealOffsetXProperty, value);
+    }
+
+    public static readonly AdamantiumProperty RevealOffsetYProperty = AdamantiumProperty.Register(nameof(RevealOffsetY),
+        typeof(double), typeof(PaneGroup), new PropertyMetadata(0.0));
+
+    public double RevealOffsetY
+    {
+        get => GetValue<double>(RevealOffsetYProperty);
+        set => SetValue(RevealOffsetYProperty, value);
     }
 
     /// <summary>What the header shows: the active pane's own header. One title, not a list - the tabs below already say
@@ -462,7 +489,29 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
     // what is actually in the group. Kind is NOT here: it comes from where the group stands (see KindProperty).
     private void SyncChrome()
     {
+        // A property callback can fire while the control is still being CONSTRUCTED - default values are applied before
+        // the items collection exists - so there is nothing to describe yet. The rebuild that fills the group calls
+        // this again.
+        if (Items == null) return;
+
         Title = (SelectedItem as Pane)?.Header ?? Items.OfType<Pane>().FirstOrDefault()?.Header;
+
+        // A window showing ONE panel has nothing to choose between, and a strip of one tab is a row of buttons that all
+        // do what is already done - it only takes room away from the thing being looked at. The window's title bar
+        // names it instead. Drop a second panel in and the strip comes back, because then there is a choice to make.
+        ShowTabStrip = !IsFloatingRoot || Items.Count > 1;
+    }
+
+    /// <summary>Whether the tab strip is drawn at all - false for the single panel of a floating window. Derived, never
+    /// authored: it follows from what is IN the group and where the group stands.</summary>
+    public static readonly AdamantiumProperty ShowTabStripProperty = AdamantiumProperty.Register(
+        nameof(ShowTabStrip), typeof(bool), typeof(PaneGroup),
+        new PropertyMetadata(true, PropertyMetadataOptions.AffectsMeasure));
+
+    public bool ShowTabStrip
+    {
+        get => GetValue<bool>(ShowTabStripProperty);
+        private set => SetValue(ShowTabStripProperty, value);
     }
 
     private ButtonBase _pinButton;
@@ -491,6 +540,14 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
     /// is: a press anywhere else in the group belongs to a tab or to the body.</summary>
     private IUIComponent _caption;
 
+    /// <summary>The flyout's caption - the only one a REVEALED panel has on screen, and therefore the one it is dragged
+    /// by in that state.</summary>
+    private IInputComponent _flyoutCaption;
+
+    private MouseButtonEventHandler _captionDown;
+    private MouseEventHandler _captionMove;
+    private MouseButtonEventHandler _captionUp;
+
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
@@ -506,6 +563,30 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         _pinButton = GetTemplateChild("PART_PinButton") as ButtonBase;
         _closeButton = GetTemplateChild("PART_CloseButton") as ButtonBase;
         _caption = GetTemplateChild("PART_Header") as IUIComponent;
+
+        // The flyout's caption drags the panel too - while a panel is revealed that is the ONLY caption it has on
+        // screen, so without this a revealed panel could not be taken anywhere. Handlers go on the element itself
+        // rather than relying on the press reaching this control: the flyout lives in the window's popup layer, not
+        // under this group, so nothing bubbles from it to here.
+        if (_flyoutCaption != null)
+        {
+            _flyoutCaption.RemoveHandler(Mouse.MouseDownEvent, _captionDown);
+            _flyoutCaption.RemoveHandler(Mouse.MouseMoveEvent, _captionMove);
+            _flyoutCaption.RemoveHandler(Mouse.MouseUpEvent, _captionUp);
+        }
+
+        _flyoutCaption = GetTemplateChild("PART_FlyoutHeader") as IInputComponent;
+
+        if (_flyoutCaption != null)
+        {
+            _captionDown ??= OnMouseLeftButtonDown;
+            _captionMove ??= OnMouseMove;
+            _captionUp ??= OnMouseLeftButtonUp;
+
+            _flyoutCaption.AddHandler(Mouse.MouseDownEvent, _captionDown);
+            _flyoutCaption.AddHandler(Mouse.MouseMoveEvent, _captionMove);
+            _flyoutCaption.AddHandler(Mouse.MouseUpEvent, _captionUp);
+        }
 
         // The flyout carries its own pair of them: while a panel is revealed its docked caption is not on screen, and a
         // flyout you cannot pin is a panel you can only look at.

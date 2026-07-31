@@ -25,6 +25,7 @@ using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.EntityServices;
 using Adamantium.UI.Events;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.Docking;
 using Adamantium.UI.Controls.Navigation;
 using Adamantium.UI.Navigation;
 using Adamantium.UI.Platforms.MacOS;
@@ -432,6 +433,9 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
             mappings.Register<ContentControl>(new ContentControlRegionAdapter(viewLocator));
             mappings.Register<Selector>(new SelectorRegionAdapter(viewLocator));
             mappings.Register<ItemsControl>(new ItemsControlRegionAdapter(viewLocator));
+            // Registered for the AREA specifically. A PaneGroup is a Selector and the Selector adapter already covers
+            // it - one strip of tabs. What an area adds is the choice of PLACE, which a strip does not have.
+            mappings.Register<DockingArea>(new DockingAreaRegionAdapter(viewLocator));
             containerRegistry.RegisterInstance<RegionAdapterMappings>(mappings);
         }
 

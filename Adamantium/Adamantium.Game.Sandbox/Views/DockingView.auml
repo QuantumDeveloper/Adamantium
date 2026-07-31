@@ -1,17 +1,19 @@
 <View xmlns="http://adamantium/ui"
       xmlns:behaviors="clr-namespace:Adamantium.Game.Sandbox.Behaviors"
+      xmlns:nav="clr-namespace:Adamantium.UI.Controls.Navigation;assembly=Adamantium.UI.Controls"
       xmlns:docking="clr-namespace:Adamantium.UI.Controls.Docking;assembly=Adamantium.UI.Controls">
-    <Grid RowDefinitions="Auto,Auto,*" Margin="24">
+    <Grid RowDefinitions="Auto,Auto,Auto,*" Margin="24">
 
         <TextBlock Grid.Row="0" MarginBottom="12" MaxWidth="820"
                    Text="An editor-shaped arrangement written as ZONES only. Nothing here says what share of what a group takes - the author writes WHERE (centre, right, bottom) and the split tree is derived from that. Drag the grips between the areas: they rewrite the layout's own shares, which is the number a save would read."
                    Foreground="{ResourceReference TextFillColorSecondary}"/>
 
-        <!-- The application answering the two questions the area asks. Both rules here are about the STATE OF THE
-             LAYOUT AT THIS MOMENT, which is exactly what a set of zones cannot express and therefore what the events
-             are for: no more than three tabs in one panel, and the last tab of a panel may not be pulled out. Where a
-             pane may go AT ALL is data instead - see Pane.Allowed on Errors below, which the compass reads BEFORE the
-             drag, so forbidden indicators are never drawn. -->
+        <!-- The application answering the two questions the area asks. The rule here is about the STATE OF THE LAYOUT
+             AT THIS MOMENT, which is what a set of zones cannot express and therefore what the events are for: the last
+             tab of a panel may not be pulled out. Where a pane may go AT ALL is data instead - see Pane.Allowed on
+             Errors below, which the compass reads BEFORE the drag, so forbidden indicators are never drawn. A pane
+             allowed ONLY to float (Telerik's FloatingOnly) is not written here at all: it cannot start out docked, or
+             it would be standing where its own rules forbid. Open one with "Create in: Floating" above. -->
         <Border Grid.Row="1" MarginBottom="12" Padding="10 6 10 6"
                 Background="{ResourceReference ControlFillColorDefault}"
                 BorderBrush="{ResourceReference ControlStrokeColorDefault}" BorderThickness="1">
@@ -19,14 +21,32 @@
                        Foreground="{ResourceReference TextFillColorSecondary}"/>
         </Border>
 
+        <!-- The area as a navigation REGION. Nothing below names a pane, a group or a zone in code: the view model asks
+             the region for a NAME, and the docking adapter either activates the pane that name already stands for -
+             wherever it has been dragged to since - or opens a new one where "Create in" says. -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" MarginBottom="12">
+            <TextBlock Text="Pane" VerticalAlignment="Center" MarginRight="6"
+                       Foreground="{ResourceReference TextFillColorSecondary}"/>
+            <DropDown ItemsSource="{Binding Pages}" SelectedItem="{Binding SelectedPage, Mode=TwoWay}"
+                      Width="150" MarginRight="14"/>
+
+            <TextBlock Text="Create in" VerticalAlignment="Center" MarginRight="6"
+                       Foreground="{ResourceReference TextFillColorSecondary}"/>
+            <DropDown ItemsSource="{Binding Places}" SelectedItem="{Binding SelectedPlace, Mode=TwoWay}"
+                      Width="120" MarginRight="14"/>
+
+            <Button Content="Navigate" Command="{Binding NavigateCommand}" Width="100" Height="32" MarginRight="8"/>
+            <Button Content="New pane" Command="{Binding NewTabCommand}" Width="100" Height="32"/>
+        </StackPanel>
+
         <!-- Square corners on purpose: areas meet each other along the splitters, and a rounded corner there leaves a
              notch of background at every junction instead of a clean seam. -->
-        <Border Grid.Row="2" BorderThickness="1"
+        <Border Grid.Row="3" BorderThickness="1"
                 BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                 Background="{ResourceReference CardBackgroundFillColorDefault}">
-            <docking:DockingArea DividerThickness="6">
+            <docking:DockingArea DividerThickness="6" nav:RegionManager.RegionName="docking">
                 <docking:DockingArea.Behaviors>
-                    <behaviors:DockingPolicyBehavior MaxPanesPerGroup="3" KeepLastPane="True"/>
+                    <behaviors:DockingPolicyBehavior KeepLastPane="True"/>
                 </docking:DockingArea.Behaviors>
 
                 <!-- Declared first, so it is innermost: the documents. -->
