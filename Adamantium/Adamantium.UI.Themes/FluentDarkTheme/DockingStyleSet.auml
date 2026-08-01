@@ -74,7 +74,7 @@
     </Style>
 
     <!-- A TOOL group is dressed differently from a document one, and the difference is not decoration: a tool has a
-         HEADER carrying its name and the two things you do to a tool and never to a document - pin it away and close it -
+         HEADER carrying its name and the two things you do to a tool and never to a document - put it away and close it -
          while its tabs sit along the BOTTOM. A document has many siblings and no caption of its own; a tool has few and
          is part of the workspace rather than of the work. Every editor draws this distinction; until now we drew none. -->
     <!-- Close buttons and the stretched lone tab are BEHAVIOUR, not looks: they live on PaneGroup and DockingArea
@@ -117,7 +117,7 @@
                                      accurate-pointing-device-only target, and a header is exactly where someone on a
                                      tablet reaches to put a panel away. The square also makes them line up with each
                                      other and sit centred in the header without anyone counting paddings. -->
-                                <controls:Button x:Name="PART_PinButton" Grid.Column="1"
+                                <controls:Button x:Name="PART_AutoHideButton" Grid.Column="1"
                                         Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0"
                                         Classes="CaptionButton"
 
@@ -130,7 +130,7 @@
                                          shoulders (3..11), tapering neck (6..8), point at (7,12). Drawn, never typed -
                                          a glyph depends on a font having it, and the one this started as is missing
                                          from most UI fonts, so the button rendered empty. -->
-                                    <controls:Path x:Name="PinGlyph"
+                                    <controls:Path x:Name="AutoHideGlyph"
                                             Data="M5,2 L9,2 L9,4 L11,6 L11,7 L8,7 L8,10 L7,12 L6,10 L6,7 L3,7 L3,6 L5,4 Z"
                                             Stroke="{ThemeResource AccentForegroundColor}" StrokeThickness="1"
                                             Fill="{ThemeResource AccentForegroundColor}"
@@ -190,7 +190,7 @@
                              popup so that it draws OVER the neighbours instead of pushing them aside (rule 3.10); the
                              strip is what it is placed against, so it opens exactly where the panel would have been.
                              Its own caption, because the docked one is not on screen in this state - and a flyout you
-                             cannot pin is a panel you can only look at. -->
+                             cannot dock back is a panel you can only look at. -->
                         <!-- Placed against the GROUP, not the tab strip inside it: the strip sits at whatever inset the
                              chrome gives it, and a flyout lined up with the strip carried that inset along - so it
                              started left of the panel and ran off the far end. The group is what the docking area puts
@@ -215,14 +215,14 @@
                                             <controls:ContentPresenter Grid.Column="0" VerticalAlignment="Center"
                                                     Content="{TemplateBinding Title}"
                                                     Foreground="{ThemeResource AccentForegroundColor}"/>
-                                            <controls:Button x:Name="PART_FlyoutPinButton" Grid.Column="1"
+                                            <controls:Button x:Name="PART_FlyoutAutoHideButton" Grid.Column="1"
                                                     Width="28" Height="28" MinWidth="0" MinHeight="0" Padding="0"
                                                     Classes="CaptionButton"
                                                     BackgroundPointerOver="{ResourceReference OnAccentOverlayPointerOver}"
                                                     BackgroundPressed="{ResourceReference OnAccentOverlayPressed}"
                                                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                                     VerticalAlignment="Center">
-                                                <!-- Hollow: this panel is NOT pinned - that is the whole reason it is a
+                                                <!-- Hollow: this panel is NOT docked - that is the whole reason it is a
                                                      flyout. Pressing it is what docks it, and the tack fills in. -->
                                                 <controls:Path Data="M5,2 L9,2 L9,4 L11,6 L11,7 L8,7 L8,10 L7,12 L6,10 L6,7 L3,7 L3,6 L5,4 Z"
                                                         Stroke="{ThemeResource AccentForegroundColor}" StrokeThickness="1"
@@ -265,23 +265,23 @@
                              rearrange - there is no docked panel here to rearrange in. The CAPTION stays: a revealed
                              panel still has to say which panel it is. -->
                         <PropertyTrigger Property="IsFolded" Value="true">
-                            <!-- Unpinned: the thumbtack is an OUTLINE. Pinned it is SOLID - that filled/hollow pair is how
-                                 every editor shows the state of the pin, and it is the button telling you what it did. -->
-                            <Setter TargetName="PinGlyph" Property="Fill" Value="Transparent"/>
+                            <!-- Folded away: the thumbtack is an OUTLINE. Docked it is SOLID - that filled/hollow pair is how
+                                 every editor shows the state of auto-hide, and it is the button telling you what it did. -->
+                            <Setter TargetName="AutoHideGlyph" Property="Fill" Value="Transparent"/>
                         </PropertyTrigger>
                         <!-- Put AWAY: caption and body both go, and the strip is all that is left, exactly where the
                              panel was. Revealed keeps both - that is the whole difference between the two folded states.
                              How much room the strip needs is measured by the strip (the group's length becomes Auto), so
                              there is no size stated here for anything to disagree with. -->
-                        <!-- Not on an EDGE: there is nowhere to fold to, so the pin has nothing it could do. A button
+                        <!-- Not on an EDGE: there is nowhere to fold to, so auto-hide has nothing it could do. A button
                              that is present and does nothing is worse than one that is not there - it says the panel
                              refused, when in fact nothing was ever asked of it. -->
                         <PropertyTrigger Property="Edge" Value="None">
-                            <Setter TargetName="PART_PinButton" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="PART_AutoHideButton" Property="Visibility" Value="Collapsed"/>
                         </PropertyTrigger>
                         <!-- The whole of a floating window: the window's own title bar names it and carries the system's
                              close button, so a caption here would repeat the name word for word, in a second colour, with
-                             a pin that has no edge left to fold against. -->
+                             a thumbtack with no edge left to fold against. -->
                         <PropertyTrigger Property="IsFloatingRoot" Value="true">
                             <Setter TargetName="PART_Header" Property="Visibility" Value="Collapsed"/>
                         </PropertyTrigger>
