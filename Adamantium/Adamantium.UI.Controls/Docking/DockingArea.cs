@@ -61,6 +61,9 @@ public class DockingArea : Panel
 
     private PaneNode RootContent => (_root ?? Layout.Main)?.Content;
 
+    /// <summary>THIS window's document area, or null if it has none - a floating window of tools does not.</summary>
+    private PaneNode Well => (_root ?? Layout.Main)?.DocumentWell;
+
     // The control per group node, kept ACROSS rebuilds: a group that merely moved keeps its selection and scroll.
     private readonly Dictionary<PaneGroupNode, PaneGroup> _groupsByNode = new();
 
@@ -69,7 +72,8 @@ public class DockingArea : Panel
 
     protected override Size MeasureOverride(Size availableSize)
     {
-        EnsureLayout();
+        EnsureLayout(fromLayoutPass: true);
+        FollowWindowActivation(HostWindow);
 
         // Strips first, each asked what it needs across its own edge; the rest is the tree's.
         var left = MeasureBar(DockZone.Left, availableSize);
@@ -87,7 +91,7 @@ public class DockingArea : Panel
 
     protected override Size ArrangeOverride(Size finalSize)
     {
-        EnsureLayout();
+        EnsureLayout(fromLayoutPass: true);
 
         // Sides take the FULL height, bands what is left between them - the order the layout itself uses (rule 2.3).
         var left = BarExtent(DockZone.Left);
@@ -107,6 +111,22 @@ public class DockingArea : Panel
         ArrangeBar(DockZone.Bottom, new Rect(left, finalSize.Height - bottom, bandWidth, bottom));
 
         return finalSize;
+    }
+
+    /// <summary>The window this area lives in - its own for a floating one, the walk up the tree for the main one.</summary>
+    private WindowBase HostWindow
+    {
+        get
+        {
+            if (_window != null) return _window;
+
+            for (IUIComponent node = this; node != null; node = node.VisualParent)
+            {
+                if (node is WindowBase window) return window;
+            }
+
+            return null;
+        }
     }
 
     /// <summary>The visual for the split tree - one child among the strips, and the only one that grows.</summary>
@@ -260,6 +280,106 @@ public class DockingArea : Panel
         if (node != null && Layout.RevealGroup(node)) Rebuild();
     }
 
+    /// <summary>Makes a pane THE active one - what is being worked in. One across the whole layout, floating windows
+    /// included, so the accent border says where the work is rather than where a pointer once passed. The GROUP holding
+    /// it is what wears the accent.
+    /// <para>A PANE and not the group, and not a control: controls are thrown away and rebuilt from the model, and a
+    /// GROUP is not permanent either - dropping a tab into another panel merges it away. Measured: a tab torn into a
+    /// window and then dropped onto another one left the accent pointing at a group that no longer existed, so nothing
+    /// was lit until the next click. A pane id survives every move, which is exactly what "what am I working in" needs.
+    /// </para></summary>
+    internal void MakeActive(PaneGroup group) => MakeActive(NodeOf(group));
+
+    private void MakeActive(PaneGroupNode node) => MakeActive(ActivePaneOf(node));
+
+    private void MakeActive(string paneId)
+    {
+        if (paneId == null) return;
+
+        // Remembered PER WINDOW as well: coming back to a window has to restore the pane that was being worked in
+        // THERE, not hand the accent to whichever panel that window happens to build first.
+        if (Layout.FindGroup(paneId) is { } home && Layout.RootOf(home) is { } root)
+        {
+            Owner._activeByRoot[root] = paneId;
+        }
+
+        if (paneId == Owner._activePane) return;
+
+        Owner._activePane = paneId;
+        Owner.SyncActive();
+    }
+
+    // The pane a group is CURRENTLY showing - what activating that panel means.
+    private static string ActivePaneOf(PaneGroupNode node)
+    {
+        if (node == null || node.IsEmpty) return null;
+
+        var index = node.ActiveIndex;
+        return index >= 0 && index < node.PaneIds.Count ? node.PaneIds[index] : node.PaneIds[0];
+    }
+
+    // Whether this group is the one holding the active pane.
+    private bool IsActiveGroup(PaneGroupNode group)
+    {
+        return Owner._activePane != null && group != null && group.PaneIds.Contains(Owner._activePane);
+    }
+
+    // A window becoming the active one makes its panel the active panel: an accent border that only answers to a click
+    // INSIDE the panel leaves the whole window looking inactive after it is raised by its caption or by Alt-Tab.
+    private void FollowWindowActivation(WindowBase window)
+    {
+        if (window == null || !_watchedWindows.Add(window)) return;
+
+        window.PropertyChanged += (_, e) =>
+        {
+            if (e.Property != WindowBase.IsActiveProperty || !window.IsActive) return;
+
+            MakeActive(ActivePaneOf(_root ?? Layout.Main));
+        };
+    }
+
+    // Which pane of a window wears the accent when that window is raised: the one last worked in there, or - the first
+    // time, or after that one has left - whatever the window holds.
+    private string ActivePaneOf(DockingRoot root)
+    {
+        if (root == null) return null;
+
+        if (Owner._activeByRoot.TryGetValue(root, out var remembered)
+            && Layout.FindGroup(remembered) is { } home && ReferenceEquals(Layout.RootOf(home), root))
+        {
+            return remembered;
+        }
+
+        foreach (var group in DockingLayout.GroupsIn(root.Content))
+        {
+            if (ActivePaneOf(group) is { } pane) return pane;
+        }
+
+        return null;
+    }
+
+    private readonly Dictionary<DockingRoot, string> _activeByRoot = new();
+
+    // Subscribed once per window. The MAIN one is only reachable once this area is in a tree, so it is wired from the
+    // layout pass rather than from a constructor that runs before there is a window to speak of.
+    private readonly HashSet<WindowBase> _watchedWindows = [];
+
+    // Paints the flag onto whatever controls exist right now, in every window. Not a rebuild: which panel is active
+    // changes nothing about the layout, and rebuilding on a mouse press would throw the strip's scroll away mid-click.
+    private void SyncActive()
+    {
+        foreach (var area in Family)
+        {
+            foreach (var pair in area._groupsByNode)
+            {
+                pair.Value.IsActive = IsActiveGroup(pair.Key);
+            }
+        }
+    }
+
+    // The pane being worked in - an ID, because it outlives the group holding it (see MakeActive).
+    private string _activePane;
+
     /// <summary>Puts a revealed body away again, leaving the strip.</summary>
     internal void Hide(PaneGroup group)
     {
@@ -335,13 +455,13 @@ public class DockingArea : Panel
         if (paneId == null || !Owner._hidden.Remove(paneId, out var spot)) return false;
 
         var home = spot.Group;
-        if (home is { Parent: not null } || ReferenceEquals(home, Layout.DocumentWell))
+        if (home is { Parent: not null } || Layout.IsDocument(home))
         {
             home.Insert(System.Math.Min(spot.Index, home.PaneIds.Count), paneId);
         }
-        else if (spot.Zone is DockZone.Center && Layout.DocumentWell != null)
+        else if (spot.Zone is DockZone.Center && Layout.ActiveWellGroup is { } documents)
         {
-            Layout.DocumentWell.Add(paneId);
+            documents.Add(paneId);
         }
         else
         {
@@ -370,6 +490,14 @@ public class DockingArea : Panel
         var id = EnsureId(pane);
         RegisterPane(id, pane);
 
+        // Asked before this area has read its own markup (a region adapter attaches first - see EnsureLayout): the pane
+        // waits for it rather than founding a layout of its own that the authored one would then replace.
+        if (!_layoutBuilt)
+        {
+            _deferredPanes.Add((pane, zone));
+            return id;
+        }
+
         // Already here: opening it again ACTIVATES it rather than making a second copy of the same thing.
         if (Layout.FindGroup(id) is { } existing)
         {
@@ -393,10 +521,11 @@ public class DockingArea : Panel
             zone = DockZone.Center;
         }
 
-        if (zone is DockZone.Center && Layout.DocumentWell is { } well)
+        // Into the ACTIVE group of the document area - which is the area itself until it has been split (rule 1.6.3).
+        if (zone is DockZone.Center && Layout.ActiveWellGroup is { } documents)
         {
-            well.Add(id);
-            well.ActiveIndex = well.PaneIds.Count - 1;
+            documents.Add(id);
+            documents.ActiveIndex = documents.PaneIds.Count - 1;
         }
         else if (Layout.GroupAt(_root ?? Layout.Main, zone) is { } side)
         {
@@ -430,6 +559,9 @@ public class DockingArea : Panel
             Layout.Normalize();
         }
 
+        // What has just been opened is what is being worked in.
+        Owner._activePane = id;
+
         RebuildFamily();
         return id;
     }
@@ -440,6 +572,7 @@ public class DockingArea : Panel
         if (Layout.FindGroup(paneId) is not { } group) return false;
 
         group.ActiveIndex = group.PaneIds.IndexOf(paneId);
+        Owner._activePane = paneId;   // navigating to a pane is what makes its panel the one being worked in
 
         // Shown, not pinned back: navigating to a tool is a glance at it, like clicking its tab on the strip.
         if (group.State == PaneGroupState.Collapsed) Layout.RevealGroup(group);
@@ -876,11 +1009,10 @@ public class DockingArea : Panel
         // that would then be undone.
         if ((allowed & zone) == 0) zone = DockZone.None;
 
-        // Splitting the CENTRE costs the centre; splitting a tool panel costs that panel, which the centre's floor has
-        // no say in. Asking the floor about both left a panel undroppable beside ANY panel once the centre was at its
-        // minimum.
-        if (ReferenceEquals(node, Layout.DocumentWell) && (RoomFor() & zone) == 0) zone = DockZone.None;
-
+        // The centre's floor (rule 7.6) is NOT asked here. A cross aimed inside the document area divides the AREA
+        // ITSELF and both halves stay documents (rule 1.6), so the area is worth exactly what it was; a cross aimed at a
+        // tool costs that tool, which the centre has no say in. What does cost the centre is a band arriving from
+        // OUTSIDE it - that is the edge anchors above, and they are where the floor is spent.
         return new DockTarget(node, bounds, zone, DockCompass.PreviewOf(bounds, zone));
     }
 
@@ -930,7 +1062,10 @@ public class DockingArea : Panel
 
         var node = new PaneGroupNode();
         node.Add(pane.Id);
-        var root = new DockingRoot(node, isMain: false);
+
+        // The new window's CENTRE is what was carried into it, whatever it was where it came from - see
+        // DockingLayout.TearOffGroup. Alone in a window, a pane stands in that window's centre and is a document there.
+        var root = new DockingRoot(node, isMain: false) { DocumentWell = node };
         Layout.Roots.Add(root);
 
         // How far along its tab the pointer took hold, read BEFORE the rebuild - the window is then placed so the grip
@@ -941,6 +1076,10 @@ public class DockingArea : Panel
 
         var floating = Float(root, pane.Header?.ToString() ?? "Pane", out var pieceWindow, was);
         Show(floating, pieceWindow, grabX);
+
+        // What was just carried out IS what is being worked in. Waiting for the window's activation instead left the
+        // torn-off pane selected but with no accent anywhere until it was clicked.
+        Owner.MakeActive(node);
 
         Owner.CloseEmptyWindows();   // it may have been the last pane of a floating window
 
@@ -981,6 +1120,10 @@ public class DockingArea : Panel
 
         Rebuild();   // detaches it from this tree, so the floating area can take it
         Show(area, window, grabX);
+
+        // Carried out by hand, so it is what is being worked in - see TearOff.
+        Owner.MakeActive(node);
+
         Owner.CloseEmptyWindows();
         return true;
     }
@@ -1006,6 +1149,7 @@ public class DockingArea : Panel
         window.Closed += (_, _) => CloseRoot(root);
 
         area._window = window;
+        area.FollowWindowActivation(window);
         return area;
     }
 
@@ -1040,7 +1184,8 @@ public class DockingArea : Panel
         group.Add(id);
         group.ActiveIndex = 0;
 
-        var root = new DockingRoot(group, isMain: false);
+        // Standing alone in a window means standing in that window's centre, exactly as a torn-off pane does.
+        var root = new DockingRoot(group, isMain: false) { DocumentWell = group };
         Layout.Roots.Add(root);
 
         OpenWindowFor(root, title, default);
@@ -1304,11 +1449,11 @@ public class DockingArea : Panel
         }
 
         // The same answers Resolve arms the drop with, so no indicator promises what a drop then declines. The floor
-        // speaks only for what the CENTRE pays: every edge anchor, and a side of the centre itself.
-        var room = RoomFor();
-        _compass.AllowedZones = Owner._dragAllowed
-            & (ReferenceEquals(target.Node, Layout.DocumentWell) ? room : DockZone.All);
-        _compass.AllowedEdgeZones = Owner._dragAllowed & room;
+        // speaks only for the EDGE anchors: those are bands taken OUT of the centre. The cross always offers all four
+        // sides - over the document area it divides the area into strictly-document parts (rule 1.6), over a tool it
+        // costs that tool.
+        _compass.AllowedZones = Owner._dragAllowed;
+        _compass.AllowedEdgeZones = Owner._dragAllowed & RoomFor();
         _compass.AimAt(target.Bounds, target.Zone, target.IsEdge, EdgeDockSize);
     }
 
@@ -1316,8 +1461,10 @@ public class DockingArea : Panel
     // (rule 7.6). Tabbing into a group and floating cost the centre nothing, so they are always on offer.
     private DockZone RoomFor()
     {
-        var well = Layout.DocumentWell;
-        if (well == null || !_groupsByNode.TryGetValue(well, out var group)) return DockZone.All;
+        // The area as a whole, however many groups it has been split into (rule 1.6): what a tool costs is taken from
+        // all of it, not from whichever group happens to be first. THIS window's area - a floating one has its own, and
+        // a window with none charges nothing.
+        if (VisualOf(Well) is not { } well || well.Bounds.Width <= 0) return DockZone.All;
 
         // The arrival costs only the DIVIDER, not its whole band: a band that does not fit is squeezed, not refused
         // (PaneHost hands every child its minimum first). Charging the full band left top and bottom never on offer on
@@ -1325,8 +1472,8 @@ public class DockingArea : Panel
         var cost = DividerThickness;
         var zones = DockZone.Center | DockZone.Floating;
 
-        if (group.Bounds.Width - cost > DocumentMinSize) zones |= DockZone.Left | DockZone.Right;
-        if (group.Bounds.Height - cost > DocumentMinSize) zones |= DockZone.Top | DockZone.Bottom;
+        if (well.Bounds.Width - cost > DocumentMinSize) zones |= DockZone.Left | DockZone.Right;
+        if (well.Bounds.Height - cost > DocumentMinSize) zones |= DockZone.Top | DockZone.Bottom;
 
         return zones;
     }
@@ -1358,14 +1505,33 @@ public class DockingArea : Panel
         // BEFORE the model is touched, and of the RECEIVING area: a veto found afterwards would mean undoing a move.
         if (area.Refuses(new PaneDockingEventArgs([..DockingLayout.PanesIn(root.Content)], target.Node, target.Zone))) return;
 
+        // Read BEFORE the move: dropping onto a centre indicator merges the dragged group away entirely (its panes
+        // become tabs of the target), and afterwards there is no node left to ask what was being carried.
+        var carried = ActivePaneOf(root.Content as PaneGroupNode)
+                      ?? DockingLayout.PanesIn(root.Content).FirstOrDefault();
+
+        // An EDGE anchor lands BESIDE what it is aimed at, never inside it: in a floating window the document area IS
+        // the whole content, so without saying so a tool dropped on the rim joined the documents and came out dressed
+        // as one (rule 1.6 - the cross divides the area, the rim does not).
         if (!Layout.MoveNode(root.Content, target.Node, target.Zone,
-                size: target.IsEdge ? PaneLength.Pixels(EdgeDockSize) : null)) return;
+                size: target.IsEdge ? PaneLength.Pixels(EdgeDockSize) : null, beside: target.IsEdge)) return;
 
         // The window gives up its controls BEFORE anything rebuilds: their panes are about to join another tree.
         window.Content = null;
-        FloatingArea(window)?.Release();
+        var donor = FloatingArea(window);
+        donor?.Release();
+
+
+
+        // What was just dropped is what is being worked in, wherever it ended up - and its WINDOW is what is being
+        // worked in too. Without raising it the accent was handed straight back: the emptied window closes, the OS
+        // gives focus to whichever window is next in line, and the activation handler follows it. Measured - a tab
+        // dropped into the main window lit up and went dark again as a leftover floating window took the focus.
+        Owner.MakeActive(carried);
+        area.HostWindow?.Activate();
 
         RebuildFamily();
+
     }
 
     private DockingArea FloatingArea(WindowBase window)
@@ -1396,7 +1562,19 @@ public class DockingArea : Panel
     // from the model rather than one of them patched.
     private void RebuildFamily()
     {
-        foreach (var area in Family) area.Rebuild();
+        // Windows whose ROOT has left the layout are not rebuilt: their panes are already somewhere else, and building
+        // them again would hand the SAME content to a second, doomed set of controls. Content is an element and an
+        // element has one parent, so the losing copy takes it out of the live tree - measured on a merge of two floating
+        // windows: the emptied window rebuilt itself, its tab body left the surviving window, and the tab went blank.
+        // They are closed a line later; this only stops them showing anything on the way out.
+        foreach (var area in Family)
+        {
+            if (area._root != null && !Layout.Roots.Contains(area._root)) 
+                continue;
+
+            area.Rebuild();
+        }
+
         Owner.CloseEmptyWindows();
     }
 
@@ -1480,10 +1658,11 @@ public class DockingArea : Panel
         {
             case PaneGroupNode group:
             {
-                // An empty group is gone - except the document well, which stays as empty space. Closing the last
-                // document must not take the centre of the layout with it.
-                var isWell = ReferenceEquals(group, Layout.DocumentWell);
-                if (group.IsEmpty && !isWell) return null;
+                // An empty group is gone - except the LAST one of the document area, which stays as empty space: closing
+                // the last document must not take the centre of the layout with it (rule 1.4). One of two editors side
+                // by side is ordinary and does die when emptied.
+                var isDocument = Layout.IsDocument(group);
+                if (group.IsEmpty && !ReferenceEquals(group, Well)) return null;
 
                 var control = GroupFor(group);
 
@@ -1494,9 +1673,13 @@ public class DockingArea : Panel
                 control.Edge = DockingLayout.EdgeOf(group);
                 control.IsFloatingRoot = _root is { IsMain: false } && ReferenceEquals(RootContent, group);
 
-                // Looks follow the PLACE (rule 1.2): a tool dropped into the centre is dressed as a document - it has no
-                // edge there to fold against, so a pin would be a button that cannot do anything.
-                control.Kind = isWell ? PaneKind.Document : PaneKind.Tool;
+                // Looks follow the PLACE (rule 1.2): anything INSIDE the document area is dressed as a document - it has
+                // no edge there to fold against, so a pin would be a button that cannot do anything. After rule 1.6
+                // that is every group of a split area, not just the one - and a window documents were carried into,
+                // which is the area away from home rather than a tool.
+                control.Kind = isDocument ? PaneKind.Document : PaneKind.Tool;
+                ApplyTabPolicy(control);   // after Kind: which half of the policy applies follows from it
+                control.IsActive = IsActiveGroup(group);
                 control.RevealExtent = FlyoutExtent(group);
 
                 FillPanes(control, group);
@@ -1678,6 +1861,94 @@ public class DockingArea : Panel
     /// <summary>Space left between two neighbours for the divider that will sit there.</summary>
     public double DividerThickness { get; set; } = 4.0;
 
+    // --- Tab policy -------------------------------------------------------------------------------------------------
+    // How the tabs of a panel behave, stated on the AREA and pushed onto every group it builds (like Kind, Edge and
+    // State). Here rather than in the theme because this is a decision about BEHAVIOUR - is a lone tab a title - and the
+    // theme should only have to say what that looks like. A host changes it in markup or code without restyling
+    // anything or copying a control template. Whether a tab carries a CLOSE button is not here: that belongs to the
+    // pane, one answer per panel (Pane.IsClosable), not one answer for every document in the area.
+
+    /// <summary>Whether the ONLY document tab fills its strip, reading as the title of what is open. A second document
+    /// makes them ordinary tabs again. On by default; tools keep plain tabs, their name is on their caption.</summary>
+    public static readonly AdamantiumProperty StretchSingleDocumentTabProperty = AdamantiumProperty.Register(
+        nameof(StretchSingleDocumentTab), typeof(bool), typeof(DockingArea),
+        new PropertyMetadata(true, OnTabPolicyChanged));
+
+    // Where the selection bar of a panel's strip runs, and how thick it is - the same two properties every TabControl
+    // has, said ONCE for the whole area. Nullable, and that is the point: unset means the area has NO opinion and does
+    // not touch its groups, so the theme's look stands and a group that states its own keeps it. Only a value here is
+    // pushed down, and then it is pushed to all of them, which is what "the area decides" has to mean.
+    public static readonly AdamantiumProperty SelectionIndicatorPlacementProperty = AdamantiumProperty.Register(
+        nameof(SelectionIndicatorPlacement), typeof(TabIndicatorPlacement?), typeof(DockingArea),
+        new PropertyMetadata(null, OnTabPolicyChanged));
+
+    public static readonly AdamantiumProperty SelectionIndicatorThicknessProperty = AdamantiumProperty.Register(
+        nameof(SelectionIndicatorThickness), typeof(double?), typeof(DockingArea),
+        new PropertyMetadata(null, OnTabPolicyChanged));
+
+    public bool StretchSingleDocumentTab
+    {
+        get => GetValue<bool>(StretchSingleDocumentTabProperty);
+        set => SetValue(StretchSingleDocumentTabProperty, value);
+    }
+
+    /// <summary>Which side of a panel's tab strip the selection bar runs along, for every panel of this area. Unset
+    /// (default): each strip keeps what the theme or the group itself says.</summary>
+    public TabIndicatorPlacement? SelectionIndicatorPlacement
+    {
+        get => GetValue<TabIndicatorPlacement?>(SelectionIndicatorPlacementProperty);
+        set => SetValue(SelectionIndicatorPlacementProperty, value);
+    }
+
+    /// <summary>How thick that bar is, for every panel of this area. Unset (default): the theme's thickness.</summary>
+    public double? SelectionIndicatorThickness
+    {
+        get => GetValue<double?>(SelectionIndicatorThicknessProperty);
+        set => SetValue(SelectionIndicatorThicknessProperty, value);
+    }
+
+    // The policy as PLAIN FIELDS, mirrored from the properties above. Building a panel must never READ a property of
+    // the area: SetValue holds the component's lock across its callbacks, so while a layout load runs inside
+    // Workspace's callback on the loop thread and waits for the dispatcher, the pump thread rebuilding panels would
+    // wait for that same lock - measured as a hang the moment the docking view was shown.
+    private bool _stretchSingleDocumentTab = true;
+    private TabIndicatorPlacement? _indicatorPlacement;
+    private double? _indicatorThickness;
+
+    // Pushed onto the live controls at once - the policy is about panels that already exist, and waiting for the next
+    // rebuild would leave the setting apparently ignored.
+    private static void OnTabPolicyChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (component is not DockingArea area) return;
+
+        // GetValue, not e.NewValue: that is the raw slot, not the effective value. Re-entrant here - this callback
+        // already runs under the area's own lock, on the thread that took it.
+        area._stretchSingleDocumentTab = area.StretchSingleDocumentTab;
+        area._indicatorPlacement = area.SelectionIndicatorPlacement;
+        area._indicatorThickness = area.SelectionIndicatorThickness;
+
+        foreach (var member in area.Family)
+        {
+            foreach (var pair in member._groupsByNode) member.ApplyTabPolicy(pair.Value);
+        }
+    }
+
+    // The area's tab policy, as it applies to THIS group - which side of rule 1.2 it is on decides what applies.
+    private void ApplyTabPolicy(PaneGroup control)
+    {
+        var isDocument = control.Kind == PaneKind.Document;
+        var owner = Owner;
+
+        // A DOCUMENT group allows close buttons on its tabs; which of its panes actually carry one is each pane's own
+        // answer (Pane.IsClosable). A TOOL group never does: its close button is on the CAPTION, and it already closes
+        // the selected pane rather than the group - a second button beside it would say the same thing twice.
+        control.ShowCloseButton = isDocument;
+        control.StretchSingleTab = isDocument && owner._stretchSingleDocumentTab;
+
+        if (owner._indicatorPlacement is { } placement) control.SelectionIndicatorPlacement = placement;
+        if (owner._indicatorThickness is { } thickness) control.SelectionIndicatorThickness = thickness;
+    }
+
     /// <summary>How wide a pane docked to an EDGE starts out, in pixels along that edge's axis. A band, not half the
     /// area; in pixels so a side panel keeps its width while the window resizes around it.</summary>
     public static readonly AdamantiumProperty EdgeDockSizeProperty = AdamantiumProperty.Register(
@@ -1702,11 +1973,26 @@ public class DockingArea : Panel
 
     private bool _layoutBuilt;
 
-    // Builds the layout from the authored groups ONCE - everything after that is the layout's own history, and
-    // rebuilding from markup would throw away what the user arranged.
-    private void EnsureLayout()
+    // Panes opened from code BEFORE the markup's children arrived - see EnsureLayout.
+    private readonly List<(Pane Pane, DockZone Zone)> _deferredPanes = [];
+
+    /// <summary>
+    /// Builds the layout from the authored groups ONCE - everything after that is the layout's own history, and
+    /// rebuilding from markup would throw away what the user arranged.
+    /// </summary>
+    /// <param name="fromLayoutPass">Called from measure/arrange, where the markup has certainly been applied: an area
+    /// with no authored groups at all is then genuinely empty, rather than merely not filled in yet.
+    /// <para>The difference is not academic. The generated view sets RegionName on the area and only THEN adds its
+    /// panes, so a region adapter attaches to an area that has no children yet - and on a SECOND visit that adapter
+    /// already knows which panes are open and opens them immediately. Built from that moment, the layout would be built
+    /// out of nothing: no main root (an NRE the first time a pane was opened into it) and the authored panels gone.</para></param>
+    private void EnsureLayout(bool fromLayoutPass = false)
     {
         if (_layoutBuilt) return;
+
+        // Nothing authored YET and nobody has laid us out: stay unbuilt and let the caller wait for the markup.
+        if (Children.Count == 0 && !fromLayoutPass) return;
+
         _layoutBuilt = true;
 
         var declarations = new List<ZoneDeclaration>();
@@ -1752,7 +2038,15 @@ public class DockingArea : Panel
                                      "be authored inside a docked panel - opening it in a window of its own instead.");
         }
 
-        if (declarations.Count == 0) return;
+        if (declarations.Count == 0)
+        {
+            // An area with no authored groups is legitimate - a region fills it and nothing else. It still needs its
+            // MAIN root: that is where a pane opened from code goes, and a layout without one is not a layout.
+            if (Layout.Main == null) Layout.Roots.Add(new DockingRoot(null, isMain: true));
+
+            OpenDeferredPanes();
+            return;
+        }
 
         Layout = DockingLayout.FromZones(declarations);
 
@@ -1769,6 +2063,19 @@ public class DockingArea : Panel
             RegisterPane(id, pane);
             FloatNew(id, pane.Header?.ToString() ?? "Panel");
         }
+
+        OpenDeferredPanes();
+    }
+
+    // The panes that asked to be opened while the area was still empty, now that it knows its own shape.
+    private void OpenDeferredPanes()
+    {
+        if (_deferredPanes.Count == 0) return;
+
+        var waiting = _deferredPanes.ToArray();
+        _deferredPanes.Clear();
+
+        foreach (var (pane, zone) in waiting) AddPane(pane, zone);
     }
 
     // A pane's id, made from its header when the author gave none - from the header, not the position, so a saved

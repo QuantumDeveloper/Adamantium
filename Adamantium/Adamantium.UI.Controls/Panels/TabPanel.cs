@@ -45,6 +45,12 @@ public class TabPanel : Panel
         return horizontal ? new Size(main, cross) : new Size(cross, main);
     }
 
+    /// <summary>Whether a LONE tab fills the strip - the owning control's <see cref="TabControl.StretchSingleTab"/>. Read
+    /// from the owner rather than set on this panel: the panel is built from an ItemsPanelTemplate, so the theme cannot
+    /// address this instance, and writing it from the control's code would outrank the theme and never give it back.</summary>
+    private bool StretchesTheOnlyTab =>
+        Children.Count == 1 && (VisualParent as ItemsPresenter)?.Owner is TabControl { StretchSingleTab: true };
+
     protected override Size ArrangeOverride(Size finalSize)
     {
         var horizontal = Orientation == Orientation.Horizontal;
@@ -52,6 +58,15 @@ public class TabPanel : Panel
         var cross = horizontal
             ? Math.Min(finalSize.Height, DesiredSize.Height)
             : Math.Min(finalSize.Width, DesiredSize.Width);
+
+        // ONE tab told to fill takes the whole strip. Only in ARRANGE: the strip is measured with an unbounded axis (see
+        // TabStripScroller) so there is no length to fill until the slot is handed down.
+        if (StretchesTheOnlyTab)
+        {
+            var only = Children[0];
+            only.Arrange(horizontal ? new Rect(0, 0, finalSize.Width, cross) : new Rect(0, 0, cross, finalSize.Height));
+            return horizontal ? new Size(finalSize.Width, cross) : new Size(cross, finalSize.Height);
+        }
 
         double main = 0;
         foreach (var child in Children)

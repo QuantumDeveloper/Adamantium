@@ -1937,6 +1937,49 @@ namespace Adamantium.UITests
          });
       }
 
+      /// <summary>
+      /// A child COLLAPSED and shown again gives its Auto track its height back on the next pass.
+      /// <para>Measured on a docking panel: a tab strip hidden while the panel was alone in a window stayed invisible
+      /// after it was docked back with three tabs - the row said Visible and measured zero. The strip is a child of an
+      /// Auto row, and hiding it left that row with a height nothing put back.</para>
+      /// </summary>
+      [Test]
+      public void AChildShownAgain_GivesItsAutoTrackItsHeightBack()
+      {
+         var grid = new Grid();
+         grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+         grid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
 
+         var strip = new Border { Height = 36 };
+         var body = new Border();
+         grid.Children.Add(strip);
+         grid.Children.Add(body);
+         Grid.SetRow(body, 1);
+
+         var slot = new Rect(0, 0, 400, 300);
+
+         grid.Measure(slot.Size);
+         grid.Arrange(slot);
+         Assert.That(strip.RenderSize.Height, Is.EqualTo(36).Within(0.5), "the row starts at the strip's height");
+
+         // The grid is told to measure again explicitly: it caches a pass over the same size, and whether a child's
+         // visibility REACHES it is the layout manager's business, not this test's.
+         strip.Visibility = Visibility.Collapsed;
+         grid.InvalidateMeasure();
+         grid.Measure(slot.Size);
+         grid.Arrange(slot);
+         Assert.That(body.Bounds.Y, Is.EqualTo(0).Within(0.5), "hidden, it gives the row up entirely");
+
+         strip.Visibility = Visibility.Visible;
+         grid.InvalidateMeasure();
+         grid.Measure(slot.Size);
+         grid.Arrange(slot);
+
+         Assert.Multiple(() =>
+         {
+            Assert.That(strip.RenderSize.Height, Is.EqualTo(36).Within(0.5), "and shown again it takes it back");
+            Assert.That(body.Bounds.Y, Is.EqualTo(36).Within(0.5), "so the body moves down for it");
+         });
+      }
    }
 }

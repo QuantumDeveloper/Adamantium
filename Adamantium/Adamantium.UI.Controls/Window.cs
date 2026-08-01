@@ -57,6 +57,13 @@ public class Window : WindowBase
 
     public override void Hide()
     {
+        // Cancels a DEFERRED show as well. Show() on a window that has not drawn its first frame only asks to be shown
+        // later (ShouldDisplayWindow, carried out by the renderer after the first Present); left standing, that request
+        // outlived the Hide and put the window back up by itself.
+        // Measured on the docking compass: an overlay shown and hidden inside one drag came back after the first frame
+        // and stayed - a topmost, captionless window over the docking area and over the floating windows, which is what
+        // "the control froze" was. The window said it was hidden; the OS said otherwise.
+        ShouldDisplayWindow = false;
         WindowWorkerService.HideWindow();
     }
 }

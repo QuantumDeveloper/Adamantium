@@ -60,6 +60,39 @@ public class TabControl : Selector
     public static readonly AdamantiumProperty TabStripPlacementProperty = AdamantiumProperty.Register(nameof(TabStripPlacement),
         typeof(TabStripPlacement), typeof(TabControl), new PropertyMetadata(TabStripPlacement.Top));
 
+    /// <summary>Whether the tab strip is drawn at all. A control with ONE tab in a window of its own has no choice to
+    /// offer, and a strip of one is a button that does what is already done - the window's title bar names it instead.
+    /// <para>Lives here rather than on PaneGroup because the templates that have to hide the strip are the TabControl
+    /// ones: a document group uses them unchanged, so a property the base template could not see hid nothing and a lone
+    /// document floated in a window with a one-tab strip across the top.</para></summary>
+    public static readonly AdamantiumProperty ShowTabStripProperty = AdamantiumProperty.Register(
+        nameof(ShowTabStrip), typeof(bool), typeof(TabControl),
+        new PropertyMetadata(true, PropertyMetadataOptions.AffectsMeasure));
+
+    public bool ShowTabStrip
+    {
+        get => GetValue<bool>(ShowTabStripProperty);
+        set => SetValue(ShowTabStripProperty, value);
+    }
+
+    /// <summary>Whether a LONE tab fills the whole strip instead of taking only its own width. Off by default and turned
+    /// on where it reads right - the document area does it, so a single open editor is titled across the top rather than
+    /// tagged in the corner; a second tab arriving makes them ordinary tabs again.
+    /// <para>Setting rather than a hard rule because it is a matter of taste that differs per strip: a browser does it,
+    /// a settings dialog does not.</para></summary>
+    public static readonly AdamantiumProperty StretchSingleTabProperty = AdamantiumProperty.Register(
+        nameof(StretchSingleTab), typeof(bool), typeof(TabControl),
+        new PropertyMetadata(false, PropertyMetadataOptions.AffectsArrange, OnStretchSingleTabChanged));
+
+    private static void OnStretchSingleTabChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (component is not TabControl control) return;
+
+        // The PANEL is what lays the tabs out, and it is not the one the property changed on.
+        control.ItemsHostPanel?.InvalidateArrange();
+        control.SyncStretchedTab();
+    }
+
     // Drag-reorder animation feel - theme-settable so the motion is declared, not hard-coded. Duration drives both the
     // neighbour "slide out of the way" and the dragged tab's "settle into its slot" (and slide-home on a short drag);
     // Easing shapes them (null -> a decelerate cubic).
@@ -80,6 +113,10 @@ public class TabControl : Selector
     public static readonly AdamantiumProperty SelectionIndicatorThicknessProperty = AdamantiumProperty.Register(
         nameof(SelectionIndicatorThickness), typeof(double), typeof(TabControl), new PropertyMetadata(3.0));
 
+    public static readonly AdamantiumProperty SelectionIndicatorPlacementProperty = AdamantiumProperty.Register(
+        nameof(SelectionIndicatorPlacement), typeof(TabIndicatorPlacement), typeof(TabControl),
+        new PropertyMetadata(TabIndicatorPlacement.Inner));
+
     public static readonly AdamantiumProperty SelectionAnimationDurationProperty = AdamantiumProperty.Register(
         nameof(SelectionAnimationDuration), typeof(TimeSpan), typeof(TabControl),
         new PropertyMetadata(TimeSpan.FromMilliseconds(250)));
@@ -97,6 +134,14 @@ public class TabControl : Selector
     {
         get => GetValue<double>(SelectionIndicatorThicknessProperty);
         set => SetValue(SelectionIndicatorThicknessProperty, value);
+    }
+
+    /// <summary>Which side of the strip the indicator runs along - beside the content (default) or along the strip's
+    /// outer edge. Only the side ACROSS the strip is a choice; where it sits along it is the selected tab.</summary>
+    public TabIndicatorPlacement SelectionIndicatorPlacement
+    {
+        get => GetValue<TabIndicatorPlacement>(SelectionIndicatorPlacementProperty);
+        set => SetValue(SelectionIndicatorPlacementProperty, value);
     }
 
     /// <summary>How long the indicator takes to slide/resize to a newly selected tab. Theme-settable.</summary>
@@ -143,6 +188,12 @@ public class TabControl : Selector
     {
         get => GetValue<Thickness>(PaddingProperty);
         set => SetValue(PaddingProperty, value);
+    }
+
+    public bool StretchSingleTab
+    {
+        get => GetValue<bool>(StretchSingleTabProperty);
+        set => SetValue(StretchSingleTabProperty, value);
     }
 
     public TabControl()
@@ -273,6 +324,36 @@ public class TabControl : Selector
         SelectSingle(index);
         _reselecting = false;
         UpdateSelectedContent();
+        SyncStretchedTab();
+    }
+
+    /// <summary>True while ONE tab is filling the whole strip (see <see cref="StretchSingleTab"/>). A tab that spans its
+    /// strip is a title, not a choice: it wears the accent itself and the sliding indicator under it - which exists to
+    /// say WHICH of several is current - has nothing left to point out.</summary>
+    public static readonly AdamantiumProperty HasStretchedTabProperty = AdamantiumProperty.Register(
+        nameof(HasStretchedTab), typeof(bool), typeof(TabControl), new PropertyMetadata(false));
+
+    public bool HasStretchedTab
+    {
+        get => GetValue<bool>(HasStretchedTabProperty);
+        private set => SetValue(HasStretchedTabProperty, value);
+    }
+
+    // Told to the CONTAINER as well as to this control: the strip's template hides the indicator, and the tab's own
+    // template paints itself in the accent - two different templates asking the same question.
+    private void SyncStretchedTab()
+    {
+        // The base constructor seeds every property with its default and fires the changed callback, so this can run
+        // before ItemsControl has made the collection. The strip that fills it calls here again.
+        if (Items == null) return;
+
+        var stretched = StretchSingleTab && Items.Count == 1;
+        HasStretchedTab = stretched;
+
+        for (var i = 0; i < Items.Count; i++)
+        {
+            if (ItemContainerGenerator.ContainerFromIndex(i) is TabItem tab) tab.IsStretched = stretched;
+        }
     }
 
     private void UpdateSelectedContent()

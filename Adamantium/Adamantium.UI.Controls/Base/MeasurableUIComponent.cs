@@ -278,6 +278,10 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     
     public bool IsMeasureValid { get; private set; }
 
+    // True while THIS element's MeasureCore runs - i.e. while it is measuring its own children. A child whose desired
+    // size changes during that cascade must not invalidate us: we are computing our size from it right now.
+    private bool _measuring;
+
     public bool IsArrangeValid { get; private set; }
 
     public Size DesiredSize { get; private set; }
@@ -361,7 +365,11 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             IsArrangeValid = false;
             IsGeometryValid = false;
 
+            var previousDesired = DesiredSize;
+
+            _measuring = true;
             var desiredSize = MeasureCore(availableSize).Constrain(availableSize);
+            _measuring = false;
 
             if (IsInvalidSize(desiredSize))
             {
@@ -369,6 +377,19 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             }
 
             DesiredSize = desiredSize;
+
+            // A CHANGED desired size is news for the parent, whoever asked for this measure. The layout pass propagates
+            // this too, but only for a node it dequeued itself - and a node measured any other way (a parent's cascade,
+            // a direct Measure, an inline re-measure from arrange) then goes valid holding a size nobody above it has
+            // seen. The pass afterwards skips it on the validity gate, silently, and every ancestor keeps the number it
+            // had. Measured on a docking panel returning from a window: its tab strip measured 272x36 while the grid one
+            // level up stayed at 0 and "valid", so the strip was drawn empty until something else disturbed the tree.
+            // NOT while the parent is measuring US - that cascade is already computing its own size from this one.
+            if (previousDesired != desiredSize
+                && VisualParent is MeasurableUIComponent { IsMeasureValid: true, _measuring: false, IsMeasureBoundary: false } parent)
+            {
+                parent.InvalidateMeasure();
+            }
             // Cache the AVAILABLE size this measure ran with - the gate above compares the next availableSize against
             // it to skip a redundant re-measure. (Storing DesiredSize here was the bug: desired != available for any
             // control that doesn't fill its slot, so the gate always missed and EVERY such control - e.g. a Path with

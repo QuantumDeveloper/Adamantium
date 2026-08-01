@@ -13,26 +13,14 @@ namespace Adamantium.Game.Sandbox.Behaviors;
 /// its own rules in - without reaching inside the control or subclassing it.</para>
 /// <para><see cref="Pane.Allowed"/> already covers "where may this pane go at all", in data that serialises - including
 /// the one restriction docking libraries actually ship (Telerik's FloatingOnly): a pane allowed only
-/// <see cref="DockZone.Floating"/> leaves for a window of its own and cannot be docked back. What is left for an EVENT
-/// is the rule a set of zones cannot express, because it is about the state of the layout right now - here: the last
-/// tab of a panel may not be pulled out.</para>
-/// <para>There was a second rule here once - a cap on tabs per group - and it was a bad example: no docking control
-/// anywhere limits how many tabs a group may hold (overflow is a scrolling strip and a menu, not a refusal), and it
-/// read as a broken drop rather than as a policy.</para>
+/// <see cref="DockZone.Floating"/> leaves for a window of its own and cannot be docked back.</para>
+/// <para>It answers YES to everything and only says so out loud. Two rules lived here before and both were bad examples:
+/// a cap on tabs per group (no docking control anywhere limits that - overflow is a scrolling strip, not a refusal), and
+/// "the last tab of a panel may not be pulled out", which refused the tab while dragging the same panel by its CAPTION
+/// did the very same thing - one move, allowed or refused depending on where it was grabbed.</para>
 /// </summary>
 public class DockingPolicyBehavior : Behavior<DockingArea>
 {
-    /// <summary>Refuse to tear out the LAST tab of a group, which would take the group with it. A rule about the
-    /// state of the layout at this moment, not about where a pane is allowed to live.</summary>
-    public static readonly AdamantiumProperty KeepLastPaneProperty = AdamantiumProperty.Register(nameof(KeepLastPane),
-        typeof(bool), typeof(DockingPolicyBehavior), new PropertyMetadata(false));
-
-    public bool KeepLastPane
-    {
-        get => GetValue<bool>(KeepLastPaneProperty);
-        set => SetValue(KeepLastPaneProperty, value);
-    }
-
     private DockingArea _area;
 
     protected override void OnAttached(DockingArea area)
@@ -63,14 +51,6 @@ public class DockingPolicyBehavior : Behavior<DockingArea>
     private void OnTearingOff(object sender, PaneTearingOffEventArgs e)
     {
         var what = e.IsWholePanel ? "panel" : "tab";
-
-        if (KeepLastPane && !e.IsWholePanel && e.Panes.Count == 1
-            && _area?.Layout.FindGroup(e.Panes[0]) is { PaneIds.Count: 1 })
-        {
-            e.Cancel = true;
-            Answer($"REFUSED: '{e.Panes[0]}' is the last tab of its panel, and taking it would take the panel with it.");
-            return;
-        }
 
         Answer($"Tearing off the {what} ({string.Join(", ", e.Panes)}) - allowed.");
     }

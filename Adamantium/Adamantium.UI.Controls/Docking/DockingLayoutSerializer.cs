@@ -50,7 +50,7 @@ public static class DockingLayoutSerializer
 
             foreach (var root in layout.Roots)
             {
-                WriteRoot(writer, layout, root, keepPane);
+                WriteRoot(writer, root, keepPane);
             }
 
             writer.WriteEndArray();
@@ -156,7 +156,7 @@ public static class DockingLayoutSerializer
         }
     }
 
-    private static void WriteRoot(Utf8JsonWriter writer, DockingLayout layout, DockingRoot root, Func<string, bool> keep)
+    private static void WriteRoot(Utf8JsonWriter writer, DockingRoot root, Func<string, bool> keep)
     {
         writer.WriteStartObject();
         writer.WriteBoolean("main", root.IsMain);
@@ -173,7 +173,9 @@ public static class DockingLayoutSerializer
             writer.WriteEndArray();
         }
 
-        if (WriteNode(writer, "content", layout, root.Content, keep) == false)
+        // The window's OWN document area travels with its tree: which node is the area has to survive the round trip, or
+        // the centre stops existing the moment the layout is loaded and the next document opens wherever it likes.
+        if (WriteNode(writer, "content", root.DocumentWell, root.Content, keep) == false)
         {
             writer.WriteNull("content");
         }
@@ -191,7 +193,7 @@ public static class DockingLayoutSerializer
             }
 
             writer.WriteStartArray(bar.Key.ToString());
-            foreach (var group in bar.Value) WriteGroup(writer, layout, group, keep);
+            foreach (var group in bar.Value) WriteGroup(writer, root.DocumentWell, group, keep);
             writer.WriteEndArray();
         }
 
@@ -201,18 +203,18 @@ public static class DockingLayoutSerializer
     }
 
     // Returns false when the node writes nothing at all - every pane in it was dropped by keepPane.
-    private static bool WriteNode(Utf8JsonWriter writer, string name, DockingLayout layout, PaneNode node, Func<string, bool> keep)
+    private static bool WriteNode(Utf8JsonWriter writer, string name, PaneNode well, PaneNode node, Func<string, bool> keep)
     {
         switch (node)
         {
             case PaneGroupNode group when HasKeptPane(group, keep):
                 writer.WritePropertyName(name);
-                WriteGroup(writer, layout, group, keep);
+                WriteGroup(writer, well, group, keep);
                 return true;
 
             case PaneSplitNode split when HasKeptPane(split, keep):
                 writer.WritePropertyName(name);
-                WriteSplit(writer, layout, split, keep);
+                WriteSplit(writer, well, split, keep);
                 return true;
 
             default:
@@ -220,11 +222,16 @@ public static class DockingLayoutSerializer
         }
     }
 
-    private static void WriteSplit(Utf8JsonWriter writer, DockingLayout layout, PaneSplitNode split, Func<string, bool> keep)
+    private static void WriteSplit(Utf8JsonWriter writer, PaneNode well, PaneSplitNode split, Func<string, bool> keep)
     {
         writer.WriteStartObject();
         writer.WriteString("split", split.Orientation.ToString());
         writer.WriteString("length", split.Length.ToString());
+
+        // A SPLIT can be the document area too, once the area has been divided (rule 1.6). Written only on the group
+        // before, a saved split area came back as an ordinary row and its editors as tools.
+        if (ReferenceEquals(split, well)) writer.WriteBoolean("well", true);
+
         writer.WriteStartArray("children");
 
         foreach (var child in split.Children)
@@ -232,10 +239,10 @@ public static class DockingLayoutSerializer
             switch (child)
             {
                 case PaneGroupNode group when HasKeptPane(group, keep):
-                    WriteGroup(writer, layout, group, keep);
+                    WriteGroup(writer, well, group, keep);
                     break;
                 case PaneSplitNode nested when HasKeptPane(nested, keep):
-                    WriteSplit(writer, layout, nested, keep);
+                    WriteSplit(writer, well, nested, keep);
                     break;
             }
         }
@@ -244,7 +251,7 @@ public static class DockingLayoutSerializer
         writer.WriteEndObject();
     }
 
-    private static void WriteGroup(Utf8JsonWriter writer, DockingLayout layout, PaneGroupNode group, Func<string, bool> keep)
+    private static void WriteGroup(Utf8JsonWriter writer, PaneNode well, PaneGroupNode group, Func<string, bool> keep)
     {
         writer.WriteStartObject();
 
@@ -261,17 +268,19 @@ public static class DockingLayoutSerializer
 
         if (group.State != PaneGroupState.Docked) writer.WriteString("state", group.State.ToString());
 
-        // The document well is a PLACE, so which node it is has to survive the round trip - otherwise the centre stops
-        // existing the moment the layout is loaded, and the next document opens wherever it likes (rule 1).
-        if (ReferenceEquals(group, layout.DocumentWell)) writer.WriteBoolean("well", true);
+        if (ReferenceEquals(group, well)) writer.WriteBoolean("well", true);
 
         writer.WriteEndObject();
     }
 
     private static DockingRoot ReadRoot(JsonElement element, DockingLayout layout, Func<string, bool> known)
     {
+        // Which node this window's document area is, collected as the tree is read - it is a node in that tree, so it
+        // cannot be named before the tree exists.
+        PaneNode well = null;
+
         var content = element.TryGetProperty("content", out var contentElement) && contentElement.ValueKind == JsonValueKind.Object
-            ? ReadNode(contentElement, layout, known)
+            ? ReadNode(contentElement, layout, known, ref well)
             : null;
 
         var root = new DockingRoot(content, element.TryGetProperty("main", out var main) && main.GetBoolean());
@@ -292,16 +301,18 @@ public static class DockingLayoutSerializer
 
                 foreach (var group in bar.Value.EnumerateArray())
                 {
-                    var read = ReadGroup(group, layout, known);
+                    var read = ReadGroup(group, known, ref well);
                     if (!read.IsEmpty) root.Bars[edge].Add(read);
                 }
             }
         }
 
+        root.DocumentWell = well;
+
         return content != null || HasBarredPanes(root) ? root : null;
     }
 
-    private static PaneNode ReadNode(JsonElement element, DockingLayout layout, Func<string, bool> known)
+    private static PaneNode ReadNode(JsonElement element, DockingLayout layout, Func<string, bool> known, ref PaneNode well)
     {
         if (element.TryGetProperty("split", out var orientation))
         {
@@ -315,20 +326,23 @@ public static class DockingLayoutSerializer
             {
                 foreach (var child in children.EnumerateArray())
                 {
-                    var node = ReadNode(child, layout, known);
+                    var node = ReadNode(child, layout, known, ref well);
                     if (node != null) split.Add(node);
                 }
             }
 
             // A split that lost every child to a dropped document is not a split any more.
-            return split.Children.Count > 0 ? split : null;
+            if (split.Children.Count == 0) return null;
+
+            if (element.TryGetProperty("well", out var isWell) && isWell.GetBoolean()) well = split;
+            return split;
         }
 
-        var group = ReadGroup(element, layout, known);
+        var group = ReadGroup(element, known, ref well);
         return group.IsEmpty ? null : group;
     }
 
-    private static PaneGroupNode ReadGroup(JsonElement element, DockingLayout layout, Func<string, bool> known)
+    private static PaneGroupNode ReadGroup(JsonElement element, Func<string, bool> known, ref PaneNode well)
     {
         var group = new PaneGroupNode
         {
@@ -373,10 +387,9 @@ public static class DockingLayoutSerializer
         // flyout hanging over it restores a gesture rather than an arrangement.
         if (group.State == PaneGroupState.Revealed) group.State = PaneGroupState.Collapsed;
 
-        if (element.TryGetProperty("well", out var well) && well.GetBoolean() && !group.IsEmpty)
-        {
-            layout.DocumentWell = group;
-        }
+        // An EMPTY area still counts: the centre is a place, and a layout saved with nothing open in it comes back with
+        // the place, not without one.
+        if (element.TryGetProperty("well", out var isWell) && isWell.GetBoolean()) well = group;
 
         return group;
     }

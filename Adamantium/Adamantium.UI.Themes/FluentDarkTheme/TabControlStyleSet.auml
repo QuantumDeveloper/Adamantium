@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
           xmlns:x="http://adamantium/ui/xaml/extensions">
 
@@ -117,7 +117,7 @@
                              * / Auto reflow actually re-runs - a mid-pass visibility flip loses its invalidation and the button
                              then sat off-screen until a resize. Shown only when the strip overflows + ShowTabOverflowMenu;
                              toggles PART_TabOverflowPopup - a ListBox of every tab; picking a row selects it + scrolls it in. -->
-                        <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                        <Grid x:Name="StripRow" Grid.Row="0" ColumnDefinitions="*,Auto">
                             <TabStripScroller x:Name="PART_TabStrip" Grid.Column="0" Orientation="Horizontal">
                                 <Grid>
                                     <ItemsPresenter x:Name="PART_ItemsPresenter"/>
@@ -161,6 +161,24 @@
                                               TransitionDuration="{TemplateBinding ContentTransitionDuration}"/>
                         </Border>
                     </Grid>
+                    <ControlTemplate.Triggers>
+                        <!-- The WHOLE strip row, overflow button included: hiding only the scroller left a ▾ floating
+                             over nothing. -->
+                        <PropertyTrigger Property="ShowTabStrip" Value="false">
+                            <Setter TargetName="StripRow" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <!-- One tab filling the strip wears the accent itself (see TabItemStyleSet), so the bar that
+                             says which of several is current has nothing left to say. -->
+                        <PropertyTrigger Property="HasStretchedTab" Value="true">
+                            <Setter TargetName="PART_SelectionIndicator" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <!-- The bar runs beside the CONTENT by default; Outer moves it to the strip's far edge - here,
+                             above the tab rather than under it. Which alignment that is depends on the placement, which
+                             is why each template says it for itself. -->
+                        <PropertyTrigger Property="SelectionIndicatorPlacement" Value="Outer">
+                            <Setter TargetName="PART_SelectionIndicator" Property="VerticalAlignment" Value="Top"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -187,7 +205,7 @@
                                               TransitionDuration="{TemplateBinding ContentTransitionDuration}"/>
                         </Border>
                         <!-- Strip + ▾ overflow (Auto column beside the * scroller) - see the Top template for the rationale. -->
-                        <Grid Grid.Row="1" ColumnDefinitions="*,Auto">
+                        <Grid x:Name="StripRow" Grid.Row="1" ColumnDefinitions="*,Auto">
                             <TabStripScroller x:Name="PART_TabStrip" Grid.Column="0" Orientation="Horizontal">
                                 <Grid>
                                     <ItemsPresenter x:Name="PART_ItemsPresenter"/>
@@ -216,6 +234,19 @@
                             </Popup>
                         </Grid>
                     </Grid>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="ShowTabStrip" Value="false">
+                            <Setter TargetName="StripRow" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <!-- One tab filling the strip wears the accent itself (see TabItemStyleSet), so the bar that
+                             says which of several is current has nothing left to say. -->
+                        <PropertyTrigger Property="HasStretchedTab" Value="true">
+                            <Setter TargetName="PART_SelectionIndicator" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="SelectionIndicatorPlacement" Value="Outer">
+                            <Setter TargetName="PART_SelectionIndicator" Property="VerticalAlignment" Value="Bottom"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -236,7 +267,7 @@
                     <Grid ColumnDefinitions="Auto,*">
                         <!-- Strip + ▾ overflow in an Auto ROW below the * scroller (the strip is vertical, so it overflows
                              DOWNWARD - the ▾ sits at the bottom and reserves a row). -->
-                        <Grid Grid.Column="0" RowDefinitions="*,Auto">
+                        <Grid x:Name="StripRow" Grid.Column="0" RowDefinitions="*,Auto">
                             <TabStripScroller x:Name="PART_TabStrip" Grid.Row="0" Orientation="Vertical">
                                 <Grid>
                                     <ItemsPresenter x:Name="PART_ItemsPresenter"/>
@@ -279,6 +310,19 @@
                                               TransitionDuration="{TemplateBinding ContentTransitionDuration}"/>
                         </Border>
                     </Grid>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="ShowTabStrip" Value="false">
+                            <Setter TargetName="StripRow" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <!-- One tab filling the strip wears the accent itself (see TabItemStyleSet), so the bar that
+                             says which of several is current has nothing left to say. -->
+                        <PropertyTrigger Property="HasStretchedTab" Value="true">
+                            <Setter TargetName="PART_SelectionIndicator" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="SelectionIndicatorPlacement" Value="Outer">
+                            <Setter TargetName="PART_SelectionIndicator" Property="HorizontalAlignment" Value="Left"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -312,7 +356,7 @@
                                               TransitionDuration="{TemplateBinding ContentTransitionDuration}"/>
                         </Border>
                         <!-- Strip + ▾ overflow in an Auto ROW below the * scroller (vertical strip - see the Left template). -->
-                        <Grid Grid.Column="1" RowDefinitions="*,Auto">
+                        <Grid x:Name="StripRow" Grid.Column="1" RowDefinitions="*,Auto">
                             <TabStripScroller x:Name="PART_TabStrip" Grid.Row="0" Orientation="Vertical">
                                 <Grid>
                                     <ItemsPresenter x:Name="PART_ItemsPresenter"/>
@@ -341,6 +385,19 @@
                             </Popup>
                         </Grid>
                     </Grid>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="ShowTabStrip" Value="false">
+                            <Setter TargetName="StripRow" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <!-- One tab filling the strip wears the accent itself (see TabItemStyleSet), so the bar that
+                             says which of several is current has nothing left to say. -->
+                        <PropertyTrigger Property="HasStretchedTab" Value="true">
+                            <Setter TargetName="PART_SelectionIndicator" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="SelectionIndicatorPlacement" Value="Outer">
+                            <Setter TargetName="PART_SelectionIndicator" Property="HorizontalAlignment" Value="Right"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
