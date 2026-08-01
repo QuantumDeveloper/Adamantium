@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.RoutedEvents;
@@ -136,6 +137,18 @@ public abstract class Selector : ItemsControl
         // The base ctor seeds each property with its default and fires its changed callback, so a selection callback can
         // run during construction - before ItemsControl's ctor has created the generator. Nothing to reflect yet.
         if (ItemContainerGenerator == null) return;
+
+        foreach (var (container, item) in RealizedContainers())
+        {
+            if (container is ISelectable selectable) selectable.IsSelected = IsItemSelected(item);
+        }
+    }
+
+    /// <summary>Every realized container, with the item it stands for. Virtual because a control may lay its items out
+    /// in MORE THAN ONE list - a tab strip keeps pinned tabs in a row of their own, realized by that row's generator -
+    /// and a selection that only reached this control's own generator would light up nothing there.</summary>
+    protected virtual IEnumerable<(IUIComponent Container, object Item)> RealizedContainers()
+    {
         foreach (var index in ItemContainerGenerator.RealizedIndices.ToList())
         {
             // An index the item list no longer has: the realized set can be a step behind the collection (an item was
@@ -143,8 +156,7 @@ public abstract class Selector : ItemsControl
             // stands for nothing. It used to read straight through and take the whole app down on a closed tab.
             if (index < 0 || index >= Items.Count) continue;
 
-            if (ItemContainerGenerator.ContainerFromIndex(index) is ISelectable selectable)
-                selectable.IsSelected = IsItemSelected(Items[index]);
+            if (ItemContainerGenerator.ContainerFromIndex(index) is { } container) yield return (container, Items[index]);
         }
     }
 

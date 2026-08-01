@@ -158,9 +158,6 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent, ITe
         }
     }
 
-
-    public AdamantiumComponent TemplatedParent { get; internal set;}
-
     public virtual void OnApplyTemplate()
     {
     }
