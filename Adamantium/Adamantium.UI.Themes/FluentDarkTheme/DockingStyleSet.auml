@@ -14,7 +14,24 @@
          nothing in it, not a window that merely looks plain. -->
     <Style Selector="DockingWindow" BasedOn="Window"/>
 
+    <!-- A hair of space between the panels and the window's own frame. MEASURED: with none, a panel's border sits in the
+         same pixel as the window border - at 150% its 1.5 physical pixels straddle the seam, half of it under the frame
+         and the rest smeared by antialiasing, so the accent below was visible only along the edge that touched nothing.
+         One DIP is enough to let every side of every panel be seen. -->
+    <Style Selector="DockingArea">
+        <Setter Property="Margin" Value="1"/>
+    </Style>
+
     <Style Selector="PaneGroup" BasedOn="TabControl"/>
+
+    <!-- The panel being worked in wears the ACCENT on its border. Every other border is the faint neutral stroke that
+         merely separates panels, which is right for the ones you are not in and useless for the one you are: with all of
+         them the same, nothing on screen says where the next keystroke or newly opened pane will go. -->
+    <Style Selector="PaneGroup">
+        <PropertyTrigger Property="IsActive" Value="true">
+            <Setter Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+        </PropertyTrigger>
+    </Style>
 
     <Style Selector="Pane" BasedOn="TabItem"/>
 
@@ -60,12 +77,9 @@
          HEADER carrying its name and the two things you do to a tool and never to a document - pin it away and close it -
          while its tabs sit along the BOTTOM. A document has many siblings and no caption of its own; a tool has few and
          is part of the workspace rather than of the work. Every editor draws this distinction; until now we drew none. -->
-    <!-- A DOCUMENT is closed from its own tab: it has no caption to hang a button on, and a document you cannot close
-         without the keyboard is not a document. A tool keeps its caption button instead (below), so its tabs stay
-         plain - closing a tool means putting the PANEL away, which is a statement about the panel, not about the tab. -->
-    <Style Selector="PaneGroup[Kind=Document]">
-        <Setter Property="ShowCloseButton" Value="True"/>
-    </Style>
+    <!-- Close buttons and the stretched lone tab are BEHAVIOUR, not looks: they live on PaneGroup and DockingArea
+         (see DockingArea.StretchSingleDocumentTab and Pane.IsClosable) so a host changes them without touching a
+         theme. -->
 
     <Style Selector="PaneGroup[Kind=Tool]">
         <Setter Property="TabStripPlacement" Value="Bottom"/>

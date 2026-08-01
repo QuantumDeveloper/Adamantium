@@ -20,6 +20,10 @@ public class ItemsPresenter : InputUIComponent
     /// <summary>The items host panel (for the owning control / tests).</summary>
     internal Panel Panel => _panel;
 
+    /// <summary>The control whose items are being presented - how a panel built from an ItemsPanelTemplate reaches the
+    /// settings that describe how to lay ITS items out (see <see cref="Panels.TabPanel"/>).</summary>
+    internal ItemsControl Owner => _owner;
+
     private bool IsVirtualizing => _panel is VirtualizingPanel;
 
     /// <summary>Called by the owning <see cref="ItemsControl"/> from OnApplyTemplate: builds the panel and fills it.</summary>
@@ -51,26 +55,10 @@ public class ItemsPresenter : InputUIComponent
         else
             Refresh();                          // non-virtualizing panel: realize every container up front
 
-        // The new panel holds the SAME containers, re-parented - and a container carries its measure state across, so it
-        // keeps the size it worked out in the OLD panel and nothing asks it again. Any dirty mark it raised meanwhile is
-        // gone too: the dirty queue belongs to the visual root, and re-attaching re-registers nothing. So say it here.
-        // Measured: swapping a folded tab strip to a vertical panel left every tab at the 78x29 it had lying flat, while
-        // its label was already turned on its side and drawn outside those bounds.
-        foreach (var child in _panel.Children)
-        {
-            if (child is IMeasurableComponent measurable) measurable.InvalidateMeasure();
-        }
-
-        // The ANCESTORS as well, not just this presenter: every cached size above was computed from the panel that has just
-        // been thrown away. Relying on the manager to carry the change up fails whenever the rebuild happened while this
-        // subtree was detached - the propagation has no queue to travel through, and afterwards each ancestor is
-        // "valid" holding a number that describes a panel which no longer exists.
-        // Measured: a folded tool strip stayed 239x29 - a row of flat tabs - while its panel was already vertical and its
-        // tabs 41x66, because the scroller two levels up had been measured in between and never asked again.
-        for (IUIComponent node = this; node != null; node = node.VisualParent)
-        {
-            if (node is IMeasurableComponent ancestor) ancestor.InvalidateMeasure();
-        }
+        // Nothing is invalidated by hand here. A container carried into the new panel re-attaches, and re-attaching is
+        // where an element settles the layout debt it could not register while it was out of a tree - see
+        // MeasurableUIComponent.OnAttachedToVisualTree, which re-registers what has a constraint of its own and tells the
+        // parent to re-read the rest. Repeating that here was one mechanism written twice.
     }
 
     /// <summary>Regenerates the item containers into the panel. Phase 1: full, non-virtualizing realization.</summary>

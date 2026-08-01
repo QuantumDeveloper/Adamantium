@@ -238,6 +238,99 @@ public class ContentPresenterTests
         Assert.That(tb.Text, Is.EqualTo("Zed"), "a {Binding} set via element.SetBinding inside a template must still resolve");
     }
 
+    /// <summary>
+    /// An ELEMENT content handed to another presenter belongs to that one. The presenter it left is told afterwards -
+    /// its Content goes null - and it must not detach the element out of its new home on the way out.
+    /// <para>Measured on docking: merging two floating windows moved a tab's body to the surviving window's presenter,
+    /// the emptied one was notified a moment later and pulled the same element back out, and the tab was blank with its
+    /// content parented nowhere - and it never came back.</para>
+    /// </summary>
+    [Test]
+    public void ElementContentTakenByAnotherPresenter_IsNotDetachedByTheOldOne()
+    {
+        var body = new TextBlock { Text = "body" };
+        var slot = new Size(100, 100);
+
+        var first = new ContentPresenter { Content = body };
+        first.Measure(slot);
+        Assert.That(body.VisualParent, Is.SameAs(first), "the presenter it was given to hosts it");
+
+        var second = new ContentPresenter { Content = body };
+        second.Measure(slot);
+        Assert.That(body.VisualParent, Is.SameAs(second), "handing it on moves it");
+
+        // ...and only now does the first one hear that its content changed.
+        first.Content = null;
+        first.Measure(slot);
+
+        Assert.That(body.VisualParent, Is.SameAs(second), "the presenter that no longer owns it must leave it alone");
+    }
+
+    /// <summary>
+    /// TEMPLATED content moved to another presenter: the view model is shown by a template, so each presenter builds its
+    /// OWN visual from it. The presenter that lost the content tears its copy down - and that teardown must not leave the
+    /// new one empty.
+    /// <para>Measured on docking: merging two floating windows blanked exactly the tabs whose body is a view model shown
+    /// through the region's view locator, while tabs holding a plain element survived.</para>
+    /// </summary>
+    [Test]
+    public void TemplatedContentMovedToAnotherPresenter_LeavesTheNewOneShowingIt()
+    {
+        var built = 0;
+        var template = new DataTemplate(() =>
+        {
+            built++;
+            return new TemplateResult { RootComponent = new Border { Child = new TextBlock { Text = "view" } } };
+        });
+
+        var vm = new ItemVm { Name = "page" };
+        var slot = new Size(100, 100);
+
+        var first = new ContentPresenter { ContentTemplate = template, Content = vm };
+        first.Measure(slot);
+        Assert.That(first.VisualChildren, Is.Not.Empty, "the first presenter shows it");
+
+        // The same view model handed to another presenter - what a merge does.
+        var second = new ContentPresenter { ContentTemplate = template, Content = vm };
+        second.Measure(slot);
+
+        // ...and only then is the first told its content is gone.
+        first.Content = null;
+        first.Measure(slot);
+        second.Measure(slot);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(built, Is.EqualTo(2), "each presenter builds its own visual from the template");
+            Assert.That(second.VisualChildren, Is.Not.Empty, "and the surviving one still shows its own");
+        });
+    }
+
+    /// <summary>
+    /// A presenter restyles only the text IT generated from a string. An AUTHORED TextBlock given as content keeps its
+    /// own colour: writing into it would be an explicit value, and an explicit value outranks inheritance for good.
+    /// <para>Measured on docking: merging two floating windows let the emptied presenter - holding the Transparent
+    /// default by then - stamp that onto the tab's body, so the text stayed invisible in its new home no matter what
+    /// the live presenter's colour was.</para>
+    /// </summary>
+    [Test]
+    public void AnAuthoredTextContent_TakesItsColourFromWhicheverPresenterHoldsIt()
+    {
+        var authored = new TextBlock { Text = "body" };
+        var slot = new Size(100, 100);
+
+        // The presenter it starts in, holding the colour a torn-down one ends up with.
+        var dim = new ContentPresenter { Foreground = Brushes.Transparent, Content = authored };
+        dim.Measure(slot);
+
+        // Handed to a live presenter with a real colour - what a merge does.
+        var lit = new ContentPresenter { Foreground = Brushes.White, Content = authored };
+        lit.Measure(slot);
+
+        Assert.That(authored.Foreground, Is.SameAs(Brushes.White),
+            "the colour must follow the presenter that holds it now - a value stamped in by the old one would be permanent");
+    }
+
     [Test]
     public void UIElementContent_DoesNotOverrideDataContext()
     {

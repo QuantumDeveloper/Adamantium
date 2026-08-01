@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using Adamantium.UI.Core;
 using Adamantium.UI.Controls.Primitives;
 using Adamantium.UI.Core.Input;
@@ -84,7 +84,11 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
             e.Handled = area.TearOff(pane, e);
         };
 
-        SelectionChanged += (_, _) => SyncChrome();
+        SelectionChanged += (_, _) =>
+        {
+
+            SyncChrome();
+        };
 
         // Which host holds the body follows the CONTENT as well as the state - the selected pane changes under both.
         PropertyChanged += (_, e) =>
@@ -110,7 +114,22 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
     // are different things, which is why this is three states and not a flag.
     private void OnPreviewDown(object sender, MouseButtonEventArgs e)
     {
+        // Touching a panel is what makes it the one being worked in - anywhere in it, tab strip, caption or body.
+        Area?.MakeActive(this);
+
         if (State == PaneGroupState.Collapsed) Area?.Reveal(this);
+    }
+
+    /// <summary>The panel being worked in - ONE across the whole layout, floating windows included. Only its border is
+    /// drawn in the accent, which is the only thing on screen saying where a keystroke or a newly opened pane will go.
+    /// <para>Set by the docking area, never authored: which panel is active is a fact about the session.</para></summary>
+    public static readonly AdamantiumProperty IsActiveProperty = AdamantiumProperty.Register(
+        nameof(IsActive), typeof(bool), typeof(PaneGroup), new PropertyMetadata(false));
+
+    public bool IsActive
+    {
+        get => GetValue<bool>(IsActiveProperty);
+        internal set => SetValue(IsActiveProperty, value);
     }
 
     // --- Tearing the PANEL off by its caption -----------------------------------------------------------------------
@@ -426,19 +445,8 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         // A window showing ONE panel has nothing to choose between, and a strip of one tab is a row of buttons that all
         // do what is already done - it only takes room away from the thing being looked at. The window's title bar
         // names it instead. Drop a second panel in and the strip comes back, because then there is a choice to make.
-        ShowTabStrip = !IsFloatingRoot || Items.Count > 1;
-    }
-
-    /// <summary>Whether the tab strip is drawn at all - false for the single panel of a floating window. Derived, never
-    /// authored: it follows from what is IN the group and where the group stands.</summary>
-    public static readonly AdamantiumProperty ShowTabStripProperty = AdamantiumProperty.Register(
-        nameof(ShowTabStrip), typeof(bool), typeof(PaneGroup),
-        new PropertyMetadata(true, PropertyMetadataOptions.AffectsMeasure));
-
-    public bool ShowTabStrip
-    {
-        get => GetValue<bool>(ShowTabStripProperty);
-        private set => SetValue(ShowTabStripProperty, value);
+        // NO tabs at all is the emptied document area, which holds its place without drawing a bar of nothing.
+        ShowTabStrip = Items.Count > 0 && (!IsFloatingRoot || Items.Count > 1);
     }
 
     private ButtonBase _pinButton;

@@ -21,6 +21,14 @@ public class DockingRoot
     /// <summary>True for the root that lives in the application's main window (there is at most one).</summary>
     public bool IsMain { get; set; }
 
+    /// <summary>This window's DOCUMENT AREA, or null if it has none. Every window has its own: what was carried out of
+    /// the main window's centre is still a document, so it keeps the document chrome and the document rules while it
+    /// floats, and docks back as one.
+    /// <para>A NODE rather than a "this window holds documents" flag, and that difference is the whole point: a flag
+    /// dressed the WHOLE window as documents, so a tool docked beside the editor in it came out looking like a document
+    /// too. The area is a PLACE (rule 1.6) here exactly as it is at home - things can sit outside it.</para></summary>
+    public PaneNode DocumentWell { get; set; }
+
     /// <summary>Where the window sits, in SCREEN coordinates. Restoring checks it against the available screens - a
     /// window saved on a monitor that is no longer there has to come back somewhere visible.</summary>
     public Rect Bounds { get; set; }

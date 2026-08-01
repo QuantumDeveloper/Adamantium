@@ -103,9 +103,14 @@ public class Border : Decorator
       // `thickness` px == a WPF inside border, with the fill composited under it in the same pass.
       if (borderThickness.IsUniform && cornerRadius.IsUniform && hasThickness && BorderBrush.IsVisible())
       {
+         // The ring onto whole PIXELS - edges and thickness alike. Off the grid, a 1-DIP line at a fractional scale is
+         // drawn at half coverage on each side and reads as no line at all (see DevicePixels).
          var t = borderThickness.Left;
+         var ring = outerRect;
+         this.Snap(ref ring, ref t);
+
          var half = t * 0.5;
-         var penRect = outerRect.Deflate(new Thickness(half));
+         var penRect = ring.Deflate(new Thickness(half));
          var penRadius = new CornerRadius(Math.Max(0.0, cornerRadius.TopLeft - half));
          var fill = Background.IsVisible() ? Background : Brushes.Transparent;
          ctx.DrawRectangle(fill, penRect, penRadius, new Pen(BorderBrush, t));

@@ -19,7 +19,10 @@
              strip; on a turned label in a narrow column it read as text pushed off-centre. -->
         <Setter Property="Padding" Value="12 6 12 6"/>
         <Setter Property="FontSize" Value="13"/>
-        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <!-- LEFT, not centre: a tab is a label, and it reads from the left of whatever room it has. No difference at all
+             for an ordinary content-sized tab (its slot IS the header); it decides where the name of a lone stretched
+             document sits, and centred it drifted away from the tab's own edge. -->
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
 
@@ -33,18 +36,23 @@
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             Padding="{TemplateBinding Padding}">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <!-- A GRID, not a stack: the middle track is starred, so when a tab is given MORE room than its
+                             content needs - a lone document filling its strip (TabControl.StretchSingleTab) - the extra
+                             goes to the header and the close button stays against the right edge. Stacked, the button
+                             sat glued to the end of the text with the whole rest of the strip empty after it. A
+                             content-sized tab is unchanged: the starred track is then exactly the header's width. -->
+                        <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
                             <!-- What marks the tab, drawn from DATA by IconTemplate. Collapsed by default and revealed by
                                  the HasIcon trigger below: an empty presenter measures to nothing, but its MARGIN is
                                  reserved regardless, and that gap is what pushed a turned label off-centre. -->
-                            <ContentPresenter x:Name="PART_Icon"
+                            <ContentPresenter x:Name="PART_Icon" Grid.Column="0"
                                     VerticalAlignment="Center"
                                     Visibility="Collapsed"
                                     Margin="0 0 6 0"
                                     Content="{TemplateBinding Icon}"
                                     ContentTemplate="{TemplateBinding IconTemplate}"/>
                             <ContentPresenter
-                                    x:Name="PART_ContentPresenter"
+                                    x:Name="PART_ContentPresenter" Grid.Column="1"
                                     HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                     VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                     Foreground="{TemplateBinding Foreground}"
@@ -54,17 +62,27 @@
                                     ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}"/>
                             <!-- The close button; its LOOK is CloseButtonTemplate (a themed 'x' from TabControlStyleSet).
                                  Collapsed unless the owner turns close buttons on (see the ShowCloseButton trigger). -->
-                            <Button x:Name="PART_CloseButton"
+                            <Button x:Name="PART_CloseButton" Grid.Column="2"
                                     Template="{TemplateBinding CloseButtonTemplate}"
                                     Margin="8 0 0 0"
                                     MinWidth="0" MinHeight="0" Padding="0"
                                     VerticalAlignment="Center"
                                     Visibility="Collapsed"/>
-                        </StackPanel>
+                        </Grid>
                     </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!-- The ONLY tab, filling its strip: it is the title of what is open, so it carries the accent itself. The sliding
+         indicator is hidden by the strip's own template (TabControl.HasStretchedTab) - a bar that says WHICH of several
+         is current has nothing to point out when there is one. -->
+    <Style Selector="TabItem[IsStretched=true]">
+        <Setter Property="BackgroundSelected" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="ForegroundSelected" Value="{ThemeResource AccentForegroundColor}"/>
+        <Setter Property="BackgroundPointerOver" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="CornerRadius" Value="0"/>
     </Style>
 
     <Style Selector="TabItem">

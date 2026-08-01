@@ -413,21 +413,22 @@ public class DockAutoHideTests
         Assert.Multiple(() =>
         {
             Assert.That(layout.DocumentWell, Is.SameAs(documents), "the well is still the well");
-            Assert.That(layout.DocumentWell.PaneIds, Is.EqualTo(new[] { "scene", "inspector" }));
+            Assert.That(documents.PaneIds, Is.EqualTo(new[] { "scene", "inspector" }));
         });
     }
 
-    /// <summary>The centre cannot be put away or taken out: there is no edge for it to fold against, and a window whose
-    /// centre has left is not a layout state that should be reachable.</summary>
+    /// <summary>The centre cannot be put away or docked somewhere else: there is no edge for it to fold against, and a
+    /// window whose centre has moved into a tool panel is not a layout state that should be reachable (rule 1.6).
+    /// <para>Its CONTENTS are another matter - see DocumentAreaTests: the last group may be carried out into a window
+    /// of its own, and what stays behind is the empty place.</para></summary>
     [Test]
-    public void TheDocumentWell_CannotBeCollapsedTornOffOrMoved()
+    public void TheDocumentWell_CannotBeCollapsedOrMoved()
     {
         var (layout, documents, inspector) = Authored();
 
         Assert.Multiple(() =>
         {
             Assert.That(layout.CollapseGroup(documents), Is.False, "collapse");
-            Assert.That(layout.TearOffGroup(documents), Is.Null, "tear-off");
             Assert.That(layout.MoveNode(documents, inspector, DockZone.Right), Is.False, "move");
             Assert.That(layout.DocumentWell, Is.SameAs(documents), "and it is still where it was");
         });

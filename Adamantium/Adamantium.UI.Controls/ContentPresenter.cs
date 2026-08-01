@@ -23,6 +23,7 @@ public class ContentPresenter : InputUIComponent
     private TemplateResult _outgoingTemplateResult;
     private bool _isContentChanged;
     private bool _transitionPending;
+    private bool _textIsGenerated;                             // is _currentRoot the TextBlock this presenter generated?
     private bool _lastContentRebuilt;                          // did the last measure REBUILD the visual (vs data-only reuse)?
     private Size _lastArrangeSize = new(double.NaN, double.NaN);   // last finalSize we actually walked in ArrangeOverride
 
@@ -88,6 +89,7 @@ public class ContentPresenter : InputUIComponent
     // so the presenter can skip re-walking it - the reused child invalidates ITSELF if its own size actually changed).
     private bool UpdateVisualContent(object newContent)
     {
+
         if (!_isContentChanged)
             return false;
 
@@ -137,9 +139,7 @@ public class ContentPresenter : InputUIComponent
         }
         else if (_currentRoot != null)
         {
-            RemoveVisualChild(_currentRoot);
-            RemoveLogicalChild(_currentRoot);
-            _currentTemplateResult?.Destroy();
+            Release(_currentRoot, _currentTemplateResult);
         }
 
         _currentRoot = null;
@@ -154,6 +154,7 @@ public class ContentPresenter : InputUIComponent
         _transitionPending = animate && _currentRoot != null;
         if (animate && !_transitionPending)
             RemoveOutgoing();
+
         return true;   // a new visual was built -> the presenter must measure/arrange it
     }
 
@@ -204,11 +205,27 @@ public class ContentPresenter : InputUIComponent
         if (_outgoingRoot == null)
             return;
 
-        RemoveVisualChild(_outgoingRoot);
-        RemoveLogicalChild(_outgoingRoot);
-        _outgoingTemplateResult?.Destroy();
+        Release(_outgoingRoot, _outgoingTemplateResult);
         _outgoingRoot = null;
         _outgoingTemplateResult = null;
+    }
+
+    /// <summary>
+    /// Lets go of a visual this presenter was showing - but ONLY while it is still ours.
+    /// <para>Content can be an ELEMENT, and an element has exactly one parent. When the same element is handed to another
+    /// presenter, that presenter adopts it and this one is told about the change afterwards - so tearing it down here
+    /// unconditionally reaches into its NEW home and rips it out. Measured on docking: merging two floating windows moved
+    /// a tab's body to the surviving window's presenter, and the emptied one - notified a moment later - detached it
+    /// again, leaving the tab blank with its content parented nowhere.</para>
+    /// <para>A visual built from a TEMPLATE is ours by construction and is always destroyed with it.</para>
+    /// </summary>
+    private void Release(IUIComponent visual, TemplateResult built)
+    {
+        if (built == null && !ReferenceEquals(visual.VisualParent, this)) return;
+
+        RemoveVisualChild(visual);
+        RemoveLogicalChild(visual);
+        built?.Destroy();
     }
 
     // Starts the slide once the children have been arranged at the full presenter rect (same origin), so the only
@@ -278,7 +295,13 @@ public class ContentPresenter : InputUIComponent
         // wouldn't reach it - re-push on change. TEMPLATED content needs nothing here: it inherits the presenter's
         // Foreground/FontSize naturally (the change cascades via ParentPropertyChanged), now that no per-TextBlock Style
         // sits at a higher priority masking it - see TextBlockStyleSet.
-        if (_currentRoot is not TextBlock textBlock) return;
+        //
+        // ONLY the generated one. An AUTHORED TextBlock handed over as content is not ours to write into: an explicit
+        // write outranks inheritance permanently, so whatever colour this presenter happened to hold at that instant
+        // becomes the element's own for good. Measured on docking: merging two floating windows had the EMPTIED
+        // presenter - by then holding the Transparent default - stamp it onto the tab's body, and the body stayed
+        // invisible in its new home, where the live presenter's white could no longer reach it.
+        if (!_textIsGenerated || _currentRoot is not TextBlock textBlock) return;
         textBlock.FontSize = FontSize;
         if (Foreground != null) textBlock.Foreground = Foreground;
     }

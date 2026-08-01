@@ -565,6 +565,17 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 
     private IntPtr HandleNcHittest(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
+        // A window that declared itself TRANSPARENT TO INPUT must say so here, whatever chrome it has. WS_EX_TRANSPARENT
+        // alone is not enough: the OS asks the window where the point landed, and a window that answers "my client area"
+        // has claimed it - the style only decides what happens when nobody claims it.
+        // Measured on the docking compass, an overlay that is nothing but a read-out: custom chrome made it answer
+        // HTCLIENT everywhere, so it swallowed every click over the area it floats above and over any window under it.
+        if (window.TransparentToInput)
+        {
+            handled = true;
+            return (IntPtr)(int)NcHitTest.Transparent;
+        }
+
         if (!chromeCustom)
         {
             // Native frame: let the OS decide the hit region; remember whether it's a sizing frame so HandleSetCursor

@@ -254,6 +254,7 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
         if (this.GetVisualAncestors().OfType<TabControl>().FirstOrDefault() is { } owner)
         {
             IsSelected = owner.IsContainerSelected(this);
+            IsStretched = owner.HasStretchedTab;
             // Pull the close-button config from the owner (authored + generated tabs alike) and follow later changes.
             _closeOwner = owner;
             _closeOwner.PropertyChanged += OnOwnerPropertyChanged;
@@ -288,6 +289,20 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
             SyncCloseButton();
         else if (e.Property == TabControl.IconTemplateProperty)
             SyncIconTemplate();
+        else if (e.Property == TabControl.HasStretchedTabProperty && sender is TabControl owner)
+            IsStretched = owner.HasStretchedTab;
+    }
+
+    /// <summary>This tab fills its whole strip because it is the only one (see <see cref="TabControl.StretchSingleTab"/>).
+    /// With nothing to choose between, the tab IS the title: the theme fills it with the accent instead of sliding an
+    /// indicator under it. Set by the owner, never authored.</summary>
+    public static readonly AdamantiumProperty IsStretchedProperty = AdamantiumProperty.Register(
+        nameof(IsStretched), typeof(bool), typeof(TabItem), new PropertyMetadata(false));
+
+    public bool IsStretched
+    {
+        get => GetValue<bool>(IsStretchedProperty);
+        internal set => SetValue(IsStretchedProperty, value);
     }
 
     // Effective button state = owner shows close buttons AND this tab is closable; the look comes from the owner.
