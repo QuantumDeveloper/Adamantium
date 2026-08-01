@@ -1,4 +1,3 @@
-using System.Linq;
 using Adamantium.UI.Controls.Docking;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Behaviors;

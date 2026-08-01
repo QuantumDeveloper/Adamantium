@@ -42,7 +42,12 @@
                  layout is kept - that is the application's business. -->
             <Button Content="Save layout" Command="{Binding SaveLayoutCommand}" Width="110" Height="32" MarginRight="8"/>
             <Button Content="Restore" Command="{Binding RestoreLayoutCommand}" Width="90" Height="32" MarginRight="8"/>
-            <Button Content="Forget" Command="{Binding ForgetLayoutCommand}" Width="80" Height="32"/>
+            <Button Content="Forget" Command="{Binding ForgetLayoutCommand}" Width="80" Height="32" MarginRight="24"/>
+
+            <!-- Pinned tabs: a row of their own (Rider) or sharing the one row (Visual Studio). The area pushes it onto
+                 every panel it holds - see DockingArea.PinnedTabsPlacement. -->
+            <CheckBox Content="Pinned tabs in a separate row" IsChecked="True"
+                      Command="{Binding TogglePinnedRowCommand}" VerticalAlignment="Center"/>
         </StackPanel>
 
         <TextBlock Grid.Row="3" Text="{Binding LayoutState}" MarginBottom="12" MaxWidth="900"
@@ -58,15 +63,36 @@
                     SelectionIndicatorPlacement="Outer" SelectionIndicatorThickness="2">
                 <docking:DockingArea.Behaviors>
                     <behaviors:DockingPolicyBehavior/>
+                    <!-- The tab menu, built by the APPLICATION and calling the area's own API (ClosePane,
+                         CloseOtherPanes, ClosePanesOfGroup, CloseUnpinnedPanes, CloseAllPanes). A behaviour rather than
+                         markup, so panes opened by CODE get it too - and it stands next to the control, so it works on
+                         the pane and the area directly instead of routing through the view model. -->
+                    <behaviors:TabContextMenuBehavior/>
                 </docking:DockingArea.Behaviors>
 
-                <!-- Declared first, so it is innermost: the documents. -->
+                <!-- Declared first, so it is innermost: the documents.
+                     The "Unsaved changes" box tells the VIEW MODEL that this document has unsaved work, and the view
+                     model is what refuses the close (DockingWorkspace.PaneClosing): the control ASKS, the application
+                     ANSWERS, out of its own state. Tick it in Scene, then use "Close all tabs" from the tab's menu and
+                     watch everything else go while Scene stays. -->
                 <docking:PaneGroup Name="documents" Zone="Center">
                     <docking:Pane Header="Scene">
-                        <TextBlock Text="Scene" Margin="16" Opacity="0.7"/>
+                        <StackPanel Margin="16">
+                            <TextBlock Text="Scene" Opacity="0.7" MarginBottom="10"/>
+                            <CheckBox Content="Unsaved changes (refuses to close outright)"
+                                      Command="{Binding ToggleUnsavedCommand}" CommandParameter="Scene" MarginBottom="6"/>
+                            <CheckBox Content="Ask in a dialog before closing"
+                                      Command="{Binding ToggleAskCommand}" CommandParameter="Scene"/>
+                        </StackPanel>
                     </docking:Pane>
                     <docking:Pane Header="Game">
-                        <TextBlock Text="Game" Margin="16" Opacity="0.7"/>
+                        <StackPanel Margin="16">
+                            <TextBlock Text="Game" Opacity="0.7" MarginBottom="10"/>
+                            <CheckBox Content="Unsaved changes (refuses to close outright)"
+                                      Command="{Binding ToggleUnsavedCommand}" CommandParameter="Game" MarginBottom="6"/>
+                            <CheckBox Content="Ask in a dialog before closing"
+                                      Command="{Binding ToggleAskCommand}" CommandParameter="Game"/>
+                        </StackPanel>
                     </docking:Pane>
                 </docking:PaneGroup>
 
