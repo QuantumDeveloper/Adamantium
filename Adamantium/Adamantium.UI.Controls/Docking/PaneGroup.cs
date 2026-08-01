@@ -110,7 +110,7 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         AddHandler(Mouse.PreviewMouseDownEvent, new MouseButtonEventHandler(OnPreviewDown), handledEventsToo: true);
     }
 
-    // A click on a put-away strip REVEALS the panel; only the pin puts it back. Glancing at a tool and keeping it open
+    // A click on a put-away strip REVEALS the panel; only the auto-hide button puts it back. Glancing at a tool and keeping it open
     // are different things, which is why this is three states and not a flag.
     private void OnPreviewDown(object sender, MouseButtonEventArgs e)
     {
@@ -143,7 +143,7 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
     {
         base.OnMouseLeftButtonDown(sender, e);
 
-        // Handled means a child took it - the pin and close buttons do, which is why they are not torn off by a wobble.
+        // Handled means a child took it - the auto-hide and close buttons do, which is why they are not torn off by a wobble.
         if (e.Handled) return;
         if (e.OriginalSource is not IUIComponent source) return;
 
@@ -208,7 +208,7 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
 
     /// <summary>Document group or tool group: a tool wears a caption and keeps its tabs at the bottom, a document wears
     /// tabs on top and nothing else. Taken from WHERE THE GROUP STANDS (rule 1.2), not from the panes in it - reading
-    /// it off the first pane put a caption with a pin in the middle of the editing area. The pane's own
+    /// it off the first pane put a caption with an auto-hide button in the middle of the editing area. The pane's own
     /// <see cref="Pane.Kind"/> is unaffected: that is policy, not looks.</summary>
     public static readonly AdamantiumProperty KindProperty = AdamantiumProperty.Register(nameof(Kind),
         typeof(PaneKind), typeof(PaneGroup), new PropertyMetadata(PaneKind.Document));
@@ -232,7 +232,7 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         set => SetValue(StateProperty, value);
     }
 
-    /// <summary>Whether the panel is folded to its strip - true in BOTH unpinned states: a revealed panel keeps its
+    /// <summary>Whether the panel is folded to its strip - true in BOTH folded states: a revealed panel keeps its
     /// strip against the edge exactly as a put-away one does. Folded here so a style needs one plain trigger.</summary>
     public static readonly AdamantiumProperty IsFoldedProperty = AdamantiumProperty.Register(nameof(IsFolded),
         typeof(bool), typeof(PaneGroup), new PropertyMetadata(false));
@@ -244,7 +244,7 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
     }
 
     /// <summary>Whether this group is the WHOLE of a floating window. Such a panel wears no caption: the title bar
-    /// already names it, and a pin there would have no edge to fold against. Dock a second panel into that window and
+    /// already names it, and an auto-hide button there would have no edge to fold against. Dock a second panel into that window and
     /// it stops being the whole of it - the captions are then what tell the two apart.</summary>
     public static readonly AdamantiumProperty IsFloatingRootProperty = AdamantiumProperty.Register(
         nameof(IsFloatingRoot), typeof(bool), typeof(PaneGroup),
@@ -291,7 +291,7 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         // PUT AWAY means nothing is showing, so nothing is selected: the strip is a row of buttons and a highlighted one
         // would claim a panel is open when none is. A TabControl otherwise insists on a selection and hands it to the first
         // tab, which is how the highlight jumped to "Inspector" the moment the panel folded. Revealing selects the tab that
-        // was pressed; pinning restores a normal strip, which picks one again by itself.
+        // was pressed; docking it back restores a normal strip, which picks one again by itself.
         RequiresSelection = State != PaneGroupState.Collapsed;
         if (State == PaneGroupState.Collapsed) SelectedIndex = -1;
 
@@ -449,9 +449,9 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         ShowTabStrip = Items.Count > 0 && (!IsFloatingRoot || Items.Count > 1);
     }
 
-    private ButtonBase _pinButton;
+    private ButtonBase _autoHideButton;
     private ButtonBase _closeButton;
-    private ButtonBase _flyoutPinButton;
+    private ButtonBase _flyoutAutoHideButton;
     private ButtonBase _flyoutCloseButton;
     private Popup _flyout;
 
@@ -490,12 +490,12 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         // A tool group's header carries the two verbs that only apply to a tool. Re-found on every template application
         // and unsubscribed first: a placement change swaps the whole template, and a handler left on a discarded button
         // is a click that goes nowhere anyone can see.
-        if (_pinButton != null) _pinButton.Click -= OnPinClicked;
+        if (_autoHideButton != null) _autoHideButton.Click -= OnAutoHideClicked;
         if (_closeButton != null) _closeButton.Click -= OnCloseClicked;
-        if (_flyoutPinButton != null) _flyoutPinButton.Click -= OnPinClicked;
+        if (_flyoutAutoHideButton != null) _flyoutAutoHideButton.Click -= OnAutoHideClicked;
         if (_flyoutCloseButton != null) _flyoutCloseButton.Click -= OnCloseClicked;
 
-        _pinButton = GetTemplateChild("PART_PinButton") as ButtonBase;
+        _autoHideButton = GetTemplateChild("PART_AutoHideButton") as ButtonBase;
         _closeButton = GetTemplateChild("PART_CloseButton") as ButtonBase;
         _caption = GetTemplateChild("PART_Header") as IUIComponent;
 
@@ -524,8 +524,8 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         }
 
         // The flyout carries its own pair of them: while a panel is revealed its docked caption is not on screen, and a
-        // flyout you cannot pin is a panel you can only look at.
-        _flyoutPinButton = GetTemplateChild("PART_FlyoutPinButton") as ButtonBase;
+        // flyout you cannot dock back is a panel you can only look at.
+        _flyoutAutoHideButton = GetTemplateChild("PART_FlyoutAutoHideButton") as ButtonBase;
         _flyoutCloseButton = GetTemplateChild("PART_FlyoutCloseButton") as ButtonBase;
 
         if (_flyout != null)
@@ -540,21 +540,23 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
             _flyout.PropertyChanged += OnFlyoutPropertyChanged;
         }
 
-        if (_pinButton != null) _pinButton.Click += OnPinClicked;
+        if (_autoHideButton != null) _autoHideButton.Click += OnAutoHideClicked;
         if (_closeButton != null) _closeButton.Click += OnCloseClicked;
-        if (_flyoutPinButton != null) _flyoutPinButton.Click += OnPinClicked;
+        if (_flyoutAutoHideButton != null) _flyoutAutoHideButton.Click += OnAutoHideClicked;
         if (_flyoutCloseButton != null) _flyoutCloseButton.Click += OnCloseClicked;
 
         SyncChrome();
     }
 
-    /// <summary>Pin: a docked group folds away to the edge it sits on, leaving its panes as buttons on that edge's strip;
-    /// a folded one - whether put away or merely being looked at - comes back into the layout, tabs and all. The area owns
-    /// the move, because which state a panel is in belongs to the layout.</summary>
-    private void OnPinClicked(object sender, RoutedEventArgs e)
+    /// <summary>Auto-hide: a docked group folds away to the edge it sits on, leaving its panes as buttons on that edge's
+    /// strip; a folded one - whether put away or merely being looked at - comes back into the layout, tabs and all. The
+    /// area owns the move, because which state a panel is in belongs to the layout.
+    /// <para>NOT called "pin", though the button is a thumbtack: pinning belongs to a TAB (<see cref="Pane.IsPinned"/>),
+    /// and one word cannot mean both "keep this tab" and "put this panel away".</para></summary>
+    private void OnAutoHideClicked(object sender, RoutedEventArgs e)
     {
         e.Handled = true;
-        Area?.TogglePinned(this);
+        Area?.ToggleAutoHide(this);
     }
 
     /// <summary>Close: the ACTIVE pane goes, not the group - the group is only where it was sitting, and it disappears
@@ -572,7 +574,10 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
     {
         if (Area is not { } area || tab is not Pane pane) return true;
 
-        area.ClosePane(pane);
+        // Started and not awaited on purpose: a click is not something anyone awaits, and the application may put a
+        // dialog on screen before answering. The tab stays where it is until the close actually goes through - the
+        // strip is a view of the layout, so it follows the model rather than jumping ahead of it.
+        _ = area.ClosePaneAsync(pane);
         return false;
     }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 
 namespace Adamantium.UI.Controls.Docking;
 
@@ -16,6 +17,15 @@ public class DockingWorkspace
     /// <summary>Raised after a layout has been applied - the view model may want to write down that it worked, or
     /// enable the commands that only make sense once there is an arrangement.</summary>
     public event EventHandler Restored;
+
+    /// <summary>A pane is about to close - set <see cref="PaneClosingEventArgs.Cancel"/> to refuse. The QUESTION comes
+    /// from the control (a close can be asked for by the tab's own button as much as by a menu), and the ANSWER belongs
+    /// to whoever owns the document's state, which is the view model. This is how it reaches one: a view model cannot
+    /// see the area, and the area must not go looking for state inside the visual tree.</summary>
+    public event Func<object, PaneClosingEventArgs, Task> PaneClosing;
+
+    /// <summary>Raised after a pane has closed - for anything keeping its own list of what is open.</summary>
+    public event EventHandler<PaneClosedEventArgs> PaneClosed;
 
     /// <summary>Raised when the view is built and an area has attached itself. This is when a view model may restore a
     /// saved arrangement: before it there is nothing to restore INTO, and a view model has no other way to know - it
@@ -39,16 +49,39 @@ public class DockingWorkspace
         return true;
     }
 
+    /// <summary>Where pinned tabs live in every panel of the area - a row of their own or the one row. Null before an
+    /// area has attached, and a write then is simply dropped: there is nothing yet to arrange.</summary>
+    public PinnedTabsPlacement? PinnedTabsPlacement
+    {
+        get => _area?.PinnedTabsPlacement;
+        set { if (_area != null) _area.PinnedTabsPlacement = value; }
+    }
+
+    // Closing is NOT proxied here. A menu, a toolbar button, anything standing next to the control has the area in
+    // hand and calls DockingArea.ClosePane / CloseOtherPanes / … directly; passing that through the workspace would be
+    // indirection with nothing in it. What a view model genuinely cannot do without is the QUESTION above - it has no
+    // way to reach the area to subscribe.
+
     // Called by the attached property when the view is built. A workspace serves ONE area: two would make "save" mean
     // two different arrangements under one name.
     internal void Attach(DockingArea area)
     {
         _area = area;
+        area.PaneClosing += OnPaneClosing;
+        area.PaneClosed += OnPaneClosed;
         Ready?.Invoke(this, EventArgs.Empty);
     }
 
     internal void Detach(DockingArea area)
     {
+        area.PaneClosing -= OnPaneClosing;
+        area.PaneClosed -= OnPaneClosed;
         if (ReferenceEquals(_area, area)) _area = null;
     }
+
+    // Forwarded verbatim, refusal and WAITING included: the workspace decides nothing, it only lets the two sides talk.
+    private Task OnPaneClosing(object sender, PaneClosingEventArgs e) =>
+        PaneClosing?.Invoke(this, e) ?? Task.CompletedTask;
+
+    private void OnPaneClosed(object sender, PaneClosedEventArgs e) => PaneClosed?.Invoke(this, e);
 }

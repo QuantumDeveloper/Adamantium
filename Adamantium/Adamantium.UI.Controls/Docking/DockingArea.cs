@@ -259,8 +259,10 @@ public class DockingArea : Panel
         foreach (var pair in _hostsByNode) pair.Key.Length = PaneHost.GetPaneLength(pair.Value);
     }
 
-    /// <summary>The pin button: puts a docked group away to its strip, or pins a folded one back into the layout.</summary>
-    internal void TogglePinned(PaneGroup group)
+    /// <summary>Auto-hide: puts a docked group away to its strip, or brings a folded one back into the layout. The
+    /// button is a thumbtack, but the word "pin" belongs to a TAB (<see cref="Pane.IsPinned"/>) - what this does to a
+    /// PANEL is hide it until it is wanted.</summary>
+    internal void ToggleAutoHide(PaneGroup group)
     {
         var node = NodeOf(group);
         if (node == null) return;
@@ -423,14 +425,50 @@ public class DockingArea : Panel
     /// on the next navigation and opens nothing.</summary>
     public event EventHandler<PaneClosedEventArgs> PaneClosed;
 
-    internal void ClosePane(Pane pane)
+    /// <summary>Asked BEFORE a pane is closed; set <see cref="PaneClosingEventArgs.Cancel"/> to refuse. Every close goes
+    /// through here - the tab's own button, the caption's, and each pane of a bulk close - so "do not close unsaved
+    /// work" is stated once and holds everywhere.
+    /// <para>The handler returns a TASK, and the area waits for it. That is the whole point: an application that wants
+    /// to ASK THE USER answers only when the user has answered, and a plain <c>EventHandler</c> - which must return at
+    /// once - has nowhere to wait. A handler with nothing to wait for returns <c>Task.CompletedTask</c>.</para></summary>
+    public event Func<object, PaneClosingEventArgs, Task> PaneClosing;
+
+    // Handlers are asked ONE AT A TIME, not with WhenAll: each may put a dialog on screen, and two dialogs at once is
+    // not a question, it is a pile-up.
+    private async Task AskHandlers(PaneClosingEventArgs args)
     {
-        if (pane?.Id is not { } id) return;
+        if (Owner.PaneClosing is not { } subscribers) return;
+
+        foreach (var handler in subscribers.GetInvocationList())
+        {
+            await ((Func<object, PaneClosingEventArgs, Task>)handler)(Owner, args);
+            if (args.CancelAll) args.Cancel = true;
+            if (args.Cancel) return;   // refused - no point asking anyone else about this pane
+        }
+    }
+
+    internal async Task<bool> ClosePaneAsync(Pane pane) => (await ClosePaneAsync(pane, null)).closed;
+
+    // The shared body. `stop` reports a CancelAll back to a bulk operation, which is the difference between "this one
+    // stays" and "stop asking me about the rest".
+    private async Task<(bool closed, bool stop)> ClosePaneAsync(Pane pane, object _)
+    {
+        if (pane?.Id is not { } id) return (false, false);
 
         var group = Layout.FindGroup(id);
-        if (group == null) return;
+        if (group == null) return (false, false);
 
         var isTool = pane.Kind == PaneKind.Tool;
+
+        // On the OWNER, like PaneClosed: a pane closes in any window of the layout, and listeners attach to the area.
+        var closing = new PaneClosingEventArgs(id, isTool);
+        await AskHandlers(closing);
+        if (closing.Cancel) return (false, closing.CancelAll);
+
+        // The layout may have moved on while the question was on screen - a dialog is a long time in UI terms.
+        if (Layout.FindGroup(id) is not { } stillThere) return (false, false);
+        group = stillThere;
+
         if (isTool)
         {
             Owner._hidden[id] = new HiddenSpot(group, group.PaneIds.IndexOf(id), pane.Zone);
@@ -446,6 +484,68 @@ public class DockingArea : Panel
 
         // On the OWNER: a pane can be closed in any window of the layout, and listeners attached to the area.
         Owner.PaneClosed?.Invoke(Owner, new PaneClosedEventArgs(id, isTool));
+        return (true, false);
+    }
+
+    // --- Closing in bulk ----------------------------------------------------------------------------------------------
+    // What a tab's context menu is made of. The MENU is the application's - it holds "save", source control, whatever
+    // that application has - but these operations are not: without them the application would have to walk the layout
+    // itself, and a second way to close a pane is a second set of rules about what closing means.
+    //
+    // Every one of them closes ONE PANE AT A TIME, in order, awaiting each: the policy (rule 3a) and the refusal
+    // (PaneClosing) apply per pane, so a document that says no stays open while the rest still close - and if the
+    // application puts a dialog up, the questions come one after another instead of all at once. Each returns how many
+    // actually went: "close all" that closed three of five is not a failure, and the caller may want to say so.
+
+    /// <summary>Closes one pane by id. False if there is no such pane or the application refused.</summary>
+    public async Task<bool> ClosePaneAsync(string paneId)
+    {
+        return paneId != null && _panesById.TryGetValue(paneId, out var pane) && await ClosePaneAsync(pane);
+    }
+
+    /// <summary>Closes every pane of the PANEL holding <paramref name="paneId"/> - the "close all tabs" of that
+    /// panel.</summary>
+    public Task<int> ClosePanesOfGroupAsync(string paneId) => CloseAllAsync(PanesBesideAndIncluding(paneId, keep: null));
+
+    /// <summary>Closes every pane of that panel EXCEPT the named one.</summary>
+    public Task<int> CloseOtherPanesAsync(string paneId) => CloseAllAsync(PanesBesideAndIncluding(paneId, keep: paneId));
+
+    /// <summary>Closes every UNPINNED pane of that panel (see <see cref="TabItem.IsPinned"/>); pinned tabs stay, which
+    /// is what pinning them was for.</summary>
+    public Task<int> CloseUnpinnedPanesAsync(string paneId)
+    {
+        var ids = PanesBesideAndIncluding(paneId, keep: null);
+        ids?.RemoveAll(id => _panesById.TryGetValue(id, out var pane) && pane.IsPinned);
+        return CloseAllAsync(ids);
+    }
+
+    /// <summary>Closes every pane of this layout, in every window of it. Panes still refuse one by one.</summary>
+    public Task<int> CloseAllPanesAsync() => CloseAllAsync([.. Owner._panesById.Keys]);
+
+    // A COPY of the ids, never the model's own list: closing rewrites it as we go.
+    private List<string> PanesBesideAndIncluding(string paneId, string keep)
+    {
+        if (paneId == null || Layout.FindGroup(paneId) is not { } group) return null;
+
+        var ids = new List<string>(group.PaneIds);
+        if (keep != null) ids.Remove(keep);
+        return ids;
+    }
+
+    private async Task<int> CloseAllAsync(List<string> ids)
+    {
+        if (ids == null) return 0;
+
+        var closed = 0;
+        foreach (var id in ids)
+        {
+            if (!_panesById.TryGetValue(id, out var pane)) continue;
+
+            var (wentAway, stop) = await ClosePaneAsync(pane, null);
+            if (wentAway) closed++;
+            if (stop) break;   // the user said stop, not "keep this one" - asking about the rest would be badgering
+        }
+        return closed;
     }
 
     /// <summary>Brings a put-away tool back - to the group it was in, or, if that group has since died, to the zone its
@@ -753,6 +853,11 @@ public class DockingArea : Panel
             area._root.Bounds = new Rect(window.Left, window.Top, window.ClientWidth, window.ClientHeight);
         }
     }
+
+    /// <summary>The panel controls this area currently shows - one per group of the arrangement. For a host that needs
+    /// to reach the panels themselves (a test, a menu that dresses them), not for driving the layout: what a panel IS
+    /// belongs to the model, and this is only the view of it.</summary>
+    public IEnumerable<PaneGroup> Groups => _groupsByNode.Values;
 
     /// <summary>The pane a given id stands for, or null.</summary>
     public Pane PaneById(string paneId)
@@ -1167,9 +1272,19 @@ public class DockingArea : Panel
             foreach (var group in bar) ids.AddRange(group.PaneIds);
         }
 
+        // The window is going either way (the platform has already closed it), so this is not a question - it is the
+        // same bookkeeping ClosePaneAsync does, minus the asking. Anything else would leave the layout holding panes
+        // whose window no longer exists while a dialog was on screen.
         foreach (var id in ids)
         {
-            if (_panesById.TryGetValue(id, out var pane)) ClosePane(pane);
+            if (!_panesById.TryGetValue(id, out var pane)) continue;
+
+            var isTool = pane.Kind == PaneKind.Tool;
+            if (isTool) Owner._hidden[id] = new HiddenSpot(Layout.FindGroup(id), 0, pane.Zone);
+            else _panesById.Remove(id);
+
+            Layout.RemovePane(id);
+            Owner.PaneClosed?.Invoke(Owner, new PaneClosedEventArgs(id, isTool));
         }
 
         Layout.Roots.Remove(root);
@@ -1886,6 +2001,18 @@ public class DockingArea : Panel
         nameof(SelectionIndicatorThickness), typeof(double?), typeof(DockingArea),
         new PropertyMetadata(null, OnTabPolicyChanged));
 
+    /// <summary>Whether pinned tabs get a row of their own in every panel of this area, or share the one row. Unset
+    /// (default): each panel keeps what the theme says.</summary>
+    public static readonly AdamantiumProperty PinnedTabsPlacementProperty = AdamantiumProperty.Register(
+        nameof(PinnedTabsPlacement), typeof(PinnedTabsPlacement?), typeof(DockingArea),
+        new PropertyMetadata(null, OnTabPolicyChanged));
+
+    public PinnedTabsPlacement? PinnedTabsPlacement
+    {
+        get => GetValue<PinnedTabsPlacement?>(PinnedTabsPlacementProperty);
+        set => SetValue(PinnedTabsPlacementProperty, value);
+    }
+
     public bool StretchSingleDocumentTab
     {
         get => GetValue<bool>(StretchSingleDocumentTabProperty);
@@ -1914,6 +2041,7 @@ public class DockingArea : Panel
     private bool _stretchSingleDocumentTab = true;
     private TabIndicatorPlacement? _indicatorPlacement;
     private double? _indicatorThickness;
+    private PinnedTabsPlacement? _pinnedPlacement;
 
     // Pushed onto the live controls at once - the policy is about panels that already exist, and waiting for the next
     // rebuild would leave the setting apparently ignored.
@@ -1926,6 +2054,7 @@ public class DockingArea : Panel
         area._stretchSingleDocumentTab = area.StretchSingleDocumentTab;
         area._indicatorPlacement = area.SelectionIndicatorPlacement;
         area._indicatorThickness = area.SelectionIndicatorThickness;
+        area._pinnedPlacement = area.PinnedTabsPlacement;
 
         foreach (var member in area.Family)
         {
@@ -1943,10 +2072,15 @@ public class DockingArea : Panel
         // answer (Pane.IsClosable). A TOOL group never does: its close button is on the CAPTION, and it already closes
         // the selected pane rather than the group - a second button beside it would say the same thing twice.
         control.ShowCloseButton = isDocument;
+
+        // Pinning is a DOCUMENT affordance too: it is about keeping one of many things that come and go. A tool panel
+        // holds a handful of tabs that are all part of the workspace, so there is nothing there to single out.
+        control.ShowPinButton = isDocument;
         control.StretchSingleTab = isDocument && owner._stretchSingleDocumentTab;
 
         if (owner._indicatorPlacement is { } placement) control.SelectionIndicatorPlacement = placement;
         if (owner._indicatorThickness is { } thickness) control.SelectionIndicatorThickness = thickness;
+        if (owner._pinnedPlacement is { } pinnedPlacement) control.PinnedTabsPlacement = pinnedPlacement;
     }
 
     /// <summary>How wide a pane docked to an EDGE starts out, in pixels along that edge's axis. A band, not half the

@@ -95,7 +95,7 @@ public class DockingGestureTests
     /// <summary>Closing a DOCUMENT is final, and it is announced: anything keeping its own account of what is open has
     /// to hear it, or it goes on believing a closed pane is still there.</summary>
     [Test]
-    public void ClosingADocument_IsFinalAndAnnounced()
+    public async System.Threading.Tasks.Task ClosingADocument_IsFinalAndAnnounced()
     {
         var area = Area(Group("documents", DockZone.Center, "scene", "game"));
         var doc = PaneOf(area, "game");
@@ -109,7 +109,7 @@ public class DockingGestureTests
             restorable = e.CanRestore;
         };
 
-        area.ClosePane(doc);
+        await area.ClosePaneAsync(doc);
 
         Assert.Multiple(() =>
         {
@@ -123,7 +123,7 @@ public class DockingGestureTests
     /// <summary>Closing a TOOL puts it away instead: it is part of the workspace, so it stays reachable from a menu and
     /// comes back where it stood.</summary>
     [Test]
-    public void ClosingATool_PutsItAwayAndItComesBack()
+    public async System.Threading.Tasks.Task ClosingATool_PutsItAwayAndItComesBack()
     {
         var area = Area(Group("documents", DockZone.Center, "scene"), Group("tools", DockZone.Right, "inspector", "hierarchy"));
         var tool = PaneOf(area, "hierarchy");
@@ -131,7 +131,7 @@ public class DockingGestureTests
         var restorable = false;
         area.PaneClosed += (_, e) => restorable = e.CanRestore;
 
-        area.ClosePane(tool);
+        await area.ClosePaneAsync(tool);
 
         Assert.Multiple(() =>
         {
