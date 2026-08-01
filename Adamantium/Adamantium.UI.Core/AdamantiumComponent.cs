@@ -430,6 +430,7 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     {
         ValidateProperty(property);
 
+        bool known;
         lock (values)
         {
             // An attached property has no pre-created slot (it isn't in this type's registered set), so ensure its
@@ -441,10 +442,16 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
                 values.Add(property, new ValueContainer());
             }
 
-            if (values.ContainsKey(property))
-            {
-                RunSetValueSequence(property, value, priority, true);
-            }
+            known = values.ContainsKey(property);
+        }
+
+        // OUTSIDE the lock. The lock guards the value SLOTS; the sequence below runs arbitrary code - a changed-callback,
+        // a coercion, layout invalidation, PropertyChanged handlers - and one of those posting to the dispatcher while
+        // holding this component's lock is a deadlock: the pump thread, rebuilding a panel, then waits for the lock its
+        // holder can only release once the pump drains the queue (measured on the docking view).
+        if (known)
+        {
+            RunSetValueSequence(property, value, priority, true);
         }
     }
 
@@ -499,8 +506,6 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
     private void RunSetValueSequence(AdamantiumProperty property, object value, ValuePriority priority, bool raiseValueChangedEvent)
     {
-        var oldEffectiveValue = GetOrCalculateEffectiveValue(property);
-
         var metadata = property.GetDefaultMetadata(GetType());
         if (property.ValidateValueCallBack?.Invoke(value) == false)
         {
@@ -521,20 +526,33 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             value = newValue;
         }
 
-        var args = new AdamantiumPropertyChangedEventArgs(property, values[property].GetValue(priority), value);
-        
-        if (!values.ContainsKey(property))
+        // The ONLY part that needs the lock: read the old effective value, write the slot, read the new one. Everything
+        // after this block is notification, and notification must not hold a lock (see SetValue).
+        object oldEffectiveValue;
+        object slotBefore;
+        object effectiveAfterWrite;
+        lock (values)
         {
-            values.Add(property, new ValueContainer());
+            oldEffectiveValue = GetOrCalculateEffectiveValue(property);
+
+            if (!values.TryGetValue(property, out var container))
+            {
+                container = new ValueContainer();
+                values.Add(property, container);
+            }
+
+            slotBefore = container.GetValue(priority);
+            container.SetValue(value, priority);
+            effectiveAfterWrite = GetOrCalculateEffectiveValue(property);
         }
-        values[property].SetValue(value, priority);
+
+        var args = new AdamantiumPropertyChangedEventArgs(property, slotBefore, value);
 
         // A write that leaves the EFFECTIVE value where it was is not a change, so it must not run the changed-callback.
         // Running it anyway is how two properties that assign each other close a cycle with no exit: a presenter whose
         // Content is bound to its own DataContext writes back the object it already sits on, the callback re-assigns the
         // same DataContext, that refreshes the bindings, which writes Content again - the app died of a stack overflow.
         // The equal-effective check below guards only invalidation and events, which is why the cycle ran above it.
-        var effectiveAfterWrite = GetOrCalculateEffectiveValue(property);
         if (!Equals(oldEffectiveValue, effectiveAfterWrite))
         {
             metadata.PropertyChangedCallback?.Invoke(this, args);
@@ -548,7 +566,13 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             OnValueSet(property, oldEffectiveValue, value, priority);
         }
 
-        var newEffectiveValue = GetOrCalculateEffectiveValue(property);
+        // Re-read under the lock: a changed-callback or a started transition above may have written another slot.
+        object newEffectiveValue;
+        lock (values)
+        {
+            newEffectiveValue = GetOrCalculateEffectiveValue(property);
+        }
+
         if (Equals(oldEffectiveValue, newEffectiveValue))
         {
             return;
