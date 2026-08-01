@@ -67,7 +67,9 @@ public class ItemsControl : Control, IContainer
     /// <summary>The panel that actually lays the item containers out, or null before the template is applied. Public
     /// because anything positioning against the items - a drag deciding where a drop lands, a dock target offering a
     /// slot - has to ask it, and while it was internal each of them reached it by walking the visual tree instead.</summary>
-    public Panel ItemsHostPanel => _presenter?.Panel;
+    /// <para>Virtual because a control may lay its items out in MORE THAN ONE list - a tab strip keeps pinned tabs in a
+    /// row of their own - and then "the panel the items are in" is a question only that control can answer.</para>
+    public virtual Panel ItemsHostPanel => _presenter?.Panel;
 
     public IEnumerable ItemsSource
     {

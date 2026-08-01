@@ -462,6 +462,34 @@ namespace Adamantium.UITests
 
       }
       
+      /// <summary>What a SPANNED child is offered when it is MEASURED. CalculatesColSpanCorrectly below covers the
+      /// arrangement, but its children are fixed-size, so it cannot see this: a child whose desired size depends on the
+      /// width it is given - any wrapping panel - is measured with the wrong one and answers for a width it will never
+      /// have.
+      /// <para>Measured in the tab strip: a pinned row spanning three columns of an "Auto,*,Auto" grid was offered the
+      /// FIRST column's width (empty, so 0), wrapped every tab onto its own line and asked for three lines of height;
+      /// the arrange then gave it the full width and laid everything out in one. The difference showed as a band of
+      /// empty strip.</para></summary>
+      [Test]
+      public void ASpannedChild_IsMeasuredWithTheWidthOfEveryColumnItCovers()
+      {
+         var grid = new Grid { Width = 300, Height = 100 };
+         grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+         grid.ColumnDefinitions.Add(new ColumnDefinition(1, GridUnitType.Star));
+         grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+         grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+
+         var spanned = new LayoutPoker { MeasureResult = new Size(10, 10) };
+         Grid.SetColumnSpan(spanned, 3);
+         grid.Children.Add(spanned);
+
+         grid.Measure(new Size(300, 100));
+         grid.Arrange(new Rect(0, 0, 300, 100));
+
+         Assert.AreEqual(300, spanned.MeasureArg.Width,
+            "a child covering all three columns must be measured with the grid's whole width");
+      }
+
       [Test]
       public void CalculatesColSpanCorrectly()
       {
