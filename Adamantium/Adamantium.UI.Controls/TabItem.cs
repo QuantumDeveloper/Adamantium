@@ -108,10 +108,28 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
     public static readonly AdamantiumProperty IsClosableProperty = AdamantiumProperty.Register(nameof(IsClosable),
         typeof(bool), typeof(TabItem), new PropertyMetadata(true, OnCloseConfigChanged));
 
+    /// <summary>Kept: this tab does not go with a bulk close, and it lives in the strip's PINNED row rather than among
+    /// the tabs that come and go (see <see cref="TabControl.PinnedTabsPlacement"/>).</summary>
+    public static readonly AdamantiumProperty IsPinnedProperty = AdamantiumProperty.Register(nameof(IsPinned),
+        typeof(bool), typeof(TabItem), new PropertyMetadata(false, OnIsPinnedChanged));
+
+
+    // Whoever set it - the button, a menu, a view-model - the button must end up showing it.
+    private static void OnIsPinnedChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+        => ((TabItem)a).SyncPinButtonState();
     public static readonly AdamantiumProperty ShowCloseButtonProperty = AdamantiumProperty.Register(nameof(ShowCloseButton),
         typeof(bool), typeof(TabItem), new PropertyMetadata(false));
 
     public static readonly AdamantiumProperty CloseButtonTemplateProperty = AdamantiumProperty.Register(nameof(CloseButtonTemplate),
+        typeof(ControlTemplate), typeof(TabItem), new PropertyMetadata(null));
+
+    // Pin button - the same arrangement as the close one: WHETHER it is there and WHAT it looks like are effective
+    // values pulled from the owner, so a host restyles the button by handing the strip another template instead of
+    // rewriting the tab's whole ControlTemplate.
+    public static readonly AdamantiumProperty ShowPinButtonProperty = AdamantiumProperty.Register(nameof(ShowPinButton),
+        typeof(bool), typeof(TabItem), new PropertyMetadata(false));
+
+    public static readonly AdamantiumProperty PinButtonTemplateProperty = AdamantiumProperty.Register(nameof(PinButtonTemplate),
         typeof(ControlTemplate), typeof(TabItem), new PropertyMetadata(null));
 
     private static void OnCloseConfigChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
@@ -228,6 +246,27 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
         set => SetValue(IsClosableProperty, value);
     }
 
+    /// <summary>Whether this tab is pinned - kept out of a bulk close and shown in the strip's pinned row.</summary>
+    public bool IsPinned
+    {
+        get => GetValue<bool>(IsPinnedProperty);
+        set => SetValue(IsPinnedProperty, value);
+    }
+
+    /// <summary>Whether this tab shows a pin button (effective value, from the owning strip).</summary>
+    public bool ShowPinButton
+    {
+        get => GetValue<bool>(ShowPinButtonProperty);
+        set => SetValue(ShowPinButtonProperty, value);
+    }
+
+    /// <summary>The look of that button, from the owning strip - swap it to restyle pinning everywhere at once.</summary>
+    public ControlTemplate PinButtonTemplate
+    {
+        get => GetValue<ControlTemplate>(PinButtonTemplateProperty);
+        set => SetValue(PinButtonTemplateProperty, value);
+    }
+
     /// <summary>Effective close-button visibility for this tab (owner's ShowCloseButton AND this tab's IsClosable),
     /// pulled from the owning TabControl. The tab template binds the button's visibility to it.</summary>
     public bool ShowCloseButton
@@ -245,6 +284,7 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
 
     private TabControl _closeOwner;
     private ButtonBase _closeButton;
+    private ButtonBase _pinButton;
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
@@ -259,6 +299,7 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
             _closeOwner = owner;
             _closeOwner.PropertyChanged += OnOwnerPropertyChanged;
             SyncCloseButton();
+            SyncPinButton();
             SyncIconTemplate();
         }
     }
@@ -279,6 +320,11 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
         if (_closeButton != null) _closeButton.Click -= OnCloseButtonClick;
         _closeButton = GetTemplateChild("PART_CloseButton") as ButtonBase;
         if (_closeButton != null) _closeButton.Click += OnCloseButtonClick;
+
+        if (_pinButton != null) _pinButton.Click -= OnPinButtonClick;
+        _pinButton = GetTemplateChild("PART_PinButton") as ButtonBase;
+        if (_pinButton != null) _pinButton.Click += OnPinButtonClick;
+        SyncPinButtonState();
     }
 
 
@@ -287,6 +333,8 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
     {
         if (e.Property == TabControl.ShowCloseButtonProperty || e.Property == TabControl.CloseButtonTemplateProperty)
             SyncCloseButton();
+        else if (e.Property == TabControl.ShowPinButtonProperty || e.Property == TabControl.PinButtonTemplateProperty)
+            SyncPinButton();
         else if (e.Property == TabControl.IconTemplateProperty)
             SyncIconTemplate();
         else if (e.Property == TabControl.HasStretchedTabProperty && sender is TabControl owner)
@@ -311,6 +359,30 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
         var owner = _closeOwner ?? Owner;
         ShowCloseButton = owner is { ShowCloseButton: true } && IsClosable;
         CloseButtonTemplate = owner?.CloseButtonTemplate;
+    }
+
+    private void SyncPinButton()
+    {
+        var owner = _closeOwner ?? Owner;
+        ShowPinButton = owner is { ShowPinButton: true };
+        PinButtonTemplate = owner?.PinButtonTemplate;
+    }
+
+    /// <summary>The pin button: this tab changes rows. Nothing else happens here - the strip re-reads the split from the
+    /// flag, which is the same path a menu command or a view-model takes.</summary>
+    private void OnPinButtonClick(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;   // don't let the click fall through to tab selection / drag
+        IsPinned = !IsPinned;
+        SyncPinButtonState();
+    }
+
+    // Pinning is a STATE, not an action, so the button is a toggle and carries that state itself - which is what lets
+    // its template draw the two apart (a hollow tack against a filled one). Pushed rather than bound: IsPinned can be
+    // set from anywhere - the button, a menu, a view-model - and all of them must leave the button looking right.
+    private void SyncPinButtonState()
+    {
+        if (_pinButton is ToggleButton toggle) toggle.IsChecked = IsPinned;
     }
 
     // One icon template for the whole strip, taken from the owner - unless this tab was given its own.

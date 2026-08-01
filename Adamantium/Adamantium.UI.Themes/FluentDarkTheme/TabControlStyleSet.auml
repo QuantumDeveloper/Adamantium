@@ -44,11 +44,53 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+        <!-- Default look of the per-tab PIN button (enable via TabControl.ShowPinButton). Its own ControlTemplate for the
+             same reason as the close button: a host restyles pinning by handing over this one template. The thumbtack is
+             DRAWN - the same shape the docking caption uses - and fills in solid once the tab is pinned, which is how
+             every editor shows the difference. -->
+        <Setter Property="PinButtonTemplate">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="PinBg" Width="24" Height="24" CornerRadius="4" Background="Transparent">
+                        <Path x:Name="PinGlyph" Data="M5,2 L9,2 L9,4 L11,6 L11,7 L8,7 L8,10 L7,12 L6,10 L6,7 L3,7 L3,6 L5,4 Z"
+                              Stroke="{ResourceReference TextFillColorSecondary}" StrokeThickness="1"
+                              Fill="Transparent"
+                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="IsMouseOver" Value="true">
+                            <Setter TargetName="PinBg" Property="Background" Value="{ResourceReference ControlFillColorSecondary}"/>
+                            <Setter TargetName="PinGlyph" Property="Stroke" Value="{ResourceReference TextFillColorPrimary}"/>
+                        </PropertyTrigger>
+                        <!-- PINNED: the tack fills in. Hollow against solid is how every editor tells the two apart, and
+                             it is the button reporting its own state rather than a second thing to read elsewhere. -->
+                        <PropertyTrigger Property="IsChecked" Value="true">
+                            <Setter TargetName="PinGlyph" Property="Fill" Value="{ResourceReference TextFillColorPrimary}"/>
+                            <Setter TargetName="PinGlyph" Property="Stroke" Value="{ResourceReference TextFillColorPrimary}"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
         <Setter Property="ItemsPanel">
             <Setter.Value>
                 <ItemsPanelTemplate>
                     <TabPanel Orientation="Horizontal"/>
                 </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A strip's list is JUST its items - no chrome, and above all no scroller of its own. The ordinary row is already
+         inside a TabStripScroller (that is what pans the strip on the wheel), and the ItemsControl default template wraps
+         its items in a ScrollViewer, which swallowed the wheel and left the strip unable to pan. Matching is by exact
+         type, so this states the whole template rather than leaning on the base one. -->
+    <Style Selector="TabItemsControl">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabItemsControl">
+                    <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
@@ -117,11 +159,28 @@
                              * / Auto reflow actually re-runs - a mid-pass visibility flip loses its invalidation and the button
                              then sat off-screen until a resize. Shown only when the strip overflows + ShowTabOverflowMenu;
                              toggles PART_TabOverflowPopup - a ListBox of every tab; picking a row selects it + scrolls it in. -->
-                        <Grid x:Name="StripRow" Grid.Row="0" ColumnDefinitions="*,Auto">
-                            <TabStripScroller x:Name="PART_TabStrip" Grid.Column="0" Orientation="Horizontal">
-                                <Grid>
-                                    <ItemsPresenter x:Name="PART_ItemsPresenter"/>
-                                    <Rectangle x:Name="PART_SelectionIndicator"
+                        <!-- TWO lists, not one strip kept in sorted order: pinned tabs above, the ones that come and go
+                             below. The pinned row is OUTSIDE the scroller on purpose - that is what makes a pinned tab
+                             impossible to scroll out of sight - and it WRAPS, so many pinned tabs cost further lines
+                             instead of squeezing the rest. Both are TabItemsControl, which asks the strip itself for
+                             containers, so a data item still becomes a real TabItem.
+                             The overflow button sits in the BOTTOM row's column, not beside both rows: it belongs to the
+                             scrolling strip, and spanning the pinned row made it a tall bar next to tabs it has nothing
+                             to do with. PinnedTabsPlacement=SameRow moves the pinned list down beside the others. -->
+                        <Grid x:Name="StripRow" Grid.Row="0" RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,*,Auto">
+                                <!-- The pinned row carries a bar of its own. Only ever ONE of the two is visible - the one
+                                     in the row holding the selected tab - so on screen it reads as a single indicator
+                                     that moves between the rows; a bar cannot point at a tab in another row. -->
+                                <Grid x:Name="PinnedRow" Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3"
+                                      Visibility="Collapsed">
+                                    <TabItemsControl x:Name="PART_PinnedTabs" ItemsSource="{TemplateBinding PinnedItems}">
+                                        <TabItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel Orientation="Horizontal"/>
+                                            </ItemsPanelTemplate>
+                                        </TabItemsControl.ItemsPanel>
+                                    </TabItemsControl>
+                                    <Rectangle x:Name="PART_PinnedSelectionIndicator"
                                                Fill="{TemplateBinding SelectionIndicatorBrush}"
                                                Width="1"
                                                Height="{TemplateBinding SelectionIndicatorThickness}"
@@ -129,8 +188,25 @@
                                                VerticalAlignment="Bottom"
                                                IsHitTestVisible="False"/>
                                 </Grid>
-                            </TabStripScroller>
-                            <ToggleButton x:Name="PART_TabOverflow" Grid.Column="1" VerticalAlignment="Stretch"
+                            <TabStripScroller x:Name="PART_TabStrip" Grid.Row="1" Grid.Column="1" Orientation="Horizontal">
+                                    <Grid>
+                                        <TabItemsControl x:Name="PART_Tabs" ItemsSource="{TemplateBinding UnpinnedItems}">
+                                            <TabItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <TabPanel Orientation="Horizontal"/>
+                                                </ItemsPanelTemplate>
+                                            </TabItemsControl.ItemsPanel>
+                                        </TabItemsControl>
+                                        <Rectangle x:Name="PART_SelectionIndicator"
+                                                   Fill="{TemplateBinding SelectionIndicatorBrush}"
+                                                   Width="1"
+                                                   Height="{TemplateBinding SelectionIndicatorThickness}"
+                                                   HorizontalAlignment="Left"
+                                                   VerticalAlignment="Bottom"
+                                                   IsHitTestVisible="False"/>
+                                    </Grid>
+                                </TabStripScroller>
+                            <ToggleButton x:Name="PART_TabOverflow" Grid.Row="1" Grid.Column="2" VerticalAlignment="Stretch"
                                           MinWidth="28" Padding="4 0" Visibility="Collapsed" BorderThickness="0"
                                           HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                           Background="{ResourceReference SolidBackgroundFillColorBase}">
@@ -138,7 +214,7 @@
                                       Width="8" Height="5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </ToggleButton>
                             <!-- Flyout list of every tab (wired in code), opened below the ▾ (edge-aware via FlipToFit). -->
-                            <Popup x:Name="PART_TabOverflowPopup" Grid.Column="1" Placement="Bottom" FlipToFit="True" VerticalOffset="2">
+                            <Popup x:Name="PART_TabOverflowPopup" Grid.Row="1" Grid.Column="2" Placement="Bottom" FlipToFit="True" VerticalOffset="2">
                                 <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
                                         BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                                         BorderThickness="1" CornerRadius="4" Padding="2">
@@ -177,6 +253,36 @@
                              is why each template says it for itself. -->
                         <PropertyTrigger Property="SelectionIndicatorPlacement" Value="Outer">
                             <Setter TargetName="PART_SelectionIndicator" Property="VerticalAlignment" Value="Top"/>
+                            <Setter TargetName="PART_PinnedSelectionIndicator" Property="VerticalAlignment" Value="Top"/>
+                        </PropertyTrigger>
+                        <!-- Each row exists only while it has something in it: an empty one still takes its padding, and
+                             a band of blank strip reads as a bug. Pin every tab and the ordinary row goes; unpin them
+                             all and the pinned row goes. -->
+                        <PropertyTrigger Property="HasPinnedTabs" Value="true">
+                            <Setter TargetName="PinnedRow" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="HasUnpinnedTabs" Value="false">
+                            <Setter TargetName="PART_TabStrip" Property="Visibility" Value="Collapsed"/>
+                        </PropertyTrigger>
+                        <!-- ONE row: the pinned list moves down beside the others, in the first column, and stops
+                             spanning the width. The tabs themselves are unchanged - only where their list sits. -->
+                        <PropertyTrigger Property="PinnedTabsPlacement" Value="SameRow">
+                            <Setter TargetName="PinnedRow" Property="Grid.Row" Value="1"/>
+                            <Setter TargetName="PinnedRow" Property="Grid.ColumnSpan" Value="1"/>
+                            <!-- Content-width, and no wider: in the shared row it stands in the Auto column beside the
+                                 scrolling strip, and a row that stretches leaves the starred column nothing - the
+                                 ordinary tabs then have no width at all and simply are not there. -->
+                            <Setter TargetName="PinnedRow" Property="HorizontalAlignment" Value="Left"/>
+                            <!-- And a WRAPPING panel is exactly what stretches: measured unbounded in the Auto column it
+                                 answers with the whole width (measured: pinnedPanel=676 of 676, scroller=0). There is
+                                 nothing to wrap onto in a shared row anyway, so it lays out as a plain strip. -->
+                            <Setter TargetName="PART_PinnedTabs" Property="ItemsPanel">
+                                <Setter.Value>
+                                    <ItemsPanelTemplate>
+                                        <TabPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </Setter.Value>
+                            </Setter>
                         </PropertyTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -225,7 +331,7 @@
                                 <Path Data="M0,0 L8,0 L4,5 Z" Fill="{ResourceReference TextFillColorSecondary}"
                                       Width="8" Height="5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </ToggleButton>
-                            <Popup x:Name="PART_TabOverflowPopup" Grid.Column="1" Placement="Bottom" FlipToFit="True" VerticalOffset="2">
+                            <Popup x:Name="PART_TabOverflowPopup" Grid.Row="1" Grid.Column="2" Placement="Bottom" FlipToFit="True" VerticalOffset="2">
                                 <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
                                         BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                                         BorderThickness="1" CornerRadius="4" Padding="2">

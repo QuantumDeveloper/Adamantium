@@ -1,4 +1,7 @@
 using System.Collections;
+using System.Collections.ObjectModel;
+using System.Collections.Generic;
+using System.Linq;
 using System.Collections.Specialized;
 using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Controls.Base;
@@ -216,6 +219,156 @@ public class TabControl : Selector
             if (_overflow?.IsChecked == true) _overflow.IsChecked = false;   // a pick from the flyout closes it
         };
         Items.CollectionChanged += OnItemsChanged;
+
+        PinnedItems = [];
+        UnpinnedItems = [];
+        Items.CollectionChanged += (_, _) => WatchPinning();
+    }
+
+    // --- Pinned tabs: TWO sources, not one list that has to be sorted ------------------------------------------------
+    // A pinned tab does not belong among the tabs that come and go: it must not be pushed out of view by them, and a
+    // strip that scrolls must not carry it away. Two collections say that directly - each tab goes into the one it
+    // belongs to - and the ORDER falls out for free, with nothing to keep sorted.
+    //
+    // Split by the ITEM, which for a tab strip authored in markup IS the TabItem (a docking Pane goes straight into
+    // Items). An item that is DATA has no container yet at this point, and nothing to read IsPinned off - such an item
+    // stays in the ordinary row. Data-bound pinning needs the flag to come from the DATA, which is a separate decision
+    // and not one to guess at here.
+
+    // Read-only PROPERTIES, not plain CLR ones: a theme has to be able to point a list at them with a
+    // {TemplateBinding}, and that resolves an AdamantiumProperty by name - against a plain property it finds nothing at
+    // all (measured: the application died on startup with "Value cannot be null. (Parameter 'property')"). Read-only
+    // because the split is the control's own answer; nothing outside assigns these.
+    public static readonly AdamantiumProperty PinnedItemsProperty = AdamantiumProperty.RegisterReadOnly(
+        nameof(PinnedItems), typeof(ObservableCollection<object>), typeof(TabControl), new PropertyMetadata(null));
+
+    public static readonly AdamantiumProperty UnpinnedItemsProperty = AdamantiumProperty.RegisterReadOnly(
+        nameof(UnpinnedItems), typeof(ObservableCollection<object>), typeof(TabControl), new PropertyMetadata(null));
+
+    /// <summary>The pinned tabs, in the order they were added.</summary>
+    public ObservableCollection<object> PinnedItems
+    {
+        get => GetValue<ObservableCollection<object>>(PinnedItemsProperty);
+        private set => SetValue(PinnedItemsProperty, value);
+    }
+
+    /// <summary>Everything else - the tabs that come and go.</summary>
+    public ObservableCollection<object> UnpinnedItems
+    {
+        get => GetValue<ObservableCollection<object>>(UnpinnedItemsProperty);
+        private set => SetValue(UnpinnedItemsProperty, value);
+    }
+
+    /// <summary>Whether tabs carry a pin button. Off by default: pinning is an editor's affordance, not something every
+    /// strip wants on every tab.</summary>
+    public static readonly AdamantiumProperty ShowPinButtonProperty = AdamantiumProperty.Register(
+        nameof(ShowPinButton), typeof(bool), typeof(TabControl), new PropertyMetadata(false));
+
+    /// <summary>The look of that button - a standalone template, like <see cref="CloseButtonTemplate"/>, so a host
+    /// restyles pinning by handing over ONE template instead of copying the whole tab template.</summary>
+    public static readonly AdamantiumProperty PinButtonTemplateProperty = AdamantiumProperty.Register(
+        nameof(PinButtonTemplate), typeof(ControlTemplate), typeof(TabControl), new PropertyMetadata(null));
+
+    public bool ShowPinButton
+    {
+        get => GetValue<bool>(ShowPinButtonProperty);
+        set => SetValue(ShowPinButtonProperty, value);
+    }
+
+    public ControlTemplate PinButtonTemplate
+    {
+        get => GetValue<ControlTemplate>(PinButtonTemplateProperty);
+        set => SetValue(PinButtonTemplateProperty, value);
+    }
+
+    public static readonly AdamantiumProperty PinnedTabsPlacementProperty = AdamantiumProperty.Register(
+        nameof(PinnedTabsPlacement), typeof(PinnedTabsPlacement), typeof(TabControl),
+        new PropertyMetadata(Controls.PinnedTabsPlacement.SeparateRow));
+
+    /// <summary>Whether pinned tabs get a row of their own (default) or share the one row with the others.</summary>
+    public PinnedTabsPlacement PinnedTabsPlacement
+    {
+        get => GetValue<PinnedTabsPlacement>(PinnedTabsPlacementProperty);
+        set => SetValue(PinnedTabsPlacementProperty, value);
+    }
+
+    // The OWNER watches its tabs, rather than each tab looking upward for its owner: a tab reaches its strip through the
+    // visual tree, and an item is in Items long before it is in any tree (measured - pinning simply did nothing until
+    // the control had a template). Re-subscribed wholesale on every change: a strip holds tens of tabs, not thousands.
+    private readonly HashSet<TabItem> _watchedForPinning = [];
+
+    private void WatchPinning()
+    {
+        foreach (var tab in _watchedForPinning) tab.PropertyChanged -= OnTabPinningChanged;
+        _watchedForPinning.Clear();
+
+        foreach (var item in Items)
+        {
+            if (item is not TabItem tab || !_watchedForPinning.Add(tab)) continue;
+
+            tab.PropertyChanged += OnTabPinningChanged;
+        }
+
+        SplitByPinned();
+    }
+
+    private void OnTabPinningChanged(object sender, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (e.Property != TabItem.IsPinnedProperty) return;
+
+        SplitByPinned();
+        if (sender is TabItem tab) AnimateRowChange(tab);
+    }
+
+    /// <summary>Re-reads which tabs are pinned. Called on a collection change and when a tab's
+    /// <see cref="TabItem.IsPinned"/> changes.</summary>
+    internal void SplitByPinned()
+    {
+        PinnedItems.Clear();
+        UnpinnedItems.Clear();
+
+        foreach (var item in Items)
+        {
+            if (item is TabItem { IsPinned: true }) PinnedItems.Add(item);
+            else UnpinnedItems.Add(item);
+        }
+
+        HasPinnedTabs = PinnedItems.Count > 0;
+        HasUnpinnedTabs = UnpinnedItems.Count > 0;
+    }
+
+    public static readonly AdamantiumProperty HasUnpinnedTabsProperty = AdamantiumProperty.RegisterReadOnly(
+        nameof(HasUnpinnedTabs), typeof(bool), typeof(TabControl), new PropertyMetadata(false));
+
+    /// <summary>Whether anything is UNpinned. Pin every tab and the ordinary row has nothing left to show - it collapses
+    /// rather than standing there as a band of empty strip.</summary>
+    public bool HasUnpinnedTabs
+    {
+        get => GetValue<bool>(HasUnpinnedTabsProperty);
+        private set => SetValue(HasUnpinnedTabsProperty, value);
+    }
+
+    // A tab that changed rows is taken out of one list and put into another, so it appears in its new row at once, in
+    // full - which reads as a jump rather than a move. A short fade says "this is the same tab, it went there"; the
+    // strip is already reflowing underneath, and racing that with a slide would only fight the layout.
+    private void AnimateRowChange(TabItem tab)
+    {
+        tab.Opacity = 0;
+        tab.BeginAnimation(OpacityProperty, new DoubleAnimation
+        {
+            From = 0, To = 1, Duration = ReorderAnimationDuration, Easing = ReorderEasing ?? DefaultReorderEasing
+        });
+    }
+
+    public static readonly AdamantiumProperty HasPinnedTabsProperty = AdamantiumProperty.RegisterReadOnly(
+        nameof(HasPinnedTabs), typeof(bool), typeof(TabControl), new PropertyMetadata(false));
+
+    /// <summary>Whether anything is pinned - what the theme shows the pinned row on. An empty row still costs its
+    /// padding and its border, which reads as a strip that has grown for no reason.</summary>
+    public bool HasPinnedTabs
+    {
+        get => GetValue<bool>(HasPinnedTabsProperty);
+        private set => SetValue(HasPinnedTabsProperty, value);
     }
 
     /// <summary>The body of the selected tab, shown by the template's <c>PART_SelectedContentHost</c>. Read-only: the
@@ -352,7 +505,7 @@ public class TabControl : Selector
 
         for (var i = 0; i < Items.Count; i++)
         {
-            if (ItemContainerGenerator.ContainerFromIndex(i) is TabItem tab) tab.IsStretched = stretched;
+            if (ContainerOfTab(i) is TabItem tab) tab.IsStretched = stretched;
         }
     }
 
@@ -371,8 +524,70 @@ public class TabControl : Selector
     /// <summary>Selects the tab hosted by <paramref name="container"/> (called when its header is clicked).</summary>
     internal void SelectTab(TabItem container)
     {
-        var index = ItemContainerGenerator.IndexFromContainer(container);
+        var index = IndexOfTab(container);
         if (index >= 0) SelectedIndex = index;
+    }
+
+    /// <summary>Both rows, so the selection lights up a pinned tab as readily as an ordinary one. A strip's containers
+    /// are realized by the two lists in its template, not by this control's own generator.</summary>
+    protected override IEnumerable<(IUIComponent Container, object Item)> RealizedContainers()
+    {
+        foreach (var pair in base.RealizedContainers()) yield return pair;
+
+        foreach (var host in (ItemsControl[])[_tabsHost, _pinnedHost])
+        {
+            if (host?.ItemContainerGenerator is not { } generator) continue;
+
+            foreach (var index in generator.RealizedIndices.ToList())
+            {
+                if (index < 0 || index >= host.Items.Count) continue;
+
+                if (generator.ContainerFromIndex(index) is { } container) yield return (container, host.Items[index]);
+            }
+        }
+    }
+
+    /// <summary>The container standing for <see cref="ItemsControl.Items"/>[<paramref name="index"/>], whichever of the
+    /// strip's lists realized it - the counterpart of <see cref="IndexOfTab"/>. Everything that positions against a tab
+    /// (the selection bar, the reorder animation) asks in indices of the ONE item list and gets the live control back.
+    /// </summary>
+    internal IUIComponent ContainerOfTab(int index)
+    {
+        if (index < 0 || index >= Items.Count) return null;
+        if (ItemContainerGenerator.ContainerFromIndex(index) is { } own) return own;
+
+        var item = Items[index];
+        foreach (var host in (ItemsControl[])[_tabsHost, _pinnedHost])
+        {
+            var local = host?.Items.IndexOf(item) ?? -1;
+            if (local < 0) continue;
+
+            if (host.ItemContainerGenerator.ContainerFromIndex(local) is { } realized) return realized;
+        }
+
+        // An authored tab is its own container, so it never passes through a generator at all.
+        return item as IUIComponent;
+    }
+
+    /// <summary>Where a tab stands in <see cref="ItemsControl.Items"/>, whoever realized it. A strip is laid out as two
+    /// lists (pinned and ordinary), so a container may have been generated by either of them - and everything that acts
+    /// on a tab (select, close, reorder) still speaks in indices of the ONE list of items this control has.</summary>
+    internal int IndexOfTab(IUIComponent container)
+    {
+        var index = ItemContainerGenerator.IndexFromContainer(container);
+        if (index >= 0) return index;
+
+        foreach (var host in (ItemsControl[])[_tabsHost, _pinnedHost])
+        {
+            var local = host?.ItemContainerGenerator.IndexFromContainer(container) ?? -1;
+            if (local < 0 || local >= host.Items.Count) continue;
+
+            var owner = Items.IndexOf(host.Items[local]);
+            if (owner >= 0) return owner;
+        }
+
+        // An authored tab is its own container and was never generated by anyone.
+        return Items.IndexOf(container);
     }
 
     // --- Drag reorder (animated, visual-first) --------------------------------------------------------------------
@@ -415,7 +630,7 @@ public class TabControl : Selector
         _dragVertical = StripIsVertical;
         IsTearingOff = false;   // per-gesture state: left set, it kills the indicator and every later tear-off
         _dragged = tab;
-        _dragStartIndex = _targetIndex = ItemContainerGenerator.IndexFromContainer(tab);
+        _dragStartIndex = _targetIndex = IndexOfTab(tab);
         _grabOffset = along - SlotStart(tab);
         _draggedExtent = Extent(tab);
         tab.ZIndex = 1;   // float above its siblings for the drag
@@ -544,7 +759,7 @@ public class TabControl : Selector
         // its neighbours aside).
         for (var i = 0; i < Items.Count; i++)
         {
-            if (ItemContainerGenerator.ContainerFromIndex(i) is TabItem other) SetOffset(other, 0);
+            if (ContainerOfTab(i) is TabItem other) SetOffset(other, 0);
         }
 
         _dragStartIndex = _targetIndex = -1;
@@ -579,7 +794,7 @@ public class TabControl : Selector
         var target = _dragStartIndex;
         for (var i = 0; i < Items.Count; i++)
         {
-            if (i == _dragStartIndex || ItemContainerGenerator.ContainerFromIndex(i) is not TabItem other) continue;
+            if (i == _dragStartIndex || ContainerOfTab(i) is not TabItem other) continue;
             var otherCentre = SlotStart(other) + Extent(other) / 2;
             if (i > _dragStartIndex && centre > otherCentre) target = Math.Max(target, i);
             else if (i < _dragStartIndex && centre < otherCentre) target = Math.Min(target, i);
@@ -630,7 +845,7 @@ public class TabControl : Selector
     {
         for (var i = 0; i < Items.Count; i++)
         {
-            if (i == _dragStartIndex || ItemContainerGenerator.ContainerFromIndex(i) is not TabItem other) continue;
+            if (i == _dragStartIndex || ContainerOfTab(i) is not TabItem other) continue;
 
             double gap = 0;
             if (_targetIndex > _dragStartIndex && i > _dragStartIndex && i <= _targetIndex) gap = -_draggedExtent;
@@ -646,12 +861,12 @@ public class TabControl : Selector
         if (target > start)
             for (var i = start + 1; i <= target; i++)
             {
-                if (ItemContainerGenerator.ContainerFromIndex(i) is TabItem t) shift += Extent(t);
+                if (ContainerOfTab(i) is TabItem t) shift += Extent(t);
             }
         else if (target < start)
             for (var i = target; i < start; i++)
             {
-                if (ItemContainerGenerator.ContainerFromIndex(i) is TabItem t) shift -= Extent(t);
+                if (ContainerOfTab(i) is TabItem t) shift -= Extent(t);
             }
         return shift;
     }
@@ -659,7 +874,7 @@ public class TabControl : Selector
     private void ClearDragOffsets()
     {
         for (var i = 0; i < Items.Count; i++)
-            if (ItemContainerGenerator.ContainerFromIndex(i) is TabItem t && t.RenderTransform is Transform)
+            if (ContainerOfTab(i) is TabItem t && t.RenderTransform is Transform)
                 SetOffset(t, 0);
     }
 
@@ -745,18 +960,57 @@ public class TabControl : Selector
     // layout (initial place / resize / reorder). It lives in the strip's scroll content, so it pans and clips with the
     // tabs for free. Vertical strips use Y/ScaleY. Same DoubleAnimation infra as the drag-reorder above.
 
-    private UIComponent _indicator;
+    private UIComponent _indicator;         // the bar of the row the selection is in - what everything below drives
+    private UIComponent _rowIndicator;      // the ordinary row's bar
+    private UIComponent _pinnedRowIndicator;// the pinned row's bar
     private bool _indicatorPlaced;
+
+    /// <summary>Points <see cref="_indicator"/> at the bar belonging to the row the selected tab is in, and hides the
+    /// other one. A pinned tab is in a different row from the scrolling strip, and a bar in the wrong row has nothing it
+    /// could point at - which is why there is one per row rather than one that tries to reach both.</summary>
+    private void UseIndicatorOfSelectedRow()
+    {
+        var pinned = SelectedIndex >= 0 && SelectedIndex < Items.Count && PinnedItems.Contains(Items[SelectedIndex]);
+        var wanted = pinned ? _pinnedRowIndicator : _rowIndicator;
+        var other = pinned ? _rowIndicator : _pinnedRowIndicator;
+
+        if (other != null) other.Visibility = Visibility.Collapsed;
+        if (ReferenceEquals(_indicator, wanted)) return;
+
+        _indicator = wanted;
+        _indicatorPlaced = false;   // a bar that has just taken over has never been placed in its row
+        _animatingIndicator = false;
+    }
     private bool _animatingIndicator;
     private bool _reselecting;   // a collection-change reselection is in flight -> snap the bar via PlaceIndicator, don't slide
     private LayoutManager _hookedManager;
     private double _lastAlong, _lastExtent;
 
+    // The two lists a strip is made of. PART_Tabs holds the ordinary tabs (and is what "the items host" means for
+    // everything that positions against them - a reorder drag, a drop target); PART_PinnedTabs holds the pinned ones in
+    // their own row. A theme that states neither leaves both null, and the strip falls back to the single presenter.
+    private ItemsControl _tabsHost;
+    private ItemsControl _pinnedHost;
+
+    /// <summary>The panel the ORDINARY tabs are laid out in. Pinned tabs sit in a list of their own, and nothing that
+    /// measures a drag along the strip has any business there.</summary>
+    public override Panel ItemsHostPanel => _tabsHost?.ItemsHostPanel ?? base.ItemsHostPanel;
+
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
 
-        _indicator = GetTemplateChild("PART_SelectionIndicator") as UIComponent;
+        _tabsHost = GetTemplateChild("PART_Tabs") as ItemsControl;
+        _pinnedHost = GetTemplateChild("PART_PinnedTabs") as ItemsControl;
+
+
+        // One bar per ROW: each lives inside the row it marks, so it moves and clips with those tabs. Which of the two is
+        // in use follows the selected tab (see UseIndicatorOfSelectedRow) - a bar cannot point across rows.
+        _rowIndicator = GetTemplateChild("PART_SelectionIndicator") as UIComponent;
+        _pinnedRowIndicator = GetTemplateChild("PART_PinnedSelectionIndicator") as UIComponent;
+        if (_pinnedRowIndicator != null) _pinnedRowIndicator.IsHitTestVisible = false;
+
+        UseIndicatorOfSelectedRow();
         if (_indicator != null)
         {
             _indicator.IsHitTestVisible = false;   // a thin overlay bar must never eat a tab click
@@ -829,7 +1083,7 @@ public class TabControl : Selector
         if (!_scrollPending) return;
         if (_tabStrip == null || SelectedIndex < 0) return;
 
-        if (ItemContainerGenerator.ContainerFromIndex(SelectedIndex) is not IUIComponent container) return;
+        if (ContainerOfTab(SelectedIndex) is not IUIComponent container) return;
         // Not laid out yet - scrolling to a tab with no bounds scrolls to nowhere. The next pass will find it placed.
         if (container.Bounds.Width <= 0 && container.Bounds.Height <= 0) return;
 
@@ -842,6 +1096,7 @@ public class TabControl : Selector
 
     private void PlaceIndicator()
     {
+        UseIndicatorOfSelectedRow();
         // Authoritative placement: the bar must always end up on the selected tab. A pure selection slide animates the
         // bar's transform while the tabs' Bounds stay put, so its target is unchanged - leave that slide running. But ANY
         // layout reflow that MOVES the selected tab (a tab closed/opened/resized/reordered, the strip scrolled) changes the
@@ -868,18 +1123,35 @@ public class TabControl : Selector
         // the narrow strip stopped being narrow.
         vertical = StripIsVertical;
         if (_indicator == null || _indicator.VisualParent == null) return false;
-        if (ItemContainerGenerator.ContainerFromIndex(SelectedIndex) is not TabItem container) return false;
+        if (ContainerOfTab(SelectedIndex) is not TabItem container) return false;
 
         var bounds = container.Bounds;
         if (bounds.Width <= 0 || bounds.Height <= 0) return false;   // not laid out yet; PlaceIndicator will place it
 
         var reference = _indicator.VisualParent;
         along = -(vertical ? _indicator.Bounds.Y : _indicator.Bounds.X);
-        for (IUIComponent n = container; n != null && !ReferenceEquals(n, reference); n = n.VisualParent)
+
+        // Walk up to the bar's own parent, adding each offset on the way. The selected tab may not be under it at all -
+        // a pinned tab sits in the OTHER row, and the bar lives in the scrolling one. Then there is nothing here to
+        // point at, and summing the walk to the root instead sent the bar off sideways (seen on pinning a tab).
+        var reached = false;
+        for (IUIComponent n = container; n != null; n = n.VisualParent)
         {
+            if (ReferenceEquals(n, reference))
+            {
+                reached = true;
+                break;
+            }
+
             along += vertical ? n.Bounds.Y : n.Bounds.X;
             if (n is UIComponent uc && uc.RenderTransform is Transform pan)
                 along += vertical ? pan.TranslateY : pan.TranslateX;
+        }
+
+        if (!reached)
+        {
+            _indicator.Visibility = Visibility.Collapsed;
+            return false;
         }
         extent = vertical ? bounds.Height : bounds.Width;
         return true;
@@ -887,6 +1159,8 @@ public class TabControl : Selector
 
     private void UpdateIndicator(bool animate)
     {
+        UseIndicatorOfSelectedRow();
+
         // No selected tab (an empty TabControl, or a deselected strip): hide the bar. Otherwise its default 1px template
         // rectangle lingers as a stray accent pixel in the strip's corner (it is only ever positioned/sized via its
         // RenderTransform, which UpdateIndicator skips when there's nothing to underline). Reset _indicatorPlaced so it
@@ -1102,7 +1376,7 @@ public class TabControl : Selector
         for (var i = 0; i < Items.Count; i++)
         {
             var item = Items[i];
-            var tab = item as TabItem ?? ItemContainerGenerator.ContainerFromIndex(i) as TabItem;
+            var tab = item as TabItem ?? ContainerOfTab(i) as TabItem;
 
             // An authored tab is named by its header; a data-bound one by the item itself, drawn through the very
             // template the strip uses. A header that is ITSELF a control cannot be shown in two places any more than the
@@ -1177,7 +1451,7 @@ public class TabControl : Selector
     // (mutating ItemsSource when data-bound to a writable list, else the authored Items) - mirroring MoveItem's source rule.
     internal void RequestClose(TabItem tab)
     {
-        var index = ItemContainerGenerator.IndexFromContainer(tab);
+        var index = IndexOfTab(tab);
         if (index < 0 || index >= Items.Count) return;
 
         var args = new TabCloseRequestedEventArgs(tab, Items[index]);
