@@ -41,7 +41,7 @@
                              goes to the header and the close button stays against the right edge. Stacked, the button
                              sat glued to the end of the text with the whole rest of the strip empty after it. A
                              content-sized tab is unchanged: the starred track is then exactly the header's width. -->
-                        <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto" VerticalAlignment="Center">
                             <!-- What marks the tab, drawn from DATA by IconTemplate. Collapsed by default and revealed by
                                  the HasIcon trigger below: an empty presenter measures to nothing, but its MARGIN is
                                  reserved regardless, and that gap is what pushed a turned label off-centre. -->
@@ -60,9 +60,18 @@
                                     Content="{TemplateBinding Header}"
                                     ContentTemplate="{TemplateBinding HeaderTemplate}"
                                     ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}"/>
+                            <!-- The pin button, BEFORE the close one: pinning is about keeping the tab, closing about
+                                 losing it, and the more destructive of the two belongs at the very edge. Its LOOK is
+                                 PinButtonTemplate, so a host restyles it without touching this template. -->
+                            <ToggleButton x:Name="PART_PinButton" Grid.Column="2"
+                                    Template="{TemplateBinding PinButtonTemplate}"
+                                    Margin="6 0 0 0"
+                                    MinWidth="0" MinHeight="0" Padding="0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed"/>
                             <!-- The close button; its LOOK is CloseButtonTemplate (a themed 'x' from TabControlStyleSet).
                                  Collapsed unless the owner turns close buttons on (see the ShowCloseButton trigger). -->
-                            <Button x:Name="PART_CloseButton" Grid.Column="2"
+                            <Button x:Name="PART_CloseButton" Grid.Column="3"
                                     Template="{TemplateBinding CloseButtonTemplate}"
                                     Margin="8 0 0 0"
                                     MinWidth="0" MinHeight="0" Padding="0"
@@ -117,6 +126,33 @@
                 <Condition Property="IsSelected" Value="true"/>
             </MultiTrigger.Conditions>
             <Setter TargetName="PART_CloseButton" Property="Visibility" Value="Visible"/>
+        </MultiTrigger>
+        <!-- The pin button follows the same rule as the close one - reserved while idle, revealed on hover or on the
+             selected tab - with one addition: on a PINNED tab it is always visible, because it is the only way back and
+             a button you have to hunt for is not one. -->
+        <PropertyTrigger Property="ShowPinButton" Value="true">
+            <Setter TargetName="PART_PinButton" Property="Visibility" Value="Hidden"/>
+        </PropertyTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ShowPinButton" Value="true"/>
+                <Condition Property="IsMouseOver" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_PinButton" Property="Visibility" Value="Visible"/>
+        </MultiTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ShowPinButton" Value="true"/>
+                <Condition Property="IsSelected" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_PinButton" Property="Visibility" Value="Visible"/>
+        </MultiTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ShowPinButton" Value="true"/>
+                <Condition Property="IsPinned" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_PinButton" Property="Visibility" Value="Visible"/>
         </MultiTrigger>
     </Style>
 
