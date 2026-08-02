@@ -51,6 +51,13 @@ public class Window : WindowBase
         
     public override void Close()
     {
+        // Cancels a DEFERRED show, exactly as Hide does. A window closed before it drew its first frame still had
+        // "display me later" standing, and the renderer carried it out after the first Present - so the window came up
+        // AFTER being closed and stayed there, owned by nobody.
+        // Measured on restoring a layout that has floating panels: the old windows are closed and the new ones opened in
+        // the same pass, and the ones closed while still pending simply reappeared - a fresh pair of stray windows on
+        // every restore.
+        ShouldDisplayWindow = false;
         IsClosed = true;
         OnClosed();
     }
