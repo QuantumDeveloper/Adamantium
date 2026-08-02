@@ -22,7 +22,12 @@ public static class TextureExtensions
         imageMemoryBarrier.SubresourceRange.BaseMipLevel = 0;
         imageMemoryBarrier.SubresourceRange.LevelCount = 1;
         imageMemoryBarrier.SubresourceRange.BaseArrayLayer = 0;
-        imageMemoryBarrier.SubresourceRange.LayerCount = 1;
+        // ALL layers, not just the first. A layout transition applies to the subresources the barrier names, so with a
+        // count of 1 an array texture had only layer 0 moved: the rest stayed as created, and both the upload into them
+        // and the shader's read of them were reads of an image in the wrong layout. Validation says it plainly
+        // ("arrayLayer = 1 ... expects TRANSFER_DST_OPTIMAL, current layout is PREINITIALIZED"), and the draw that
+        // followed took the whole renderer down with it.
+        imageMemoryBarrier.SubresourceRange.LayerCount = Constants.VK_REMAINING_ARRAY_LAYERS;
 
         if (newLayout == ImageLayout.DepthStencilAttachmentOptimal)
         {

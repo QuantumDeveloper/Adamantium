@@ -268,6 +268,11 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         return Texture.CreateFrom(this, description, pixelData);
     }
 
+    public ITexture CreateTextureArray(TextureDescription description, IReadOnlyList<byte[]> layers)
+    {
+        return Texture.CreateArrayFrom(this, description, layers);
+    }
+
     public ITexture ImportSharedSurface(SharedSurfaceDescriptor descriptor)
     {
         return SharedSurface.Import(this, descriptor);
@@ -486,13 +491,15 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         return LogicalDevice.GetDescriptorSetLayoutOffset(layout, bindingSlot);
     }
 
-    public ShaderEXT CreateShader(ShaderCreateInfoEXT shaderCreateInfo)
+    public ShaderEXT CreateShader(ShaderCreateInfoEXT shaderCreateInfo, string name = null)
     {
         // Shader-object binary cache (dodges the Turing vkCreateShadersEXT NVVM flake). On a cache hit, create from the
         // driver-compiled BINARY - no NVVM, no flake. On a miss (or an incompatible binary after a driver/device change),
         // compile from SPIR-V once and persist the binary for next launch. The binary path goes through
         // CreateShaderFromBinary, which honours the mandatory 16-byte pCode alignment for VK_SHADER_CODE_TYPE_BINARY_EXT.
-        if (ShaderBinaryCache.TryLoad(this, shaderCreateInfo, out var binary))
+        // `name` is what the cache file is called - effect.technique.pass.stage - so the folder says which shaders exist
+        // and which ones a launch actually compiled.
+        if (ShaderBinaryCache.TryLoad(this, shaderCreateInfo, name, out var binary))
         {
             var result = LogicalDevice.CreateShaderFromBinary(ShaderBinaryCache.AsBinary(shaderCreateInfo, binary), out var cached);
             if (result == Result.Success) return cached;
@@ -500,7 +507,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         }
 
         LogicalDevice.CreateShadersEXT(1, shaderCreateInfo, null, out var shaderObject);
-        ShaderBinaryCache.Save(this, shaderCreateInfo, shaderObject[0]);
+        ShaderBinaryCache.Save(this, shaderCreateInfo, name, shaderObject[0]);
         return shaderObject[0];
     }
 

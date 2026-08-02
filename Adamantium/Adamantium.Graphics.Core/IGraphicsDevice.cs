@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Adamantium.Core;
 using Adamantium.EffectsCompiler;
 using Adamantium.Graphics.Core.EffectsFramework;
@@ -157,7 +158,8 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
 
     uint GetDescriptorSetLayoutOffset(DescriptorSetLayout layout, uint bindingSlot);
 
-    ShaderEXT CreateShader(ShaderCreateInfoEXT shaderCreateInfo);
+    /// <param name="name">Readable identity of the shader (effect.technique.pass.stage) - names its binary-cache file.</param>
+    ShaderEXT CreateShader(ShaderCreateInfoEXT shaderCreateInfo, string name = null);
 
     void DestroyShader(ShaderEXT shaderObject);
 
@@ -233,6 +235,10 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
         string name = "");
 
     ITexture CreateTexture(TextureDescription description, byte[] pixelData);
+
+    /// <summary>One texture whose ARRAY LAYERS are <paramref name="layers"/> (all the same size), uploaded in a single
+    /// staging buffer and a single copy - an animation's frames, selected in the shader by layer.</summary>
+    ITexture CreateTextureArray(TextureDescription description, IReadOnlyList<byte[]> layers);
 
     /// <summary>Imports an externally produced shared surface zero-copy and returns it as a sampleable texture.
     /// The producer hands off the <paramref name="descriptor"/> after exporting its memory/semaphores.</summary>
