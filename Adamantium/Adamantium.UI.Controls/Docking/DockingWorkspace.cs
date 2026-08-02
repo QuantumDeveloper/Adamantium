@@ -66,6 +66,16 @@ public class DockingWorkspace
     // two different arrangements under one name.
     internal void Attach(DockingArea area)
     {
+        // A workspace serves ONE area. A view rebuilt on re-entry hands over a new one, and the outgoing area is still
+        // holding the floating windows it opened - nobody detaches it, because leaving the tree is not a detach. Let it
+        // go of them here, or every visit stacks another set of windows on top of the last (three visits, six windows).
+        if (_area != null && !ReferenceEquals(_area, area))
+        {
+            _area.PaneClosing -= OnPaneClosing;
+            _area.PaneClosed -= OnPaneClosed;
+            _area.ReleaseFloatingWindows();
+        }
+
         _area = area;
         area.PaneClosing += OnPaneClosing;
         area.PaneClosed += OnPaneClosed;

@@ -29,6 +29,7 @@ public class DockingArea : Panel
     private readonly DockingArea _owner;              // the main area, when this is a floating one
     private readonly List<DockingArea> _satellites = [];
     private WindowBase _window;                       // the window a floating area lives in
+    private EventHandler<EventArgs> _onWindowClosed;  // "the user closed it" - taken back when WE close it ourselves
 
     public DockingArea() => _panesById = new Dictionary<string, Pane>();
 
@@ -782,21 +783,22 @@ public class DockingArea : Panel
         // behind would be showing a tree that is no longer part of any layout.
         foreach (var area in Owner._satellites.ToArray())
         {
-            var window = area._window;
-            area._window = null;
-            area.Release();
-
+            var window = area.TakeWindow();
             if (window != null) UIAppContext.Current.Dispatcher.InvokeAsync(window.Close);
         }
 
         Owner._satellites.Clear();
-        _groupsByNode.Clear();
-        _hostsByNode.Clear();
-        Children.Clear();
+
+        // The SAME release every other area gets, not a shorter one. Forgetting the node->control pairing is not enough:
+        // the old panels go on holding the very same Pane objects as their items, and a pane held by one panel does not
+        // move into another - so the panels rebuilt from the restored arrangement came up with tabs that were empty, and
+        // then with no tabs at all. Release hands the panes back first.
+        Release();
         _tree = null;
 
         Layout = loaded;
         Layout.Normalize();
+
 
         Rebuild();
 
@@ -805,6 +807,7 @@ public class DockingArea : Panel
         {
             if (root.IsMain) continue;
 
+            var ids = string.Join(",", DockingLayout.PanesIn(root.Content));
             OpenWindowFor(root, TitleOf(root), root.Bounds);
         }
 
@@ -815,6 +818,7 @@ public class DockingArea : Panel
     // and nowhere else - the layout that follows refers to it by id like any other.
     private void RestoreMissingPanes(string state)
     {
+
         if (PaneRestoring == null && Owner.PaneRestoring == null) return;
 
         foreach (var pair in DockingLayoutSerializer.ReadRestoreKeys(state))
@@ -1249,9 +1253,12 @@ public class DockingArea : Panel
             Area = area
         };
 
-        // Closed by its own button, the window takes its panes with it - otherwise they stay in the MODEL with no
-        // window to show them, and navigating to one activates a pane that is nowhere on screen.
-        window.Closed += (_, _) => CloseRoot(root);
+        // Closed by its own BUTTON, the window takes its panes with it - otherwise they stay in the MODEL with no window
+        // to show them, and navigating to one activates a pane that is nowhere on screen. Kept as a field so the area
+        // can take it back: a window we close OURSELVES, replacing one arrangement with another, must not carry the
+        // panes off - the new arrangement is about to ask for those very panes.
+        area._onWindowClosed = (_, _) => CloseRoot(root);
+        window.Closed += area._onWindowClosed;
 
         area._window = window;
         area.FollowWindowActivation(window);
@@ -1311,8 +1318,11 @@ public class DockingArea : Panel
     // that comes back from a saved file is wired exactly like one that was just torn off - it can be dragged, docked
     // back and closed the same way.
     // at = where it was last seen (a saved layout knows); default cascades off this area's corner instead.
+    // TEMPORARY: every window a layout opens or lets go, so the count on screen is diagnosed from a record rather than
+    // guessed at.
     private void OpenWindowFor(DockingRoot root, string title, Rect at)
     {
+
         // A remembered place is only worth using while it still exists: a layout saved with a panel on a second monitor
         // is opened on a machine that no longer has one, and a window put back there is one nobody can reach - not even
         // to close it. Then it cascades, exactly like a window that was never anywhere.
@@ -1691,6 +1701,38 @@ public class DockingArea : Panel
         }
 
         Owner.CloseEmptyWindows();
+    }
+
+    /// <summary>Takes this floating area's window back from it, ready to be closed BY US - so the window's own "the user
+    /// closed me" handler does not run and does not carry the panes off with it. The panes stay in the layout: replacing
+    /// one arrangement with another is not the same statement as a person shutting a window.
+    /// <para>Measured on a second restore: the panes recreated moments earlier were struck off as those windows closed,
+    /// and the arrangement then opened its floating roots with nothing in them.</para></summary>
+    private WindowBase TakeWindow()
+    {
+        var window = _window;
+        _window = null;
+
+        if (window != null && _onWindowClosed != null) window.Closed -= _onWindowClosed;
+        _onWindowClosed = null;
+
+        Release();
+        return window;
+    }
+
+    /// <summary>Gives up every floating window this area opened. Called when the area stops being the one its workspace
+    /// serves - a view rebuilt on re-entry brings a NEW area, and the old one is still holding the windows it opened.
+    /// Without this each visit opened the floating roots again on top of the ones already on screen (measured: three
+    /// visits, six windows).</summary>
+    internal void ReleaseFloatingWindows()
+    {
+        foreach (var area in _satellites.ToArray())
+        {
+            var window = area.TakeWindow();
+            if (window != null) UIAppContext.Current.Dispatcher.InvokeAsync(window.Close);
+        }
+
+        _satellites.Clear();
     }
 
     private void CloseEmptyWindows()
