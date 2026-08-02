@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using Adamantium.Graphics.Core;
@@ -111,7 +112,7 @@ public unsafe class Texture : GraphicsResource, ITexture
         handle.Free();
     }
         
-    protected Texture(IGraphicsDevice device, ImageDescription description, byte[] data, ImageUsageFlagBits usage, ImageLayout desiredLayout) : 
+    protected Texture(IGraphicsDevice device, ImageDescription description, byte[] data, ImageUsageFlagBits usage, ImageLayout desiredLayout) :
         base(device)
     {
         Description = description;
@@ -122,6 +123,46 @@ public unsafe class Texture : GraphicsResource, ITexture
         var handle = GCHandle.Alloc(data, GCHandleType.Pinned);
         CopyDataToImage(TotalSizeInBytes, handle.AddrOfPinnedObject());
         handle.Free();
+    }
+
+    // One image, one LAYER per element of <paramref name="layers"/> - an animation's frames, so playing it is choosing a
+    // layer instead of swapping textures. All of it goes up in ONE staging buffer and ONE copy (a region per layer):
+    // uploading layer by layer would mean a command buffer, a submit and a fence WAIT each time, which is what made a
+    // 200-frame GIF cost hundreds of separate uploads.
+    protected Texture(IGraphicsDevice device, ImageDescription description, IReadOnlyList<byte[]> layers, ImageUsageFlagBits usage, ImageLayout desiredLayout) :
+        base(device)
+    {
+        Description = description;
+        Description.Usage |= ImageUsageFlagBits.TransferDstBit | usage;
+        Description.DesiredImageLayout = desiredLayout;
+
+        var layerSize = (ulong)layers[0].Length;
+        TotalSizeInBytes = layerSize * (ulong)layers.Count;
+
+        CreateBuffer(TotalSizeInBytes,
+            BufferUsageFlagBits.TransferSrcBit,
+            MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.HostCoherent,
+            out var stagingBuffer,
+            out var stagingBufferMemory);
+
+        var mapped = GraphicsDevice.MapMemory(stagingBufferMemory, 0, TotalSizeInBytes, 0);
+        for (var i = 0; i < layers.Count; i++)
+        {
+            var handle = GCHandle.Alloc(layers[i], GCHandleType.Pinned);
+            System.Buffer.MemoryCopy(handle.AddrOfPinnedObject().ToPointer(),
+                (byte*)mapped + layerSize * (ulong)i, layerSize, layerSize);
+            handle.Free();
+        }
+        GraphicsDevice.UnmapMemory(stagingBufferMemory);
+
+        CreateImage(Description, MemoryPropertyFlags.DeviceLocal, out vulkanImage, out vulkanImageMemory);
+        this.TransitionImageLayout(ImageLayout.TransferDstOptimal);
+        CopyBufferToLayers(stagingBuffer, vulkanImage, Description, layerSize, layers.Count);
+        this.TransitionImageLayout(Description.DesiredImageLayout);
+        CreateImageView(Description);
+
+        GraphicsDevice.Destroy(stagingBuffer);
+        GraphicsDevice.Destroy(stagingBufferMemory);
     }
 
     private void CopyDataToImage(ulong totalSizeInBytes, IntPtr pointerToPixelData)
@@ -196,6 +237,33 @@ public unsafe class Texture : GraphicsResource, ITexture
         GraphicsDevice.EndSingleTimeCommand(commandBuffer);
     }
         
+    // Every layer in ONE command and ONE submit: region i reads its slice of the staging buffer and writes array layer i.
+    // That is the point of the array - uploading an animation costs one fence wait, not one per frame.
+    private void CopyBufferToLayers(VkBuffer buffer, VulkanImage image, TextureDescription description, ulong layerSize, int layerCount)
+    {
+        var commandBuffer = GraphicsDevice.BeginSingleTimeCommand();
+
+        var regions = new BufferImageCopy[layerCount];
+        for (var i = 0; i < layerCount; i++)
+        {
+            var region = new BufferImageCopy();
+            region.BufferOffset = layerSize * (ulong)i;
+            region.BufferRowLength = 0;
+            region.BufferImageHeight = 0;
+            region.ImageSubresource = new ImageSubresourceLayers();
+            region.ImageSubresource.AspectMask = ImageAspectFlagBits.ColorBit;
+            region.ImageSubresource.MipLevel = 0;
+            region.ImageSubresource.BaseArrayLayer = (uint)i;
+            region.ImageSubresource.LayerCount = 1;
+            region.ImageOffset = new Offset3D { X = 0, Y = 0, Z = 0 };
+            region.ImageExtent = new Extent3D { Width = description.Width, Height = description.Height, Depth = 1 };
+            regions[i] = region;
+        }
+
+        commandBuffer.CopyBufferToImage(buffer, image, ImageLayout.TransferDstOptimal, (uint)layerCount, regions);
+        GraphicsDevice.EndSingleTimeCommand(commandBuffer);
+    }
+
     private void CopyImageToBuffer(VkBuffer buffer)
     {
         var commandBuffer = GraphicsDevice.BeginSingleTimeCommand();
@@ -388,6 +456,22 @@ public unsafe class Texture : GraphicsResource, ITexture
         return new Texture(graphicsDevice, description, pixelData, usage, desiredLayout);
     }
     
+    /// <summary>One texture whose ARRAY LAYERS are <paramref name="layers"/> (all of the same size), uploaded in a single
+    /// staging buffer and a single copy. The shader picks a layer, so nothing is uploaded again to show another one.</summary>
+    public static Texture CreateArrayFrom(
+        IGraphicsDevice graphicsDevice,
+        TextureDescription description,
+        IReadOnlyList<byte[]> layers,
+        ImageUsageFlagBits usage = ImageUsageFlagBits.SampledBit,
+        ImageLayout desiredLayout = ImageLayout.ShaderReadOnlyOptimal)
+    {
+        ArgumentNullException.ThrowIfNull(graphicsDevice);
+        ArgumentNullException.ThrowIfNull(layers);
+        if (layers.Count == 0) throw new ArgumentException("An array texture needs at least one layer.", nameof(layers));
+
+        return new Texture(graphicsDevice, description, layers, usage, desiredLayout);
+    }
+
     public static Texture CreateFrom(
         IGraphicsDevice graphicsDevice,
         VulkanImage vulkanImage,

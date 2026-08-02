@@ -375,6 +375,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
 
             stageBlock.Index = link.Index;
             stageBlock.EntryPoint = link.EntryPoint;
+            stageBlock.CacheName = $"{Effect?.Name}.{Technique?.Name}.{Name}.{link.ShaderType}";
 
             InitStageBlock(stageBlock, logger);
 
@@ -1087,6 +1088,8 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         public byte[] ByteCode;
         public DescriptorSetLayout[] Layouts;
         public string EntryPoint;
+        /// <summary>effect.technique.pass.stage - names this shader's binary-cache file so the cache folder is readable.</summary>
+        public string CacheName;
         public readonly EffectShaderType Type;
         public readonly IGraphicsDevice GraphicsDevice;
 
@@ -1117,7 +1120,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
                 // VK_EXT_descriptor_buffer: classic descriptor set layouts, without the heap flag or mappings.
                 shaderCreateInfo.PSetLayouts = Layouts;
                 shaderCreateInfo.SetLayoutCount = Layouts != null ? (uint)Layouts.Length : 0;
-                ShaderObject = GraphicsDevice.CreateShader(shaderCreateInfo);
+                ShaderObject = GraphicsDevice.CreateShader(shaderCreateInfo, CacheName);
                 return;
             }
 
@@ -1253,7 +1256,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
                 shaderCreateInfo.PNext = mappingInfo;
             }
 
-            ShaderObject = GraphicsDevice.CreateShader(shaderCreateInfo);
+            ShaderObject = GraphicsDevice.CreateShader(shaderCreateInfo, CacheName);
         }
 
         protected override void Dispose(bool disposeManagedResources)

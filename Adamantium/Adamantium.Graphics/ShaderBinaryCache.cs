@@ -42,9 +42,11 @@ public static class ShaderBinaryCache
         return _deviceDir;
     }
 
-    // The cache file for one shader = a hash of its SPIR-V bytes + stage + entry-point name (the SPIR-V already implies
-    // the set layouts / push constants, which are reflected from it).
-    private static string FileFor(GraphicsDevice device, ShaderCreateInfoEXT info)
+    // The cache file for one shader: "<effect>.<technique>.<pass>.<stage>_<hash>.shaderbin". The NAME is what makes the
+    // folder readable - which shader is which, and how many actually compiled - and the HASH is what keeps it correct:
+    // it covers the SPIR-V bytes + stage + entry-point name, so editing a shader lands on a new file instead of loading
+    // a binary that no longer matches the code (the name alone cannot tell two versions apart).
+    private static string FileFor(GraphicsDevice device, ShaderCreateInfoEXT info, string name)
     {
         using var sha = SHA256.Create();
         var buf = new MemoryStream();
@@ -53,18 +55,32 @@ public static class ShaderBinaryCache
         // Hash the entry-point NAME's bytes, not String.GetHashCode - the latter is RANDOMISED per process, so it made
         // the file name differ every run and the cache never hit.
         if (!string.IsNullOrEmpty(info.PName)) buf.Write(System.Text.Encoding.UTF8.GetBytes(info.PName));
-        var name = Convert.ToHexString(sha.ComputeHash(buf.ToArray()));
-        return Path.Combine(DeviceDir(device), name + ".shaderbin");
+        var hash = Convert.ToHexString(sha.ComputeHash(buf.ToArray())).Substring(0, 16);
+        var readable = Sanitize(name) ?? info.Stage.ToString();
+        return Path.Combine(DeviceDir(device), $"{readable}_{hash}.shaderbin");
+    }
+
+    // File names come from shader/technique/pass names, so keep only what a file name may hold.
+    private static string Sanitize(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        var chars = name.ToCharArray();
+        for (var i = 0; i < chars.Length; i++)
+        {
+            if (char.IsLetterOrDigit(chars[i]) || chars[i] is '.' or '-' or '_') continue;
+            chars[i] = '-';
+        }
+        return new string(chars);
     }
 
     /// <summary>Try to read a cached driver binary for this shader. False = miss (compile from SPIR-V and then Save).</summary>
-    public static bool TryLoad(GraphicsDevice device, ShaderCreateInfoEXT info, out byte[] binary)
+    public static bool TryLoad(GraphicsDevice device, ShaderCreateInfoEXT info, string name, out byte[] binary)
     {
         binary = null;
         if (!Enabled) return false;
         try
         {
-            var file = FileFor(device, info);
+            var file = FileFor(device, info, name);
             if (!File.Exists(file)) return false;
             binary = File.ReadAllBytes(file);
             return binary.Length > 0;
@@ -73,7 +89,7 @@ public static class ShaderBinaryCache
     }
 
     /// <summary>Persist the driver-compiled binary of a freshly created shader object, so later launches skip NVVM.</summary>
-    public static void Save(GraphicsDevice device, ShaderCreateInfoEXT info, ShaderEXT shader)
+    public static void Save(GraphicsDevice device, ShaderCreateInfoEXT info, string name, ShaderEXT shader)
     {
         if (!Enabled) return;
         try
@@ -83,7 +99,7 @@ public static class ShaderBinaryCache
             var bytes = new byte[(int)size];
             if (device.LogicalDevice.GetShaderBinaryDataEXT(shader, ref size, bytes) != Result.Success) return;
 
-            var file = FileFor(device, info);
+            var file = FileFor(device, info, name);
             Directory.CreateDirectory(Path.GetDirectoryName(file)!);
             var tmp = file + ".tmp";
             File.WriteAllBytes(tmp, bytes);
