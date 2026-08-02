@@ -201,5 +201,18 @@ namespace Adamantium.Imaging.Gif
             var pixels = GetRawPixels(frameIndex);
             return new FrameData(pixels, GetImageDescription());
         }
+
+        // Decoded pixels AND the palette-index stream both go: each is width*height*4 bytes per frame, so a 200-frame
+        // 960x540 GIF sits on ~830 MB of them. The compressed data stays, so asking for a frame again simply decodes it
+        // again - from frame 0, since a GIF frame is a delta over the one before it (see DecodeFrame).
+        public void ReleaseDecodedFrames()
+        {
+            foreach (var frame in frames)
+            {
+                frame.RawPixels = null;
+                frame.IndexData = null;
+                frame.IsDecoded = false;
+            }
+        }
     }
 }

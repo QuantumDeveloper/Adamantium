@@ -14,6 +14,7 @@ public class ImageSourceParser : ITypeParser<BitmapSource>
         // awaits it, and IsLoaded stays false forever (the control just shows its no-image fallback, no error logged).
         // Rooting the path here makes image loading independent of how the app was launched.
         var full = Path.IsPathRooted(value) ? value : Path.Combine(AppContext.BaseDirectory, value);
-        return new BitmapImage(new Uri(full));
+        // Through the cache: the same file shown twice is one decode and one texture, not two (see BitmapImageCache).
+        return BitmapImageCache.GetOrCreate(full);
     }
 }
