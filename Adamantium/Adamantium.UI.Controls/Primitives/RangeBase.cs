@@ -1,65 +1,25 @@
 using System;
-using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Controls.Primitives;
 
 /// <summary>
-/// Base for controls over a numeric value within a [<see cref="Minimum"/>, <see cref="Maximum"/>] range - ScrollBar
-/// today, Slider/ProgressBar later. <see cref="Value"/> is always coerced into the range, and a Minimum/Maximum change
-/// re-coerces it. Mirrors WPF's RangeBase.
+/// A control over a SINGLE value within a [<see cref="RangeBoundsBase.Minimum"/>, <see cref="RangeBoundsBase.Maximum"/>]
+/// range - ScrollBar, Slider, ProgressBar. <see cref="Value"/> is always coerced into the range, and a Minimum/Maximum
+/// change re-coerces it. Mirrors WPF's RangeBase; the bounds themselves live one level up, shared with the controls that
+/// select a SPAN rather than a point (see <see cref="RangeSlider"/>).
 /// </summary>
-public abstract class RangeBase : Control
+public abstract class RangeBase : RangeBoundsBase
 {
-    public static readonly AdamantiumProperty MinimumProperty = AdamantiumProperty.Register(nameof(Minimum),
-        typeof(double), typeof(RangeBase), new PropertyMetadata(0.0, OnMinimumChanged));
-
-    public static readonly AdamantiumProperty MaximumProperty = AdamantiumProperty.Register(nameof(Maximum),
-        typeof(double), typeof(RangeBase), new PropertyMetadata(1.0, OnMaximumChanged));
-
     public static readonly AdamantiumProperty ValueProperty = AdamantiumProperty.Register(nameof(Value),
         typeof(double), typeof(RangeBase), new PropertyMetadata(0.0, OnValueChanged, CoerceValue));
-
-    public static readonly AdamantiumProperty SmallChangeProperty = AdamantiumProperty.Register(nameof(SmallChange),
-        typeof(double), typeof(RangeBase), new PropertyMetadata(1.0));
-
-    public static readonly AdamantiumProperty LargeChangeProperty = AdamantiumProperty.Register(nameof(LargeChange),
-        typeof(double), typeof(RangeBase), new PropertyMetadata(10.0));
-
-    /// <summary>Lower bound. A value below this clamps up.</summary>
-    public double Minimum
-    {
-        get => GetValue<double>(MinimumProperty);
-        set => SetValue(MinimumProperty, value);
-    }
-
-    /// <summary>Upper bound. Kept &gt;= Minimum by coercion of Value (Minimum/Maximum themselves are not reordered).</summary>
-    public double Maximum
-    {
-        get => GetValue<double>(MaximumProperty);
-        set => SetValue(MaximumProperty, value);
-    }
 
     /// <summary>Current value, always within [Minimum, Maximum].</summary>
     public double Value
     {
         get => GetValue<double>(ValueProperty);
         set => SetValue(ValueProperty, value);
-    }
-
-    /// <summary>Step for a small change (e.g. a scrollbar line button / arrow key).</summary>
-    public double SmallChange
-    {
-        get => GetValue<double>(SmallChangeProperty);
-        set => SetValue(SmallChangeProperty, value);
-    }
-
-    /// <summary>Step for a large change (e.g. a scrollbar page / PageUp-PageDown).</summary>
-    public double LargeChange
-    {
-        get => GetValue<double>(LargeChangeProperty);
-        set => SetValue(LargeChangeProperty, value);
     }
 
     public event EventHandler<ValueChangedEventArgs> ValueChanged;
@@ -74,32 +34,7 @@ public abstract class RangeBase : Control
         return value;
     }
 
-    // protected static so a subclass that wants a different default Minimum/Maximum (Slider/ProgressBar = 0..100,
-    // ScrollBar = 0..0) can re-use it in OverrideMetadata - keeping the re-coercion + OnRangeBoundsChanged behaviour that
-    // a fresh PropertyMetadata would otherwise drop. (Subclasses set the default via metadata, NOT a constructor set,
-    // which would write Local priority and permanently mask a {Binding}/Style/Trigger on the property.)
-    protected static void OnMinimumChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
-    {
-        if (e.NewValue is not double) return;
-        var range = (RangeBase)d;
-        range.ReCoerceValue();
-        range.OnRangeBoundsChanged();
-    }
-
-    protected static void OnMaximumChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
-    {
-        if (e.NewValue is not double) return;
-        var range = (RangeBase)d;
-        range.ReCoerceValue();
-        range.OnRangeBoundsChanged();
-    }
-
-    /// <summary>Minimum or Maximum changed. The value fraction (Value-Min)/(Max-Min) shifts even when Value itself is
-    /// unchanged, so a value-fraction-driven visual (a Slider's accent fill) must recompute here - OnValueChanged alone
-    /// misses a pure range rescale.</summary>
-    protected virtual void OnRangeBoundsChanged()
-    {
-    }
+    protected override void ReCoerceSelection() => ReCoerceValue();
 
     // A Minimum/Maximum change can pull Value out of range. Re-assign Value so the coercion clamps it again; if it was
     // already in range the coercion returns the same value and no ValueChanged fires (guarded below). Re-set at Value's
@@ -110,8 +45,14 @@ public abstract class RangeBase : Control
 
     private static void OnValueChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
     {
-        // Skip the construction-time callback (Unset sentinel) and no-op coercions.
-        if (e.OldValue is not double oldValue || e.NewValue is not double newValue || oldValue == newValue) return;
+        if (e.NewValue is not double newValue) return;
+
+        // The FIRST value has no previous one - the old value is the "unset" sentinel, not a number. Treating that as
+        // "nothing changed" is what left a control showing its default for good: a value arriving from a binding after
+        // the template was applied never reached the visual (a RingProgressBar bound to 40 sat at 0%). Take the default
+        // as the previous value instead, and only then decide whether anything actually moved.
+        var oldValue = e.OldValue as double? ?? (double)ValueProperty.GetDefaultMetadata(d.GetType()).DefaultValue;
+        if (oldValue == newValue) return;
 
         var range = (RangeBase)d;
         range.OnValueChanged(oldValue, newValue);
