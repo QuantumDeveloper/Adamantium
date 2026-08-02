@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 ﻿using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.RoutedEvents;
 
@@ -7,7 +8,15 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 {
     public UInt128 Uid { get; set; }
 
+    // Every property REGISTERED on this type, filled once in the constructor and never added to again - so it is safe to
+    // read from any thread without synchronising, which is what lets GetValue take no lock at all. It also doubles as
+    // the monitor WRITERS take (see SetValue): readers never wait on it, so no read can ever be caught in a lock cycle.
     private readonly Dictionary<AdamantiumProperty, ValueContainer> values = new Dictionary<AdamantiumProperty, ValueContainer>();
+
+    // ATTACHED properties are the only ones that turn up later - they belong to another type and this one has no slot
+    // for them until somebody sets one. Lazily created, so the components that never see an attached property (nearly
+    // all of them) pay nothing for it.
+    private ConcurrentDictionary<AdamantiumProperty, ValueContainer> attachedValues;
 
     private readonly Dictionary<string, StyleValueContainer> styleValues = new();
 
@@ -57,6 +66,32 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
                 metadata.PropertyChangedCallback?.Invoke(this, e);
             }
         }
+    }
+
+    // The slots of a property, or null when this component has none. Lock-free: the registered map is immutable after
+    // construction, and the attached map is concurrent.
+    private ValueContainer Slots(AdamantiumProperty property)
+    {
+        if (values.TryGetValue(property, out var container)) return container;
+
+        var attached = attachedValues;
+        return attached != null && attached.TryGetValue(property, out var slot) ? slot : null;
+    }
+
+    // The slots of a property, creating them for an ATTACHED one that has never been set on this component.
+    private ValueContainer EnsureSlots(AdamantiumProperty property)
+    {
+        if (values.TryGetValue(property, out var container)) return container;
+        if (!property.IsAttached) return null;
+
+        var map = attachedValues;
+        if (map == null)
+        {
+            Interlocked.CompareExchange(ref attachedValues, new ConcurrentDictionary<AdamantiumProperty, ValueContainer>(), null);
+            map = attachedValues;
+        }
+
+        return map.GetOrAdd(property, static _ => new ValueContainer());
     }
 
     /// <summary>
@@ -252,11 +287,10 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     {
         ArgumentNullException.ThrowIfNull(property);
 
-        object result;
-        lock (values)
-        {
-            result = GetOrCalculateEffectiveValue(property);
-        }
+        // NO LOCK. A read is a dictionary lookup over a map that never changes after construction plus one volatile
+        // field read inside the container - it cannot observe a half-written state, and it cannot wait for anybody.
+        // That is what makes a reader unable to take part in a deadlock at all, rather than merely unlikely to.
+        var result = GetOrCalculateEffectiveValue(property);
 
         if (result == AdamantiumProperty.UnsetValue)
         {
@@ -280,13 +314,12 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     // Inherited slots don't count. Used to decide whether an Inherits property should defer to its parent.
     protected bool HasExplicitValue(AdamantiumProperty property)
     {
-        lock (values)
-        {
-            if (!values.TryGetValue(property, out var container)) return false;
-            for (var p = ValuePriority.Animation; p <= ValuePriority.Style; p++)
-                if (container.GetValue(p) != AdamantiumProperty.UnsetValue)
-                    return true;
-        }
+        if (Slots(property) is not { } container) return false;
+
+        for (var p = ValuePriority.Animation; p <= ValuePriority.Style; p++)
+            if (container.GetValue(p) != AdamantiumProperty.UnsetValue)
+                return true;
+
         return false;
     }
 
@@ -297,13 +330,13 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     // coerced Minimum and stopped the binding from ever applying.
     protected ValuePriority GetBaseValuePriority(AdamantiumProperty property)
     {
-        lock (values)
+        if (Slots(property) is { } container)
         {
-            if (values.TryGetValue(property, out var container))
-                for (var p = ValuePriority.Local; p <= ValuePriority.Default; p++)
-                    if (container.GetValue(p) != AdamantiumProperty.UnsetValue)
-                        return p;
+            for (var p = ValuePriority.Local; p <= ValuePriority.Default; p++)
+                if (container.GetValue(p) != AdamantiumProperty.UnsetValue)
+                    return p;
         }
+
         return ValuePriority.Default;
     }
 
@@ -343,15 +376,7 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             throw new ArgumentNullException(nameof(property));
         }
 
-        lock (values)
-        {
-            if (values.TryGetValue(property, out var value))
-            {
-                return value != AdamantiumProperty.UnsetValue;
-            }
-        }
-
-        return false;
+        return Slots(property) != null;
     }
 
     public AdamantiumProperty GetProperty(string propertyName)
@@ -430,29 +455,17 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     {
         ValidateProperty(property);
 
-        bool known;
-        lock (values)
-        {
-            // An attached property has no pre-created slot (it isn't in this type's registered set), so ensure its
-            // ValueContainer EXISTS - but do NOT write the value here. RunSetValueSequence reads the OLD effective value
-            // first for change detection, then writes; pre-writing it made old == new, so PropertyChanged never fired for
-            // attached properties (breaking any binding / trigger / TemplateBinding observing an attached property).
-            if (property.IsAttached && !values.ContainsKey(property))
-            {
-                values.Add(property, new ValueContainer());
-            }
+        // An attached property has no pre-created slot (it isn't in this type's registered set), so ensure its container
+        // EXISTS - but do NOT write the value here. RunSetValueSequence reads the OLD effective value first for change
+        // detection, then writes; pre-writing it made old == new, so PropertyChanged never fired for attached properties
+        // (breaking any binding / trigger / TemplateBinding observing an attached property).
+        if (EnsureSlots(property) == null) return;
 
-            known = values.ContainsKey(property);
-        }
-
-        // OUTSIDE the lock. The lock guards the value SLOTS; the sequence below runs arbitrary code - a changed-callback,
-        // a coercion, layout invalidation, PropertyChanged handlers - and one of those posting to the dispatcher while
-        // holding this component's lock is a deadlock: the pump thread, rebuilding a panel, then waits for the lock its
-        // holder can only release once the pump drains the queue (measured on the docking view).
-        if (known)
-        {
-            RunSetValueSequence(property, value, priority, true);
-        }
+        // The sequence below runs arbitrary code - a changed-callback, a coercion, layout invalidation, PropertyChanged
+        // handlers - and one of those posting to the dispatcher while holding a lock is a deadlock: the pump thread,
+        // rebuilding a panel, then waits for the lock its holder can only release once the pump drains the queue
+        // (measured on the docking view). Nothing here holds one.
+        RunSetValueSequence(property, value, priority, true);
     }
 
     /// <summary>
@@ -498,10 +511,11 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         // rewritten on every read but nothing ever reads it - the resolution below scans the SOURCE slots
         // (Animation..Default) and the Effective slot is only a trailing cache - so that write plus its extra lookups were
         // pure overhead on the hottest path in the engine (measure+arrange read Margin/alignment/min-max on every node).
-        if (!values.TryGetValue(property, out var container)) return AdamantiumProperty.UnsetValue;
+        if (Slots(property) is not { } container) 
+            return AdamantiumProperty.UnsetValue;
 
         // Cached: scans the source slots (Animation..Default) only after a Set dirtied them, not on every read.
-        return container.GetEffective((int)ValuePriority.Default);
+        return container.Effective;
     }
 
     private void RunSetValueSequence(AdamantiumProperty property, object value, ValuePriority priority, bool raiseValueChangedEvent)
@@ -531,19 +545,18 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         object oldEffectiveValue;
         object slotBefore;
         object effectiveAfterWrite;
-        lock (values)
+        var slots = EnsureSlots(property);
+        if (slots == null) return;
+
+        // The lock is on the CONTAINER, not on the whole value store: two properties of one component never contend,
+        // and READERS take no lock at all. It covers only the read-modify-read of these slots - no callback, no
+        // invalidation, nothing that could go looking for another lock.
+        lock (slots)
         {
-            oldEffectiveValue = GetOrCalculateEffectiveValue(property);
-
-            if (!values.TryGetValue(property, out var container))
-            {
-                container = new ValueContainer();
-                values.Add(property, container);
-            }
-
-            slotBefore = container.GetValue(priority);
-            container.SetValue(value, priority);
-            effectiveAfterWrite = GetOrCalculateEffectiveValue(property);
+            oldEffectiveValue = slots.Effective;
+            slotBefore = slots.GetValue(priority);
+            slots.SetValue(value, priority);
+            effectiveAfterWrite = slots.Effective;
         }
 
         var args = new AdamantiumPropertyChangedEventArgs(property, slotBefore, value);
@@ -568,10 +581,7 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
         // Re-read under the lock: a changed-callback or a started transition above may have written another slot.
         object newEffectiveValue;
-        lock (values)
-        {
-            newEffectiveValue = GetOrCalculateEffectiveValue(property);
-        }
+        newEffectiveValue = GetOrCalculateEffectiveValue(property);
 
         if (Equals(oldEffectiveValue, newEffectiveValue))
         {
