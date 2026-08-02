@@ -245,7 +245,7 @@
 	<ItemGroup>
 		<AdditionalFiles Include="$(ProjectDir)**\*.auml" />
 		<AdditionalFiles Include="$(ProjectDir)**\*.fx" />
-		<AdditionalFiles Include="$(ProjectDir)**\*.hlsl" />
+		<AdditionalFiles Include="$(ProjectDir)**\*.fxh" />
 		<AdditionalFiles Remove="$(ProjectDir)ControlTemplate.auml" />
 		<!-- Content resources fed to AssetsGenerator (it filters by extension and skips cooked .aemf). -->
 		<AdditionalFiles Include="$(ProjectDir)Models\**\*.*" />
@@ -269,8 +269,8 @@
 		     outputs newer than inputs" and csc never ran - measured, not assumed: editing a view and
 		     rebuilding ran a stale assembly. This item IS in CoreCompile's Inputs, so it invalidates the
 		     compile the way an edited .cs does, for the CLI and the IDE alike. -->
-		<UpToDateCheckInput Include="@(AdditionalFiles)" />
-		<CustomAdditionalCompileInputs Include="@(AdditionalFiles)" />
+		<UpToDateCheckInput Include="@(AdditionalFiles)" Visible="false" />
+		<CustomAdditionalCompileInputs Include="@(AdditionalFiles)" Visible="false" />
 	</ItemGroup>
 
 	<ItemGroup>

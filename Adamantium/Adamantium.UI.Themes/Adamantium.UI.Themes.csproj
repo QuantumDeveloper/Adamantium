@@ -8,7 +8,7 @@
         <LangVersion>latest</LangVersion>
         <EmitCompilerGeneratedFiles>false</EmitCompilerGeneratedFiles>
         <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
-        <OutputType>Exe</OutputType>
+        <OutputType>Library</OutputType>
     </PropertyGroup>
 
     <ItemGroup>
@@ -30,7 +30,7 @@
         <AdditionalFiles Include="$(ProjectDir)**\*.auml" />
         <CompilerVisibleProperty Include="RootNamespace" />
         <!-- IDE up-to-date check: rebuild when generator inputs (AdditionalFiles) change. -->
-        <UpToDateCheckInput Include="@(AdditionalFiles)" />
+        <UpToDateCheckInput Include="@(AdditionalFiles)" Visible="false" />
     </ItemGroup>
 
 </Project>

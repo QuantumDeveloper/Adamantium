@@ -8,7 +8,7 @@
         <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
         <CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
         <LangVersion>latest</LangVersion>
-        <OutputType>Exe</OutputType>
+        <OutputType>Library</OutputType>
     </PropertyGroup>
 
     <ItemGroup>
@@ -30,7 +30,7 @@
         <CompilerVisibleProperty Include="RootNamespace" />
         <AdditionalFiles Remove="obj\**" />
         <!-- IDE up-to-date check: rebuild when generator inputs (AdditionalFiles) change. -->
-        <UpToDateCheckInput Include="@(AdditionalFiles)" />
+        <UpToDateCheckInput Include="@(AdditionalFiles)" Visible="false" />
     </ItemGroup>
 
     <ItemGroup>
