@@ -12,13 +12,18 @@ internal class ValueContainer
 
     private readonly object[] _values;
 
-    // Cached effective value (the highest-priority set slot) + dirty flag. GetValue is the hottest call in the engine
-    // (measure/arrange read Margin/alignment/min-max on every node - hundreds of thousands of reads per scroll frame) and
-    // used to scan all source slots on EVERY read. The value only changes on a Set, so cache it and re-scan lazily on the
-    // next read after a change - moving the scan off the read path. Read+write both run under AdamantiumComponent's
-    // `values` lock, so no extra synchronisation is needed.
-    private object _effective = AdamantiumProperty.UnsetValue;
-    private bool _effectiveDirty = true;
+    // The effective value (the highest-priority set slot), computed WHEN A SLOT IS WRITTEN. Reads outnumber writes by
+    // orders of magnitude - measure/arrange read Margin/alignment/min-max on every node, hundreds of thousands of times
+    // a scroll frame - so the scan belongs on the rare side.
+    //
+    // It used to be computed lazily ON READ (a dirty flag re-scanned on the next GetEffective), which made READING a
+    // WRITE: two threads reading the same property could tear it - one clearing the flag before the other saw the new
+    // value - and that is why a read had to take the component's lock at all. Now a read is a single volatile field
+    // read, so it can never observe a half-finished update and needs no lock of its own.
+    private volatile object _effective = AdamantiumProperty.UnsetValue;
+
+    // The lowest-priority SOURCE slot; everything below it is the computed tail (see ValuePriority).
+    private const int LastSourcePriority = (int)ValuePriority.Default;
 
     public ValueContainer()
     {
@@ -28,10 +33,29 @@ internal class ValueContainer
 
     public IReadOnlyList<object> Values => _values;
 
+    // Which slot the effective value currently comes from. Kept so the common Set does NOT rescan: writing a value at or
+    // above the winning priority simply becomes the new winner. Only a write that could UNCOVER a lower slot (clearing
+    // the winner, or writing below it) has to look, and those are rare.
+    private int _effectiveFrom = LastSourcePriority + 1;
+
     public void SetValue(object value, ValuePriority priority)
     {
-        _values[(int)priority] = value;
-        _effectiveDirty = true;
+        var slot = (int)priority;
+        _values[slot] = value;
+
+        // Published as ONE reference write: a reader sees the value from before this Set or the one after it, never a
+        // container caught mid-rescan.
+        if (value != AdamantiumProperty.UnsetValue && slot <= _effectiveFrom)
+        {
+            _effectiveFrom = slot;
+            _effective = value;
+            return;
+        }
+
+        if (slot > _effectiveFrom) return;   // written under the winner - it changes nothing that is visible
+
+        _effectiveFrom = LastSourcePriority + 1;
+        _effective = Scan();
     }
 
     public object GetValue(ValuePriority priority)
@@ -39,17 +63,20 @@ internal class ValueContainer
         return _values[(int)priority];
     }
 
-    /// <summary>The effective value: the first SET slot scanning source priorities 0..<paramref name="maxPriority"/>
-    /// (highest priority wins). O(1) when clean; re-scans only after a Set changed a slot.</summary>
-    public object GetEffective(int maxPriority)
+    /// <summary>The effective value: the first SET slot, highest priority first. A plain field read - no scan, no
+    /// bookkeeping, nothing to synchronise.</summary>
+    public object Effective => _effective;
+
+    private object Scan()
     {
-        if (_effectiveDirty)
+        for (var i = 0; i <= LastSourcePriority; i++)
         {
-            _effective = AdamantiumProperty.UnsetValue;
-            for (var i = 0; i <= maxPriority; i++)
-                if (_values[i] != AdamantiumProperty.UnsetValue) { _effective = _values[i]; break; }
-            _effectiveDirty = false;
+            if (_values[i] == AdamantiumProperty.UnsetValue) continue;
+
+            _effectiveFrom = i;
+            return _values[i];
         }
-        return _effective;
+
+        return AdamantiumProperty.UnsetValue;
     }
 }
