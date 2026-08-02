@@ -12,6 +12,8 @@ namespace Adamantium.UI.Controls;
 public class Image : InputUIComponent, IDesignTimeAnimatedMedia
 {
    private bool _runtimePlaying;
+   private uint _layerIndex;      // frame being shown when drawing from the frame array (no BitmapFrame involved)
+   private uint _frameCursor;     // THIS control's playback position - the source may be shared with other images
    private BitmapImage _bitmap;
    private BitmapFrame _frame;
    private BitmapFrame _oldFrame;
@@ -61,6 +63,21 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
       typeof(UInt32), typeof(Image),
       new PropertyMetadata(0U, OnMipLevelChangedCallback));
 
+   public static readonly AdamantiumProperty IsPlayingProperty = AdamantiumProperty.Register(nameof(IsPlaying),
+      typeof(bool), typeof(Image), new PropertyMetadata(true, OnIsPlayingChanged));
+
+   // Read-only: how many frames the SOURCE turned out to have. Nobody can know it before the decode finishes, and a UI
+   // that lets you pick a frame range needs it to bound the choice.
+   public static readonly AdamantiumProperty FrameCountProperty = AdamantiumProperty.RegisterReadOnly(nameof(FrameCount),
+      typeof(UInt32), typeof(Image), new PropertyMetadata(0U));
+
+   private static void OnIsPlayingChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+   {
+      // Resuming has to be able to WAKE the ticker: it removes itself while paused only if the animation also ended,
+      // and either way starting it again is harmless (StartRuntimePlayback returns if it is already running).
+      if (a is Image img && (bool)e.NewValue) img.StartRuntimePlayback();
+   }
+
    private static void OnMipLevelChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
    {
       if (a is Image img)
@@ -84,12 +101,25 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
       }
    }
 
+   // The range is not just a hint for the next load: it drives playback LIVE, so moving it re-aims the loop at once and
+   // pulls the current frame inside the new bounds (otherwise the cursor could sit outside and the animation would jump
+   // to the start on the next step).
    private static void OnFrameRangeChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
    {
-      if (a is Image img)
-      {
-         img.InvalidateRender(false);
-      }
+      if (a is not Image img) return;
+
+      img.ApplyFrameRange();
+      img.InvalidateRender(false);
+   }
+
+   private void ApplyFrameRange()
+   {
+      if (_bitmap is not { FrameCount: > 1 }) return;
+
+      var (start, end) = FrameRange();
+      if (_frameCursor < start) _frameCursor = start;
+      else if (_frameCursor > end) _frameCursor = end;
+      _layerIndex = _frameCursor;
    }
 
    private static void OnNumberOfReplaysChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
@@ -120,6 +150,21 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
    {
       get => GetValue<UInt32>(MipLevelProperty);
       set => SetValue(MipLevelProperty, value);
+   }
+
+   /// <summary>Whether an animated source is running. Setting it false STOPS on the current frame and setting it true
+   /// carries on from there - the cursor is untouched either way.</summary>
+   public bool IsPlaying
+   {
+      get => GetValue<bool>(IsPlayingProperty);
+      set => SetValue(IsPlayingProperty, value);
+   }
+
+   /// <summary>Frames in the current source (1 for a still image, 0 until it has loaded).</summary>
+   public UInt32 FrameCount
+   {
+      get => GetValue<UInt32>(FrameCountProperty);
+      private set => SetValue(FrameCountProperty, value);
    }
    
    public UInt32 StartFrame
@@ -201,15 +246,9 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
          // already-completed Task, so the await continued INLINE, on whatever thread set Source - which for anything that
          // is not a URI (a drop, a stream) is the loop thread that owns layout. A 200-frame GIF therefore froze the whole
          // UI, scrolling included, for as long as it took to decode all of it - and decoded frames nobody may ever see.
-         var endFrame = EndFrame > _bitmap.FrameCount ? _bitmap.FrameCount : EndFrame;
-         if (StartFrame > endFrame)
-         {
-            StartFrame = endFrame;
-         }
-
-         _bitmap.StartFrame = StartFrame;
-         _bitmap.EndFrame = endFrame;
-         _bitmap.ResetFrameIndex();
+         FrameCount = _bitmap.FrameCount;
+         _frameCursor = FrameRange().Start;
+         _layerIndex = _frameCursor;
 
          if (_bitmap.FrameCount > 1)
          {
@@ -271,85 +310,88 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
          return true;
       }
       if (Visibility != Visibility.Visible) return false;
+      // Paused: hold the ticker but let no time accumulate, so resuming continues from this frame instead of jumping
+      // ahead by however long the pause lasted.
+      if (!IsPlaying) return false;
       var keepPlaying = AdvancePlayback(deltaSeconds);
       if (!keepPlaying) _runtimePlaying = false;
       return !keepPlaying;
    }
 
-   // Advances _frame by one step in the current ReplayDirection. Shared by the runtime timer and the design-time clock.
+   // The frame range this control plays, clamped to what the source has. Read per step rather than stored, so moving a
+   // slider takes effect on the very next frame.
+   private (uint Start, uint End) FrameRange()
+   {
+      var last = _bitmap.FrameCount > 0 ? _bitmap.FrameCount - 1 : 0;
+      var start = Math.Min(StartFrame, last);
+      var end = Math.Min(EndFrame, last);
+      return end < start ? (start, start) : (start, end);
+   }
+
+   // Advances the CONTROL's own cursor by one step in the current ReplayDirection. The cursor lives here, not in the
+   // BitmapImage, because one decoded source can be shown by several images at once - each with its own range, speed and
+   // position. Sharing the source is what stops the same file being decoded (and uploaded) once per image.
    private void AdvanceFrame()
    {
+      var (start, end) = FrameRange();
+      if (_frameCursor < start || _frameCursor > end) _frameCursor = start;
+
+      var backwards = ReplayDirection is ReplayDirection.Backward
+                      || (ReplayDirection is ReplayDirection.ForwardLooped or ReplayDirection.BackwardLooped
+                          && _replayDirection == ReplayDirection.Backward);
+
+      if (backwards)
+      {
+         if (_frameCursor <= start)
+         {
+            // Bounce for a ping-pong direction, wrap for a plain backward one.
+            if (ReplayDirection is ReplayDirection.ForwardLooped or ReplayDirection.BackwardLooped)
+            {
+               _replayDirection = ReplayDirection.Forward;
+               if (_frameCursor < end) _frameCursor++;
+            }
+            else
+            {
+               _frameCursor = end;
+               _currentReplayIteration++;
+            }
+         }
+         else
+         {
+            _frameCursor--;
+         }
+      }
+      else
+      {
+         if (_frameCursor >= end)
+         {
+            if (ReplayDirection is ReplayDirection.ForwardLooped or ReplayDirection.BackwardLooped)
+            {
+               _replayDirection = ReplayDirection.Backward;
+               if (_frameCursor > start) _frameCursor--;
+            }
+            else
+            {
+               _frameCursor = start;
+               _currentReplayIteration++;
+            }
+         }
+         else
+         {
+            _frameCursor++;
+         }
+      }
+
+      _layerIndex = _frameCursor;
+
+      // Drawing from the frame array? Then the step IS the number - asking the decoder for pixels would rebuild data the
+      // GPU already holds, which is exactly what the array was built to stop paying for.
+      if (_bitmap.FrameArrayTexture != null) return;
+
       _oldFrame = _frame;
       try
       {
-         switch (ReplayDirection)
-         {
-            case ReplayDirection.Forward:
-               _frame = _bitmap.GetNextFrame();
-               break;
-            case ReplayDirection.Backward:
-               _frame = _bitmap.GetPreviousFrame();
-               break;
-            case ReplayDirection.ForwardLooped:
-               switch (_replayDirection)
-               {
-                  case ReplayDirection.Forward:
-                  {
-                     _frame = _bitmap.GetNextFrame();
-                     if (_bitmap.CurrentFrameIndex >= _bitmap.EndFrame)
-                     {
-                        _replayDirection = ReplayDirection.Backward;
-                     }
-
-                     break;
-                  }
-                  case ReplayDirection.Backward:
-                  {
-                     _frame = _bitmap.GetPreviousFrame();
-                     if (_bitmap.CurrentFrameIndex <= _bitmap.StartFrame)
-                     {
-                        _replayDirection = ReplayDirection.Forward;
-                     }
-
-                     break;
-                  }
-               }
-
-               break;
-            default:
-            {
-               switch (_replayDirection)
-               {
-                  case ReplayDirection.Backward:
-                  {
-                     _frame = _bitmap.GetPreviousFrame();
-                     if (_bitmap.CurrentFrameIndex <= _bitmap.StartFrame)
-                     {
-                        _replayDirection = ReplayDirection.Forward;
-                     }
-
-                     break;
-                  }
-                  case ReplayDirection.Forward:
-                  {
-                     _frame = _bitmap.GetNextFrame();
-                     if (_bitmap.CurrentFrameIndex >= _bitmap.EndFrame)
-                     {
-                        _replayDirection = ReplayDirection.Backward;
-                     }
-
-                     break;
-                  }
-               }
-
-               break;
-            }
-         }
-
-         if (_bitmap.CurrentFrameIndex >= _bitmap.FrameCount)
-         {
-            _currentReplayIteration++;
-         }
+         _frame = _bitmap.GetCachedFrame(_frameCursor);
       }
       catch (Exception)
       {
@@ -404,14 +446,18 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
 
    protected override Size ArrangeOverride(Size finalSize)
    {
-      if (Source != null)
-      {
-         var source = Source;
+      if (Source == null) return Size.Zero;
 
-         return CalculateScaling(Stretch, finalSize, new Size(source.Width, source.Height));
-      }
+      // A Stretch alignment means "take the slot" - so take it, and CENTRE the fitted picture inside it (OnRender).
+      // Returning only the fitted size made the element smaller than the slot it was given, and the base arrange anchors
+      // Stretch at the start, so the whole leftover piled up on ONE side: a picture whose aspect differs from its slot
+      // sat against the left/top edge with an empty strip on the right/bottom. Any other alignment still shrinks to the
+      // picture - that is the size THAT alignment then positions.
+      var fitted = CalculateScaling(Stretch, finalSize, new Size(Source.Width, Source.Height));
 
-      return Size.Zero;
+      return new Size(
+         HorizontalAlignment == HorizontalAlignment.Stretch ? finalSize.Width : fitted.Width,
+         VerticalAlignment == VerticalAlignment.Stretch ? finalSize.Height : fitted.Height);
    }
 
    protected override void OnRender(IDrawingContext context)
@@ -429,7 +475,42 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
       // and re-invalidates once loaded. A decoded _frame (BitmapFrame) or a non-BitmapImage source is always ready.
       if (image is BitmapImage { IsLoaded: false }) return;
 
-      context.ForControl(this).DrawImage(image, FilterBrush, new Rect(Bounds.Size), CornerRadius);
+      // Scale the picture per Stretch, then CENTRE it in what the element occupies. Two directions to the leftover:
+      // a fit SMALLER than the element leaves an equal margin on both sides (Uniform in a box of another aspect);
+      // a fit LARGER is CROPPED, equally on both sides, by drawing only the part of the source that stays inside -
+      // which is what makes None (1:1, cropped), UniformToFill (fills, crops the long axis) and Fill (squashes to
+      // the box) three different pictures. Squeezing the whole source into the element instead made all three the
+      // same drawing: Fill.
+      var fitted = CalculateScaling(Stretch, Bounds.Size, new Size(Source.Width, Source.Height));
+      var visibleU = fitted.Width > 0 ? Math.Min(1.0, Bounds.Width / fitted.Width) : 1.0;
+      var visibleV = fitted.Height > 0 ? Math.Min(1.0, Bounds.Height / fitted.Height) : 1.0;
+      var width = Math.Min(fitted.Width, Bounds.Width);
+      var height = Math.Min(fitted.Height, Bounds.Height);
+      var destination = new Rect((Bounds.Width - width) / 2, (Bounds.Height - height) / 2, width, height);
+
+      var session = context.ForControl(this);
+
+      // An animation draws from ONE texture whose layers are its frames: the frame is a number handed to the shader, so
+      // advancing it costs no upload and no allocation. (Before this, every frame became its own texture - a 200-frame
+      // GIF meant 200 of them, ~400 MB, built one blocking upload at a time.) The layer is the frame's OWN index, not
+      // the bitmap's cursor: the cursor has already moved on to the next frame by the time this one is drawn.
+      if (BitmapImage.UseFrameArrayTextures && _bitmap is { FrameCount: > 1, IsLoaded: true } animated)
+      {
+         // Which frame: once the array exists, the layer the cursor last landed on (no BitmapFrame is decoded at all).
+         // Until then the fallback path is decoding frames, so follow ITS frame; before the first tick, the range start.
+         var layer = animated.FrameArrayTexture != null ? _layerIndex : _frame?.Index ?? animated.StartFrame;
+         session.DrawImageFrame(animated, FilterBrush, destination, CornerRadius, (int)layer);
+         return;
+      }
+
+      if (visibleU >= 1 && visibleV >= 1)
+      {
+         session.DrawImage(image, FilterBrush, destination, CornerRadius);
+         return;
+      }
+
+      session.DrawImage(image, FilterBrush, destination, CornerRadius,
+         new Rect((1 - visibleU) / 2, (1 - visibleV) / 2, visibleU, visibleV));
    }
 
    private Size CalculateScaling(Stretch stretch, Size destinationSize, Size sourceSize)

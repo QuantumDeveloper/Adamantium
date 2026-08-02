@@ -27,4 +27,9 @@ public interface IRawBitmap
     public ImageDescription GetImageDescription();
 
     public FrameData GetFrameData(uint frameIndex);
+
+    /// <summary>Drops whatever decoded pixel data is being held for the frames, keeping only what is needed to decode
+    /// them again. For an animation handed to the GPU as one texture there is nothing left to read them for, and a
+    /// long one holds hundreds of megabytes this way. Decoders that keep nothing can ignore this.</summary>
+    public void ReleaseDecodedFrames() { }
 }

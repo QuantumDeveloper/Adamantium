@@ -199,6 +199,10 @@ public class ImageRenderComponent : UIRenderComponent
 
     public ITexture Texture { get; set; }
 
+    /// <summary>Set when <see cref="Texture"/> is an animation's frame ARRAY: which layer to sample. Advancing the
+    /// animation writes this number and nothing else - no upload, no rebuild.</summary>
+    public int? FrameLayer { get; set; }
+
     public SamplerState Sampler { get; set; }
 
     /// <summary>When set, this image is backed by an externally produced shared surface. Sampled via the private
@@ -239,6 +243,14 @@ public class ImageRenderComponent : UIRenderComponent
             {
                 UIBasicEffect.BasicSolidColorPass.Apply();
             }
+        }
+        else if (FrameLayer is { } layer)
+        {
+            // An animation: the frames are layers of ONE texture and this draw picks one. Nothing is uploaded per frame.
+            UIBasicEffect.ShaderTextureArray.SetResource(Texture);
+            UIBasicEffect.TextureLayer.SetValue((float)layer);
+            UIBasicEffect.SampleType.SetResource(Sampler);
+            UIBasicEffect.BasicTexturedArrayPass.Apply();
         }
         else
         {

@@ -743,11 +743,23 @@ public class ImageRenderUnit : RenderUnit<ImagePayload>
     // ImageRenderComponent.SharedSource/PreRender); a regular bitmap is sampled directly.
     private ImageRenderComponent CreateImageRenderer(Adamantium.Graphics.Core.Models.Mesh mesh, BitmapSource image)
     {
-        var texture = image.GetOrCreateTexture(ResourceFactory);
+        // An animated source draws from its FRAME-ARRAY texture (all frames as layers, built once); the payload says
+        // which layer. The array is built OFF this thread, so until it exists the animation draws its current frame the
+        // single-image way - a frame late at worst, instead of a frozen app while ~400 MB is decoded and uploaded here.
+        var layer = Payload.FrameLayer;
+        ITexture texture = null;
+        if (layer.HasValue && image is BitmapImage animated)
+        {
+            animated.RequestFrameArrayTexture(ResourceFactory);
+            texture = animated.FrameArrayTexture;
+            if (texture == null) layer = null;
+        }
+        texture ??= image.GetOrCreateTexture(ResourceFactory);
         if (texture == null) return null;   // decode still pending - no texture yet, draw nothing until a re-render
         var component = new ImageRenderComponent(GraphicsDevice, UIBasicEffect, mesh, texture, BufferManager)
         {
-            Sampler = GraphicsDevice.SamplerStates.LinearClampToEdge
+            Sampler = GraphicsDevice.SamplerStates.LinearClampToEdge,
+            FrameLayer = layer
         };
         // A live shared surface (game→panel): sample it directly, and drive the producer/consumer timeline so the
         // sample never races the producer's write (see ImageRenderComponent.PreRender). Composited with the default
@@ -786,6 +798,31 @@ public class ImageRenderUnit : RenderUnit<ImagePayload>
 
         DrawCommand = drawCommand;
         Payload = inputPayload;
+
+        // A new animation frame is ONLY this: the layer the shader samples. No rebuild, no upload - which is the whole
+        // point of keeping the frames as layers of one texture.
+        if (GeometryRenderer is ImageRenderComponent imageComponent)
+        {
+            // The layer number may only be handed to a component that actually HOLDS the frame array - its presence is
+            // what selects the array pass. Setting it on a component built over a single texture made that texture be
+            // drawn as if it were an array, which wedged the GPU. Switching between the two means rebuilding: either the
+            // array has just finished building (the animation was on the single-image fallback), or it is gone again.
+            var componentOnArray = imageComponent.FrameLayer.HasValue;
+            var wantsArray = inputPayload.FrameLayer.HasValue
+                             && inputPayload.Image is BitmapImage { FrameArrayTexture: not null };
+
+            if (componentOnArray == wantsArray)
+            {
+                if (componentOnArray) imageComponent.FrameLayer = inputPayload.FrameLayer;   // same texture, new frame
+            }
+            else
+            {
+                rectangleGeometry.ProcessGeometry(GeometryType.Both);
+                RemapSourceUv(rectangleGeometry.Mesh, inputPayload.SourceUv);
+                GeometryRenderer.DeferDispose();
+                GeometryRenderer = CreateImageRenderer(rectangleGeometry.Mesh, (BitmapSource)inputPayload.Image);
+            }
+        }
 
         GeometryRenderer?.RenderData = drawCommand.RenderData;
     }

@@ -9,6 +9,10 @@ public interface IResourceFactory
 {
     ITexture CreateTexture(TextureDescription description, byte[] pixelData);
 
+    /// <summary>One texture whose ARRAY LAYERS are <paramref name="layers"/> - an animation's frames, uploaded once and
+    /// then selected in the shader by layer, instead of a texture per frame.</summary>
+    ITexture CreateTextureArray(TextureDescription description, IReadOnlyList<byte[]> layers);
+
     /// <summary>Imports an externally produced shared surface (zero-copy) on the UI resource device.</summary>
     ITexture ImportSharedSurface(SharedSurfaceDescriptor descriptor);
 

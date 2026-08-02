@@ -19,6 +19,10 @@ public interface IDrawingSession
     /// <summary>Draws a normalised (0..1) SUB-RECT of the image into <paramref name="destinationRect"/> - a mosaic tile
     /// shows just its fragment of one shared photo without cropping/copying the bitmap.</summary>
     IDrawingSession DrawImage(ImageSource image, Brush filter, Rect destinationRect, CornerRadius corners, Rect sourceUv);
+
+    /// <summary>Draws one FRAME of an animated image: its frames are the layers of a single texture, and the frame is
+    /// chosen in the shader. Advancing an animation therefore uploads nothing and allocates nothing.</summary>
+    IDrawingSession DrawImageFrame(ImageSource image, Brush filter, Rect destinationRect, CornerRadius corners, int frameLayer);
     IDrawingSession DrawText(TextRenderingParameters renderingParameters, 
         Size desiredSize, 
         TextLayout textLayout,

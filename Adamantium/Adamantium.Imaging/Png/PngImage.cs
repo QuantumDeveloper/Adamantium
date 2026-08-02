@@ -100,6 +100,20 @@ namespace Adamantium.Imaging.Png
             return SurfaceFormat.Undefined;
         }
 
+        // The decoded pixels of every frame, dropped: an APNG handed to the GPU as one texture has no reader left for
+        // them. The encoded data stays, so a later request decodes again (see DecodeFrame).
+        public void ReleaseDecodedFrames()
+        {
+            lock (_frameDecodeLock)
+            {
+                foreach (var frame in Frames)
+                {
+                    frame.RawPixelBuffer = null;
+                    frame.IsDecoded = false;
+                }
+            }
+        }
+
         private byte[] DecodeFrame(PngFrame frame, uint index)
         {
             if (frame.IsDecoded) return frame.RawPixelBuffer;
