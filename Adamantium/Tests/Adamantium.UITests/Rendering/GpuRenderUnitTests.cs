@@ -524,6 +524,7 @@ public class GpuRenderUnitTests
     private sealed class StubResourceFactory : IResourceFactory
     {
         public ITexture CreateTexture(TextureDescription description, byte[] pixelData) => throw new NotSupportedException();
+        public ITexture CreateTextureArray(TextureDescription description, System.Collections.Generic.IReadOnlyList<byte[]> layers) => throw new NotSupportedException();
         public ITexture ImportSharedSurface(SharedSurfaceDescriptor descriptor) => throw new NotSupportedException();
         public IRenderTarget CreateRenderTarget(uint width, uint height, MSAALevel msaa, SurfaceFormat format, ImageLayout desiredLayout) => throw new NotSupportedException();
         public FontRenderer GetFontRenderer(IGraphicsDevice graphicsDevice) => throw new NotSupportedException();

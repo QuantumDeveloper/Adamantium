@@ -1,33 +1,94 @@
-<View xmlns="http://adamantium/ui">
-    <!-- DataContext is the ImageViewModel. Opacity binds all images. Disabling the horizontal scrollbar gives the
-         WrapPanel the viewport WIDTH, so images wrap into rows and the ScrollViewer scrolls only vertically. -->
-    <Grid RowDefinitions="Auto,*" Margin="24">
-        <StackPanel Grid.Row="0" Orientation="Horizontal">
-            <TextBlock Text="Opacity:" VerticalAlignment="Center"/>
-            <Slider Width="240" 
-                    Minimum="0.1" 
-                    Maximum="1" 
-                    Value="{Binding Opacity, Mode=TwoWay}" 
-                    Margin="12,0,0,0"/>
-        </StackPanel>
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:c="clr-namespace:Adamantium.UI.Controls;assembly=Adamantium.UI.Controls"
+      xmlns:core="clr-namespace:Adamantium.UI.Core;assembly=Adamantium.UI.Core"
+      xmlns:m="clr-namespace:Adamantium.UI.Core.Media;assembly=Adamantium.UI.Core">
+    <!-- DataContext is the ImageViewModel: the stretch playground on top, the format gallery (with its own Opacity
+         slider) below. Disabling the horizontal scrollbar gives the WrapPanel the viewport WIDTH, so images wrap into
+         rows and the ScrollViewer scrolls only vertically. -->
+    <ScrollViewer Margin="24"
+                  HorizontalScrollBarVisibility="Disabled"
+                  VerticalScrollBarVisibility="Auto">
+        <StackPanel Orientation="Vertical">
 
-        <ScrollViewer Grid.Row="1"
-                      Margin="0,14,0,0"
-                      HorizontalScrollBarVisibility="Disabled"
-                      VerticalScrollBarVisibility="Auto">
+            <!-- Stretch playground: the box is drawn, so it is visible how much room the picture was given and where the
+                 leftover goes. The rule (Stretch) decides the FIT - and whether the leftover is a MARGIN (the fit is
+                 smaller) or a CROP (the fit is larger); the alignment decides whether the element TAKES the box or
+                 shrinks to the picture it drew, which is what the element-size readout shows. -->
+            <TextBlock Text="Stretch playground" FontSize="18" Margin="0,0,0,12"/>
+            <StackPanel Orientation="Horizontal">
+                <!-- Fixed cell around the box, so resizing the box doesn't shove the controls around. -->
+                <Grid Width="440" Height="320">
+                    <Border Width="{Binding BoxWidth}" Height="{Binding BoxHeight}"
+                            HorizontalAlignment="Left" VerticalAlignment="Top"
+                            BorderThickness="1"
+                            BorderBrush="{ResourceReference ControlStrokeColorDefault}">
+                        <Image x:Name="Showcase"
+                               Source="Textures/luxfon.tga"
+                               Stretch="{Binding Stretch}"
+                               StretchDirection="{Binding StretchDirection}"
+                               HorizontalAlignment="{Binding HorizontalAlignment}"
+                               VerticalAlignment="{Binding VerticalAlignment}"/>
+                    </Border>
+                </Grid>
+
+                <StackPanel Orientation="Vertical" Margin="24,0,0,0">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock Text="Stretch:" VerticalAlignment="Center" Width="120"/>
+                        <DropDown EnumType="{x:Type m:Stretch}" SelectedItem="{Binding Stretch, Mode=TwoWay}" Width="170"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock Text="Direction:" VerticalAlignment="Center" Width="120"/>
+                        <DropDown EnumType="{x:Type c:StretchDirection}" SelectedItem="{Binding StretchDirection, Mode=TwoWay}" Width="170"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock Text="H alignment:" VerticalAlignment="Center" Width="120"/>
+                        <DropDown EnumType="{x:Type core:HorizontalAlignment}" SelectedItem="{Binding HorizontalAlignment, Mode=TwoWay}" Width="170"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock Text="V alignment:" VerticalAlignment="Center" Width="120"/>
+                        <DropDown EnumType="{x:Type core:VerticalAlignment}" SelectedItem="{Binding VerticalAlignment, Mode=TwoWay}" Width="170"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                        <TextBlock Text="Box width:" VerticalAlignment="Center" Width="120"/>
+                        <Slider Width="170" Minimum="60" Maximum="420"
+                                TickFrequency="10" IsSnapToTickEnabled="true"
+                                Value="{Binding BoxWidth, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding BoxWidth}" VerticalAlignment="Center" Width="46"
+                                   HorizontalTextAlignment="Right"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                        <TextBlock Text="Box height:" VerticalAlignment="Center" Width="120"/>
+                        <Slider Width="170" Minimum="60" Maximum="300"
+                                TickFrequency="10" IsSnapToTickEnabled="true"
+                                Value="{Binding BoxHeight, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding BoxHeight}" VerticalAlignment="Center" Width="46"
+                                   HorizontalTextAlignment="Right"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Element size:" VerticalAlignment="Center" Width="120"/>
+                        <TextBlock Text="{Binding ActualWidth, ElementName=Showcase}" VerticalAlignment="Center"/>
+                        <TextBlock Text=" x " VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding ActualHeight, ElementName=Showcase}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+
+            <Border Height="1" Background="{ResourceReference ControlFillColorTertiary}" Margin="0,24,0,0"/>
+            <TextBlock Text="Formats and animation" FontSize="18" Margin="0,20,0,12"/>
+
+            <!-- Opacity belongs to THIS group - it fades the format gallery below, not the playground above. -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                <TextBlock Text="Opacity:" VerticalAlignment="Center" Width="120"/>
+                <Slider Width="240"
+                        Minimum="0.1"
+                        Maximum="1"
+                        Value="{Binding Opacity, Mode=TwoWay}"
+                        VerticalAlignment="Center"/>
+            </StackPanel>
+
             <WrapPanel Orientation="Horizontal" ItemWidth="212" ItemHeight="200">
-                <StackPanel Margin="8">
-                    <TextBlock Text="PNG (APNG animated)"/>
-                    <Image Width="188" Height="150" Source="Textures/APNG-cube.png" Opacity="{Binding Opacity}"/>
-                </StackPanel>
-                <StackPanel Margin="8">
-                    <TextBlock Text="GIF (infinity)"/>
-                    <Image Width="188" Height="150" Source="Textures/infinity.gif" Delay="25" Opacity="{Binding Opacity}"/>
-                </StackPanel>
-                <StackPanel Margin="8">
-                    <TextBlock Text="GIF (earth)"/>
-                    <Image Width="188" Height="150" Source="Textures/RotatingEarth2.gif" Delay="25" Opacity="{Binding Opacity}"/>
-                </StackPanel>
                 <StackPanel Margin="8">
                     <TextBlock Text="TGA (luxfon)"/>
                     <Image Width="188" Height="150" Source="Textures/luxfon.tga" Opacity="{Binding Opacity}"/>
@@ -41,6 +102,106 @@
                     <Image Width="188" Height="150" Source="Textures/elephant.png" MipLevel="2" Opacity="{Binding Opacity}"/>
                 </StackPanel>
             </WrapPanel>
-        </ScrollViewer>
-    </Grid>
+
+            <Border Height="1" Background="{ResourceReference ControlFillColorTertiary}" Margin="0,24,0,0"/>
+            <TextBlock Text="Animation control" FontSize="18" Margin="0,20,0,4"/>
+            <TextBlock Text="Each source plays on its own terms: the frame range it loops over, the delay between frames, whether it runs at all, and the four corner radii. The frame count is reported BY the image once its file has decoded, which is what bounds the range sliders."
+                       TextWrapping="WrapByWords" Margin="0,0,0,16"/>
+
+            <!-- One row per animation: the picture on the left, its own controls on the right. -->
+            <ItemsControl ItemsSource="{Binding Animations}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border BorderThickness="1" CornerRadius="6" Padding="14" Margin="0,0,0,12"
+                                BorderBrush="{ResourceReference ControlStrokeColorDefault}">
+                            <StackPanel Orientation="Horizontal">
+                                <StackPanel Orientation="Vertical" Width="380">
+                                    <TextBlock Text="{Binding Title}" Margin="0,0,0,8"/>
+                                    <Image Width="350" Height="260"
+                                           Source="{Binding Source}"
+                                           Delay="{Binding Delay}"
+                                           StartFrame="{Binding StartFrame}"
+                                           EndFrame="{Binding EndFrame}"
+                                           IsPlaying="{Binding IsPlaying}"
+                                           ReplayDirection="{Binding Direction}"
+                                           CornerRadius="{Binding CornerRadius}"
+                                           FrameCount="{Binding FrameCount, Mode=OneWayToSource}"/>
+                                </StackPanel>
+
+                                <StackPanel Orientation="Vertical" Margin="20,0,0,0">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <Button Content="{Binding PlayPauseText}" Width="90" Height="30"
+                                                Command="{Binding TogglePlaybackCommand}"/>
+                                        <TextBlock Text="frames:" VerticalAlignment="Center" Margin="16,0,6,0"/>
+                                        <TextBlock Text="{Binding FrameCount}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <TextBlock Text="Direction:" VerticalAlignment="Center" Width="96"/>
+                                        <DropDown EnumType="{x:Type c:ReplayDirection}"
+                                                  SelectedItem="{Binding Direction, Mode=TwoWay}" Width="180"/>
+                                    </StackPanel>
+
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                        <TextBlock Text="Delay (ms):" VerticalAlignment="Center" Width="96"/>
+                                        <Slider Width="150" Minimum="1" Maximum="200"
+                                                TickFrequency="1" IsSnapToTickEnabled="true"
+                                                Value="{Binding Delay, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding Delay}" VerticalAlignment="Center" Width="40"
+                                                   HorizontalTextAlignment="Right"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                        <TextBlock Text="First frame:" VerticalAlignment="Center" Width="96"/>
+                                        <Slider Width="150" Minimum="0" Maximum="{Binding LastFrame}"
+                                                TickFrequency="1" IsSnapToTickEnabled="true"
+                                                Value="{Binding StartFrame, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding StartFrame}" VerticalAlignment="Center" Width="40"
+                                                   HorizontalTextAlignment="Right"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                        <TextBlock Text="Last frame:" VerticalAlignment="Center" Width="96"/>
+                                        <Slider Width="150" Minimum="0" Maximum="{Binding LastFrame}"
+                                                TickFrequency="1" IsSnapToTickEnabled="true"
+                                                Value="{Binding EndFrame, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding EndFrame}" VerticalAlignment="Center" Width="40"
+                                                   HorizontalTextAlignment="Right"/>
+                                    </StackPanel>
+
+                                    <StackPanel Orientation="Horizontal">
+                                        <StackPanel Orientation="Vertical" Margin="0,0,20,0">
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                                <TextBlock Text="Top left:" VerticalAlignment="Center" Width="80"/>
+                                                <Slider Width="110" Minimum="0" Maximum="60"
+                                                        TickFrequency="1" IsSnapToTickEnabled="true"
+                                                        Value="{Binding TopLeft, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="Bottom left:" VerticalAlignment="Center" Width="80"/>
+                                                <Slider Width="110" Minimum="0" Maximum="60"
+                                                        TickFrequency="1" IsSnapToTickEnabled="true"
+                                                        Value="{Binding BottomLeft, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Vertical">
+                                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                                <TextBlock Text="Top right:" VerticalAlignment="Center" Width="86"/>
+                                                <Slider Width="110" Minimum="0" Maximum="60"
+                                                        TickFrequency="1" IsSnapToTickEnabled="true"
+                                                        Value="{Binding TopRight, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="Bottom right:" VerticalAlignment="Center" Width="86"/>
+                                                <Slider Width="110" Minimum="0" Maximum="60"
+                                                        TickFrequency="1" IsSnapToTickEnabled="true"
+                                                        Value="{Binding BottomRight, Mode=TwoWay}" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </ScrollViewer>
 </View>
