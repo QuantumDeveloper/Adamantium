@@ -20,6 +20,34 @@
         <TextBlock Text="Progress (bound to the same value):" Margin="0,20,0,6"/>
         <ProgressBar Width="300" Height="12" Value="{Binding Value}" Maximum="{Binding Maximum}" HorizontalAlignment="Left"/>
 
+        <!-- A SPAN of the same scale: two handles that cannot cross, plus the band between them, which drags the whole
+             span at once. MinimumRangeWidth keeps that band grabbable even when the span is squeezed to nothing. -->
+        <TextBlock Text="Range (two bounds on the same scale):" Margin="0,20,0,6"/>
+        <!-- The upright one goes FIRST, before the readouts: a number whose width changes as it counts re-lays-out
+             everything after it, and a control sitting there would twitch on every step of a drag.
+             Snapping to whole units keeps both the values and that width steady. -->
+        <StackPanel Orientation="Horizontal">
+            <RangeSlider Orientation="Vertical" Height="150" Margin="0,0,40,0"
+                         Minimum="0" Maximum="{Binding Maximum}"
+                         MinimumRangeWidth="16"
+                         BandThickness="8"
+                         TickFrequency="1" IsSnapToTickEnabled="true"
+                         IsValueToolTipEnabled="true"
+                         LowerValue="{Binding SpanStart, Mode=TwoWay}"
+                         UpperValue="{Binding SpanEnd, Mode=TwoWay}"/>
+            <RangeSlider Width="300"
+                         Minimum="0" Maximum="{Binding Maximum}"
+                         MinimumRangeWidth="16"
+                         TickFrequency="1" IsSnapToTickEnabled="true"
+                         IsValueToolTipEnabled="true"
+                         LowerValue="{Binding SpanStart, Mode=TwoWay}"
+                         UpperValue="{Binding SpanEnd, Mode=TwoWay}"
+                         VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding SpanStart}" VerticalAlignment="Center" FontSize="16" Margin="16,0,0,0"/>
+            <TextBlock Text=" .. " VerticalAlignment="Center" FontSize="16"/>
+            <TextBlock Text="{Binding SpanEnd}" VerticalAlignment="Center" FontSize="16"/>
+        </StackPanel>
+
         <StackPanel Orientation="Horizontal" Margin="0,24,0,0">
             <Slider Orientation="Vertical"
                     Height="170"
