@@ -28,7 +28,7 @@
             <ScrollViewer Width="520" Height="320"
                           PanningMode="Both" IsInertiaEnabled="true"
                           HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-                <Image Width="1600" Height="1200" Source="Textures/luxfon.tga"/>
+                <Image Source="Textures/luxfon.tga"/>
             </ScrollViewer>
         </StackPanel>
     </StackPanel>
