@@ -21,5 +21,10 @@ public partial class RangesViewModel : TabPageViewModel
 
     [Bindable] private SweepDirection _direction = SweepDirection.Clockwise;
 
+    /// <summary>The span a RangeSlider selects out of the same 0..Maximum scale as everything else on the tab.</summary>
+    [Bindable] private double _spanStart = 20;
+
+    [Bindable] private double _spanEnd = 70;
+
     [Command] private void Reset() => Value = 0;
 }

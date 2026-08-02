@@ -149,21 +149,19 @@
                                         <TextBlock Text="{Binding Delay}" VerticalAlignment="Center" Width="40"
                                                    HorizontalTextAlignment="Right"/>
                                     </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                                        <TextBlock Text="First frame:" VerticalAlignment="Center" Width="96"/>
-                                        <Slider Width="150" Minimum="0" Maximum="{Binding LastFrame}"
-                                                TickFrequency="1" IsSnapToTickEnabled="true"
-                                                Value="{Binding StartFrame, Mode=TwoWay}" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding StartFrame}" VerticalAlignment="Center" Width="40"
-                                                   HorizontalTextAlignment="Right"/>
-                                    </StackPanel>
+                                    <!-- One control for the span: two sliders would let the end be set below the start,
+                                         a RangeSlider cannot express that at all. -->
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                        <TextBlock Text="Last frame:" VerticalAlignment="Center" Width="96"/>
-                                        <Slider Width="150" Minimum="0" Maximum="{Binding LastFrame}"
-                                                TickFrequency="1" IsSnapToTickEnabled="true"
-                                                Value="{Binding EndFrame, Mode=TwoWay}" VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding EndFrame}" VerticalAlignment="Center" Width="40"
+                                        <TextBlock Text="Frames:" VerticalAlignment="Center" Width="96"/>
+                                        <RangeSlider Width="150" Minimum="0" Maximum="{Binding LastFrame}"
+                                                     TickFrequency="1" IsSnapToTickEnabled="true"
+                                                     LowerValue="{Binding StartFrame, Mode=TwoWay}"
+                                                     UpperValue="{Binding EndFrame, Mode=TwoWay}"
+                                                     VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding StartFrame}" VerticalAlignment="Center" Width="34"
                                                    HorizontalTextAlignment="Right"/>
+                                        <TextBlock Text=" .. " VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding EndFrame}" VerticalAlignment="Center" Width="34"/>
                                     </StackPanel>
 
                                     <StackPanel Orientation="Horizontal">
