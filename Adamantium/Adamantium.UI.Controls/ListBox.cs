@@ -4,6 +4,8 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.Linq;
+using Adamantium.UI.Controls.Base;
+using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.RoutedEvents;
@@ -28,6 +30,105 @@ public class ListBox : Selector
     {
         // A list box takes keyboard focus (arrow-key navigation delegates to its items) - opt in, base default is false.
         FocusableProperty.OverrideMetadata(typeof(ListBox), new PropertyMetadata(true));
+
+        // For Tab the list is a DOORWAY, not a stop: it is entered once - landing on an item - and the next Tab leaves
+        // the whole list. Without the first half Tab stopped ON the list and never got inside it; without the second it
+        // would walk every row before reaching whatever is underneath.
+        KeyboardNavigation.IsTabStopProperty.OverrideMetadata(typeof(ListBox), new PropertyMetadata(false));
+        KeyboardNavigation.TabNavigationProperty.OverrideMetadata(typeof(ListBox),
+            new PropertyMetadata(KeyboardNavigationMode.Once));
+
+        // The arrows are the LIST's own business, not the navigator's: they move the SELECTION, and the focus and the
+        // scroll follow it. The navigator only ever gets keys nobody claimed, so claiming them here is what stops the
+        // focus wandering off to a neighbouring control instead of down the rows.
+        Keyboard.KeyDownEvent.RegisterClassHandler<ListBox>(new KeyEventHandler(OnKeyDownClassHandler));
+    }
+
+    private static void OnKeyDownClassHandler(object sender, KeyEventArgs e) => (sender as ListBox)?.OnNavigationKey(e);
+
+    private void OnNavigationKey(KeyEventArgs e)
+    {
+        if (e.Handled || Items == null || Items.Count == 0) return;
+
+        var direction = DirectionOf(e.Key);
+        if (direction == null || ItemsHostPanel is not INavigablePanel host) return;
+
+        // The list KEEPS its arrows whether or not they lead anywhere: running out of rows must not hand the focus to
+        // whatever sits beside the list, and one arrow too many should not cost you your place in it.
+        e.Handled = true;
+
+        // Nothing selected yet: the first press takes the first item, whichever key it was.
+        if (SelectedIndex < 0)
+        {
+            SelectOnly(0);
+            ShowSelected(0);
+            return;
+        }
+
+        // WHICH item is next is the PANEL's answer, not ours: it is the one that knows whether the items stand in a
+        // column, a row, or a grid of wrapped lines. Stepping the index by one instead - as this did - reads as "down"
+        // meaning "the next chip along" in a wrapped list, which is not what the arrow pointed at.
+        var index = NextIndex(host, direction.Value);
+        if (index < 0 || index >= Items.Count) return;
+
+        SelectOnly(index);
+        ShowSelected(index);
+    }
+
+    /// <summary>The item an arrow leads to. Normally the panel's answer, from the geometry of the row the selection is
+    /// on - but a selection that has been SCROLLED AWAY FROM has no container to ask about, and answering "nowhere"
+    /// there left the keyboard dead until something visible was selected again. Item order is the only thing that still
+    /// means anything in that state, so the arrow steps through it and the view comes back to the selection.</summary>
+    private int NextIndex(INavigablePanel host, FocusNavigationDirection direction)
+    {
+        var current = ItemContainerGenerator.ContainerFromIndex(SelectedIndex);
+        if (current is { Visibility: Visibility.Visible } && host.Navigate(current, direction) is { } next)
+        {
+            return ItemContainerGenerator.IndexFromContainer(next);
+        }
+
+        return current is { Visibility: Visibility.Visible }
+            ? -1                                                        // on screen, and the panel says there is nothing that way
+            : SelectedIndex + (direction is FocusNavigationDirection.Down or FocusNavigationDirection.Right ? 1 : -1);
+    }
+
+    private static FocusNavigationDirection? DirectionOf(Key key) => key switch
+    {
+        Key.LeftArrow => FocusNavigationDirection.Left,
+        Key.RightArrow => FocusNavigationDirection.Right,
+        Key.UpArrow => FocusNavigationDirection.Up,
+        Key.DownArrow => FocusNavigationDirection.Down,
+        _ => null
+    };
+
+    /// <summary>Put the focus on the newly selected row and scroll it into view.</summary>
+    private void ShowSelected(int index)
+    {
+        var container = ItemContainerGenerator.ContainerFromIndex(index);
+        if (container is IInputComponent focusable && container.Visibility == Visibility.Visible)
+        {
+            FocusManager.Focus(focusable, NavigationMethod.Directional);
+            (container as UIComponent)?.BringIntoView();
+            return;
+        }
+
+        // Not realized - the row is outside the window the panel is keeping. There is no visual to scroll to, but the
+        // panel can still say WHERE the row will be, and scrolling there materialises it: the view comes back to the
+        // selection now, and the focus lands on it as soon as it exists.
+        if (ItemsHostPanel is VirtualizingPanel panel && panel.TryGetItemRect(index, out var rect))
+        {
+            EnclosingScrollViewer()?.BringIntoView(rect);
+        }
+    }
+
+    private ScrollViewer EnclosingScrollViewer()
+    {
+        for (IUIComponent node = ItemsHostPanel; node != null; node = node.VisualParent)
+        {
+            if (node is ScrollViewer viewer) return viewer;
+        }
+
+        return null;
     }
 
     private HashSet<object> _selectedSet = [];  // O(1) membership truth - used to reflect selection onto (recycled) containers

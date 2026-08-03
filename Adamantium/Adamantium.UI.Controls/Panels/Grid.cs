@@ -1,7 +1,9 @@
-﻿using System.Collections.Specialized;
+using System.Collections.Specialized;
 using System.Diagnostics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Controls.Base;
+using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.RoutedEvents;
 
@@ -9,6 +11,38 @@ namespace Adamantium.UI.Controls.Panels;
 
 public class Grid: Panel
 {
+   /// <summary>A cell here is stated, not derived, so an arrow moves to the NEAREST child that stays in the same line -
+   /// the same row for a sideways move, the same column for a vertical one. Nearest by cell, not by pixels: the grid's
+   /// own coordinates are what its children were placed by, and a row of different-sized cells would otherwise navigate
+   /// in an order the layout never used.</summary>
+   public override IUIComponent Navigate(IUIComponent from, FocusNavigationDirection direction)
+   {
+      if (!IsArrow(direction)) return base.Navigate(from, direction);
+      if (from is not MeasurableUIComponent child || Children.IndexOf(child) < 0) return null;
+
+      var vertical = IsVertical(direction);
+      var forward = IsForward(direction);
+      var line = vertical ? GetColumn(child) : GetRow(child);
+      var position = vertical ? GetRow(child) : GetColumn(child);
+
+      IMeasurableComponent nearest = null;
+      var nearestPosition = 0;
+      foreach (var candidate in Children)
+      {
+         if (ReferenceEquals(candidate, child)) continue;
+         if ((vertical ? GetColumn(candidate) : GetRow(candidate)) != line) continue;
+
+         var candidatePosition = vertical ? GetRow(candidate) : GetColumn(candidate);
+         if (forward ? candidatePosition <= position : candidatePosition >= position) continue;
+         if (nearest != null && (forward ? candidatePosition >= nearestPosition : candidatePosition <= nearestPosition)) continue;
+
+         nearest = candidate;
+         nearestPosition = candidatePosition;
+      }
+
+      return nearest;
+   }
+
    // Which cell a child occupies is consumed by the GRID, never by the child - so a change here has to re-run the
    // PARENT's layout. Without that the grid stays measure-valid at an unchanged constraint, early-returns, and the child
    // keeps the cell it was last put in: a trigger that moved a part to another cell appeared to do nothing at all.

@@ -1,6 +1,7 @@
 using System;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Input;
 
 namespace Adamantium.UI.Controls.Panels;
 
@@ -22,6 +23,31 @@ public class StackPanel : VirtualizingPanel
       new PropertyMetadata(Orientation.Vertical,
          PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
 
+
+   /// <summary>Items stack at a uniform extent, so where the n-th one sits is arithmetic - and stays answerable for an
+   /// item that has been virtualized away, which is exactly when someone needs to scroll to it.</summary>
+   public override bool TryGetItemRect(int index, out Rect rect)
+   {
+      rect = default;
+      if (!IsItemsHost || _itemExtent <= 0 || index < 0) return false;
+
+      var vertical = Orientation == Orientation.Vertical;
+      var along = index * _itemExtent;
+      rect = vertical
+         ? new Rect(0, along, RenderSize.Width, _itemExtent)
+         : new Rect(along, 0, _itemExtent, RenderSize.Height);
+      return true;
+   }
+
+   /// <summary>Along the stack an arrow is the next child; ACROSS it there is nothing - a line of children has no
+   /// second dimension - so the answer is null and the question goes to whatever holds this stack.</summary>
+   public override IUIComponent Navigate(IUIComponent from, FocusNavigationDirection direction)
+   {
+      if (!IsArrow(direction)) return base.Navigate(from, direction);
+      if (IsVertical(direction) != (Orientation == Orientation.Vertical)) return null;
+
+      return Neighbour(from, IsForward(direction));
+   }
 
    public Orientation Orientation
    {

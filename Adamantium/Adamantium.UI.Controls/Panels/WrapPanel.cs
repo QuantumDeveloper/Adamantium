@@ -1,5 +1,6 @@
-﻿using Adamantium.Mathematics;
+using Adamantium.Mathematics;
 using Adamantium.UI.Core;
+using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core.Input;
 
 namespace Adamantium.UI.Controls.Panels;
@@ -40,6 +41,120 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
    // resolve the slot by arithmetic and return just that container/skeleton - instead of the base walk visiting every
    // realized tile's whole subtree (thousands of nodes) on every mouse move (the second-monitor freeze). `local` is in
    // panel space (absolute slot coordinates); null = let the caller do the default full walk (a plain, non-items panel).
+   static WrapPanel()
+   {
+      // A field of tiles KEEPS the arrows: at its edge the key does nothing rather than throwing the focus onto some
+      // control beside the panel. Leaving is Tab's job - one arrow too many should not cost you your place in a grid.
+      KeyboardNavigation.DirectionalNavigationProperty.OverrideMetadata(typeof(WrapPanel),
+         new PropertyMetadata(KeyboardNavigationMode.Contained));
+   }
+
+   /// <summary>Every slot comes from the index and the uniform cell, so where the n-th item sits is arithmetic - and
+   /// stays answerable for an item that has been virtualized away, which is exactly when someone needs to scroll to it.</summary>
+   public override bool TryGetItemRect(int index, out Rect rect)
+   {
+      rect = default;
+      if (!IsItemsHost || _columns <= 0 || _cellFlow <= 0 || _cellScroll <= 0 || index < 0) return false;
+
+      var flow = index % _columns * _cellFlow;
+      var scroll = index / _columns * _cellScroll;
+      rect = Orientation == Orientation.Horizontal
+         ? new Rect(flow, scroll, _cellFlow, _cellScroll)
+         : new Rect(scroll, flow, _cellScroll, _cellFlow);
+      return true;
+   }
+
+   /// <summary>Lines of cells: an arrow along the flow is the neighbour on this line, one across it is the nearest tile
+   /// on the next. Answered from the ARRANGED positions, which is what lets it work for tiles of different sizes - and
+   /// under virtualization too, where the realized children are the ones on screen and therefore exactly the ones an
+   /// arrow can reach. A neighbour that is not realized yet answers null, and the key then does nothing (the panel
+   /// keeps its arrows) until the scroll-to-materialize half of the plan lands.</summary>
+   public override IUIComponent Navigate(IUIComponent from, FocusNavigationDirection direction)
+   {
+      if (!IsArrow(direction)) return base.Navigate(from, direction);
+      if (from == null) return null;
+
+      // From the ARRANGED positions, not from an index: a plain wrap panel has children of DIFFERENT sizes and lines
+      // of different lengths, so there is no items-per-line number to step by - the count the virtualized path keeps
+      // (_columns) is meaningless here, and using it made every arrow answer nothing at all. The layout this panel
+      // already produced is the only honest source of who sits beside whom.
+      var horizontal = Orientation == Orientation.Horizontal;
+      var alongTheFlow = IsVertical(direction) != horizontal;
+      var forward = IsForward(direction);
+
+      var self = from.Bounds;
+      var selfLine = horizontal ? self.Y : self.X;
+      var selfFlow = horizontal ? self.X + self.Width / 2 : self.Y + self.Height / 2;
+
+      IUIComponent best = null;
+      double bestLine = 0, bestFlow = 0;
+      IUIComponent wrapped = null;                 // where the flow carries on when this line runs out
+      double wrappedLine = 0, wrappedFlow = 0;
+      var isOurs = false;
+
+      foreach (var candidate in VisualChildren)
+      {
+         if (ReferenceEquals(candidate, from)) { isOurs = true; continue; }
+
+         // A PARKED container is still a visual child - virtualization hides it rather than detaching it - and it keeps
+         // the bounds it had when it was last on screen. Offering one as a neighbour put the focus nowhere and left the
+         // search to carry on from a position that no longer exists: a wall in the middle of a visible row, forwards
+         // only, because the parked ones lie in the direction the window has moved.
+         if (candidate.Visibility != Visibility.Visible) continue;
+
+         var bounds = candidate.Bounds;
+         var line = horizontal ? bounds.Y : bounds.X;
+         var flow = horizontal ? bounds.X + bounds.Width / 2 : bounds.Y + bounds.Height / 2;
+
+         if (alongTheFlow)
+         {
+            if (Math.Abs(line - selfLine) <= LineTolerance)
+            {
+               if (forward ? flow <= selfFlow : flow >= selfFlow) continue;                   // behind us
+               if (best != null && (forward ? flow >= bestFlow : flow <= bestFlow)) continue; // further than one we have
+
+               best = candidate;
+               bestFlow = flow;
+               continue;
+            }
+
+            // The LINE ends, the flow does not: like text, it carries on at the start of the next line - and backwards,
+            // at the end of the previous one. Held as a fallback so it is used only once the line has truly run out.
+            if (forward ? line <= selfLine + LineTolerance : line >= selfLine - LineTolerance) continue;
+            if (wrapped != null)
+            {
+               if (forward ? line > wrappedLine + LineTolerance : line < wrappedLine - LineTolerance) continue;
+               if (Math.Abs(line - wrappedLine) <= LineTolerance &&
+                   (forward ? flow >= wrappedFlow : flow <= wrappedFlow)) continue;
+            }
+
+            wrapped = candidate;
+            wrappedLine = line;
+            wrappedFlow = flow;
+            continue;
+         }
+
+         if (forward ? line <= selfLine + LineTolerance : line >= selfLine - LineTolerance) continue;
+         if (best != null)
+         {
+            // The NEAREST line wins; within one line, the neighbour nearest along the flow - which is what keeps a
+            // column when the tiles above and below are of different widths.
+            if (forward ? line > bestLine + LineTolerance : line < bestLine - LineTolerance) continue;
+            if (Math.Abs(line - bestLine) <= LineTolerance &&
+                Math.Abs(flow - selfFlow) >= Math.Abs(bestFlow - selfFlow)) continue;
+         }
+
+         best = candidate;
+         bestLine = line;
+         bestFlow = flow;
+      }
+
+      if (!isOurs) return null;
+      return alongTheFlow ? best ?? wrapped : best;
+   }
+
+   private const double LineTolerance = 0.5;   // two children are on one line when their line coordinates agree to this
+
    IReadOnlyList<IUIComponent> IHitTestChildren.GetHitTestChildren(Vector2 local)
    {
       if (!IsItemsHost) return null;

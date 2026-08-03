@@ -1,5 +1,7 @@
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
+using Adamantium.UI.Controls.Base;
+using Adamantium.UI.Core.Input;
 
 namespace Adamantium.UI.Controls.Panels;
 
@@ -85,6 +87,28 @@ public class UniformGrid:Panel
          index++;
       }
       return finalSize;
+   }
+
+   /// <summary>Every cell here comes from the child's INDEX, so navigation is the same arithmetic the arrange uses:
+   /// sideways is index ±1 within the row, up and down are ±one row. A sideways step must not fall off the end of a
+   /// line into the next one, which plain index arithmetic would happily do.</summary>
+   public override IUIComponent Navigate(IUIComponent from, FocusNavigationDirection direction)
+   {
+      if (!IsArrow(direction)) return base.Navigate(from, direction);
+      if (from is not MeasurableUIComponent child) return null;
+
+      var index = Children.IndexOf(child);
+      if (index < 0) return null;
+
+      GetDimensions(out var rows, out var columns);
+      if (rows == 0 || columns == 0) return null;
+
+      var row = index / columns + (IsVertical(direction) ? (IsForward(direction) ? 1 : -1) : 0);
+      var column = index % columns + (IsVertical(direction) ? 0 : IsForward(direction) ? 1 : -1);
+      if (row < 0 || row >= rows || column < 0 || column >= columns) return null;
+
+      var next = row * columns + column;
+      return next >= 0 && next < Children.Count ? Children[next] : null;
    }
 
    // Rows/Columns are filled in from the child count: set Columns and the rows follow (and vice versa); set neither and
