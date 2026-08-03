@@ -1,3 +1,4 @@
+using System;
 using Adamantium.Mathematics;
 using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Core;
@@ -48,7 +49,7 @@ public class ProceduralBrushBakeTests
     [Test]
     public void PatternBrush_Bakes_TypeCellAndZeroNoise()
     {
-        var brush = new PatternBrush { Pattern = PatternType.Dots, CellSize = 20, Color1 = new Color(200, 100, 50, 255), Color2 = new Color(10, 20, 30, 255) };
+        var brush = new PatternBrush { Pattern = PatternType.Dots, CellSize = 20, HatchAngle = 60, Color1 = new Color(200, 100, 50, 255), Color2 = new Color(10, 20, 30, 255) };
         var ok = PatternRectCollector.BakeItem(Payload(brush), Matrix4x4F.Identity, 1.0, 0, out var item);
         Assert.Multiple(() =>
         {
@@ -56,8 +57,12 @@ public class ProceduralBrushBakeTests
             Assert.That(item.Params.Y, Is.EqualTo(2f), "type = the PatternType ordinal (Dots = 2)");
             Assert.That(item.Params.Z, Is.EqualTo(20f).Within(1e-4f), "cell = CellSize * sx (sx = 1)");
             Assert.That(item.Params.X, Is.EqualTo(6f).Within(1e-4f), "corner radius carried into params.x");
-            Assert.That(item.Noise.X, Is.EqualTo(0f), "a pattern carries no noise params");
-            Assert.That(item.Noise.W, Is.EqualTo(0f));
+            // A pattern's noise record carries the HATCH LINE NORMAL, not FBM params: the trig is baked here because the
+            // pattern pixel shader is already at the NVVM instruction limit. Only the two FBM slots are unused.
+            Assert.That(item.Noise.X, Is.EqualTo((float)Math.Cos(Math.PI / 3)).Within(1e-4f), "cos(HatchAngle) -> Noise.x");
+            Assert.That(item.Noise.Y, Is.EqualTo((float)Math.Sin(Math.PI / 3)).Within(1e-4f), "sin(HatchAngle) -> Noise.y");
+            Assert.That(item.Noise.Z, Is.EqualTo(0f), "lacunarity is a noise-only slot");
+            Assert.That(item.Noise.W, Is.EqualTo(0f), "and so is gain");
         });
     }
 

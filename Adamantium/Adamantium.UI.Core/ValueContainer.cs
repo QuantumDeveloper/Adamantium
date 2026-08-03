@@ -22,6 +22,13 @@ internal class ValueContainer
     // read, so it can never observe a half-finished update and needs no lock of its own.
     private volatile object _effective = AdamantiumProperty.UnsetValue;
 
+    // The winning slot's value BEFORE coercion - what was actually asked for. Coercion is a mapping from this to the
+    // effective value, not a rewrite of the request: keeping the request means it can be mapped AGAIN when the things
+    // the coercion depends on change. Without it a value that had to be clamped is gone for good - a lower bound of 20
+    // clamped to 1 because the upper bound had not arrived yet could never come back to 20 once it did.
+    // Only read/written under the container's lock (writes and re-coercions), so it needs no volatile of its own.
+    private object _base = AdamantiumProperty.UnsetValue;
+
     // The lowest-priority SOURCE slot; everything below it is the computed tail (see ValuePriority).
     private const int LastSourcePriority = (int)ValuePriority.Default;
 
@@ -38,24 +45,24 @@ internal class ValueContainer
     // the winner, or writing below it) has to look, and those are rare.
     private int _effectiveFrom = LastSourcePriority + 1;
 
-    public void SetValue(object value, ValuePriority priority)
+    /// <summary>Writes a slot and returns the new BASE value - the winning slot's request, still uncoerced. The caller
+    /// coerces it and hands the result back through <see cref="SetEffective"/>; until then the effective value is
+    /// unchanged, so a reader never sees a value that has skipped its coercion.</summary>
+    public object SetValue(object value, ValuePriority priority)
     {
         var slot = (int)priority;
         _values[slot] = value;
 
-        // Published as ONE reference write: a reader sees the value from before this Set or the one after it, never a
-        // container caught mid-rescan.
         if (value != AdamantiumProperty.UnsetValue && slot <= _effectiveFrom)
         {
             _effectiveFrom = slot;
-            _effective = value;
-            return;
+            return _base = value;
         }
 
-        if (slot > _effectiveFrom) return;   // written under the winner - it changes nothing that is visible
+        if (slot > _effectiveFrom) return _base;   // written under the winner - it changes nothing that is visible
 
         _effectiveFrom = LastSourcePriority + 1;
-        _effective = Scan();
+        return _base = Scan();
     }
 
     public object GetValue(ValuePriority priority)
@@ -63,9 +70,16 @@ internal class ValueContainer
         return _values[(int)priority];
     }
 
-    /// <summary>The effective value: the first SET slot, highest priority first. A plain field read - no scan, no
-    /// bookkeeping, nothing to synchronise.</summary>
+    /// <summary>The effective value: the winning slot's request, coerced. A plain field read - no scan, no bookkeeping,
+    /// nothing to synchronise.</summary>
     public object Effective => _effective;
+
+    /// <summary>What the winning slot asked for, before coercion - the input a re-coercion works from.</summary>
+    public object BaseValue => _base;
+
+    /// <summary>Publishes the coerced value. ONE reference write: a reader sees the value from before this update or the
+    /// one after it, never a container caught mid-change.</summary>
+    public void SetEffective(object value) => _effective = value;
 
     private object Scan()
     {

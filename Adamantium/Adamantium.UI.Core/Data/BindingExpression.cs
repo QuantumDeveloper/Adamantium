@@ -335,14 +335,45 @@ public class BindingExpression : BindingExpressionBase
    public override void UpdateSource()
    {
       if (_sourceProperty is not { CanWrite: true } || TargetProperty == null) return;
-      var value = Target.GetValue(TargetProperty);
+      var targetValue = Target.GetValue(TargetProperty);
+      var value = targetValue;
       if (Binding.Converter != null)
-         value = Binding.Converter.ConvertBack(value, _sourceProperty.PropertyType, Binding.ConverterParameter, CultureInfo.CurrentCulture);
+         value = Binding.Converter.ConvertBack(value, _sourceProperty.PropertyType, Binding.ConverterParameter,
+            CultureInfo.CurrentCulture);
       // Guard the ECHO (see _writingSource): our synchronous source write must not schedule a source->target push back.
       _writingSource = true;
-      try { _sourceProperty.SetValue(ResolvedSource, Coerce(value, _sourceProperty.PropertyType)); }
-      finally { _writingSource = false; }
+      try
+      {
+         _sourceProperty.SetValue(ResolvedSource, Coerce(value, _sourceProperty.PropertyType));
+      }
+      finally
+      {
+         _writingSource = false;
+      }
+
+      // The Binding slot is this expression's copy of what the SOURCE holds, and the write above just moved the source.
+      // The echo guard suppresses the push that would normally refresh that copy, so without this the target keeps a
+      // request the source no longer has anywhere: a value that had to be CLAMPED was published to the source as the
+      // clamped one, yet the target still remembered the number from before the clamp - and a later re-coercion (the
+      // ceiling moving back up) resurrected it and overwrote the source with it. A range slider whose end had been
+      // squeezed by a shrinking Maximum therefore rode the edge all the way back up instead of staying where the
+      // view-model said it was. Re-entrancy is bounded by the write below leaving the effective value alone (it IS the
+      // effective value), which raises nothing.
+      if (Mode != BindingMode.TwoWay || _syncingSlot) 
+         return;
+      
+      _syncingSlot = true;
+      try
+      {
+         Target.SetValue(TargetProperty, targetValue, ValuePriority.Binding);
+      }
+      finally
+      {
+         _syncingSlot = false;
+      }
    }
+
+   private bool _syncingSlot;   // see UpdateSource: the slot refresh must not drive another write-back
 
    // Minimal target-type coercion (no full converter pipeline): pass-through when assignable, ToString for a string
    // target, else a best-effort Convert.ChangeType; on failure keep the raw value (lenient - used writing back to source).

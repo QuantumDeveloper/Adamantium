@@ -116,9 +116,16 @@ public class SliderTests
 
         var fill = (Border)slider.GetTemplateChild("PART_SelectionRange");
         var track = (Track)slider.GetTemplateChild("PART_Track");
-        Assert.That(track.ActualWidth, Is.GreaterThan(0), "sanity: the track got a width");
-        Assert.That(fill.RenderSize.Width, Is.EqualTo(0.40 * track.ActualWidth).Within(2.0),
-            "accent fill must be ARRANGED to 40% of the track once layout settles, not 0 until the first drag");
+        var thumb = track.Thumb.Bounds;
+        Assert.Multiple(() =>
+        {
+            Assert.That(track.ActualWidth, Is.GreaterThan(0), "sanity: the track got a width");
+            Assert.That(fill.RenderSize.Width, Is.GreaterThan(0), "the fill must be arranged once layout settles, not 0 until the first drag");
+            // Against the THUMB, not against a second projection of the value: the thumb travels the trough minus its own
+            // width, so measuring the fill as a fraction of the FULL width leaves the two half a thumb apart at the ends.
+            Assert.That(fill.RenderSize.Width, Is.EqualTo(thumb.X + thumb.Width / 2).Within(1.0),
+                "the accent fill must end at the thumb");
+        });
     }
 
     [Test]
@@ -131,9 +138,15 @@ public class SliderTests
 
         var fill = (Border)slider.GetTemplateChild("PART_SelectionRange");
         var track = (Track)slider.GetTemplateChild("PART_Track");
-        Assert.That(track.ActualHeight, Is.GreaterThan(0), "sanity: the track got a height");
-        Assert.That(fill.RenderSize.Height, Is.EqualTo(0.40 * track.ActualHeight).Within(2.0),
-            "accent fill must be ARRANGED to 40% of the track height once layout settles");
+        var thumb = track.Thumb.Bounds;
+        Assert.Multiple(() =>
+        {
+            Assert.That(track.ActualHeight, Is.GreaterThan(0), "sanity: the track got a height");
+            Assert.That(fill.RenderSize.Height, Is.GreaterThan(0), "the fill must be arranged once layout settles");
+            // Upright and reversed: the fill grows from the BOTTOM up to the thumb, so it ends where the thumb's centre is.
+            Assert.That(fill.RenderSize.Height, Is.EqualTo(track.ActualHeight - (thumb.Y + thumb.Height / 2)).Within(1.0),
+                "the accent fill must end at the thumb");
+        });
     }
 
     // The THUMB (not just the accent fill) must sit at the Value fraction. The theme binds Track.Value={TemplateBinding

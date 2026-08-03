@@ -10,10 +10,10 @@ namespace Adamantium.UI.Core.Data;
 /// </summary>
 /// <remarks>
 /// <see cref="Flush"/> runs once per frame, at the start of the layout pass and BEFORE the layout drain, so the target
-/// writes (and the measure/arrange invalidations they trigger) land in THIS frame's layout queue. The flush is a
-/// snapshot: an expression re-dirtied during the flush (a dependent binding A→B) is applied on the NEXT frame, which
-/// bounds per-frame work and lets dependent chains converge over a few frames. Enqueue is thread-safe (a source can
-/// change on a background thread); the apply happens on the flushing (layout/UI) thread.
+/// writes (and the measure/arrange invalidations they trigger) land in THIS frame's layout queue. A dependent chain
+/// (A→B, where applying A re-dirties B) is drained WITHIN the flush, so layout never runs on a half-propagated graph -
+/// see <see cref="MaxCascadeRounds"/>. Enqueue is thread-safe (a source can change on a background thread); the apply
+/// happens on the flushing (layout/UI) thread.
 /// </remarks>
 public static class BindingUpdateQueue
 {
@@ -40,22 +40,46 @@ public static class BindingUpdateQueue
         lock (Sync) Dirty.Remove(expression);
     }
 
-    /// <summary>Applies every pending binding update once (coalesced). Called once per frame before layout.</summary>
+    /// <summary>How many times a single <see cref="Flush"/> re-drains what its own applies dirtied. Deep enough for any
+    /// real dependent chain, finite so a pair of bindings that never settle costs a few rounds a frame instead of hanging
+    /// the loop - the leftovers drain over later frames, exactly as an over-budget batch does.</summary>
+    private const int MaxCascadeRounds = 8;
+
+    /// <summary>Applies every pending binding update (coalesced), including the ones those applies dirty in turn, so the
+    /// graph is settled before layout reads it.</summary>
     public static void Flush()
+    {
+        // Draining the cascade here, rather than leaving it to the next frame, is what keeps a control whose geometry
+        // depends on TWO bound properties from being laid out with one of them still stale. A RangeSlider bound to a
+        // shared view-model got its new Maximum in this flush but the matching UpperValue - which another control's
+        // coercion had just written back to that view-model - only in the next one, so every step of the drag arranged
+        // one frame with the thumb short of the rail's end and the next frame back on it: a thumb visibly shivering at
+        // the edge. The budget still applies ACROSS the rounds, so the storm cap is unchanged.
+        var remaining = MaxAppliesPerFlush > 0 ? MaxAppliesPerFlush : int.MaxValue;
+        for (var round = 0; round < MaxCascadeRounds && remaining > 0; round++)
+        {
+            var applied = FlushOnce(remaining);
+            if (applied == 0) return;
+            remaining -= applied;
+        }
+    }
+
+    /// <summary>One coalesced pass over the currently-dirty expressions; returns how many were applied.</summary>
+    private static int FlushOnce(int budget)
     {
         lock (Sync)
         {
-            if (Dirty.Count == 0) return;
+            if (Dirty.Count == 0) return 0;
             Batch.Clear();
-            if (MaxAppliesPerFlush > 0 && Dirty.Count > MaxAppliesPerFlush)
+            if (Dirty.Count > budget)
             {
                 // Over budget: apply only the first N this flush; the rest stay dirty and drain over later frames.
                 foreach (var expression in Dirty)
                 {
                     Batch.Add(expression);
-                    if (Batch.Count >= MaxAppliesPerFlush) break;
+                    if (Batch.Count >= budget) break;
                 }
-                foreach (var expression in Batch) 
+                foreach (var expression in Batch)
                     Dirty.Remove(expression);
             }
             else
@@ -65,9 +89,11 @@ public static class BindingUpdateQueue
             }
         }
         // Apply OUTSIDE the lock: ApplyPending runs converters + SetValue and can re-enter Enqueue (dependent bindings),
-        // which would deadlock under the lock; those re-enqueues land in Dirty for the next flush.
+        // which would deadlock under the lock; those re-enqueues land in Dirty for the next round.
+        var count = Batch.Count;
         foreach (var expression in Batch)
             expression.ApplyPending();   // diagnostics counted in UpdateTarget (the actual target write), not here
         Batch.Clear();
+        return count;
     }
 }

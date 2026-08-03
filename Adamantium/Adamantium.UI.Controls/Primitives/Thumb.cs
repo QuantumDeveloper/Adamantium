@@ -93,7 +93,14 @@ public class Thumb : Control
       IsDragging = false;
    }
 
-   protected override void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+   protected override void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e) => BeginDrag(e);
+
+   /// <summary>Starts a drag from <paramref name="e"/> as though the press had landed on this thumb. For an owner that
+   /// decides a press belongs to this handle even when the hit-test missed it - a band a few pixels thick, on a rail
+   /// several times taller, is aimed at and missed constantly. Doing nothing with such a press is what makes a click
+   /// "not register"; moving the value to it instead makes the handle jump out from under the pointer. Idempotent while
+   /// the drag is live, so an owner may forward a press this thumb ALSO received without restarting anything.</summary>
+   public void BeginDrag(MouseButtonEventArgs e)
    {
       // Already dragging AND still holding capture -> ignore. If IsDragging is stale (capture was revoked externally,
       // e.g. an alt-tab, without an up reaching us) a fresh press re-starts cleanly instead of being swallowed.

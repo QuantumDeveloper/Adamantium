@@ -5,12 +5,12 @@ using Adamantium.UI.Core.RoutedEvents;
 namespace Adamantium.UI.Controls.Primitives;
 
 /// <summary>
-/// A control over a SINGLE value within a [<see cref="RangeBoundsBase.Minimum"/>, <see cref="RangeBoundsBase.Maximum"/>]
+/// A control over a SINGLE value within a [<see cref="RangeLimitsBase.Minimum"/>, <see cref="RangeLimitsBase.Maximum"/>]
 /// range - ScrollBar, Slider, ProgressBar. <see cref="Value"/> is always coerced into the range, and a Minimum/Maximum
 /// change re-coerces it. Mirrors WPF's RangeBase; the bounds themselves live one level up, shared with the controls that
 /// select a SPAN rather than a point (see <see cref="RangeSlider"/>).
 /// </summary>
-public abstract class RangeBase : RangeBoundsBase
+public abstract class RangeBase : RangeLimitsBase
 {
     public static readonly AdamantiumProperty ValueProperty = AdamantiumProperty.Register(nameof(Value),
         typeof(double), typeof(RangeBase), new PropertyMetadata(0.0, OnValueChanged, CoerceValue));
@@ -34,14 +34,10 @@ public abstract class RangeBase : RangeBoundsBase
         return value;
     }
 
-    protected override void ReCoerceSelection() => ReCoerceValue();
-
-    // A Minimum/Maximum change can pull Value out of range. Re-assign Value so the coercion clamps it again; if it was
-    // already in range the coercion returns the same value and no ValueChanged fires (guarded below). Re-set at Value's
-    // CURRENT priority, not the default Local: a Local re-coerce (Local=1) would outrank a {Binding} on Value (Binding=2)
-    // and pin a data-bound slider at its coerced Minimum, because Minimum is applied (coercing the default 0 up to Min)
-    // BEFORE the binding resolves - so the coerced default must not be promoted above the binding.
-    private void ReCoerceValue() => SetValue(ValueProperty, Value, GetBaseValuePriority(ValueProperty));
+    // A Minimum/Maximum change can pull Value out of range - or free a value that had to be clamped by the previous
+    // bounds. Re-coercion re-maps the REQUEST at its own priority, so neither happens at the cost of the other: a
+    // data-bound slider is not pinned to a coerced default, and a value clamped earlier is restored when it fits again.
+    protected override void ReCoerceSelection() => CoerceValue(ValueProperty);
 
     private static void OnValueChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
     {
