@@ -310,6 +310,15 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
     /// shared source's fan-out (no storm on a shared-property change while it sits off screen). It stays attached and
     /// pooled - NO detach, so no structural re-record - and is re-subscribed for free when reused, because the reuse sets
     /// its DataContext which runs RefreshBindings. Deactivate is O(1)-per-binding (SharedSourceRegistry).</summary>
+    /// <summary>Where item <paramref name="index"/> sits in this panel's own coordinates, whether or not it has been
+    /// realized. The point of it: something scrolling TO an item that was virtualized away has no container to aim at,
+    /// and the panel is the only one that knows where the item WOULD be. False when it cannot say.</summary>
+    public virtual bool TryGetItemRect(int index, out Rect rect)
+    {
+        rect = default;
+        return false;
+    }
+
     protected static void ParkContainer(IUIComponent container)
     {
         container.Visibility = Visibility.Collapsed;

@@ -4,14 +4,60 @@ using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Collections;
 using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
 
 namespace Adamantium.UI.Controls.Panels;
 
-public abstract class Panel: InputUIComponent, IContainer
+public abstract class Panel: InputUIComponent, IContainer, INavigablePanel
 {
    // A panel is a passive layout container - never a keyboard-focus target. That now comes for free from the
    // Focusable=false default (see InputUIComponent); no per-panel override needed.
+
+   /// <summary>Tab order is the order the children are in - the one thing EVERY panel knows about its own layout.
+   /// The arrow keys are a different question: they need to know which child is above or beside another, and that is
+   /// the layout itself, so the base answers null and each panel that has a shape overrides it.</summary>
+   public virtual IUIComponent Navigate(IUIComponent from, FocusNavigationDirection direction)
+   {
+      if (direction is not (FocusNavigationDirection.Next or FocusNavigationDirection.Previous)) return null;
+
+      return Neighbour(from, direction == FocusNavigationDirection.Next);
+   }
+
+   /// <summary>The child one step along the children's own order, or null at either end.
+   /// Over the VISUAL children, not <see cref="Children"/>: a virtualizing items host attaches its realized containers
+   /// straight to the visual tree (<c>AddVisualChild</c>), so they are not in Children at all - which is why a list
+   /// could be entered but never walked, with either the arrows or Tab. For a plain panel the two mirror each other
+   /// index for index, so nothing else changes.</summary>
+   protected IUIComponent Neighbour(IUIComponent from, bool forward)
+   {
+      IUIComponent previous = null;
+      var passed = false;
+
+      // IReadOnlyCollection, so no indexer: one pass, remembering the last one before and taking the first one after.
+      foreach (var child in VisualChildren)
+      {
+         if (ReferenceEquals(child, from)) { passed = true; continue; }
+         // Skip what is not on screen: a virtualizing panel PARKS an off-screen container (hidden, still a child) rather
+         // than detaching it, and a parked one is not somewhere the focus can go.
+         if (child.Visibility != Visibility.Visible) continue;
+
+         if (passed) return forward ? child : previous;
+         previous = child;
+      }
+
+      return passed && !forward ? previous : null;
+   }
+
+   /// <summary>Down and Right run with the children's order; Up and Left run against it.</summary>
+   protected static bool IsForward(FocusNavigationDirection direction) =>
+      direction is FocusNavigationDirection.Next or FocusNavigationDirection.Down or FocusNavigationDirection.Right;
+
+   protected static bool IsVertical(FocusNavigationDirection direction) =>
+      direction is FocusNavigationDirection.Up or FocusNavigationDirection.Down;
+
+   protected static bool IsArrow(FocusNavigationDirection direction) =>
+      direction is not (FocusNavigationDirection.Next or FocusNavigationDirection.Previous);
 
    public static readonly AdamantiumProperty BackgroundProperty = AdamantiumProperty.Register(nameof(Background),
       typeof(Brush), typeof(Panel),

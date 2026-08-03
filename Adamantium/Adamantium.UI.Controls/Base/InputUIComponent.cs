@@ -136,6 +136,10 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         RawMouseMiddleButtonUpEvent.RegisterClassHandler<IInputComponent>(new MouseButtonEventHandler(RawMouseMiddleButtonUpHandler));
 
         MouseRightButtonUpEvent.RegisterClassHandler<IInputComponent>(new MouseButtonEventHandler(OpenContextMenuHandler));
+
+        // Keyboard navigation is a static service, and a static class registers nothing until something touches it.
+        // Here is the one place guaranteed to run before any element exists.
+        KeyboardNavigation.Register();
     }
 
     // A right-click on an element with a ContextMenu (its own or an ancestor's) opens it at the cursor. The right-button-up
