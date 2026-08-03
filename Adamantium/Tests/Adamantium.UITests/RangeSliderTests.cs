@@ -83,8 +83,8 @@ public class RangeSliderTests
     public void BothKindsOfRangeControlShareTheSameBounds()
     {
         Assert.That(typeof(RangeSlider), Is.InstanceOf<object>());
-        Assert.That(typeof(RangeBoundsBase).IsAssignableFrom(typeof(RangeSlider)), Is.True);
-        Assert.That(typeof(RangeBoundsBase).IsAssignableFrom(typeof(RangeBase)), Is.True);
+        Assert.That(typeof(RangeLimitsBase).IsAssignableFrom(typeof(RangeSlider)), Is.True);
+        Assert.That(typeof(RangeLimitsBase).IsAssignableFrom(typeof(RangeBase)), Is.True);
         Assert.That(typeof(RangeBase).IsAssignableFrom(typeof(Slider)), Is.True);
         Assert.That(typeof(RangeBase).IsAssignableFrom(typeof(RingProgressBar)), Is.True);
     }

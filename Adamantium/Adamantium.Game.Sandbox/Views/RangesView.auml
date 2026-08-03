@@ -3,14 +3,21 @@
       xmlns:c="clr-namespace:Adamantium.UI.Controls;assembly=Adamantium.UI.Controls"
       xmlns:m="clr-namespace:Adamantium.UI.Core.Media;assembly=Adamantium.UI.Core">
     <!-- DataContext is the RangesViewModel. One shared Value binds a horizontal + vertical Slider, a linear ProgressBar
-         and a RingProgressBar; two dropdowns drive the ring's arc start position and sweep direction. -->
-    <StackPanel Orientation="Vertical" Margin="24">
+         and a RingProgressBar; two dropdowns drive the ring's arc start position and sweep direction.
+         Scrolls vertically only: with the horizontal bar disabled the content is measured at the viewport WIDTH, so
+         nothing here has to fit the window height for the ring section below to be reachable. -->
+    <ScrollViewer Margin="24"
+                  HorizontalScrollBarVisibility="Disabled"
+                  VerticalScrollBarVisibility="Auto">
+    <StackPanel Orientation="Vertical">
 
         <!-- Section 1: one shared value across a horizontal + vertical Slider and a linear ProgressBar. -->
         <TextBlock Text="One value, many controls" FontSize="18" Margin="0,0,0,10"/>
         <StackPanel Orientation="Horizontal">
             <Slider Width="300"
                     Value="{Binding Value, Mode=TwoWay}"
+                    TickFrequency="1"
+                    IsSnapToTickEnabled="true"
                     Maximum="{Binding Maximum}"
                     IsValueToolTipEnabled="true"
                     IsMoveToPointEnabled="true"/>
@@ -31,14 +38,17 @@
                          Minimum="0" Maximum="{Binding Maximum}"
                          MinimumRangeWidth="16"
                          BandThickness="8"
-                         TickFrequency="1" IsSnapToTickEnabled="true"
+                         TickFrequency="1" 
+                         IsSnapToTickEnabled="true"
                          IsValueToolTipEnabled="true"
                          LowerValue="{Binding SpanStart, Mode=TwoWay}"
                          UpperValue="{Binding SpanEnd, Mode=TwoWay}"/>
             <RangeSlider Width="300"
-                         Minimum="0" Maximum="{Binding Maximum}"
+                         Minimum="0" 
+                         Maximum="{Binding Maximum}"
                          MinimumRangeWidth="16"
-                         TickFrequency="1" IsSnapToTickEnabled="true"
+                         TickFrequency="1" 
+                         IsSnapToTickEnabled="true"
                          IsValueToolTipEnabled="true"
                          LowerValue="{Binding SpanStart, Mode=TwoWay}"
                          UpperValue="{Binding SpanEnd, Mode=TwoWay}"
@@ -53,11 +63,19 @@
                     Height="170"
                     Value="{Binding Value, Mode=TwoWay}"
                     Maximum="{Binding Maximum}"
+                    TickFrequency="1"
+                    IsSnapToTickEnabled="true"
                     IsValueToolTipEnabled="true"/>
             <StackPanel Orientation="Vertical" Margin="28,0,0,0">
                 <TextBlock Text="Maximum (rescales all of the above):"/>
-                <Slider Width="240" Value="{Binding Maximum, Mode=TwoWay}" Minimum="10" Maximum="200" IsValueToolTipEnabled="true"/>
-                <Button Content="Reset value" Command="{Binding ResetCommand}" Width="130" Height="34"/>
+                <Slider Width="240" 
+                        Value="{Binding Maximum, Mode=TwoWay}" 
+                        Minimum="10" 
+                        Maximum="200" 
+                        TickFrequency="1"
+                        IsSnapToTickEnabled="true"
+                        IsValueToolTipEnabled="true"/>
+                <Button Content="Reset all" Command="{Binding ResetCommand}" Width="130" Height="34"/>
             </StackPanel>
         </StackPanel>
 
@@ -83,4 +101,5 @@
             </StackPanel>
         </StackPanel>
     </StackPanel>
+    </ScrollViewer>
 </View>

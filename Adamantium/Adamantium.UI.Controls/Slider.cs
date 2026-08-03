@@ -113,6 +113,7 @@ public class Slider : RangeBase
             if (_track.IncreaseRepeatButton != null) _track.IncreaseRepeatButton.Click += OnIncrease;
             if (_track.DecreaseRepeatButton != null) _track.DecreaseRepeatButton.Click += OnDecrease;
         }
+        SyncTrack();
         UpdateFill();
     }
 
@@ -191,25 +192,33 @@ public class Slider : RangeBase
     // Setting Width carries AffectsRender, so it repaints live - a part sized only by the Track's arrange would not.
     protected override void OnValueChanged(double oldValue, double newValue)
     {
-        // Drive the thumb IN LOCKSTEP with the fill. The fill is set synchronously below, but the thumb is positioned by
-        // the Track's arrange off Track.Value - a (batched, next-frame) TemplateBinding to our Value - so without this the
-        // thumb lags the fill by a frame on every change (the visible thumb/fill desync while dragging). Push the value to
-        // the Track now at Binding priority (the same slot the TemplateBinding writes, so it neither masks the binding nor
-        // is masked by it), then re-arrange the Track this frame so the thumb moves together with the fill.
-        if (_track != null)
-        {
-            _track.SetValue(Track.ValueProperty, newValue, ValuePriority.Binding);
-            ForceArrangeTrack();
-        }
+        SyncTrack();
         UpdateFill();
         ForceArrangeFill();
+    }
+
+    // Drive the thumb IN LOCKSTEP with the fill. The Track positions the thumb from ITS OWN copy of the range and value,
+    // which arrives by {TemplateBinding} - batched, so a frame late - while the fill is recomputed synchronously; that
+    // frame apart IS the visible thumb/fill desync, on a value drag and on anything that moves the bounds. Write those
+    // copies now at Binding priority (the same slot the TemplateBinding writes, so it neither masks the binding nor is
+    // masked by it) and re-arrange the Track this frame. Also run when the parts first arrive, so a template that does
+    // not declare those bindings at all does not start with its thumb pinned at the minimum.
+    private void SyncTrack()
+    {
+        if (_track == null) return;
+
+        _track.SetValue(Track.MinimumProperty, Minimum, ValuePriority.Binding);
+        _track.SetValue(Track.MaximumProperty, Maximum, ValuePriority.Binding);
+        _track.SetValue(Track.ValueProperty, Value, ValuePriority.Binding);
+        ForceArrangeTrack();
     }
 
     // A Minimum/Maximum change rescales the fill even when Value is unchanged (a second slider that shares Value while
     // this one drives Maximum): the fraction (Value-Min)/(Max-Min) moved, so recompute the accent fill. The thumb already
     // re-positions via the Track's Minimum/Maximum TemplateBindings (AffectsArrange); the fill has no such path.
-    protected override void OnRangeBoundsChanged()
+    protected override void OnLimitsChanged()
     {
+        SyncTrack();
         UpdateFill();
         ForceArrangeFill();
     }
@@ -248,10 +257,20 @@ public class Slider : RangeBase
             : trackLength ?? _track.ActualHeight;
         if (full <= 0) return;
 
+        // The fill ends AT THE THUMB, so its length is the thumb's own position - asked of the Track, which is what puts
+        // the thumb there. Projecting the fraction onto the full length instead (the obvious second derivation) put the
+        // fill half a thumb short of the handle at the minimum and half a thumb past it at the maximum, drifting one way
+        // then the other as the value crossed the middle. Before the track's first arrange there is no such position yet,
+        // so the fraction still seeds it.
+        var centre = _track.ThumbCentreFromFraction(fraction);
+        var length = double.IsNaN(centre)
+            ? fraction * full
+            : Orientation == Orientation.Horizontal ? centre : full - centre;
+
         if (Orientation == Orientation.Horizontal)
-            SetIfChanged(WidthProperty, fraction * full, _selectionRange.Width);
+            SetIfChanged(WidthProperty, length, _selectionRange.Width);
         else
-            SetIfChanged(HeightProperty, fraction * full, _selectionRange.Height);
+            SetIfChanged(HeightProperty, length, _selectionRange.Height);
     }
 
     // The fill's length comes from the arrange-time track size, but a part is arranged by its parent at its DESIRED size,

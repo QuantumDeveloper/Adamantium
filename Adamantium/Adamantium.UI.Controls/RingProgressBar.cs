@@ -100,7 +100,7 @@ public class RingProgressBar : RangeBase
     protected override void OnValueChanged(double oldValue, double newValue) => UpdateIndicator();
 
     // A pure range rescale (Minimum/Maximum) shifts Percentage even when Value is unchanged - OnValueChanged alone misses it.
-    protected override void OnRangeBoundsChanged() => UpdateIndicator();
+    protected override void OnLimitsChanged() => UpdateIndicator();
 
     private static void OnStartPositionChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
     {

@@ -18,6 +18,7 @@ public class RangeTrack : Panel
     private double _density;      // value units per pixel of travel
     private double _remaining;    // pixels a thumb can travel
     private double _thumbAlong;   // thumb size along the track
+    private double _trackLength;  // the trough along the track; mirrors a point when the direction is reversed
 
     public static readonly AdamantiumProperty OrientationProperty = AdamantiumProperty.Register(nameof(Orientation),
         typeof(Orientation), typeof(RangeTrack),
@@ -41,6 +42,13 @@ public class RangeTrack : Panel
     public static readonly AdamantiumProperty MinimumBandLengthProperty = AdamantiumProperty.Register(
         nameof(MinimumBandLength), typeof(double), typeof(RangeTrack),
         new PropertyMetadata(0.0, PropertyMetadataOptions.AffectsArrange));
+
+    /// <summary>Flips the value→position mapping along the track, exactly as <see cref="Track.IsDirectionReversed"/> does
+    /// for a single thumb. Default false = Minimum at the start (top/left); a vertical range slider sets it so the span
+    /// grows UPWARD, which is what a vertical slider of any kind is expected to do.</summary>
+    public static readonly AdamantiumProperty IsDirectionReversedProperty = AdamantiumProperty.Register(
+        nameof(IsDirectionReversed), typeof(bool), typeof(RangeTrack),
+        new PropertyMetadata(false, PropertyMetadataOptions.AffectsArrange));
 
     public static readonly AdamantiumProperty LowerThumbProperty = AdamantiumProperty.Register(nameof(LowerThumb),
         typeof(Thumb), typeof(RangeTrack), new PropertyMetadata(null, OnPartChanged));
@@ -87,6 +95,12 @@ public class RangeTrack : Panel
     {
         get => GetValue<double>(MinimumBandLengthProperty);
         set => SetValue(MinimumBandLengthProperty, value);
+    }
+
+    public bool IsDirectionReversed
+    {
+        get => GetValue<bool>(IsDirectionReversedProperty);
+        set => SetValue(IsDirectionReversedProperty, value);
     }
 
     public Thumb LowerThumb
@@ -146,6 +160,7 @@ public class RangeTrack : Panel
         _density = travel > 0 && range > 0 ? range / travel : 0;
         _remaining = travel;
         _thumbAlong = thumbAlong;
+        _trackLength = trackLength;
 
         var lowerOffset = range > 0 ? Math.Clamp((LowerValue - Minimum) / range, 0, 1) * travel : 0;
         var upperOffset = range > 0 ? Math.Clamp((UpperValue - Minimum) / range, 0, 1) * travel : travel;
@@ -160,6 +175,16 @@ public class RangeTrack : Panel
         // can never mean grabbing an end thumb.
         var bandStart = lowerStart + thumbAlong;
         var bandLength = Math.Max(0, upperStart - bandStart);
+
+        // Reversed (a vertical range slider): mirror the finished layout about the middle of the trough rather than
+        // deriving a second set of positions. Reflecting all three parts together keeps the band between the thumbs by
+        // construction - the one relationship a second derivation would have to re-establish, and could get wrong.
+        if (vertical && IsDirectionReversed)
+        {
+            lowerStart = trackLength - lowerStart - thumbAlong;
+            upperStart = trackLength - upperStart - thumbAlong;
+            bandStart = trackLength - bandStart - bandLength;
+        }
 
         var crossOffset = Math.Max(0, (thickness - thumbCross) / 2);
 
@@ -187,8 +212,12 @@ public class RangeTrack : Panel
     }
 
     /// <summary>Converts a thumb-drag delta (device pixels) into the change it makes to a value.</summary>
-    public double ValueFromDistance(double horizontal, double vertical) =>
-        (Orientation == Orientation.Vertical ? vertical : horizontal) * _density;
+    public double ValueFromDistance(double horizontal, double vertical)
+    {
+        if (Orientation != Orientation.Vertical) return horizontal * _density;
+        // Reversed: the values grow upward, so dragging DOWN moves toward the minimum.
+        return (IsDirectionReversed ? -vertical : vertical) * _density;
+    }
 
     /// <summary>The LOWER bound whose thumb would be centred on <paramref name="point"/> (track-local space).</summary>
     public double LowerValueFromPoint(Vector2 point) => ValueFromPoint(point, 0);
@@ -203,6 +232,9 @@ public class RangeTrack : Panel
         if (_remaining <= 0) return Minimum;
 
         var pos = Orientation == Orientation.Vertical ? point.Y : point.X;
+        // Mirror the POINT, for the same reason the layout mirrors its rects: the lead-ins then still describe what lies
+        // before each thumb, so both mappings stay the ones the arrange above actually produced.
+        if (Orientation == Orientation.Vertical && IsDirectionReversed) pos = _trackLength - pos;
         var along = Math.Clamp(pos - leadIn - _thumbAlong / 2, 0, _remaining);
         return Minimum + along * _density;
     }

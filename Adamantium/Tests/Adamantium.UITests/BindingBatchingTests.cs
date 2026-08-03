@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
+using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core.Data;
 using NUnit.Framework;
@@ -115,5 +116,61 @@ public class BindingBatchingTests
             Assert.That(targets.All(t => t.Text == "changed"), Is.True, "the over-budget remainder drains over subsequent flushes");
         }
         finally { BindingUpdateQueue.MaxAppliesPerFlush = savedCap; }
+    }
+
+    private sealed class SpanVm : INotifyPropertyChanged
+    {
+        private double _max = 100;
+        private double _end = 100;
+
+        public double Max
+        {
+            get => _max;
+            set { if (_max == value) return; _max = value; Raise(nameof(Max)); }
+        }
+
+        public double End
+        {
+            get => _end;
+            set { if (_end == value) return; _end = value; Raise(nameof(End)); }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private void Raise(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
+
+    /// <summary>
+    /// A dependent chain has to settle INSIDE one flush, because layout runs immediately after it. Two controls share one
+    /// view-model property here: the first clamps the value it is handed and writes the result back, which is a source
+    /// change for the second. Applying that only on the next frame laid the second control out with its new ceiling and
+    /// its old value - one frame short of the end of the rail, the next frame back on it, which is a thumb that visibly
+    /// shivers at the edge for as long as the ceiling is being dragged.
+    /// </summary>
+    [Test]
+    public void ADependentChain_SettlesWithinOneFlush()
+    {
+        var vm = new SpanVm();
+
+        // The first slider follows the ceiling, clamps its end against it, and publishes the clamped end.
+        var first = new RangeSlider { DataContext = vm, Minimum = 0 };
+        first.SetBinding("Maximum", new Binding("Max"));
+        first.SetBinding("UpperValue", new Binding("End") { Mode = BindingMode.TwoWay });
+
+        // The second only reads that end. Its OWN ceiling is fixed, so nothing local can move its value: the new end can
+        // reach it only through the view-model - which is exactly the second link of the chain.
+        var second = new RangeSlider { DataContext = vm, Minimum = 0, Maximum = 100 };
+        second.SetBinding("UpperValue", new Binding("End"));
+        BindingUpdateQueue.Flush();
+        Assert.That(second.UpperValue, Is.EqualTo(100), "both start at the view-model's end");
+
+        // One flush, two links: the ceiling reaches the first slider, whose clamp writes the end back, which must reach
+        // the second before layout runs on it.
+        vm.Max = 40;
+        BindingUpdateQueue.Flush();
+
+        Assert.That(first.UpperValue, Is.EqualTo(40), "the first slider clamped its end to the new ceiling");
+        Assert.That(second.UpperValue, Is.EqualTo(40),
+            "and the second must not be laid out a frame behind the value that clamp published");
     }
 }

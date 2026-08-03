@@ -20,14 +20,11 @@ namespace Adamantium.UI.Controls;
 /// an inverted range at all: the bounds coerce against each other, keeping at least <see cref="MinimumRange"/> between
 /// them. Interaction lives here; the geometry is <see cref="RangeTrack"/>, exactly as Slider leaves it to Track.
 /// </summary>
-public class RangeSlider : RangeBoundsBase
+public class RangeSlider : RangeLimitsBase
 {
     private RangeTrack _track;
     private double _dragStartLower;
     private double _dragStartUpper;
-    private bool _coercing;
-    private double _requestedLower;   // what was asked for, before the other bound coerced it
-    private double _requestedUpper = 1.0;
     private Popup _lowerBadge, _upperBadge;            // value badges over the thumbs while dragging (opt-in)
     private TextBlock _lowerBadgeText, _upperBadgeText;
 
@@ -47,7 +44,7 @@ public class RangeSlider : RangeBoundsBase
     /// Purely visual: it never touches the values, so the two bounds may still meet on one number (55..55 is a legitimate
     /// selection) - the thumbs simply keep a grabbable gap between them at that point.</summary>
     public static readonly AdamantiumProperty MinimumRangeWidthProperty = AdamantiumProperty.Register(
-        nameof(MinimumRangeWidth), typeof(double), typeof(RangeSlider), new PropertyMetadata(12.0, OnMinimumRangeWidthChanged));
+        nameof(MinimumRangeWidth), typeof(double), typeof(RangeSlider), new PropertyMetadata(12.0));
 
     public static readonly AdamantiumProperty OrientationProperty = AdamantiumProperty.Register(nameof(Orientation),
         typeof(Orientation), typeof(RangeSlider),
@@ -130,15 +127,11 @@ public class RangeSlider : RangeBoundsBase
         set => SetValue(IsSnapToTickEnabledProperty, value);
     }
 
+    // Each bound is clamped against the other. The request itself is kept by the property system, so a bound that had to
+    // be clamped while the other was still elsewhere is restored by re-coercion once there is room - see CoerceValue.
     private static object CoerceLowerValue(AdamantiumComponent a, object value)
     {
         if (a is not RangeSlider slider || value is not double lower) return value;
-
-        // Remember what was ASKED for, before the other bound has its say. Bindings arrive one at a time: LowerValue=20
-        // can land while UpperValue is still its default 1, and squeezing 20 down to 1 would be the end of it - the 20 is
-        // gone, so when UpperValue=70 arrives a moment later there is nothing left to restore. Re-coercion works from
-        // this request, not from the squeezed result.
-        slider._requestedLower = lower;
 
         var ceiling = slider.UpperValue - slider.MinimumRange;
         return Math.Clamp(lower, slider.Minimum, Math.Max(slider.Minimum, ceiling));
@@ -148,8 +141,6 @@ public class RangeSlider : RangeBoundsBase
     {
         if (a is not RangeSlider slider || value is not double upper) return value;
 
-        slider._requestedUpper = upper;
-
         var floor = slider.LowerValue + slider.MinimumRange;
         return Math.Clamp(upper, Math.Min(slider.Maximum, floor), slider.Maximum);
     }
@@ -157,54 +148,24 @@ public class RangeSlider : RangeBoundsBase
     // Widening the gap the bounds must keep can invalidate both of them, exactly like moving Minimum/Maximum does.
     private static void OnMinimumRangeChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
-        if (a is not RangeSlider slider) return;
-
-        slider.ReCoerceSelection();
-        slider.PushToTrack();
-    }
-
-    // The screen-only minimum: nothing to coerce, the track just lays the band out no thinner than this.
-    private static void OnMinimumRangeWidthChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
-    {
-        if (a is RangeSlider slider) slider.PushToTrack();
+        (a as RangeSlider)?.ReCoerceSelection();
     }
 
     // Minimum/Maximum moved: both bounds may now be outside, so re-run both coercions (the base calls this).
     protected override void ReCoerceSelection()
     {
-        Recoerce(LowerValueProperty);
-        Recoerce(UpperValueProperty);
+        CoerceValue(LowerValueProperty);
+        CoerceValue(UpperValueProperty);
     }
-
-    protected override void OnRangeBoundsChanged() => PushToTrack();
 
     private static void OnValueChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
         if (a is not RangeSlider slider) return;
 
-
-        // The other end may now be illegal - the pair is only ever valid together.
-        slider.Recoerce(e.Property == LowerValueProperty ? UpperValueProperty : LowerValueProperty);
-        slider.PushToTrack();
+        // The other end may now be illegal - the pair is only ever valid together. Re-coercion settles because a bound
+        // that does not move announces nothing, so the exchange stops after one round.
+        slider.CoerceValue(e.Property == LowerValueProperty ? UpperValueProperty : LowerValueProperty);
         slider.RangeChanged?.Invoke(slider, EventArgs.Empty);
-    }
-
-    // Re-runs a bound through its coercion from what was REQUESTED for it, so a value that had to be squeezed while the
-    // other end was still at its default comes back once there is room. The guard is what keeps the pair from
-    // ping-ponging: each end re-coerces the other, so without it a legal write would bounce between them.
-    private void Recoerce(AdamantiumProperty property)
-    {
-        if (_coercing) return;
-
-        _coercing = true;
-        try
-        {
-            SetCurrentValue(property, property == LowerValueProperty ? _requestedLower : _requestedUpper);
-        }
-        finally
-        {
-            _coercing = false;
-        }
     }
 
     public override void OnApplyTemplate()
@@ -215,8 +176,6 @@ public class RangeSlider : RangeBoundsBase
         _track = GetTemplateChild("PART_Track") as RangeTrack;
         if (_track != null)
         {
-            // The pixel minimum only becomes a value once the track has a size, and it changes with every resize.
-            _track.SizeChanged += OnTrackSizeChanged;
             if (_track.LowerThumb != null)
             {
                 _track.LowerThumb.DragStarted += OnThumbDragStarted;
@@ -236,21 +195,11 @@ public class RangeSlider : RangeBoundsBase
                 _track.CenterThumb.DragCompleted += OnCenterDragCompleted;
             }
         }
-
-        PushToTrack();
-    }
-
-    private void OnTrackSizeChanged(object sender, SizeChangedEventArgs e)
-    {
-        ReCoerceSelection();
-        PushToTrack();
     }
 
     private void DetachParts()
     {
         if (_track == null) return;
-
-        _track.SizeChanged -= OnTrackSizeChanged;
 
         if (_track.LowerThumb != null)
         {
@@ -370,13 +319,17 @@ public class RangeSlider : RangeBoundsBase
         var vertical = Orientation == Orientation.Vertical;
         var pos = vertical ? point.Y : point.X;
 
-        // Occupancy is judged ALONG the track only. Testing the full rectangle meant a press a couple of pixels above or
-        // below the band - which is thin, on a rail several times its thickness - counted as empty trough, and the
-        // nearest bound jumped to the pointer just as the band was being grabbed.
-        if (CoversAlong(_track.LowerThumb, pos, vertical)
-            || CoversAlong(_track.UpperThumb, pos, vertical)
-            || CoversAlong(_track.CenterThumb, pos, vertical))
+        // Occupancy is judged ALONG the track only, and a press that lands on a handle's span GRABS that handle - from
+        // wherever it landed across the rail. The band is a few pixels thick on a rail several times taller, so aiming at
+        // it lands beside it about as often as on it; measured, the misses were one to three pixels below a six-pixel
+        // band. Judging along the track and then merely returning is what made those presses do nothing at all, and
+        // moving the nearest bound to them instead - what this did before - made a handle jump out from under the
+        // pointer. Forwarding is a no-op when the thumb took the press itself (BeginDrag is idempotent while it holds
+        // capture), which it does whenever the aim was true.
+        var handle = CoveringHandle(pos, vertical);
+        if (handle != null)
         {
+            handle.BeginDrag(e);
             return;
         }
 
@@ -401,6 +354,15 @@ public class RangeSlider : RangeBoundsBase
         if (thumb == null) return 0;
         var bounds = thumb.Bounds;
         return vertical ? bounds.Y + bounds.Height / 2 : bounds.X + bounds.Width / 2;
+    }
+
+    // Which handle owns this position along the track, if any. The three never overlap along it, so at most one answers.
+    private Thumb CoveringHandle(double pos, bool vertical)
+    {
+        if (CoversAlong(_track.CenterThumb, pos, vertical)) return _track.CenterThumb;
+        if (CoversAlong(_track.LowerThumb, pos, vertical)) return _track.LowerThumb;
+        if (CoversAlong(_track.UpperThumb, pos, vertical)) return _track.UpperThumb;
+        return null;
     }
 
     // Does this part span the position ALONG the track? (Across it, anywhere on the rail counts as the same place.)
@@ -491,15 +453,4 @@ public class RangeSlider : RangeBoundsBase
         return Math.Clamp(Minimum + steps * TickFrequency, Minimum, Maximum);
     }
 
-    private void PushToTrack()
-    {
-        if (_track == null) return;
-
-        _track.Orientation = Orientation;
-        _track.Minimum = Minimum;
-        _track.Maximum = Maximum;
-        _track.LowerValue = LowerValue;
-        _track.UpperValue = UpperValue;
-        _track.MinimumBandLength = MinimumRangeWidth;
-    }
 }

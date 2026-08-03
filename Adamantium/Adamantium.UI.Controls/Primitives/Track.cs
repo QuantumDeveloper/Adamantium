@@ -200,6 +200,22 @@ public class Track : Panel
         return finalSize;
     }
 
+    /// <summary>Where the CENTRE of the thumb sits for a fraction of the range, in pixels from the start of the track -
+    /// the same mapping <see cref="ArrangeOverride"/> uses. Anything that has to line up with the thumb (a Slider's accent
+    /// fill) must read it from here rather than project the fraction itself: the thumb travels the trough MINUS its own
+    /// length, so a second projection onto the FULL length drifts by half a thumb at either end - short of the thumb at
+    /// the minimum, past it at the maximum, agreeing only in the middle. The FRACTION is the caller's, deliberately: the
+    /// value-to-fraction step belongs to whoever owns the range, and taking a value here would answer from this track's
+    /// own copy of Minimum/Maximum instead. NaN before the first arrange, when there is no geometry to answer with.</summary>
+    public double ThumbCentreFromFraction(double fraction)
+    {
+        if (_remaining <= 0) return double.NaN;
+
+        var along = Math.Clamp(fraction, 0, 1) * _remaining;
+        if (Orientation == Orientation.Vertical && IsDirectionReversed) along = _remaining - along;
+        return along + _thumbAlong / 2;
+    }
+
     /// <summary>Converts a thumb-drag delta (in device pixels) into the corresponding change in <see cref="Value"/>.</summary>
     public double ValueFromDistance(double horizontal, double vertical)
     {

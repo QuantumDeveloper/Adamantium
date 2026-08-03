@@ -82,6 +82,9 @@
             <Setter TargetName="Rail" Property="VerticalAlignment" Value="Stretch"/>
             <Setter TargetName="SelectedBand" Property="Width" Value="{TemplateBinding BandThickness}"/>
             <Setter TargetName="SelectedBand" Property="Height" Value="Auto"/>
+            <!-- Minimum at the BOTTOM, the span grows UP - what every vertical slider does. The track defaults to
+                 top=min (the scrollbar convention), so a vertical one has to opt into the reversal. -->
+            <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="true"/>
         </PropertyTrigger>
     </Style>
 

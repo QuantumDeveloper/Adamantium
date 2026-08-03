@@ -39,26 +39,23 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
                 throw new ArgumentException($"Value {metadata} is incorrect!");
             }
 
-            if (metadata.CoerceValueCallback != null)
-            {
-                var coercedValue = metadata.CoerceValueCallback?.Invoke(this, metadata.DefaultValue);
-                if (coercedValue != metadata)
-                {
-                    if (property.ValidateValueCallBack?.Invoke(coercedValue) == false)
-                    {
-                        throw new ArgumentException($"Value {coercedValue} is incorrect!");
-                    }
-
-                    metadata.DefaultValue = coercedValue;
-                }
-            }
+            // The default is NOT coerced here. Coercion answers "given this object's current state, what does that
+            // request become", so running it during construction asks a half-built object - and the result used to be
+            // written back into metadata.DefaultValue, which belongs to the TYPE: one instance's state would have
+            // decided the default for every other instance of it, for the life of the process. A default stands as
+            // authored until something is actually set, and from then on the coercion runs on every write.
 
             if (!values.ContainsKey(property))
             {
                 values[property] = new ValueContainer();
             }
 
-            values[property].SetValue(metadata.DefaultValue, ValuePriority.Default);
+            // Seed the slot AND publish it as the effective value. Publishing is a separate step now that the container
+            // keeps the request and the coerced result apart - and it matters from the very first read: a property whose
+            // effective value is still "unset" hands callbacks that sentinel instead of its default, and code comparing
+            // the old value against it sees a type it cannot use (an implicit transition, for one, refuses to animate
+            // from it). The default is published as authored; the first write is what runs the coercion.
+            values[property].SetEffective(values[property].SetValue(metadata.DefaultValue, ValuePriority.Default));
             if (metadata.DefaultValue != null)
             {
                 var e = new AdamantiumPropertyChangedEventArgs(property, AdamantiumProperty.UnsetValue,
@@ -518,6 +515,45 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         return container.Effective;
     }
 
+    /// <summary>
+    /// Re-runs <paramref name="property"/>'s coercion. Use it from a property whose value the coercion DEPENDS ON: the
+    /// dependency just moved, so what was legal before may not be now - or, just as important, what had to be clamped
+    /// before may be legal again. The request is re-mapped, never rewritten, so a value clamped while its dependency was
+    /// still elsewhere comes back the moment there is room for it (WPF's DependencyObject.CoerceValue).
+    /// </summary>
+    public void CoerceValue(AdamantiumProperty property)
+    {
+        var slots = Slots(property);
+        if (slots == null) return;
+
+        object baseValue;
+        lock (slots)
+        {
+            baseValue = slots.BaseValue;
+        }
+
+        if (baseValue == AdamantiumProperty.UnsetValue) return;   // nothing was ever asked for - nothing to re-map
+
+        // Through the normal write path with the SAME request at the SAME priority: the coercion runs again and, if the
+        // result differs, the change is announced exactly as any other would be. Re-coercing to the same value ends
+        // there (the equal-effective early-return), which is what stops two properties that coerce against each other
+        // from bouncing.
+        RunSetValueSequence(property, baseValue, GetBaseValuePriority(property), true);
+    }
+
+    private object Coerce(AdamantiumProperty property, PropertyMetadata metadata, object baseValue)
+    {
+        if (metadata.CoerceValueCallback == null) return baseValue;
+
+        var coerced = metadata.CoerceValueCallback.Invoke(this, baseValue);
+        if (!Equals(coerced, baseValue) && property.ValidateValueCallBack?.Invoke(coerced) == false)
+        {
+            throw new ArgumentException($"Value {coerced} is incorrect!");
+        }
+
+        return coerced;
+    }
+
     private void RunSetValueSequence(AdamantiumProperty property, object value, ValuePriority priority, bool raiseValueChangedEvent)
     {
         var metadata = property.GetDefaultMetadata(GetType());
@@ -526,21 +562,7 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             throw new ArgumentException($"Value {value} is incorrect!");
         }
 
-        if (metadata.CoerceValueCallback != null)
-        {
-            var newValue = metadata.CoerceValueCallback?.Invoke(this, value);
-            if (newValue != value)
-            {
-                if (property.ValidateValueCallBack?.Invoke(value) == false)
-                {
-                    throw new ArgumentException($"Value {value} is incorrect!");
-                }
-            }
-
-            value = newValue;
-        }
-
-        // The ONLY part that needs the lock: read the old effective value, write the slot, read the new one. Everything
+        // The ONLY part that needs the lock: read the old effective value, write the slot, coerce, publish. Everything
         // after this block is notification, and notification must not hold a lock (see SetValue).
         object oldEffectiveValue;
         object slotBefore;
@@ -549,17 +571,24 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         if (slots == null) return;
 
         // The lock is on the CONTAINER, not on the whole value store: two properties of one component never contend,
-        // and READERS take no lock at all. It covers only the read-modify-read of these slots - no callback, no
-        // invalidation, nothing that could go looking for another lock.
+        // and READERS take no lock at all. It covers only the read-modify-write of these slots - no invalidation and
+        // nothing that could go looking for another lock. The coercion inside it only READS (of this or another
+        // property, and reads are lock-free), which is what makes it safe to run here.
         lock (slots)
         {
             oldEffectiveValue = slots.Effective;
             slotBefore = slots.GetValue(priority);
-            slots.SetValue(value, priority);
-            effectiveAfterWrite = slots.Effective;
+            // The slot keeps the REQUEST; coercion maps it to what the property actually reads as. Storing the coerced
+            // value instead would throw the request away, and with it any chance of mapping it again later when whatever
+            // the coercion depends on has moved (see ValueContainer.BaseValue and CoerceValue).
+            var baseValue = slots.SetValue(value, priority);
+            effectiveAfterWrite = Coerce(property, metadata, baseValue);
+            slots.SetEffective(effectiveAfterWrite);
         }
 
-        var args = new AdamantiumPropertyChangedEventArgs(property, slotBefore, value);
+        // The change is reported as the value the property now READS as - the coerced one. A callback that reacted to
+        // the raw request would be looking at a value the property never had.
+        var args = new AdamantiumPropertyChangedEventArgs(property, slotBefore, effectiveAfterWrite);
 
         // A write that leaves the EFFECTIVE value where it was is not a change, so it must not run the changed-callback.
         // Running it anyway is how two properties that assign each other close a cycle with no exit: a presenter whose
