@@ -5,6 +5,7 @@ using Adamantium.UI.Controls.Adorners;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Rendering;
+using Adamantium.Vulkan.Core;
 
 namespace Adamantium.UI.EntityServices;
 
@@ -51,6 +52,7 @@ public class AdornerRenderProcessor : EntityProcessor<WindowRenderService>
             LayoutFrameAdorner(adorner);
             Flatten(adorner, _flat);
         }
+
         _cache.BuildFromComponents(_flat, projection);
         _cache.ProcessCommands(projection, AssociatedService.RenderScale);
         _cache.PreRender();
@@ -63,12 +65,14 @@ public class AdornerRenderProcessor : EntityProcessor<WindowRenderService>
     // for it, Template stays null and the adorner falls back to its own OnRender - so the designer frames never disappear.
     private static void LayoutFrameAdorner(IUIComponent adorner)
     {
-        if (adorner is not Adorner a || !a.FillsAdornedBounds || a.AdornedElement == null) return;
+        if (adorner is not Adorner a || !a.FillsAdornedBounds || a.AdornedElement == null)
+            return;
 
         if (!a.ThemeApplied)
         {
             a.ThemeApplied = true;
-            if (UIApplication.Current?.ThemeManager is { CurrentTheme: { } theme } manager) manager.ApplyTheme(theme, a);
+            if (UIApplication.Current?.ThemeManager is { CurrentTheme: { } theme } manager)
+                manager.ApplyTheme(theme, a);
         }
 
         if (a.Template != null)
@@ -81,10 +85,33 @@ public class AdornerRenderProcessor : EntityProcessor<WindowRenderService>
 
     private static void Flatten(IUIComponent component, List<IUIComponent> list)
     {
-        if (component == null || component.Visibility != Visibility.Visible) return;
+        if (component == null || component.Visibility != Visibility.Visible)
+            return;
+
         list.Add(component);
-        foreach (var child in component.VisualChildren) Flatten(child, list);
+        foreach (var child in component.VisualChildren)
+            Flatten(child, list);
     }
 
-    public override void Draw(AppTime gameTime) => _cache?.Render();
+    /// <summary>Draws the overlay WITH the device and a full-window scissor - the same way the popup stage does.
+    /// <para>The parameterless <c>Render()</c> is the GPU-FREE overload (device null): it starts none of the batch
+    /// collectors, so everything that draws through a batch - which is every themed Border, i.e. the whole focus ring -
+    /// was silently dropped. Measured: the ring was built, themed, sized and positioned correctly every frame and put
+    /// not one pixel on the screen. The designer and the offscreen tests always passed a device, which is why the stage
+    /// looked healthy everywhere except in a running application.</para></summary>
+    public override void Draw(AppTime gameTime)
+    {
+        if (_cache == null)
+            return;
+
+        var window = AssociatedService.Window;
+        var scale = AssociatedService.RenderScale;
+        var scissor = new Rect2D
+        {
+            Offset = new Offset2D(),
+            Extent = new Extent2D { Width = (uint)(window.ClientWidth * scale), Height = (uint)(window.ClientHeight * scale) }
+        };
+        AssociatedService.GraphicsDevice.SetScissors(scissor);
+        _cache.Render(AssociatedService.GraphicsDevice, scissor);
+    }
 }

@@ -1,4 +1,6 @@
+using System.Linq;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Controls.Adorners;
 using Adamantium.UI.Controls.Buttons;
 using Adamantium.UI.Controls.Decorators;
 using Adamantium.UI.Controls.Text;
@@ -123,6 +125,83 @@ public class KeyboardNavigationTests
         KeyboardNavigation.Move(FocusNavigationDirection.Next);
 
         Assert.That(FocusManager.Focused, Is.SameAs(c));
+    }
+
+    /// <summary>An explicit tab order beats the order the controls stand in - which is the point of having one: the
+    /// layout that reads best is often not the order a form should be filled in.</summary>
+    [Test]
+    public void TabIndexDecidesTheOrder()
+    {
+        var a = NewButton("a");
+        var b = NewButton("b");
+        var c = NewButton("c");
+        KeyboardNavigation.SetTabIndex(a, 3);
+        KeyboardNavigation.SetTabIndex(b, 1);
+        KeyboardNavigation.SetTabIndex(c, 2);
+
+        var stack = new StackPanel();
+        stack.Children.Add(a);
+        stack.Children.Add(b);
+        stack.Children.Add(c);
+        Root(stack);
+
+        FocusManager.Focus(b);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Next), Is.True);
+            Assert.That(FocusManager.Focused, Is.SameAs(c), "1 -> 2");
+            Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Next), Is.True);
+            Assert.That(FocusManager.Focused, Is.SameAs(a), "2 -> 3");
+        });
+    }
+
+    /// <summary>Numbering ONE control must not renumber the rest: everything left alone keeps the order it stands in,
+    /// and simply comes after. Otherwise an explicit index would mean numbering every control on the form.</summary>
+    [Test]
+    public void UnnumberedControlsKeepTheirOwnOrder()
+    {
+        var first = NewButton("first");
+        var a = NewButton("a");
+        var b = NewButton("b");
+        KeyboardNavigation.SetTabIndex(first, 0);   // only this one is asked for
+
+        var stack = new StackPanel();
+        stack.Children.Add(a);
+        stack.Children.Add(b);
+        stack.Children.Add(first);
+        Root(stack);
+
+        FocusManager.Focus(first);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Next), Is.True);
+            Assert.That(FocusManager.Focused, Is.SameAs(a), "then the ones nobody numbered, in their own order");
+            Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Next), Is.True);
+            Assert.That(FocusManager.Focused, Is.SameAs(b));
+        });
+    }
+
+    /// <summary>The ARROWS ignore it: an explicit tab order says which control comes next in a form, not which one is
+    /// physically below another.</summary>
+    [Test]
+    public void ArrowsIgnoreTheTabOrder()
+    {
+        var a = NewButton("a");
+        var b = NewButton("b");
+        KeyboardNavigation.SetTabIndex(a, 2);
+        KeyboardNavigation.SetTabIndex(b, 1);
+
+        var stack = new StackPanel { Orientation = Orientation.Vertical };
+        stack.Children.Add(a);
+        stack.Children.Add(b);
+        Root(stack);
+
+        FocusManager.Focus(a);
+        KeyboardNavigation.Move(FocusNavigationDirection.Down);
+
+        Assert.That(FocusManager.Focused, Is.SameAs(b), "down is still the one below");
     }
 
     [Test]
@@ -653,6 +732,168 @@ public class KeyboardNavigationTests
             Assert.That(KeyboardNavigation.GetIsTabStop(list), Is.False, "the list itself is not where Tab stops");
             Assert.That(KeyboardNavigation.GetTabNavigation(list), Is.EqualTo(KeyboardNavigationMode.Once));
             Assert.That(list.Focusable, Is.True, "it can still be focused - by a click, or to start the arrows");
+        });
+    }
+
+    // --- The ring, and the tab strip ------------------------------------------------------------------------------
+
+    /// <summary>The focus ring lives on the WINDOW's adorner layer, so "is there a focus visual" is one question with
+    /// one answer: after a keyboard move the layer holds a ring, and it is on the control the move landed on. A click
+    /// leaves none - it already said where you are.</summary>
+    [Test]
+    public void AKeyboardMovePutsTheRingOnWhatItLandedOn()
+    {
+        var a = NewButton("a");
+        var b = NewButton("b");
+        var stack = new StackPanel();
+        stack.Children.Add(a);
+        stack.Children.Add(b);
+        var window = new Window { Width = 200, Height = 100, Content = stack };
+        for (var i = 0; i < 5; i++) WindowExtension.UpdateTree(window);
+        Assert.That(a.GetVisualAncestors(), Does.Contain(window), "sanity: the buttons are inside the window");
+
+        FocusManager.Focus(a, NavigationMethod.Mouse);
+        Assert.That(window.AdornerLayer.Adorners.OfType<FocusAdorner>(), Is.Empty, "a click needs no ring");
+
+        KeyboardNavigation.Move(FocusNavigationDirection.Next);
+
+        var ring = window.AdornerLayer.Adorners.OfType<FocusAdorner>().SingleOrDefault();
+        Assert.Multiple(() =>
+        {
+            Assert.That(ring, Is.Not.Null, "the keyboard move lit one");
+            Assert.That(ring?.AdornedElement, Is.SameAs(b), "on what it landed on - and only there");
+        });
+    }
+
+    /// <summary>Stepping INTO a container - what Enter on a tab header does. Tab keeps walking the headers, so the way
+    /// into a page cannot be Tab; it is this. False when there is nowhere to land, which is how a caller knows the page
+    /// has not been built yet and it should ask again.</summary>
+    [Test]
+    public void MoveIntoLandsOnTheFirstControlInside()
+    {
+        var inside = NewButton("inside");
+        var page = new StackPanel();
+        page.Children.Add(inside);
+        var outside = NewButton("outside");
+        var root = new StackPanel();
+        root.Children.Add(outside);
+        root.Children.Add(page);
+        Root(root);
+
+        FocusManager.Focus(outside);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(KeyboardNavigation.MoveInto(page), Is.True);
+            Assert.That(FocusManager.Focused, Is.SameAs(inside));
+            Assert.That(KeyboardNavigation.MoveInto(new StackPanel()), Is.False, "nothing to step into - say so");
+        });
+    }
+
+    /// <summary>The way INTO a container is its first tab stop by NUMBER, not the first child in the tree. Entering at
+    /// the tree's first child and then walking by number means the numbering says one thing and the way in another -
+    /// a form laid out A B C D but numbered 3 1 4 2 was entered at A and then walked B, D, C.</summary>
+    [Test]
+    public void EnteringAContainerLandsOnItsFirstTabStop()
+    {
+        var a = NewButton("a");
+        var b = NewButton("b");
+        var c = NewButton("c");
+        KeyboardNavigation.SetTabIndex(a, 3);
+        KeyboardNavigation.SetTabIndex(b, 1);
+        KeyboardNavigation.SetTabIndex(c, 2);
+
+        var inner = new StackPanel();
+        inner.Children.Add(a);
+        inner.Children.Add(b);
+        inner.Children.Add(c);
+
+        var before = NewButton("before");
+        var outer = new StackPanel();
+        outer.Children.Add(before);
+        outer.Children.Add(inner);
+        Root(outer);
+
+        FocusManager.Focus(before);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Next), Is.True);
+            Assert.That(FocusManager.Focused, Is.SameAs(b), "Tab enters at the LOWEST number, not the first child");
+            Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Next), Is.True);
+            Assert.That(FocusManager.Focused, Is.SameAs(c), "and carries on by number");
+        });
+    }
+
+    /// <summary>Coming BACK to a container you left returns to the place you were keeping in it, not to its end. A list
+    /// is one stop in the tab order, so leaving and returning has to be the round trip it looks like - landing on the
+    /// last row instead throws away the row you had chosen, and in a long list that row is the whole point.</summary>
+    [Test]
+    public void ReturningToAContainerLandsWhereYouLeftIt()
+    {
+        var first = NewButton("first");
+        var middle = NewButton("middle");
+        var last = NewButton("last");
+        var inner = new StackPanel();
+        inner.Children.Add(first);
+        inner.Children.Add(middle);
+        inner.Children.Add(last);
+        KeyboardNavigation.SetTabNavigation(inner, KeyboardNavigationMode.Once);
+
+        var after = NewButton("after");
+        var outer = new StackPanel();
+        outer.Children.Add(inner);
+        outer.Children.Add(after);
+        Root(outer);
+
+        FocusManager.Focus(middle);   // where you were when you left
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Next), Is.True);
+            Assert.That(FocusManager.Focused, Is.SameAs(after), "Tab leaves the whole container");
+            Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Previous), Is.True);
+            Assert.That(FocusManager.Focused, Is.SameAs(middle), "...and Shift+Tab comes back to the same place");
+        });
+    }
+
+    /// <summary>...and the same for a step in that is not a Tab at all - Enter opening a tab's page.</summary>
+    [Test]
+    public void MoveIntoAlsoRespectsTheTabOrder()
+    {
+        var first = NewButton("first");
+        var second = NewButton("second");
+        KeyboardNavigation.SetTabIndex(first, 2);
+        KeyboardNavigation.SetTabIndex(second, 1);
+
+        var page = new StackPanel();
+        page.Children.Add(first);
+        page.Children.Add(second);
+        Root(page);
+
+        Assert.That(KeyboardNavigation.MoveInto(page), Is.True);
+        Assert.That(FocusManager.Focused, Is.SameAs(second));
+    }
+
+    /// <summary>...and the arrows walk the strip the way it runs, ignoring the tab order entirely.</summary>
+    [Test]
+    public void TheArrowsWalkTheStripAlongTheWayItRuns()
+    {
+        var first = new TabItem { Header = "first", Width = 60, Height = 24 };
+        var second = new TabItem { Header = "second", Width = 60, Height = 24 };
+        var strip = new TabPanel { Orientation = Orientation.Horizontal };
+        strip.Children.Add(first);
+        strip.Children.Add(second);
+        Root(strip);
+
+        FocusManager.Focus(first);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Right), Is.True);
+            Assert.That(FocusManager.Focused, Is.SameAs(second), "along the strip");
+            Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Down), Is.False,
+                "and nothing across it - a horizontal strip has no tab above or below another");
         });
     }
 

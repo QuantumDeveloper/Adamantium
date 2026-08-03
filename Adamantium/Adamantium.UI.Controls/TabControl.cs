@@ -491,6 +491,63 @@ public class TabControl : Selector
         if (index >= 0) SelectedIndex = index;
     }
 
+    private IUIComponent _contentHost;
+    private TabItem _enterFrom;
+    private IUIComponent _enterReplacing;
+    private int _enterTries;
+
+    /// <summary>Enter on a header OPENS that tab: picks it, then puts the focus on the first control of its page. Tab
+    /// goes on walking the headers, so this is the way in - otherwise reaching a page means tabbing past every other
+    /// tab in the strip.
+    /// <para>The page does not exist yet when the key is pressed: the selection only hands the presenter new content,
+    /// and the visual for it is built on the next measure. So the step in stays PENDING and is retried once layout has
+    /// settled - the same shape <see cref="ScrollSelectedIntoView"/> already has, and for the same reason.</para></summary>
+    internal void EnterTab(TabItem container)
+    {
+        // The page ON SCREEN right now - the one this is about to replace. Stepping in has to wait for it to GO: the
+        // selection only hands the presenter new content, and until the next measure builds a visual for it the host
+        // still holds the previous page. Measured: without this the focus landed on the OLD page's first button, which
+        // was then detached by the swap - and Tab went on walking a tree that was no longer on screen.
+        _enterReplacing = IsContainerSelected(container) ? null : FirstPage();
+        SelectTab(container);
+        _enterFrom = container;
+        _enterTries = 120;   // settles, not frames: a slide transition holds the outgoing page for a moment
+        EnterSelectedContent();   // an already-selected tab has its page - no waiting needed
+    }
+
+    private IUIComponent FirstPage()
+    {
+        if (_contentHost == null)
+            return null;
+
+        foreach (var child in _contentHost.VisualChildren)
+            return child;
+
+        return null;
+    }
+
+    private void EnterSelectedContent()
+    {
+        if (_enterFrom == null)
+            return;
+
+        // The focus moved on (a click, another key): the step in was for the person who pressed Enter, not for wherever
+        // they went next.
+        if (!ReferenceEquals(FocusManager.Focused, _enterFrom) || --_enterTries < 0)
+        {
+            _enterFrom = null;
+            return;
+        }
+
+        // Still the page being replaced - the presenter has not built the new one yet.
+        var page = FirstPage();
+        if (page == null || ReferenceEquals(page, _enterReplacing))
+            return;
+
+        if (KeyboardNavigation.MoveInto(_contentHost))
+            _enterFrom = null;
+    }
+
     /// <summary>Both rows, so the selection lights up a pinned tab as readily as an ordinary one. A strip's containers
     /// are realized by the two lists in its template, not by this control's own generator.</summary>
     protected override IEnumerable<(IUIComponent Container, object Item)> RealizedContainers()
@@ -965,6 +1022,7 @@ public class TabControl : Selector
 
         _tabsHost = GetTemplateChild("PART_Tabs") as ItemsControl;
         _pinnedHost = GetTemplateChild("PART_PinnedTabs") as ItemsControl;
+        _contentHost = GetTemplateChild("PART_SelectedContentHost") as IUIComponent;
 
 
         // One bar per ROW: each lives inside the row it marks, so it moves and clips with those tabs. Which of the two is
@@ -1024,6 +1082,7 @@ public class TabControl : Selector
     {
         PlaceIndicator();
         ScrollSelectedIntoView();
+        EnterSelectedContent();
     }
 
     protected override Size ArrangeOverride(Size finalSize)

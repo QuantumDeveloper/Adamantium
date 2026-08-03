@@ -1,5 +1,7 @@
+using Adamantium.UI.Controls.Adorners;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
+using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Controls.Base;
@@ -102,6 +104,10 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     {
         FocusManager.GotFocusEvent.RegisterClassHandler<IInputComponent>(new RoutedEventHandler(GotFocusHandler));
         FocusManager.LostFocusEvent.RegisterClassHandler<IInputComponent>(new RoutedEventHandler(LostFocusHandler));
+        Keyboard.GotKeyboardFocusWithinEvent.RegisterClassHandler<IInputComponent>(
+            new RoutedEventHandler(GotKeyboardFocusWithinHandler));
+        Keyboard.LostKeyboardFocusWithinEvent.RegisterClassHandler<IInputComponent>(
+            new RoutedEventHandler(LostKeyboardFocusWithinHandler));
         Mouse.MouseEnterEvent.RegisterClassHandler<IInputComponent>(new MouseEventHandler(MouseEnterHandler));
         Mouse.MouseLeaveEvent.RegisterClassHandler<IInputComponent>(new MouseEventHandler(MouseLeaveHandler));
         Mouse.PreviewMouseDownEvent.RegisterClassHandler<IInputComponent>(new MouseButtonEventHandler(PreviewMouseDownHandler));
@@ -207,6 +213,35 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         AdamantiumProperty.RegisterReadOnly(nameof(IsMouseOver),
             typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false));
 
+    /// <summary>The focus is on this element OR on something inside it. What a composite control needs: a NumericUpDown
+    /// is never itself focused - its editor is - so IsFocused is false on it while the user is very much in it.</summary>
+    public static readonly AdamantiumProperty IsKeyboardFocusWithinProperty =
+        AdamantiumProperty.RegisterReadOnly(nameof(IsKeyboardFocusWithin),
+            typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false));
+
+    /// <summary>...and the focus got there BY KEYBOARD, which is when a focus ring is worth drawing. A ring that also
+    /// appeared on every click would be noise: the click already said where you are.</summary>
+    public static readonly AdamantiumProperty IsFocusVisibleProperty =
+        AdamantiumProperty.RegisterReadOnly(nameof(IsFocusVisible),
+            typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false));
+
+    /// <summary>What the focus ring on THIS control looks like: a <see cref="Style"/> applied to the
+    /// <see cref="FocusAdorner"/> the keyboard puts on it - the same shape WPF's FocusVisualStyle has.
+    /// <para>Null (the default) means the theme's own <c>FocusAdorner</c> style decides, which is where the ring is
+    /// described for the whole application. Set this - from a style, like anything else - only where one control needs
+    /// a different one: a tighter ring on a dense toolbar. It is applied AFTER the theme, so its setters win.</para>
+    /// <para>NO ring is a style with no <c>Template</c> - for a control that shows the focus its own way (an editor
+    /// that accents its own border), so the two never say the same thing twice. That is why there is no separate
+    /// on/off switch: the ring a control shows IS this style, and a style that draws nothing shows nothing.</para></summary>
+    public static readonly AdamantiumProperty FocusVisualStyleProperty = AdamantiumProperty.Register(
+        nameof(FocusVisualStyle), typeof(Style), typeof(InputUIComponent), new PropertyMetadata(null));
+
+    public Style FocusVisualStyle
+    {
+        get => GetValue<Style>(FocusVisualStyleProperty);
+        set => SetValue(FocusVisualStyleProperty, value);
+    }
+
     public static readonly AdamantiumProperty IsMouseDirectlyOverProperty =
         AdamantiumProperty.RegisterReadOnly(nameof(IsMouseDirectlyOver),
             typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false));
@@ -225,6 +260,18 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     {
         get => GetValue<bool>(IsMouseOverProperty);
         private set => SetValue(IsMouseOverProperty, value);
+    }
+
+    public bool IsKeyboardFocusWithin
+    {
+        get => GetValue<bool>(IsKeyboardFocusWithinProperty);
+        private set => SetValue(IsKeyboardFocusWithinProperty, value);
+    }
+
+    public bool IsFocusVisible
+    {
+        get => GetValue<bool>(IsFocusVisibleProperty);
+        private set => SetValue(IsFocusVisibleProperty, value);
     }
 
     public bool IsMouseDirectlyOver
@@ -622,6 +669,22 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     {
         var ui = sender as InputUIComponent;
         ui?.OnLostFocus(e);
+    }
+
+    // Raised individually on each element that JOINED or LEFT the focused element's ancestor chain, so the state is
+    // simply set - there is no chain to walk here, that already happened.
+    private static void GotKeyboardFocusWithinHandler(object sender, RoutedEventArgs e)
+    {
+        if (sender is not InputUIComponent ui) return;
+        ui.IsKeyboardFocusWithin = true;
+        ui.IsFocusVisible = FocusManager.IsFocusVisible;
+    }
+
+    private static void LostKeyboardFocusWithinHandler(object sender, RoutedEventArgs e)
+    {
+        if (sender is not InputUIComponent ui) return;
+        ui.IsKeyboardFocusWithin = false;
+        ui.IsFocusVisible = false;
     }
 
     private static void MouseEnterHandler(object sender, MouseEventArgs e)
@@ -1036,11 +1099,39 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     protected virtual void OnGotFocus(RoutedEventArgs e)
     {
         IsFocused = e.OriginalSource == this;
+        if (IsFocused && FocusManager.IsFocusVisible)
+            AdornerHost()?.AdornerLayer.SetFocus(this);
     }
 
     protected virtual void OnLostFocus(RoutedEventArgs e)
     {
         IsFocused = false;
+        // The move announces Lost before Got, so clearing here and setting there leaves exactly one ring - and none at
+        // all when the focus was taken by a click, which says where you are without any help.
+        AdornerHost()?.AdornerLayer.SetFocus(null);
+    }
+
+    // The ring goes on the WINDOW's adorner layer, not into this control's template: a template is a thing that can be
+    // forgotten, and a control whose template forgot it would silently have no focus visual at all. One implementation
+    // there covers every control, and draws above the content - so a control that clips its own children still shows it.
+    private IAdornerHost AdornerHost()
+    {
+        for (IUIComponent node = this; node != null; node = node.VisualParent)
+        {
+            if (node is IAdornerHost host)
+                return host;
+        }
+
+        return null;
+    }
+
+    /// <summary>Leaving the tree gives up the focus. A control taken off screen - the page a tab swap replaced, a row a
+    /// list stopped realizing - cannot go on holding the keyboard: Tab would keep walking that dead tree, and every stop
+    /// on the way is invisible. The detach walks the whole subtree, so a focused descendant is covered too.</summary>
+    protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnDetachedFromVisualTree(e);
+        FocusManager.Release(this);
     }
 
     protected virtual void OnMouseEnter(MouseEventArgs e)

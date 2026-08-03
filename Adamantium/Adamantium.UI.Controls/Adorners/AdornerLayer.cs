@@ -16,19 +16,43 @@ public class AdornerLayer
     private readonly List<Adorner> _selection = [];
     private readonly List<IUIComponent> _overlays = [];   // general overlays (e.g. the templatable drop-insertion indicator)
     private HoverAdorner _hover;
+    private FocusAdorner _focus;
 
-    /// <summary>All active overlays (selection frames + general overlays + the optional hover frame) as one flat list for
-    /// the renderer. Selection first, overlays next, hover last so the transient hover sits on top.</summary>
+    /// <summary>All active overlays (selection frames + general overlays + the hover frame + the focus ring) as one flat
+    /// list for the renderer. Selection first, overlays next, then the transient hover, and the focus ring on top - it
+    /// says where the keyboard is, which is the one thing that must not be buried under anything else.</summary>
     public IReadOnlyList<IUIComponent> Adorners
     {
         get
         {
-            var all = new List<IUIComponent>(_selection.Count + _overlays.Count + 1);
+            var all = new List<IUIComponent>(_selection.Count + _overlays.Count + 2);
             all.AddRange(_selection);
             all.AddRange(_overlays);
             if (_hover != null) all.Add(_hover);
+            if (_focus != null) all.Add(_focus);
             return all;
         }
+    }
+
+    /// <summary>Shows the focus ring on <paramref name="element"/>; null clears it. One ring per window, replaced as the
+    /// focus moves - the same shape the transient hover frame has.</summary>
+    public void SetFocus(UIComponent element)
+    {
+        if (element == null)
+        {
+            _focus = null;
+            return;
+        }
+
+        if (_focus != null && ReferenceEquals(_focus.AdornedElement, element))
+            return;
+
+        _focus = new FocusAdorner(element);
+        // The control's own ring, where it asked for one. Attached here rather than left to the stage's ApplyTheme:
+        // attached styles are applied AFTER the theme, so a control's FocusVisualStyle overrides the theme's ring
+        // instead of being overwritten by it.
+        if (element is InputUIComponent { FocusVisualStyle: { } style })
+            _focus.AttachStyles(style);
     }
 
     /// <summary>Add a general overlay (a raw Adorner or a templatable one), rendered on top of the content. Idempotent.</summary>
@@ -57,7 +81,8 @@ public class AdornerLayer
         _hover = element != null && !IsSelected(element) ? new HoverAdorner(element) : null;
     }
 
-    /// <summary>Clears both the selection and the hover frame.</summary>
+    /// <summary>Clears the selection and the hover frame. The focus ring is NOT cleared here: it is not designer
+    /// decoration but where the keyboard currently is, and that does not stop being true when a selection changes.</summary>
     public void Clear()
     {
         _selection.Clear();

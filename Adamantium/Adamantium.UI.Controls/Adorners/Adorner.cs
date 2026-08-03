@@ -47,9 +47,15 @@ public class Adorner : TemplatedUIComponent
     // at the adorned element places the adorner - and its arranged template - exactly on its target.
     public override IUIComponent RenderParent => AdornedElement;
 
+    // ...but NOT clipped to that element's box: an adorner exists to draw AROUND its target, and a control whose
+    // template clips its own content would otherwise erase the whole decoration. Everything above the target still
+    // clips it - see IUIComponent.ClippedByRenderParent.
+    public override bool ClippedByRenderParent => false;
+
     /// <summary>The adorned element's painted rectangle in its OWN local space: a Shape's stroke-aware RenderBounds,
-    /// otherwise its arranged box. What an OnRender-drawing adorner (a selection / hover frame) decorates.</summary>
-    public Rect AdornedBounds =>
+    /// otherwise its arranged box. What an OnRender-drawing adorner (a selection / hover frame) decorates. Virtual
+    /// because an adorner may decorate a box OTHER than the element's own - the focus ring stands off it.</summary>
+    public virtual Rect AdornedBounds =>
         AdornedElement is Shape shape ? shape.RenderBounds : new Rect(AdornedElement.RenderSize);
 
     /// <summary>True if this adorner's template should be sized to fill the adorned element's bounds (a frame that wraps its

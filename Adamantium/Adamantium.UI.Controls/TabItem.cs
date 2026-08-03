@@ -129,6 +129,21 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
         FocusableProperty.OverrideMetadata(typeof(TabItem), new PropertyMetadata(true));
         FontSizeProperty.OverrideMetadata(typeof(TabItem),
             new PropertyMetadata(13.0, PropertyMetadataOptions.Inherits | PropertyMetadataOptions.AffectsMeasure));
+        // Enter/Space OPENS the tab: picks it and steps into its page. Tab keeps walking the headers, which is how a
+        // strip is read; this is the way IN, so reaching the page never means tabbing past every other header.
+        Keyboard.KeyDownEvent.RegisterClassHandler<TabItem>(new KeyEventHandler(OnKeyDownClassHandler));
+    }
+
+    private static void OnKeyDownClassHandler(object sender, KeyEventArgs e)
+    {
+        if (e.Handled || sender is not TabItem tab || e.OriginalSource != tab)
+            return;
+
+        if (e.Key is not (Key.Enter or Key.Space))
+            return;
+
+        tab.Owner?.EnterTab(tab);
+        e.Handled = true;
     }
 
     /// <summary>The tab-strip label - a string or any UI content. Distinct from <see cref="ContentControl.Content"/>,
@@ -288,6 +303,26 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
         _pinButton = GetTemplateChild("PART_PinButton") as ButtonBase;
         if (_pinButton != null) _pinButton.Click += OnPinButtonClick;
         SyncPinButtonState();
+
+        // The whole header is one stop, so Tab does not walk INTO it: without this the step past the current tab lands
+        // on the close button of a tab you are not even on. They stay clickable - only out of the tab order.
+        if (_closeButton != null)
+            KeyboardNavigation.SetIsTabStop(_closeButton, false);
+
+        if (_pinButton != null)
+            KeyboardNavigation.SetIsTabStop(_pinButton, false);
+    }
+
+    /// <summary>A header the arrows moved to may be scrolled out of the strip - so bring it back into view, the same as
+    /// selecting one does. Asked of the scroller this tab actually sits in: a PINNED tab is outside it (that is what
+    /// makes it un-scrollable), and finds none, which is the right answer there.</summary>
+    protected override void OnGotFocus(RoutedEventArgs e)
+    {
+        base.OnGotFocus(e);
+        if (e.OriginalSource != this)
+            return;
+
+        this.GetVisualAncestors().OfType<TabStripScroller>().FirstOrDefault()?.ScrollIntoView(this);
     }
 
 

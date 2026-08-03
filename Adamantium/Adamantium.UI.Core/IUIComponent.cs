@@ -31,6 +31,14 @@ public interface IUIComponent : IFundamentalUIComponent
     /// there is one answer to "whose space am I in", not two that can drift apart.</summary>
     IUIComponent RenderParent { get; }
 
+    /// <summary>Whether the RENDER PARENT's own <see cref="ClipToBounds"/> applies to this component. True for ordinary
+    /// content - a child lives inside its parent's box. False for an ADORNER: it draws in its target's space precisely
+    /// in order to paint AROUND it, so being clipped to that target's box erases exactly what it exists to draw (a focus
+    /// ring vanished on every control whose template clips its content, and survived only on those that do not). The
+    /// clips ABOVE the target still apply - a viewport is a viewport, and a ring on a half-scrolled row must not spill
+    /// out of the list it belongs to.</summary>
+    bool ClippedByRenderParent { get; }
+
     IRootVisualComponent RootVisual { get; }
     Int32 ZIndex { get; set; }
     bool IsAttachedToVisualTree { get; }
