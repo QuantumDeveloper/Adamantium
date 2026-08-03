@@ -156,43 +156,6 @@ public class TabControl : Selector
 
     // Content-area chrome (the panel below the tab strip that hosts the selected body). Set by the theme, TemplateBound
     // by the default template - so a theme/accent swap restyles it and a host can retheme it.
-    public static readonly AdamantiumProperty BorderBrushProperty = AdamantiumProperty.Register(nameof(BorderBrush),
-        typeof(Brush), typeof(TabControl), new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));
-
-    public static readonly AdamantiumProperty BorderThicknessProperty = AdamantiumProperty.Register(nameof(BorderThickness),
-        typeof(Thickness), typeof(TabControl), new PropertyMetadata(default(Thickness), PropertyMetadataOptions.AffectsMeasure));
-
-    public static readonly AdamantiumProperty CornerRadiusProperty = AdamantiumProperty.Register(nameof(CornerRadius),
-        typeof(CornerRadius), typeof(TabControl), new PropertyMetadata(default(CornerRadius), PropertyMetadataOptions.AffectsRender));
-
-    public static readonly AdamantiumProperty PaddingProperty = AdamantiumProperty.Register(nameof(Padding),
-        typeof(Thickness), typeof(TabControl),
-        new PropertyMetadata(default(Thickness), PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
-
-    public Brush BorderBrush
-    {
-        get => GetValue<Brush>(BorderBrushProperty);
-        set => SetValue(BorderBrushProperty, value);
-    }
-
-    public Thickness BorderThickness
-    {
-        get => GetValue<Thickness>(BorderThicknessProperty);
-        set => SetValue(BorderThicknessProperty, value);
-    }
-
-    public CornerRadius CornerRadius
-    {
-        get => GetValue<CornerRadius>(CornerRadiusProperty);
-        set => SetValue(CornerRadiusProperty, value);
-    }
-
-    public Thickness Padding
-    {
-        get => GetValue<Thickness>(PaddingProperty);
-        set => SetValue(PaddingProperty, value);
-    }
-
     public bool StretchSingleTab
     {
         get => GetValue<bool>(StretchSingleTabProperty);

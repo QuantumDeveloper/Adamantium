@@ -40,19 +40,6 @@ public class DropDown : Selector
         typeof(Type), typeof(DropDown), new PropertyMetadata(null, OnEnumTypeChanged));
 
     // Header chrome (like the other controls': set by the theme, TemplateBound by the default template).
-    public static readonly AdamantiumProperty BorderBrushProperty = AdamantiumProperty.Register(nameof(BorderBrush),
-        typeof(Brush), typeof(DropDown), new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));
-
-    public static readonly AdamantiumProperty BorderThicknessProperty = AdamantiumProperty.Register(nameof(BorderThickness),
-        typeof(Thickness), typeof(DropDown), new PropertyMetadata(default(Thickness), PropertyMetadataOptions.AffectsMeasure));
-
-    public static readonly AdamantiumProperty CornerRadiusProperty = AdamantiumProperty.Register(nameof(CornerRadius),
-        typeof(CornerRadius), typeof(DropDown), new PropertyMetadata(default(CornerRadius), PropertyMetadataOptions.AffectsRender));
-
-    public static readonly AdamantiumProperty PaddingProperty = AdamantiumProperty.Register(nameof(Padding),
-        typeof(Thickness), typeof(DropDown),
-        new PropertyMetadata(default(Thickness), PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
-
     // Header hover fill (projected by the template trigger), like ButtonBase.
     public static readonly AdamantiumProperty BackgroundPointerOverProperty = AdamantiumProperty.Register(
         nameof(BackgroundPointerOver), typeof(Brush), typeof(DropDown), new PropertyMetadata(default(Brush)));
@@ -117,30 +104,6 @@ public class DropDown : Selector
     {
         get => GetValue<Type>(EnumTypeProperty);
         set => SetValue(EnumTypeProperty, value);
-    }
-
-    public Brush BorderBrush
-    {
-        get => GetValue<Brush>(BorderBrushProperty);
-        set => SetValue(BorderBrushProperty, value);
-    }
-
-    public Thickness BorderThickness
-    {
-        get => GetValue<Thickness>(BorderThicknessProperty);
-        set => SetValue(BorderThicknessProperty, value);
-    }
-
-    public CornerRadius CornerRadius
-    {
-        get => GetValue<CornerRadius>(CornerRadiusProperty);
-        set => SetValue(CornerRadiusProperty, value);
-    }
-
-    public Thickness Padding
-    {
-        get => GetValue<Thickness>(PaddingProperty);
-        set => SetValue(PaddingProperty, value);
     }
 
     public Brush BackgroundPointerOver

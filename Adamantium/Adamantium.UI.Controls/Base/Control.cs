@@ -1,4 +1,5 @@
-﻿using Adamantium.UI.Core;
+﻿using Adamantium.ProceduralGeometry;
+using Adamantium.UI.Core;
 using Adamantium.UI.Core.Media;
 
 namespace Adamantium.UI.Controls.Base;
@@ -23,9 +24,55 @@ public class Control : TemplatedUIComponent, IControl
       typeof(Brush), typeof(Control),
       new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));
 
+   // The chrome every framed control needs. Declared ONCE here rather than re-registered by each control that happens
+   // to draw a frame: a re-registration makes a DIFFERENT property that merely shares a name, so a control that forgot
+   // one had a style setter naming a property it did not have - which throws when the theme is attached, not when the
+   // style is written. A control whose look wants another default overrides the METADATA (see TextBoxBase); it does not
+   // declare the property again. Controls that are not Controls - Border, Decorator, Panel - still carry their own.
+   public static readonly AdamantiumProperty BorderBrushProperty = AdamantiumProperty.Register(nameof(BorderBrush),
+      typeof(Brush), typeof(Control),
+      new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));
+
+   public static readonly AdamantiumProperty BorderThicknessProperty = AdamantiumProperty.Register(
+      nameof(BorderThickness), typeof(Thickness), typeof(Control),
+      new PropertyMetadata(default(Thickness), PropertyMetadataOptions.AffectsMeasure));
+
+   public static readonly AdamantiumProperty CornerRadiusProperty = AdamantiumProperty.Register(nameof(CornerRadius),
+      typeof(CornerRadius), typeof(Control),
+      new PropertyMetadata(default(CornerRadius), PropertyMetadataOptions.AffectsRender));
+
+   public static readonly AdamantiumProperty PaddingProperty = AdamantiumProperty.Register(nameof(Padding),
+      typeof(Thickness), typeof(Control),
+      new PropertyMetadata(default(Thickness),
+         PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
+
    public Brush Background
    {
       get => GetValue<Brush>(BackgroundProperty);
       set => SetValue(BackgroundProperty, value);
+   }
+
+   public Brush BorderBrush
+   {
+      get => GetValue<Brush>(BorderBrushProperty);
+      set => SetValue(BorderBrushProperty, value);
+   }
+
+   public Thickness BorderThickness
+   {
+      get => GetValue<Thickness>(BorderThicknessProperty);
+      set => SetValue(BorderThicknessProperty, value);
+   }
+
+   public CornerRadius CornerRadius
+   {
+      get => GetValue<CornerRadius>(CornerRadiusProperty);
+      set => SetValue(CornerRadiusProperty, value);
+   }
+
+   public Thickness Padding
+   {
+      get => GetValue<Thickness>(PaddingProperty);
+      set => SetValue(PaddingProperty, value);
    }
 }

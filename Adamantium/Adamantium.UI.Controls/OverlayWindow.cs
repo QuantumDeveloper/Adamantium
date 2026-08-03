@@ -53,6 +53,14 @@ public class OverlayWindow : ContentControl
     public static readonly AdamantiumProperty CloseByEscapeProperty = AdamantiumProperty.Register(nameof(CloseByEscape),
         typeof(bool), typeof(OverlayWindow), new PropertyMetadata(true));
 
+    static OverlayWindow()
+    {
+        // A card stands off its content; the chrome property itself is Control's, only the default differs.
+        PaddingProperty.OverrideMetadata(typeof(OverlayWindow),
+            new PropertyMetadata(new Thickness(16),
+                PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
+    }
+
     public static readonly AdamantiumProperty OverlayBrushProperty = AdamantiumProperty.Register(nameof(OverlayBrush),
         typeof(Brush), typeof(OverlayWindow), new PropertyMetadata(null));
 
@@ -61,18 +69,6 @@ public class OverlayWindow : ContentControl
 
     public static readonly AdamantiumProperty TitleForegroundProperty = AdamantiumProperty.Register(nameof(TitleForeground),
         typeof(Brush), typeof(OverlayWindow), new PropertyMetadata(null));
-
-    public static readonly AdamantiumProperty BorderBrushProperty = AdamantiumProperty.Register(nameof(BorderBrush),
-        typeof(Brush), typeof(OverlayWindow), new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));
-
-    public static readonly AdamantiumProperty BorderThicknessProperty = AdamantiumProperty.Register(nameof(BorderThickness),
-        typeof(Thickness), typeof(OverlayWindow), new PropertyMetadata(default(Thickness)));
-
-    public static readonly AdamantiumProperty CornerRadiusProperty = AdamantiumProperty.Register(nameof(CornerRadius),
-        typeof(CornerRadius), typeof(OverlayWindow), new PropertyMetadata(default(CornerRadius)));
-
-    public static readonly AdamantiumProperty PaddingProperty = AdamantiumProperty.Register(nameof(Padding),
-        typeof(Thickness), typeof(OverlayWindow), new PropertyMetadata(new Thickness(16)));
 
     public static readonly AdamantiumProperty OpenDurationProperty = AdamantiumProperty.Register(nameof(OpenDuration),
         typeof(double), typeof(OverlayWindow), new PropertyMetadata(0.18));
@@ -206,30 +202,6 @@ public class OverlayWindow : ContentControl
     {
         get => GetValue<Brush>(TitleForegroundProperty);
         set => SetValue(TitleForegroundProperty, value);
-    }
-
-    public Brush BorderBrush
-    {
-        get => GetValue<Brush>(BorderBrushProperty);
-        set => SetValue(BorderBrushProperty, value);
-    }
-
-    public Thickness BorderThickness
-    {
-        get => GetValue<Thickness>(BorderThicknessProperty);
-        set => SetValue(BorderThicknessProperty, value);
-    }
-
-    public CornerRadius CornerRadius
-    {
-        get => GetValue<CornerRadius>(CornerRadiusProperty);
-        set => SetValue(CornerRadiusProperty, value);
-    }
-
-    public Thickness Padding
-    {
-        get => GetValue<Thickness>(PaddingProperty);
-        set => SetValue(PaddingProperty, value);
     }
 
     /// <summary>Open/close animation duration in seconds.</summary>
