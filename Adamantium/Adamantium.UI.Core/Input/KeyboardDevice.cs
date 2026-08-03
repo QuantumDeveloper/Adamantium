@@ -149,9 +149,14 @@ public class KeyboardDevice
       return Keyboard.Platform?.IsKeyToggled(key) ?? false;
    }
 
-   public void ProcessEvent(RawInputEventArgs eventArgs)
+   /// <summary>Delivers a raw key/text event. <paramref name="fallback"/> is where a key goes when NOTHING is focused -
+   /// the window itself: a window opens with no focused element, and dropping the key there left the keyboard dead until
+   /// something had been clicked. The window is the root of the route, which is exactly where navigation listens, so the
+   /// first Tab can step into the tree.</summary>
+   public void ProcessEvent(RawInputEventArgs eventArgs, IInputComponent fallback = null)
    {
-      if (FocusedComponent != null)
+      var target = FocusedComponent ?? fallback;
+      if (target != null)
       {
          if (eventArgs is RawKeyboardEventArgs e)
          {
@@ -175,7 +180,7 @@ public class KeyboardDevice
                   }
                   UpdateKeyData(e.ChangedKey, parameters);
 
-                  FocusedComponent.RaiseEvent(args);
+                  target.RaiseEvent(args);
 
                   if (e.EventType == RawKeyboardEventType.KeyDown)
                   {
@@ -187,7 +192,7 @@ public class KeyboardDevice
                      parameters.CurrentState = KeyState.Up;
                      args.RoutedEvent = Keyboard.KeyUpEvent;
                   }
-                  FocusedComponent.RaiseEvent(args);
+                  target.RaiseEvent(args);
                   break;
             }
          }
@@ -200,10 +205,10 @@ public class KeyboardDevice
             {
                RoutedEvent = Keyboard.PreviewTextInputEvent
             };
-            FocusedComponent.RaiseEvent(textArgs);
+            target.RaiseEvent(textArgs);
 
             textArgs.RoutedEvent = Keyboard.TextInputEvent;
-            FocusedComponent.RaiseEvent(textArgs);
+            target.RaiseEvent(textArgs);
          }
       }
    }

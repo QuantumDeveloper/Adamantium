@@ -331,6 +331,68 @@ public class GpuRenderUnitTests
         finally { System.IO.File.Delete(path); }
     }
 
+    // The FOCUS RING: unlike the selection frame it paints nothing itself - its whole look is a ControlTemplate (the
+    // theme's, or a control's own FocusVisualStyle), so what has to be proven is that a TEMPLATED adorner reaches the
+    // screen at all, and lands OUTSIDE the control it rings. Built exactly the way AdornerRenderProcessor builds it:
+    // size the adorner to its (outset) bounds, then hand the stage the whole flattened subtree.
+    [Test]
+    public void Adorner_FocusRing_FromItsTemplate_DrawsOutsideTheControl()
+    {
+        var factory = new RenderUnitFactory(_device, _resourceFactory);
+        using var renderer = new OffscreenTestRenderer(_device, factory, 64, 64) { ClearColor = Colors.Black };
+
+        var box = new Adamantium.UI.Controls.Shapes.Rectangle { Width = 40, Height = 40, Fill = Brushes.Red };
+        box.Measure(new Size(64, 64));
+        box.Arrange(new Rect(10, 10, 40, 40));
+
+        var root = new TestRoot(64, 64);
+        root.Add(box);
+
+        var ring = new Adamantium.UI.Controls.Adorners.FocusAdorner(box) { Outset = 2 };
+        ring.Template = new Adamantium.UI.Core.Templates.ControlTemplate(() =>
+            new Adamantium.UI.Core.Templates.TemplateResult
+            {
+                RootComponent = new Adamantium.UI.Controls.Decorators.Border
+                {
+                    BorderThickness = new Thickness(2),
+                    BorderBrush = Brushes.Lime
+                }
+            });
+
+        var bounds = ring.AdornedBounds;   // the box's own space, pushed out by the outset
+        ((IMeasurableComponent)ring).Measure(bounds.Size, true);
+        ((IMeasurableComponent)ring).Arrange(bounds, true);
+
+        var flat = new System.Collections.Generic.List<IUIComponent>();
+        void Flatten(IUIComponent c)
+        {
+            flat.Add(c);
+            foreach (var child in c.VisualChildren) Flatten(child);
+        }
+        Flatten(ring);
+        renderer.Adorners = flat;
+
+        Assert.That(renderer.RenderFrame(root), Is.True, "off-screen frame must render");
+
+        var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"focusring_{System.Guid.NewGuid():N}.bgra");
+        renderer.SaveRaw(path);
+        try
+        {
+            var bytes = System.IO.File.ReadAllBytes(path);   // B8G8R8A8, top-left origin
+            bool Ring(int x, int y) { var o = (y * 64 + x) * 4; return bytes[o + 1] > 150 && bytes[o] < 110 && bytes[o + 2] < 110; }
+            bool Red(int x, int y) { var o = (y * 64 + x) * 4; return bytes[o] < 100 && bytes[o + 1] < 100 && bytes[o + 2] > 140; }
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(Red(30, 30), Is.True, "sanity: the control itself is still drawn");
+                // The box spans 10..50; outset 2 puts the ring's own 2px line at x = 8..9, clear of the control.
+                Assert.That(Ring(8, 30) || Ring(9, 30), Is.True, "the ring is drawn, and OUTSIDE the control");
+                Assert.That(Ring(30, 8) || Ring(30, 9), Is.True, "...on the top edge too");
+            });
+        }
+        finally { System.IO.File.Delete(path); }
+    }
+
     // An element that FILLS the surface (touches every edge): the selection chrome must be drawn INSIDE its bounds so it
     // stays within the window framebuffer. Regression: it used to inflate the frame + handles OUTSIDE the bounds, so for
     // an edge element they fell off-window and were clipped to a few corner specks (the designer's "no frame" bug).

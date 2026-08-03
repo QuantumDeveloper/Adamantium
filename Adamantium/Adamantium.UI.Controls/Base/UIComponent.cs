@@ -519,6 +519,10 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     /// can name the element whose space it draws in.</summary>
     public virtual IUIComponent RenderParent => VisualParent;
 
+    /// <summary>See <see cref="IUIComponent.ClippedByRenderParent"/>. Content lives inside its parent's box; an adorner
+    /// draws around its target and says so by overriding this.</summary>
+    public virtual bool ClippedByRenderParent => true;
+
     public IRootVisualComponent RootVisual { get; private set; }
 
     /// <summary>

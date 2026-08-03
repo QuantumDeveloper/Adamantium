@@ -21,7 +21,47 @@ public abstract class Panel: InputUIComponent, IContainer, INavigablePanel
    {
       if (direction is not (FocusNavigationDirection.Next or FocusNavigationDirection.Previous)) return null;
 
-      return Neighbour(from, direction == FocusNavigationDirection.Next);
+      return TabNeighbour(from, direction == FocusNavigationDirection.Next);
+   }
+
+   /// <summary>The neighbour in TAB order: by <see cref="KeyboardNavigation.TabIndex"/> first, and by the order the
+   /// children stand in for the ties. The arrows deliberately do NOT use this - they are a question about the layout,
+   /// and an explicit tab order says nothing about which control is physically to the left of another.</summary>
+   private IUIComponent TabNeighbour(IUIComponent from, bool forward)
+   {
+      List<IUIComponent> ordered = null;
+      var position = 0;
+
+      foreach (var child in VisualChildren)
+      {
+         // Skip what is not on screen: a virtualizing panel PARKS an off-screen container (hidden, still a child).
+         if (child.Visibility != Visibility.Visible && !ReferenceEquals(child, from)) continue;
+         if (KeyboardNavigation.GetTabIndex(child) != int.MaxValue) ordered ??= [];
+         position++;
+      }
+
+      // Nobody asked for an order: the children's own is the answer, and there is nothing to sort.
+      if (ordered == null || position == 0) return Neighbour(from, forward);
+
+      foreach (var child in VisualChildren)
+      {
+         if (child.Visibility != Visibility.Visible && !ReferenceEquals(child, from)) continue;
+         ordered.Add(child);
+      }
+
+      var order = new Dictionary<IUIComponent, int>(ordered.Count);
+      for (var i = 0; i < ordered.Count; i++) order[ordered[i]] = i;
+      ordered.Sort((left, right) =>
+      {
+         var byIndex = KeyboardNavigation.GetTabIndex(left).CompareTo(KeyboardNavigation.GetTabIndex(right));
+         return byIndex != 0 ? byIndex : order[left].CompareTo(order[right]);
+      });
+
+      var at = ordered.IndexOf(from);
+      if (at < 0) return null;
+
+      var next = at + (forward ? 1 : -1);
+      return next >= 0 && next < ordered.Count ? ordered[next] : null;
    }
 
    /// <summary>The child one step along the children's own order, or null at either end.

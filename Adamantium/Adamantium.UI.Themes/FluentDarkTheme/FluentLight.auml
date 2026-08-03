@@ -11,6 +11,7 @@
         <StyleInclude Source="{x:Type fluentDark:DragHandleStyleSet}"/>
 		<StyleInclude Source="{x:Type fluentDark:SelectionAdornerStyleSet}"/>
 		<StyleInclude Source="{x:Type fluentDark:HoverAdornerStyleSet}"/>
+		<StyleInclude Source="{x:Type fluentDark:FocusAdornerStyleSet}"/>
 		<StyleInclude Source="{x:Type fluentDark:BorderStyleSet}"/>
 		<StyleInclude Source="{x:Type fluentDark:ButtonStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ContentControlStyleSet}"/>

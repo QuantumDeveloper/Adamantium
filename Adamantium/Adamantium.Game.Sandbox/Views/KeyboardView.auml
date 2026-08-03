@@ -1,0 +1,90 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions">
+    <!-- DataContext is the KeyboardViewModel. Put the mouse down and drive this tab from the keyboard: Tab and
+         Shift+Tab step BETWEEN the blocks, the arrows move INSIDE one. The accent ring follows the focus, and shows up
+         only for keyboard moves - a click already says where you are. -->
+    <ScrollViewer Margin="24" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel Orientation="Vertical">
+
+            <TextBlock Text="Tab moves between blocks, the arrows move inside one" FontSize="18" Margin="0,0,0,4"/>
+            <TextBlock Text="The ring appears for keyboard moves only. Click anywhere and it goes away - the click already said where you are."
+                       Foreground="{ResourceReference TextFillColorSecondary}" Margin="0,0,0,20"/>
+
+            <!-- 1. An EXPLICIT order. The buttons stand left to right, but Tab visits them by their number - which is the
+                    whole point: the order that reads best is often not the order a form is filled in. -->
+            <TextBlock Text="1. Explicit tab order" FontSize="16" Margin="0,0,0,6"/>
+            <TextBlock Text="Laid out A B C D, but numbered 3 1 4 2 - Tab follows the numbers, not the layout."
+                       Foreground="{ResourceReference TextFillColorSecondary}" Margin="0,0,0,8"/>
+            <StackPanel Orientation="Horizontal">
+                <Button Content="A (3rd)" Width="110" Height="34" MarginRight="8" KeyboardNavigation.TabIndex="3"/>
+                <Button Content="B (1st)" Width="110" Height="34" MarginRight="8" KeyboardNavigation.TabIndex="1"/>
+                <Button Content="C (4th)" Width="110" Height="34" MarginRight="8" KeyboardNavigation.TabIndex="4"/>
+                <Button Content="D (2nd)" Width="110" Height="34" MarginRight="8" KeyboardNavigation.TabIndex="2"/>
+                <Button Content="Skipped" Width="110" Height="34" KeyboardNavigation.IsTabStop="false"/>
+            </StackPanel>
+
+            <!-- 2. A grid: the arrows are a question about the LAYOUT, so the grid answers by row and column. -->
+            <Border Height="1" Background="{ResourceReference ControlFillColorTertiary}" Margin="0,24,0,0"/>
+            <TextBlock Text="2. A grid answers by row and column" FontSize="16" Margin="0,20,0,6"/>
+            <TextBlock Text="Arrow into it and walk the cells. At the edge the arrow leaves the grid - a form is not a closed field."
+                       Foreground="{ResourceReference TextFillColorSecondary}" Margin="0,0,0,8"/>
+            <UniformGrid Rows="3" Columns="4" Width="470" HorizontalAlignment="Left"
+                         RowSpacing="6" ColumnSpacing="6">
+                <Button Content="1"/>
+                <Button Content="2"/>
+                <Button Content="3"/>
+                <Button Content="4"/>
+                <Button Content="5"/>
+                <Button Content="6"/>
+                <Button Content="7"/>
+                <Button Content="8"/>
+                <Button Content="9"/>
+                <Button Content="10"/>
+                <Button Content="11"/>
+                <Button Content="12"/>
+            </UniformGrid>
+
+            <!-- 3. Wrapped lines: along the line, across to the next, and round the end the way reading does. The panel
+                    KEEPS the arrows, so one arrow too many cannot cost you your place. -->
+            <Border Height="1" Background="{ResourceReference ControlFillColorTertiary}" Margin="0,24,0,0"/>
+            <TextBlock Text="3. Wrapped tiles keep their arrows" FontSize="16" Margin="0,20,0,6"/>
+            <TextBlock Text="Right at the end of a line carries on at the start of the next. At the edge of the field the arrow does nothing - Tab is how you leave."
+                       Foreground="{ResourceReference TextFillColorSecondary}" Margin="0,0,0,8"/>
+            <ListBox Height="150" Width="470" HorizontalAlignment="Left"
+                     ItemsSource="{Binding Tiles}"
+                     Background="Transparent">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" ItemWidth="110" ItemHeight="34"/>
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+            </ListBox>
+
+            <!-- 4. A list: Tab enters it ONCE and leaves it whole; the arrows move the selection, and the view follows. -->
+            <Border Height="1" Background="{ResourceReference ControlFillColorTertiary}" Margin="0,24,0,0"/>
+            <TextBlock Text="4. A list is entered once" FontSize="16" Margin="0,20,0,6"/>
+            <TextBlock Text="Tab lands on a row and the next Tab leaves the whole list - not twenty-four rows later. Arrows move the selection and scroll it into view."
+                       Foreground="{ResourceReference TextFillColorSecondary}" Margin="0,0,0,8"/>
+            <StackPanel Orientation="Horizontal">
+                <ListBox Width="220" Height="160" ItemsSource="{Binding Rows}"/>
+                <StackPanel Orientation="Vertical" Margin="20,0,0,0">
+                    <TextBlock Text="Tab from the list lands here:" Margin="0,0,0,8"/>
+                    <Button Content="After the list" Width="160" Height="34" MarginBottom="8"/>
+                    <CheckBox Content="...and then here"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- 5. The controls whose arrows are their own: the value ones eat them, so the focus stays put. -->
+            <Border Height="1" Background="{ResourceReference ControlFillColorTertiary}" Margin="0,24,0,0"/>
+            <TextBlock Text="5. Controls that claim the arrows" FontSize="16" Margin="0,20,0,6"/>
+            <TextBlock Text="A slider and a number take the arrows to change their value, so the focus stays on them. Navigation only ever gets the keys nobody claimed."
+                       Foreground="{ResourceReference TextFillColorSecondary}" Margin="0,0,0,8"/>
+            <StackPanel Orientation="Horizontal">
+                <Slider Width="220" Minimum="0" Maximum="100" Value="40" VerticalAlignment="Center"/>
+                <NumericUpDown Width="150" Minimum="0" Maximum="100" Value="7" Margin="20,0,0,0"/>
+                <TextBox Width="180" Placeholder="text takes them too" Margin="20,0,0,0"/>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</View>

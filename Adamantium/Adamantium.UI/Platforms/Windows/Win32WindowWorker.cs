@@ -848,8 +848,10 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     private IntPtr HandleKeyDown(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
         var press = DecodePress(lParam);
+        // ...to THIS window when nothing is focused: a window opens with no focused element, and a key dropped there
+        // left the keyboard dead until something had been clicked. See KeyboardDevice.ProcessEvent.
         DispatchInput(() => KeyboardDevice.CurrentDevice.ProcessEvent(new RawKeyboardEventArgs((Key)Messages.GetKey(wParam),
-            RawKeyboardEventType.KeyDown, press, KeyboardDevice.CurrentDevice.Modifiers, GetTimeStamp())));
+            RawKeyboardEventType.KeyDown, press, KeyboardDevice.CurrentDevice.Modifiers, GetTimeStamp()), window));
         handled = true;
         return IntPtr.Zero;
     }
@@ -858,7 +860,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     {
         var press = DecodePress(lParam);
         DispatchInput(() => KeyboardDevice.CurrentDevice.ProcessEvent(new RawKeyboardEventArgs((Key)Messages.GetKey(wParam),
-            RawKeyboardEventType.KeyUp, press, KeyboardDevice.CurrentDevice.Modifiers, GetTimeStamp())));
+            RawKeyboardEventType.KeyUp, press, KeyboardDevice.CurrentDevice.Modifiers, GetTimeStamp()), window));
         handled = true;
         return IntPtr.Zero;
     }

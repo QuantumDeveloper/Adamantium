@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- THE FOCUS RING for the whole application: what the keyboard leaves around the control it reached. The adorner
+         stage sizes it to the focused control's bounds (pushed out by Outset) and draws it above the content, so this
+         one style is the focus visual of every control - restyle it here and the whole app follows.
+         A single control wanting a different ring sets its own FocusVisualStyle; that is applied after this and wins. -->
+    <Style Selector="FocusAdorner">
+        <!-- ON the control's own outline, not standing off it. Two reasons, both measured: a ring that stands off is cut
+             by whatever clips the control (a tab fills its strip's height exactly, so its top and bottom fell outside
+             the strip's clip and left two bars down the sides); and the adorner's arrange takes the outset into its
+             SIZE but not into its POSITION, so an offset ring came out shifted by the outset and read as lopsided.
+             Both are worth fixing in the layout/render seam - see docs/TECH_DEBT.md - and until they are, zero is the
+             honest value: the ring traces the control's outline and matches its corners exactly. -->
+        <Setter Property="Outset" Value="0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="FocusAdorner">
+                    <!-- TWO tones, the way UWP draws it: a thick outer line with a thin inner one just inside it. The
+                         outer one is the ACCENT, so the ring says the same thing as every other "this one" cue in the
+                         app and follows an accent change live; the thin inner line is the theme's focus stroke, and it
+                         is what keeps the ring legible where the accent alone would vanish - on an accent-filled
+                         button, or against a card of much the same hue.
+                         AdornedCornerRadius is the control's own rounding grown by the outset, so the ring runs
+                         parallel to the edge it follows. -->
+                    <!-- SIBLINGS in a Grid, not one border nested in the other: the inner line is placed by its own
+                         margin rather than by whatever inset the outer one gives a child, which is the arrangement the
+                         selection frame already uses. -->
+                    <Grid IsHitTestVisible="False">
+                        <Border BorderThickness="2"
+                                BorderBrush="{ThemeResource AccentFillColorDefault}"
+                                CornerRadius="{TemplateBinding AdornedCornerRadius}"/>
+                        <Border Margin="2"
+                                BorderThickness="1"
+                                BorderBrush="{ThemeResource FocusStrokeColorInner}"
+                                CornerRadius="{TemplateBinding AdornedCornerRadius}"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

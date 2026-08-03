@@ -411,7 +411,10 @@ public partial class RenderCache
         if (c == null) return null;
         if (_clipCache.TryGetValue(c, out var cached)) return cached;
         var s = ApplySnap(c);
-        var parentClip = CumulativeClip(s.RenderParent);
+        // An adorner skips its TARGET's own clip and starts from what clips the target - see ClippedByRenderParent.
+        var parentClip = c.ClippedByRenderParent || s.RenderParent == null
+            ? CumulativeClip(s.RenderParent)
+            : CumulativeClip(ApplySnap(s.RenderParent).RenderParent);
         var result = parentClip;
         if (s.ClipToBounds)
         {

@@ -1,6 +1,7 @@
 using System;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Input;
 
 namespace Adamantium.UI.Controls.Panels;
 
@@ -23,6 +24,20 @@ public class TabPanel : Panel
     {
         get => GetValue<Orientation>(OrientationProperty);
         set => SetValue(OrientationProperty, value);
+    }
+
+    /// <summary>The arrows walk the strip ALONG the way it runs - Left/Right on a top strip, Up/Down on a side one -
+    /// and answer nothing across it, where there is no other tab to go to. Tab keeps walking the headers itself; these
+    /// are the moves that belong to the strip's shape.</summary>
+    public override IUIComponent Navigate(IUIComponent from, FocusNavigationDirection direction)
+    {
+        if (!IsArrow(direction))
+            return base.Navigate(from, direction);
+
+        if (IsVertical(direction) != (Orientation == Orientation.Vertical))
+            return null;
+
+        return Neighbour(from, IsForward(direction));
     }
 
     protected override Size MeasureOverride(Size availableSize)

@@ -34,18 +34,9 @@ public static class FocusManager
             element = element.GetSelfAndVisualAncestors().OfType<IInputComponent>().FirstOrDefault(CanFocus);
          }
 
-         if (element != null && Focused != element)
-         {
-            // Use a FRESH args per event: RaiseEvent only sets Source/OriginalSource when they are null (`??= this`), so
-            // reusing one args object across LostFocus then GotFocus made GotFocus carry the LOST element as its
-            // OriginalSource. OnGotFocus derives IsFocused from `OriginalSource == this`, so the newly-focused element
-            // never lit up (no caret, no focus visual). One args each -> each carries its own raiser.
-            Focused?.RaiseEvent(new RoutedEventArgs(LostFocusEvent));
-
-            Focus(element);
-
-            Focused.RaiseEvent(new RoutedEventArgs(GotFocusEvent));
-         }
+         // A CLICK, so the move is announced by Focus itself (see AnnounceFocusMove) - including that this one must not
+         // light a focus ring: the click already said where you are.
+         if (element != null) Focus(element, NavigationMethod.Mouse);
       }
    }
 
@@ -108,14 +99,37 @@ public static class FocusManager
       Focused = null;
    }
 
+   /// <summary>Gives up the focus if it is on <paramref name="element"/>, announcing the move so the ring goes out with
+   /// it. What a control calls when it LEAVES the visual tree: the focus cannot stay on something that is no longer on
+   /// screen - the keyboard would go on walking a tree nobody can see (measured: after a tab swap, Tab kept moving
+   /// through the page that had just been replaced).</summary>
+   public static void Release(IInputComponent element)
+   {
+      if (element == null || !ReferenceEquals(Focused, element))
+         return;
+
+      var previous = Focused;
+      Focused = null;
+      AnnounceFocusMove(previous, null, NavigationMethod.Unspecified);
+   }
+
    public static bool Focus(IInputComponent component, NavigationMethod navigationMethod = NavigationMethod.Unspecified,
       InputModifiers modifiers = InputModifiers.None)
    {
       if (component != null)
       {
+         if (ReferenceEquals(Focused, component)) return true;
+
          var scope = GetFocusScopeAncestors(component).FirstOrDefault();
+         var previous = Focused;
          Focused = component;
          lastFocused = component;
+
+         // Announce the move HERE, not only on the mouse path. Focus set programmatically - which is every keyboard
+         // move, and every control that focuses itself - used to change nothing visible at all, because the events that
+         // drive IsFocused were raised by the mouse handler alone.
+         AnnounceFocusMove(previous, component, navigationMethod);
+
          if (scope != null)
          {
             Scope = scope;
@@ -135,6 +149,27 @@ public static class FocusManager
          }
       }
       return false;
+   }
+
+   /// <summary>True while the focus was last moved BY THE KEYBOARD. What a focus visual keys off: a ring that also
+   /// appeared on every click is noise, since a click already says where you are.</summary>
+   public static bool IsFocusVisible { get; private set; }
+
+   // One place that tells everyone the focus moved: the two elements themselves, and every element that gained or lost
+   // "the focus is somewhere inside me" (the same ancestor-chain machinery IsMouseOver runs on - a composite control has
+   // to know the focus is in its editor without being the focused element itself).
+   private static void AnnounceFocusMove(IInputComponent previous, IInputComponent current, NavigationMethod method)
+   {
+      IsFocusVisible = method is NavigationMethod.Tab or NavigationMethod.Directional;
+
+      // A fresh args per raise: RaiseEvent only fills Source/OriginalSource when they are null, so one shared object
+      // would carry the LOST element into the GOT event - and IsFocused is derived from exactly that.
+      previous?.RaiseEvent(new RoutedEventArgs(LostFocusEvent));
+      current?.RaiseEvent(new RoutedEventArgs(GotFocusEvent));
+
+      AncestorState.Transition(previous, current,
+         Keyboard.GotKeyboardFocusWithinEvent, Keyboard.LostKeyboardFocusWithinEvent,
+         evt => new RoutedEventArgs(evt));
    }
 
    private static IInputComponent lastFocused;

@@ -21,6 +21,7 @@ public partial class GalleryViewModel
         new SplitterViewModel(),
         new ColorPickerViewModel(),
         new RangesViewModel(),
+        new KeyboardViewModel(),
         new ResourcesViewModel(),
         new ScrollBarViewModel(),
         new ListsViewModel(),
