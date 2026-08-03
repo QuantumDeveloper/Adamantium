@@ -1,5 +1,7 @@
 using Adamantium.MVVM;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Media;
 
 namespace Adamantium.Game.Sandbox.ViewModels;
@@ -22,6 +24,31 @@ public partial class RangesViewModel : TabPageViewModel
     [Bindable] private double _value = InitialValue;
 
     [Bindable] private double _maximum = InitialMaximum;
+
+    /// <summary>Swaps the pair in every one of the showcase NumericUpDowns at once - the placements are fixed per box,
+    /// so this one switch shows that the order is independent of where the buttons sit.</summary>
+    [Bindable] private bool _areNumericButtonsSwapped;
+
+    /// <summary>The shapes StringFormat takes, to switch between live: plain numeric formats, and a COMPOSITE one that
+    /// carries a unit along with the number. That last one is also the honest edge - "2.5 kg" is not a number, so the
+    /// box can still be stepped and dragged, but no longer typed into.</summary>
+    public string[] Formats { get; } = ["N0", "N2", "0.###", "C2", "{0:N1} kg"];
+
+    [Bindable] private string _numericFormat = "N2";
+
+    /// <summary>The pointer the value-drag shows, one per direction, picked live. The control takes a Cursor and the
+    /// dropdown offers the enum; <see cref="Cursors.Of"/> is the bridge between the two - which is what it is for.</summary>
+    [Bindable] private CursorType _scrubLeftCursorType = CursorType.SizeEWE;
+
+    [Bindable] private CursorType _scrubRightCursorType = CursorType.SizeEWE;
+
+    public Cursor ScrubLeftCursor => Cursors.Of(ScrubLeftCursorType) ?? Cursors.SizeEWE;
+
+    public Cursor ScrubRightCursor => Cursors.Of(ScrubRightCursorType) ?? Cursors.SizeEWE;
+
+    partial void OnScrubLeftCursorTypeChanged(CursorType value) => RaisePropertyChanged(nameof(ScrubLeftCursor));
+
+    partial void OnScrubRightCursorTypeChanged(CursorType value) => RaisePropertyChanged(nameof(ScrubRightCursor));
 
     [Bindable] private RingStartPosition _startPosition = RingStartPosition.Top;
 

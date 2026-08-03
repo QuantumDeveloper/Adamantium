@@ -1,7 +1,8 @@
 <View xmlns="http://adamantium/ui"
       xmlns:x="http://adamantium/ui/xaml/extensions"
       xmlns:c="clr-namespace:Adamantium.UI.Controls;assembly=Adamantium.UI.Controls"
-      xmlns:m="clr-namespace:Adamantium.UI.Core.Media;assembly=Adamantium.UI.Core">
+      xmlns:m="clr-namespace:Adamantium.UI.Core.Media;assembly=Adamantium.UI.Core"
+      xmlns:i="clr-namespace:Adamantium.UI.Core.Input;assembly=Adamantium.UI.Core">
     <!-- DataContext is the RangesViewModel. One shared Value binds a horizontal + vertical Slider, a linear ProgressBar
          and a RingProgressBar; two dropdowns drive the ring's arc start position and sweep direction.
          Scrolls vertically only: with the horizontal bar disabled the content is measured at the viewport WIDTH, so
@@ -79,7 +80,84 @@
             </StackPanel>
         </StackPanel>
 
-        <!-- Section 2: the circular gauge, bound to the SAME value, with its arc start + sweep direction driven by two
+        <!-- Section 2: the same value typed rather than dragged. All three placements stand side by side rather than
+             hiding behind a dropdown - the point is to compare them - and ONE switch swaps the pair in every one of
+             them at once, which is exactly why placement and order are two knobs and not one enum of six. -->
+        <Border Height="1" Background="{ResourceReference ControlFillColorTertiary}" Margin="0,28,0,0"/>
+        <TextBlock Text="Numeric up-down" FontSize="18" Margin="0,24,0,10"/>
+        <StackPanel Orientation="Horizontal">
+            <StackPanel Orientation="Vertical" Margin="0,0,20,0">
+                <TextBlock Text="Split" Margin="0,0,0,4"/>
+                <NumericUpDown Width="150" ButtonsPlacement="Split"
+                        Value="{Binding Value, Mode=TwoWay}"
+                        Minimum="0" Maximum="{Binding Maximum}"
+                        AreButtonsSwapped="{Binding AreNumericButtonsSwapped}"/>
+            </StackPanel>
+            <StackPanel Orientation="Vertical" Margin="0,0,20,0">
+                <TextBlock Text="Left" Margin="0,0,0,4"/>
+                <NumericUpDown Width="150" ButtonsPlacement="Left"
+                        Value="{Binding Value, Mode=TwoWay}"
+                        Minimum="0" Maximum="{Binding Maximum}"
+                        AreButtonsSwapped="{Binding AreNumericButtonsSwapped}"/>
+            </StackPanel>
+            <StackPanel Orientation="Vertical" Margin="0,0,24,0">
+                <TextBlock Text="Right" Margin="0,0,0,4"/>
+                <NumericUpDown Width="150" ButtonsPlacement="Right"
+                        Value="{Binding Value, Mode=TwoWay}"
+                        Minimum="0" Maximum="{Binding Maximum}"
+                        AreButtonsSwapped="{Binding AreNumericButtonsSwapped}"/>
+            </StackPanel>
+            <CheckBox Content="Swap the buttons" VerticalAlignment="Bottom"
+                      IsChecked="{Binding AreNumericButtonsSwapped, Mode=TwoWay}"/>
+        </StackPanel>
+
+        <!-- The rest of the knobs, one box each, so what every one of them does is visible on its own. -->
+        <StackPanel Orientation="Horizontal" Margin="0,20,0,0">
+            <!-- StringFormat, switchable: the same value written out five ways. Step 0.25 with snapping, so the digits
+                 the format shows are digits the value actually has. -->
+            <StackPanel Orientation="Vertical" Margin="0,0,20,0">
+                <TextBlock Text="String format" Margin="0,0,0,4"/>
+                <NumericUpDown Width="150" Minimum="0" Maximum="10" Value="2.5"
+                        SmallChange="0.25" SnapsToSmallChange="true"
+                        StringFormat="{Binding NumericFormat}"/>
+                <DropDown Width="150" Margin="0,6,0,0"
+                          ItemsSource="{Binding Formats}"
+                          SelectedItem="{Binding NumericFormat, Mode=TwoWay}"/>
+            </StackPanel>
+            <StackPanel Orientation="Vertical" Margin="0,0,20,0">
+                <TextBlock Text="Integers only" Margin="0,0,0,4"/>
+                <NumericUpDown Width="150" Minimum="-50" Maximum="50" Value="7"
+                        InputMode="Integers" StringFormat="N0"/>
+            </StackPanel>
+            <!-- The property-panel field: no buttons, and the number is dragged sideways to change it - the gesture a
+                 3D tool puts on every numeric field. Shift for a tenth of a step, Ctrl for a page. -->
+            <StackPanel Orientation="Vertical" Margin="0,0,20,0">
+                <TextBlock Text="Drag me sideways" Margin="0,0,0,4"/>
+                <NumericUpDown Width="150" Minimum="0" Maximum="100" Value="30"
+                        AreButtonsVisible="false"
+                        IsDragScrubEnabled="true"
+                        TracksMouseWheelWhenOver="true"
+                        ScrubLeftCursor="{Binding ScrubLeftCursor}"
+                        ScrubRightCursor="{Binding ScrubRightCursor}"/>
+            </StackPanel>
+            <StackPanel Orientation="Vertical">
+                <TextBlock Text="Read-only" Margin="0,0,0,4"/>
+                <NumericUpDown Width="150" Minimum="0" Maximum="100" Value="42" IsReadOnly="true"/>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- The drag has a direction, so it has two pointers - pick either. The catalog ships no one-way pair yet, so
+             both start on the plain double-headed arrow; a real .cur can be handed to the same properties in code. -->
+        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <TextBlock Text="Drag cursor, left:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+            <DropDown EnumType="{x:Type i:CursorType}" Width="150"
+                      SelectedItem="{Binding ScrubLeftCursorType, Mode=TwoWay}"/>
+            <TextBlock Text="right:" VerticalAlignment="Center" Margin="16,0,8,0"/>
+            <DropDown EnumType="{x:Type i:CursorType}" Width="150"
+                      SelectedItem="{Binding ScrubRightCursorType, Mode=TwoWay}"/>
+        </StackPanel>
+
+        <!-- Section 3: the circular gauge, bound to the SAME value, with its arc start + sweep direction driven by two
              dropdowns. Kept in its own block so it reads as a distinct feature, not mixed into the linear controls. -->
         <Border Height="1" Background="{ResourceReference ControlFillColorTertiary}" Margin="0,28,0,0"/>
         <TextBlock Text="Ring progress" FontSize="18" Margin="0,24,0,10"/>

@@ -25,6 +25,7 @@
         <StyleInclude Source="{x:Type fluentDark:ToggleSwitchStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:SliderStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:RangeSliderStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:NumericUpDownStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:ProgressBarStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:RingProgressBarStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:BusyIndicatorStyleSet}"/>
