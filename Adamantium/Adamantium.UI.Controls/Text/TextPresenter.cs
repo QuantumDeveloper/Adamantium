@@ -54,12 +54,38 @@ public sealed class TextPresenter : InputUIComponent
     {
         base.OnMouseLeftButtonDown(sender, e);
         if (Owner == null) return;
-        var shift = (Keyboard.Modifiers & (InputModifiers.LeftShift | InputModifiers.RightShift)) != 0;
         var p = e.GetPosition(this);
+
+        // A repeat click SELECTS rather than places: the word under it, then the lot. Dragging is not the only way to
+        // select, and in a box where the drag is spoken for - a NumericUpDown scrubbing its value on that same press -
+        // it is the only way left.
+        if (e.ClickCount >= 3)
+        {
+            Owner.SurfaceSelectAll();
+            e.Handled = true;
+            return;
+        }
+        if (e.ClickCount == 2)
+        {
+            Owner.SurfaceSelectWord(p.X, p.Y);
+            e.Handled = true;
+            return;
+        }
+
+        var shift = (Keyboard.Modifiers & (InputModifiers.LeftShift | InputModifiers.RightShift)) != 0;
         Owner.SurfaceMouseDown(p.X, p.Y, shift);
         _selecting = true;
         CaptureMouse();
         e.Handled = true;
+    }
+
+    /// <summary>Abandon a selection drag in progress, for an owner that has decided the press means something else (see
+    /// <see cref="NumericUpDown"/>'s scrub). Without it the drag stays armed with no way to end - the button-up goes to
+    /// whoever took the capture - and the next hover would carry on selecting.</summary>
+    internal void CancelSelection()
+    {
+        _selecting = false;
+        if (IsMouseCaptured) ReleaseMouseCapture();
     }
 
     protected override void OnMouseMove(object sender, MouseEventArgs e)

@@ -66,19 +66,6 @@ public abstract class TextBoxBase : Control
     public static readonly AdamantiumProperty FloatingPlaceholderForegroundProperty = AdamantiumProperty.Register(nameof(FloatingPlaceholderForeground),
         typeof(Brush), typeof(TextBoxBase), new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
 
-    public static readonly AdamantiumProperty BorderBrushProperty = AdamantiumProperty.Register(nameof(BorderBrush),
-        typeof(Brush), typeof(TextBoxBase), new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));
-
-    public static readonly AdamantiumProperty BorderThicknessProperty = AdamantiumProperty.Register(nameof(BorderThickness),
-        typeof(Thickness), typeof(TextBoxBase), new PropertyMetadata(new Thickness(1), PropertyMetadataOptions.AffectsMeasure));
-
-    public static readonly AdamantiumProperty CornerRadiusProperty = AdamantiumProperty.Register(nameof(CornerRadius),
-        typeof(CornerRadius), typeof(TextBoxBase), new PropertyMetadata(default(CornerRadius), PropertyMetadataOptions.AffectsRender));
-
-    public static readonly AdamantiumProperty PaddingProperty = AdamantiumProperty.Register(nameof(Padding),
-        typeof(Thickness), typeof(TextBoxBase),
-        new PropertyMetadata(new Thickness(8, 4, 8, 4), PropertyMetadataOptions.AffectsMeasure));
-
     public static readonly AdamantiumProperty CaretBrushProperty = AdamantiumProperty.Register(nameof(CaretBrush),
         typeof(Brush), typeof(TextBoxBase), new PropertyMetadata(Brushes.White, PropertyMetadataOptions.AffectsRender));
 
@@ -92,6 +79,13 @@ public abstract class TextBoxBase : Control
         // An editor is a keyboard-focus target - opt in (the base default is now false). Its inner TextPresenter stays
         // non-focusable, so the focus walk from a click on the surface lands here, on the TextBox.
         FocusableProperty.OverrideMetadata(typeof(TextBoxBase), new PropertyMetadata(true));
+
+        // The chrome properties are Control's; an editor only differs in what it defaults them TO - a framed box with
+        // room around its text, rather than Control's bare zeroes.
+        BorderThicknessProperty.OverrideMetadata(typeof(TextBoxBase),
+            new PropertyMetadata(new Thickness(1), PropertyMetadataOptions.AffectsMeasure));
+        PaddingProperty.OverrideMetadata(typeof(TextBoxBase),
+            new PropertyMetadata(new Thickness(8, 4, 8, 4), PropertyMetadataOptions.AffectsMeasure));
 
         // Scroll-bar policy uses the shared ScrollViewer.* ATTACHED properties (no per-control duplicates). An editor
         // defaults to Hidden on BOTH axes - a single-line box scrolls its caret into view WITHOUT ever showing a bar - and
@@ -207,30 +201,6 @@ public abstract class TextBoxBase : Control
         set => SetValue(FloatingPlaceholderForegroundProperty, value);
     }
 
-    public Brush BorderBrush
-    {
-        get => GetValue<Brush>(BorderBrushProperty);
-        set => SetValue(BorderBrushProperty, value);
-    }
-
-    public Thickness BorderThickness
-    {
-        get => GetValue<Thickness>(BorderThicknessProperty);
-        set => SetValue(BorderThicknessProperty, value);
-    }
-
-    public CornerRadius CornerRadius
-    {
-        get => GetValue<CornerRadius>(CornerRadiusProperty);
-        set => SetValue(CornerRadiusProperty, value);
-    }
-
-    public Thickness Padding
-    {
-        get => GetValue<Thickness>(PaddingProperty);
-        set => SetValue(PaddingProperty, value);
-    }
-
     public Brush CaretBrush
     {
         get => GetValue<Brush>(CaretBrushProperty);
@@ -305,6 +275,7 @@ public abstract class TextBoxBase : Control
     private const double CaretPadding = 2.0;   // keep the caret this far from the viewport edge when auto-scrolling
 
     private bool _caretVisible = true;
+    private bool _caretSuppressed;   // an owner has taken the press for something that is not typing - see SuppressCaret
     private bool _blinking;
     private double _blinkAccum;
     private double _textOy;                     // vertical offset of the text within the surface (float strip + single-line centring)
@@ -813,6 +784,67 @@ public abstract class TextBoxBase : Control
     internal void SurfaceMouseMove(double localX, double localY)
         => MoveCaretTo(IndexFromPoint(localX, localY - _textOy), extend: true);
 
+    /// <summary>Double-click: take the word under the point (or the run of spaces, when the click lands between words -
+    /// a gesture that selects nothing at all reads as a dead click).</summary>
+    internal void SurfaceSelectWord(double localX, double localY)
+    {
+        Focus();
+        SelectWordAt(IndexFromPoint(localX, localY - _textOy));
+    }
+
+    /// <summary>Selects the word containing <paramref name="index"/> - what a double-click does, and what anything else
+    /// that wants a word rather than a character can call.</summary>
+    public void SelectWordAt(int index)
+    {
+        var (start, end) = WordAt(index);
+        SelectionStart = start;
+        SelectionLength = end - start;
+        CaretIndex = end;
+    }
+
+    /// <summary>Triple-click: everything.</summary>
+    internal void SurfaceSelectAll()
+    {
+        Focus();
+        SelectAll();
+    }
+
+    /// <summary>Drop a mouse selection that is still in progress - see <see cref="TextPresenter.CancelSelection"/>.</summary>
+    internal void CancelMouseSelection()
+    {
+        _presenter?.CancelSelection();
+        SelectionLength = 0;
+    }
+
+    /// <summary>Hide the caret while an owner has taken the press for something that is not typing - a NumericUpDown
+    /// running its value under a drag. The box keeps focus (the keys still belong to it the moment the drag ends), but a
+    /// caret blinking through the drag claims it is being edited as text, and points at a place in a number that is
+    /// being replaced several times a second.</summary>
+    internal void SuppressCaret(bool suppress)
+    {
+        if (_caretSuppressed == suppress) return;
+
+        _caretSuppressed = suppress;
+        if (suppress) InvalidateSurface();
+        else ResetBlink();   // back from the drag: show it at once rather than mid-blink
+    }
+
+    // The run around an index: a word, or the whitespace between two. Not WordBoundary() twice - that one walks OVER the
+    // gap to the next word, so a click at a word's first character would have selected the word BEFORE it.
+    private (int Start, int End) WordAt(int index)
+    {
+        var text = Text ?? string.Empty;
+        if (text.Length == 0) return (0, 0);
+
+        var i = Math.Clamp(index, 0, text.Length - 1);
+        var inWhitespace = char.IsWhiteSpace(text[i]);
+        var start = i;
+        var end = i;
+        while (start > 0 && char.IsWhiteSpace(text[start - 1]) == inWhitespace) start--;
+        while (end < text.Length && char.IsWhiteSpace(text[end]) == inWhitespace) end++;
+        return (start, end);
+    }
+
     internal void RenderSurface(IDrawingSession session, Size size)
     {
         EnsureLayout();
@@ -851,7 +883,7 @@ public abstract class TextBoxBase : Control
         }
 
         // Caret.
-        if (IsFocused && _caretVisible)
+        if (IsFocused && _caretVisible && !_caretSuppressed)
         {
             var c = CaretRect(CaretIndex);
             session.DrawRectangle(CaretBrush, new Rect(ox + c.X, oy + c.Y, CaretWidth, c.Height));

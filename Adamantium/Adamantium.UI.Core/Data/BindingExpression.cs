@@ -340,6 +340,16 @@ public class BindingExpression : BindingExpressionBase
       if (Binding.Converter != null)
          value = Binding.Converter.ConvertBack(value, _sourceProperty.PropertyType, Binding.ConverterParameter,
             CultureInfo.CurrentCulture);
+
+      // "No value" cannot be written into a source that has no way to hold it: a NumericUpDown that was cleared has a
+      // null Value, and a view-model exposing a plain double would take it as a reflection error mid-keystroke. Leave
+      // the source at what it last agreed to instead - and leave our own copy of it alone too, since nothing moved.
+      if (value == null && _sourceProperty.PropertyType.IsValueType &&
+          Nullable.GetUnderlyingType(_sourceProperty.PropertyType) == null)
+      {
+         return;
+      }
+
       // Guard the ECHO (see _writingSource): our synchronous source write must not schedule a source->target push back.
       _writingSource = true;
       try
