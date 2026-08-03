@@ -49,19 +49,6 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
     public static readonly AdamantiumProperty IsSelectedProperty = AdamantiumProperty.Register(nameof(IsSelected),
         typeof(bool), typeof(TabItem), new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
 
-    public static readonly AdamantiumProperty BorderBrushProperty = AdamantiumProperty.Register(nameof(BorderBrush),
-        typeof(Brush), typeof(TabItem), new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));
-
-    public static readonly AdamantiumProperty BorderThicknessProperty = AdamantiumProperty.Register(nameof(BorderThickness),
-        typeof(Thickness), typeof(TabItem), new PropertyMetadata(default(Thickness), PropertyMetadataOptions.AffectsMeasure));
-
-    public static readonly AdamantiumProperty CornerRadiusProperty = AdamantiumProperty.Register(nameof(CornerRadius),
-        typeof(CornerRadius), typeof(TabItem), new PropertyMetadata(default(CornerRadius), PropertyMetadataOptions.AffectsRender));
-
-    public static readonly AdamantiumProperty PaddingProperty = AdamantiumProperty.Register(nameof(Padding),
-        typeof(Thickness), typeof(TabItem),
-        new PropertyMetadata(default(Thickness), PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
-
     // State brushes the default template's triggers project onto the tab chrome (hover / selected). Exposed as properties
     // so ONE template serves every state - the theme just sets these. Null = no change in that state.
     public static readonly AdamantiumProperty BackgroundPointerOverProperty = AdamantiumProperty.Register(
@@ -194,30 +181,6 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
     {
         get => GetValue<bool>(IsSelectedProperty);
         set => SetValue(IsSelectedProperty, value);
-    }
-
-    public Brush BorderBrush
-    {
-        get => GetValue<Brush>(BorderBrushProperty);
-        set => SetValue(BorderBrushProperty, value);
-    }
-
-    public Thickness BorderThickness
-    {
-        get => GetValue<Thickness>(BorderThicknessProperty);
-        set => SetValue(BorderThicknessProperty, value);
-    }
-
-    public CornerRadius CornerRadius
-    {
-        get => GetValue<CornerRadius>(CornerRadiusProperty);
-        set => SetValue(CornerRadiusProperty, value);
-    }
-
-    public Thickness Padding
-    {
-        get => GetValue<Thickness>(PaddingProperty);
-        set => SetValue(PaddingProperty, value);
     }
 
     public Brush BackgroundPointerOver

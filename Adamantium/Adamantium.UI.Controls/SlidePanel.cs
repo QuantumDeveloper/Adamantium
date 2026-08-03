@@ -40,17 +40,13 @@ public class SlidePanel : ContentControl
     public static readonly AdamantiumProperty SlideDurationProperty = AdamantiumProperty.Register(nameof(SlideDuration),
         typeof(double), typeof(SlidePanel), new PropertyMetadata(0.25));
 
-    public static readonly AdamantiumProperty BorderBrushProperty = AdamantiumProperty.Register(nameof(BorderBrush),
-        typeof(Brush), typeof(SlidePanel), new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));
-
-    public static readonly AdamantiumProperty BorderThicknessProperty = AdamantiumProperty.Register(nameof(BorderThickness),
-        typeof(Thickness), typeof(SlidePanel), new PropertyMetadata(default(Thickness)));
-
-    public static readonly AdamantiumProperty CornerRadiusProperty = AdamantiumProperty.Register(nameof(CornerRadius),
-        typeof(CornerRadius), typeof(SlidePanel), new PropertyMetadata(default(CornerRadius)));
-
-    public static readonly AdamantiumProperty PaddingProperty = AdamantiumProperty.Register(nameof(Padding),
-        typeof(Thickness), typeof(SlidePanel), new PropertyMetadata(new Thickness(16)));
+    static SlidePanel()
+    {
+        // A drawer stands off its content; the chrome property itself is Control's, only the default differs.
+        PaddingProperty.OverrideMetadata(typeof(SlidePanel),
+            new PropertyMetadata(new Thickness(16),
+                PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
+    }
 
     /// <summary>Which window edge the panel docks to and slides from.</summary>
     public Dock Placement
@@ -92,30 +88,6 @@ public class SlidePanel : ContentControl
     {
         get => GetValue<double>(SlideDurationProperty);
         set => SetValue(SlideDurationProperty, value);
-    }
-
-    public Brush BorderBrush
-    {
-        get => GetValue<Brush>(BorderBrushProperty);
-        set => SetValue(BorderBrushProperty, value);
-    }
-
-    public Thickness BorderThickness
-    {
-        get => GetValue<Thickness>(BorderThicknessProperty);
-        set => SetValue(BorderThicknessProperty, value);
-    }
-
-    public CornerRadius CornerRadius
-    {
-        get => GetValue<CornerRadius>(CornerRadiusProperty);
-        set => SetValue(CornerRadiusProperty, value);
-    }
-
-    public Thickness Padding
-    {
-        get => GetValue<Thickness>(PaddingProperty);
-        set => SetValue(PaddingProperty, value);
     }
 
     private Popup _popup;

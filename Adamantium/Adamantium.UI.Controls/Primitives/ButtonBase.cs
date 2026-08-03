@@ -14,23 +14,6 @@ namespace Adamantium.UI.Controls.Primitives;
 /// </summary>
 public abstract class ButtonBase : ContentControl
 {
-    public static readonly AdamantiumProperty BorderBrushProperty = AdamantiumProperty.Register(nameof(BorderBrush),
-        typeof(Brush), typeof(ButtonBase),
-        new PropertyMetadata(Brushes.Transparent, PropertyMetadataOptions.AffectsRender));
-
-    public static readonly AdamantiumProperty CornerRadiusProperty = AdamantiumProperty.Register(nameof(CornerRadius),
-        typeof(CornerRadius), typeof(ButtonBase),
-        new PropertyMetadata(default(CornerRadius), PropertyMetadataOptions.AffectsRender));
-
-    public static readonly AdamantiumProperty BorderThicknessProperty = AdamantiumProperty.Register(nameof(BorderThickness),
-        typeof(Thickness), typeof(ButtonBase),
-        new PropertyMetadata(default(Thickness), PropertyMetadataOptions.AffectsMeasure));
-
-    public static readonly AdamantiumProperty PaddingProperty = AdamantiumProperty.Register(nameof(Padding),
-        typeof(Thickness), typeof(ButtonBase),
-        new PropertyMetadata(default(Thickness),
-            PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsArrange));
-
     // State brushes the default template's triggers project onto the chrome for hover/press/disabled. Exposing them as
     // properties is what lets ONE template serve every button variant: the Accent style just overrides these brushes
     // (via {ThemeResource}), no second template. Set by the theme; null means "no change in that state".
@@ -78,30 +61,6 @@ public abstract class ButtonBase : ContentControl
     {
         add => AddHandler(ClickEvent, value);
         remove => RemoveHandler(ClickEvent, value);
-    }
-
-    public Brush BorderBrush
-    {
-        get => GetValue<Brush>(BorderBrushProperty);
-        set => SetValue(BorderBrushProperty, value);
-    }
-
-    public CornerRadius CornerRadius
-    {
-        get => GetValue<CornerRadius>(CornerRadiusProperty);
-        set => SetValue(CornerRadiusProperty, value);
-    }
-
-    public Thickness BorderThickness
-    {
-        get => GetValue<Thickness>(BorderThicknessProperty);
-        set => SetValue(BorderThicknessProperty, value);
-    }
-
-    public Thickness Padding
-    {
-        get => GetValue<Thickness>(PaddingProperty);
-        set => SetValue(PaddingProperty, value);
     }
 
     public Brush BackgroundPointerOver
