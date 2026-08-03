@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- Two handles on one rail, with the SELECTED span painted between them. The RangeTrack owns the geometry (it sizes
          both thumbs' travel against the trough minus BOTH of them, so they can never overlap) and this style is the rail
@@ -16,11 +15,11 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RangeSlider">
-                    <controls:Grid>
-                        <controls:Border x:Name="Rail" Height="4" CornerRadius="2"
+                    <Grid>
+                        <Border x:Name="Rail" Height="4" CornerRadius="2"
                                 Background="{ResourceReference ControlFillColorTertiary}"
                                 VerticalAlignment="Center"/>
-                        <controls:RangeTrack x:Name="PART_Track"
+                        <RangeTrack x:Name="PART_Track"
                                 Orientation="{TemplateBinding Orientation}"
                                 Minimum="{TemplateBinding Minimum}"
                                 Maximum="{TemplateBinding Maximum}"
@@ -30,39 +29,39 @@
                             <!-- The accent band is a THUMB: it shows the selected span and drags the whole span at once.
                                  Unlike a Slider's fill it is not anchored to an end, so the track arranges it between
                                  the two handles rather than the control sizing it. -->
-                            <controls:RangeTrack.CenterThumb>
-                                <controls:Thumb x:Name="SelectedBand" Height="{TemplateBinding BandThickness}">
-                                    <controls:Thumb.Template>
+                            <RangeTrack.CenterThumb>
+                                <Thumb x:Name="SelectedBand" Height="{TemplateBinding BandThickness}">
+                                    <Thumb.Template>
                                         <ControlTemplate TargetType="Thumb">
                                             <!-- Square ends: the band butts up against a round handle at each side, and a
                                                  rounded end there reads as a gap rather than a join. -->
-                                            <controls:Border Background="{ThemeResource AccentFillColorDefault}"/>
+                                            <Border Background="{ThemeResource AccentFillColorDefault}"/>
                                         </ControlTemplate>
-                                    </controls:Thumb.Template>
-                                </controls:Thumb>
-                            </controls:RangeTrack.CenterThumb>
-                            <controls:RangeTrack.LowerThumb>
-                                <controls:Thumb Width="20" Height="20">
-                                    <controls:Thumb.Template>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </RangeTrack.CenterThumb>
+                            <RangeTrack.LowerThumb>
+                                <Thumb Width="20" Height="20">
+                                    <Thumb.Template>
                                         <ControlTemplate TargetType="Thumb">
-                                            <controls:Border CornerRadius="10"
+                                            <Border CornerRadius="10"
                                                     Background="{ThemeResource AccentFillColorDefault}"/>
                                         </ControlTemplate>
-                                    </controls:Thumb.Template>
-                                </controls:Thumb>
-                            </controls:RangeTrack.LowerThumb>
-                            <controls:RangeTrack.UpperThumb>
-                                <controls:Thumb Width="20" Height="20">
-                                    <controls:Thumb.Template>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </RangeTrack.LowerThumb>
+                            <RangeTrack.UpperThumb>
+                                <Thumb Width="20" Height="20">
+                                    <Thumb.Template>
                                         <ControlTemplate TargetType="Thumb">
-                                            <controls:Border CornerRadius="10"
+                                            <Border CornerRadius="10"
                                                     Background="{ThemeResource AccentFillColorDefault}"/>
                                         </ControlTemplate>
-                                    </controls:Thumb.Template>
-                                </controls:Thumb>
-                            </controls:RangeTrack.UpperThumb>
-                        </controls:RangeTrack>
-                    </controls:Grid>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </RangeTrack.UpperThumb>
+                        </RangeTrack>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
