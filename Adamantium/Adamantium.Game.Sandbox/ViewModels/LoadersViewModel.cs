@@ -11,4 +11,10 @@ public partial class LoadersViewModel : TabPageViewModel
     public LoadersViewModel() : base("Loaders") { }
 
     [Bindable] private bool _isActive = true;
+
+    /// <summary>Zoom for the whole pack. At the size an indicator ships in, its detail - a 3px marching dash, the trim
+    /// of an arc - is a couple of pixels and simply cannot be judged; this is the difference between "looks fine" and
+    /// having actually looked.</summary>
+    [Bindable] private double _scale = 1.0;
+
 }
