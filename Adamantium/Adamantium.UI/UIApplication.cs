@@ -9,6 +9,7 @@ using Adamantium.Core.Collections;
 using Adamantium.Core.DependencyInjection;
 using Adamantium.Core.Events;
 using Adamantium.ECS;
+using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.UI.Core.Diagnostics;
 using Adamantium.UI.AggregatorEvents;
@@ -357,6 +358,9 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         Dispatcher = Threading.Dispatcher.CurrentDispatcher;
         GraphicsDeviceService.IsInDebugMode = EnableGraphicsDebug;
         GraphicsDeviceService.CreateMainDevice("Adamantium Main");
+        // Before ANY window: on a cache cold for this driver this compiles every shader in throwaway child processes,
+        // where the driver's intermittent crash costs a restart instead of the application. Returns at once when done.
+        ShaderPrecompiler.EnsureCompiled(GraphicsDeviceService.ResourceLoaderDevice as GraphicsDevice);
         LoadThemes();
         SubscribeToEvents();
         

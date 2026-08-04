@@ -42,6 +42,10 @@ public static class ShaderBinaryCache
         return _deviceDir;
     }
 
+    /// <summary>The per-device cache folder. Public so <see cref="ShaderPrecompiler"/> can stamp it as complete: the
+    /// stamp then shares this folder's key (GPU + driver version) and so expires by itself when either changes.</summary>
+    public static string DirectoryFor(GraphicsDevice device) => DeviceDir(device);
+
     // The cache file for one shader: "<effect>.<technique>.<pass>.<stage>_<hash>.shaderbin". The NAME is what makes the
     // folder readable - which shader is which, and how many actually compiled - and the HASH is what keeps it correct:
     // it covers the SPIR-V bytes + stage + entry-point name, so editing a shader lands on a new file instead of loading
