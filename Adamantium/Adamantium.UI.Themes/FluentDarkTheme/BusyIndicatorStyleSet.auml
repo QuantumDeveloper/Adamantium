@@ -311,28 +311,39 @@
                 <ControlTemplate TargetType="BusyIndicator">
                     <!-- Nothing here rotates: the dashes travel ALONG the contour (StrokeDashOffset), which is a different
                          motion from a spin - the ring stands still and the pattern flows through it. -->
-                    <controls:Ellipse x:Name="AntsRing"
-                                      Stroke="{ThemeResource AccentFillColorDefault}"
-                                      StrokeThickness="4"
-                                      StrokeDashArray="2 6"
-                                      StrokeDashCap="ConvexRound"
-                                      StrokeDashOffset="0"
-                                      Fill="Transparent"
-                                      EllipseType="EdgeToEdge"/>
+                    <!-- A RECTANGLE, not a ring, and that is the whole effect rather than a styling preference: on a
+                         circle "the dashes travel along the contour" and "the dashed ring spins" are the SAME motion -
+                         nothing can tell them apart, so the marching reads as a spin (which the Ring class already is).
+                         Straight runs and corners are what make it legible, which is also why every selection marquee
+                         this effect is named after is rectangular.
+                         The numbers are in pixels (the array is not scaled by thickness): a dash must be longer than the
+                         stroke is thick or it reads as a dot, and a ROUND dash cap adds half the thickness at each end,
+                         fattening the dash and eating the gap. Flat caps, dash a little shorter than the gap. -->
+                    <controls:Rectangle x:Name="AntsRing"
+                                        CornerRadius="2"
+                                        Stroke="{ThemeResource AccentFillColorDefault}"
+                                        StrokeThickness="3"
+                                        StrokeDashArray="5 7"
+                                        StrokeDashCap="Flat"
+                                        StrokeDashFit="True"
+                                        StrokeDashOffset="0"
+                                        Fill="Transparent"/>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
 
-    <!-- One dash period is (2 + 6) = 8 stroke units, so offsetting by exactly 8 lands the pattern back on itself: the loop
-         is seamless. Any other end value would visibly jump each time it restarts. -->
+    <!-- StrokeDashPhase is measured in PERIODS, so 0 -> 1 is exactly one step of the pattern and the loop is seamless by
+         construction - no adding up the dash array here, and nothing to re-derive when the pattern changes. -->
     <Style Selector="BusyIndicator.Ants">
         <PropertyTrigger Property="IsActive" Value="True">
             <PropertyTrigger.EnterActions>
                 <RunAnimationAction TargetName="AntsRing">
-                    <Animation Duration="0:0:0.7" IterationCount="Infinity">
-                        <KeyFrame Cue="0"><Setter Property="StrokeDashOffset" Value="0"/></KeyFrame>
-                        <KeyFrame Cue="1"><Setter Property="StrokeDashOffset" Value="8"/></KeyFrame>
+                    <!-- One period every third of a second: slower than this and the eye has nothing to lock onto, since
+                         every dash looks like every other and only the SPEED says which way the pattern is going. -->
+                    <Animation Duration="0:0:0.33" IterationCount="Infinity">
+                        <KeyFrame Cue="0"><Setter Property="StrokeDashPhase" Value="0"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="StrokeDashPhase" Value="1"/></KeyFrame>
                     </Animation>
                 </RunAnimationAction>
             </PropertyTrigger.EnterActions>
@@ -349,47 +360,57 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="BusyIndicator">
-                    <!-- A highlight BAND that slides across the card (via a transform - so the compositor plays it on the
-                         render thread) rather than a gradient whose stops move. Its peak colour is a THEMED Color resource
-                         ({ResourceReference ShimmerPeakColor}: a white glare on dark, a dark sweep on light) - a gradient
-                         STOP now takes a resource reference just like an element property, since the resolver applies to any
-                         AdamantiumComponent, not only UI elements. The card and band are Grid SIBLINGS (a Border is a
-                         Decorator and would shrink to a child-less band), and the Grid CLIPS so the tails don't spill. -->
-                    <controls:Grid ClipToBounds="True">
-                        <controls:Border CornerRadius="6" Background="{ResourceReference ShimmerTrackFill}"/>
-                        <controls:Rectangle CornerRadius="6" Stroke="Transparent">
-                            <controls:Rectangle.Fill>
-                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                                    <GradientStop Color="#00000000" Offset="0"/>
-                                    <GradientStop Color="{ResourceReference ShimmerPeakColor}" Offset="0.5"/>
-                                    <GradientStop Color="#00000000" Offset="1"/>
-                                </LinearGradientBrush>
-                            </controls:Rectangle.Fill>
-                            <controls:Rectangle.RenderTransform>
-                                <Transform x:Name="ShimmerSlide" TranslateX="-100"/>
-                            </controls:Rectangle.RenderTransform>
-                        </controls:Rectangle>
-                    </controls:Grid>
+                    <!-- ONE rounded card, painted by ONE gradient whose stops travel. Not a band sliding inside a clipping
+                         Grid, which is what this used to be: the clip is RECTANGULAR (it knows nothing about CornerRadius),
+                         so as the band reached an end it filled the card's rounded corner square while the other end stayed
+                         round. With a single shape there is nothing to clip and the rounding is the card's own - the bug
+                         cannot come back. See docs/TECH_DEBT.md for the clip gap itself, which is still open.
+                         The colours are themed resources (a white glare on dark, a dark sweep on light); a gradient STOP
+                         takes a resource reference just like an element property. -->
+                    <controls:Rectangle CornerRadius="6" Stroke="Transparent">
+                        <controls:Rectangle.Fill>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                <GradientStop x:Name="ShimmerLead" Color="{ResourceReference ShimmerTrackColor}" Offset="0"/>
+                                <GradientStop x:Name="ShimmerPeak" Color="{ResourceReference ShimmerPeakColor}" Offset="0.15"/>
+                                <GradientStop x:Name="ShimmerTrail" Color="{ResourceReference ShimmerTrackColor}" Offset="0.3"/>
+                            </LinearGradientBrush>
+                        </controls:Rectangle.Fill>
+                    </controls:Rectangle>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
 
-    <!-- The band glides across and back (AutoReverse) rather than snapping to the left edge each loop. The card is 180 wide,
-         so a -100..+100 sweep carries the highlight fully off each edge (its tails fade and the Grid clips the rest), giving
-         a clean travel with no hard jump. A single transform track, which the compositor can play on the render thread. -->
+    <!-- The three stops travel together, keeping the 0.3-wide highlight rigid as it crosses. They stay INSIDE 0..1 for the
+         whole sweep on purpose: gradient offsets are clamped to that range, so a stop that ran past an edge would stall
+         there and the glare would pile up in the corner instead of gliding. AutoReverse so it comes back rather than
+         snapping to the left edge each loop. Offset is a PAINT property - measured as the channel that costs nothing. -->
     <Style Selector="BusyIndicator.Shimmer">
         <PropertyTrigger Property="IsActive" Value="True">
             <PropertyTrigger.EnterActions>
-                <RunAnimationAction TargetName="ShimmerSlide">
+                <RunAnimationAction TargetName="ShimmerLead">
                     <Animation Duration="0:0:2.0" IterationCount="Infinity" AutoReverse="True" Easing="CubicInOut">
-                        <KeyFrame Cue="0"><Setter Property="TranslateX" Value="-100"/></KeyFrame>
-                        <KeyFrame Cue="1"><Setter Property="TranslateX" Value="100"/></KeyFrame>
+                        <KeyFrame Cue="0"><Setter Property="Offset" Value="0"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="Offset" Value="0.7"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="ShimmerPeak">
+                    <Animation Duration="0:0:2.0" IterationCount="Infinity" AutoReverse="True" Easing="CubicInOut">
+                        <KeyFrame Cue="0"><Setter Property="Offset" Value="0.15"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="Offset" Value="0.85"/></KeyFrame>
+                    </Animation>
+                </RunAnimationAction>
+                <RunAnimationAction TargetName="ShimmerTrail">
+                    <Animation Duration="0:0:2.0" IterationCount="Infinity" AutoReverse="True" Easing="CubicInOut">
+                        <KeyFrame Cue="0"><Setter Property="Offset" Value="0.3"/></KeyFrame>
+                        <KeyFrame Cue="1"><Setter Property="Offset" Value="1"/></KeyFrame>
                     </Animation>
                 </RunAnimationAction>
             </PropertyTrigger.EnterActions>
             <PropertyTrigger.ExitActions>
-                <StopAnimationAction TargetName="ShimmerSlide"/>
+                <StopAnimationAction TargetName="ShimmerLead"/>
+                <StopAnimationAction TargetName="ShimmerPeak"/>
+                <StopAnimationAction TargetName="ShimmerTrail"/>
             </PropertyTrigger.ExitActions>
         </PropertyTrigger>
     </Style>

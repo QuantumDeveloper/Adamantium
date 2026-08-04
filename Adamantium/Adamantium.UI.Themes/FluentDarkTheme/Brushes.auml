@@ -81,5 +81,8 @@
          card; the light palette inverts it to a DARK sweep, which is what actually reads on a light surface. -->
     <SolidColorBrush x:Key="ShimmerTrackFill" Color="#14FFFFFF"/>
     <math:Color x:Key="ShimmerPeakColor">#99FFFFFF</math:Color>
+    <!-- The track as a COLOUR as well as a brush: the card is now painted by ONE gradient whose flanks are the track, so
+         the flanking stops need a colour. Keep the two in step - they are the same surface. -->
+    <math:Color x:Key="ShimmerTrackColor">#14FFFFFF</math:Color>
 
 </ResourceDictionary>
