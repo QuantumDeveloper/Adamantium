@@ -1,0 +1,202 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:behaviors="clr-namespace:Adamantium.Game.Sandbox.Behaviors">
+    <!-- A BENCH, not a showcase: the numbers at the top are the point. Two sections ask the same question from opposite
+         sides - many ANIMATIONS against many PAINTERS of one animated brush - so a frame's cost can be attributed to one
+         or the other instead of guessed at. Written after 25 orphaned loading pulses took the presented rate from ~900
+         to ~200 while the loop never moved: the leak is fixed, the price of an animation is still worth watching. -->
+    <ScrollViewer Margin="24" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+    <StackPanel Orientation="Vertical">
+        <TextBlock Text="Animation cost bench" FontSize="20"/>
+
+        <Border Margin="0,16,0,0" Padding="10" Background="#CC202020">
+            <TextBlock FontSize="13" Foreground="LightGreen" TextWrapping="WrapBySymbols" Text="collecting...">
+                <TextBlock.Behaviors>
+                    <behaviors:DiagnosticsOverlayBehavior/>
+                </TextBlock.Behaviors>
+            </TextBlock>
+        </Border>
+        <TextBlock Text="1. Many animations" FontSize="16" Margin="0,28,0,0"/>
+        <TextBlock Opacity="0.7" TextWrapping="WrapByWords"
+                   Text="Each indicator runs its own infinite animation and repaints only itself, so the cost here should follow the COUNT. Watch which number moves: 'loop' is layout plus record, 'render' is presented frames."/>
+
+        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <Button Content="+1" Command="{Binding AddOneCommand}"/>
+            <Button Content="+5" Command="{Binding AddFiveCommand}" Margin="8,0,0,0"/>
+            <Button Content="+25" Command="{Binding AddTwentyFiveCommand}" Margin="8,0,0,0"/>
+            <Button Content="Clear" Command="{Binding ClearSpinnersCommand}" Margin="8,0,0,0"/>
+        </StackPanel>
+        <ItemsControl ItemsSource="{Binding Spinners}" Margin="0,12,0,0">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <BusyIndicator IsActive="True" Width="32" Height="32" Margin="6"/>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <TextBlock Text="2. The same count, different channels" FontSize="16" Margin="0,28,0,0"/>
+        <TextBlock Opacity="0.7" TextWrapping="WrapByWords"
+                   Text="25 indicators per press, but of classes that animate DIFFERENT things. Ring/Dots move transforms only; Ripple also animates element Opacity (no compositor channel yet); Arc animates StrokeTrimEnd, which is geometry and rebuilds the stroke every frame. Equal counts, unequal cost - that is the whole point."/>
+
+        <WrapPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <Button Content="+25 of EVERY kind" Command="{Binding AddEveryKindCommand}" Margin="0,0,8,8"/>
+            <Button Content="+25 Dots" Command="{Binding AddDotsCommand}" Margin="0,0,8,8"/>
+            <Button Content="+25 Ripple" Command="{Binding AddRippleCommand}" Margin="0,0,8,8"/>
+            <Button Content="+25 Arc" Command="{Binding AddArcCommand}" Margin="0,0,8,8"/>
+            <Button Content="+25 Bar" Command="{Binding AddBarCommand}" Margin="0,0,8,8"/>
+            <Button Content="+25 Ants" Command="{Binding AddAntsCommand}" Margin="0,0,8,8"/>
+            <Button Content="+25 Equalizer" Command="{Binding AddEqualizerCommand}" Margin="0,0,8,8"/>
+            <Button Content="+25 Flip" Command="{Binding AddFlipCommand}" Margin="0,0,8,8"/>
+            <Button Content="+25 Heartbeat" Command="{Binding AddHeartbeatCommand}" Margin="0,0,8,8"/>
+            <Button Content="+25 Shimmer" Command="{Binding AddShimmerCommand}" Margin="0,0,8,8"/>
+            <Button Content="Clear all" Command="{Binding ClearKindsCommand}" Margin="0,0,8,8"/>
+        </WrapPanel>
+
+        <ItemsControl ItemsSource="{Binding DotsIndicators}" Margin="0,12,0,0">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <BusyIndicator Classes="Dots" IsActive="True" Margin="6"/>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <ItemsControl ItemsSource="{Binding RippleIndicators}" Margin="0,4,0,0">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <BusyIndicator Classes="Ripple" IsActive="True" Width="32" Height="32" Margin="6"/>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <ItemsControl ItemsSource="{Binding ArcIndicators}" Margin="0,4,0,0">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <BusyIndicator Classes="Arc" IsActive="True" Width="32" Height="32" Margin="6"/>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <ItemsControl ItemsSource="{Binding BarIndicators}" Margin="0,4,0,0">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <BusyIndicator Classes="Bar" IsActive="True" Margin="6"/>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <ItemsControl ItemsSource="{Binding AntsIndicators}" Margin="0,4,0,0">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <BusyIndicator Classes="Ants" IsActive="True" Width="32" Height="32" Margin="6"/>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <ItemsControl ItemsSource="{Binding EqualizerIndicators}" Margin="0,4,0,0">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <BusyIndicator Classes="Equalizer" IsActive="True" Margin="6"/>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <ItemsControl ItemsSource="{Binding FlipIndicators}" Margin="0,4,0,0">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <BusyIndicator Classes="Flip" IsActive="True" Margin="6"/>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <ItemsControl ItemsSource="{Binding HeartbeatIndicators}" Margin="0,4,0,0">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <BusyIndicator Classes="Heartbeat" IsActive="True" Margin="6"/>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <ItemsControl ItemsSource="{Binding ShimmerIndicators}" Margin="0,4,0,0">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <BusyIndicator Classes="Shimmer" IsActive="True" Margin="6"/>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <TextBlock Text="3. One animated brush, many painters" FontSize="16" Margin="0,28,0,0"/>
+        <TextBlock Opacity="0.7" TextWrapping="WrapByWords"
+                   Text="Every card paints the SAME brush and ONE animation drives it - how the loading skeletons work. If the cost follows the card count rather than that single animation, the price is paid per painter."/>
+
+        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <Button Content="Toggle pulse" Command="{Binding ToggleSharedPulseCommand}"/>
+            <Button Content="+10 cards" Command="{Binding AddTenSkeletonsCommand}" Margin="8,0,0,0"/>
+            <Button Content="+100 cards" Command="{Binding AddHundredSkeletonsCommand}" Margin="8,0,0,0"/>
+            <Button Content="Clear" Command="{Binding ClearSkeletonsCommand}" Margin="8,0,0,0"/>
+        </StackPanel>
+
+        <ItemsControl ItemsSource="{Binding Skeletons}" Margin="0,12,0,0">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal"/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <!-- The item IS the shared brush, so this binds to itself and every card paints the same one. -->
+                    <Border Width="72" Height="24" Margin="4" CornerRadius="4" Background="{Binding}"/>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </StackPanel>
+    </ScrollViewer>
+</View>

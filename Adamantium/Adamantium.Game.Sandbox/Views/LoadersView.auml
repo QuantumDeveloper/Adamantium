@@ -1,8 +1,11 @@
-<View xmlns="http://adamantium/ui">
+﻿<View xmlns="http://adamantium/ui">
     <!-- DataContext is the LoadersViewModel. The whole pack is theme-authored: BusyIndicator itself carries no look, only
          IsActive - each indicator here is a class-selected template (see BusyIndicatorStyleSet). One toggle drives them
          all, which is also the honest test: switching them OFF must STOP the (infinite) animations, not merely hide them. -->
-    <StackPanel Orientation="Vertical" Margin="24">
+    <!-- Scrollable: the zoom below can make the pack several screens tall, and a bench you cannot reach the bottom of is
+         not a bench. -->
+    <ScrollViewer Margin="24" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+    <StackPanel Orientation="Vertical">
 
         <StackPanel Orientation="Horizontal">
             <ToggleSwitch Content="Running" IsChecked="{Binding IsActive, Mode=TwoWay}"/>
@@ -10,63 +13,107 @@
                        VerticalAlignment="Center" Margin="16,0,0,0" Opacity="0.6"/>
         </StackPanel>
 
+        <!-- Zoom, so the detail can actually be judged: a 3px marching dash at x3 is a 9px dash. Each card carries a
+             bound LayoutTransform - a LAYOUT one, not a render one, so a magnified card takes the room it occupies and
+             the rest reflow around it instead of being drawn over. Binding a Transform is possible because bindings now
+             live on the property system rather than on tree elements (see AdamantiumComponent.SetBinding). -->
+        <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+            <TextBlock Text="Zoom" VerticalAlignment="Center"/>
+            <!-- Snapped to tenths: the exact zoom is never the point, and a free slider just spends its travel on values
+                 nobody can tell apart. -->
+            <Slider Minimum="0.5" Maximum="4" Value="{Binding Scale, Mode=TwoWay}"
+                    TickFrequency="0.1" IsSnapToTickEnabled="True"
+                    Width="260" Margin="12,0,0,0" VerticalAlignment="Center"/>
+            <TextBlock Text="{Binding Scale}" VerticalAlignment="Center" Margin="12,0,0,0" Opacity="0.6"/>
+        </StackPanel>
+
         <WrapPanel Orientation="Horizontal" Margin="0,24,0,0">
 
             <StackPanel Orientation="Vertical" Margin="16" Width="180">
+                <StackPanel.LayoutTransform>
+                    <Transform ScaleX="{Binding Scale}" ScaleY="{Binding Scale}"/>
+                </StackPanel.LayoutTransform>
                 <BusyIndicator IsActive="{Binding IsActive}" Height="56" Width="56"/>
                 <TextBlock Text="Ring" HorizontalTextAlignment="Center" Margin="0,12,0,0"/>
                 <TextBlock Text="a sweeping arc, spinning" HorizontalTextAlignment="Center" Opacity="0.6" FontSize="12"/>
             </StackPanel>
 
             <StackPanel Orientation="Vertical" Margin="16" Width="180">
+                <StackPanel.LayoutTransform>
+                    <Transform ScaleX="{Binding Scale}" ScaleY="{Binding Scale}"/>
+                </StackPanel.LayoutTransform>
                 <BusyIndicator Classes="Dots" IsActive="{Binding IsActive}" HorizontalAlignment="Center"/>
                 <TextBlock Text="Dots" HorizontalTextAlignment="Center" Margin="0,12,0,0"/>
                 <TextBlock Text="one wave, three delays" HorizontalTextAlignment="Center" Opacity="0.6" FontSize="12"/>
             </StackPanel>
 
             <StackPanel Orientation="Vertical" Margin="16" Width="180">
+                <StackPanel.LayoutTransform>
+                    <Transform ScaleX="{Binding Scale}" ScaleY="{Binding Scale}"/>
+                </StackPanel.LayoutTransform>
                 <BusyIndicator Classes="Ripple" IsActive="{Binding IsActive}" Height="56" Width="56"/>
                 <TextBlock Text="Ripple" HorizontalTextAlignment="Center" Margin="0,12,0,0"/>
                 <TextBlock Text="rings growing out of the centre" HorizontalTextAlignment="Center" Opacity="0.6" FontSize="12"/>
             </StackPanel>
 
             <StackPanel Orientation="Vertical" Margin="16" Width="180">
+                <StackPanel.LayoutTransform>
+                    <Transform ScaleX="{Binding Scale}" ScaleY="{Binding Scale}"/>
+                </StackPanel.LayoutTransform>
                 <BusyIndicator Classes="Bar" IsActive="{Binding IsActive}" VerticalAlignment="Center"/>
                 <TextBlock Text="Bar" HorizontalTextAlignment="Center" Margin="0,12,0,0"/>
                 <TextBlock Text="an indeterminate sweep" HorizontalTextAlignment="Center" Opacity="0.6" FontSize="12"/>
             </StackPanel>
 
             <StackPanel Orientation="Vertical" Margin="16" Width="180">
+                <StackPanel.LayoutTransform>
+                    <Transform ScaleX="{Binding Scale}" ScaleY="{Binding Scale}"/>
+                </StackPanel.LayoutTransform>
                 <BusyIndicator Classes="Arc" IsActive="{Binding IsActive}" Height="56" Width="56"/>
                 <TextBlock Text="Arc" HorizontalTextAlignment="Center" Margin="0,12,0,0"/>
                 <TextBlock Text="the arc itself grows and shrinks" HorizontalTextAlignment="Center" Opacity="0.6" FontSize="12"/>
             </StackPanel>
 
             <StackPanel Orientation="Vertical" Margin="16" Width="180">
+                <StackPanel.LayoutTransform>
+                    <Transform ScaleX="{Binding Scale}" ScaleY="{Binding Scale}"/>
+                </StackPanel.LayoutTransform>
                 <BusyIndicator Classes="Ants" IsActive="{Binding IsActive}" Height="56" Width="56"/>
                 <TextBlock Text="Marching ants" HorizontalTextAlignment="Center" Margin="0,12,0,0"/>
                 <TextBlock Text="dashes travel along the ring" HorizontalTextAlignment="Center" Opacity="0.6" FontSize="12"/>
             </StackPanel>
 
             <StackPanel Orientation="Vertical" Margin="16" Width="180">
+                <StackPanel.LayoutTransform>
+                    <Transform ScaleX="{Binding Scale}" ScaleY="{Binding Scale}"/>
+                </StackPanel.LayoutTransform>
                 <BusyIndicator Classes="Heartbeat" IsActive="{Binding IsActive}" Height="56" Width="56"/>
                 <TextBlock Text="Heartbeat" HorizontalTextAlignment="Center" Margin="0,12,0,0"/>
                 <TextBlock Text="two beats, then a rest" HorizontalTextAlignment="Center" Opacity="0.6" FontSize="12"/>
             </StackPanel>
 
             <StackPanel Orientation="Vertical" Margin="16" Width="180">
+                <StackPanel.LayoutTransform>
+                    <Transform ScaleX="{Binding Scale}" ScaleY="{Binding Scale}"/>
+                </StackPanel.LayoutTransform>
                 <BusyIndicator Classes="Equalizer" IsActive="{Binding IsActive}" HorizontalAlignment="Center"/>
                 <TextBlock Text="Equalizer" HorizontalTextAlignment="Center" Margin="0,12,0,0"/>
                 <TextBlock Text="bars on mismatched periods" HorizontalTextAlignment="Center" Opacity="0.6" FontSize="12"/>
             </StackPanel>
 
             <StackPanel Orientation="Vertical" Margin="16" Width="180">
+                <StackPanel.LayoutTransform>
+                    <Transform ScaleX="{Binding Scale}" ScaleY="{Binding Scale}"/>
+                </StackPanel.LayoutTransform>
                 <BusyIndicator Classes="Flip" IsActive="{Binding IsActive}" HorizontalAlignment="Center"/>
                 <TextBlock Text="Flip" HorizontalTextAlignment="Center" Margin="0,12,0,0"/>
                 <TextBlock Text="cards turning in perspective (3D)" HorizontalTextAlignment="Center" Opacity="0.6" FontSize="12"/>
             </StackPanel>
 
             <StackPanel Orientation="Vertical" Margin="16" Width="200">
+                <StackPanel.LayoutTransform>
+                    <Transform ScaleX="{Binding Scale}" ScaleY="{Binding Scale}"/>
+                </StackPanel.LayoutTransform>
                 <BusyIndicator Classes="Shimmer" IsActive="{Binding IsActive}"/>
                 <TextBlock Text="Shimmer" HorizontalTextAlignment="Center" Margin="0,12,0,0"/>
                 <TextBlock Text="a gradient band sweeping a card" HorizontalTextAlignment="Center" Opacity="0.6" FontSize="12"/>
@@ -75,4 +122,5 @@
         </WrapPanel>
 
     </StackPanel>
+    </ScrollViewer>
 </View>
