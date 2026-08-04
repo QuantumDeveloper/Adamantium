@@ -121,6 +121,7 @@ public partial class RenderCache
 
     private readonly List<IUIComponent> _structuralBuf = new();      // components that entered/left the drawn set this frame
     private readonly List<IUIComponent> _movedNodesCapture = new();  // moved motion nodes, for the snapshot re-freeze on a FULL frame
+    private readonly List<IUIComponent> _partialConsumed = new();    // rendered by a partial pass that may yet be discarded
 
     // Structural-record (splice) scratch - the marks name what entered/left; new subtrees get a rank between neighbours' (RecordStructuralFrame):
     private readonly HashSet<IUIComponent> _placeRoots = new();       // outermost unranked (=new) drawn components to place
@@ -214,9 +215,12 @@ public partial class RenderCache
 
             // Record each dirty component; a Fallback stops the pass.
             var fellBack = false;
+            _partialConsumed.Clear();
             foreach (var component in _geometryDirtyBuffer)
             {
-                if (RecordReRender(component, _packet) == PartialRecord.Fallback) { fellBack = true; break; }
+                var recorded = RecordReRender(component, _packet);
+                if (recorded == PartialRecord.Recorded) _partialConsumed.Add(component);
+                if (recorded == PartialRecord.Fallback) { fellBack = true; break; }
             }
 
             // Partial stands ONLY if nothing structural surfaced and the dirty set didn't grow (a Render re-marking
@@ -241,6 +245,16 @@ public partial class RenderCache
                 return;   // packet.Kind == Partial -> ApplyFrame runs the partial apply
             }
             // a structural change or a new invalidation surfaced during the partial pass -> escalate below
+
+            // ...and everything this pass recorded is DISCARDED by the escalated record (it Resets the packet). But
+            // RecordReRender already ran component.Render, which set IsGeometryValid back to true - so the full walk would
+            // read "was clean", get no commands, and REUSE the units describing the component's PREVIOUS appearance
+            // (a de-selected row keeping its highlight through a fast virtualized scroll, forever). Give the flag back:
+            // the pass that supersedes this one must re-record them for real.
+            foreach (var component in _partialConsumed)
+            {
+                component.InvalidateRender(false);
+            }
         }
 
         // STRUCTURAL: content entered/left the drawn set; every change NAMES its component, so the paint order can be
