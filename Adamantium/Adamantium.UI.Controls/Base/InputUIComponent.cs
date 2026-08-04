@@ -108,6 +108,10 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
             new RoutedEventHandler(GotKeyboardFocusWithinHandler));
         Keyboard.LostKeyboardFocusWithinEvent.RegisterClassHandler<IInputComponent>(
             new RoutedEventHandler(LostKeyboardFocusWithinHandler));
+        Keyboard.KeyDownEvent.RegisterClassHandler<IInputComponent>(new KeyEventHandler(KeyDownHandler));
+        Keyboard.KeyUpEvent.RegisterClassHandler<IInputComponent>(new KeyEventHandler(KeyUpHandler));
+        Keyboard.PreviewKeyDownEvent.RegisterClassHandler<IInputComponent>(new KeyEventHandler(PreviewKeyDownHandler));
+        Keyboard.PreviewKeyUpEvent.RegisterClassHandler<IInputComponent>(new KeyEventHandler(PreviewKeyUpHandler));
         Mouse.MouseEnterEvent.RegisterClassHandler<IInputComponent>(new MouseEventHandler(MouseEnterHandler));
         Mouse.MouseLeaveEvent.RegisterClassHandler<IInputComponent>(new MouseEventHandler(MouseLeaveHandler));
         Mouse.PreviewMouseDownEvent.RegisterClassHandler<IInputComponent>(new MouseButtonEventHandler(PreviewMouseDownHandler));
@@ -671,6 +675,50 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         ui?.OnLostFocus(e);
     }
 
+    // The keyboard is subscribed ONCE, here, like the mouse and the focus - and handed to a virtual, so a control that
+    // wants a key overrides OnKeyDown instead of registering a class handler of its own. It runs on every element the
+    // key bubbles through, each with itself as sender, which is what lets a control claim a key its child ignored.
+    private static void KeyDownHandler(object sender, KeyEventArgs e)
+    {
+        (sender as InputUIComponent)?.OnKeyDown(e);
+    }
+
+    private static void KeyUpHandler(object sender, KeyEventArgs e)
+    {
+        (sender as InputUIComponent)?.OnKeyUp(e);
+    }
+
+    private static void PreviewKeyDownHandler(object sender, KeyEventArgs e)
+    {
+        (sender as InputUIComponent)?.OnPreviewKeyDown(e);
+    }
+
+    private static void PreviewKeyUpHandler(object sender, KeyEventArgs e)
+    {
+        (sender as InputUIComponent)?.OnPreviewKeyUp(e);
+    }
+
+    /// <summary>A key travelling up through this element. Set <see cref="RoutedEventArgs.Handled"/> to claim it - that
+    /// is the whole contract with navigation, which only ever gets the keys nobody claimed.</summary>
+    protected virtual void OnKeyDown(KeyEventArgs e)
+    {
+    }
+
+    protected virtual void OnKeyUp(KeyEventArgs e)
+    {
+    }
+
+    /// <summary>The same key on the way DOWN, before anything inside this element sees it - what a composite control
+    /// takes a key with when its own editor would otherwise claim it first (an arrow key stepping a numeric's value
+    /// rather than the caret inside its text box).</summary>
+    protected virtual void OnPreviewKeyDown(KeyEventArgs e)
+    {
+    }
+
+    protected virtual void OnPreviewKeyUp(KeyEventArgs e)
+    {
+    }
+
     // Raised individually on each element that JOINED or LEFT the focused element's ancestor chain, so the state is
     // simply set - there is no chain to walk here, that already happened.
     private static void GotKeyboardFocusWithinHandler(object sender, RoutedEventArgs e)
@@ -1100,7 +1148,21 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     {
         IsFocused = e.OriginalSource == this;
         if (IsFocused && FocusManager.IsFocusVisible)
-            AdornerHost()?.AdornerLayer.SetFocus(this);
+            AdornerHost()?.AdornerLayer.SetFocus(FocusVisualOwner());
+    }
+
+    /// <summary>The control the focus ring belongs to: a focused TEMPLATE PART marks the control it is part of, never
+    /// itself. The keyboard is in a NumericUpDown - not in "the text box inside its frame" - and a ring around that
+    /// editor draws a second box inside the control's own one, around a part the user does not think of as a control at
+    /// all. Content authored in a view has no templated parent, so it rings itself (measured: a page's buttons, check
+    /// boxes and drop-downs all report none, while the numeric's editor reports the numeric).</summary>
+    private InputUIComponent FocusVisualOwner()
+    {
+        var owner = this;
+        while (owner.TemplatedParent is InputUIComponent templated)
+            owner = templated;
+
+        return owner;
     }
 
     protected virtual void OnLostFocus(RoutedEventArgs e)
@@ -1122,7 +1184,10 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
                 return host;
         }
 
-        return null;
+        // Nothing above: this element is hosted on the OVERLAY - a menu row, a drop-down's list - whose content has no
+        // visual path back to the window at all. The popup recorded which window it was hosted in, so ask it; without
+        // this the keyboard could move about inside an open popup with nothing to show for it.
+        return Popup.HostOf(this) as IAdornerHost;
     }
 
     /// <summary>Leaving the tree gives up the focus. A control taken off screen - the page a tab swap replaced, a row a

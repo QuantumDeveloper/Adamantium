@@ -41,10 +41,13 @@ public class ListBox : Selector
         // The arrows are the LIST's own business, not the navigator's: they move the SELECTION, and the focus and the
         // scroll follow it. The navigator only ever gets keys nobody claimed, so claiming them here is what stops the
         // focus wandering off to a neighbouring control instead of down the rows.
-        Keyboard.KeyDownEvent.RegisterClassHandler<ListBox>(new KeyEventHandler(OnKeyDownClassHandler));
     }
 
-    private static void OnKeyDownClassHandler(object sender, KeyEventArgs e) => (sender as ListBox)?.OnNavigationKey(e);
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        OnNavigationKey(e);
+    }
 
     private void OnNavigationKey(KeyEventArgs e)
     {

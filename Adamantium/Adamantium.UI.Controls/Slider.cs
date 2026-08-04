@@ -45,7 +45,6 @@ public class Slider : RangeBase
 
     static Slider()
     {
-        Keyboard.KeyDownEvent.RegisterClassHandler<Slider>(new KeyEventHandler(KeyDownClassHandler));
         // Slider convention: a 0..100 range (vs RangeBase's 0..1). A metadata default, NOT a constructor set - a set
         // writes Local priority, which outranks and permanently masks a {Binding}/Style/Trigger on Maximum (the bug that
         // froze a data-bound slider). Re-use RangeBase's OnMaximumChanged so the re-coercion still fires. LargeChange (10)
@@ -372,13 +371,9 @@ public class Slider : RangeBase
         return snapped;
     }
 
-    private static void KeyDownClassHandler(object sender, KeyEventArgs e)
+    protected override void OnKeyDown(KeyEventArgs e)
     {
-        if (sender is Slider slider) slider.OnKeyDownInternal(e);
-    }
-
-    private void OnKeyDownInternal(KeyEventArgs e)
-    {
+        base.OnKeyDown(e);
         if (!IsEnabled) return;
 
         // Reversed so Up/Right increase and Down/Left decrease for BOTH orientations (a vertical slider's top is its max).

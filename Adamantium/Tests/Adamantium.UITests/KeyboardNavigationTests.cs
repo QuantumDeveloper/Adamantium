@@ -765,6 +765,149 @@ public class KeyboardNavigationTests
         });
     }
 
+    /// <summary>Closing an overlay puts the keyboard back where it was. Otherwise it is stranded on something that has
+    /// just left the screen, and the next Tab starts again from the top of the window instead of carrying on from the
+    /// control that opened the thing - which is exactly what Escape is pressed to undo.</summary>
+    [Test]
+    public void ClosingAnOverlayGivesTheFocusBack()
+    {
+        var opener = NewButton("opener");
+        var inside = NewButton("inside");
+        var popup = new Popup { Child = inside, KeepOpen = true };
+
+        var page = new StackPanel();
+        page.Children.Add(opener);
+        page.Children.Add(popup);
+        var window = new Window { Width = 300, Height = 200, Content = page };
+        for (var i = 0; i < 5; i++) WindowExtension.UpdateTree(window);
+
+        FocusManager.Focus(opener, NavigationMethod.Tab);
+        popup.IsOpen = true;
+        for (var i = 0; i < 5; i++) WindowExtension.UpdateTree(window);
+        FocusManager.Focus(inside, NavigationMethod.Tab);
+
+        popup.IsOpen = false;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(FocusManager.Focused, Is.SameAs(opener), "back to what opened it");
+            Assert.That(FocusManager.IsFocusVisible, Is.True, "and it looks the way it did - the ring came back with it");
+        });
+    }
+
+    /// <summary>...but a focus that has MOVED ON is left alone: the person has already said where they want to be.</summary>
+    [Test]
+    public void ClosingAnOverlayLeavesAFocusThatMovedOnAlone()
+    {
+        var opener = NewButton("opener");
+        var elsewhere = NewButton("elsewhere");
+        var inside = NewButton("inside");
+        var popup = new Popup { Child = inside, KeepOpen = true };
+
+        var page = new StackPanel();
+        page.Children.Add(opener);
+        page.Children.Add(elsewhere);
+        page.Children.Add(popup);
+        var window = new Window { Width = 300, Height = 200, Content = page };
+        for (var i = 0; i < 5; i++) WindowExtension.UpdateTree(window);
+
+        FocusManager.Focus(opener, NavigationMethod.Tab);
+        popup.IsOpen = true;
+        for (var i = 0; i < 5; i++) WindowExtension.UpdateTree(window);
+        FocusManager.Focus(elsewhere, NavigationMethod.Mouse);   // a click landed outside the overlay
+
+        popup.IsOpen = false;
+
+        Assert.That(FocusManager.Focused, Is.SameAs(elsewhere));
+    }
+
+    /// <summary>A panel with no shape of its own answers the arrows with the order its children were added - the only
+    /// order it honestly knows. A Canvas places every child by hand and a DockPanel stacks them against edges; neither
+    /// has a row or a column to walk, and answering nothing left the arrows dead inside them.</summary>
+    [Test]
+    public void APanelWithNoShapeWalksItsChildrenInOrder()
+    {
+        var a = NewButton("a");
+        var b = NewButton("b");
+        var c = NewButton("c");
+        var canvas = new Canvas();
+        canvas.Children.Add(a);
+        canvas.Children.Add(b);
+        canvas.Children.Add(c);
+        Root(canvas);
+
+        FocusManager.Focus(b);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Down), Is.True);
+            Assert.That(FocusManager.Focused, Is.SameAs(c), "down runs with the order");
+            Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Left), Is.True);
+            Assert.That(FocusManager.Focused, Is.SameAs(b), "...and left runs against it");
+            Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Up), Is.True);
+            Assert.That(FocusManager.Focused, Is.SameAs(a));
+            Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Up), Is.False, "and it stops at the end");
+        });
+    }
+
+    /// <summary>...and where the author numbered that panel, the arrows follow the NUMBERS. In a panel with no rows and
+    /// no columns there is nothing an arrow can mean except the panel's order, so an explicit one is stated once and
+    /// answers both keys. (A panel with a shape is the opposite case - see the grid and the wrapped tiles.)</summary>
+    [Test]
+    public void ANumberedShapelessPanelIsWalkedByItsNumbers()
+    {
+        var a = NewButton("a");
+        var b = NewButton("b");
+        var c = NewButton("c");
+        KeyboardNavigation.SetTabIndex(a, 3);
+        KeyboardNavigation.SetTabIndex(b, 1);
+        KeyboardNavigation.SetTabIndex(c, 2);
+
+        var canvas = new Canvas();
+        canvas.Children.Add(a);
+        canvas.Children.Add(b);
+        canvas.Children.Add(c);
+        Root(canvas);
+
+        FocusManager.Focus(b);   // the one numbered first
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Right), Is.True);
+            Assert.That(FocusManager.Focused, Is.SameAs(c), "2 comes after 1");
+            Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Down), Is.True);
+            Assert.That(FocusManager.Focused, Is.SameAs(a), "...and 3 after 2, whatever order they were added in");
+        });
+    }
+
+    /// <summary>A focused TEMPLATE PART marks the control it is part of. A composite control - a numeric whose editor
+    /// holds the focus - is what the user sees and what the ring has to wrap; a ring around the editor draws a second
+    /// box inside the control's own frame.</summary>
+    [Test]
+    public void TheRingOnATemplatePartMarksTheControlItIsPartOf()
+    {
+        var editor = new TextBox { Width = 60, Height = 20 };
+        var control = new Button
+        {
+            Width = 100,
+            Height = 30,
+            Template = new ControlTemplate(() => new TemplateResult { RootComponent = editor })
+        };
+
+        var window = new Window { Width = 200, Height = 100, Content = control };
+        for (var i = 0; i < 5; i++) WindowExtension.UpdateTree(window);
+        Assert.That(editor.TemplatedParent, Is.SameAs(control), "sanity: the editor is a part of the control's template");
+
+        FocusManager.Focus(editor, NavigationMethod.Tab);
+
+        var ring = window.AdornerLayer.Adorners.OfType<FocusAdorner>().SingleOrDefault();
+        Assert.Multiple(() =>
+        {
+            Assert.That(ring, Is.Not.Null);
+            Assert.That(ring?.AdornedElement, Is.SameAs(control), "the ring wraps the control, not its part");
+        });
+    }
+
     /// <summary>Stepping INTO a container - what Enter on a tab header does. Tab keeps walking the headers, so the way
     /// into a page cannot be Tab; it is this. False when there is nowhere to land, which is how a caller knows the page
     /// has not been built yet and it should ask again.</summary>

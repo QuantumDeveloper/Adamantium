@@ -219,6 +219,19 @@ public class Popup : MeasurableUIComponent, IContainer
     // window via the recorded entry on its anchor's overlay-root ancestor. Weak-keyed so a closed popup's child is collectable.
     private static readonly ConditionalWeakTable<IUIComponent, IPopupHost> OverlayRootHost = new();
 
+    /// <summary>The window an element hosted on the overlay belongs to, for anything that has to walk OUT of a popup and
+    /// cannot do it visually - the focus ring looking for the layer to draw itself on, most of all. Null for an element
+    /// that is not inside an open popup.</summary>
+    public static IPopupHost HostOf(IUIComponent element)
+    {
+        for (var node = element; node != null; node = node.VisualParent)
+        {
+            if (OverlayRootHost.TryGetValue(node, out var host)) return host;
+        }
+
+        return null;
+    }
+
     private void Open()
     {
         // First open: realize the deferred content (build + theme it NOW, not in the owner's template). A leaf whose submenu
@@ -241,9 +254,12 @@ public class Popup : MeasurableUIComponent, IContainer
         if (_host == null) return;   // not in a window yet; OnAttachedToVisualTree retries
         if (Child is UIComponent child) child.DataContext = DataContext;
         if (Child is IUIComponent overlayRoot) OverlayRootHost.AddOrUpdate(overlayRoot, _host);   // so nested popups find it
+        _focusReturn.Capture();   // where the keyboard was, so closing can put it back
         _host.PopupLayer.Add(this);
         if (!KeepOpen) HookLightDismiss();   // click-outside-to-close, hosted centrally here (see OnGlobalPreviewDown)
     }
+
+    private readonly FocusReturn _focusReturn = new();
 
     private void Close()
     {
@@ -252,6 +268,9 @@ public class Popup : MeasurableUIComponent, IContainer
         if (Child is IUIComponent overlayRoot) OverlayRootHost.Remove(overlayRoot);
         _host?.PopupLayer.Remove(this);
         _host = null;
+        // The focus goes back to whatever opened this - but only if it is still in here, where it is about to be
+        // stranded. See FocusReturn.
+        if (wasOpen) _focusReturn.Restore(Child);
         if (wasOpen) Closed?.Invoke(this, EventArgs.Empty);
     }
 

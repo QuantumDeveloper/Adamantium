@@ -1,5 +1,6 @@
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
+using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Controls;
 
@@ -19,6 +20,19 @@ public class DropDownItem : ListBoxItem
         // base sets IsPressed/Focus/Handled (its ListBox lookup is a harmless no-op with no ListBox ancestor here).
         base.OnMouseLeftButtonDown(sender, e);
         (Owner ?? FindOwnerLogically())?.SelectFromContainer(this);
+    }
+
+    /// <summary>Enter or Space on a row that somehow holds the focus (a click focuses it) picks it - the same thing the
+    /// press does. The keyboard's normal path never comes through here: the drop-down keeps the focus on its header and
+    /// answers the arrows itself, because a key pressed inside the popup would never reach the control that owns it.</summary>
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Handled || e.Key is not (Key.Enter or Key.Space))
+            return;
+
+        (Owner ?? FindOwnerLogically())?.SelectFromContainer(this);
+        e.Handled = true;
     }
 
     // Fallback for an authored DropDownItem (no PrepareContainer): the popup child keeps a LOGICAL link to the DropDown

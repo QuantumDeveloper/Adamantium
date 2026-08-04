@@ -68,11 +68,12 @@ public class RenderTargetPanel : Grid
    private bool _rightDown;  // Drag mode: right button held on the panel
    private Vector2 _engagePoint;   // panel-relative cursor position at engage; restored (as screen) on release
 
-   public RenderTargetPanel()
+   // Esc is the always-available escape hatch out of mouse-look (frees the hidden cursor), the safety net for
+   // Continuous mode and any missed button-up.
+   protected override void OnKeyDown(KeyEventArgs e)
    {
-      // Esc is the always-available escape hatch out of mouse-look (frees the hidden cursor), the safety net for
-      // Continuous mode and any missed button-up.
-      KeyDown += (_, e) => { if (e.Key == Key.Escape) Disengage(); };
+      base.OnKeyDown(e);
+      if (e.Key == Key.Escape) Disengage();
    }
 
    /// <summary>

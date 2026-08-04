@@ -52,6 +52,61 @@ public class DropDown : Selector
         FocusableProperty.OverrideMetadata(typeof(DropDown), new PropertyMetadata(true));
     }
 
+    /// <summary>The whole keyboard contract of a drop-down, answered HERE, on the header, which keeps the focus the
+    /// entire time: Enter/Space opens, the arrows move the highlighted row while it is open, Enter/Space then closes on
+    /// that row, and Escape closes putting back what was chosen before.
+    /// <para>The focus deliberately never goes INTO the list. The popup's contents hang on the overlay with no visual
+    /// path back, so a key pressed with the focus down there never travels through this control - which is exactly how
+    /// an earlier attempt left both Escape and the arrows dead once the list was open.</para></summary>
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Handled || !IsEnabled)
+            return;
+
+        if (!IsDropDownOpen)
+        {
+            if (e.Key is not (Key.Enter or Key.Space or Key.DownArrow))
+                return;
+
+            _indexOnOpen = SelectedIndex;   // what Escape puts back
+            IsDropDownOpen = true;
+            e.Handled = true;
+            return;
+        }
+
+        switch (e.Key)
+        {
+            case Key.DownArrow:
+            case Key.UpArrow:
+                Step(e.Key == Key.DownArrow ? 1 : -1);
+                e.Handled = true;
+                break;
+            case Key.Enter or Key.Space:
+                IsDropDownOpen = false;   // the highlighted row is already the selected one
+                e.Handled = true;
+                break;
+            case Key.Escape:
+                if (_indexOnOpen != SelectedIndex) SelectSingle(_indexOnOpen);
+                IsDropDownOpen = false;
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private int _indexOnOpen = -1;
+
+    // One row along, clamped at the ends - the same step the wheel takes over a closed drop-down.
+    private void Step(int delta)
+    {
+        var count = Items.Count;
+        if (count == 0) return;
+
+        var from = SelectedIndex < 0 ? (delta > 0 ? -1 : count) : SelectedIndex;
+        var next = Math.Clamp(from + delta, 0, count - 1);
+        if (next != SelectedIndex) SelectSingle(next);
+    }
+
     public DropDown()
     {
         SelectionChanged += (_, _) => UpdateDisplayContent();
@@ -164,6 +219,11 @@ public class DropDown : Selector
     // an enum-bound dropdown reads well out of the box while SelectedItem stays the real enum value. Anything else ToStrings.
     private object FormatForDisplay(object item)
     {
+        // An item authored as its own container is a CONTROL, and a control can only be in one place: handing it to the
+        // header takes the row OUT of the list. Measured while arrowing through an open list - the highlighted row
+        // vanished for a frame and the header jumped to its size. Show what the row holds, not the row itself.
+        if (item is DropDownItem container) item = container.Content;
+
         // A template (fixed OR selector-chosen) renders the raw item itself, so pass it through untouched - flattening an
         // enum to its friendly string here would hand the template/selector a string instead of the real value.
         if (ItemTemplate != null || ItemTemplateSelector != null || item is not Enum e) return item;

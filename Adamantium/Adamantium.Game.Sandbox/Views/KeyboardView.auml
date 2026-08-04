@@ -79,10 +79,54 @@
             <TextBlock Text="5. Controls that claim the arrows" FontSize="16" Margin="0,20,0,6"/>
             <TextBlock Text="A slider and a number take the arrows to change their value, so the focus stays on them. Navigation only ever gets the keys nobody claimed."
                        Foreground="{ResourceReference TextFillColorSecondary}" Margin="0,0,0,8"/>
+            <TextBlock Text="Watch the number: the focus is really on the text box inside its frame, yet the ring wraps the whole control. A focused part of a template marks the control it is part of - nobody thinks of that editor as a control of its own."
+                       Foreground="{ResourceReference TextFillColorSecondary}" Margin="0,0,0,8"/>
             <StackPanel Orientation="Horizontal">
                 <Slider Width="220" Minimum="0" Maximum="100" Value="40" VerticalAlignment="Center"/>
                 <NumericUpDown Width="150" Minimum="0" Maximum="100" Value="7" Margin="20,0,0,0"/>
                 <TextBox Width="180" Placeholder="text takes them too" Margin="20,0,0,0"/>
+            </StackPanel>
+
+            <!-- 6. Panels with no shape: a Canvas places every child by hand and a DockPanel stacks them against edges,
+                    so neither has a row or a column an arrow could walk. Both answer with the order the children were
+                    added - the only order they honestly know. -->
+            <Border Height="1" Background="{ResourceReference ControlFillColorTertiary}" Margin="0,24,0,0"/>
+            <TextBlock Text="6. A panel with no shape walks the order it was given" FontSize="16" Margin="0,20,0,6"/>
+            <TextBlock Text="Nothing here sits in a row or a column - these buttons are placed by hand, and docked to edges. Down and Right run with the order they were added to the panel, Up and Left against it."
+                       Foreground="{ResourceReference TextFillColorSecondary}" Margin="0,0,0,8"/>
+            <StackPanel Orientation="Horizontal" MarginBottom="24">
+                <Border BorderBrush="{ResourceReference ControlStrokeColorDefault}" BorderThickness="1" CornerRadius="4"
+                        Width="230" Height="130">
+                    <!-- Added first, second, third - but placed so that no reading of the layout gives that order. -->
+                    <Canvas>
+                        <Button Content="first" Width="80" Height="30" Canvas.Left="12" Canvas.Top="70"/>
+                        <Button Content="second" Width="80" Height="30" Canvas.Left="120" Canvas.Top="16"/>
+                        <Button Content="third" Width="80" Height="30" Canvas.Left="30" Canvas.Top="20"/>
+                    </Canvas>
+                </Border>
+                <Border BorderBrush="{ResourceReference ControlStrokeColorDefault}" BorderThickness="1" CornerRadius="4"
+                        Width="230" Height="130" Margin="20,0,0,0">
+                    <DockPanel>
+                        <Button Content="top" Height="30" DockPanel.Dock="Top"/>
+                        <Button Content="bottom" Height="30" DockPanel.Dock="Bottom"/>
+                        <Button Content="left" Width="80" DockPanel.Dock="Left"/>
+                        <Button Content="fills the rest"/>
+                    </DockPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- 7. An overlay is a place you come BACK from: closing it returns the keyboard to whatever opened it,
+                    looking the way it looked. Otherwise the focus is stranded on something no longer on screen and the
+                    next Tab starts again from the top of the window. -->
+            <Border Height="1" Background="{ResourceReference ControlFillColorTertiary}" Margin="0,24,0,0"/>
+            <TextBlock Text="7. An overlay gives the focus back" FontSize="16" Margin="0,20,0,6"/>
+            <TextBlock Text="Tab to the list below, open it with Enter, then close it with Escape - the ring comes back to the drop-down itself, not to the top of the page. Pick with Enter and it comes back too."
+                       Foreground="{ResourceReference TextFillColorSecondary}" Margin="0,0,0,8"/>
+            <StackPanel Orientation="Horizontal" MarginBottom="24">
+                <DropDown Width="200" Placeholder="Open me with Enter" ItemsSource="{Binding Tiles}"/>
+                <TextBlock Text="Tab lands here after it" VerticalAlignment="Center" Margin="20,0,0,0"
+                           Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <Button Content="After the list" Width="140" Height="34" Margin="20,0,0,0"/>
             </StackPanel>
 
         </StackPanel>

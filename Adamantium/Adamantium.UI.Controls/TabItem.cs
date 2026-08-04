@@ -129,20 +129,20 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
         FocusableProperty.OverrideMetadata(typeof(TabItem), new PropertyMetadata(true));
         FontSizeProperty.OverrideMetadata(typeof(TabItem),
             new PropertyMetadata(13.0, PropertyMetadataOptions.Inherits | PropertyMetadataOptions.AffectsMeasure));
-        // Enter/Space OPENS the tab: picks it and steps into its page. Tab keeps walking the headers, which is how a
-        // strip is read; this is the way IN, so reaching the page never means tabbing past every other header.
-        Keyboard.KeyDownEvent.RegisterClassHandler<TabItem>(new KeyEventHandler(OnKeyDownClassHandler));
     }
 
-    private static void OnKeyDownClassHandler(object sender, KeyEventArgs e)
+    /// <summary>Enter/Space OPENS the tab: picks it and steps into its page. Tab keeps walking the headers, which is how
+    /// a strip is read; this is the way IN, so reaching the page never means tabbing past every other header.</summary>
+    protected override void OnKeyDown(KeyEventArgs e)
     {
-        if (e.Handled || sender is not TabItem tab || e.OriginalSource != tab)
+        base.OnKeyDown(e);
+        if (e.Handled || e.OriginalSource != this)
             return;
 
         if (e.Key is not (Key.Enter or Key.Space))
             return;
 
-        tab.Owner?.EnterTab(tab);
+        Owner?.EnterTab(this);
         e.Handled = true;
     }
 
