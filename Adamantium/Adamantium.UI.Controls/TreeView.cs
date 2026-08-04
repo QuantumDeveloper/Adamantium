@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Base;
+using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Data;
 using Adamantium.UI.Core.Input;
@@ -23,6 +24,17 @@ namespace Adamantium.UI.Controls;
 /// </summary>
 public class TreeView : ItemsControl
 {
+    static TreeView()
+    {
+        // The same standing a list box has, and for the same reasons: the tree takes the keyboard (its arrows walk the
+        // rows), but for Tab it is a DOORWAY, not a stop - entered once, onto a row, and the next Tab leaves the whole
+        // tree rather than walking every node in it.
+        FocusableProperty.OverrideMetadata(typeof(TreeView), new PropertyMetadata(true));
+        KeyboardNavigation.IsTabStopProperty.OverrideMetadata(typeof(TreeView), new PropertyMetadata(false));
+        KeyboardNavigation.TabNavigationProperty.OverrideMetadata(typeof(TreeView),
+            new PropertyMetadata(KeyboardNavigationMode.Once));
+    }
+
     // Read-only: the DATA item behind the most-recently selected node (null = nothing selected).
     public static readonly AdamantiumProperty SelectedItemProperty = AdamantiumProperty.Register(nameof(SelectedItem),
         typeof(object), typeof(TreeView), new PropertyMetadata(null));
@@ -49,6 +61,9 @@ public class TreeView : ItemsControl
     // containers just mirror their row. The set is the currently-selected rows; the anchor is the Shift-range fixed end.
     private readonly HashSet<TreeRow> _selectedRows = [];
     private TreeRow _anchorRow;
+    // The row that owns the KEYBOARD place - the same reason selection lives on rows, and it survives virtualization the
+    // same way. See PrepareContainer: a focus pinned to a container drifts when the panel recycles that container.
+    private TreeRow _focusedRow;
     // Writes a node's selection onto the node itself (from the ItemContainerStyle's IsSelected binding path), so a selection
     // persists across a view rebuild and reaches OFF-SCREEN rows that have no container. No-op if the style doesn't bind it.
     private Action<object, bool> _setNodeSelected = static (_, _) => { };
@@ -235,6 +250,27 @@ public class TreeView : ItemsControl
         if (container is TreeViewItem node && item is TreeRow row)
         {
             node.BindRow(row, ItemTemplate);
+
+            // The focus rides the ROW, exactly as the selection does. A container is not a place in the tree: the panel
+            // recycles containers onto other rows as the view scrolls, so a focus left pinned to one drifts onto
+            // whatever row it lands on - the focus ring a row or two below the one the arrow key actually went to.
+            if (ReferenceEquals(row, _focusedRow))
+            {
+                if (IsKeyboardFocusWithin && !node.IsFocused)
+                {
+                    FocusManager.Focus(node, NavigationMethod.Directional);
+                }
+            }
+            else if (node.IsFocused)
+            {
+                // ...and the other half, for the same reason BindRow drops the hover: this container WAS the keyboard's
+                // visual and now shows somebody else's row. Left holding the focus it re-draws the ring on each row the
+                // scroll recycles it through. The place itself is unharmed - it is the row, which simply has no visual
+                // while it is off-screen - so the tree holds the focus meanwhile (its keys keep working) and hands it
+                // back the moment that row is bound again. Unspecified, not Directional: a mouse scroll must not paint
+                // a ring around the whole tree.
+                FocusManager.Focus(this, NavigationMethod.Unspecified);
+            }
         }
         else
         {
@@ -258,7 +294,17 @@ public class TreeView : ItemsControl
     // No-op when the row is already in that state, so it's safe on every change: ToggleRow, restore-on-rebuild, recycling.
     internal void SyncRowExpansion(TreeViewItem container, bool expanded)
     {
-        if (_flattener == null || container.Row is not { } row || row.IsExpanded == expanded)
+        if (container.Row is not { } row) return;
+
+        SetRowExpanded(row, expanded);
+        if (expanded) container.SyncHasItems();   // a former leaf may have just become a branch -> reveal its expander
+    }
+
+    // The same splice, addressed by ROW rather than by container - what the keyboard has in hand, since it walks the flat
+    // list and the row it wants to open may have no realized container at all.
+    private void SetRowExpanded(TreeRow row, bool expanded)
+    {
+        if (_flattener == null || row.IsExpanded == expanded)
         {
             return;
         }
@@ -267,13 +313,152 @@ public class TreeView : ItemsControl
         {
             _setNodeExpanded(row.Node, true);   // trigger the lazy load before the flattener reads the children
             _flattener.Expand(row);
-            container.SyncHasItems();   // a former leaf may have just become a branch -> reveal its expander
         }
         else
         {
             _flattener.Collapse(row);
             _setNodeExpanded(row.Node, false);
         }
+    }
+
+    /// <summary>The tree owns its arrows, the way a list owns its own: they move the SELECTION down and up the flat list
+    /// of visible rows, and Left/Right fold a branch shut or open it. A tree that let navigation have these keys would
+    /// send the focus off to whatever sits beside it on the first press.
+    /// <para>Left on a leaf (or an already-closed branch) goes to its PARENT, and Right on an open branch steps into its
+    /// first child - so one key both folds and climbs, which is how every tree is driven.</para></summary>
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Handled || Items.Count == 0) return;
+
+        var index = CurrentRowIndex();
+        var row = index >= 0 ? Items[index] as TreeRow : null;
+
+        switch (e.Key)
+        {
+            case Key.DownArrow:
+                GoTo(index + 1);   // nothing selected yet (-1) -> the first row
+                break;
+
+            case Key.UpArrow:
+                GoTo(index - 1);
+                break;
+
+            case Key.Home:
+                GoTo(0);
+                break;
+
+            case Key.End:
+                GoTo(Items.Count - 1);
+                break;
+
+            case Key.RightArrow:
+                if (row is { HasChildren: true, IsExpanded: false }) Expand(index, row, true);
+                else GoTo(index + 1);
+                break;
+
+            case Key.LeftArrow:
+                if (row is { IsExpanded: true }) Expand(index, row, false);
+                else if (row != null) GoTo(ParentIndex(index, row.Depth));
+                break;
+
+            default:
+                return;   // not the tree's key - leave it for whoever wants it
+        }
+
+        // Claimed whether or not it led anywhere: running out of rows must not hand the focus to a neighbouring control,
+        // and one arrow too many should not cost you your place in the tree.
+        e.Handled = true;
+    }
+
+    /// <summary>Open or fold a row THROUGH ITS CONTAINER where there is one. The expander glyph is drawn from the
+    /// container's <see cref="TreeViewItem.IsExpanded"/>, so a keyboard that spliced the flat list directly left the
+    /// branch open with an arrow still pointing sideways. Going through the container drives the one path everything
+    /// else uses (the expander, a view-model binding, a double-click). A row nobody has realized has no glyph to keep
+    /// honest, so there the splice IS the whole job.</summary>
+    private void Expand(int index, TreeRow row, bool expanded)
+    {
+        if (ItemContainerGenerator.ContainerFromIndex(index) is TreeViewItem container)
+        {
+            container.IsExpanded = expanded;
+            return;
+        }
+
+        SetRowExpanded(row, expanded);
+    }
+
+    // A container took the focus (a click, a Tab in): its row is the keyboard place from now on.
+    internal void NoteFocusedRow(TreeRow row) => _focusedRow = row;
+
+    // Where the keyboard is: the row that owns the place, else the focused container's row, else the selection.
+    private int CurrentRowIndex()
+    {
+        if (_focusedRow != null && Items.IndexOf(_focusedRow) is var known && known >= 0)
+            return known;
+
+        if (FocusManager.Focused is TreeViewItem { Row: { } focused } && Items.IndexOf(focused) is var index && index >= 0)
+            return index;
+
+        for (var i = 0; i < Items.Count; i++)
+        {
+            if (Items[i] is TreeRow row && ReferenceEquals(row.Node, SelectedItem)) return i;
+        }
+
+        return -1;
+    }
+
+    // The row this one hangs under: the nearest row ABOVE it that stands one level shallower.
+    private int ParentIndex(int index, int depth)
+    {
+        for (var i = index - 1; i >= 0; i--)
+        {
+            if (Items[i] is TreeRow row && row.Depth < depth) return i;
+        }
+
+        return -1;
+    }
+
+    // Select the row at this index and take the view + the focus to it. Out of range = nothing to go to.
+    private void GoTo(int index)
+    {
+        if (index < 0 || index >= Items.Count || Items[index] is not TreeRow row) return;
+
+        SelectOnly(row);
+        SyncSelectionToContainers();
+        ShowRow(index);
+    }
+
+    /// <summary>Put the focus on the row and bring it into view. A row the panel has not realized has no visual to focus
+    /// - but the panel can still say where it WILL be, and scrolling there materialises it (the same two-step the list
+    /// makes, and for the same reason: a selection scrolled far out of the window otherwise goes unreachable).</summary>
+    private void ShowRow(int index)
+    {
+        // The ROW owns the keyboard place from here on, whether or not it has a visual yet: the scroll below can rebind
+        // every container under us, and PrepareContainer hands the focus to whichever one ends up showing this row.
+        _focusedRow = Items[index] as TreeRow;
+
+        var container = ItemContainerGenerator.ContainerFromIndex(index);
+        if (container is IInputComponent focusable && container.Visibility == Visibility.Visible)
+        {
+            FocusManager.Focus(focusable, NavigationMethod.Directional);
+            (container as UIComponent)?.BringIntoView();
+            return;
+        }
+
+        if (ItemsHostPanel is VirtualizingPanel panel && panel.TryGetItemRect(index, out var rect))
+        {
+            EnclosingScrollViewer()?.BringIntoView(rect);
+        }
+    }
+
+    private ScrollViewer EnclosingScrollViewer()
+    {
+        for (IUIComponent node = ItemsHostPanel; node != null; node = node.VisualParent)
+        {
+            if (node is ScrollViewer viewer) return viewer;
+        }
+
+        return null;
     }
 
     // A node was clicked: apply the selection policy over the flat ROWS (Single/Multiple/Extended), then mirror the new
@@ -403,10 +588,14 @@ public class TreeView : ItemsControl
 
         foreach (var child in panel.VisualChildren)
         {
-            if (child is TreeViewItem tvi && tvi.Row is { } row)
-            {
-                tvi.IsSelected = row.IsSelected;
-            }
+            if (child is not TreeViewItem tvi || tvi.Row is not { } row) continue;
+
+            // _selectedRows is the ONE truth, and a row that disagrees with it is put right here. A row can be left
+            // marked without us: the item container style may bind IsSelected two-way to the node, so a container being
+            // recycled onto another row writes through that binding - and the row it marked is not in the set, which is
+            // exactly what ClearSelection walks. The rows would then stay lit with nothing able to clear them (seen
+            // while holding an arrow key: the list scrolls fast, containers recycle, and highlights pile up behind).
+            tvi.IsSelected = row.IsSelected;
         }
     }
 }
