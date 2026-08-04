@@ -14,7 +14,23 @@ public abstract class BindingExpressionBase
 
    public BindingStatus Status { get; internal set; }
 
-   public IFundamentalUIComponent Target { get; set; }
+   /// <summary>What the binding writes to. Any component with the property system, NOT only a tree element: a Transform
+   /// is an AdamantiumComponent that carries animatable properties but sits outside the logical tree, and refusing to
+   /// bind it made <c>&lt;Transform ScaleX="{Binding Zoom}"/&gt;</c> - the obvious markup - impossible. It reaches a
+   /// DataContext through its InheritanceParent, which is what <see cref="DataContextSource"/> walks.</summary>
+   public IAdamantiumComponent Target { get; set; }
+
+   /// <summary>The nearest tree element at or above <see cref="Target"/> - the thing that actually has a DataContext to
+   /// bind against, and the anchor for ElementName/ancestor lookups.</summary>
+   public IFundamentalUIComponent DataContextSource => NearestElement(Target);
+
+   internal static IFundamentalUIComponent NearestElement(IAdamantiumComponent component)
+   {
+      for (var node = component; node != null; node = node.InheritanceParent)
+         if (node is IFundamentalUIComponent element) return element;
+
+      return null;
+   }
 
    public AdamantiumProperty TargetProperty { get; set; }
 

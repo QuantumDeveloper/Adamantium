@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Adamantium.UI.Core.MarkupExtensions;
 
 namespace Adamantium.UI.Core.Data;
@@ -50,7 +50,7 @@ public class Ancestor : MarkupExtension
 
     /// <summary>Creates the live expression on <paramref name="target"/>'s <paramref name="propertyName"/> and registers
     /// it so it re-establishes on tree changes. Mirrors <c>ThemeResource.Apply</c> / the codegen emission for bindings.</summary>
-    public AncestorBindingExpression Apply(IFundamentalUIComponent target, string propertyName,
+    public AncestorBindingExpression Apply(IAdamantiumComponent target, string propertyName,
         ValuePriority priority = ValuePriority.Binding)
     {
         var expression = new AncestorBindingExpression(target, target.GetProperty(propertyName), this) { Priority = priority };
@@ -60,7 +60,7 @@ public class Ancestor : MarkupExtension
 
     public override object ProvideObject(MarkupContext context)
     {
-        if (context?.TargetObject is IFundamentalUIComponent target && !string.IsNullOrEmpty(context.TargetPropertyName))
+        if (context?.TargetObject is IAdamantiumComponent target && !string.IsNullOrEmpty(context.TargetPropertyName))
             Apply(target, context.TargetPropertyName);
         return this;
     }

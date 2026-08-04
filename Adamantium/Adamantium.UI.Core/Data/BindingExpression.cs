@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Globalization;
@@ -55,7 +55,7 @@ public class BindingExpression : BindingExpressionBase
 
    private bool IsProducer => TargetProperty == null;
 
-   public BindingExpression(IFundamentalUIComponent target, AdamantiumProperty targetProperty, BindingBase bindingBase)
+   public BindingExpression(IAdamantiumComponent target, AdamantiumProperty targetProperty, BindingBase bindingBase)
    {
       Target = target;
       TargetProperty = targetProperty;
@@ -64,14 +64,14 @@ public class BindingExpression : BindingExpressionBase
       Mode = Binding.Mode;
    }
 
-   public BindingExpression(IFundamentalUIComponent target, string targetPropertyName, BindingBase bindingBase)
+   public BindingExpression(IAdamantiumComponent target, string targetPropertyName, BindingBase bindingBase)
       : this(target, target.GetProperty(targetPropertyName), bindingBase)
    {
    }
 
    // Factory + dispatch: a MultiBinding becomes a MultiBindingExpression, anything else a plain BindingExpression.
    // This is the single place that turns a BindingBase into a live, connected expression.
-   public static BindingExpressionBase CreateBindingExpression(IFundamentalUIComponent target,
+   public static BindingExpressionBase CreateBindingExpression(IAdamantiumComponent target,
       AdamantiumProperty targetProperty, BindingBase bindingBase)
    {
       BindingExpressionBase expression = bindingBase is MultiBinding
@@ -81,7 +81,7 @@ public class BindingExpression : BindingExpressionBase
       return expression;
    }
 
-   public static BindingExpressionBase CreateBindingExpression(IFundamentalUIComponent target,
+   public static BindingExpressionBase CreateBindingExpression(IAdamantiumComponent target,
       string targetPropertyName, BindingBase bindingBase)
       => CreateBindingExpression(target, target.GetProperty(targetPropertyName), bindingBase);
 
@@ -168,7 +168,7 @@ public class BindingExpression : BindingExpressionBase
       SourcePropertyName = null;
       _bindToSource = false;
 
-      var root = Binding.Source ?? ResolveElementName() ?? Target?.DataContext;
+      var root = Binding.Source ?? ResolveElementName() ?? DataContextSource?.DataContext;
       var path = Binding.Path?.Path;
       if (root == null) return;
 

@@ -411,10 +411,10 @@ public partial class RenderCache
         if (c == null) return null;
         if (_clipCache.TryGetValue(c, out var cached)) return cached;
         var s = ApplySnap(c);
-        // An adorner skips its TARGET's own clip and starts from what clips the target - see ClippedByRenderParent.
+        // An adorner skips its TARGET's own clip and, above it, obeys only the VIEWPORTS - see ClippedByRenderParent.
         var parentClip = c.ClippedByRenderParent || s.RenderParent == null
             ? CumulativeClip(s.RenderParent)
-            : CumulativeClip(ApplySnap(s.RenderParent).RenderParent);
+            : AdornerClip(ApplySnap(s.RenderParent).RenderParent, c);
         var result = parentClip;
         if (s.ClipToBounds)
         {
@@ -425,4 +425,34 @@ public partial class RenderCache
         return result;
     }
 
+    /// <summary>The clip an ADORNER inherits from above its target: only the ancestors that call themselves viewports
+    /// (<see cref="IUIComponent.ClipsAdorners"/>), never the ordinary ClipToBounds boxes on the way. Those boxes exist
+    /// to keep CONTENT inside them, and shaving the focus ring on each one left it unusable with any standoff - every
+    /// card, tab strip and docking panel took a bite. Not memoized: it walks per adorner, and adorners are counted in
+    /// ones per frame (the ring, a hover cue) rather than in thousands like content.</summary>
+    private Rect? AdornerClip(IUIComponent node, IUIComponent adorner)
+    {
+        // The viewport is widened by what the adorner is entitled to draw outside its target: otherwise a control
+        // standing flush against the edge of a scroll area wears a shaved ring, which is exactly what the standoff
+        // exists to avoid. Bounded by the standoff itself, so a row scrolled further than that is still cut.
+        var standoff = (adorner as Controls.Adorners.Adorner)?.ClipStandoff ?? 0;
+
+        Rect? result = null;
+        for (var n = node; n != null; n = ApplySnap(n).RenderParent)
+        {
+            var s = ApplySnap(n);
+            if (!s.ClipToBounds || !n.ClipsAdorners) continue;
+
+            var rect = new Rect(0, 0, s.RenderSize.Width, s.RenderSize.Height).TransformToAABB(World(n));
+            if (standoff > 0)
+            {
+                rect = new Rect(rect.X - standoff, rect.Y - standoff,
+                    rect.Width + standoff * 2, rect.Height + standoff * 2);
+            }
+
+            result = result is { } r ? r.Intersect(rect) : rect;
+        }
+
+        return result;
+    }
 }

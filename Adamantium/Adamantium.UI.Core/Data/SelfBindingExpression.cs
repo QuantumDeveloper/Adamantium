@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using Adamantium.UI.Core.Diagnostics;
 using Adamantium.UI.Core.RoutedEvents;
 
@@ -17,7 +17,7 @@ public class SelfBindingExpression : BindingExpressionBase
     private string[] _segments = [];
     private INotifyPropertyChanged _leafOwner;
 
-    public SelfBindingExpression(IFundamentalUIComponent target, AdamantiumProperty targetProperty, Self def)
+    public SelfBindingExpression(IAdamantiumComponent target, AdamantiumProperty targetProperty, Self def)
     {
         Target = target;
         TargetProperty = targetProperty;

@@ -1,4 +1,4 @@
-using Adamantium.UI.Core.RoutedEvents;
+﻿using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Core.Data;
 
@@ -20,7 +20,7 @@ public class TemplateBindingExpression : BindingExpressionBase
         Mode = templateBinding.Mode;
     }
 
-    public TemplateBindingExpression(IFundamentalUIComponent source, IFundamentalUIComponent target, string targetProperty, TemplateBinding templateBinding) : this(templateBinding)
+    public TemplateBindingExpression(IFundamentalUIComponent source, IAdamantiumComponent target, string targetProperty, TemplateBinding templateBinding) : this(templateBinding)
     {
         // {TemplateBinding Path} on a part's property: read Path from the templated parent (source) and write the part's
         // declared property (targetProperty). The generator passes propRef.Name (the part attribute) as targetProperty

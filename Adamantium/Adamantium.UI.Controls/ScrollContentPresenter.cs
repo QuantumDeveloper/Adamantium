@@ -73,6 +73,11 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
         // (Focusable=false comes from ContentPresenter's metadata override - a passive presenter is never a focus target.)
     }
 
+    /// <summary>This clip is a VIEWPORT, so it binds adorners too: a focus ring on a row scrolled half out of the list
+    /// must be cut by the list, the way the row itself is. See <see cref="IUIComponent.ClipsAdorners"/> for why that is
+    /// the exception rather than the rule.</summary>
+    public override bool ClipsAdorners => true;
+
     public Size Extent => Delegating ? _inner.Extent : _extent;
 
     public Size Viewport => _viewport;

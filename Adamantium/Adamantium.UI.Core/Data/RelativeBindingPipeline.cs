@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 
 namespace Adamantium.UI.Core.Data;
@@ -16,7 +16,7 @@ internal static class RelativeBindingPipeline
     /// <summary>Walk a dotted path off <paramref name="root"/>. The first segment is read from
     /// <paramref name="firstProperty"/> (the root's AdamantiumProperty, when it has one) else by reflection; the rest by
     /// reflection. Returns <see cref="Unset"/> if any hop is null or missing.</summary>
-    internal static object Walk(IFundamentalUIComponent root, AdamantiumProperty firstProperty, string[] segments)
+    internal static object Walk(IAdamantiumComponent root, AdamantiumProperty firstProperty, string[] segments)
     {
         if (root == null || segments.Length == 0) return Unset;
 
@@ -36,7 +36,7 @@ internal static class RelativeBindingPipeline
 
     /// <summary>The object that OWNS the leaf property of a dotted path (root for a single segment, else the last hop),
     /// so a caller can observe its INotifyPropertyChanged. Returns null if the chain breaks before the leaf.</summary>
-    internal static object LeafOwner(IFundamentalUIComponent root, AdamantiumProperty firstProperty, string[] segments)
+    internal static object LeafOwner(IAdamantiumComponent root, AdamantiumProperty firstProperty, string[] segments)
     {
         if (segments.Length <= 1) return root;
         object current = firstProperty != null

@@ -380,7 +380,20 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     {
         return AdamantiumPropertyMap.ResolveProperty(GetType(), propertyName);
     }
-    
+
+    /// <summary>Bind a property. Declared HERE, on the property system itself, rather than on tree elements: anything
+    /// with AdamantiumProperties is a legitimate binding target, and a Transform - a component that carries animatable
+    /// properties but stands outside the tree - was refused for no better reason than where the method happened to live.
+    /// It reaches a DataContext through its InheritanceParent (see BindingExpressionBase.DataContextSource).</summary>
+    public Data.BindingExpressionBase SetBinding(string property, Data.BindingBase bindingBase)
+        => SetBinding(GetProperty(property), bindingBase);
+
+    /// <summary>Bindings live in the central BindingEngine registry (queryable/refreshable), not as element-private
+    /// state. Returns the base type - a MultiBinding yields a MultiBindingExpression, not a BindingExpression.</summary>
+    public Data.BindingExpressionBase SetBinding(AdamantiumProperty property, Data.BindingBase bindingBase)
+        => Data.BindingEngine.SetBinding(this, property, bindingBase);
+
+
     public void SetTriggerValue(string propertyName, object value, object token)
     {
         var property = AdamantiumPropertyMap.ResolveProperty(GetType(), propertyName);

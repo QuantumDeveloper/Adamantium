@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using Adamantium.UI.Core.Diagnostics;
 using Adamantium.UI.Core.RoutedEvents;
 
@@ -25,7 +25,7 @@ public class AncestorBindingExpression : BindingExpressionBase
     private bool _hooked;
     private bool _targetHooked;
 
-    public AncestorBindingExpression(IFundamentalUIComponent target, AdamantiumProperty targetProperty, Ancestor def)
+    public AncestorBindingExpression(IAdamantiumComponent target, AdamantiumProperty targetProperty, Ancestor def)
     {
         Target = target;
         TargetProperty = targetProperty;
@@ -45,16 +45,25 @@ public class AncestorBindingExpression : BindingExpressionBase
         UnhookTree();
     }
 
+    // The element the subscriptions are ON. The target itself may be a Transform or another non-tree component, which
+    // has no attach/detach of its own and rides its owner's - and the SAME instance must be used to unsubscribe, so it
+    // is kept rather than re-walked (the owner can change between hook and unhook).
+    private IFundamentalUIComponent _anchor;
+
     // Subscribe to the target's own attach/detach so the ancestor is (re)resolved every time the target enters the tree.
     private void HookTree()
     {
-        if (_hooked || Target == null) return;
+        if (_hooked) return;
+
+        _anchor = DataContextSource;
+        if (_anchor == null) return;
+
         if (_def.Logical)
         {
-            Target.AttachedToLogicalTree += OnLogicalAttached;
-            Target.DetachedFromLogicalTree += OnLogicalDetached;
+            _anchor.AttachedToLogicalTree += OnLogicalAttached;
+            _anchor.DetachedFromLogicalTree += OnLogicalDetached;
         }
-        else if (Target is IUIComponent visual)
+        else if (_anchor is IUIComponent visual)
         {
             visual.AttachedToVisualTreeEvent += OnVisualAttached;
             visual.DetachedFromVisualTreeEvent += OnVisualDetached;
@@ -63,31 +72,32 @@ public class AncestorBindingExpression : BindingExpressionBase
         {
             // Non-visual target (a Behavior): it has no visual node, so it re-resolves against its HOST's visual tree.
             // AddLogicalChild (attach to the host) raises the logical-tree event - use that to (re)resolve.
-            Target.AttachedToLogicalTree += OnLogicalAttached;
-            Target.DetachedFromLogicalTree += OnLogicalDetached;
+            _anchor.AttachedToLogicalTree += OnLogicalAttached;
+            _anchor.DetachedFromLogicalTree += OnLogicalDetached;
         }
         _hooked = true;
     }
 
     private void UnhookTree()
     {
-        if (!_hooked || Target == null) return;
+        if (!_hooked || _anchor == null) return;
         if (_def.Logical)
         {
-            Target.AttachedToLogicalTree -= OnLogicalAttached;
-            Target.DetachedFromLogicalTree -= OnLogicalDetached;
+            _anchor.AttachedToLogicalTree -= OnLogicalAttached;
+            _anchor.DetachedFromLogicalTree -= OnLogicalDetached;
         }
-        else if (Target is IUIComponent visual)
+        else if (_anchor is IUIComponent visual)
         {
             visual.AttachedToVisualTreeEvent -= OnVisualAttached;
             visual.DetachedFromVisualTreeEvent -= OnVisualDetached;
         }
         else
         {
-            Target.AttachedToLogicalTree -= OnLogicalAttached;
-            Target.DetachedFromLogicalTree -= OnLogicalDetached;
+            _anchor.AttachedToLogicalTree -= OnLogicalAttached;
+            _anchor.DetachedFromLogicalTree -= OnLogicalDetached;
         }
         _hooked = false;
+        _anchor = null;
     }
 
     private void OnLogicalAttached(object sender, LogicalTreeAttachmentEventArgs e) => ResolveAndReport();
@@ -124,10 +134,15 @@ public class AncestorBindingExpression : BindingExpressionBase
         if (!ReferenceEquals(value, RelativeBindingPipeline.Unset)) Target.SetValue(TargetProperty, value, Priority);
     }
 
+    // Asked of the nearest ELEMENT: a Transform (or any other non-tree target) has no place in the tree of its own and
+    // is attached exactly when its owner is.
     private bool IsTargetAttached()
-        => _def.Logical ? Target?.GetLogicalParentOrBridge() != null
-         : Target is IUIComponent visual ? visual.VisualParent != null
-         : Target?.LogicalParent != null;   // non-visual (a Behavior): attached once it has a host
+    {
+        var element = DataContextSource;
+        return _def.Logical ? element?.GetLogicalParentOrBridge() != null
+             : element is IUIComponent visual ? visual.VisualParent != null
+             : element?.LogicalParent != null;   // non-visual (a Behavior): attached once it has a host
+    }
 
     private void OnDetached()
     {
@@ -193,14 +208,17 @@ public class AncestorBindingExpression : BindingExpressionBase
 
     private IFundamentalUIComponent FindAncestor()
     {
-        if (_def.AncestorType == null || Target == null) return null;
+        // The walk starts from the nearest ELEMENT: the target may be a Transform, which is not in the tree at all and
+        // whose ancestors are its owner's.
+        var anchor = DataContextSource;
+        if (_def.AncestorType == null || anchor == null) return null;
         var skip = _def.Skip;
 
         if (_def.Logical)
         {
             // Logical walk BRIDGES template boundaries via TemplatedParent (GetLogicalParentOrBridge) - otherwise it
             // dead-ends at each container's template part and never reaches the ItemsControl. See docs/TREE_MODEL_DESIGN.md.
-            for (var cur = Target.GetLogicalParentOrBridge(); cur != null; cur = cur.GetLogicalParentOrBridge())
+            for (var cur = anchor.GetLogicalParentOrBridge(); cur != null; cur = cur.GetLogicalParentOrBridge())
             {
                 if (_def.Stop != null && _def.Stop.IsInstanceOfType(cur)) return null;
                 if (Matches(cur) && skip-- <= 0) return cur;
@@ -212,7 +230,7 @@ public class AncestorBindingExpression : BindingExpressionBase
             // start at its host - the element it's attached to (its logical parent) - and walk that host's VISUAL tree.
             // The visual tree crosses template boundaries, so this reaches an ItemsControl / Window ancestor that a
             // logical walk (which stops at each container's template parts) never could.
-            var start = Target is IUIComponent visual ? visual.VisualParent : Target.LogicalParent as IUIComponent;
+            var start = anchor is IUIComponent visual ? visual.VisualParent : anchor.LogicalParent as IUIComponent;
             for (var cur = start; cur != null; cur = cur.VisualParent)
             {
                 if (_def.Stop != null && _def.Stop.IsInstanceOfType(cur)) return null;

@@ -36,6 +36,9 @@ public class FocusAdorner : Adorner
         set => SetValue(OutsetProperty, value);
     }
 
+    /// <summary>The ring stands off by exactly <see cref="Outset"/>, so that is what a viewport must let past its edge.</summary>
+    public override double ClipStandoff => Outset;
+
     /// <summary>The rounding for the ring: the adorned control's own, GROWN by the outset so the ring stays parallel to
     /// the edge it follows - a square ring around a rounded button reads as a second, badly aligned control. A ring
     /// template <c>{TemplateBinding}</c>s this instead of restating a radius that would then fight the control's own.

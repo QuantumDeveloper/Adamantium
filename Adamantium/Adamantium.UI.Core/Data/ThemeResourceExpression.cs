@@ -1,4 +1,4 @@
-using Adamantium.UI.Core.RoutedEvents;
+﻿using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Core.Data;
 
@@ -16,7 +16,7 @@ public class ThemeResourceExpression : BindingExpressionBase
     private AdamantiumComponent _theme;
     private AdamantiumProperty _sourceProperty;
 
-    public ThemeResourceExpression(IFundamentalUIComponent target, AdamantiumProperty targetProperty, string key,
+    public ThemeResourceExpression(IAdamantiumComponent target, AdamantiumProperty targetProperty, string key,
         ValuePriority priority = ValuePriority.Template, object token = null)
     {
         Target = target;
