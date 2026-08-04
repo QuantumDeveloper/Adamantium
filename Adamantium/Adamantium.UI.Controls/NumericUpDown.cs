@@ -163,9 +163,6 @@ public class NumericUpDown : RangeLimitsBase
 
     public NumericUpDown()
     {
-        // The tunnel, so an arrow key is a step before the text box reads it as caret movement, which it would mark
-        // handled. The wheel bubbles up from the text box, so it is taken on the way back.
-        AddHandler(Keyboard.PreviewKeyDownEvent, new KeyEventHandler(OnPreviewKeyDown));
         AddHandler(Keyboard.PreviewTextInputEvent, new TextInputEventHandler(OnPreviewTextInput));
         AddHandler(Mouse.MouseWheelEvent, new MouseWheelEventHandler(OnMouseWheelStep));
     }
@@ -547,8 +544,11 @@ public class NumericUpDown : RangeLimitsBase
 
     // --- Input ------------------------------------------------------------------------------------------------------
 
-    private void OnPreviewKeyDown(object sender, KeyEventArgs e)
+    // The TUNNEL, so an arrow key is a step before the text box reads it as caret movement, which it would mark handled.
+    // The wheel bubbles up from the text box, so it is taken on the way back.
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
     {
+        base.OnPreviewKeyDown(e);
         if (e.Handled || IsReadOnly) return;
 
         switch (e.Key)

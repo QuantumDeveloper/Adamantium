@@ -115,6 +115,29 @@ public class TabDragGestureTests
         });
     }
 
+    /// <summary>A strip is laid out as TWO rows - pinned and ordinary - and a drag belongs to exactly one of them.
+    /// Reordering walked the single item list and slid every tab whose index fell between the start and the target, so
+    /// tabs in the OTHER row moved in lockstep with tabs they have nothing to do with. The rows were never linked; they
+    /// were sharing one index range.</summary>
+    [Test]
+    public void DraggingATab_LeavesTheOtherRowWhereItIs()
+    {
+        var (tc, tabs) = ArrangedStrip(Orientation.Horizontal, 40, 40, 40, 40);
+        tabs[0].IsPinned = true;   // the pinned row
+        tabs[1].IsPinned = true;
+                                   // tabs 2 and 3 are the ordinary row
+
+        tc.BeginDrag(tabs[3], 125.0);   // grabbed 5px into the last ordinary tab (it starts at 120)
+        tc.UpdateDrag(tabs[3], 80.0);   // ...dragged back past tab 2's centre, so the gap opens at index 2
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(tabs[2].RenderTransform, Is.Not.Null, "the tab it passed IN ITS OWN ROW slides aside");
+            Assert.That(tabs[0].RenderTransform, Is.Null, "and the pinned row is not touched at all");
+            Assert.That(tabs[1].RenderTransform, Is.Null);
+        });
+    }
+
     /// <summary>A visual root with a client viewport, mirroring a window's role - the press path focuses the tab, and
     /// focus needs a root to walk up to.</summary>
     private sealed class TestWindowRoot : Grid, IRootVisualComponent

@@ -99,7 +99,6 @@ public abstract class TextBoxBase : Control
 
     protected TextBoxBase()
     {
-        AddHandler(Keyboard.KeyDownEvent, new KeyEventHandler(OnKeyDownHandler));
         AddHandler(Keyboard.TextInputEvent, new TextInputEventHandler(OnTextInputHandler));
     }
 
@@ -651,8 +650,9 @@ public abstract class TextBoxBase : Control
         e.Handled = true;
     }
 
-    private void OnKeyDownHandler(object sender, KeyEventArgs e)
+    protected override void OnKeyDown(KeyEventArgs e)
     {
+        base.OnKeyDown(e);
         var ctrl = (Keyboard.Modifiers & (InputModifiers.LeftControl | InputModifiers.RightControl)) != 0;
         var shift = (Keyboard.Modifiers & (InputModifiers.LeftShift | InputModifiers.RightShift)) != 0;
 

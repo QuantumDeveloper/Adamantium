@@ -14,15 +14,16 @@ public abstract class Panel: InputUIComponent, IContainer, INavigablePanel
    // A panel is a passive layout container - never a keyboard-focus target. That now comes for free from the
    // Focusable=false default (see InputUIComponent); no per-panel override needed.
 
-   /// <summary>Tab order is the order the children are in - the one thing EVERY panel knows about its own layout.
-   /// The arrow keys are a different question: they need to know which child is above or beside another, and that is
-   /// the layout itself, so the base answers null and each panel that has a shape overrides it.</summary>
-   public virtual IUIComponent Navigate(IUIComponent from, FocusNavigationDirection direction)
-   {
-      if (direction is not (FocusNavigationDirection.Next or FocusNavigationDirection.Previous)) return null;
-
-      return TabNeighbour(from, direction == FocusNavigationDirection.Next);
-   }
+   /// <summary>A panel with no shape of its own - a Canvas where every child is placed by hand, a DockPanel where they
+   /// are stacked against edges - has exactly ONE order to answer with, and both Tab and the arrows get it: the
+   /// children's own order, or the author's numbering where there is one, run forwards by Next/Down/Right and
+   /// backwards by Previous/Up/Left.
+   /// <para>The numbering wins over the order they were added for the arrows too, and deliberately: in a panel with no
+   /// rows and no columns there is nothing for an arrow to mean EXCEPT that order, so stating it should state it once.
+   /// Panels that DO have a shape (a stack, a grid, wrapped lines, a tab strip) override this and answer the arrows
+   /// from their layout - there an explicit tab order says nothing about what sits to the left of what.</para></summary>
+   public virtual IUIComponent Navigate(IUIComponent from, FocusNavigationDirection direction) =>
+      TabNeighbour(from, IsForward(direction));
 
    /// <summary>The neighbour in TAB order: by <see cref="KeyboardNavigation.TabIndex"/> first, and by the order the
    /// children stand in for the ties. The arrows deliberately do NOT use this - they are a question about the layout,

@@ -52,16 +52,12 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
 
     public void LayoutPopups() => PopupLayer.UpdateLayout(new Size(ClientWidth, ClientHeight));
 
-    public WindowBase()
+    // Default/cancel routing: the window is the root, so unhandled Enter/Esc reach it last, after everything on the way
+    // up has had its say. Enter activates the IsDefault button, Escape the IsCancel one - unless the focused element
+    // already claimed the key. WPF Window default/cancel behaviour.
+    protected override void OnKeyDown(KeyEventArgs e)
     {
-        // Default/cancel routing: the window is the root, so unhandled Enter/Esc bubble up here from the focused element.
-        AddHandler(Keyboard.KeyDownEvent, new KeyEventHandler(OnWindowKeyDown));
-    }
-
-    // Enter activates the IsDefault button, Escape the IsCancel button - unless the focused element already handled the
-    // key (handled keys don't reach this handler). WPF Window default/cancel behaviour.
-    private void OnWindowKeyDown(object sender, KeyEventArgs e)
-    {
+        base.OnKeyDown(e);
         if (e.Handled) return;
         var target = e.Key switch
         {

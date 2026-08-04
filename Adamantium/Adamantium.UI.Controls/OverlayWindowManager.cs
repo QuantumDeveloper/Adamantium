@@ -71,6 +71,11 @@ public sealed class OverlayWindowManager
             Child = window
         };
 
+        // Where the keyboard was before this window took over, so closing puts it back (see FocusReturn). The card is
+        // added to the popup layer directly rather than through Popup.IsOpen, so that path's own return never runs.
+        var focusReturn = new FocusReturn();
+        focusReturn.Capture();
+
         _windows.Add(window);
         _host.PopupLayer.Add(window.HostPopup);
         Normalize();
@@ -88,6 +93,7 @@ public sealed class OverlayWindowManager
             window.ScrimPopup = null;
             _windows.Remove(window);
             SetActive(_windows.Count > 0 ? _windows[^1] : null);   // the next front-most becomes active
+            focusReturn.Restore(window);
             if (_windows.Count == 0) RemoveHostHooks();
             tcs.TrySetResult(window.Result);
         }

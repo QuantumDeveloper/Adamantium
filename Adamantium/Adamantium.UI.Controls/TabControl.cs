@@ -644,12 +644,24 @@ public class TabControl : Selector
         BeginDrag(tab, StripIsVertical ? pos.Y : pos.X);
     }
 
+    private bool _draggedPinned;
+
+    /// <summary>The tab at <paramref name="index"/> WHEN it shares the dragged tab's row, and null otherwise. A strip is
+    /// laid out as two lists - pinned and ordinary - and a drag belongs to exactly one of them: the pinned tabs are a
+    /// row of their own (or their own run of the shared row), and nothing in the other row is being reordered.
+    /// <para>Without this the reorder walked the ONE item list and slid every tab whose index fell between the start and
+    /// the target - including tabs in the other row, which moved in lockstep with tabs they have nothing to do with.
+    /// The two rows only looked synchronised; they were sharing one index range.</para></summary>
+    private TabItem Reorders(int index) =>
+        ContainerOfTab(index) is TabItem tab && tab.IsPinned == _draggedPinned ? tab : null;
+
     // Core (position given as the coordinate ALONG the strip axis, in the items-host panel's space) - unit-testable.
     internal void BeginDrag(TabItem tab, double along)
     {
         _dragVertical = StripIsVertical;
         IsTearingOff = false;   // per-gesture state: left set, it kills the indicator and every later tear-off
         _dragged = tab;
+        _draggedPinned = tab.IsPinned;   // the ROW this gesture belongs to - see Reorders
         _dragStartIndex = _targetIndex = IndexOfTab(tab);
         _grabOffset = along - SlotStart(tab);
         _draggedExtent = Extent(tab);
@@ -814,7 +826,7 @@ public class TabControl : Selector
         var target = _dragStartIndex;
         for (var i = 0; i < Items.Count; i++)
         {
-            if (i == _dragStartIndex || ContainerOfTab(i) is not TabItem other) continue;
+            if (i == _dragStartIndex || Reorders(i) is not { } other) continue;
             var otherCentre = SlotStart(other) + Extent(other) / 2;
             if (i > _dragStartIndex && centre > otherCentre) target = Math.Max(target, i);
             else if (i < _dragStartIndex && centre < otherCentre) target = Math.Min(target, i);
@@ -865,7 +877,7 @@ public class TabControl : Selector
     {
         for (var i = 0; i < Items.Count; i++)
         {
-            if (i == _dragStartIndex || ContainerOfTab(i) is not TabItem other) continue;
+            if (i == _dragStartIndex || Reorders(i) is not { } other) continue;
 
             double gap = 0;
             if (_targetIndex > _dragStartIndex && i > _dragStartIndex && i <= _targetIndex) gap = -_draggedExtent;
@@ -881,12 +893,12 @@ public class TabControl : Selector
         if (target > start)
             for (var i = start + 1; i <= target; i++)
             {
-                if (ContainerOfTab(i) is TabItem t) shift += Extent(t);
+                if (Reorders(i) is { } t) shift += Extent(t);
             }
         else if (target < start)
             for (var i = target; i < start; i++)
             {
-                if (ContainerOfTab(i) is TabItem t) shift -= Extent(t);
+                if (Reorders(i) is { } t) shift -= Extent(t);
             }
         return shift;
     }

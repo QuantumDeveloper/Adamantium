@@ -49,8 +49,6 @@ public abstract class ButtonBase : ContentControl
 
     static ButtonBase()
     {
-        Keyboard.KeyDownEvent.RegisterClassHandler<ButtonBase>(new KeyEventHandler(KeyDownClassHandler));
-        Keyboard.KeyUpEvent.RegisterClassHandler<ButtonBase>(new KeyEventHandler(KeyUpClassHandler));
         // A button IS a keyboard-focus target (space/enter activate it) - opt in, since the base default is now false.
         // Metadata priority (not a ctor set), so a {Binding}/Style/Trigger can still override it (e.g. a scrollbar's
         // repeat buttons set Focusable="False" in their template). Covers Button/RepeatButton/Toggle*/CheckBox/Radio.
@@ -225,18 +223,9 @@ public abstract class ButtonBase : ContentControl
         }
     }
 
-    private static void KeyDownClassHandler(object sender, KeyEventArgs e)
+    protected override void OnKeyDown(KeyEventArgs e)
     {
-        if (sender is ButtonBase button) button.OnKeyDownInternal(e);
-    }
-
-    private static void KeyUpClassHandler(object sender, KeyEventArgs e)
-    {
-        if (sender is ButtonBase button) button.OnKeyUpInternal(e);
-    }
-
-    private void OnKeyDownInternal(KeyEventArgs e)
-    {
+        base.OnKeyDown(e);
         if (!IsEnabled || e.IsRepeated) return;
 
         switch (e.Key)
@@ -253,8 +242,9 @@ public abstract class ButtonBase : ContentControl
         }
     }
 
-    private void OnKeyUpInternal(KeyEventArgs e)
+    protected override void OnKeyUp(KeyEventArgs e)
     {
+        base.OnKeyUp(e);
         if (e.Key != Key.Space) return;
 
         var wasPressed = IsPressed;
