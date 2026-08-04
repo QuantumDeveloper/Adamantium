@@ -240,6 +240,20 @@ public abstract class Shape : InputUIComponent
       AdamantiumProperty.Register(nameof(StrokeDashCap), typeof(PenLineCap), typeof(Shape),
          new PropertyMetadata(PenLineCap.ConvexRound, PropertyMetadataOptions.AffectsRender));
 
+   // Stretch the dash pattern so a CLOSED contour holds a whole number of periods. Off by default: a dashed border is
+   // usually meant to keep the length it was given. On, the ring closes on itself at any size - what marching ants need,
+   // since otherwise the leftover period shows up as one long dash at the seam.
+   public static readonly AdamantiumProperty StrokeDashFitProperty =
+      AdamantiumProperty.Register(nameof(StrokeDashFit), typeof(Boolean), typeof(Shape),
+         new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
+
+   // Dash offset in PERIODS rather than pixels. Animate this 0 -> 1 and the dashes march exactly one step and land back
+   // on themselves, whatever the dash array is - which is the whole point: a marching pattern should not make its author
+   // add up the array by hand and then remember to redo it whenever the pattern changes.
+   public static readonly AdamantiumProperty StrokeDashPhaseProperty =
+      AdamantiumProperty.Register(nameof(StrokeDashPhase), typeof(Double), typeof(Shape),
+         new PropertyMetadata(0d, PropertyMetadataOptions.AffectsRender));
+
    public Brush Fill
    {
       get => GetValue<Brush>(FillProperty);
@@ -323,6 +337,20 @@ public abstract class Shape : InputUIComponent
       get => GetValue<PenLineCap>(StrokeDashCapProperty);
       set => SetValue(StrokeDashCapProperty, value);
    }
+
+   /// <summary>See <see cref="StrokeDashFitProperty"/>.</summary>
+   public Boolean StrokeDashFit
+   {
+      get => GetValue<Boolean>(StrokeDashFitProperty);
+      set => SetValue(StrokeDashFitProperty, value);
+   }
+
+   /// <summary>See <see cref="StrokeDashPhaseProperty"/>.</summary>
+   public Double StrokeDashPhase
+   {
+      get => GetValue<Double>(StrokeDashPhaseProperty);
+      set => SetValue(StrokeDashPhaseProperty, value);
+   }
       
    private static object CoerceStrokeThickness(AdamantiumComponent adamantiumAdamantiumComponent, object baseValue)
    {
@@ -352,7 +380,9 @@ public abstract class Shape : InputUIComponent
          StrokeLineJoin,
          StrokeTrimStart,
          StrokeTrimEnd,
-         StrokeDashCap);
+         StrokeDashCap,
+         StrokeDashFit,
+         StrokeDashPhase);
    }
 
    // Expands StrokeDashSymbols ("Dash Dot Dot Dash") into a dash array using the named widths + gap from

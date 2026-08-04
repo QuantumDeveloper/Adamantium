@@ -34,6 +34,19 @@ public class Pen : IEquatable<Pen>
 
    public Double TrimEnd { get; }
 
+   /// <summary>Whether the dash pattern is stretched so a WHOLE number of periods fits a closed contour. The array is
+   /// given in pixels, and a closed contour's length almost never divides by the pattern - the remainder is left over
+   /// where the contour closes and shows up as one long dash. Fitting scales the pattern by at most half a period so
+   /// the ring closes on itself at ANY size, which is what a marching-ants ring needs and what a ruler-like dashed
+   /// border must NOT have (its dashes are supposed to measure a fixed length).</summary>
+   public Boolean FitDashesToContour { get; }
+
+   /// <summary>Dash offset expressed in PERIODS instead of pixels, added to <see cref="DashOffset"/>. One period is the
+   /// whole pattern, so animating this 0 -> 1 marches the dashes exactly one step and lands back on itself - seamlessly,
+   /// whatever the array says and whatever the contour fit scaled it to. The pixel offset cannot do that: it makes the
+   /// author work out the period by hand and then re-derive it every time the pattern changes.</summary>
+   public Double DashPhase { get; }
+
    public Pen(
       Brush brush,
       Double thickness = 1.0,
@@ -44,8 +57,12 @@ public class Pen : IEquatable<Pen>
       PenLineJoin penLineJoin = PenLineJoin.Miter,
       Double trimStart = 0.0,
       Double trimEnd = 1.0,
-      PenLineCap dashCap = PenLineCap.ConvexRound)
+      PenLineCap dashCap = PenLineCap.ConvexRound,
+      Boolean fitDashesToContour = false,
+      Double dashPhase = 0)
    {
+      FitDashesToContour = fitDashesToContour;
+      DashPhase = dashPhase;
       _brush = brush?.ForRendering();
       DashStrokeArray = new AdamantiumCollection<double>(dashStrokeArray);
       DashOffset = dashOffset;
@@ -65,7 +82,11 @@ public class Pen : IEquatable<Pen>
       return Equals(Brush, other.Brush) && Thickness.Equals(other.Thickness) && DashOffset.Equals(other.DashOffset) &&
              Equals(DashStrokeArray, other.DashStrokeArray) && StartLineCap == other.StartLineCap &&
              EndLineCap == other.EndLineCap && DashCap == other.DashCap && PenLineJoin == other.PenLineJoin &&
-             TrimStart.Equals(other.TrimStart) && TrimEnd.Equals(other.TrimEnd);
+             TrimStart.Equals(other.TrimStart) && TrimEnd.Equals(other.TrimEnd) &&
+             // Load-bearing: a pen that compares EQUAL is treated as unchanged and the stroke is never re-pointed, so a
+             // property missing from here is a property that silently cannot be animated (the marching ants stopped
+             // moving the moment DashPhase was added and left out).
+             DashPhase.Equals(other.DashPhase) && FitDashesToContour == other.FitDashesToContour;
    }
 
    public override bool Equals(object obj)
@@ -80,6 +101,6 @@ public class Pen : IEquatable<Pen>
    {
       return HashCode.Combine(
          HashCode.Combine(Brush, Thickness, DashOffset, DashStrokeArray, (int)StartLineCap, (int)EndLineCap, (int)PenLineJoin),
-         HashCode.Combine(TrimStart, TrimEnd, (int)DashCap));
+         HashCode.Combine(TrimStart, TrimEnd, (int)DashCap, DashPhase, FitDashesToContour));
    }
 }

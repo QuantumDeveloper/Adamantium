@@ -284,12 +284,47 @@ public class StrokeGeometry : Geometry
       return dashesData;
    }
 
+   /// <summary>The dash pattern to walk a closed contour with. Unchanged unless the pen asks for fitting, in which case
+   /// it is scaled so <paramref name="contourLength"/> holds a whole number of periods - the difference between a ring
+   /// that closes on itself and one with a visible long dash at the seam. <paramref name="scale"/> is handed back so the
+   /// caller can put the dash OFFSET in the same units.
+   /// <para>NB the fit is computed from the pattern alone. A non-flat dash cap adds half the thickness at each end of
+   /// every gap, so with round caps the fit is approximate - close enough to hide the seam, not exact.</para></summary>
+   private static double[] FitDashArray(Pen pen, double contourLength, out double scale)
+   {
+      scale = 1.0;
+      var array = pen.DashStrokeArray.ToArray();
+      if (!pen.FitDashesToContour || array.Length == 0 || contourLength <= 0) return array;
+
+      var period = 0.0;
+      foreach (var entry in array) period += entry;
+      if (period <= 0) return array;
+
+      var periods = Math.Max(1.0, Math.Round(contourLength / period));
+      scale = contourLength / (periods * period);
+      for (var i = 0; i < array.Length; i++) array[i] *= scale;
+
+      return array;
+   }
+
    private List<DashData> SplitClosedGeometryToDashes(Vector2[] points, Pen pen)
    {
       var dashesData = new List<DashData>();
-      var offset = pen.DashOffset;
-         
-      var remainingGeometryLength = GetGeometryLength(points, true);
+
+      var contourLength = GetGeometryLength(points, true);
+
+      // A closed contour's length almost never divides by the dash pattern, and the remainder shows up where the contour
+      // closes - as ONE long dash (the merge below). Fitting stretches the pattern by at most half a period so a whole
+      // number of them goes round, which is what keeps a marching-ants ring seamless at any size.
+      var dashArray = FitDashArray(pen, contourLength, out var dashScale);
+
+      // The phase is in PERIODS - the arithmetic the author would otherwise do by hand - so it turns into pixels here;
+      // both parts then scale with the fit, or a ring seamless in shape would still drift in phase as it marched.
+      var authoredPeriod = 0.0;
+      foreach (var entry in pen.DashStrokeArray) authoredPeriod += entry;
+      var offset = (pen.DashOffset + pen.DashPhase * authoredPeriod) * dashScale;
+
+      var remainingGeometryLength = contourLength;
 
       // clip the offset if it is too long and is greater then geometry length
       offset %= remainingGeometryLength;
@@ -316,10 +351,10 @@ public class StrokeGeometry : Geometry
          if (isDash) dashGeometry.Add(currentPoint);
             
          // loop dash array usage
-         if (dashArrayIndex == pen.DashStrokeArray.Count) dashArrayIndex = 0;
+         if (dashArrayIndex == dashArray.Length) dashArrayIndex = 0;
 
          // get current offset from template array
-         var currentOffset = pen.DashStrokeArray[dashArrayIndex];
+         var currentOffset = dashArray[dashArrayIndex];
             
          // move offset in accordance to line cap endings
          if (!isDash)
