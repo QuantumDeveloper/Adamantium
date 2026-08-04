@@ -133,6 +133,13 @@ public class TreeViewItem : ItemsControl, IHeaderedItemsControl, ISpringLoadable
     /// (the flattener already holds the row's state) - it does NOT re-drive expansion, which routes through the owner.</summary>
     internal void BindRow(TreeRow row, DataTemplate headerTemplate)
     {
+        // Whatever the pointer was over, it was over the row this container USED to show. Hover is state about the
+        // pointer and THIS row, and a recycled container knows nothing about it any more: the mouse has not moved, so
+        // no Leave will ever arrive to put it out. Left standing, the rows a fast keyboard scroll recycles through
+        // carry the highlight away with them and it never clears. If the pointer really is over this row, the next
+        // mouse move lights it again.
+        IsPointerOverHeader = false;
+
         Row = row;
         DataContext = row.Node;
         Header = row.Node;
@@ -189,6 +196,17 @@ public class TreeViewItem : ItemsControl, IHeaderedItemsControl, ISpringLoadable
         // Route the click (with its Ctrl/Shift modifiers) to the owner TreeView - the Single/Multiple/Extended policy lives
         // there, since it must reach across rows to clear or range-select the others.
         FindOwnerTreeView()?.OnItemClicked(this, e.Modifiers);
+    }
+
+    // Focus arriving by any route (a click, a Tab into the tree, the arrow keys) tells the tree WHICH ROW now owns the
+    // keyboard place - the tree keeps that as a row, not as this container, and re-delivers it when containers recycle.
+    protected override void OnGotFocus(RoutedEventArgs e)
+    {
+        base.OnGotFocus(e);
+        if (IsFocused && Row is { } row)
+        {
+            FindOwnerTreeView()?.NoteFocusedRow(row);
+        }
     }
 
     // The TreeView hosting this node; its SelectionMode decides the click policy and it owns the flat-list expansion.

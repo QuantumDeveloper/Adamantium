@@ -5,6 +5,7 @@ using System.Linq;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.Decorators;
 using Adamantium.UI.Core.Data;
+using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Templates;
 using NUnit.Framework;
 
@@ -211,5 +212,159 @@ public class TreeViewVirtualizationTests
             Assert.That(tree.Items[0], Is.InstanceOf<TreeRow>());
             Assert.That(((TreeRow)tree.Items[0]).Node, Is.SameAs(roots[0]));
         });
+    }
+
+    // --- The tree's own keys ---------------------------------------------------------------------------------------
+    // A tree is driven with four keys and they are all about the FLAT list of visible rows: down and up walk it, right
+    // opens a branch (or steps into it), left folds it shut (or climbs to the parent). The tree claims them, the way a
+    // list claims its own - otherwise the first press sends the focus off to whatever sits beside the tree.
+
+    private static TreeView KeyboardTree(out ObservableCollection<Node> roots)
+    {
+        roots = new ObservableCollection<Node>([
+            new Node("a", new Node("a1"), new Node("a2")),
+            new Node("b")
+        ]);
+
+        return new TreeView
+        {
+            ItemTemplate = new HierarchicalDataTemplate(() => new TemplateResult { RootComponent = new Border() })
+            {
+                ItemsSource = new Binding("Children")
+            },
+            ItemsSource = roots
+        };
+    }
+
+    private static void Press(TreeView tree, Key key) =>
+        tree.RaiseEvent(new KeyEventArgs(KeyboardDevice.CurrentDevice, key, InputModifiers.None, 0)
+        {
+            RoutedEvent = Keyboard.KeyDownEvent
+        });
+
+    private static string Selected(TreeView tree) => (tree.SelectedItem as Node)?.Name;
+
+    private static string[] VisibleRows(TreeView tree) =>
+        tree.Items.Cast<TreeRow>().Select(r => ((Node)r.Node).Name).ToArray();
+
+    [Test]
+    public void DownWalksTheVisibleRows_AndTheFirstPressTakesTheFirstRow()
+    {
+        var tree = KeyboardTree(out _);
+
+        Press(tree, Key.DownArrow);
+        Assert.That(Selected(tree), Is.EqualTo("a"), "nothing was selected - the first press takes the first row");
+
+        Press(tree, Key.DownArrow);
+        Assert.That(Selected(tree), Is.EqualTo("b"), "...and the next one steps down the flat list");
+
+        Press(tree, Key.DownArrow);
+        Assert.That(Selected(tree), Is.EqualTo("b"), "at the end it stays put rather than leaving the tree");
+    }
+
+    [Test]
+    public void RightOpensABranch_ThenStepsIntoIt()
+    {
+        var tree = KeyboardTree(out _);
+        Press(tree, Key.DownArrow);   // on "a", which is collapsed
+
+        Press(tree, Key.RightArrow);
+        Assert.Multiple(() =>
+        {
+            Assert.That(VisibleRows(tree), Is.EqualTo(new[] { "a", "a1", "a2", "b" }), "the branch opened");
+            Assert.That(Selected(tree), Is.EqualTo("a"), "and the row itself is still the one selected");
+        });
+
+        Press(tree, Key.RightArrow);
+        Assert.That(Selected(tree), Is.EqualTo("a1"), "a second Right steps into the branch it just opened");
+    }
+
+    [Test]
+    public void LeftFoldsTheBranch_AndFromALeafClimbsToItsParent()
+    {
+        var tree = KeyboardTree(out _);
+        Press(tree, Key.DownArrow);    // "a"
+        Press(tree, Key.RightArrow);   // open it
+        Press(tree, Key.RightArrow);   // step to "a1"
+
+        Press(tree, Key.LeftArrow);
+        Assert.That(Selected(tree), Is.EqualTo("a"), "a leaf has nothing to fold, so Left climbs to its parent");
+
+        Press(tree, Key.LeftArrow);
+        Assert.Multiple(() =>
+        {
+            Assert.That(VisibleRows(tree), Is.EqualTo(new[] { "a", "b" }), "and on the parent it folds the branch shut");
+            Assert.That(Selected(tree), Is.EqualTo("a"));
+        });
+    }
+
+    [Test]
+    public void TheKeyboardPlaceIsTheRow_NotTheContainerShowingIt()
+    {
+        var tree = KeyboardTree(out _);
+        Press(tree, Key.DownArrow);   // "a"
+        Press(tree, Key.DownArrow);   // "b" - the row the keyboard is on
+
+        // A recycled container: the panel has just bound it to ANOTHER row while it still holds the focus. That is what
+        // a scroll does to every container it reuses, and reading the keyboard's place off one made the next arrow step
+        // from the wrong row - the focus ring landing a row or two away from the row that was actually selected.
+        var recycled = new TreeViewItem();
+        tree.PrepareContainer(recycled, tree.Items[0]);   // now shows "a"
+        FocusManager.Focus(recycled);
+
+        Press(tree, Key.UpArrow);
+        Assert.That(Selected(tree), Is.EqualTo("a"), "up steps from 'b' - the ROW the keyboard is on, not that container's");
+    }
+
+    [Test]
+    public void ARecycledContainerGivesTheRingBack_AndTakesItAgainWhenTheRowReturns()
+    {
+        var tree = KeyboardTree(out _);
+        Press(tree, Key.DownArrow);   // "a" owns the keyboard place
+
+        var container = new TreeViewItem();
+        tree.PrepareContainer(container, tree.Items[0]);   // showing "a"
+        FocusManager.Focus(container);
+
+        // The scroll carries "a" off-screen and recycles this container onto another row. Keeping the focus here would
+        // re-draw the ring on every row the scroll reuses it for.
+        tree.PrepareContainer(container, tree.Items[1]);   // now showing "b"
+        Assert.Multiple(() =>
+        {
+            Assert.That(container.IsFocused, Is.False, "the ring does not stay on a container showing someone else's row");
+            Assert.That(FocusManager.Focused, Is.SameAs(tree), "the tree holds the keyboard while that row has no visual");
+        });
+
+        // ...and the row coming back into view takes its focus back, on whichever container now shows it.
+        var returned = new TreeViewItem();
+        tree.PrepareContainer(returned, tree.Items[0]);
+        Assert.That(FocusManager.Focused, Is.SameAs(returned), "the row is visible again, so the ring returns to it");
+    }
+
+    [Test]
+    public void HomeAndEndGoToTheEndsOfTheList()
+    {
+        var tree = KeyboardTree(out _);
+        Press(tree, Key.DownArrow);
+
+        Press(tree, Key.End);
+        Assert.That(Selected(tree), Is.EqualTo("b"));
+
+        Press(tree, Key.Home);
+        Assert.That(Selected(tree), Is.EqualTo("a"));
+    }
+
+    [Test]
+    public void AKeyTheTreeDoesNotWantIsLeftAlone()
+    {
+        var tree = KeyboardTree(out _);
+        var args = new KeyEventArgs(KeyboardDevice.CurrentDevice, Key.Tab, InputModifiers.None, 0)
+        {
+            RoutedEvent = Keyboard.KeyDownEvent
+        };
+
+        tree.RaiseEvent(args);
+
+        Assert.That(args.Handled, Is.False, "Tab belongs to navigation - the tree must not swallow it");
     }
 }
