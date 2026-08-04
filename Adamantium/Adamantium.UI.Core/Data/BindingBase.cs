@@ -1,4 +1,4 @@
-using Adamantium.UI.Core.MarkupExtensions;
+﻿using Adamantium.UI.Core.MarkupExtensions;
 
 namespace Adamantium.UI.Core.Data;
 
@@ -24,7 +24,7 @@ public abstract class BindingBase: MarkupExtension, ICloneable
    // the binding object itself.
    public override object ProvideObject(MarkupContext context)
    {
-      if (context?.TargetObject is IFundamentalUIComponent target && !string.IsNullOrEmpty(context.TargetPropertyName))
+      if (context?.TargetObject is IAdamantiumComponent target && !string.IsNullOrEmpty(context.TargetPropertyName))
          return BindingEngine.SetBinding(target, context.TargetPropertyName, this);
       return this;
    }

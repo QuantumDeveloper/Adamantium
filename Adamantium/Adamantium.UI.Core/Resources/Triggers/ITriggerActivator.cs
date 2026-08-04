@@ -8,6 +8,17 @@ public interface ITriggerActivator
     void Activate();
     void Deactivate();
 
+    /// <summary>The host has left the visual tree: stop anything the trigger left RUNNING, but keep the condition and
+    /// the applied setters, because the host is expected back. Deactivate is the wrong tool here - it forgets the state
+    /// - and doing nothing is what leaked: a looping loading pulse whose page was navigated away kept ticking for the
+    /// rest of the session, one orphan per indicator, and the frame paid for all of them.</summary>
+    void SuspendActions();
+
+    /// <summary>...and the host is back: re-run what suspending stopped, if the condition still holds. A looping
+    /// animation resumes at the phase it was suspended on (RunAnimationAction keeps it), so a returning page picks its
+    /// pulse up mid-stride instead of snapping back to the start.</summary>
+    void ResumeActions();
+
     /// <summary>
     /// Whether this trigger reaches into the templated control's named parts (any setter has a TargetName).
     /// Only such activators need re-pointing when the template is swapped; one that only touches the host's OWN

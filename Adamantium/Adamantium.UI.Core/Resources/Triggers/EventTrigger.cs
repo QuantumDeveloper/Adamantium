@@ -59,6 +59,13 @@ internal sealed class EventTriggerActivator : ITriggerActivator
         _subscribed = false;
     }
 
+    // An event trigger holds no state between firings - it runs its actions when the event arrives and forgets them - so
+    // there is nothing for a detached host to suspend or a returning one to resume. NB an event action that starts a
+    // LOOPING animation is therefore not covered here; nothing records that it is running.
+    public void SuspendActions() { }
+
+    public void ResumeActions() { }
+
     private void OnEvent(object sender, RoutedEventArgs e)
     {
         foreach (var action in _trigger.EnterActions)

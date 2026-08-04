@@ -213,6 +213,24 @@ public class Style : AdamantiumComponent
         }
     }
 
+    // The component left / re-entered the visual tree. Style triggers are where a loading indicator's pulse actually
+    // comes from (the theme runs it), so this is the half that matters most - see ITriggerActivator.SuspendActions.
+    internal static void SuspendActivators(IFundamentalUIComponent component)
+    {
+        var activators = GetActiveActivators(component);
+        if (activators == null) return;
+
+        foreach (var activator in activators) activator?.SuspendActions();
+    }
+
+    internal static void ResumeActivators(IFundamentalUIComponent component)
+    {
+        var activators = GetActiveActivators(component);
+        if (activators == null) return;
+
+        foreach (var activator in activators) activator?.ResumeActions();
+    }
+
     private static List<ITriggerActivator> GetActiveActivators(IFundamentalUIComponent component)
     {
         return component.GetValue<List<ITriggerActivator>>(ActiveActivatorsProperty);

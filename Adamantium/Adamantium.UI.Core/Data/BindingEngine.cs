@@ -1,4 +1,4 @@
-using System.Runtime.CompilerServices;
+﻿using System.Runtime.CompilerServices;
 
 namespace Adamantium.UI.Core.Data;
 
@@ -11,9 +11,9 @@ namespace Adamantium.UI.Core.Data;
 public static class BindingEngine
 {
     // Weak element keys -> the element's live bindings by target property. Weak so the registry never pins an element.
-    private static readonly ConditionalWeakTable<IFundamentalUIComponent, Dictionary<AdamantiumProperty, BindingExpressionBase>> _bindings = new();
+    private static readonly ConditionalWeakTable<IAdamantiumComponent, Dictionary<AdamantiumProperty, BindingExpressionBase>> _bindings = new();
 
-    public static BindingExpressionBase SetBinding(IFundamentalUIComponent target, AdamantiumProperty targetProperty,
+    public static BindingExpressionBase SetBinding(IAdamantiumComponent target, AdamantiumProperty targetProperty,
         BindingBase bindingBase)
     {
         var expression = BindingExpression.CreateBindingExpression(target, targetProperty, bindingBase);
@@ -23,7 +23,7 @@ public static class BindingEngine
         return expression;
     }
 
-    public static BindingExpressionBase SetBinding(IFundamentalUIComponent target, string targetProperty,
+    public static BindingExpressionBase SetBinding(IAdamantiumComponent target, string targetProperty,
         BindingBase bindingBase)
         => SetBinding(target, target.GetProperty(targetProperty), bindingBase);
 
@@ -48,26 +48,26 @@ public static class BindingEngine
     }
 
     /// <summary>The live binding on a target property, or null.</summary>
-    public static BindingExpressionBase GetBindingExpression(IFundamentalUIComponent target, AdamantiumProperty targetProperty)
+    public static BindingExpressionBase GetBindingExpression(IAdamantiumComponent target, AdamantiumProperty targetProperty)
         => _bindings.TryGetValue(target, out var map) && map.TryGetValue(targetProperty, out var e) ? e : null;
 
     /// <summary>Every live binding on an element.</summary>
-    public static IReadOnlyCollection<BindingExpressionBase> GetBindings(IFundamentalUIComponent target)
+    public static IReadOnlyCollection<BindingExpressionBase> GetBindings(IAdamantiumComponent target)
         => _bindings.TryGetValue(target, out var map) ? map.Values.ToArray() : [];
 
     /// <summary>Re-resolves and re-applies every binding on an element - e.g. after its DataContext changed.</summary>
-    public static void RefreshBindings(IFundamentalUIComponent target)
+    public static void RefreshBindings(IAdamantiumComponent target)
     {
         if (_bindings.TryGetValue(target, out var map))
             foreach (var e in map.Values) e.EstablishConnection();
     }
 
-    public static void ClearBinding(IFundamentalUIComponent target, AdamantiumProperty targetProperty)
+    public static void ClearBinding(IAdamantiumComponent target, AdamantiumProperty targetProperty)
     {
         if (_bindings.TryGetValue(target, out var map) && map.Remove(targetProperty, out var e)) e.CloseConnection();
     }
 
-    public static void ClearBindings(IFundamentalUIComponent target)
+    public static void ClearBindings(IAdamantiumComponent target)
     {
         if (!_bindings.TryGetValue(target, out var map)) return;
         foreach (var e in map.Values) e.CloseConnection();
@@ -78,7 +78,7 @@ public static class BindingEngine
     /// an off-screen container: the tile drops out of any shared source's fan-out (no storm on a shared-property change)
     /// yet is re-established for free when it is reused, because a container's DataContext change runs RefreshBindings.
     /// Unlike <see cref="ClearBindings"/> the map is left intact so that re-establish has something to re-establish.</summary>
-    public static void DeactivateBindings(IFundamentalUIComponent target)
+    public static void DeactivateBindings(IAdamantiumComponent target)
     {
         if (_bindings.TryGetValue(target, out var map))
             foreach (var e in map.Values) e.CloseConnection();

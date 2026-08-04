@@ -253,19 +253,6 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
     
     public IAdamantiumComponent TemplatedParent { get; internal set; }
 
-    public BindingExpressionBase SetBinding(string property, BindingBase bindingBase)
-    {
-        var adamantiumProperty = GetProperty(property);
-        return SetBinding(adamantiumProperty, bindingBase);
-    }
-
-    public BindingExpressionBase SetBinding(AdamantiumProperty property, BindingBase bindingBase)
-    {
-        // Bindings live in the central BindingEngine registry (queryable/refreshable), not as element-private state. Returns
-        // the base type - a MultiBinding yields a MultiBindingExpression, not a BindingExpression (they're siblings).
-        return BindingEngine.SetBinding(this, property, bindingBase);
-    }
-    
     public void RemoveBinding(string property)
     {
         var adamantiumProperty = GetProperty(property);
@@ -515,6 +502,28 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         {
             _triggerActivators.Add(trigger.Apply(new StyleTriggerExecutionContext(this, theme)));
         }
+    }
+
+    /// <summary>The component left the visual tree: stop what its triggers left RUNNING, without forgetting their state.
+    /// A page navigated away used to keep its loading pulses ticking for the rest of the session, and every frame paid
+    /// for all of them (measured: 25 orphans off one page, render rate a quarter of what it was).</summary>
+    protected void SuspendTriggerActions()
+    {
+        if (_triggerActivators != null)
+            foreach (var activator in _triggerActivators)
+                activator?.SuspendActions();
+
+        Style.SuspendActivators(this);
+    }
+
+    /// <summary>...and it is back: re-run what suspending stopped, where the condition still holds.</summary>
+    protected void ResumeTriggerActions()
+    {
+        if (_triggerActivators != null)
+            foreach (var activator in _triggerActivators)
+                activator?.ResumeActions();
+
+        Style.ResumeActivators(this);
     }
 
     private void DeactivateTriggers()

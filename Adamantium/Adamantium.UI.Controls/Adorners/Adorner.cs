@@ -23,6 +23,12 @@ public class Adorner : TemplatedUIComponent
         AdornedElement = adornedElement;
     }
 
+    /// <summary>How far outside the adorned element this adorner is entitled to draw. A VIEWPORT that clips adorners
+    /// (see <see cref="IUIComponent.ClipsAdorners"/>) admits this much beyond its edge, so a control standing flush
+    /// against the edge of a scroll area still gets its whole ring - the alternative was every such control wearing a
+    /// shaved one, or every author remembering to pad scrollable content by exactly the ring's standoff.</summary>
+    public virtual double ClipStandoff => 0;
+
     private IUIComponent _adornedElement;
 
     /// <summary>The element this adorner decorates; the adorner (and its template) draw in its coordinate space. Setting it

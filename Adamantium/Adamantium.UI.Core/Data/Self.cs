@@ -1,4 +1,4 @@
-using Adamantium.UI.Core.MarkupExtensions;
+﻿using Adamantium.UI.Core.MarkupExtensions;
 
 namespace Adamantium.UI.Core.Data;
 
@@ -21,7 +21,7 @@ public class Self : MarkupExtension
 
     public object TargetNullValue { get; set; }
 
-    public SelfBindingExpression Apply(IFundamentalUIComponent target, string propertyName,
+    public SelfBindingExpression Apply(IAdamantiumComponent target, string propertyName,
         ValuePriority priority = ValuePriority.Binding)
     {
         var expression = new SelfBindingExpression(target, target.GetProperty(propertyName), this) { Priority = priority };
@@ -31,7 +31,7 @@ public class Self : MarkupExtension
 
     public override object ProvideObject(MarkupContext context)
     {
-        if (context?.TargetObject is IFundamentalUIComponent target && !string.IsNullOrEmpty(context.TargetPropertyName))
+        if (context?.TargetObject is IAdamantiumComponent target && !string.IsNullOrEmpty(context.TargetPropertyName))
             Apply(target, context.TargetPropertyName);
         return this;
     }

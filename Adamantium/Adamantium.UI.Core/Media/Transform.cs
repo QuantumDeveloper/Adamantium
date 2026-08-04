@@ -113,7 +113,37 @@ public class Transform : AnimatableUIComponent
     /// <summary>The element this transform is assigned to as RenderTransform (set by the owner). Lets a transform tick
     /// mark ONLY its owner when the owner is a render MOTION NODE (its slot matrix rewrites - the O(1) tilt/flip path)
     /// instead of the global transform flag that re-bakes the whole scene.</summary>
-    internal IUIComponent Owner { get; set; }
+    internal IUIComponent Owner
+    {
+        get => _owner;
+        set
+        {
+            if (ReferenceEquals(_owner, value)) return;
+
+            if (_owner is AdamantiumComponent previous) previous.PropertyChanged -= OnOwnerPropertyChanged;
+            _owner = value;
+
+            // ...and the INHERITANCE parent, which is what gives a transform a DataContext. A transform is a component
+            // with the property system but no place in the tree, so on its own a {Binding} on it has nothing to resolve
+            // against; through the owner it binds like anything else - which is what makes
+            // <Transform ScaleX="{Binding Zoom}"/> - the obvious markup - actually work.
+            InheritanceParent = value as AdamantiumComponent;
+            if (value is AdamantiumComponent owner) owner.PropertyChanged += OnOwnerPropertyChanged;
+
+            // A transform is BUILT before it is assigned, so its bindings were established with no owner and therefore
+            // no DataContext - and nothing else would ever re-run them: a transform has no attach event of its own and
+            // never sees a DataContext change. Re-establish here, and again below when the owner's DataContext arrives
+            // (the usual order: build the tree, then hand it its data).
+            Data.BindingEngine.RefreshBindings(this);
+        }
+    }
+
+    private IUIComponent _owner;
+
+    private void OnOwnerPropertyChanged(object sender, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (e.Property?.Name == "DataContext") Data.BindingEngine.RefreshBindings(this);
+    }
 
     /// <summary>True when this transform is an element's LayoutTransform (not its RenderTransform): a value change then
     /// re-runs the owner's LAYOUT, because it reshapes the footprint - not just the render.</summary>

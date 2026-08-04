@@ -103,10 +103,39 @@ internal abstract class TriggerActivatorBase : ITriggerActivator
         // START their animations (an auto-hide scrollbar fades OUT from its ExitActions) on parts already thrown away.
         var invoked = _actionTargets;
         _actionTargets = null;
-        if (!wasConditionMet || _trigger.EnterActions == null) return;
+        if (!wasConditionMet) return;
+        UndoEnterActions(invoked);
+    }
+
+    // Undo whatever the ENTER actions left running, on the parts they were actually invoked against.
+    private void UndoEnterActions(Dictionary<ITriggerAction, IAdamantiumComponent> invoked)
+    {
+        if (_trigger.EnterActions == null) return;
+
         foreach (var action in _trigger.EnterActions)
             if (action is IUndoableTriggerAction undoable)
                 undoable.Undo(Context, invoked != null && invoked.TryGetValue(action, out var t) ? t : null);
+    }
+
+    private bool _suspended;
+
+    /// <summary>See <see cref="ITriggerActivator.SuspendActions"/>. The setters and the condition stay exactly as they
+    /// are - only what is RUNNING is stopped, so nothing has to be re-evaluated when the host comes back.</summary>
+    public void SuspendActions()
+    {
+        if (_suspended || !_conditionMet) return;
+
+        _suspended = true;
+        UndoEnterActions(_actionTargets);   // keep the targets: Resume re-invokes and overwrites them
+    }
+
+    /// <summary>See <see cref="ITriggerActivator.ResumeActions"/>.</summary>
+    public void ResumeActions()
+    {
+        if (!_suspended) return;
+
+        _suspended = false;
+        if (_conditionMet && _trigger.EnterActions != null) InvokeActions(_trigger.EnterActions);
     }
 
     // What each invoked action actually acted ON. Resolved at INVOKE time and kept, for the same reason the setters' targets

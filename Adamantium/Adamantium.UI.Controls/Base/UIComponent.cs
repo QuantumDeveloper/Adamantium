@@ -523,6 +523,10 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     /// draws around its target and says so by overriding this.</summary>
     public virtual bool ClippedByRenderParent => true;
 
+    /// <summary>See <see cref="IUIComponent.ClipsAdorners"/>. A box is not a viewport, so clipping children says nothing
+    /// about adorners; the component that means "you may not draw past here" overrides this.</summary>
+    public virtual bool ClipsAdorners => false;
+
     public IRootVisualComponent RootVisual { get; private set; }
 
     /// <summary>
@@ -742,6 +746,9 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         // recursion below carries this to the whole re-attached subtree.
         InvalidateRender(false);
 
+        // Back on screen: whatever its triggers had running before it left starts again, at the phase it stopped on.
+        ResumeTriggerActions();
+
         OnAttachedToVisualTree(e);
         AttachedToVisualTreeEvent?.Invoke(this, e);
 
@@ -760,6 +767,10 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     {
         // Clear the root link so IsAttachedToVisualTree (=> RootVisual != null) flips to false for this subtree.
         RootVisual = null;
+
+        // Off screen: nothing it drives should keep costing a frame. A looping loading pulse is the case that made this
+        // necessary - see FundamentalUIComponent.SuspendTriggerActions.
+        SuspendTriggerActions();
 
         OnDetachedFromVisualTree(e);
         DetachedFromVisualTreeEvent?.Invoke(this, e);

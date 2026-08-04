@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Globalization;
 
 namespace Adamantium.UI.Core.Data;
@@ -20,7 +20,7 @@ public class MultiBindingExpression : BindingExpressionBase
    private bool _suspendRefresh;
    private bool IsProducer => TargetProperty == null;
 
-   public MultiBindingExpression(IFundamentalUIComponent target, AdamantiumProperty targetProperty, BindingBase bindingBase)
+   public MultiBindingExpression(IAdamantiumComponent target, AdamantiumProperty targetProperty, BindingBase bindingBase)
    {
       Target = target;
       TargetProperty = targetProperty;

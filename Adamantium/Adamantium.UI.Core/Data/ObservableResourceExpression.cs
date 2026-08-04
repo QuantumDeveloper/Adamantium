@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.RoutedEvents;
 
@@ -20,7 +20,7 @@ public class ObservableResourceExpression : BindingExpressionBase
     private readonly object _token;
     private IResourceManager _resources;
 
-    public ObservableResourceExpression(IFundamentalUIComponent target, AdamantiumProperty targetProperty, string key,
+    public ObservableResourceExpression(IAdamantiumComponent target, AdamantiumProperty targetProperty, string key,
         ValuePriority priority = ValuePriority.Template, object token = null)
     {
         Target = target;
@@ -42,8 +42,10 @@ public class ObservableResourceExpression : BindingExpressionBase
         // Re-resolve once the target is ROOTED, where its full ancestor chain - incl. a Local dictionary's owner - is
         // present: a visual element via the visual tree; a non-visual one via the LOGICAL tree (it never enters the
         // visual tree, so its visual-attach event never fires).
-        if (Target is IUIComponent visual) visual.AttachedToVisualTreeEvent += OnVisualAttached;
-        else if (Target != null) Target.AttachedToLogicalTree += OnLogicalAttached;
+        // Asked of the nearest ELEMENT - a non-tree target (a Transform) has no attach of its own and rides its owner's.
+        var element = DataContextSource;
+        if (element is IUIComponent visual) visual.AttachedToVisualTreeEvent += OnVisualAttached;
+        else if (element != null) element.AttachedToLogicalTree += OnLogicalAttached;
 
         if (Target is IInputComponent input) input.Unloaded += OnTargetUnloaded;
     }
@@ -51,7 +53,7 @@ public class ObservableResourceExpression : BindingExpressionBase
     public override void UpdateTarget()
     {
         if (_resources == null || TargetProperty == null) return;
-        var value = _resources.FindResource(Target, _key);   // tree-scoped; falls back Theme -> Global
+        var value = _resources.FindResource(DataContextSource, _key);   // tree-scoped; falls back Theme -> Global
         // A transient miss (e.g. mid theme-swap, before the new theme's dictionary is loaded) must NOT clobber the
         // property with null - keep the last good value until the resolve succeeds again.
         if (value == null) return;
@@ -68,8 +70,9 @@ public class ObservableResourceExpression : BindingExpressionBase
             _resources.ResourcesChanged -= OnResourcesChanged;
             _resources = null;
         }
-        if (Target is IUIComponent visual) visual.AttachedToVisualTreeEvent -= OnVisualAttached;
-        else if (Target != null) Target.AttachedToLogicalTree -= OnLogicalAttached;
+        var element = DataContextSource;
+        if (element is IUIComponent visual) visual.AttachedToVisualTreeEvent -= OnVisualAttached;
+        else if (element != null) element.AttachedToLogicalTree -= OnLogicalAttached;
         if (Target is IInputComponent input) input.Unloaded -= OnTargetUnloaded;
     }
 
