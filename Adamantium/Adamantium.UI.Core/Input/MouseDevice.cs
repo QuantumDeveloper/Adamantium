@@ -418,6 +418,20 @@ public class MouseDevice
         source.RaiseEvent(args);
     }
 
+    /// <summary>Re-decide what the pointer is over when the CONTENT under it has moved, not the pointer. Hover says what
+    /// is under the cursor NOW, and a list scrolled by the keyboard or the wheel slides its rows under a cursor that
+    /// never moves: no Enter and no Leave arrive, so the highlight stays on the row that has left - and a recycled
+    /// container carries it off to a row nobody is pointing at. Called once a layout pass has SETTLED, which is exactly
+    /// when the answer can have changed.
+    /// <para>Ignored while something holds the capture: there the captured element is the mouse-over target by
+    /// definition (a thumb being dragged past its own bounds), and re-deciding would take that away mid-gesture.</para></summary>
+    public void RefreshMouseOver(IInputComponent root)
+    {
+        if (Captured != null || root is not IRootVisualComponent client) return;
+
+        SetMouseOver(root, client.PointToClient(Position), InputModifiers.None, 0);
+    }
+
     private IInputComponent SetMouseOver(IInputComponent rootComponent, Vector2 p, InputModifiers modifiers, uint timestamp)
     {
         // Mouse-over is GEOMETRIC: bounds containment, so the over-chain doesn't fall through a transparent gap to an
