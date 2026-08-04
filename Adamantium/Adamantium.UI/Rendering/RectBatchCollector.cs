@@ -55,8 +55,11 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
     // Bake a pen into the instance's stroke fields (shared by the rect + ellipse batches). Colour with opacity folded;
     // width/dash/offset scale by the world device scale (sx) into device px, matching the arc-length `s` the shader
     // computes; trim is a 0..1 fraction. CENTRE-aligned (half in / half out). No pen -> a zero stroke (fill only).
+    /// <param name="contourLength">Length of the outline being stroked, in LOCAL units, or 0 when the caller cannot say.
+    /// Only <see cref="Pen.FitDashesToContour"/> needs it: the pattern is stretched so a whole number of periods goes
+    /// round, which is what keeps a closed dashed ring from carrying one long dash at its seam.</param>
     internal static void BakeStroke(Pen pen, double opacity, float sx,
-        out Vector4F strokeColor, out Vector4F stroke0, out Vector4F stroke1)
+        out Vector4F strokeColor, out Vector4F stroke0, out Vector4F stroke1, double contourLength = 0)
     {
         strokeColor = Vector4F.Zero;
         stroke0 = Vector4F.Zero;
@@ -68,17 +71,43 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
         strokeColor = sc;
 
         float dashOn = 0f, dashGap = 0f;
+        var period = 0.0;
+        var fit = 1.0;
         if (pen.DashStrokeArray is { Count: 2 } d)
         {
-            dashOn = (float)(d[0] * sx);
-            dashGap = (float)(d[1] * sx);
+            period = d[0] + d[1];
+            // Fit the pattern to the outline: without it the leftover of the last period lands where the contour closes
+            // and reads as one long dash, and it moves about as the shape resizes.
+            if (pen.FitDashesToContour && period > 0 && contourLength > 0)
+            {
+                var periods = Math.Max(1.0, Math.Round(contourLength / period));
+                fit = contourLength / (periods * period);
+            }
+
+            dashOn = (float)(d[0] * fit * sx);
+            dashGap = (float)(d[1] * fit * sx);
         }
         // Packed for the shader: caps base-8 (codes below) - DashCap for dash-piece ends, Start/EndLineCap for the
         // contour's real ends (only exist when trimmed); the JOIN (0 miter, 1 bevel, 2 round) in the 512s place.
         var capFlags = CapCode(pen.DashCap) + 8f * CapCode(pen.StartLineCap) + 64f * CapCode(pen.EndLineCap)
                      + 512f * JoinCode(pen.PenLineJoin);
         stroke0 = new Vector4F((float)(pen.Thickness * sx), 0f, dashOn, dashGap);
-        stroke1 = new Vector4F((float)(pen.DashOffset * sx), (float)pen.TrimStart, (float)pen.TrimEnd, capFlags);
+        // DashPhase is in PERIODS - so an animation runs 0 -> 1 and lands back on itself whatever the array says - and
+        // becomes pixels here, alongside the pixel offset. Both take the fit, or a ring seamless in shape would still
+        // drift in phase as it marched.
+        var offset = (pen.DashOffset + pen.DashPhase * period) * fit;
+        stroke1 = new Vector4F((float)(offset * sx), (float)pen.TrimStart, (float)pen.TrimEnd, capFlags);
+    }
+
+    // Outline length of a rounded rect: the four straight runs plus the corner arcs (four quarter-circles = one full
+    // circle when the radii are uniform). Only the dash FIT reads it, and only uniform corners batch here anyway.
+    private static double RoundedRectPerimeter(Rect rect, ProceduralGeometry.CornerRadius corners)
+    {
+        if (rect.Width <= 0 || rect.Height <= 0) return 0;
+
+        var r = Math.Max(0, corners.TopLeft);
+        r = Math.Min(r, Math.Min(rect.Width, rect.Height) / 2.0);
+        return 2 * (rect.Width - 2 * r) + 2 * (rect.Height - 2 * r) + 2 * Math.PI * r;
     }
 
     // All six caps, drawn analytically by CapReach in BatchEffect.fx. Codes MATCH the geometry stroker's MapCap so the two
@@ -127,7 +156,8 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
         // trim), CENTRE-aligned (half in / half out). Solid, dashed and trimmed strokes all draw analytically in the SDF
         // shader, so a stroked tile stays in the batch (no per-tile GPU buffers) - the whole grid can dash without OOM.
         var sx = world.M11; var sy = world.M22; var tx = world.M41; var ty = world.M42;
-        BakeStroke(p.Pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1);
+        BakeStroke(p.Pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1,
+            RoundedRectPerimeter(p.DestinationRect, p.CornerRadius));
 
         var r = p.DestinationRect;
         item = new RectItem

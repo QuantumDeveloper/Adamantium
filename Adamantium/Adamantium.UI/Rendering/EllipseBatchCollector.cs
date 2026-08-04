@@ -80,9 +80,9 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
         // CENTRE-aligned. Solid/dashed/trimmed all draw analytically in the SDF shader, so a stroked ellipse stays in the
         // batch (no per-tile GPU buffers).
         var sx = world.M11; var sy = world.M22; var tx = world.M41; var ty = world.M42;
-        RectBatchCollector.BakeStroke(p.Pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1);
-
         var r = p.DestinationRect;
+        RectBatchCollector.BakeStroke(p.Pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1,
+            EllipsePerimeter(r.Width / 2.0, r.Height / 2.0));
         item = new EllipseItem
         {
             // NODE-local when transformSlot != 0 (world is then the transform RELATIVE to the motion node; the vertex
@@ -95,5 +95,15 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
             Stroke1 = stroke1
         };
         return true;
+    }
+
+    // Ramanujan's second approximation - exact enough that the dash fit lands on a whole number of periods (the error is
+    // parts per billion for any ratio a UI produces), and there is no closed form to be exact with.
+    private static double EllipsePerimeter(double a, double b)
+    {
+        if (a <= 0 || b <= 0) return 0;
+
+        var h = (a - b) * (a - b) / ((a + b) * (a + b));
+        return Math.PI * (a + b) * (1 + 3 * h / (10 + Math.Sqrt(4 - 3 * h)));
     }
 }

@@ -57,6 +57,7 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
         public ReusableBuffer VertexBuffer;
         public Buffer PatternBuffer;     // dash only
         public Buffer IndirectBuffer;    // dash only (VkDrawIndirectCommand)
+        public float DashScale = 1f;     // what FitDashesToContour stretched the pattern by (1 = untouched)
         public ulong PointsBytes => (ulong)(PointsData.Length * sizeof(float));
         public ulong VertexBytes => (ulong)(VertexCount * 3 * sizeof(float));   // 3 floats/vertex (x, y, signed dist)
     }
@@ -157,6 +158,27 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
         return floats;
     }
 
+    // How much the dash pattern must stretch for a WHOLE number of periods to go round this closed contour. Never more
+    // than half a period either way, so the dashes keep the length they were authored with to within a few percent.
+    private static float FitScale(Vector2[] points, Pen pen)
+    {
+        var period = 0.0;
+        foreach (var entry in pen.DashStrokeArray) period += entry;
+        if (period <= 0) return 1f;
+
+        var length = 0.0;
+        for (var i = 0; i < points.Length; i++)
+        {
+            var next = i + 1 == points.Length ? 0 : i + 1;   // closed: the last segment runs back to the start
+            length += (points[next] - points[i]).Length();
+        }
+
+        if (length <= 0) return 1f;
+
+        var periods = Math.Max(1.0, Math.Round(length / period));
+        return (float)(length / (periods * period));
+    }
+
     // Builds the GPU buffers for one contour. Returns null for a degenerate contour (no thread/vertex work).
     private Contour BuildContour(Vector2[] points, bool isClosed, bool capNeedsFan, bool dashCapNeedsFan)
     {
@@ -183,10 +205,17 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
 
             // Pattern buffer: the real dash array, or a 1-element dummy for trim-only (PatternCount=0 -> not read).
             var patternArr = _hasDashes ? new float[_pen.DashStrokeArray.Count] : new float[1];
+            // A CLOSED contour's length almost never divides by the dash pattern, and the remainder lands where the
+            // contour closes - one long dash at the seam, moving as the shape resizes. Fitting stretches the pattern by
+            // at most half a period so a whole number goes round; the offset is scaled to match when it is uploaded.
+            c.DashScale = _hasDashes && isClosed && _pen.FitDashesToContour
+                ? FitScale(points, _pen)
+                : 1f;
             // Clamp each dash segment to >=1px. This CUT path turns every dash into REAL geometry, and a sub-pixel piece
             // becomes a degenerate quad that never rasterizes - the line breaks up at DashOn<1. The SDF batch is analytic
             // (per-fragment coverage) so a sub-pixel dash just fades there; only this compute path needs the floor.
-            for (var i = 0; i < _pen.DashStrokeArray.Count; i++) patternArr[i] = Math.Max((float)_pen.DashStrokeArray[i], 1.0f);
+            for (var i = 0; i < _pen.DashStrokeArray.Count; i++)
+                patternArr[i] = Math.Max((float)_pen.DashStrokeArray[i] * c.DashScale, 1.0f);
             c.PatternBuffer = ToDispose(Buffer.New(_device, (ulong)(patternArr.Length * sizeof(float)),
                 BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, StrokeMemory));
             var pp = c.PatternBuffer.MapMemory();
@@ -320,7 +349,19 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
                 _effect.PatternAddress.SetValue(c.PatternBuffer.GetDeviceAddress());
                 _effect.PatternCount.SetValue(_hasDashes ? (uint)_pen.DashStrokeArray.Count : 0u);
                 _effect.MaxVertices.SetValue(c.VertexCount);
-                _effect.DashOffset.SetValue((float)_pen.DashOffset);
+                // The phase is in PERIODS, so it becomes pixels here - which is exactly the arithmetic the author would
+                // otherwise be doing by hand. Both parts then scale with the contour fit, or the ring, seamless in
+                // shape, would still drift in phase as it marches.
+                var period = 0.0;
+                foreach (var entry in _pen.DashStrokeArray) period += entry;
+                var effectiveOffset = (float)((_pen.DashOffset + _pen.DashPhase * period) * c.DashScale);
+                if (Environment.GetEnvironmentVariable("ADAM_DASH_LOG") == "1")
+                {
+                    Console.Error.WriteLine(
+                        $"[DASH] phase={_pen.DashPhase:F3} pxOffset={_pen.DashOffset:F2} period={period:F1} " +
+                        $"scale={c.DashScale:F3} -> {effectiveOffset:F2}");
+                }
+                _effect.DashOffset.SetValue(effectiveOffset);
                 _effect.TrimStart.SetValue((float)Math.Clamp(_pen.TrimStart, 0.0, 1.0));
                 _effect.TrimEnd.SetValue((float)Math.Clamp(_pen.TrimEnd, 0.0, 1.0));
                 _effect.StrokeDashCutPass.Apply();   // separate compute kernel for the dash/trim cut
