@@ -99,6 +99,25 @@ public class RenderCacheTests
     }
 
     [Test]
+    public void DiscardedPartialPass_ReRecordsWhatItAlreadyRendered()
+    {
+        var c = AddControl(); DrawsRectangle(c);
+        RenderFrame();
+        var unit = _factory.Created.Single();
+
+        // Frame 2: c is dirty and now draws NOTHING, but its Render raises an unnamed structural change - so the partial
+        // pass that ALREADY consumed its dirty flag is discarded and a full walk records the frame instead. That walk
+        // reads dirtiness before calling Render, so a consumed component looks clean, renders no commands, and its
+        // cached units get reused as "draws what it drew before" - the de-selected row that kept its highlight through
+        // a fast virtualized scroll. The discarded pass must give the flag back.
+        c.RenderAction = _ => RenderDirty.MarkStructural();
+        c.Invalidate();
+        RenderFrame();
+
+        Assert.That(unit.DeferDisposeCount, Is.EqualTo(1));
+    }
+
+    [Test]
     public void CleanControl_WithNoCommands_ReusesCachedUnits()
     {
         var c = AddControl(); DrawsRectangle(c);
