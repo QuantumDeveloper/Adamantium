@@ -52,6 +52,20 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
 
     public void LayoutPopups() => PopupLayer.UpdateLayout(new Size(ClientWidth, ClientHeight));
 
+    private bool _hoverHooked;
+
+    /// <summary>Hover is a statement about what is under the cursor NOW, so it has to be re-decided when the CONTENT
+    /// moves and the pointer does not: a list scrolled by the keyboard or the wheel slides its rows under a still
+    /// cursor, and no Enter or Leave is ever sent. The window is where this belongs - it owns the tree the answer is
+    /// hit-tested against - and a settled layout is exactly the moment the answer can have changed.</summary>
+    private void HookHoverRefresh()
+    {
+        if (_hoverHooked) return;
+
+        _hoverHooked = true;
+        LayoutManager.GetOrCreate(this).LayoutUpdated += (_, _) => MouseDevice.CurrentDevice.RefreshMouseOver(this);
+    }
+
     // Default/cancel routing: the window is the root, so unhandled Enter/Esc reach it last, after everything on the way
     // up has had its say. Enter activates the IsDefault button, Escape the IsCancel one - unless the focused element
     // already claimed the key. WPF Window default/cancel behaviour.
@@ -695,6 +709,7 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         // Seed the initial layout via the manager, NOT InvalidateMeasure(): a fresh root is IsMeasureValid=false, so that
         // method's early-return drops the enqueue - the first real layout would otherwise defer to the first user input.
         LayoutManager.GetOrCreate(this).InvalidateMeasure(this);
+        HookHoverRefresh();
     }
 
     public void SetIsActive(bool isActive)
