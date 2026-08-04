@@ -79,5 +79,6 @@
          highlight is a translucent DARK band - a soft shadow gliding over a faint grey card, which reads clearly. -->
     <SolidColorBrush x:Key="ShimmerTrackFill" Color="#14000000"/>
     <math:Color x:Key="ShimmerPeakColor">#59000000</math:Color>
+    <math:Color x:Key="ShimmerTrackColor">#14000000</math:Color>
 
 </ResourceDictionary>
