@@ -367,8 +367,17 @@ public class Slider : RangeBase
     private double SnapToTick(double value)
     {
         if (!IsSnapToTickEnabled || TickFrequency <= 0) return value;
+
         var snapped = Minimum + Math.Round((value - Minimum) / TickFrequency) * TickFrequency;
-        return snapped;
+
+        // ...and then land it on the tick EXACTLY. Minimum + n x 0.1 is a sum of binary fractions, so the arithmetic
+        // above lands a hair beside the tick (1.9000000000000001), and a snapped value is precisely the one people read,
+        // bind and print - a slider that says it snaps must not hand back a number with a tail on it. Round to the
+        // decimals the tick itself has, capped where double stops being exact anyway.
+        var decimals = 0;
+        for (var probe = TickFrequency; decimals < 15 && probe != Math.Floor(probe); decimals++) probe *= 10;
+
+        return Math.Round(snapped, decimals);
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
