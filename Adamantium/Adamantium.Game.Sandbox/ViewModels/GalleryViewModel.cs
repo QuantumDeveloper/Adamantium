@@ -49,6 +49,11 @@ public partial class GalleryViewModel
     // Drives the TabControl.ContentTransition from a DropDown (enum-bound) so the tab-content slide mode switches live.
     [Bindable] private ContentTransition _slideMode = ContentTransition.SlideLeft;
 
+    // Drives the TabControl.SelectionIndicatorPlacement from a DropDown, so the accent bar can be moved between the
+    // tab's inner and outer edge live - the two draw the bar in the same place by different alignments, which is the
+    // one thing that differs between them.
+    [Bindable] private TabIndicatorPlacement _indicatorPlacement = TabIndicatorPlacement.Inner;
+
     public GalleryViewModel(IDependencyResolver resolver)
     {
         // The Navigation tab owns a region and needs INavigationService - resolve it through DI (which injects the service)

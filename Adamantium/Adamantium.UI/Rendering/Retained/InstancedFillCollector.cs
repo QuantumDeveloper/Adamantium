@@ -43,6 +43,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
     private const MemoryPropertyFlags Mem = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal;
     private static readonly int VertexStride = Marshal.SizeOf<UIVertex>();
+    private static readonly int RingStride = Marshal.SizeOf<FringeVertex>();
     private static readonly int InstanceStride = Marshal.SizeOf<GeometryInstance>();
     private static readonly int GradInstanceStride = Marshal.SizeOf<GradientGeometryInstance>();
     private static readonly int PatInstanceStride = Marshal.SizeOf<PatternGeometryInstance>();
@@ -57,6 +58,12 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         public bool Indexed;
         public PrimitiveType Topology;
         public bool MeshUploaded;
+
+        // The shared analytic-AA ring for this key's mesh (built once with the mesh - see FrozenMesh.Ring). Every
+        // instance draws it with the SAME instance buffer as the body, so N elements cost one fringe draw instead of N.
+        public ReusableBuffer Ring;
+        public Buffer RingBuffer;
+        public uint RingVertexCount;
 
         public GeometryInstance[] Items = new GeometryInstance[64];
         public int Count;        // instances appended this frame (across all this key's flushes)
@@ -228,7 +235,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
         _scissor = scissor;
         if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
-        _pendingUnits.Add(unit);
+        AddPendingUnit(unit);
         if (!_hasUnion) { _uL = logicalBounds.X; _uT = logicalBounds.Y; _uR = logicalBounds.Right; _uB = logicalBounds.Bottom; _hasUnion = true; }
         else
         {
@@ -267,7 +274,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
         _scissor = scissor;
         if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
-        _pendingUnits.Add(unit);
+        AddPendingUnit(unit);
         if (!_hasUnion) { _uL = logicalBounds.X; _uT = logicalBounds.Y; _uR = logicalBounds.Right; _uB = logicalBounds.Bottom; _hasUnion = true; }
         else
         {
@@ -325,7 +332,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
         _scissor = scissor;
         if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
-        _pendingUnits.Add(unit);
+        AddPendingUnit(unit);
         if (!_hasUnion) { _uL = logicalBounds.X; _uT = logicalBounds.Y; _uR = logicalBounds.Right; _uB = logicalBounds.Bottom; _hasUnion = true; }
         else
         {
@@ -384,6 +391,15 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         inst.Color3 = c3;
         inst.Noise = noise;
         return inst;
+    }
+
+    // Register a collected unit for the deferred per-unit draw - but ONLY if it still has something to draw there. A
+    // solid fill whose fringe is instanced too has nothing left (its body is skipped via FillInstanced), and that empty
+    // Render() per element is exactly the cost this path exists to remove.
+    private void AddPendingUnit(GeometryRenderUnit unit)
+    {
+        if (!unit.HasPerUnitOverlay) return;
+        _pendingUnits.Add(unit);
     }
 
     /// <summary>Does a unit's logical bounds overlap the pending group? A later overlapping non-batched unit must draw
@@ -473,6 +489,24 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             _device.SetScissors(fullScissor);
         }
 
+        // The analytic-AA fringe of those same instances: the shared ring per key, drawn with the SAME instance buffer
+        // range as the body above, one draw per key. This is what the deferred per-unit fringe loop used to do one
+        // element at a time (a pipeline switch + a uniform matrix each), which measured ~90% of the draw phase.
+        if (rec.Keys.Count > 0 && AnalyticAa.Enabled)
+        {
+            SetupFringeState(projection);
+            _device.SetScissors(rec.Scissor);
+            foreach (var (seg, first, count) in rec.Keys)
+            {
+                if (seg.RingBuffer == null) continue;   // a mesh with no closed boundary has no fringe
+                _effect.InstancesAddress.SetValue(seg.Gpu.GetDeviceAddress() + (ulong)(first * InstanceStride));
+                _device.SetVertexBuffer(seg.RingBuffer);
+                _effect.BatchFringePass.Apply();
+                _device.Draw(seg.RingVertexCount, count);
+            }
+            _device.SetScissors(fullScissor);
+        }
+
         // Gradient instanced fills for this group (same shared meshes, gradient pass + per-instance gradient buffer),
         // drawn after the solid fills in the same clip. State is the same as the solid fill; only the pass differs.
         if (rec.GradKeys.Count > 0)
@@ -543,6 +577,20 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         _device.DepthCompareFunction = CompareOp.Always;
     }
 
+    // Fringe device state: as the fill, but the ring's own vertex layout and the pixel basis its VS offsets in.
+    private void SetupFringeState(Matrix4x4F projection)
+    {
+        SetupInstancedState(projection);
+        _device.VertexType = typeof(FringeVertex);
+        _device.PrimitiveTopology = PrimitiveTopology.TriangleList;
+        var vp = _device.CurrentViewports;
+        if (vp is { Length: > 0 }) _effect.ViewportSize.SetValue(new Vector2F(vp[0].Width, vp[0].Height));
+        _effect.FringePixels.SetValue(DeviceFringePx);
+    }
+
+    // Fringe width in DEVICE pixels - the same constant the per-unit fringe uses (GpuFillRenderComponent).
+    private const float DeviceFringePx = 1.0f;
+
     // Build (once) the immutable vtx/idx buffers for a key's shared local mesh. Returns null until it has a drawable mesh.
     private KeySegment GetOrCreate(GeometryKey key, FrozenMesh mesh)
     {
@@ -566,6 +614,15 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             seg.IdxBuffer = seg.Idx.Acquire((ulong)(indices.Length * sizeof(int)), out var writeI);
             if (writeI) seg.IdxBuffer.SetData(indices, 0, (uint)indices.Length);
             seg.IndexCount = (uint)indices.Length;
+        }
+
+        // The fringe ring: immutable like the mesh (both are keyed on the same tessellation).
+        if (mesh.Ring is { Length: > 0 } ring)
+        {
+            seg.Ring ??= ToDispose(_bufferManager.CreateBuffer(BufferUsageFlags.VertexBuffer, Mem));
+            seg.RingBuffer = seg.Ring.Acquire((ulong)(ring.Length * RingStride), out var writeRing);
+            if (writeRing) seg.RingBuffer.SetData(ring, 0, (uint)ring.Length);
+            seg.RingVertexCount = (uint)ring.Length;
         }
 
         seg.Topology = mesh.Topology;

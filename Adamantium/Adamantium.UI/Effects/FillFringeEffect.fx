@@ -1,20 +1,21 @@
-// GPU fill anti-aliasing (Analytic AA, Phase 1). Reuses the line-rendering GPU infra: a compute technique
-// (FillFringeExpand) turns a CLOSED fill contour into a ~1px coverage fringe RING around it - inner edge on the contour
-// (coverage = 1, meets the solid body), outer edge pushed out by FringeWidth (coverage = 0) - written as a triangle
-// LIST via a BDA device address. A graphics technique (FillFringeDraw) rasterizes it with the fill colour and
-// alpha *= coverage, feathering the edge analytically (no MSAA), drawn on top of the CPU-triangulated solid body.
-// Fills are closed loops, so there are no caps/ends here. Shader bodies are Slang. Single .fx -> one Effect class.
+// GPU fill anti-aliasing (Analytic AA). Rasterizes a coverage fringe RING around a CLOSED fill contour - inner edge on
+// the contour (coverage = 1, meets the solid body), outer edge (coverage = 0) - with the fill colour and alpha *=
+// coverage, feathering the edge analytically (no MSAA), drawn on top of the CPU-triangulated solid body. Fills are
+// closed loops, so there are no caps/ends here. Shader bodies are Slang. Single .fx -> one Effect class.
+//
+// The ring's TRIANGLES come from the CPU (Rendering/FringeGeometry.cs) - the same builder the instanced fringe uses, so
+// the ring has one definition. A vertex holds the contour point plus, on the outer edge, the two adjacent EDGE
+// DIRECTIONS; the VS turns those into a screen-space miter and pushes the vertex FringePixels out. So the buffer holds
+// no scale anywhere: it is built once per shape and stays correct at any zoom. (It used to be expanded by a compute
+// pass at a LOCAL width of 1px/scale, which made every scale a different buffer - that pass is gone, since a ring that
+// never changes has nothing to re-expand.) Building the miter from the screen edge directions also keeps the width
+// honest under anisotropic scale, skew and rotation, where a local-space miter mapped to screen is not perpendicular
+// to the screen edge.
 
-// --- FillFringeExpand (compute) globals ---
-uint64_t PointsAddress;   // float2[] contour points (PointCount), CLOSED loop (point[PointCount-1] -> point[0])
-uint64_t OutputAddress;   // float3[] output vertices: (x, y, coverage)
-uint PointCount;
-float FringeWidth;        // outward fringe width in geometry units (CPU sets ~1 device px / current scale)
-float Winding;            // +1 / -1 chosen on the CPU (from the contour's signed area) so the miter points OUTWARD
-
-// --- FillFringeDraw (graphics) globals ---
 float4x4 Projection;
 float4 FillColor;
+float2 ViewportSize;      // render target size in DEVICE pixels - the NDC <-> pixel basis for the fringe offset
+float FringePixels;       // fringe width in DEVICE pixels (1 = the analytic-AA edge is exactly one pixel wide)
 
 // Gradient-aware fringe: when IsGradient != 0 the ring is coloured by the SAME linear/radial gradient as the fill (so the
 // feathered edge matches the fill colour there, not one flat colour) - the fix for aliased gradient-shape edges. The
@@ -72,64 +73,42 @@ float4 FringeGradColor(float t)
     return cols[n - 1];
 }
 
-// Outward miter offset direction*length at contour point i: bisector of the two adjacent edge normals, length clamped
-// so a sharp corner can't shoot the fringe to infinity, oriented outward by Winding. Closed loop => i always has both
-// neighbours.
-float2 OutwardMiter(uint i)
+float2 SafeDir(float2 v)
 {
-    float2* points = (float2*)PointsAddress;
-    uint prev = (i + PointCount - 1u) % PointCount;
-    uint next = (i + 1u) % PointCount;
-    float2 d0 = normalize(points[i] - points[prev]);   // incoming edge dir
-    float2 d1 = normalize(points[next] - points[i]);   // outgoing edge dir
-    float2 n0 = float2(-d0.y, d0.x);
-    float2 n1 = float2(-d1.y, d1.x);
-    float2 miter = normalize(n0 + n1);
-    float denom = max(dot(miter, n0), 0.25);           // clamp the corner spike to <= 4x
-    return miter * (Winding / denom);
+    float len = length(v);
+    return len > 1e-9 ? v / len : float2(0.0, 0.0);   // a degenerate edge would otherwise produce a NaN direction
 }
 
-void WriteVert(float3* outv, uint idx, float2 pos, float cov)
-{
-    outv[idx] = float3(pos, cov);
-}
-
-// One thread per contour SEGMENT (i -> next). Emits the ring quad (2 triangles, 6 verts) between the contour edge
-// (coverage 1) and the outward-offset fringe edge (coverage 0). UI draws cull-none, so triangle winding is irrelevant.
-[shader("compute")]
-[numthreads(64, 1, 1)]
-void FillFringeExpandCS(uint3 tid : SV_DispatchThreadID)
-{
-    float2* points = (float2*)PointsAddress;
-    float3* outVerts = (float3*)OutputAddress;
-
-    uint i = tid.x;
-    if (i >= PointCount) return;
-
-    uint ni = (i + 1u) % PointCount;
-    float2 inA = points[i];
-    float2 inB = points[ni];
-    float2 outA = inA + OutwardMiter(i) * FringeWidth;
-    float2 outB = inB + OutwardMiter(ni) * FringeWidth;
-
-    uint baseV = i * 6u;
-    WriteVert(outVerts, baseV + 0u, inA,  1.0);
-    WriteVert(outVerts, baseV + 1u, outA, 0.0);
-    WriteVert(outVerts, baseV + 2u, inB,  1.0);
-    WriteVert(outVerts, baseV + 3u, outA, 0.0);
-    WriteVert(outVerts, baseV + 4u, outB, 0.0);
-    WriteVert(outVerts, baseV + 5u, inB,  1.0);
-}
-
-struct VSInput { float2 Position : POSITION; float Coverage : TEXCOORD0; };
+// An INNER vertex (on the contour, coverage 1) carries zero directions and is never offset; an OUTER vertex carries the
+// two adjacent edge directions, from which the VS builds the screen-space miter. Winding is folded into their SIGN by
+// the builder (reversing an edge direction reverses its 90-degree normal), so a hole's inward fringe is just a sign in
+// these vectors. Matches RenderUnits/FringeVertex.cs.
+struct VSInput { float2 Position : POSITION; float2 Dir0 : TEXCOORD0; float2 Dir1 : TEXCOORD1; };
 struct PSInput { float4 Position : SV_Position; float Coverage : TEXCOORD0; float2 Local : TEXCOORD1; };
 
 [shader("vertex")]
 PSInput FillFringeVS(VSInput input)
 {
     PSInput o;
-    o.Position = mul(float4(input.Position, 0.0, 1.0), Projection);   // row-vector convention (matches engine effects)
-    o.Coverage = input.Coverage;
+    float4 clip = mul(float4(input.Position, 0.0, 1.0), Projection);   // row-vector convention (matches engine effects)
+    float outer = dot(input.Dir0, input.Dir0) + dot(input.Dir1, input.Dir1);
+    if (outer > 0.0)
+    {
+        // Edge directions -> PIXEL space (w = 0 drops the projection's translation), then the miter is built THERE, so
+        // it is perpendicular to the edge as the rasterizer sees it and the width is exactly FringePixels pixels.
+        float2 halfVp = max(ViewportSize, float2(1.0, 1.0)) * 0.5;
+        float w = max(clip.w, 1e-6);
+        float2 e0 = SafeDir(mul(float4(input.Dir0, 0.0, 0.0), Projection).xy / w * halfVp);
+        float2 e1 = SafeDir(mul(float4(input.Dir1, 0.0, 0.0), Projection).xy / w * halfVp);
+        float2 n0 = float2(-e0.y, e0.x);
+        float2 n1 = float2(-e1.y, e1.x);
+        float2 sum = n0 + n1;
+        float2 miter = length(sum) > 1e-4 ? normalize(sum) : n0;   // a 180-degree reversal has no bisector: use one normal
+        float denom = max(dot(miter, n0), 0.25);                   // clamp the corner spike to <= 4x
+        clip.xy += miter * (FringePixels / denom) / halfVp * w;
+    }
+    o.Position = clip;
+    o.Coverage = outer > 0.0 ? 0.0 : 1.0;   // outer edge fades to 0; the contour vertex meets the solid body at 1
     o.Local = input.Position;   // LOCAL geometry position -> the PS maps it to the gradient uv
     return o;
 }
@@ -154,14 +133,6 @@ float4 FillFringePS(PSInput input) : SV_Target
 
 technique FillFringe
 {
-    // Expand (compute): closed contour -> coverage fringe ring, written via BDA. Plain Draw.
-    pass Expand
-    {
-        EffectName = "FillFringeEffect";
-        Profile = 6.6;
-        ComputeShader = FillFringeExpandCS;
-    }
-
     // Draw (graphics): rasterize the fringe ring; alpha ramps with coverage.
     pass Draw
     {

@@ -38,6 +38,23 @@ uint64_t OrbitAddress;
 // straight AlphaBlend, like the solid fills) - so two straight layers (fill under stroke) are composited to one.
 //
 // stroke0 = (width_px, align[-1 inside/0 center/+1 outside], dashOn, dashGap); stroke1 = (dashOffset, trimStart, trimEnd, flags).
+// How many DEVICE PIXELS one unit of a slot's space spans, per axis. The SDF shapes are baked in the space of their
+// transform-table slot, and that space is not the screen's: an element whose own scale lives in the slot (anything that
+// drives its own transform - an animated one is exactly that) reaches the shader with, say, a 1-unit-wide rect and a
+// scale of 125 in the matrix. Distances then mean 125 px along X and 1 px along Y, and ONE scalar AA width cannot serve
+// both - which is what smeared the tab-selection bar along its whole length. Callers convert their SDF inputs with this,
+// so `d` comes out in pixels and fwidth(d) is ~1 on every axis.
+// NB single exit, no early return: an early `return` in a .fx body has repeatedly tripped an AV inside NVVM here.
+float2 SlotPixelScale(float4x4 nodeWorld)
+{
+    float4x4 m = mul(nodeWorld, Projection);
+    float2 halfVp = ViewportSize * 0.5;
+    float2 ax = mul(float4(1.0, 0.0, 0.0, 0.0), m).xy * halfVp;
+    float2 ay = mul(float4(0.0, 1.0, 0.0, 0.0), m).xy * halfVp;
+    float2 scale = max(float2(length(ax), length(ay)), float2(1e-4, 1e-4));
+    return ViewportSize.x < 1.0 ? float2(1.0, 1.0) : scale;   // no viewport supplied: leave the bake untouched
+}
+
 float4 CompositeFillStroke(float d, float4 fill, float4 stroke, float width, float align, float strokeMask)
 {
     float aa = max(fwidth(d), 1e-5);
@@ -382,7 +399,74 @@ FillPSInput InstancedFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
 [shader("fragment")]
 float4 InstancedFillPS(FillPSInput input) : SV_Target
 {
-    return input.Color;   // solid fill (straight alpha, drawn with AlphaBlend); analytic-AA fringe is a later pass
+    return input.Color;   // solid fill (straight alpha, drawn with AlphaBlend); the fringe pass below feathers its edge
+}
+
+// ---- InstancedFringe pass: the analytic-AA fringe of the SAME instances, as one instanced draw --------------------
+// The ring (Rendering/FringeGeometry.cs) is scale-free - a contour point plus, on the outer edge, the two adjacent edge
+// DIRECTIONS - so every instance of a mesh shares ONE ring buffer and reads its own transform/colour from the SAME
+// GeometryInstance buffer the body pass used. That is what replaces the old per-element fringe draw (which cost one
+// pipeline switch + one uniform matrix per element and dominated the frame). The width is applied HERE, in device
+// pixels, so it stays one pixel at any zoom.
+float2 ViewportSize;      // render target size in DEVICE pixels - the NDC <-> pixel basis for the fringe offset
+float FringePixels;       // fringe width in DEVICE pixels
+
+struct FringeVertex
+{
+    float2 Position : POSITION;
+    float2 Dir0     : TEXCOORD0;   // incoming edge direction, Winding folded into its sign; zero on the contour itself
+    float2 Dir1     : TEXCOORD1;   // outgoing edge direction
+};
+
+struct FringePSInput
+{
+    float4 Position : SV_Position;
+    float4 Color    : COLOR0;
+    float  Coverage : TEXCOORD0;
+};
+
+[shader("vertex")]
+FringePSInput InstancedFringeVS(FringeVertex v, uint instanceId : SV_InstanceID)
+{
+    GeometryInstance* instances = (GeometryInstance*)InstancesAddress;
+    GeometryInstance inst = instances[instanceId];
+    float4x4* transforms = (float4x4*)TransformsAddress;
+    float4x4 world = mul(inst.Local, transforms[(uint)inst.Params.x]);
+    float4x4 m = mul(world, Projection);
+
+    float4 clip = mul(float4(v.Position, 0.0, 1.0), m);
+    float outer = dot(v.Dir0, v.Dir0) + dot(v.Dir1, v.Dir1);
+    if (outer > 0.0)
+    {
+        // Edge directions -> PIXEL space (w = 0 drops the translation), so the miter is perpendicular to the edge as the
+        // rasterizer sees it - correct under anisotropic scale, skew and rotation alike.
+        float2 halfVp = max(ViewportSize, float2(1.0, 1.0)) * 0.5;
+        float w = max(clip.w, 1e-6);
+        float2 e0 = mul(float4(v.Dir0, 0.0, 0.0), m).xy / w * halfVp;
+        float2 e1 = mul(float4(v.Dir1, 0.0, 0.0), m).xy / w * halfVp;
+        e0 = length(e0) > 1e-9 ? normalize(e0) : float2(0.0, 0.0);
+        e1 = length(e1) > 1e-9 ? normalize(e1) : float2(0.0, 0.0);
+        float2 n0 = float2(-e0.y, e0.x);
+        float2 n1 = float2(-e1.y, e1.x);
+        float2 sum = n0 + n1;
+        float2 miter = length(sum) > 1e-4 ? normalize(sum) : n0;   // a 180-degree reversal has no bisector: use one normal
+        float denom = max(dot(miter, n0), 0.25);                   // clamp the corner spike to <= 4x
+        clip.xy += miter * (FringePixels / denom) / halfVp * w;
+    }
+
+    FringePSInput o;
+    o.Position = clip;
+    o.Color = inst.Color;
+    o.Coverage = outer > 0.0 ? 0.0 : 1.0;
+    return o;
+}
+
+[shader("fragment")]
+float4 InstancedFringePS(FringePSInput input) : SV_Target
+{
+    float4 c = input.Color;
+    c.a *= saturate(input.Coverage);   // 1 at the contour -> 0 at the outer edge = analytic edge coverage
+    return c;
 }
 
 // ---- RectBatchInstanced: the SAME SDF rounded-rect batch, but per-instance RectItem read from a BDA STORAGE buffer by
@@ -408,21 +492,27 @@ PSInput RectBatchInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_I
 
     PSInput o;
     float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
-    float outset = max(item.Stroke0.x * (0.5 * (1.0 + item.Stroke0.y) + 0.5), 0.0) + 1.0;
     // Node-local corner -> world via the instance's transform-table matrix (slot 0 = identity for legacy world bakes).
-    // The SDF inputs (Local/Half) stay in the RECT's own frame, so rounded corners + strokes are correct under rotation.
+    // The SDF inputs (Local/Half) keep the RECT's own ORIENTATION, so rounded corners + strokes are correct under
+    // rotation, but are measured in DEVICE PIXELS (SlotPixelScale) so one AA width fits both axes even when the slot
+    // scales them differently. A slot with no scale gives (1,1) and this is the identity of the old code.
     float4x4* transforms = (float4x4*)TransformsAddress;
     float4x4 nodeWorld = transforms[(uint)item.Params.y];
-    float2 localPos = item.Bounds.xy + corner * item.Bounds.zw + (corner * 2.0 - 1.0) * outset;
+    float2 px = SlotPixelScale(nodeWorld);
+    float iso = min(px.x, px.y);   // stroke width / radius / dashes are one number: an anisotropic slot has no exact answer
+
+    float widthPx = item.Stroke0.x * iso;
+    float outsetPx = max(widthPx * (0.5 * (1.0 + item.Stroke0.y) + 0.5), 0.0) + 1.0;
+    float2 localPos = item.Bounds.xy + corner * item.Bounds.zw + (corner * 2.0 - 1.0) * (outsetPx / px);
     float4 worldPos = mul(float4(localPos, 0.0, 1.0), nodeWorld);
     o.Position = mul(worldPos, Projection);
-    o.Half   = item.Bounds.zw * 0.5;
-    o.Local  = (corner - 0.5) * item.Bounds.zw + (corner * 2.0 - 1.0) * outset;
-    o.Radius = item.Params.x;
+    o.Half   = item.Bounds.zw * 0.5 * px;
+    o.Local  = (corner - 0.5) * item.Bounds.zw * px + (corner * 2.0 - 1.0) * outsetPx;
+    o.Radius = item.Params.x * iso;
     o.Color  = item.Color;
     o.StrokeColor = item.StrokeColor;
-    o.Stroke0 = item.Stroke0;
-    o.Stroke1 = item.Stroke1;
+    o.Stroke0 = float4(widthPx, item.Stroke0.y, item.Stroke0.z * iso, item.Stroke0.w * iso);
+    o.Stroke1 = float4(item.Stroke1.x * iso, item.Stroke1.y, item.Stroke1.z, item.Stroke1.w);
     return o;
 }
 
@@ -492,19 +582,24 @@ EllipsePSInput EllipseBatchInstancedVS(uint vertexId : SV_VertexID, uint instanc
 
     EllipsePSInput o;
     float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
-    float outset = max(item.Stroke0.x * (0.5 * (1.0 + item.Stroke0.y) + 0.5), 0.0) + 1.0;
-    // Node-local -> world via the transform table (slot 0 = identity), same scheme as RectBatchInstancedVS.
+    // Node-local -> world via the transform table (slot 0 = identity), and the SDF inputs in DEVICE PIXELS - same
+    // scheme, and same reason, as RectBatchInstancedVS (see SlotPixelScale).
     float4x4* transforms = (float4x4*)TransformsAddress;
     float4x4 nodeWorld = transforms[(uint)item.Params.x];
-    float2 localPos = item.Bounds.xy + corner * item.Bounds.zw + (corner * 2.0 - 1.0) * outset;
+    float2 px = SlotPixelScale(nodeWorld);
+    float iso = min(px.x, px.y);
+
+    float widthPx = item.Stroke0.x * iso;
+    float outsetPx = max(widthPx * (0.5 * (1.0 + item.Stroke0.y) + 0.5), 0.0) + 1.0;
+    float2 localPos = item.Bounds.xy + corner * item.Bounds.zw + (corner * 2.0 - 1.0) * (outsetPx / px);
     float4 worldPos = mul(float4(localPos, 0.0, 1.0), nodeWorld);
     o.Position = mul(worldPos, Projection);
-    o.Half   = item.Bounds.zw * 0.5;
-    o.Local  = (corner - 0.5) * item.Bounds.zw + (corner * 2.0 - 1.0) * outset;
+    o.Half   = item.Bounds.zw * 0.5 * px;
+    o.Local  = (corner - 0.5) * item.Bounds.zw * px + (corner * 2.0 - 1.0) * outsetPx;
     o.Color  = item.Color;
     o.StrokeColor = item.StrokeColor;
-    o.Stroke0 = item.Stroke0;
-    o.Stroke1 = item.Stroke1;
+    o.Stroke0 = float4(widthPx, item.Stroke0.y, item.Stroke0.z * iso, item.Stroke0.w * iso);
+    o.Stroke1 = float4(item.Stroke1.x * iso, item.Stroke1.y, item.Stroke1.z, item.Stroke1.w);
     return o;
 }
 
@@ -684,6 +779,8 @@ GradPSInput GradientRectInstancedVS(uint vertexId : SV_VertexID, uint instanceId
     float outset = max(it.Stroke0.x * (0.5 * (1.0 + it.Stroke0.y) + 0.5), 0.0) + 1.0;
     // Node-local -> world via the transform table (slot in Geom1.w - Geom1.z is the shape flag; slot 0 = identity),
     // same scheme as RectBatchInstancedVS.
+    // NB still in SLOT units, unlike the solid rect/ellipse: this PS re-reads the stroke record by BDA, so pixel-space
+    // SDF would need an extra interpolator here - and THIS pass flakes vkCreateShadersEXT on any added code (see below).
     float4x4* transforms = (float4x4*)TransformsAddress;
     float4x4 nodeWorld = transforms[(uint)it.Geom1.w];
     float2 localPos = it.Bounds.xy + corner * it.Bounds.zw + (corner * 2.0 - 1.0) * outset;
@@ -835,6 +932,7 @@ PatternPSInput PatternRectInstancedVS(uint vertexId : SV_VertexID, uint instance
     PatternPSInput o;
     float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
     float outset = max(it.Stroke0.x * (0.5 * (1.0 + it.Stroke0.y) + 0.5), 0.0) + 1.0;
+    // NB still in SLOT units, like the gradient pass and unlike the solid rect/ellipse - see the note there.
     float4x4* transforms = (float4x4*)TransformsAddress;
     float4x4 nodeWorld = transforms[(uint)it.Params.w];
     float2 localPos = it.Bounds.xy + corner * it.Bounds.zw + (corner * 2.0 - 1.0) * outset;
@@ -1386,6 +1484,7 @@ FractalPSInput FractalRectInstancedVS(uint vertexId : SV_VertexID, uint instance
     FractalPSInput o;
     float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
     float outset = max(it.Stroke0.x * (0.5 * (1.0 + it.Stroke0.y) + 0.5), 0.0) + 1.0;
+    // NB still in SLOT units, like the gradient pass and unlike the solid rect/ellipse - see the note there.
     float4x4* transforms = (float4x4*)TransformsAddress;
     float4x4 nodeWorld = transforms[(uint)it.Params.z];
     float2 localPos = it.Bounds.xy + corner * it.Bounds.zw + (corner * 2.0 - 1.0) * outset;
@@ -1632,6 +1731,15 @@ technique Batch
         Profile = 6.6;
         VertexShader = InstancedFillVS;
         PixelShader = InstancedFillPS;
+    }
+
+    // The analytic-AA fringe of those same instances: one shared scale-free ring, the same instance buffer, one draw.
+    pass Fringe
+    {
+        EffectName = "BatchEffect";
+        Profile = 6.6;
+        VertexShader = InstancedFringeVS;
+        PixelShader = InstancedFringePS;
     }
 
     // General geometry instancing with a LINEAR/RADIAL GRADIENT fill (per-instance GradientGeometryInstance; gradient

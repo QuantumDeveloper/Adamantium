@@ -17,6 +17,10 @@
             <DropDown EnumType="{x:Type controls:ContentTransition}"
                       SelectedItem="{Binding SlideMode, Mode=TwoWay}"
                       Width="140"/>
+            <TextBlock Text="Indicator:" VerticalAlignment="Center" Margin="20,0,8,0"/>
+            <DropDown EnumType="{x:Type controls:TabIndicatorPlacement}"
+                      SelectedItem="{Binding IndicatorPlacement, Mode=TwoWay}"
+                      Width="120"/>
         </StackPanel>
 
         <!-- Data-driven tabs: the TabControl binds to the root view-model's Tabs collection. Each tab's header comes from
@@ -27,6 +31,7 @@
                     ItemsSource="{Binding Tabs}"
                     SelectedItem="{Binding SelectedTab, Mode=TwoWay}"
                     TabStripPlacement="{Binding TabPlacement}"
+                    SelectionIndicatorPlacement="{Binding IndicatorPlacement}"
                     ContentTransition="{Binding SlideMode}"
                     ShowCloseButton="True">
             <!-- Drag a tab AWAY from the strip (across it, not along it) and let go: it gets its own window. -->

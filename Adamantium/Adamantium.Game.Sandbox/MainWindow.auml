@@ -11,7 +11,7 @@
         Title="Adamantium Window"
         Width="1280"
         Height="720"
-        AnalyticAntialiasing="true"
+        AnalyticAntialiasing="{Binding AnalyticAa, Mode=TwoWay}"
         ResizeMode="{Binding WindowResizeMode, Mode=TwoWay}"
         LeftWindowCommands="{Binding LeftWindowCommands}"
         RightWindowCommands="{Binding RightWindowCommands}"
@@ -54,14 +54,22 @@
              independent of the right-side toggle, which drives the plate above. -->
         <SlidePanel Placement="Right" Width="264" Header="Diagnostics"
                     IsOpen="{Binding DiagnosticsPanelOpen, Mode=TwoWay}">
-            <TextBlock FontSize="13"
-                       Foreground="LightGreen"
-                       TextWrapping="WrapBySymbols"
-                       Text="diagnostics…">
-                <TextBlock.Behaviors>
-                    <behaviors:DiagnosticsOverlayBehavior/>
-                </TextBlock.Behaviors>
-            </TextBlock>
+            <StackPanel Orientation="Vertical">
+                <!-- Analytic AA on/off, live: the render service re-reads Window.AnalyticAntialiasing every frame, so this
+                     flips the coverage fringe and feathered strokes WITHOUT rebuilding the render cache - an A/B of an
+                     edge artifact, which is why it belongs with the diagnostics rather than in the window chrome. -->
+                <ToggleSwitch Content="Analytic AA"
+                              IsChecked="{Binding AnalyticAa, Mode=TwoWay}"
+                              Margin="0,0,0,12"/>
+                <TextBlock FontSize="13"
+                           Foreground="LightGreen"
+                           TextWrapping="WrapBySymbols"
+                           Text="diagnostics…">
+                    <TextBlock.Behaviors>
+                        <behaviors:DiagnosticsOverlayBehavior/>
+                    </TextBlock.Behaviors>
+                </TextBlock>
+            </StackPanel>
         </SlidePanel>
     </Grid>
 </Window>
