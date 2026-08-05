@@ -853,10 +853,10 @@ float4 GradientPS(GradPSInput input) : SV_Target
 // far more often; BDA-in-PS with a light signature is what the stable rect/ellipse gradient already does.
 struct GradGeomData
 {
-    float4x4 World;
+    float4x4 Local;      // element local -> SLOT space (the slot's matrix is applied on top, from the transform table)
     float4 Params;       // .x type (1 linear/2 radial), .y spread, .z stop count, .w interp mode (0 sRGB/1 OKLab)
     float4 Geom0;        // LOCAL 0..1: linear (startXY, endXY) | radial (centerXY, radiusXY)
-    float4 Geom1;        // radial focal (originXY, _, _)
+    float4 Geom1;        // radial focal (originXY, _); .w = transform-table slot
     float4 LocalBounds;  // shape local bounds: minXY, sizeXY
     float4 Stop0; float4 Stop1; float4 Stop2; float4 Stop3;
     float4 Stop4; float4 Stop5; float4 Stop6; float4 Stop7;
@@ -875,7 +875,10 @@ GradFillPSInput GradientFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
 {
     GradGeomData* items = (GradGeomData*)InstancesAddress;
     GradGeomData it = items[instanceId];
-    float4 world = mul(float4(v.position.xyz, 1.0), it.World);
+    // local -> slot space -> world, as InstancedFillVS: the slot matrix lives in the transform table, so a node move
+    // rewrites 64 bytes there and every instance under it follows without this buffer being touched.
+    float4x4* transforms = (float4x4*)TransformsAddress;
+    float4 world = mul(mul(float4(v.position.xyz, 1.0), it.Local), transforms[(uint)it.Geom1.w]);
 
     GradFillPSInput o;
     o.Position = mul(world, Projection);
@@ -1421,8 +1424,8 @@ float4 PatternPS(PatternPSInput input) : SV_Target
 // and calls the SAME PatternFillColor the SDF rect pattern PS uses (fed the fragment's LOCAL mesh position).
 struct PatGeomData
 {
-    float4x4 World;
-    float4 Params;       // .y pattern type, .z cell (LOCAL units). .x/.w unused
+    float4x4 Local;      // element local -> SLOT space (the slot's matrix is applied on top, from the transform table)
+    float4 Params;       // .y pattern type, .z cell (LOCAL units), .w transform-table slot. .x unused
     float4 LocalBounds;  // shape local bounds: minXY, sizeXY
     float4 Color1;
     float4 Color2;
@@ -1442,7 +1445,9 @@ PatFillPSInput PatternFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
 {
     PatGeomData* items = (PatGeomData*)InstancesAddress;
     PatGeomData it = items[instanceId];
-    float4 world = mul(float4(v.position.xyz, 1.0), it.World);
+    // local -> slot space -> world, as InstancedFillVS / GradientFillVS.
+    float4x4* transforms = (float4x4*)TransformsAddress;
+    float4 world = mul(mul(float4(v.position.xyz, 1.0), it.Local), transforms[(uint)it.Params.w]);
 
     PatFillPSInput o;
     o.Position = mul(world, Projection);

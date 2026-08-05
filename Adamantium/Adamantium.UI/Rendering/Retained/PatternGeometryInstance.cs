@@ -14,11 +14,14 @@ namespace Adamantium.UI.Rendering.Retained;
 [StructLayout(LayoutKind.Sequential)]
 public struct PatternGeometryInstance
 {
-    /// <summary>Full per-instance world transform (element local -> world). Row-vector convention (as GeometryInstance).</summary>
-    public Matrix4x4F World;
+    /// <summary>Per-instance transform RELATIVE to the transform-table slot in <see cref="Params"/>.w (element local ->
+    /// slot space). Row-vector convention (as GeometryInstance). The vertex shader applies the slot matrix on top, so
+    /// moving the slot's node never touches this record.</summary>
+    public Matrix4x4F Local;
 
     /// <summary>.y = pattern type (matches PatternRectData: 0 checker..4 simplex/7 perlin/8 value/9 worley/10 ridged/
-    /// 11 turbulence/12 voronoi-borders/13 combustible); .z = cell size in LOCAL units. .x/.w unused.</summary>
+    /// 11 turbulence/12 voronoi-borders/13 combustible); .z = cell size in LOCAL units; .w = transform-table slot
+    /// (same place the SDF pattern keeps it). .x unused.</summary>
     public Vector4F Params;
 
     /// <summary>The shape's local-space bounds (minX, minY, sizeX, sizeY): the pattern origin is minXY; combustible centres on it.</summary>

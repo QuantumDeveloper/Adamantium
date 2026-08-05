@@ -471,10 +471,17 @@ public partial class RenderCache
                 // (FillInstanced) and its fringe/stroke draw at the flush.
                 if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
-                if (_instancedFill.TryAddGradient(ggru, wt, scissor, LogicalBounds(unit.Component, wt)))
+                var gradBake = ResolveBake(device, unit.Component, wt, out var slot4GradFill);
+                if (_instancedFill.TryAddGradient(ggru, gradBake, scissor, LogicalBounds(unit.Component, wt), slot4GradFill))
                 {
                     ggru.FillInstanced = true;
-                    if (_recording) { group.PatchableRectOnly = false; MarkNodeNotAware(unit.Component); }   // instanced gradient: world-baked
+                    // The fill rides the slot now; only a per-unit overlay (its fringe, still per-unit here, or a
+                    // stroke) bakes its transform at record time and so costs the node its slot-write fast path.
+                    if (_recording)
+                    {
+                        group.PatchableRectOnly = false;
+                        if (ggru.HasPerUnitOverlay) MarkNodeNotAware(unit.Component);
+                    }
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -487,10 +494,17 @@ public partial class RenderCache
                 // one - the fill body is skipped (FillInstanced) and the unit's fringe/stroke draw at the flush.
                 if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
-                if (_instancedFill.TryAddPattern(pgru, wt, scissor, LogicalBounds(unit.Component, wt)))
+                var patBake = ResolveBake(device, unit.Component, wt, out var slot4PatFill);
+                if (_instancedFill.TryAddPattern(pgru, patBake, scissor, LogicalBounds(unit.Component, wt), slot4PatFill))
                 {
                     pgru.FillInstanced = true;
-                    if (_recording) { group.PatchableRectOnly = false; MarkNodeNotAware(unit.Component); }   // instanced pattern: world-baked
+                    // As the gradient above: the fill rides the slot, so only a real per-unit overlay costs the node
+                    // its slot-write fast path.
+                    if (_recording)
+                    {
+                        group.PatchableRectOnly = false;
+                        if (pgru.HasPerUnitOverlay) MarkNodeNotAware(unit.Component);
+                    }
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
