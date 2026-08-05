@@ -207,7 +207,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     /// <summary>Collect one instanceable fill: append its per-instance world+colour to its key's buffer and register the
     /// unit for a deferred fringe/stroke draw. False only if it can't be batched (no drawable mesh, or the instance buffer
     /// overflowed this frame) - the caller then draws that unit per-unit (fill included).</summary>
-    public bool TryAdd(GeometryRenderUnit unit, Matrix4x4F world, Rect2D scissor, Rect logicalBounds)
+    public bool TryAdd(GeometryRenderUnit unit, Matrix4x4F local, Rect2D scissor, Rect logicalBounds, int transformSlot)
     {
         if (!unit.TryGetInstancedFill(out var key, out var meshObj, out var color)) return false;
         if (meshObj is not FrozenMesh mesh) return false;
@@ -224,7 +224,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         }
         if (seg.Count + 1 > seg.GpuCapacity) return false;   // this frame's GPU buffer is full -> per-unit fallback
 
-        seg.Items[seg.Count++] = GeometryInstance.FromWorld(world, color);
+        seg.Items[seg.Count++] = GeometryInstance.FromLocal(local, color, transformSlot);
 
         _scissor = scissor;
         if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
@@ -524,9 +524,14 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     }
 
     // Shared InstancedFill device state (all keys draw the same way; only the mesh topology varies).
+    /// <summary>Device address of the shared transform table - the vertex shader fetches each instance's slot matrix from
+    /// it. Set by the caller each frame (the table may have been reallocated), same as for the SDF batches.</summary>
+    public ulong TransformsAddress { get; set; }
+
     private void SetupInstancedState(Matrix4x4F projection)
     {
         _effect.Projection.SetValue(projection);
+        _effect.TransformsAddress.SetValue(TransformsAddress);
         _device.VertexType = typeof(UIVertex);
         _device.PolygonMode = PolygonMode.Fill;
         _device.RasterizerDiscardEnabled = false;   // a prior compute pass (fringe/stroke expander) may have left discard ON

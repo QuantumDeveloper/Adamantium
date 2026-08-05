@@ -166,6 +166,18 @@ public partial class RenderCache
             {
                 _transformTable.EnsureResources(device);
             }
+            _transformTable.BeginFrameStats();
+            // AGGREGATE, never assign: there is one table PER RENDER CACHE (per window/popup) and these counters are static,
+            // so a plain assignment let the last writer - typically an empty overlay window holding a single slot - erase
+            // the real window's numbers. Max for levels, sum for per-frame events; the reader zeroes them after logging.
+            var stats = _transformTable;
+            if (stats.SlotCount > Core.Diagnostics.RuntimeStats.TransformSlots)
+                Core.Diagnostics.RuntimeStats.TransformSlots = stats.SlotCount;
+            if (stats.Recreations > Core.Diagnostics.RuntimeStats.TransformRecreations)
+                Core.Diagnostics.RuntimeStats.TransformRecreations = stats.Recreations;
+            Core.Diagnostics.RuntimeStats.TransformWrites += stats.WritesLastFrame;
+            Core.Diagnostics.RuntimeStats.TransformAcquires += stats.AcquiresLastFrame;
+            Core.Diagnostics.RuntimeStats.TransformReleases += stats.ReleasesLastFrame;
             _rectBatch.TransformsAddress = _transformTable.DeviceAddress;
             _ellipseBatch.TransformsAddress = _transformTable.DeviceAddress;
             _gradientRectBatch.TransformsAddress = _transformTable.DeviceAddress;
@@ -187,6 +199,7 @@ public partial class RenderCache
             {
                 _instanceBuffers ??= new GpuBufferManager(device);
                 _instancedFill ??= new InstancedFillCollector(device, _instanceBuffers);
+                _instancedFill.TransformsAddress = _transformTable.DeviceAddress;   // instance VS fetches its slot matrix
                 _instancedFill.BeginFrame();
                 _instancedFill.SceneClean = sceneClean;
             }
@@ -431,10 +444,16 @@ public partial class RenderCache
                 // natural z-layer (paint order), not all-at-once.
                 if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
-                if (_instancedFill.TryAdd(gru, wt, scissor, LogicalBounds(unit.Component, wt)))
+                var fillBake = ResolveBake(device, unit.Component, wt, out var slot4Fill);
+                if (_instancedFill.TryAdd(gru, fillBake, scissor, LogicalBounds(unit.Component, wt), slot4Fill))
                 {
                     gru.FillInstanced = true;
-                    if (_recording) { group.PatchableRectOnly = false; MarkNodeNotAware(unit.Component); }   // instanced fill: world-baked
+                    // The FILL now rides the slot, but this unit's analytic-AA fringe and its stroke still draw per-unit
+                    // from RenderData.TransformMatrix, which is baked at record time and not refreshed by a replay. Letting
+                    // the node stay aware would move the fill on a slot write while its own outline stayed behind - the
+                    // exact tear the transform table just removed. So the node still loses the fast path here; closing
+                    // that needs the per-unit draw to follow the slot too.
+                    if (_recording) { group.PatchableRectOnly = false; MarkNodeNotAware(unit.Component); }
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;   // fill batched; fringe/stroke drawn at the flush, over the fill

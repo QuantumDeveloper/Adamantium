@@ -27,6 +27,12 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
 {
     private const double RefreshSeconds = 0.25;   // rewrite the text ~4x/sec - readable, and cheap (no per-frame raster)
 
+    // TEMPORARY: the same numbers as the plate, appended to a file next to the executable so a measurement can be read
+    // afterwards instead of watched on screen (the fringe/transform-table perf investigation). Remove with the
+    // AppendAllText call below once that work lands.
+    private static readonly string TracePath =
+        System.IO.Path.Combine(AppContext.BaseDirectory, "diag.log");
+
     private long _lastMeasure, _lastArrange, _lastBindings, _lastPresented;
     private double _windowElapsed, _windowMaxLayoutMs;
     private double _sumLayout, _sumBuild, _sumProc, _sumDraw, _sumProcs;   // per-frame sums -> averages over the window
@@ -89,6 +95,26 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
             $"processors {avgProcs,4:F1}    other {other,4:F1} ms\n" +
             $"measure/arrange  {measure - _lastMeasure} / {arrange - _lastArrange}\n" +
             $"bindings {bindings - _lastBindings}    anim {AnimationManager.ActiveCount}";
+
+        // TEMPORARY diagnostic trace (transform-table perf investigation): same numbers as the plate plus the transform
+        // table's per-frame counters, appended to a file so they can be read without watching the screen. The one to watch
+        // is `w` (writes): a settled scene should be 0. Steady non-zero writes with matching a/r means slots are churning -
+        // released and re-acquired every frame - and each write is its own 64-byte upload.
+        try
+        {
+            System.IO.File.AppendAllText(TracePath,
+                $"render {renderFps,5:F0} loop {fps,5:F0} frame {frameMs,5:F1}ms  " +
+                $"build/proc/draw {avgBuild,4:F1}/{avgProc,4:F1}/{avgDraw,4:F1}  other {other,4:F1}  " +
+                $"xform slots {RuntimeStats.TransformSlots} w {RuntimeStats.TransformWrites} " +
+                $"a/r {RuntimeStats.TransformAcquires}/{RuntimeStats.TransformReleases} realloc {RuntimeStats.TransformRecreations}\n");
+        }
+        catch { /* diagnostics must never break the frame */ }
+
+        // Zero the aggregates so the next window measures its own frames (the producers accumulate; see RenderCache.Draw).
+        RuntimeStats.TransformSlots = 0;
+        RuntimeStats.TransformWrites = 0;
+        RuntimeStats.TransformAcquires = 0;
+        RuntimeStats.TransformReleases = 0;
 
 
         _lastMeasure = measure; _lastArrange = arrange; _lastBindings = bindings;
