@@ -33,7 +33,11 @@ namespace Adamantium.EffectsCompiler
             @"(?<multiply>\*)|" +
             @"(?<divide>\/)|" +
             @"(?<comment>\//)|" +
-            @"(?<unk>[^\s]+)",
+            // ONE character, not a run. The operators this grammar has no rule for - ! % & | ^ ~ ? : and every
+            // non-ASCII character a comment may contain - land here, and a greedy run swallowed everything up to the
+            // next space along with them: `!isEnd)` ate its own closing parenthesis, so the bracket counter never
+            // balanced and the whole effect failed to parse with a position pointing at innocent code.
+            @"(?<unk>[^\s])",
             RegexOptions.Compiled
             );
 

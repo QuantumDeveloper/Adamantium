@@ -53,9 +53,30 @@ public sealed class StrokeSettings : PropertyChangedBase
     public double Corner { get => _corner; set { if (SetProperty(ref _corner, value)) RaisePropertyChanged(nameof(CornerRadius)); } }
     public CornerRadius CornerRadius => new(_corner);
 
-    // Cap for dash-piece ends AND trim ends. Bound two-way to a DropDown (EnumType=PenLineCap) - all six caps.
-    private PenLineCap _cap = PenLineCap.ConvexRound;
-    public PenLineCap Cap { get => _cap; set => SetProperty(ref _cap, value); }
+    // FOUR separate caps, because they are four separate properties and conflating them is what hid the bugs: the demo
+    // used to bind all of them to one setting, so the interesting cases - a dash cap that differs from the line cap,
+    // a start that differs from an end - could not be produced at all.
+    //
+    // The rule they follow: Start/End belong to the whole stroke and exist ONLY at its two real ends; every other dash
+    // end takes its own dash cap; a CLOSED, untrimmed contour has no real ends at all, so it is dash caps everywhere.
+    // The two dash caps set differently make each dash an arrow (a concave bite behind a convex tip).
+    private PenLineCap _dashStartCap = PenLineCap.ConvexRound;
+    public PenLineCap DashStartCap { get => _dashStartCap; set => SetProperty(ref _dashStartCap, value); }
+
+    private PenLineCap _dashEndCap = PenLineCap.ConvexRound;
+    public PenLineCap DashEndCap { get => _dashEndCap; set => SetProperty(ref _dashEndCap, value); }
+
+    private PenLineCap _startCap = PenLineCap.Flat;
+    public PenLineCap StartCap { get => _startCap; set => SetProperty(ref _startCap, value); }
+
+    private PenLineCap _endCap = PenLineCap.Flat;
+    public PenLineCap EndCap { get => _endCap; set => SetProperty(ref _endCap, value); }
+
+    // Stretch the pattern so a CLOSED contour holds a whole number of periods. Off, the leftover lands where the
+    // contour closes - one odd dash at the seam, which for a rounded rect is the bottom-right corner. It is the seam,
+    // not the corner: there is nothing to fix in the corner code, and this is the switch that shows it.
+    private bool _dashFit;
+    public bool DashFit { get => _dashFit; set => SetProperty(ref _dashFit, value); }
 
     // Corner join. Bound two-way to a DropDown (EnumType=PenLineJoin): Miter / Bevel / Round.
     private PenLineJoin _join = PenLineJoin.Round;

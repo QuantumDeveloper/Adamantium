@@ -25,7 +25,7 @@ namespace Adamantium.UI.Rendering.RenderUnits;
 // TryUpdateGeometry, with no Vulkan allocation. See GPU_BUFFER_REUSE_PLAN.
 public sealed class GpuStrokeRenderComponent : UIRenderComponent
 {
-    // Disc-fan subdivision for round joins/caps (a smooth-enough circle); 0 when the contour has no round geometry.
+    // Disc-fan subdivision for round joins (a smooth-enough circle); 0 when the contour has no round geometry.
     private const uint RoundSegmentsCount = 16;
     private const int MaxDashVertices = 8192 * 6;   // safety cap on the dash output buffer (per contour)
     private const MemoryPropertyFlags StrokeMemory = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal;
@@ -48,7 +48,7 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
     private sealed class Contour
     {
         public bool IsClosed;
-        public uint RoundSegments;   // 0 (no fan) or RoundSegmentsCount - depends on this contour's closedness + caps
+        public uint RoundSegments;   // 0 (no fan) or RoundSegmentsCount - depends on the join only (caps are analytic)
         public uint PointCount;
         public uint ThreadCount;     // compute threads: points (continuous) or 1 (dash, single-thread cut)
         public uint VertexCount;     // continuous: exact draw count; dash: output capacity (actual count is on GPU)
@@ -59,7 +59,7 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
         public Buffer IndirectBuffer;    // dash only (VkDrawIndirectCommand)
         public float DashScale = 1f;     // what FitDashesToContour stretched the pattern by (1 = untouched)
         public ulong PointsBytes => (ulong)(PointsData.Length * sizeof(float));
-        public ulong VertexBytes => (ulong)(VertexCount * 3 * sizeof(float));   // 3 floats/vertex (x, y, signed dist)
+        public ulong VertexBytes => (ulong)(VertexCount * 10 * sizeof(float));   // see StrokeVertex (pos + one float4 per piece end)
     }
 
     public GpuStrokeRenderComponent(IGraphicsDevice device, UIBasicEffect uiBasicEffect, StrokeEffect effect,
@@ -72,21 +72,17 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
         _useCut = _hasDashes || pen.TrimStart > 0.0 || pen.TrimEnd < 1.0;
         _joinType = MapJoin(pen.PenLineJoin);
 
-        // Start/EndLineCap apply on both paths (continuous ends, cut terminal ends); DashCap only on the cut path
-        // (each dash/dot piece end), so it's kept separate - otherwise the round DashCap default would force a disc fan
-        // onto every plain solid stroke.
-        var capNeedsFan = IsFanCap(pen.StartLineCap) || IsFanCap(pen.EndLineCap);
-        var dashCapNeedsFan = IsFanCap(pen.DashCap);
         foreach (var (points, isClosed) in contours)
         {
-            var contour = BuildContour(points, isClosed, capNeedsFan, dashCapNeedsFan);
+            var contour = BuildContour(points, isClosed);
             if (contour != null) _contours.Add(contour);
         }
     }
 
-    // True when newPen keeps every SIZE-affecting parameter (cut mode, join, caps, dash pattern -> same buffer sizes +
-    // fan counts). The rest (thickness, dash offset, trim values, colour) are GPU uniforms, so a compatible pen can be
-    // swapped without reallocating - TryRepoint / TryUpdateGeometry just re-dispatch with the new uniforms.
+    // True when newPen keeps every SIZE-affecting parameter (cut mode, join, dash pattern -> same buffer sizes + fan
+    // counts). The rest (thickness, dash offset, trim values, colour, and now every CAP - they are analytic, so they
+    // emit no geometry at all) are GPU uniforms, so a compatible pen can be swapped without reallocating - TryRepoint /
+    // TryUpdateGeometry just re-dispatch with the new uniforms.
     private bool IsPenSizeCompatible(Pen newPen)
     {
         if (newPen?.Brush is not SolidColorBrush) return false;   // null pen (no stroke, e.g. thickness 0) or non-solid -> not repointable
@@ -94,9 +90,6 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
         var newUseCut = newHasDashes || newPen.TrimStart > 0.0 || newPen.TrimEnd < 1.0;
         if (newUseCut != _useCut) return false;                       // continuous <-> cut changes the buffer set
         if (MapJoin(newPen.PenLineJoin) != _joinType) return false;  // join changes the corner fan size
-        if (MapCap(newPen.StartLineCap) != MapCap(_pen.StartLineCap)) return false;
-        if (MapCap(newPen.EndLineCap) != MapCap(_pen.EndLineCap)) return false;
-        if (MapCap(newPen.DashCap) != MapCap(_pen.DashCap)) return false;
 
         // Dash pattern (buffer size + content): each GetPen() makes a NEW collection, so compare by value, not ref.
         var oldDash = _pen.DashStrokeArray; var newDash = newPen.DashStrokeArray;
@@ -180,17 +173,18 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
     }
 
     // Builds the GPU buffers for one contour. Returns null for a degenerate contour (no thread/vertex work).
-    private Contour BuildContour(Vector2[] points, bool isClosed, bool capNeedsFan, bool dashCapNeedsFan)
+    private Contour BuildContour(Vector2[] points, bool isClosed)
     {
         if (points.Length < 2) return null;
 
         var c = new Contour { IsClosed = isClosed, PointCount = (uint)points.Length, PointsData = ToFloats(points) };
 
-        // Disc segments are needed when a join is round (disc) or bevel (wedge), OR a cap needs emitted geometry
-        // (round / triangle / concave). On the cut path a ROUND JOIN also needs the disc (emitted at every corner the
-        // dash crosses), as does a fan DashCap (round dots). Caps appear on both paths; closed contours have no caps.
-        var needsFan = !_useCut && (_joinType == 2u || _joinType == 1u || (!isClosed && capNeedsFan));
-        c.RoundSegments = (needsFan || (_useCut && (capNeedsFan || dashCapNeedsFan || _joinType == 2u))) ? RoundSegmentsCount : 0u;
+        // Disc segments are needed by the JOIN only: round (a disc) or bevel (a wedge) on the continuous path, round on
+        // the cut path (a disc at every corner a dash crosses; a bevel wedge is written inline there). Caps need none -
+        // they are a per-fragment mask now, which is also why a round cap no longer drags a 16-triangle fan onto every
+        // dash of every dashed stroke.
+        var needsFan = _useCut ? _joinType == 2u : _joinType != 0u;
+        c.RoundSegments = needsFan ? RoundSegmentsCount : 0u;
 
         // Raw contour -> BDA storage buffer (the GPU reads it; dashing/trim happen on the GPU, not here).
         c.PointsBuffer = ToDispose(BufferManager.CreateBuffer(
@@ -233,7 +227,7 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
 
         if (c.ThreadCount == 0 || c.VertexCount == 0) return null;
 
-        // 3 floats/vertex now: (x, y, signed perpendicular distance) - the distance drives the analytic-AA coverage.
+        // 10 floats/vertex (see StrokeVertex): position, then one float4 per end of the piece.
         c.VertexBuffer = ToDispose(BufferManager.CreateBuffer(
             BufferUsageFlags.VertexBuffer | BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, StrokeMemory));
         c.VertexBuffer.Reserve(c.VertexBytes);
@@ -242,15 +236,14 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
     }
 
     // Worst-case vertex count for the dash output buffer: total arc length / shortest "on" dash, plus a per-segment
-    // allowance for corner splits. Per piece that's 6 quad verts plus, for round caps, up to two disc fans
-    // (2 * roundSegments * 3); plus one corner join per segment (a round disc, or up to 3 bevel/miter triangles).
-    // Capped. This is the only CPU work dashing does - an O(points) length sum, no per-piece tessellation - so animated
-    // dashes (DashOffset) cost the CPU nothing per frame.
+    // allowance for corner splits. A piece is exactly its 6 quad verts (caps are a mask, they emit nothing), plus one
+    // corner join per segment (a round disc, or up to 3 bevel/miter triangles). Capped. This is the only CPU work
+    // dashing does - an O(points) length sum, no per-piece tessellation - so animated dashes cost the CPU nothing.
     private static uint DashOutputCapacity(Vector2[] pts, bool closed, Pen pen, uint roundSegments)
     {
         int n = pts.Length;
         int segs = closed ? n : n - 1;
-        long perPiece = 6 + (roundSegments > 0 ? 2L * roundSegments * 3 : 0);   // quad + up to two round-cap discs
+        const long perPiece = 6;
         long joinVerts = (long)segs * (roundSegments > 0 ? roundSegments * 3 : 9);   // one join per corner
 
         // Trim-only (no dashes): trim clips to at most one run, so segs + 2 boundary splits is the bound.
@@ -270,9 +263,9 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
         return (uint)verts;
     }
 
-    // Cap mapping for the expander shaders. Every cap renders as its true shape: 0 = flat, 1 = square, 2 = convex round
-    // (disc), 3 = convex triangle (tip), 4 = concave triangle (V notch), 5 = concave round (carved arc). The shader
-    // shapes the end quad (CapShift) and emits the cap geometry (EmitCapTris).
+    // Cap mapping for the expander shaders. Every cap renders as its true shape: 0 = flat, 1 = square, 2 = convex round,
+    // 3 = convex triangle (tip), 4 = concave triangle (V notch), 5 = concave round (carved arc). The shader stretches
+    // the end quad far enough for the shape (CapExtend) and CARVES it per fragment (CapSd) - no cap geometry exists.
     private static uint MapCap(PenLineCap cap) => cap switch
     {
         PenLineCap.Square => 1u,
@@ -282,9 +275,6 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
         PenLineCap.ConcaveRound => 5u,
         _ => 0u   // Flat
     };
-
-    // Caps whose geometry is emitted as fan triangles (everything except flat and the quad-handled square).
-    private static bool IsFanCap(PenLineCap cap) => cap is not (PenLineCap.Flat or PenLineCap.Square);
 
     // Join mapping: 0 = miter (bisector ribbon, clamped), 1 = bevel (per-segment rectangles + corner wedge), 2 = round (rectangles + disc fan).
     private static uint MapJoin(PenLineJoin join) => join switch
@@ -335,11 +325,15 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
             _effect.DashMode.SetValue(_useCut ? 1u : 0u);
             _effect.JoinType.SetValue(_joinType);
             _effect.RoundSegments.SetValue(c.RoundSegments);
-            // Caps apply on the cut path (each dash piece has two ends) and on an OPEN continuous contour. A closed
-            // continuous loop has no ends, so both are 0 there.
-            _effect.StartCap.SetValue(_useCut || !c.IsClosed ? MapCap(_pen.StartLineCap) : 0u);
-            _effect.EndCap.SetValue(_useCut || !c.IsClosed ? MapCap(_pen.EndLineCap) : 0u);
-            _effect.DashCap.SetValue(MapCap(_pen.DashCap));   // dash/dot piece caps (cut path only)
+            // Start/EndLineCap belong to the stroke's REAL ends, and a closed contour only has them where a trim window
+            // cuts one (that is what puts a round end on a progress ring). Untrimmed and closed, there is no real end
+            // at all, so the seam wears the dash caps like every other dash boundary instead of a stray line cap.
+            var hasRealEnds = !c.IsClosed || _pen.TrimStart > 0.0 || _pen.TrimEnd < 1.0;
+            _effect.StartCap.SetValue(MapCap(hasRealEnds ? _pen.StartLineCap : _pen.DashStartCap));
+            _effect.EndCap.SetValue(MapCap(hasRealEnds ? _pen.EndLineCap : _pen.DashEndCap));
+            // The two ends of a dash are separate properties: one dash can be a concave bite and a convex tip - an arrow.
+            _effect.DashStartCap.SetValue(MapCap(_pen.DashStartCap));
+            _effect.DashEndCap.SetValue(MapCap(_pen.DashEndCap));
             _effect.HalfThickness.SetValue((float)(_pen.Thickness / 2.0));
             _effect.Fringe.SetValue(fringe);   // AA feather: the expander widens the ribbon/discs by Fringe/2
 

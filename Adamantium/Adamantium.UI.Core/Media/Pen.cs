@@ -22,9 +22,13 @@ public class Pen : IEquatable<Pen>
 
    public PenLineCap EndLineCap { get; set; }
 
-   // Cap on each DASH/dot piece's ends (the contour's true ends use Start/EndLineCap). Round makes round dots; a
-   // zero-width dot + a round dash cap renders as a circle.
-   public PenLineCap DashCap { get; set; }
+   // Cap on the STARTING end of each DASH/dot piece (the contour's true ends use Start/EndLineCap). Round makes round
+   // dots; a zero-width dot + a round dash cap renders as a circle.
+   public PenLineCap DashStartCap { get; set; }
+
+   // Cap on the ENDING end of each dash. Separate from the start on purpose: with the two set differently a dash is no
+   // longer symmetric - a concave bite behind a convex tip is an arrowhead, and a run of them is a direction.
+   public PenLineCap DashEndCap { get; set; }
 
    public PenLineJoin PenLineJoin { get; set; }
 
@@ -57,7 +61,8 @@ public class Pen : IEquatable<Pen>
       PenLineJoin penLineJoin = PenLineJoin.Miter,
       Double trimStart = 0.0,
       Double trimEnd = 1.0,
-      PenLineCap dashCap = PenLineCap.ConvexRound,
+      PenLineCap dashStartCap = PenLineCap.ConvexRound,
+      PenLineCap dashEndCap = PenLineCap.ConvexRound,
       Boolean fitDashesToContour = false,
       Double dashPhase = 0)
    {
@@ -72,7 +77,8 @@ public class Pen : IEquatable<Pen>
       PenLineJoin = penLineJoin;
       TrimStart = trimStart;
       TrimEnd = trimEnd;
-      DashCap = dashCap;
+      DashStartCap = dashStartCap;
+      DashEndCap = dashEndCap;
    }
 
    public bool Equals(Pen other)
@@ -81,7 +87,8 @@ public class Pen : IEquatable<Pen>
       if (ReferenceEquals(this, other)) return true;
       return Equals(Brush, other.Brush) && Thickness.Equals(other.Thickness) && DashOffset.Equals(other.DashOffset) &&
              Equals(DashStrokeArray, other.DashStrokeArray) && StartLineCap == other.StartLineCap &&
-             EndLineCap == other.EndLineCap && DashCap == other.DashCap && PenLineJoin == other.PenLineJoin &&
+             EndLineCap == other.EndLineCap && DashStartCap == other.DashStartCap &&
+             DashEndCap == other.DashEndCap && PenLineJoin == other.PenLineJoin &&
              TrimStart.Equals(other.TrimStart) && TrimEnd.Equals(other.TrimEnd) &&
              // Load-bearing: a pen that compares EQUAL is treated as unchanged and the stroke is never re-pointed, so a
              // property missing from here is a property that silently cannot be animated (the marching ants stopped
@@ -101,6 +108,6 @@ public class Pen : IEquatable<Pen>
    {
       return HashCode.Combine(
          HashCode.Combine(Brush, Thickness, DashOffset, DashStrokeArray, (int)StartLineCap, (int)EndLineCap, (int)PenLineJoin),
-         HashCode.Combine(TrimStart, TrimEnd, (int)DashCap, DashPhase, FitDashesToContour));
+         HashCode.Combine(TrimStart, TrimEnd, (int)DashStartCap, (int)DashEndCap, DashPhase, FitDashesToContour));
    }
 }

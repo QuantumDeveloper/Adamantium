@@ -17,12 +17,15 @@ namespace Adamantium.Engine.GraphicsTests
     public class StrokeDashCutTests
     {
         // BUG 1: a dashed stroke crossing a SHARP corner used to emit BOTH corner triangles in EmitJoin - the inner one
-        // has no adjacent dash quad to hide it, so it showed as an inward chevron. The fix fills ONLY the outer wedge.
+        // has no adjacent dash quad to hide it, so it showed as an inward chevron. The wedge is now filled on BOTH sides
+        // deliberately (the inner triangle lands inside the two quads' overlap, harmless for an opaque stroke) - which
+        // beats having to pick, and sometimes mis-pick, the outer side on a curve.
         // Geometry: open L (0,0)->(100,0)->(100,100), one dash covering the whole contour (pattern [1000,1000] so the
         // first "on" run spans both 100-long segments and crosses the corner), bevel join, flat caps, no round fan,
-        // Fringe 0. Layout: quad seg0 (6) + join (3 bevel) + quad seg1 (6) = 15 verts. The buggy version emitted 18.
+        // Fringe 0. Layout: quad seg0 (6) + wedge (6) + quad seg1 (6) = 18 verts, and NO cap geometry at either end -
+        // caps are a per-fragment mask now, so they can never add a triangle here.
         [Test]
-        public void DashJoin_SharpCorner_FillsOuterWedgeOnly()
+        public void DashJoin_SharpCorner_EmitsWedgeCarryingThePiecesEndDistances()
         {
             float[] pts = { 0f, 0f, 100f, 0f, 100f, 100f };
             float[] pattern = { 1000f, 1000f };   // one "on" run (1000) >> total length (200) -> covers both segments
@@ -51,20 +54,46 @@ namespace Adamantium.Engine.GraphicsTests
             effect.Parameters["RoundSegments"].SetValue(0u);
             effect.Parameters["StartCap"].SetValue(0u);
             effect.Parameters["EndCap"].SetValue(0u);
-            effect.Parameters["DashCap"].SetValue(0u);
+            effect.Parameters["DashStartCap"].SetValue(0u);
+            effect.Parameters["DashEndCap"].SetValue(0u);
             effect.Parameters["MaxVertices"].SetValue(4096u);
             effect.Parameters["TrimStart"].SetValue(0f);
             effect.Parameters["TrimEnd"].SetValue(1f);
 
-            var (cmd4, verts) = RunCut(main, device, gd, pass, indirect, output, 45);
+            var (cmd4, verts) = RunCut(main, device, gd, pass, indirect, output, 18 * 10);
 
-            Assert.That(cmd4[0], Is.EqualTo(15), "vertexCount: quad(6) + outer bevel wedge(3) + quad(6); the buggy inner triangle added 3 more");
+            Assert.That(cmd4[0], Is.EqualTo(18), "vertexCount: quad(6) + both-sided bevel wedge(6) + quad(6), no cap geometry");
 
-            // The join is the 3 verts (9 floats) right after seg0's quad (6 verts = 18 floats). Left turn at (100,0):
-            // outer side is the minus (bottom-right) side -> oIn (100,-5), oOut (105,0), centre V (100,0).
-            float[] expectedJoin = { 100f, -5f, -5f, 105f, 0f, -5f, 100f, 0f, 0f };
-            for (int i = 0; i < 9; i++)
-                Assert.That(verts[18 + i], Is.EqualTo(expectedJoin[i]).Within(0.01f), $"outer-wedge join float [{i}]");
+            // The join is the 6 verts right after seg0's quad, 10 floats each:
+            // (x, y | perp, uA, vA, arcA | caps, uB, vB, arcB).
+            // Corner (100,0), h = 5: plus side (100,5) & (95,0), centre (100,0), then the mirrored minus side.
+            float[] expectedWedge =
+            {
+                100f, 5f, 5f,   95f, 0f, 5f,   100f, 0f, 0f,
+                100f, -5f, -5f, 105f, 0f, -5f, 100f, 0f, 0f,
+            };
+            for (int v = 0; v < 6; v++)
+            {
+                int o = 60 + v * 10;
+                float x = verts[o + 0], y = verts[o + 1];
+                Assert.That(x, Is.EqualTo(expectedWedge[v * 3 + 0]).Within(0.01f), $"wedge vert {v} x");
+                Assert.That(y, Is.EqualTo(expectedWedge[v * 3 + 1]).Within(0.01f), $"wedge vert {v} y");
+                Assert.That(verts[o + 2], Is.EqualTo(expectedWedge[v * 3 + 2]).Within(0.01f), $"wedge vert {v} perp");
+
+                // The load-bearing part: the wedge belongs to the dash PIECE crossing the corner, so it carries that
+                // piece's two END FRAMES (the cap's shape) AND its arc distance to both ends (the cap's reach). Without
+                // the frames a concave cap carves a join as a CIRCLE around the corner - a hole punched through the
+                // dash; without the arc, a cap shaves ribbon that is far away along the path but happens to lie behind
+                // its axis. The piece spans the whole L: it starts at (0,0) heading +x and ends at (100,100) heading
+                // +y, and the corner sits at arc 100 of 200 - so uA = x, vA = y, uB = 100 - y, vB = 100 - x, arcs 100.
+                Assert.That(verts[o + 3], Is.EqualTo(x).Within(0.01f), $"wedge vert {v} uA");
+                Assert.That(verts[o + 4], Is.EqualTo(y).Within(0.01f), $"wedge vert {v} vA");
+                Assert.That(verts[o + 5], Is.EqualTo(100f).Within(0.01f), $"wedge vert {v} arcA");
+                Assert.That(verts[o + 6], Is.EqualTo(0f).Within(0.01f), $"wedge vert {v} caps (flat/flat)");
+                Assert.That(verts[o + 7], Is.EqualTo(100f - y).Within(0.01f), $"wedge vert {v} uB");
+                Assert.That(verts[o + 8], Is.EqualTo(100f - x).Within(0.01f), $"wedge vert {v} vB");
+                Assert.That(verts[o + 9], Is.EqualTo(100f).Within(0.01f), $"wedge vert {v} arcB");
+            }
 
             main.Dispose();
         }
@@ -104,7 +133,8 @@ namespace Adamantium.Engine.GraphicsTests
             effect.Parameters["RoundSegments"].SetValue(0u);
             effect.Parameters["StartCap"].SetValue(0u);
             effect.Parameters["EndCap"].SetValue(0u);
-            effect.Parameters["DashCap"].SetValue(0u);
+            effect.Parameters["DashStartCap"].SetValue(0u);
+            effect.Parameters["DashEndCap"].SetValue(0u);
             effect.Parameters["MaxVertices"].SetValue(4096u);
             effect.Parameters["TrimStart"].SetValue(0f);
             effect.Parameters["TrimEnd"].SetValue(1f);
@@ -148,7 +178,8 @@ namespace Adamantium.Engine.GraphicsTests
             effect.Parameters["RoundSegments"].SetValue(0u);
             effect.Parameters["StartCap"].SetValue(0u);
             effect.Parameters["EndCap"].SetValue(0u);
-            effect.Parameters["DashCap"].SetValue(0u);
+            effect.Parameters["DashStartCap"].SetValue(0u);
+            effect.Parameters["DashEndCap"].SetValue(0u);
             effect.Parameters["MaxVertices"].SetValue(4096u);
             effect.Parameters["TrimStart"].SetValue(0f);
             effect.Parameters["TrimEnd"].SetValue(0f);
@@ -175,9 +206,10 @@ namespace Adamantium.Engine.GraphicsTests
         [Test]
         public void Trim_PartialWindow_StillEmits()
         {
-            // window = 0.01 * ~440 ~= 4.4 device px -> a real capped piece is emitted (quad + round-cap discs).
+            // window = 0.01 * ~440 ~= 4.4 device px -> a real capped piece is emitted. Exactly one quad and no more: the
+            // round caps that used to add two 16-triangle disc fans here are a per-fragment mask now.
             var (cmd4, _) = RunEllipseTrim(0.5f, 0.51f, 1f, out var main);
-            Assert.That(cmd4[0], Is.GreaterThan(6), "a non-empty trim window still renders");
+            Assert.That(cmd4[0], Is.GreaterThanOrEqualTo(6), "a non-empty trim window still renders");
             main.Dispose();
         }
 
@@ -217,7 +249,8 @@ namespace Adamantium.Engine.GraphicsTests
             effect.Parameters["RoundSegments"].SetValue(16u);
             effect.Parameters["StartCap"].SetValue(2u);          // ConvexRound - matches the demo binding
             effect.Parameters["EndCap"].SetValue(2u);
-            effect.Parameters["DashCap"].SetValue(2u);
+            effect.Parameters["DashStartCap"].SetValue(2u);
+            effect.Parameters["DashEndCap"].SetValue(2u);
             effect.Parameters["MaxVertices"].SetValue(8192u);
             effect.Parameters["TrimStart"].SetValue(trimStart);
             effect.Parameters["TrimEnd"].SetValue(trimEnd);
