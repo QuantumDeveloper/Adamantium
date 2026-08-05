@@ -766,6 +766,8 @@ struct GradPSInput
     float2 Half     : TEXCOORD1;   // rect half-size
     float  Radius   : TEXCOORD2;   // corner radius
     nointerpolation uint InstId : TEXCOORD3;   // instance -> re-read GradientRectData in the PS for its gradient
+    nointerpolation float Scale : TEXCOORD4;   // slot unit -> device px: the PS re-reads the stroke record, which is
+                                               // baked in slot units, and has to match a pixel-space SDF
 };
 
 [shader("vertex")]
@@ -776,20 +778,24 @@ GradPSInput GradientRectInstancedVS(uint vertexId : SV_VertexID, uint instanceId
 
     GradPSInput o;
     float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
-    float outset = max(it.Stroke0.x * (0.5 * (1.0 + it.Stroke0.y) + 0.5), 0.0) + 1.0;
     // Node-local -> world via the transform table (slot in Geom1.w - Geom1.z is the shape flag; slot 0 = identity),
-    // same scheme as RectBatchInstancedVS.
-    // NB still in SLOT units, unlike the solid rect/ellipse: this PS re-reads the stroke record by BDA, so pixel-space
-    // SDF would need an extra interpolator here - and THIS pass flakes vkCreateShadersEXT on any added code (see below).
+    // and the SDF inputs in DEVICE PIXELS, same as RectBatchInstancedVS. The gradient uv is Local/Half - a RATIO - so
+    // the change of unit leaves the gradient itself untouched; the STROKE record is not a ratio, hence Scale.
     float4x4* transforms = (float4x4*)TransformsAddress;
     float4x4 nodeWorld = transforms[(uint)it.Geom1.w];
-    float2 localPos = it.Bounds.xy + corner * it.Bounds.zw + (corner * 2.0 - 1.0) * outset;
+    float2 px = SlotPixelScale(nodeWorld);
+    float iso = min(px.x, px.y);
+
+    float widthPx = it.Stroke0.x * iso;
+    float outsetPx = max(widthPx * (0.5 * (1.0 + it.Stroke0.y) + 0.5), 0.0) + 1.0;
+    float2 localPos = it.Bounds.xy + corner * it.Bounds.zw + (corner * 2.0 - 1.0) * (outsetPx / px);
     float4 worldPos = mul(float4(localPos, 0.0, 1.0), nodeWorld);
     o.Position = mul(worldPos, Projection);
-    o.Half   = it.Bounds.zw * 0.5;
-    o.Local  = (corner - 0.5) * it.Bounds.zw + (corner * 2.0 - 1.0) * outset;
-    o.Radius = it.Params.x;
+    o.Half   = it.Bounds.zw * 0.5 * px;
+    o.Local  = (corner - 0.5) * it.Bounds.zw * px + (corner * 2.0 - 1.0) * outsetPx;
+    o.Radius = it.Params.x * iso;
     o.InstId = instanceId;
+    o.Scale  = iso;
     return o;
 }
 
@@ -820,19 +826,23 @@ float4 GradientPS(GradPSInput input) : SV_Target
     // the TRUE small derivative everywhere. Harmless for linear/radial (min keeps the real value).
     float4 fill = GradColor(it, gt, min(fwidth(gt), fwidth(frac(gt + 0.5))), packedW >> 3);
 
+    // The stroke record is baked in SLOT units; the SDF above is in device pixels, so its LENGTHS convert (align, trim
+    // and the packed cap/join flags are unitless). Arc length `perim` already comes out in pixels, so dashes match.
+    float sc = input.Scale;
+    float widthPx = it.Stroke0.x * sc;
     float mask = 1.0;
     if (it.Stroke0.z > 0.0 || it.Stroke1.y > 0.0 || it.Stroke1.z < 1.0)
     {
-        float halfW = it.Stroke0.x * 0.5;
+        float halfW = widthPx * 0.5;
         float perim;
         float s = ellipse ? EllipseArc(input.Local, input.Half, perim)
                           : RoundRectArc(input.Local, input.Half, r, perim);
         float dPerp = d - it.Stroke0.y * halfW;
         float capScl = ArcCapScale(ellipse ? EllipseCurvRadius(input.Local, input.Half) : RoundRectCurvRadius(input.Local, input.Half, r), dPerp);
-        mask = DashTrimMask(s, s, perim, it.Stroke0.z, it.Stroke0.w, it.Stroke1.x, it.Stroke1.y,
+        mask = DashTrimMask(s, s, perim, it.Stroke0.z * sc, it.Stroke0.w * sc, it.Stroke1.x * sc, it.Stroke1.y,
                             it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w);
     }
-    return CompositeFillStroke(d, fill, it.StrokeColor, it.Stroke0.x, it.Stroke0.y, mask);
+    return CompositeFillStroke(d, fill, it.StrokeColor, widthPx, it.Stroke0.y, mask);
 }
 
 // ---- GradientFill: general instanced geometry (a shared tessellated mesh drawn N times) whose FILL is a LINEAR/RADIAL
@@ -921,6 +931,9 @@ struct PatternPSInput
     float2 Half     : TEXCOORD1;   // rect half-size
     float  Radius   : TEXCOORD2;   // corner radius
     nointerpolation uint InstId : TEXCOORD3;   // instance -> re-read PatternRectData in the PS
+    nointerpolation float Scale : TEXCOORD4;   // slot unit -> device px. The PS re-reads the record, whose stroke AND
+                                               // cell size (PatternBrush.CellSize / NoiseBrush.Scale, one field) are
+                                               // absolute lengths in slot units - they can't ride a ratio like uv.
 };
 
 [shader("vertex")]
@@ -931,17 +944,22 @@ PatternPSInput PatternRectInstancedVS(uint vertexId : SV_VertexID, uint instance
 
     PatternPSInput o;
     float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
-    float outset = max(it.Stroke0.x * (0.5 * (1.0 + it.Stroke0.y) + 0.5), 0.0) + 1.0;
-    // NB still in SLOT units, like the gradient pass and unlike the solid rect/ellipse - see the note there.
+    // SDF inputs in DEVICE PIXELS, same scheme as RectBatchInstancedVS (see SlotPixelScale).
     float4x4* transforms = (float4x4*)TransformsAddress;
     float4x4 nodeWorld = transforms[(uint)it.Params.w];
-    float2 localPos = it.Bounds.xy + corner * it.Bounds.zw + (corner * 2.0 - 1.0) * outset;
+    float2 px = SlotPixelScale(nodeWorld);
+    float iso = min(px.x, px.y);
+
+    float widthPx = it.Stroke0.x * iso;
+    float outsetPx = max(widthPx * (0.5 * (1.0 + it.Stroke0.y) + 0.5), 0.0) + 1.0;
+    float2 localPos = it.Bounds.xy + corner * it.Bounds.zw + (corner * 2.0 - 1.0) * (outsetPx / px);
     float4 worldPos = mul(float4(localPos, 0.0, 1.0), nodeWorld);
     o.Position = mul(worldPos, Projection);
-    o.Half   = it.Bounds.zw * 0.5;
-    o.Local  = (corner - 0.5) * it.Bounds.zw + (corner * 2.0 - 1.0) * outset;
-    o.Radius = it.Params.x;
+    o.Half   = it.Bounds.zw * 0.5 * px;
+    o.Local  = (corner - 0.5) * it.Bounds.zw * px + (corner * 2.0 - 1.0) * outsetPx;
+    o.Radius = it.Params.x * iso;
     o.InstId = instanceId;
+    o.Scale  = iso;
     return o;
 }
 
@@ -1371,22 +1389,30 @@ float4 PatternPS(PatternPSInput input) : SV_Target
     int joinType = int(fmod(floor(it.Stroke1.w / 4096.0), 8.0));
     float d = ellipse ? SdEllipse(input.Local, input.Half) : SdRoundRectJoin(input.Local, input.Half, r, joinType);
 
-    float2 p = input.Local + input.Half;   // fragment from the shape's TOP-LEFT (stable pattern origin at the corner)
-    float4 fill = PatternFillColor(it, p, input.Local, input.Half.y);
+    // The record is baked in SLOT units, the SDF above is in device pixels - so the CELL (PatternBrush.CellSize /
+    // NoiseBrush.Scale share this field) converts too, or the pattern's cell / the noise's grain would change size with
+    // the slot's scale. The noise's own knobs (octaves, seed, lacunarity, gain) are unitless and stay put.
+    float sc = input.Scale;
+    PatternRectData itPx = it;
+    itPx.Params.z = it.Params.z * sc;
 
+    float2 p = input.Local + input.Half;   // fragment from the shape's TOP-LEFT (stable pattern origin at the corner)
+    float4 fill = PatternFillColor(itPx, p, input.Local, input.Half.y);
+
+    float widthPx = it.Stroke0.x * sc;
     float mask = 1.0;
     if (it.Stroke0.z > 0.0 || it.Stroke1.y > 0.0 || it.Stroke1.z < 1.0)
     {
-        float halfW = it.Stroke0.x * 0.5;
+        float halfW = widthPx * 0.5;
         float perim;
         float s = ellipse ? EllipseArc(input.Local, input.Half, perim)
                           : RoundRectArc(input.Local, input.Half, r, perim);
         float dPerp = d - it.Stroke0.y * halfW;
         float capScl = ArcCapScale(ellipse ? EllipseCurvRadius(input.Local, input.Half) : RoundRectCurvRadius(input.Local, input.Half, r), dPerp);
-        mask = DashTrimMask(s, s, perim, it.Stroke0.z, it.Stroke0.w, it.Stroke1.x, it.Stroke1.y,
+        mask = DashTrimMask(s, s, perim, it.Stroke0.z * sc, it.Stroke0.w * sc, it.Stroke1.x * sc, it.Stroke1.y,
                             it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w);
     }
-    return CompositeFillStroke(d, fill, it.StrokeColor, it.Stroke0.x, it.Stroke0.y, mask);
+    return CompositeFillStroke(d, fill, it.StrokeColor, widthPx, it.Stroke0.y, mask);
 }
 
 // ---- PatternFill: general instanced geometry (a shared tessellated mesh drawn N times) whose FILL is a PROCEDURAL
@@ -1473,6 +1499,7 @@ struct FractalPSInput
     float2 Half     : TEXCOORD1;   // rect half-size
     float  Radius   : TEXCOORD2;   // corner radius
     nointerpolation uint InstId : TEXCOORD3;   // instance -> re-read FractalRectData in the PS
+    nointerpolation float Scale : TEXCOORD4;   // slot unit -> device px, for the stroke record the PS re-reads
 };
 
 [shader("vertex")]
@@ -1483,17 +1510,23 @@ FractalPSInput FractalRectInstancedVS(uint vertexId : SV_VertexID, uint instance
 
     FractalPSInput o;
     float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
-    float outset = max(it.Stroke0.x * (0.5 * (1.0 + it.Stroke0.y) + 0.5), 0.0) + 1.0;
-    // NB still in SLOT units, like the gradient pass and unlike the solid rect/ellipse - see the note there.
+    // SDF inputs in DEVICE PIXELS, same scheme as RectBatchInstancedVS. The fractal plane is Local/Half - a RATIO - so
+    // the change of unit leaves the image itself untouched; only the stroke record needs Scale.
     float4x4* transforms = (float4x4*)TransformsAddress;
     float4x4 nodeWorld = transforms[(uint)it.Params.z];
-    float2 localPos = it.Bounds.xy + corner * it.Bounds.zw + (corner * 2.0 - 1.0) * outset;
+    float2 px = SlotPixelScale(nodeWorld);
+    float iso = min(px.x, px.y);
+
+    float widthPx = it.Stroke0.x * iso;
+    float outsetPx = max(widthPx * (0.5 * (1.0 + it.Stroke0.y) + 0.5), 0.0) + 1.0;
+    float2 localPos = it.Bounds.xy + corner * it.Bounds.zw + (corner * 2.0 - 1.0) * (outsetPx / px);
     float4 worldPos = mul(float4(localPos, 0.0, 1.0), nodeWorld);
     o.Position = mul(worldPos, Projection);
-    o.Half   = it.Bounds.zw * 0.5;
-    o.Local  = (corner - 0.5) * it.Bounds.zw + (corner * 2.0 - 1.0) * outset;
-    o.Radius = it.Params.x;
+    o.Half   = it.Bounds.zw * 0.5 * px;
+    o.Local  = (corner - 0.5) * it.Bounds.zw * px + (corner * 2.0 - 1.0) * outsetPx;
+    o.Radius = it.Params.x * iso;
     o.InstId = instanceId;
+    o.Scale  = iso;
     return o;
 }
 
@@ -1692,18 +1725,21 @@ float4 FractalPS(FractalPSInput input) : SV_Target
         }   // end float-path else (perturbation deep path handled above)
     }
 
+    // Stroke lengths: slot units -> device pixels, to match the SDF above (align/trim/flags are unitless).
+    float sc = input.Scale;
+    float widthPx = it.Stroke0.x * sc;
     float mask = 1.0;
     if (it.Stroke0.z > 0.0 || it.Stroke1.y > 0.0 || it.Stroke1.z < 1.0)
     {
-        float halfW = it.Stroke0.x * 0.5;
+        float halfW = widthPx * 0.5;
         float perim;
         float s = RoundRectArc(input.Local, input.Half, r, perim);
         float dPerp = d - it.Stroke0.y * halfW;
         float capScl = ArcCapScale(RoundRectCurvRadius(input.Local, input.Half, r), dPerp);
-        mask = DashTrimMask(s, s, perim, it.Stroke0.z, it.Stroke0.w, it.Stroke1.x, it.Stroke1.y,
+        mask = DashTrimMask(s, s, perim, it.Stroke0.z * sc, it.Stroke0.w * sc, it.Stroke1.x * sc, it.Stroke1.y,
                             it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w);
     }
-    return CompositeFillStroke(d, fill, it.StrokeColor, it.Stroke0.x, it.Stroke0.y, mask);
+    return CompositeFillStroke(d, fill, it.StrokeColor, widthPx, it.Stroke0.y, mask);
 }
 
 // =====================================================================================================================
