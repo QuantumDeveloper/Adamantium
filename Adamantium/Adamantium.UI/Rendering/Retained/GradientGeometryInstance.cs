@@ -15,8 +15,10 @@ namespace Adamantium.UI.Rendering.Retained;
 [StructLayout(LayoutKind.Sequential)]
 public struct GradientGeometryInstance
 {
-    /// <summary>Full per-instance world transform (element local -> world). Row-vector convention (as GeometryInstance).</summary>
-    public Matrix4x4F World;
+    /// <summary>Per-instance transform RELATIVE to the transform-table slot in <see cref="Geom1"/>.w (element local ->
+    /// slot space). Row-vector convention (as GeometryInstance). The vertex shader applies the slot matrix on top, so
+    /// moving the slot's node never touches this record.</summary>
+    public Matrix4x4F Local;
 
     /// <summary>.x type (1 linear/2 radial); .y spread (0 pad/1 reflect/2 repeat); .z stop count; .w interp mode (0 sRGB/1 OKLab).</summary>
     public Vector4F Params;
@@ -24,7 +26,8 @@ public struct GradientGeometryInstance
     /// <summary>LOCAL 0..1: linear (startXY, endXY) | radial (centerXY, radiusXY).</summary>
     public Vector4F Geom0;
 
-    /// <summary>Radial focal (originXY, _, _); unused for linear.</summary>
+    /// <summary>Radial focal (originXY, _, _) - unused for linear; .w = the transform-table slot (same place the SDF
+    /// gradient keeps it, so the two records read alike).</summary>
     public Vector4F Geom1;
 
     /// <summary>The shape's local-space bounds (minX, minY, sizeX, sizeY): a fragment's uv = (localPos - min) / size.</summary>

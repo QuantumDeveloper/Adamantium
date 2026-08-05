@@ -253,7 +253,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     /// <summary>Collect one instanceable GRADIENT fill: append its per-instance world + gradient to its key's gradient
     /// buffer, and register the unit for a deferred fringe/stroke draw. False if it can't be batched (no drawable mesh or
     /// buffer overflow) - the caller draws it per-unit.</summary>
-    public bool TryAddGradient(GeometryRenderUnit unit, Matrix4x4F world, Rect2D scissor, Rect logicalBounds)
+    public bool TryAddGradient(GeometryRenderUnit unit, Matrix4x4F local, Rect2D scissor, Rect logicalBounds, int transformSlot)
     {
         if (!unit.TryGetInstancedGradientFill(out var key, out var meshObj, out var brush, out var localBounds, out var opacity)) return false;
         if (meshObj is not FrozenMesh mesh) return false;
@@ -270,7 +270,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         }
         if (seg.GradCount + 1 > seg.GradGpuCapacity) return false;
 
-        seg.GradItems[seg.GradCount++] = BuildGradientInstance(brush, world, localBounds, opacity);
+        seg.GradItems[seg.GradCount++] = BuildGradientInstance(brush, local, localBounds, opacity, transformSlot);
 
         _scissor = scissor;
         if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
@@ -288,9 +288,10 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
     // Pack a gradient brush + world + local bounds into one gradient instance record (stops/geometry via the shared
     // GradientBake; Params = (type, spread, stopCount, _) to match the gradient-fill vertex shader).
-    private static GradientGeometryInstance BuildGradientInstance(GradientBrush g, Matrix4x4F world, Rect localBounds, double opacity)
+    private static GradientGeometryInstance BuildGradientInstance(GradientBrush g, Matrix4x4F local, Rect localBounds,
+        double opacity, int transformSlot)
     {
-        var inst = new GradientGeometryInstance { World = world };
+        var inst = new GradientGeometryInstance { Local = local };
         var alpha = (float)(g.Opacity * opacity);
         Span<Vector4F> cols = stackalloc Vector4F[GradientBake.MaxStops];
         Span<float> offs = stackalloc float[GradientBake.MaxStops];
@@ -301,6 +302,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         inst.Offsets1 = new Vector4F(offs[4], offs[5], offs[6], offs[7]);
         var type = GradientBake.PackGeometry(g, out var geom0, out var geom1);
         inst.Geom0 = geom0;
+        geom1.W = transformSlot;   // .xy is the radial focal; .w carries the slot, as in the SDF gradient record
         inst.Geom1 = geom1;
         inst.LocalBounds = new Vector4F((float)localBounds.X, (float)localBounds.Y, (float)localBounds.Width, (float)localBounds.Height);
         inst.Params = new Vector4F(type, (float)g.SpreadMethod, count, (float)g.ColorInterpolationMode);   // .w = interp mode (0 sRGB/1 OKLab)
@@ -311,7 +313,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
     /// <summary>Collect one instanceable PATTERN/NOISE fill: append its per-instance world + pattern to its key's pattern
     /// buffer, and register the unit for a deferred fringe/stroke draw. False if it can't be batched.</summary>
-    public bool TryAddPattern(GeometryRenderUnit unit, Matrix4x4F world, Rect2D scissor, Rect logicalBounds)
+    public bool TryAddPattern(GeometryRenderUnit unit, Matrix4x4F local, Rect2D scissor, Rect logicalBounds, int transformSlot)
     {
         if (!unit.TryGetInstancedPatternFill(out var key, out var meshObj, out var brush, out var localBounds, out var opacity)) return false;
         if (meshObj is not FrozenMesh mesh) return false;
@@ -328,7 +330,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         }
         if (seg.PatCount + 1 > seg.PatGpuCapacity) return false;
 
-        seg.PatItems[seg.PatCount++] = BuildPatternInstance(brush, world, localBounds, opacity);
+        seg.PatItems[seg.PatCount++] = BuildPatternInstance(brush, local, localBounds, opacity, transformSlot);
 
         _scissor = scissor;
         if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
@@ -346,9 +348,10 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
     // Pack a PatternBrush/NoiseBrush + world + local bounds into one pattern instance record. Cell stays in LOCAL units (the
     // geometry PS works in local mesh coords) - no device-scale, unlike the SDF rect bake. Mirrors PatternRectCollector.BakeItem.
-    private static PatternGeometryInstance BuildPatternInstance(Brush brush, Matrix4x4F world, Rect localBounds, double opacity)
+    private static PatternGeometryInstance BuildPatternInstance(Brush brush, Matrix4x4F local, Rect localBounds,
+        double opacity, int transformSlot)
     {
-        var inst = new PatternGeometryInstance { World = world };
+        var inst = new PatternGeometryInstance { Local = local };
         int type;
         Color color1;
         Color color2;
@@ -384,7 +387,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         var c2 = color2.ToVector4(); c2.W *= alpha;
         var c3 = midColor.ToVector4(); c3.W *= alpha;
 
-        inst.Params = new Vector4F(0, type, (float)cell, 0);
+        inst.Params = new Vector4F(0, type, (float)cell, transformSlot);
         inst.LocalBounds = new Vector4F((float)localBounds.X, (float)localBounds.Y, (float)localBounds.Width, (float)localBounds.Height);
         inst.Color1 = c1;
         inst.Color2 = c2;

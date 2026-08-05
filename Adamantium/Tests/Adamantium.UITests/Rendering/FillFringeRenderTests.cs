@@ -84,6 +84,96 @@ public class FillFringeRenderTests
         AssertOnePixelEdge(RenderSquare(scale, brush), edge);
     }
 
+    // A gradient fill on ARBITRARY geometry goes through the instanced gradient pass, whose record now stores the
+    // transform RELATIVE to a transform-table slot instead of a baked world. Getting that wrong moves the shape (the
+    // classic symptom: it collapses toward the clip origin), so this pins where it lands and that the ramp survives.
+    [Test]
+    public void InstancedGradientGeometry_LandsWhereItIsPlaced()
+    {
+        var device = GpuTestDevice.Device;
+        var factory = new RenderUnitFactory(device, new StubResourceFactory());
+        using var renderer = new OffscreenTestRenderer(device, factory, Dim, Dim) { ClearColor = Colors.Transparent };
+
+        var brush = new LinearGradientBrush
+        {
+            StartPoint = new Vector2(0, 0),
+            EndPoint = new Vector2(1, 0),
+            GradientStops = { new GradientStop(Colors.Red, 0), new GradientStop(Colors.Blue, 1) }
+        };
+        var content = new TestControl
+        {
+            RenderAction = s => s.DrawGeometry(brush, new RectangleGeometry(new Rect(10, 10, 40, 40)))
+        };
+        content.Bounds = new Rect(0, 0, Dim, Dim);
+        content.RenderSize = new Size(Dim, Dim);
+
+        var root = new VisualRoot(content, Dim, Dim);
+        Assert.That(renderer.RenderFrame(root), Is.True);
+
+        using var img = renderer.RenderTarget.ResolveTexture.ReadbackToImage();
+        var pixels = new byte[(int)img.TotalSizeInBytes];
+        Marshal.Copy(img.DataPointer, pixels, 0, pixels.Length);
+        int A(int x, int y) => pixels[(y * Dim + x) * 4 + 3];
+        int R(int x, int y) => pixels[(y * Dim + x) * 4 + 2];
+        int B(int x, int y) => pixels[(y * Dim + x) * 4 + 0];
+
+        // Inside the square is opaque, outside is empty - i.e. it is drawn at 10..50, not somewhere else.
+        Assert.That(A(30, 30), Is.EqualTo(255), "the shape must cover its own bounds");
+        Assert.That(A(5, 30), Is.EqualTo(0), "nothing must be drawn left of the shape");
+        Assert.That(A(60, 30), Is.EqualTo(0), "nothing must be drawn right of the shape");
+        // ...and it is still a left-to-right red->blue ramp.
+        Assert.That(R(13, 30), Is.GreaterThan(R(47, 30)), "red must fade out from left to right");
+        Assert.That(B(47, 30), Is.GreaterThan(B(13, 30)), "blue must build up towards the right");
+    }
+
+    // Same for the PATTERN pass (noise shares this record), which also moved from a baked world onto a slot.
+    [Test]
+    public void InstancedPatternGeometry_LandsWhereItIsPlaced()
+    {
+        var device = GpuTestDevice.Device;
+        var factory = new RenderUnitFactory(device, new StubResourceFactory());
+        using var renderer = new OffscreenTestRenderer(device, factory, Dim, Dim) { ClearColor = Colors.Transparent };
+
+        var brush = new PatternBrush
+        {
+            Pattern = PatternType.Checkerboard,
+            Color1 = Colors.Red,
+            Color2 = Colors.Blue,
+            CellSize = 8
+        };
+        var content = new TestControl
+        {
+            RenderAction = s => s.DrawGeometry(brush, new RectangleGeometry(new Rect(10, 10, 40, 40)))
+        };
+        content.Bounds = new Rect(0, 0, Dim, Dim);
+        content.RenderSize = new Size(Dim, Dim);
+
+        var root = new VisualRoot(content, Dim, Dim);
+        Assert.That(renderer.RenderFrame(root), Is.True);
+
+        using var img = renderer.RenderTarget.ResolveTexture.ReadbackToImage();
+        var pixels = new byte[(int)img.TotalSizeInBytes];
+        Marshal.Copy(img.DataPointer, pixels, 0, pixels.Length);
+        int A(int x, int y) => pixels[(y * Dim + x) * 4 + 3];
+
+        Assert.That(A(30, 30), Is.EqualTo(255), "the shape must cover its own bounds");
+        Assert.That(A(5, 30), Is.EqualTo(0), "nothing must be drawn left of the shape");
+        Assert.That(A(60, 30), Is.EqualTo(0), "nothing must be drawn right of the shape");
+
+        // Both checker colours must appear inside it - i.e. the pattern is still a pattern, not one flat fill.
+        var reds = 0;
+        var blues = 0;
+        for (var x = 12; x < 48; x++)
+        {
+            var r = pixels[(30 * Dim + x) * 4 + 2];
+            var b = pixels[(30 * Dim + x) * 4 + 0];
+            if (r > 200 && b < 60) reds++;
+            if (b > 200 && r < 60) blues++;
+        }
+        Assert.That(reds, Is.GreaterThan(0), "the pattern's first colour must show");
+        Assert.That(blues, Is.GreaterThan(0), "the pattern's second colour must show");
+    }
+
     // The unit factory needs one, but nothing here draws a texture or text.
     private sealed class StubResourceFactory : IResourceFactory
     {
