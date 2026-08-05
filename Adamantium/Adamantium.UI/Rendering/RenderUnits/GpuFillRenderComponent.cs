@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
@@ -10,44 +11,34 @@ using Buffer = Adamantium.Graphics.Buffer;
 
 namespace Adamantium.UI.Rendering.RenderUnits;
 
-// GPU fill anti-aliasing (Analytic AA, Phase 1). For each CLOSED fill contour a compute shader (FillFringeExpand) builds
-// a ~1px coverage fringe RING around it (written via a BDA device address), drawn on TOP of the CPU-triangulated solid
-// body with alpha *= coverage -> an analytic feathered edge, no MSAA. Mirrors GpuStrokeRenderComponent (the same
-// contour -> compute -> Draw pattern), but one-sided (outward) and carrying a coverage attribute. A geometry with holes
-// / combined contours gets one ring per contour.
+// GPU fill anti-aliasing (Analytic AA). A CLOSED fill contour gets a coverage fringe RING around it (FringeGeometry),
+// drawn on TOP of the CPU-triangulated solid body with alpha *= coverage -> an analytic feathered edge, no MSAA. A
+// geometry with holes / combined contours contributes one ring per contour, all in one vertex buffer = one draw.
 //
-// Buffers are RENTED from the buffer manager (ReusableBuffer), not allocated per frame: a same-topology geometry change
-// (a resize) rewrites the contour points in place and re-dispatches the expander into the existing ring slot, with no
-// Vulkan allocation. See GPU_BUFFER_REUSE_PLAN.
+// This is the PER-UNIT fringe: the fill it feathers isn't in the instanced path (a gradient/pattern fill, or a mesh with
+// no frozen snapshot). An instanced solid fill gets the very same ring drawn once for all its elements - see
+// InstancedFillCollector. Both build it from FringeGeometry, so the ring has ONE definition.
+//
+// The ring holds no width: the vertex shader offsets it in DEVICE PIXELS, so it is identical at any zoom - which is
+// why it is built once on the CPU here rather than re-expanded on the GPU each time the scale moves.
 public sealed class GpuFillRenderComponent : UIRenderComponent
 {
-    // Target fringe width in DEVICE pixels. The fringe is built in geometry-LOCAL units, so PreRender converts this to
-    // local via the local->device scale (ComputeFringeWidth) - keeping the AA ~1 device px at any designer zoom.
+    // Fringe width in DEVICE pixels, applied by the vertex shader.
     private const float DeviceFringePx = 1.0f;
     private const MemoryPropertyFlags FillMemory = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal;
 
     private readonly GraphicsDevice _device;
     private readonly FillFringeEffect _effect;
-    private readonly List<Contour> _contours = [];
-    private float _expandedFringe = float.NaN;
+    private readonly ReusableBuffer _vertexBuffer;
+    private FringeVertex[] _ring;
     private Vector4F _localBounds;   // shape local bounds (minX, minY, sizeX, sizeY): the fragment->gradient uv basis
+
+    private ulong RingBytes => (ulong)(_ring.Length * Marshal.SizeOf<FringeVertex>());
 
     // The fill brush, read LIVE at Render (like the body's GeometryRenderComponent.Background) so an in-place colour
     // change or a cheap brush repoint shows without rebuilding the contour. A non-solid brush => the fringe doesn't draw
     // (the CPU body doesn't render non-solid fills either), so no stale outline is left when a fill turns into a gradient.
     public Brush Brush { get; set; }
-
-    private sealed class Contour
-    {
-        public uint PointCount;
-        public uint VertexCount;   // PointCount segments * 6 verts (closed loop)
-        public float Winding;      // +1 / -1 so the outward miter actually points outward
-        public float[] PointsData; // x,y interleaved - the CPU payload re-uploaded to the current ring slot when stale
-        public ReusableBuffer PointsBuffer;
-        public ReusableBuffer VertexBuffer;
-        public ulong PointsBytes => (ulong)(PointsData.Length * sizeof(float));
-        public ulong VertexBytes => (ulong)(VertexCount * 3 * sizeof(float));   // 3 floats/vertex: x, y, coverage
-    }
 
     public GpuFillRenderComponent(IGraphicsDevice device, UIBasicEffect uiBasicEffect, FillFringeEffect effect,
         IReadOnlyList<(Vector2[] Points, bool IsClosed)> contours, Brush brush, GpuBufferManager bufferManager) : base(device, uiBasicEffect, null, bufferManager)
@@ -56,16 +47,14 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
         _effect = effect;
         Brush = brush;
 
-        // Build each contour (base winding = outward from its own centroid), keeping its points for the nesting test.
-        var built = new List<(Contour Contour, Vector2[] Points)>();
-        foreach (var (points, _) in contours)
-        {
-            var c = BuildContour(points);
-            if (c != null) built.Add((c, points));
-        }
-        AssignNesting(built);
-        foreach (var (contour, _) in built) _contours.Add(contour);
+        _ring = FringeGeometry.BuildRing(FringeGeometry.Build(contours));
         _localBounds = ComputeLocalBounds(contours);
+
+        // Rented from the buffer manager (ReusableBuffer), not allocated per frame: a same-size geometry change (a
+        // resize) rewrites the ring into the existing slot with no Vulkan allocation. See GPU_BUFFER_REUSE_PLAN.
+        _vertexBuffer = ToDispose(BufferManager.CreateBuffer(BufferUsageFlags.VertexBuffer, FillMemory));
+        _vertexBuffer.Reserve(RingBytes);
+        _vertexBuffer.Invalidate();
     }
 
     // Bounding box of all contour points (local geometry space) as (minX, minY, sizeX, sizeY) - the gradient uv basis, so
@@ -85,162 +74,43 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
         return new Vector4F(minX, minY, Math.Max(maxX - minX, 1e-4f), Math.Max(maxY - minY, 1e-4f));
     }
 
-    // Even-odd nesting: a contour inside an ODD number of the others is a HOLE - the fill is OUTSIDE it, so its fringe
-    // must feather INWARD (toward the hole), opposite an outer contour. Winding alone can't tell them apart (the
-    // tessellator emits holes with the same winding as outers), so flip holes here. A probe VERTEX is used, not the
-    // centroid - a frame-shaped outer's centroid can fall inside its own hole and misclassify it.
-    private static void AssignNesting(List<(Contour Contour, Vector2[] Points)> built)
-    {
-        foreach (var (contour, points) in built)
-        {
-            var nesting = 0;
-            foreach (var (other, otherPoints) in built)
-                if (!ReferenceEquals(other, contour) && PointInPolygon(points[0], otherPoints))
-                    nesting++;
-            if ((nesting & 1) == 1) contour.Winding = -contour.Winding;
-        }
-    }
-
-    // Ray-cast point-in-polygon (used to find a contour's even-odd nesting depth -> hole vs outer).
-    private static bool PointInPolygon(Vector2 p, Vector2[] poly)
-    {
-        var inside = false;
-        for (int i = 0, j = poly.Length - 1; i < poly.Length; j = i++)
-        {
-            if ((poly[i].Y > p.Y) != (poly[j].Y > p.Y) &&
-                p.X < (poly[j].X - poly[i].X) * (p.Y - poly[i].Y) / (poly[j].Y - poly[i].Y) + poly[i].X)
-                inside = !inside;
-        }
-        return inside;
-    }
-
-    private Contour BuildContour(Vector2[] points)
-    {
-        if (points.Length < 3) return null;   // a fill contour needs at least a triangle
-
-        var c = new Contour
-        {
-            PointCount = (uint)points.Length,
-            VertexCount = (uint)points.Length * 6u,
-            // Outward miter sign from the contour's signed area (screen space is y-down, so the sign is tuned by the
-            // headless edge test: the fringe must land OUTSIDE the shape).
-            Winding = SignedArea(points) >= 0 ? -1f : 1f,
-            PointsData = ToFloats(points)
-        };
-
-        c.PointsBuffer = ToDispose(BufferManager.CreateBuffer(
-            BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, FillMemory));
-        c.PointsBuffer.Reserve(c.PointsBytes);
-        c.PointsBuffer.Invalidate();
-
-        c.VertexBuffer = ToDispose(BufferManager.CreateBuffer(
-            BufferUsageFlags.VertexBuffer | BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, FillMemory));
-        c.VertexBuffer.Reserve(c.VertexBytes);
-        c.VertexBuffer.Invalidate();
-        return c;
-    }
-
-    private static float[] ToFloats(Vector2[] points)
-    {
-        var floats = new float[points.Length * 2];
-        for (var i = 0; i < points.Length; i++)
-        {
-            floats[i * 2] = (float)points[i].X;
-            floats[i * 2 + 1] = (float)points[i].Y;
-        }
-        return floats;
-    }
-
-    // Same-topology update (a resize): if the new contour set matches the current one (count + per-contour point count),
-    // rewrite each contour's points in place and re-expand - no new component, no allocation. Returns false when the
-    // topology differs (contour added/removed, or a CornerRadius change altered an arc's segment count), so the caller
-    // rebuilds. Winding/nesting are preserved (a resize keeps both).
+    // Same-topology update (a resize): a re-tessellation that yields a ring of the SAME size rewrites it into the
+    // existing slot - no new component, no allocation. Returns false when the size differs (a contour added/removed, or
+    // a CornerRadius change altered an arc's segment count), so the caller rebuilds the component.
     public bool TryUpdateContours(IReadOnlyList<(Vector2[] Points, bool IsClosed)> contours, Brush brush)
     {
-        var valid = new List<Vector2[]>();
-        foreach (var (points, _) in contours)
-            if (points is { Length: >= 3 }) valid.Add(points);
+        var ring = FringeGeometry.BuildRing(FringeGeometry.Build(contours));
+        if (ring.Length != _ring.Length) return false;
 
-        if (valid.Count != _contours.Count) return false;
-        for (var i = 0; i < valid.Count; i++)
-            if (valid[i].Length != _contours[i].PointCount) return false;
-
-        for (var i = 0; i < valid.Count; i++)
-        {
-            var c = _contours[i];
-            c.PointsData = ToFloats(valid[i]);
-            c.PointsBuffer.Invalidate();    // re-upload the points to the current ring slot
-            c.VertexBuffer.Invalidate();    // re-expand into the current ring slot
-        }
+        _ring = ring;
+        _vertexBuffer.Invalidate();   // re-upload the ring to the current slot
         Brush = brush;
         _localBounds = ComputeLocalBounds(contours);
         return true;
     }
 
-    private static double SignedArea(Vector2[] p)
-    {
-        double a = 0;
-        for (int i = 0, n = p.Length; i < n; i++)
-        {
-            var j = (i + 1) % n;
-            a += p[i].X * p[j].Y - p[j].X * p[i].Y;
-        }
-        return a * 0.5;
-    }
-
-    // DeviceFringePx expressed in geometry-LOCAL units. The contour is offset in local space; only the viewport applies
-    // the designer zoom (RenderScale) while the projection stays logical, so 1 local unit spans worldScale (local->logical,
-    // from the transform's 2x2 area scale) * RenderScale (logical->device) device px. Invert that so the fringe stays
-    // ~1 device px at any zoom: no thickening when zoomed in, no sub-pixel under-coverage when zoomed out.
-    private float ComputeFringeWidth()
-    {
-        var t = RenderData.TransformMatrix;
-        var worldScale = (float)Math.Sqrt(Math.Abs(t.M11 * t.M22 - t.M12 * t.M21));
-        var deviceScale = worldScale * (float)RenderData.RenderScale;
-        return deviceScale > 1e-4f ? DeviceFringePx / deviceScale : DeviceFringePx;
-    }
-
-    // Compute runs out of the render pass (beforeRenderPass hook), same as the stroke expander: each contour ensures its
-    // points are uploaded to this frame's slot, then re-dispatches the fringe expander into this frame's vertex slot only
-    // when that slot is stale (a static fill settles to zero work; an animated one re-expands the current slot).
+    // Upload runs out of the render pass (beforeRenderPass hook) and only when this frame's slot is stale - a static
+    // fill settles to zero work. The ring itself carries no scale, so a zoom or a transform change never invalidates
+    // it; only a contour change does.
     public override void PreRender()
     {
-        if (!AnalyticAa.Enabled || Brush is not (SolidColorBrush or GradientBrush or PatternBrush or NoiseBrush)) return;   // AA off / no fringe-eligible fill: skip the expander
-        var fringeWidth = ComputeFringeWidth();
-        if (fringeWidth != _expandedFringe)
-        {
-            foreach (var c in _contours) c.VertexBuffer.Invalidate();   // scale changed -> re-expand every contour
-            _expandedFringe = fringeWidth;
-        }
+        if (!AnalyticAa.Enabled || _ring.Length == 0) return;
+        if (Brush is not (SolidColorBrush or GradientBrush or PatternBrush or NoiseBrush)) return;
 
-        foreach (var c in _contours)
-        {
-            var points = c.PointsBuffer.Acquire(c.PointsBytes, out var writePoints);
-            if (writePoints) points.SetData(c.PointsData, 0, (uint)c.PointsData.Length);
-
-            var vertices = c.VertexBuffer.Acquire(c.VertexBytes, out var writeVertices);
-            if (!writeVertices) continue;   // this frame's slot already holds the expanded ring
-
-            _effect.PointsAddress.SetValue(points.GetDeviceAddress());
-            _effect.OutputAddress.SetValue(vertices.GetDeviceAddress());
-            _effect.PointCount.SetValue(c.PointCount);
-            _effect.FringeWidth.SetValue(fringeWidth);
-            _effect.Winding.SetValue(c.Winding);
-            _effect.FillFringeExpandPass.Apply();
-
-            _device.Dispatch((c.PointCount + 63u) / 64u);
-
-            _device.BufferBarrier(vertices,
-                PipelineStageFlagBits2.ComputeShaderBit, AccessFlagBits2.ShaderWriteBit,
-                PipelineStageFlagBits2.VertexAttributeInputBit, AccessFlagBits2.VertexAttributeReadBit);
-        }
+        var vertices = _vertexBuffer.Acquire(RingBytes, out var write);
+        if (write) vertices.SetData(_ring, 0, (uint)_ring.Length);
     }
 
     public override void Render()
     {
-        if (!AnalyticAa.Enabled || _contours.Count == 0 || Brush is not (SolidColorBrush or GradientBrush or PatternBrush or NoiseBrush)) return;
+        if (!AnalyticAa.Enabled || _ring.Length == 0 || Brush is not (SolidColorBrush or GradientBrush or PatternBrush or NoiseBrush)) return;
 
         _effect.Projection.SetValue(RenderData.TransformMatrix * RenderData.ProjectionMatrix);
+        // The VS offsets the ring in DEVICE pixels, so it needs the render target's pixel size (the viewport already
+        // carries the designer zoom: it is sized ClientSize x RenderScale while the projection stays logical).
+        var vp = _device.CurrentViewports;
+        if (vp is { Length: > 0 }) _effect.ViewportSize.SetValue(new Vector2F(vp[0].Width, vp[0].Height));
+        _effect.FringePixels.SetValue(DeviceFringePx);
         if (Brush is GradientBrush g)
         {
             SetGradientUniforms(g);
@@ -268,12 +138,8 @@ public sealed class GpuFillRenderComponent : UIRenderComponent
         _device.DepthWriteEnable = true;
         _effect.FillFringeDrawPass.Apply();
 
-        foreach (var c in _contours)
-        {
-            var vertices = c.VertexBuffer.Acquire(c.VertexBytes, out _);   // the slot PreRender expanded this frame
-            _device.SetVertexBuffer(vertices);
-            _device.Draw(c.VertexCount, 1);
-        }
+        _device.SetVertexBuffer(_vertexBuffer.Acquire(RingBytes, out _));   // the slot PreRender uploaded this frame
+        _device.Draw((uint)_ring.Length, 1);
     }
 
     // Push the fill gradient into the fringe Draw uniforms (packed by the shared GradientBake, same as the fill batch), so

@@ -448,12 +448,16 @@ public partial class RenderCache
                 if (_instancedFill.TryAdd(gru, fillBake, scissor, LogicalBounds(unit.Component, wt), slot4Fill))
                 {
                     gru.FillInstanced = true;
-                    // The FILL now rides the slot, but this unit's analytic-AA fringe and its stroke still draw per-unit
-                    // from RenderData.TransformMatrix, which is baked at record time and not refreshed by a replay. Letting
-                    // the node stay aware would move the fill on a slot write while its own outline stayed behind - the
-                    // exact tear the transform table just removed. So the node still loses the fast path here; closing
-                    // that needs the per-unit draw to follow the slot too.
-                    if (_recording) { group.PatchableRectOnly = false; MarkNodeNotAware(unit.Component); }
+                    // The fill AND its analytic-AA fringe now both ride the slot (one shared ring per mesh, drawn from
+                    // the same instance buffer), so such a unit keeps the node aware. A unit that still has a per-unit
+                    // overlay - a stroke, or a fringe the instanced path doesn't cover - does NOT: that draw bakes its
+                    // transform from RenderData at record time, so a slot write would move the fill and leave its own
+                    // outline behind, the exact tear the transform table removed.
+                    if (_recording)
+                    {
+                        group.PatchableRectOnly = false;
+                        if (gru.HasPerUnitOverlay) MarkNodeNotAware(unit.Component);
+                    }
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;   // fill batched; fringe/stroke drawn at the flush, over the fill

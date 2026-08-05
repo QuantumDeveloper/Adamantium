@@ -65,6 +65,12 @@ public partial class MainViewModel
 
     [Command] private void ToggleDiagnosticsPanel() => DiagnosticsPanelOpen = !DiagnosticsPanelOpen;
 
+    // Analytic AA (the coverage fringe on fills + feathered strokes), bound to the window's AnalyticAntialiasing. It
+    // lives in the diagnostics panel rather than the chrome because it is a comparison switch, not a setting: the flag
+    // is re-read per frame, so flipping it re-renders WITHOUT rebuilding the render cache - which is what makes an A/B
+    // of an edge artifact possible at all.
+    [Bindable] private bool _analyticAa = true;
+
     // Last dialog result - shown in the window content (written by ShowConfirm).
     [Bindable] private string _lastCommand = "(none)";
 

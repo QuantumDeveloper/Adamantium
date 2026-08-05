@@ -42,6 +42,11 @@ internal abstract class SdfBatchCollector<TItem> : BatchCollector<TItem> where T
         device.DepthWriteEnable = true;
         device.DepthCompareFunction = CompareOp.Always;
         Effect.Projection.SetValue(projection);
+        // The SDF shapes measure themselves in DEVICE pixels (SlotPixelScale), which needs the render target's pixel
+        // size; without it the shader falls back to the raw slot space, where an anisotropically scaled slot smears the
+        // shape's edge along its long axis.
+        var vp = ((GraphicsDevice)device).CurrentViewports;
+        if (vp is { Length: > 0 }) Effect.ViewportSize.SetValue(new Vector2F(vp[0].Width, vp[0].Height));
         device.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
 
         device.VertexType = null;

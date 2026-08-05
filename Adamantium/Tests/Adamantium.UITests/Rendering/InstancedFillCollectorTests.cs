@@ -76,7 +76,7 @@ public class InstancedFillCollectorTests
         var key = KeyOf(units[0]);
 
         foreach (var unit in units)
-            Assert.That(collector.TryAdd(unit, Matrix4x4F.Identity, NoScissor, new Rect(0, 0, 10, 10)), Is.True);
+            Assert.That(collector.TryAdd(unit, Matrix4x4F.Identity, NoScissor, new Rect(0, 0, 10, 10), transformSlot: 0), Is.True);
 
         Assert.Multiple(() =>
         {
@@ -100,8 +100,8 @@ public class InstancedFillCollectorTests
 
         Assert.That(KeyOf(small), Is.Not.EqualTo(KeyOf(large)), "different local geometry must not share a key");
 
-        collector.TryAdd(small, Matrix4x4F.Identity, NoScissor, new Rect(0, 0, 10, 10));
-        collector.TryAdd(large, Matrix4x4F.Identity, NoScissor, new Rect(0, 0, 40, 40));
+        collector.TryAdd(small, Matrix4x4F.Identity, NoScissor, new Rect(0, 0, 10, 10), transformSlot: 0);
+        collector.TryAdd(large, Matrix4x4F.Identity, NoScissor, new Rect(0, 0, 40, 40), transformSlot: 0);
 
         Assert.That(collector.SegmentCount, Is.EqualTo(2));
         Assert.That(collector.InstanceCountOf(KeyOf(small)), Is.EqualTo(1));
@@ -122,8 +122,8 @@ public class InstancedFillCollectorTests
 
         Assert.That(KeyOf(red), Is.EqualTo(KeyOf(blue)), "colour is per-instance - it must not split the mesh");
 
-        collector.TryAdd(red, Matrix4x4F.Identity, NoScissor, new Rect(0, 0, 10, 10));
-        collector.TryAdd(blue, Matrix4x4F.Identity, NoScissor, new Rect(0, 0, 10, 10));
+        collector.TryAdd(red, Matrix4x4F.Identity, NoScissor, new Rect(0, 0, 10, 10), transformSlot: 0);
+        collector.TryAdd(blue, Matrix4x4F.Identity, NoScissor, new Rect(0, 0, 10, 10), transformSlot: 0);
 
         Assert.That(collector.SegmentCount, Is.EqualTo(1));
         Assert.That(collector.InstanceCountOf(KeyOf(red)), Is.EqualTo(2));
@@ -145,7 +145,7 @@ public class InstancedFillCollectorTests
         {
             Assert.That(collector.CanBatch(solid), Is.True, "a solid arbitrary-geometry fill instances");
             Assert.That(collector.CanBatch(gradient), Is.False, "a gradient fill does NOT join the solid batch");
-            Assert.That(collector.TryAdd(gradient, Matrix4x4F.Identity, NoScissor, new Rect(0, 0, 10, 10)), Is.False,
+            Assert.That(collector.TryAdd(gradient, Matrix4x4F.Identity, NoScissor, new Rect(0, 0, 10, 10), transformSlot: 0), Is.False,
                 "a rejected fill must report false so the caller draws it per-unit");
         });
 
@@ -163,7 +163,7 @@ public class InstancedFillCollectorTests
 
         Assert.That(collector.OverlapsPending(new Rect(0, 0, 10, 10)), Is.False, "nothing collected yet -> nothing to paint over");
 
-        collector.TryAdd(unit, Matrix4x4F.Identity, NoScissor, new Rect(10, 10, 20, 20));
+        collector.TryAdd(unit, Matrix4x4F.Identity, NoScissor, new Rect(10, 10, 20, 20), transformSlot: 0);
 
         Assert.Multiple(() =>
         {
@@ -187,7 +187,7 @@ public class InstancedFillCollectorTests
 
         var acceptedFirstFrame = 0;
         foreach (var unit in units)
-            if (collector.TryAdd(unit, Matrix4x4F.Identity, NoScissor, new Rect(0, 0, 10, 10))) acceptedFirstFrame++;
+            if (collector.TryAdd(unit, Matrix4x4F.Identity, NoScissor, new Rect(0, 0, 10, 10), transformSlot: 0)) acceptedFirstFrame++;
 
         var capacityFirstFrame = collector.GpuCapacityOf(key);
         Assert.Multiple(() =>
@@ -203,7 +203,7 @@ public class InstancedFillCollectorTests
 
         var acceptedSecondFrame = 0;
         foreach (var unit in units)
-            if (collector.TryAdd(unit, Matrix4x4F.Identity, NoScissor, new Rect(0, 0, 10, 10))) acceptedSecondFrame++;
+            if (collector.TryAdd(unit, Matrix4x4F.Identity, NoScissor, new Rect(0, 0, 10, 10), transformSlot: 0)) acceptedSecondFrame++;
 
         Assert.Multiple(() =>
         {

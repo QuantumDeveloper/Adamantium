@@ -53,6 +53,11 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
 
     public UIRenderComponent GeometryRenderer { get; set; }
 
+    /// <summary>This unit still draws something PER-UNIT once its fill has been batched - a fringe the instanced path
+    /// doesn't cover, or a stroke. Those bake their transform from <c>RenderData</c> at record time, so a motion node
+    /// carrying such a unit can't move by writing its slot alone (see MarkNodeNotAware).</summary>
+    public bool HasPerUnitOverlay => FillFringeRenderer != null || StrokeRenderer != null;
+
     // --- retained geometry-instancing (IInstanceableFill) -------------------------------------------------------------
     public bool FillInstanced { get; set; }
 
@@ -154,10 +159,15 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
 
     // Analytic AA: build a GPU coverage fringe around a SOLID fill's CLOSED contours, drawn over the body for a soft
     // ~1px edge. Only a solid-colour fill with a real closed contour gets it; otherwise no fringe (no fill AA).
+    /// <summary>True when this unit's fringe is drawn by the INSTANCED path (one shared ring per mesh, drawn with the
+    /// body's instance buffer), so building a per-unit one would draw it twice. See InstancedFillCollector.</summary>
+    protected virtual bool FringeInstanced => false;
+
     protected void ProcessFillFringe(Geometry geometry, Brush brush)
     {
         FillFringeRenderer?.DeferDispose();
         FillFringeRenderer = null;
+        if (FringeInstanced) return;
         // A solid/gradient/pattern/noise fill gets an analytic-AA fringe (the ring is coloured by the gradient, or a flat
         // representative colour for a procedural pattern/noise - so a tessellated procedural shape no longer has aliased
         // edges). Image/null fills still don't.
@@ -192,6 +202,14 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
     // tessellates on demand). No-op when nothing relevant changed.
     protected void UpdateFillFringe(Geometry geometry, Brush brush, bool rebuild, bool brushChanged)
     {
+        if (FringeInstanced)
+        {
+            // The fill just became instance-drawn (e.g. a gradient turned solid): drop the per-unit fringe so the shared
+            // ring isn't doubled by it.
+            FillFringeRenderer?.DeferDispose();
+            FillFringeRenderer = null;
+            return;
+        }
         if (rebuild)
         {
             // Same-topology resize -> rewrite the fringe contours in place (no new component / allocation); otherwise
@@ -261,17 +279,12 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
         StrokeRenderer?.PreRender();
     }
 
-    /// <summary>TEMPORARY A/B switch: draw the analytic-AA fringe or not. The fringe is a PER-UNIT draw, so an instanced
-    /// batch of N identical shapes still costs N of these on top of its one instanced call - turning it off measures
-    /// exactly what that costs. Edges go jagged while it is off; this is a measurement aid, not a feature.</summary>
-    public static bool DrawFringe = Environment.GetEnvironmentVariable("ADAMANTIUM_NO_FRINGE") != "1";
-
     public virtual void Render()
     {
         // Body first, then its analytic-AA fringe on top of the edge, then the stroke over the fill. The body is SKIPPED
         // when it went to the retained instanced renderer (FillInstanced) - its fringe/stroke still draw over the instance.
         if (!FillInstanced) GeometryRenderer?.Render();
-        if (DrawFringe) FillFringeRenderer?.Render();
+        FillFringeRenderer?.Render();
         StrokeRenderer?.Render();
     }
 
@@ -308,6 +321,11 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
     // fill (or a mesh with no vertices) falls back to the per-unit body. The instanced applier reads the FROZEN mesh
     // snapshot (captured at record after ProcessGeometry), never the live Geometry.Mesh - so it is render-thread safe.
     private FrozenMesh _frozenMesh;
+
+    // A solid fill on a mesh with a ring is drawn - body AND fringe - by the instanced path, so this unit builds no
+    // per-unit fringe at all. Everything else (gradient/pattern/image fills, a mesh with no closed boundary) still does.
+    protected override bool FringeInstanced =>
+        InstancedFillCollector.Enabled && Payload.Brush is SolidColorBrush && _frozenMesh is { Ring.Length: > 0 };
 
     public override bool TryGetInstancedFill(out GeometryKey key, out object mesh, out Vector4F color)
     {

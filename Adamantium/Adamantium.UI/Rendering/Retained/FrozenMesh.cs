@@ -5,6 +5,7 @@ using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Graphics.Core.Models;
 using Adamantium.Graphics.Core.Vertices;
 using Adamantium.UI.Core;
+using Adamantium.UI.Rendering.RenderUnits;
 
 namespace Adamantium.UI.Rendering.Retained;
 
@@ -22,13 +23,20 @@ internal sealed class FrozenMesh
     public GeometryKey Key { get; }
     public bool HasPoints => Vertices.Length > 0;
 
-    private FrozenMesh(UIVertex[] vertices, int[] indices, PrimitiveType topology, Rect bounds, GeometryKey key)
+    /// <summary>The analytic-AA ring for this mesh: the same triangles every instance of it needs, so the collector
+    /// uploads ONE of them per key and draws it instanced instead of one fringe draw per element. Empty when the mesh
+    /// has no closed boundary to feather.</summary>
+    public FringeVertex[] Ring { get; }
+
+    private FrozenMesh(UIVertex[] vertices, int[] indices, PrimitiveType topology, Rect bounds, GeometryKey key,
+        FringeVertex[] ring)
     {
         Vertices = vertices;
         Indices = indices;
         Topology = topology;
         Bounds = bounds;
         Key = key;
+        Ring = ring;
     }
 
     /// <summary>Snapshot a live tessellated mesh (call AFTER ProcessGeometry). Null if it has no drawable vertices.
@@ -39,8 +47,12 @@ internal sealed class FrozenMesh
         var vertices = mesh.ToUIVertices();
         if (vertices.Length == 0) return null;
         var indices = mesh.Indices is { Length: > 0 } ix ? (int[])ix.Clone() : [];
+        // The fringe ring is frozen with the mesh for the same reason the vertices are: it is built from the RESOLVED
+        // fill boundary of THIS tessellation, and a later re-tessellation overwrites the live mesh in place.
+        var loops = FillBoundary.ExtractLoops(mesh);
+        var ring = loops != null ? FringeGeometry.BuildRing(FringeGeometry.Build(loops)) : [];
         return new FrozenMesh(vertices, indices, mesh.MeshTopology, bounds,
-            GeometryKey.ArbitraryMesh(Fingerprint(vertices, indices)));
+            GeometryKey.ArbitraryMesh(Fingerprint(vertices, indices)), ring);
     }
 
     // Stable content hash of the LOCAL mesh (vertex bytes + indices): identical tessellations share a key/segment, and ANY
