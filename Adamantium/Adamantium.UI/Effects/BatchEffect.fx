@@ -425,15 +425,11 @@ struct FringePSInput
     float  Coverage : TEXCOORD0;
 };
 
-[shader("vertex")]
-FringePSInput InstancedFringeVS(FringeVertex v, uint instanceId : SV_InstanceID)
+// The ring's vertex, expanded. Shared by every fringe pass (solid / pattern / gradient): they differ only in WHICH
+// record supplies the matrix and the colour, and the expansion itself must stay one definition - it is the thing that
+// makes the ring exactly one device pixel wide. `coverage` comes out 1 on the contour and 0 on the outer edge.
+float4 ExpandFringe(FringeVertex v, float4x4 m, out float coverage)
 {
-    GeometryInstance* instances = (GeometryInstance*)InstancesAddress;
-    GeometryInstance inst = instances[instanceId];
-    float4x4* transforms = (float4x4*)TransformsAddress;
-    float4x4 world = mul(inst.Local, transforms[(uint)inst.Params.x]);
-    float4x4 m = mul(world, Projection);
-
     float4 clip = mul(float4(v.Position, 0.0, 1.0), m);
     float outer = dot(v.Dir0, v.Dir0) + dot(v.Dir1, v.Dir1);
     if (outer > 0.0)
@@ -453,11 +449,23 @@ FringePSInput InstancedFringeVS(FringeVertex v, uint instanceId : SV_InstanceID)
         float denom = max(dot(miter, n0), 0.25);                   // clamp the corner spike to <= 4x
         clip.xy += miter * (FringePixels / denom) / halfVp * w;
     }
+    coverage = outer > 0.0 ? 0.0 : 1.0;
+    return clip;
+}
+
+[shader("vertex")]
+FringePSInput InstancedFringeVS(FringeVertex v, uint instanceId : SV_InstanceID)
+{
+    GeometryInstance* instances = (GeometryInstance*)InstancesAddress;
+    GeometryInstance inst = instances[instanceId];
+    float4x4* transforms = (float4x4*)TransformsAddress;
+    float4x4 m = mul(mul(inst.Local, transforms[(uint)inst.Params.x]), Projection);
 
     FringePSInput o;
-    o.Position = clip;
+    float coverage;
+    o.Position = ExpandFringe(v, m, coverage);
     o.Color = inst.Color;
-    o.Coverage = outer > 0.0 ? 0.0 : 1.0;
+    o.Coverage = coverage;
     return o;
 }
 
@@ -887,12 +895,10 @@ GradFillPSInput GradientFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
     return o;
 }
 
-[shader("fragment")]
-float4 GradientFillPS(GradFillPSInput input) : SV_Target
+// The gradient colour at a LOCAL mesh position, for instanced geometry. The fill and its analytic-AA fringe both call
+// this, so the ring is coloured by exactly the same gradient as the body it feathers.
+float4 GradGeomColor(GradGeomData it, float2 local)
 {
-    GradGeomData* items = (GradGeomData*)InstancesAddress;
-    GradGeomData it = items[input.InstId];
-
     // Reconstruct a GradientRectData for the shared GradParam/GradColor (Bounds/stroke fields unused by the fill eval).
     GradientRectData gd;
     gd.Bounds = float4(0.0, 0.0, 0.0, 0.0);
@@ -905,9 +911,53 @@ float4 GradientFillPS(GradFillPSInput input) : SV_Target
     gd.Stop4 = it.Stop4; gd.Stop5 = it.Stop5; gd.Stop6 = it.Stop6; gd.Stop7 = it.Stop7;
     gd.Offsets0 = it.Offsets0; gd.Offsets1 = it.Offsets1;
 
-    float2 uv = (input.Local - it.LocalBounds.xy) / max(it.LocalBounds.zw, float2(1e-4, 1e-4));
+    float2 uv = (local - it.LocalBounds.xy) / max(it.LocalBounds.zw, float2(1e-4, 1e-4));
     float gt = GradSpread(GradParam(gd, uv), int(gd.Params.w));
     return GradColor(gd, gt, min(fwidth(gt), fwidth(frac(gt + 0.5))), int(it.Params.w));   // wrap-aware AA (conic/repeat seam)
+}
+
+[shader("fragment")]
+float4 GradientFillPS(GradFillPSInput input) : SV_Target
+{
+    GradGeomData* items = (GradGeomData*)InstancesAddress;
+    return GradGeomColor(items[input.InstId], input.Local);
+}
+
+// The analytic-AA fringe of those gradient instances: same shared ring, same instance buffer, one draw. Unlike the
+// solid and pattern fringes it needs its own PS - the ring's colour varies per fragment, so it cannot be resolved in
+// the vertex stage and handed over as one colour.
+struct GradFringePSInput
+{
+    float4 Position : SV_Position;
+    float2 Local    : TEXCOORD0;   // LOCAL mesh position -> the gradient uv
+    float  Coverage : TEXCOORD1;
+    nointerpolation uint InstId : TEXCOORD2;
+};
+
+[shader("vertex")]
+GradFringePSInput InstancedGradientFringeVS(FringeVertex v, uint instanceId : SV_InstanceID)
+{
+    GradGeomData* items = (GradGeomData*)InstancesAddress;
+    GradGeomData it = items[instanceId];
+    float4x4* transforms = (float4x4*)TransformsAddress;
+    float4x4 m = mul(mul(it.Local, transforms[(uint)it.Geom1.w]), Projection);
+
+    GradFringePSInput o;
+    float coverage;
+    o.Position = ExpandFringe(v, m, coverage);
+    o.Local = v.Position;
+    o.Coverage = coverage;
+    o.InstId = instanceId;
+    return o;
+}
+
+[shader("fragment")]
+float4 InstancedGradientFringePS(GradFringePSInput input) : SV_Target
+{
+    GradGeomData* items = (GradGeomData*)InstancesAddress;
+    float4 c = GradGeomColor(items[input.InstId], input.Local);
+    c.a *= saturate(input.Coverage);   // 1 at the contour -> 0 at the outer edge
+    return c;
 }
 
 // ---- Pattern batch: the SAME SDF rounded-rect (self-AA shape + the shared stroke), but the FILL is a PROCEDURAL two-colour
@@ -1456,6 +1506,26 @@ PatFillPSInput PatternFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
     return o;
 }
 
+// The analytic-AA fringe of those pattern/noise instances: the SAME shared ring and the SAME instance buffer as the
+// body, so N elements cost one draw instead of N. The ring is one pixel wide, so it does not evaluate the pattern -
+// it takes the brush's LOW colour, exactly as the per-unit fringe did (a procedural field is mostly its background,
+// so an edge blends into Color1 rather than ringing a bright midpoint). Reuses InstancedFringePS.
+[shader("vertex")]
+FringePSInput InstancedPatternFringeVS(FringeVertex v, uint instanceId : SV_InstanceID)
+{
+    PatGeomData* items = (PatGeomData*)InstancesAddress;
+    PatGeomData it = items[instanceId];
+    float4x4* transforms = (float4x4*)TransformsAddress;
+    float4x4 m = mul(mul(it.Local, transforms[(uint)it.Params.w]), Projection);
+
+    FringePSInput o;
+    float coverage;
+    o.Position = ExpandFringe(v, m, coverage);
+    o.Color = it.Color1;
+    o.Coverage = coverage;
+    return o;
+}
+
 [shader("fragment")]
 float4 PatternFillPS(PatFillPSInput input) : SV_Target
 {
@@ -1781,6 +1851,24 @@ technique Batch
         Profile = 6.6;
         VertexShader = InstancedFringeVS;
         PixelShader = InstancedFringePS;
+    }
+
+    // The same, for PATTERN/NOISE instances - the ring is coloured by the brush's low colour (see the VS).
+    pass PatternFringe
+    {
+        EffectName = "BatchEffect";
+        Profile = 6.6;
+        VertexShader = InstancedPatternFringeVS;
+        PixelShader = InstancedFringePS;
+    }
+
+    // The same, for GRADIENT instances - the ring is coloured by the gradient per fragment, so it has its own PS.
+    pass GradientFringe
+    {
+        EffectName = "BatchEffect";
+        Profile = 6.6;
+        VertexShader = InstancedGradientFringeVS;
+        PixelShader = InstancedGradientFringePS;
     }
 
     // General geometry instancing with a LINEAR/RADIAL GRADIENT fill (per-instance GradientGeometryInstance; gradient

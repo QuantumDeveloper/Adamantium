@@ -550,6 +550,38 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             _device.SetScissors(fullScissor);
         }
 
+        // The gradient instances' fringe: shared ring, same instance buffer, coloured by the gradient per fragment.
+        if (rec.GradKeys.Count > 0 && AnalyticAa.Enabled)
+        {
+            SetupFringeState(projection);
+            _device.SetScissors(rec.Scissor);
+            foreach (var (seg, first, count) in rec.GradKeys)
+            {
+                if (seg.RingBuffer == null) continue;
+                _effect.InstancesAddress.SetValue(seg.GradGpu.GetDeviceAddress() + (ulong)(first * GradInstanceStride));
+                _device.SetVertexBuffer(seg.RingBuffer);
+                _effect.BatchGradientFringePass.Apply();
+                _device.Draw(seg.RingVertexCount, count);
+            }
+            _device.SetScissors(fullScissor);
+        }
+
+        // The pattern/noise instances' fringe, same shape as the solid one above: shared ring, same instance buffer.
+        if (rec.PatKeys.Count > 0 && AnalyticAa.Enabled)
+        {
+            SetupFringeState(projection);
+            _device.SetScissors(rec.Scissor);
+            foreach (var (seg, first, count) in rec.PatKeys)
+            {
+                if (seg.RingBuffer == null) continue;
+                _effect.InstancesAddress.SetValue(seg.PatGpu.GetDeviceAddress() + (ulong)(first * PatInstanceStride));
+                _device.SetVertexBuffer(seg.RingBuffer);
+                _effect.BatchPatternFringePass.Apply();
+                _device.Draw(seg.RingVertexCount, count);
+            }
+            _device.SetScissors(fullScissor);
+        }
+
         // Deferred fringe/stroke of the collected units, drawn OVER their now-flushed fills, in the same clip. The unit's
         // Render() skips its fill body (FillInstanced) and draws only the analytic-AA fringe + stroke.
         if (rec.Units.Count > 0)

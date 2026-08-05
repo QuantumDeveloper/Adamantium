@@ -322,10 +322,12 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
     // snapshot (captured at record after ProcessGeometry), never the live Geometry.Mesh - so it is render-thread safe.
     private FrozenMesh _frozenMesh;
 
-    // A solid fill on a mesh with a ring is drawn - body AND fringe - by the instanced path, so this unit builds no
-    // per-unit fringe at all. Everything else (gradient/pattern/image fills, a mesh with no closed boundary) still does.
+    // A fill the instanced path draws BODY AND FRINGE for builds no per-unit fringe at all: every brush that has an
+    // instanced fringe pass, on a mesh that has a ring. What is left per-unit is a mesh with no closed boundary, or a
+    // fill kind with no instanced pass at all (an image fill).
     protected override bool FringeInstanced =>
-        InstancedFillCollector.Enabled && Payload.Brush is SolidColorBrush && _frozenMesh is { Ring.Length: > 0 };
+        InstancedFillCollector.Enabled && _frozenMesh is { Ring.Length: > 0 } &&
+        Payload.Brush is SolidColorBrush or GradientBrush or PatternBrush or NoiseBrush;
 
     public override bool TryGetInstancedFill(out GeometryKey key, out object mesh, out Vector4F color)
     {
