@@ -37,6 +37,7 @@ public partial class GalleryViewModel
         new ZoomBoxViewModel(),
         new TilesViewModel(),
         new InstancingViewModel(),
+        new TransformsViewModel(),
         new GameViewModel(),
     };
 
