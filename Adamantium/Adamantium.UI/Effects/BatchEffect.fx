@@ -348,8 +348,9 @@ float4 RectBatchPS(PSInput input) : SV_Target
 // move/resize/recolour is a patch of one record - no per-frame re-record. Matches Retained/GeometryInstance.cs.
 struct GeometryInstance
 {
-    float4x4 World;   // full per-instance world transform (element local -> world). Matches Matrix4x4F World.
+    float4x4 Local;   // element local -> SLOT space. Matches Matrix4x4F Local.
     float4 Color;     // straight-alpha RGBA (element/brush opacity folded into .w by the producer)
+    float4 Params;    // .x = transform-table slot; .yzw spare
 };
 
 // Per-instance data by BUFFER DEVICE ADDRESS (BDA), not a descriptor-heap StructuredBuffer: the SV_InstanceID-indexed
@@ -368,7 +369,10 @@ FillPSInput InstancedFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
 {
     GeometryInstance* instances = (GeometryInstance*)InstancesAddress;
     GeometryInstance inst = instances[instanceId];
-    float4 world = mul(float4(v.position.xyz, 1.0), inst.World);
+    // local -> slot space -> world. The slot matrix lives in the transform table, so a node move rewrites 64 bytes there
+    // and every instance under it follows without this buffer being touched (same scheme as the SDF batches).
+    float4x4* transforms = (float4x4*)TransformsAddress;
+    float4 world = mul(mul(float4(v.position.xyz, 1.0), inst.Local), transforms[(uint)inst.Params.x]);
     FillPSInput o;
     o.Position = mul(world, Projection);
     o.Color = inst.Color;

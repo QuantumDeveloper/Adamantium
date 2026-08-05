@@ -20,20 +20,26 @@ namespace Adamantium.UI.Rendering.Retained;
 [StructLayout(LayoutKind.Sequential)]
 public struct GeometryInstance
 {
-    /// <summary>Full per-instance world transform (element local space -> world). Row-vector convention.</summary>
-    public Matrix4x4F World;
+    /// <summary>Per-instance transform RELATIVE to the transform-table slot in <see cref="Params"/> (element local space
+    /// -> slot space). Row-vector convention. The vertex shader applies the slot matrix on top, so the world is never
+    /// stored here and moving the slot's node does not touch this record.</summary>
+    public Matrix4x4F Local;
 
     /// <summary>Straight-alpha RGBA (opacity already folded into A by the producer).</summary>
     public Vector4F Color;
 
-    public static GeometryInstance FromWorld(Matrix4x4F world, Vector4F color) => new()
+    /// <summary>.x = transform-table slot; .yzw spare.</summary>
+    public Vector4F Params;
+
+    public static GeometryInstance FromLocal(Matrix4x4F local, Vector4F color, int transformSlot) => new()
     {
         // Store the world matrix RAW (row-major, as C# lays out Matrix4x4F). Uniform matrices go through
         // EffectParameter.CopyMatrixColumnMajor (transpose) because cbuffers read column-major, but a matrix in a BDA
         // STORAGE buffer is read row-major by the vertex shader (Slang's default structured layout) - so the raw C#
         // bytes are already the right layout. Transposing here mis-places the translation into the 4th column, so mul()
         // dumps it into .w and every triangle collapses toward clip origin (the diagonal-streak-from-corner artifact).
-        World = world,
-        Color = color
+        Local = local,
+        Color = color,
+        Params = new Vector4F(transformSlot, 0, 0, 0)
     };
 }

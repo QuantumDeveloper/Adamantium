@@ -261,12 +261,17 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
         StrokeRenderer?.PreRender();
     }
 
+    /// <summary>TEMPORARY A/B switch: draw the analytic-AA fringe or not. The fringe is a PER-UNIT draw, so an instanced
+    /// batch of N identical shapes still costs N of these on top of its one instanced call - turning it off measures
+    /// exactly what that costs. Edges go jagged while it is off; this is a measurement aid, not a feature.</summary>
+    public static bool DrawFringe = Environment.GetEnvironmentVariable("ADAMANTIUM_NO_FRINGE") != "1";
+
     public virtual void Render()
     {
         // Body first, then its analytic-AA fringe on top of the edge, then the stroke over the fill. The body is SKIPPED
         // when it went to the retained instanced renderer (FillInstanced) - its fringe/stroke still draw over the instance.
         if (!FillInstanced) GeometryRenderer?.Render();
-        FillFringeRenderer?.Render();
+        if (DrawFringe) FillFringeRenderer?.Render();
         StrokeRenderer?.Render();
     }
 

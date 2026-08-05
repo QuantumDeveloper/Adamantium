@@ -33,6 +33,16 @@ public static class RuntimeStats
     /// drag the presented frame rate down with it (that is the entire point of the split). Sample by delta.</summary>
     public static long PresentedFrames;
 
+    // Transform table (see Rendering/TransformTable). Since nothing is world-baked into an instance any more, EVERY drawn
+    // element resolves a slot each walk - so the load-bearing number is how many of those actually WRITE. A settled scene
+    // should sit at zero writes; a steady non-zero means slots are churning (released and re-acquired), and each write is
+    // its own 64-byte upload. Slot/acquire/release are per-frame; Recreations is cumulative (buffer reallocations).
+    public static int TransformSlots;
+    public static int TransformWrites;
+    public static int TransformAcquires;
+    public static int TransformReleases;
+    public static int TransformRecreations;
+
     /// <summary>Cumulative count of binding target writes - every time a <c>{Binding}</c> pushes a value to its target:
     /// the initial connect, a DataContext re-resolve (e.g. a recycled list container rebinding on scroll), AND a batched
     /// source-property change. Sample by delta to see how many landed this frame (idle ~0; spikes on scroll rebinds and
