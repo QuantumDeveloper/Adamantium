@@ -71,6 +71,22 @@ public class FillFringeRenderTests
     [TestCase(4.0, 200, TestName = "Fringe_IsOutside_AndOnePixelWide_AtScale4")]
     public void Fringe_IsOutside_AndOnePixelWide(double scale, int edge) => AssertOnePixelEdge(RenderSquare(scale), edge);
 
+    // A PATTERN/NOISE fill is feathered by the INSTANCED ring too - the unit builds no per-unit fringe for it any more,
+    // so losing that pass would show up here as a hard edge rather than as a crash.
+    [TestCase(1.0, 50, TestName = "PatternFringe_IsOutside_AndOnePixelWide_AtScale1")]
+    [TestCase(4.0, 200, TestName = "PatternFringe_IsOutside_AndOnePixelWide_AtScale4")]
+    public void PatternFringe_IsOutside_AndOnePixelWide(double scale, int edge)
+    {
+        var brush = new PatternBrush
+        {
+            Pattern = PatternType.Checkerboard,
+            Color1 = Colors.Red,
+            Color2 = Colors.Blue,
+            CellSize = 8
+        };
+        AssertOnePixelEdge(RenderSquare(scale, brush), edge);
+    }
+
     // A GRADIENT fill still feathers per-unit (FillFringeEffect.fx), which offsets the ring in screen pixels the same
     // way - so it has to hold at both scales too, or the two paths have drifted apart.
     [TestCase(1.0, 50, TestName = "GradientFringe_IsOutside_AndOnePixelWide_AtScale1")]
