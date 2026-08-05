@@ -1,4 +1,4 @@
-<View xmlns="http://adamantium/ui"
+﻿<View xmlns="http://adamantium/ui"
       xmlns:x="http://adamantium/ui/xaml/extensions"
       xmlns:m="clr-namespace:Adamantium.UI.Core.Media;assembly=Adamantium.UI.Core">
     <!-- DataContext is the ShapesViewModel. ONE Stroke settings object drives the stroke of EVERY shape in the gallery
@@ -14,29 +14,29 @@
             <Ellipse Width="96" Height="96" Fill="#3B82F6" Margin="10"
                      Stroke="{Binding Stroke.StrokeBrush}" StrokeThickness="{Binding Stroke.StrokeWidth}"
                      StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
-                     StrokeDashOffset="{Binding Stroke.DashOffset}"
-                     StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                     StrokeDashOffset="{Binding Stroke.DashOffset}" StrokeDashFit="{Binding Stroke.DashFit}"
+                     StrokeDashStartCap="{Binding Stroke.DashStartCap}" StrokeDashEndCap="{Binding Stroke.DashEndCap}" StartLineCap="{Binding Stroke.StartCap}" EndLineCap="{Binding Stroke.EndCap}"
                      StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"/>
             <Rectangle Width="120" Height="90" Fill="#22C55E" Margin="10" CornerRadius="{Binding Stroke.CornerRadius}"
                      Stroke="{Binding Stroke.StrokeBrush}" StrokeThickness="{Binding Stroke.StrokeWidth}"
                      StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
-                     StrokeDashOffset="{Binding Stroke.DashOffset}"
-                     StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                     StrokeDashOffset="{Binding Stroke.DashOffset}" StrokeDashFit="{Binding Stroke.DashFit}"
+                     StrokeDashStartCap="{Binding Stroke.DashStartCap}" StrokeDashEndCap="{Binding Stroke.DashEndCap}" StartLineCap="{Binding Stroke.StartCap}" EndLineCap="{Binding Stroke.EndCap}"
                      StrokeLineJoin="{Binding Stroke.Join}"
                      StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"/>
             <Polygon Points="60,0 120,96 0,96" Fill="#F59E0B" Margin="10"
                      Stroke="{Binding Stroke.StrokeBrush}" StrokeThickness="{Binding Stroke.StrokeWidth}"
                      StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
-                     StrokeDashOffset="{Binding Stroke.DashOffset}"
-                     StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                     StrokeDashOffset="{Binding Stroke.DashOffset}" StrokeDashFit="{Binding Stroke.DashFit}"
+                     StrokeDashStartCap="{Binding Stroke.DashStartCap}" StrokeDashEndCap="{Binding Stroke.DashEndCap}" StartLineCap="{Binding Stroke.StartCap}" EndLineCap="{Binding Stroke.EndCap}"
                      StrokeLineJoin="{Binding Stroke.Join}"
                      StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"/>
             <Path Fill="Magenta" Width="200" Height="200" Margin="10"
                   Data="F0 M110,10 L168.78,190.9 L14.89,79.1 L205.11,79.1 L51.22,190.9 Z"
                   Stroke="{Binding Stroke.StrokeBrush}" StrokeThickness="{Binding Stroke.StrokeWidth}"
                   StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
-                  StrokeDashOffset="{Binding Stroke.DashOffset}"
-                  StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                  StrokeDashOffset="{Binding Stroke.DashOffset}" StrokeDashFit="{Binding Stroke.DashFit}"
+                  StrokeDashStartCap="{Binding Stroke.DashStartCap}" StrokeDashEndCap="{Binding Stroke.DashEndCap}" StartLineCap="{Binding Stroke.StartCap}" EndLineCap="{Binding Stroke.EndCap}"
                   StrokeLineJoin="{Binding Stroke.Join}"
                   StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"/>
           <StackPanel Orientation="Vertical" Margin="10">
@@ -46,8 +46,8 @@
                      StartPoint="15,140" ControlPoint1="75,10" ControlPoint2="165,150" EndPoint="225,20"
                      Stroke="{Binding Stroke.StrokeBrush}" StrokeThickness="{Binding Stroke.StrokeWidth}"
                      StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
-                     StrokeDashOffset="{Binding Stroke.DashOffset}"
-                     StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                     StrokeDashOffset="{Binding Stroke.DashOffset}" StrokeDashFit="{Binding Stroke.DashFit}"
+                     StrokeDashStartCap="{Binding Stroke.DashStartCap}" StrokeDashEndCap="{Binding Stroke.DashEndCap}" StartLineCap="{Binding Stroke.StartCap}" EndLineCap="{Binding Stroke.EndCap}"
                      StrokeLineJoin="{Binding Stroke.Join}"
                      StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"/>
           </StackPanel>
@@ -64,10 +64,10 @@
                                   StrokeThickness="{Binding Stroke.StrokeWidth}"
                      StrokeDashSymbols="{Binding Stroke.DashSymbols}" 
                                   StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
-                     StrokeDashOffset="{Binding Stroke.DashOffset}"
-                     StrokeDashCap="{Binding Stroke.Cap}" 
-                                  StartLineCap="{Binding Stroke.Cap}" 
-                                  EndLineCap="{Binding Stroke.Cap}"
+                     StrokeDashOffset="{Binding Stroke.DashOffset}" StrokeDashFit="{Binding Stroke.DashFit}"
+                     StrokeDashStartCap="{Binding Stroke.DashStartCap}" StrokeDashEndCap="{Binding Stroke.DashEndCap}" 
+                                  StartLineCap="{Binding Stroke.StartCap}" 
+                                  EndLineCap="{Binding Stroke.EndCap}"
                      StrokeLineJoin="{Binding Stroke.Join}"
                      StrokeTrimStart="{Binding Stroke.TrimStart}"
                                   StrokeTrimEnd="{Binding Stroke.TrimEnd}"/>
@@ -82,8 +82,8 @@
                      Points="10,140 60,20 130,20 180,140 250,140 290,30"
                      Stroke="{Binding Stroke.StrokeBrush}" StrokeThickness="{Binding Stroke.StrokeWidth}"
                      StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
-                     StrokeDashOffset="{Binding Stroke.DashOffset}"
-                     StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                     StrokeDashOffset="{Binding Stroke.DashOffset}" StrokeDashFit="{Binding Stroke.DashFit}"
+                     StrokeDashStartCap="{Binding Stroke.DashStartCap}" StrokeDashEndCap="{Binding Stroke.DashEndCap}" StartLineCap="{Binding Stroke.StartCap}" EndLineCap="{Binding Stroke.EndCap}"
                      StrokeLineJoin="{Binding Stroke.Join}"
                      StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"/>
           </StackPanel>
@@ -99,10 +99,10 @@
                      StrokeThickness="{Binding Stroke.StrokeWidth}"
                      StrokeDashSymbols="{Binding Stroke.DashSymbols}" 
                      StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
-                     StrokeDashOffset="{Binding Stroke.DashOffset}"
-                     StrokeDashCap="{Binding Stroke.Cap}" 
-                     StartLineCap="{Binding Stroke.Cap}" 
-                     EndLineCap="{Binding Stroke.Cap}"
+                     StrokeDashOffset="{Binding Stroke.DashOffset}" StrokeDashFit="{Binding Stroke.DashFit}"
+                     StrokeDashStartCap="{Binding Stroke.DashStartCap}" StrokeDashEndCap="{Binding Stroke.DashEndCap}" 
+                     StartLineCap="{Binding Stroke.StartCap}" 
+                     EndLineCap="{Binding Stroke.EndCap}"
                      StrokeLineJoin="{Binding Stroke.Join}"
                      StrokeTrimStart="{Binding Stroke.TrimStart}"
                      StrokeTrimEnd="{Binding Stroke.TrimEnd}"/>
@@ -157,13 +157,36 @@
                         <Slider Width="130" Minimum="0" Maximum="50" Value="{Binding Stroke.Samples, Mode=TwoWay}"/>
                         <TextBlock Text="{Binding Stroke.Samples}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
                     </StackPanel>
+                    <!-- Four caps, kept apart on purpose. Start/End are the ends of the WHOLE stroke; the two dash caps
+                         are the two ends of every dash. Bound to one setting they were indistinguishable, which is
+                         precisely why the way they interact at the first and last dash went unexamined. Setting the two
+                         dash caps DIFFERENTLY (concave behind, convex tip in front) turns each dash into an arrowhead. -->
                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
-                        <TextBlock Text="Cap" Width="80" VerticalAlignment="Center"/>
-                        <DropDown Width="176" EnumType="{x:Type m:PenLineCap}" SelectedItem="{Binding Stroke.Cap, Mode=TwoWay}"/>
+                        <TextBlock Text="Dash start" Width="80" VerticalAlignment="Center"/>
+                        <DropDown Width="176" EnumType="{x:Type m:PenLineCap}" SelectedItem="{Binding Stroke.DashStartCap, Mode=TwoWay}"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Dash end" Width="80" VerticalAlignment="Center"/>
+                        <DropDown Width="176" EnumType="{x:Type m:PenLineCap}" SelectedItem="{Binding Stroke.DashEndCap, Mode=TwoWay}"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Start cap" Width="80" VerticalAlignment="Center"/>
+                        <DropDown Width="176" EnumType="{x:Type m:PenLineCap}" SelectedItem="{Binding Stroke.StartCap, Mode=TwoWay}"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="End cap" Width="80" VerticalAlignment="Center"/>
+                        <DropDown Width="176" EnumType="{x:Type m:PenLineCap}" SelectedItem="{Binding Stroke.EndCap, Mode=TwoWay}"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                         <TextBlock Text="Join" Width="80" VerticalAlignment="Center"/>
                         <DropDown Width="176" EnumType="{x:Type m:PenLineJoin}" SelectedItem="{Binding Stroke.Join, Mode=TwoWay}"/>
+                    </StackPanel>
+                    <!-- A closed contour's perimeter almost never divides by the dash period, and the remainder lands
+                         at the seam (for a rounded rect, its bottom-right corner - where the arc length starts). This
+                         stretches the pattern to a whole number of periods so the ring closes on itself. -->
+                    <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
+                        <TextBlock Text="Dash fit" Width="80" VerticalAlignment="Center"/>
+                        <ToggleSwitch IsChecked="{Binding Stroke.DashFit, Mode=TwoWay}" VerticalAlignment="Center"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                         <TextBlock Text="Color" Width="80" VerticalAlignment="Center"/>
@@ -180,16 +203,16 @@
                            CornerRadius="{Binding Stroke.CornerRadius}"
                            StrokeThickness="{Binding Stroke.StrokeWidth}"
                            StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
-                           StrokeDashOffset="{Binding Stroke.DashOffset}"
-                           StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                           StrokeDashOffset="{Binding Stroke.DashOffset}" StrokeDashFit="{Binding Stroke.DashFit}"
+                           StrokeDashStartCap="{Binding Stroke.DashStartCap}" StrokeDashEndCap="{Binding Stroke.DashEndCap}" StartLineCap="{Binding Stroke.StartCap}" EndLineCap="{Binding Stroke.EndCap}"
                            StrokeLineJoin="{Binding Stroke.Join}"
                            StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"
                            HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,24,0"/>
                 <Ellipse Width="160" Height="120" Fill="#1E293B" Stroke="{Binding Stroke.StrokeBrush}"
                          StrokeThickness="{Binding Stroke.StrokeWidth}"
                          StrokeDashSymbols="{Binding Stroke.DashSymbols}" StrokeDashGlyphs="{Binding Stroke.DashGlyphs}"
-                         StrokeDashOffset="{Binding Stroke.DashOffset}"
-                         StrokeDashCap="{Binding Stroke.Cap}" StartLineCap="{Binding Stroke.Cap}" EndLineCap="{Binding Stroke.Cap}"
+                         StrokeDashOffset="{Binding Stroke.DashOffset}" StrokeDashFit="{Binding Stroke.DashFit}"
+                         StrokeDashStartCap="{Binding Stroke.DashStartCap}" StrokeDashEndCap="{Binding Stroke.DashEndCap}" StartLineCap="{Binding Stroke.StartCap}" EndLineCap="{Binding Stroke.EndCap}"
                          StrokeTrimStart="{Binding Stroke.TrimStart}" StrokeTrimEnd="{Binding Stroke.TrimEnd}"
                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </StackPanel>
@@ -229,7 +252,7 @@
         <Line X1="0" Y1="0" X2="360" Y2="0"
               Stroke="Lime" StrokeThickness="10"
               StrokeDashArray="36 25"
-              StartLineCap="ConvexRound" EndLineCap="ConvexRound" StrokeDashCap="ConvexRound"
+              StartLineCap="ConvexRound" EndLineCap="ConvexRound" StrokeDashStartCap="ConvexRound" StrokeDashEndCap="ConvexRound"
               HorizontalAlignment="Left">
             <Line.Triggers>
                 <PropertyTrigger Property="IsMouseOver" Value="true">

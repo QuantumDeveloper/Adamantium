@@ -235,9 +235,14 @@ public abstract class Shape : InputUIComponent
       AdamantiumProperty.Register(nameof(StrokeDashGlyphs), typeof(String), typeof(Shape),
          new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
 
-   // Cap on each dash/dot piece's ends (the contour's real ends use Start/EndLineCap). Round -> round dots.
-   public static readonly AdamantiumProperty StrokeDashCapProperty =
-      AdamantiumProperty.Register(nameof(StrokeDashCap), typeof(PenLineCap), typeof(Shape),
+   // Cap on each dash/dot piece's two ends (the contour's real ends use Start/EndLineCap). Round -> round dots. The two
+   // ends are separate properties, so a dash can be asymmetric - concave behind, convex tip in front = an arrowhead.
+   public static readonly AdamantiumProperty StrokeDashStartCapProperty =
+      AdamantiumProperty.Register(nameof(StrokeDashStartCap), typeof(PenLineCap), typeof(Shape),
+         new PropertyMetadata(PenLineCap.ConvexRound, PropertyMetadataOptions.AffectsRender));
+
+   public static readonly AdamantiumProperty StrokeDashEndCapProperty =
+      AdamantiumProperty.Register(nameof(StrokeDashEndCap), typeof(PenLineCap), typeof(Shape),
          new PropertyMetadata(PenLineCap.ConvexRound, PropertyMetadataOptions.AffectsRender));
 
    // Stretch the dash pattern so a CLOSED contour holds a whole number of periods. Off by default: a dashed border is
@@ -332,10 +337,16 @@ public abstract class Shape : InputUIComponent
       set => SetValue(StrokeDashGlyphsProperty, value);
    }
 
-   public PenLineCap StrokeDashCap
+   public PenLineCap StrokeDashStartCap
    {
-      get => GetValue<PenLineCap>(StrokeDashCapProperty);
-      set => SetValue(StrokeDashCapProperty, value);
+      get => GetValue<PenLineCap>(StrokeDashStartCapProperty);
+      set => SetValue(StrokeDashStartCapProperty, value);
+   }
+
+   public PenLineCap StrokeDashEndCap
+   {
+      get => GetValue<PenLineCap>(StrokeDashEndCapProperty);
+      set => SetValue(StrokeDashEndCapProperty, value);
    }
 
    /// <summary>See <see cref="StrokeDashFitProperty"/>.</summary>
@@ -380,7 +391,8 @@ public abstract class Shape : InputUIComponent
          StrokeLineJoin,
          StrokeTrimStart,
          StrokeTrimEnd,
-         StrokeDashCap,
+         StrokeDashStartCap,
+         StrokeDashEndCap,
          StrokeDashFit,
          StrokeDashPhase);
    }

@@ -49,7 +49,25 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
         if (pen == null) return true;
         if (pen.Brush is not SolidColorBrush) return false;
         var dash = pen.DashStrokeArray;
-        return dash is not { Count: > 0 } || dash.Count == 2;
+        if (dash is not { Count: > 0 }) return true;
+        if (dash.Count != 2) return false;
+
+        // The analytic mask asks "is the arc length of the NEAREST contour point inside a dash". `d` is continuous, but
+        // that arc length is NOT: at a corner the nearest point jumps from one edge to the other across the bisector,
+        // and the arc jumps with it by up to a whole thickness. A mask is a function of that arc, so it inherits the
+        // jump - as a dash boundary crossed for no reason, which is a phantom dash END, which draws a CAP across the
+        // ribbon in the middle of a corner. Every artifact we chased there (seam, hole, phantom scrap, transverse
+        // bite) is that one discontinuity. It is not a tuning problem: the honest question is a DISTANCE to the dashed
+        // path, which no single sample of the arc can answer.
+        // So the batch declines what it cannot represent, and the compute expander (which builds the dash pieces as
+        // real geometry, with cap frames and joins) takes it.
+        // The bound is deliberately NOT "the corner is as round as the stroke is thick", even though that is where the
+        // model actually stops being exact: two different renderers cannot agree pixel for pixel, so wherever the
+        // switch sits it SHOWS - and a threshold in the middle of the useful range flips the whole picture on a hair of
+        // thickness (7.7 vs 8.0 at corner 4 was exactly that). It sits instead where the difference is smaller than a
+        // pixel: a stroke thin enough that no cap or corner detail resolves. That is also the case batching exists for
+        // - a whole virtualized grid of one-pixel dashed borders, drawn without a GPU buffer per tile.
+        return pen.Thickness * 0.5 <= 1.5;
     }
 
     // Bake a pen into the instance's stroke fields (shared by the rect + ellipse batches). Colour with opacity folded;
@@ -87,10 +105,12 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
             dashOn = (float)(d[0] * fit * sx);
             dashGap = (float)(d[1] * fit * sx);
         }
-        // Packed for the shader: caps base-8 (codes below) - DashCap for dash-piece ends, Start/EndLineCap for the
-        // contour's real ends (only exist when trimmed); the JOIN (0 miter, 1 bevel, 2 round) in the 512s place.
-        var capFlags = CapCode(pen.DashCap) + 8f * CapCode(pen.StartLineCap) + 64f * CapCode(pen.EndLineCap)
-                     + 512f * JoinCode(pen.PenLineJoin);
+        // Packed for the shader: four caps base-8 (codes below) - the two DASH caps (a dash's own two ends, separate so
+        // it can be asymmetric), then Start/EndLineCap for the contour's real ends (which only exist when trimmed);
+        // the JOIN (0 miter, 1 bevel, 2 round) sits above them all.
+        var capFlags = CapCode(pen.DashStartCap) + 8f * CapCode(pen.DashEndCap)
+                     + 64f * CapCode(pen.StartLineCap) + 512f * CapCode(pen.EndLineCap)
+                     + 4096f * JoinCode(pen.PenLineJoin);
         stroke0 = new Vector4F((float)(pen.Thickness * sx), 0f, dashOn, dashGap);
         // DashPhase is in PERIODS - so an animation runs 0 -> 1 and lands back on itself whatever the array says - and
         // becomes pixels here, alongside the pixel offset. Both take the fit, or a ring seamless in shape would still

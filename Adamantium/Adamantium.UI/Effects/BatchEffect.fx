@@ -56,8 +56,8 @@ float4 CompositeFillStroke(float d, float4 fill, float4 stroke, float width, flo
 
 // Cap "reach" along the contour, at a fragment whose PERPENDICULAR distance from the stroke centreline is dPerp: how far
 // past a piece end the stroke still paints (SIGNED - negative reach cuts the end INWARD, giving the concave caps). All six
-// PenLineCaps analytically, no cap geometry, matching the geometry stroker's codes (EmitCapTris): 0 flat, 1 square,
-// 2 convex round, 3 convex triangle, 4 concave triangle, 5 concave round. Convex/concave forms are mirror images (+/-).
+// PenLineCaps analytically, no cap geometry, matching the geometry stroker's codes (StrokeEffect.fx CapSd): 0 flat,
+// 1 square, 2 convex round, 3 convex triangle, 4 concave triangle, 5 concave round. Convex/concave are mirrors (+/-).
 float CapReach(int cap, float dPerp, float halfW)
 {
     if (cap == 1) return halfW;                                            // square: rectangular nub
@@ -68,36 +68,75 @@ float CapReach(int cap, float dPerp, float halfW)
     return 0.0;                                                            // flat: hard cut
 }
 
+// Physical px -> units of centreline arc length at a fragment `dPerp` across the stroke, on a contour whose radius of
+// curvature there is `curvRadius` (1e9 on a straight edge -> 1.0).
+// The fragment's own radius is curvRadius + dPerp, and the correction only means anything while that is a real radius:
+// on the inner side of a bend tighter than the stroke is thick it passes through the centre of curvature and the
+// arc-length field folds over itself. There, correct NOTHING - a big ratio there does not deepen a cap correctly, it
+// just eats pixel-sized holes out of the stroke.
+// Only the OUTER side of a bend is corrected (`max(dPerp, 0)`), which is also the only side that needs it: there one
+// unit of arc covers more pixels, so a cap's reach in arc units must shrink. The inner side is left alone - a bend
+// tighter than the stroke is thick sends the fragment's own radius through zero there, and amplifying by that ratio
+// deepened a concave bite past the whole corner and ate a hole out of it. Written so the ratio cannot exceed 1 by
+// construction: an explicit upper clamp of 1.0 was enough to make the driver's NVVM AV in vkCreateShadersEXT, as was a
+// single ternary. Nothing in here may branch.
+float ArcCapScale(float curvRadius, float dPerp)
+{
+    return curvRadius / max(curvRadius + max(dPerp, 0.0), 0.5);
+}
+
 // Dash + trim coverage (0..1) at arc-length `s` (device px) along a contour of length `perimeter`. Makes dashes/trim
-// ANALYTIC (per-fragment, no cut geometry) so a dashed/trimmed stroke still BATCHES. dashOn<=0 = solid. Piece/trim ends
-// are shaped by their caps (packed base-8 into capFlags: dash + 8*start + 64*end; 0 flat, 1 square, 2 round). dPerp =
-// signed perpendicular distance from the stroke centreline; halfW = half the stroke width. ~1px AA everywhere.
+// ANALYTIC (per-fragment, no cut geometry) so a dashed/trimmed stroke still BATCHES. dashOn<=0 = solid. Piece ends are
+// shaped by their caps (packed base-8 into capFlags: dashStart + 8*dashEnd + 64*start + 512*end). dPerp = signed
+// perpendicular distance from the stroke centreline; halfW = half the stroke width. ~1px AA everywhere.
 // sTrim cuts the trim window; sDash phases the dashes. Both are the fragment's continuous centreline arc-length (callers
 // pass the same value) - corners included, since the corner arc-length is angle-based and thus uniform across the width.
+//
+// A visible PIECE is one dash run clipped to the trim window, and each of its two ends wears exactly ONE cap: the dash
+// cap, or the line cap where the trim window cuts first. Masking dashes and trim separately and multiplying (what this
+// did) stamped BOTH onto the first and last dash - a line cap and a dash cap fighting over one end.
+//
+// capScale converts a cap's PHYSICAL reach into units of `s`. They are not the same unit: `s` is the CENTRELINE arc,
+// deliberately uniform across the stroke width so a dash boundary stays radial through a corner (see RoundRectArc),
+// while a cap reaches a real number of pixels. On a straight edge capScale is 1; on a bend of curvature radius R it is
+// R / (R + dPerp), because one unit of s spans that much more at the outer radius. Adding the two raw made a concave
+// cap bite several times deeper at a corner than on a straight edge - it ate the dash there and left a hair-thin arc
+// along the outer edge, and only at corners.
 float DashTrimMask(float sTrim, float sDash, float perimeter, float dashOn, float dashGap, float dashOffset,
     float trimStart, float trimEnd, float dPerp, float halfW, float capFlags)
 {
-    int dashCap  = int(fmod(capFlags, 8.0));
-    int startCap = int(fmod(floor(capFlags / 8.0), 8.0));
-    int endCap   = int(fmod(floor(capFlags / 64.0), 8.0));   // base-8 mask: else the JOIN in the 512s place leaks in
+    int dashStartCap = int(fmod(capFlags, 8.0));
+    int dashEndCap   = int(fmod(floor(capFlags / 8.0), 8.0));
+    int startCap     = int(fmod(floor(capFlags / 64.0), 8.0));
+    int endCap       = int(fmod(floor(capFlags / 512.0), 8.0));   // base-8 mask: else the JOIN above them leaks in
 
-    float mask = 1.0;
-    if (trimStart > 0.0 || trimEnd < 1.0)              // keep only s in [trimStart, trimEnd] * perimeter; ends get caps
+    // Distance to the trim window's two ends. Untrimmed = "nowhere near", so the dash edges are the only ends there is.
+    float tS = 1e9;
+    float tE = 1e9;
+    if (trimStart > 0.0 || trimEnd < 1.0)
     {
-        float a = trimStart * perimeter;
-        float b = trimEnd * perimeter;
-        mask *= saturate((sTrim - a) + CapReach(startCap, dPerp, halfW) + 0.5)
-              * saturate((b - sTrim) + CapReach(endCap, dPerp, halfW) + 0.5);
+        tS = sTrim - trimStart * perimeter;
+        tE = trimEnd * perimeter - sTrim;
     }
+
+    // Distance to the two ends of the dash run this fragment belongs to. Inside a run it is that run; inside a gap it is
+    // whichever neighbouring run is nearer, so a convex cap still bulges out into the gap it faces.
+    float dS = 1e9;
+    float dE = 1e9;
     float period = dashOn + dashGap;
-    if (dashOn > 0.0 && period > 0.0)                  // ON for the first dashOn of each (dashOn+dashGap) period
+    if (dashOn > 0.0 && period > 0.0)
     {
         float ph = frac((sDash + dashOffset) / period) * period;   // 0..period
-        // Signed distance to the nearest ON edge (positive inside the run), wrapping so BOTH ends of every gap get a cap.
-        float dEdge = (ph <= dashOn) ? min(ph, dashOn - ph) : -min(ph - dashOn, period - ph);
-        mask *= saturate(dEdge + CapReach(dashCap, dPerp, halfW) + 0.5);
+        if (ph <= dashOn)                            { dS = ph; dE = dashOn - ph; }
+        else if (ph - dashOn <= period - ph)         { dE = dashOn - ph; }    // just past the previous run's END
+        else                                         { dS = ph - period; }    // just before the next run's START
     }
-    return mask;
+
+    float sdStart = (dS < tS) ? dS + CapReach(dashStartCap, dPerp, halfW)
+                              : tS + CapReach(startCap, dPerp, halfW);
+    float sdEnd   = (dE < tE) ? dE + CapReach(dashEndCap, dPerp, halfW)
+                              : tE + CapReach(endCap, dPerp, halfW);
+    return saturate(min(sdStart, sdEnd) + 0.5);
 }
 
 // Same as DashTrimMask, but the TRIM window wraps the fragment's signed arc offset to [-P/2, P/2] so a CONVEX cap at the
@@ -108,31 +147,43 @@ float DashTrimMask(float sTrim, float sDash, float perimeter, float dashOn, floa
 float DashTrimMaskCapped(float sTrim, float sDash, float perimeter, float dashOn, float dashGap, float dashOffset,
     float trimStart, float trimEnd, float dPerp, float halfW, float capFlags)
 {
-    int dashCap  = int(fmod(capFlags, 8.0));
-    int startCap = int(fmod(floor(capFlags / 8.0), 8.0));
-    int endCap   = int(fmod(floor(capFlags / 64.0), 8.0));
+    int dashStartCap = int(fmod(capFlags, 8.0));
+    int dashEndCap   = int(fmod(floor(capFlags / 8.0), 8.0));
+    int startCap     = int(fmod(floor(capFlags / 64.0), 8.0));
+    int endCap       = int(fmod(floor(capFlags / 512.0), 8.0));
 
-    float mask = 1.0;
+    float windowOpen = 1.0;
+    float tS = 1e9;
+    float tE = 1e9;
     if (trimStart > 0.0 || trimEnd < 1.0)
     {
         float a = trimStart * perimeter;
         float b = trimEnd * perimeter;
-        float windowOpen = (b > a) ? 1.0 : 0.0;
+        windowOpen = (b > a) ? 1.0 : 0.0;
         float centre = (a + b) * 0.5;
         float halfLen = (b - a) * 0.5;
         float ds = sTrim - centre;
-        ds -= perimeter * floor(ds / perimeter + 0.5);
-        float reach = CapReach((ds < 0.0) ? startCap : endCap, dPerp, halfW);
-        mask *= windowOpen * saturate((halfLen - abs(ds)) + reach + 0.5);
+        ds -= perimeter * floor(ds / perimeter + 0.5);   // wrapped: a convex cap at the seam bulges across s=0
+        tS = halfLen + ds;
+        tE = halfLen - ds;
     }
+
+    float dS = 1e9;
+    float dE = 1e9;
     float period = dashOn + dashGap;
     if (dashOn > 0.0 && period > 0.0)
     {
         float ph = frac((sDash + dashOffset) / period) * period;
-        float dEdge = (ph <= dashOn) ? min(ph, dashOn - ph) : -min(ph - dashOn, period - ph);
-        mask *= saturate(dEdge + CapReach(dashCap, dPerp, halfW) + 0.5);
+        if (ph <= dashOn)                    { dS = ph; dE = dashOn - ph; }
+        else if (ph - dashOn <= period - ph) { dE = dashOn - ph; }
+        else                                 { dS = ph - period; }
     }
-    return mask;
+
+    float sdStart = (dS < tS) ? dS + CapReach(dashStartCap, dPerp, halfW)
+                              : tS + CapReach(startCap, dPerp, halfW);
+    float sdEnd   = (dE < tE) ? dE + CapReach(dashEndCap, dPerp, halfW)
+                              : tE + CapReach(endCap, dPerp, halfW);
+    return windowOpen * saturate(min(sdStart, sdEnd) + 0.5);
 }
 
 // Arc-length `s` (device px) of the point on the ROUNDED-RECT contour nearest `p`, and the perimeter. Exact/closed-form.
@@ -217,6 +268,24 @@ float EllipseArc(float2 p, float2 h, out float perimeter)
     return s;
 }
 
+// Radius of curvature of the ellipse at the fragment's parametric angle: |r'|^3 / (rx*ry) for x = rx cos t, y = ry sin t.
+// Kept as its own single-expression helper - the arc functions above have early returns, and giving one of THOSE a second
+// out-parameter made the NVIDIA NVVM compiler AV in vkCreateShadersEXT (see the note on DashTrimMaskCapped).
+float EllipseCurvRadius(float2 p, float2 h)
+{
+    float t = atan2(p.y * h.x, p.x * h.y);
+    float st = sin(t), ct = cos(t);
+    float e = sqrt(h.x * h.x * st * st + h.y * h.y * ct * ct);
+    return (e * e * e) / max(h.x * h.y, 1e-6);
+}
+
+// Same for a rounded rect: the corner arcs bend with the corner radius, the four edges are straight.
+float RoundRectCurvRadius(float2 p, float2 b, float r)
+{
+    float2 q = abs(p) - (b - r);
+    return (q.x > 0.0 && q.y > 0.0 && r > 0.5) ? r : 1e9;
+}
+
 struct PSInput
 {
     float4 Position : SV_Position;
@@ -240,7 +309,7 @@ float SdRoundBox(float2 p, float2 b, float r)
 float4 RectBatchPS(PSInput input) : SV_Target
 {
     float r = min(input.Radius, min(input.Half.x, input.Half.y));   // a corner can't exceed half the smaller side
-    int joinType = int(fmod(floor(input.Stroke1.w / 512.0), 8.0));  // 0 miter, 1 bevel, 2 round
+    int joinType = int(fmod(floor(input.Stroke1.w / 4096.0), 8.0));  // 0 miter, 1 bevel, 2 round
     float d = SdRoundRectJoin(input.Local, input.Half, r, joinType);
     float mask = 1.0;
     if (input.Stroke0.z > 0.0 || input.Stroke1.y > 0.0 || input.Stroke1.z < 1.0)   // dashed or trimmed -> arc length
@@ -249,11 +318,26 @@ float4 RectBatchPS(PSInput input) : SV_Target
         float perim;
         float s = RoundRectArc(input.Local, input.Half, r, perim);
         float dPerp = d - input.Stroke0.y * halfW;
+        float capScl = ArcCapScale(RoundRectCurvRadius(input.Local, input.Half, r), dPerp);
+        // A CONCAVE cap may not eat past the middle of its dash, or a dash shorter than a thickness is consumed by
+        // its own two caps and leaves only the slivers at the ribbon edges (bow-ties at every corner on a thick
+        // stroke). The reach is homogeneous in (dPerp, halfW), so the limit rides in on the same scale. Convex caps
+        // are untouched - their bulge is what makes a zero-length dot a circle. Codes 4 and 5 are the concave forms.
+        float dashCaps = fmod(input.Stroke1.w, 64.0);
+        bool concaveCap = max(fmod(dashCaps, 8.0), floor(dashCaps / 8.0)) >= 4.0;
+        float bite = (concaveCap && input.Stroke0.z > 0.0) ? 0.5 * input.Stroke0.z / max(halfW, 1e-3) : 1e9;
+        capScl = min(capScl, bite);
         // Dash on the CONTINUOUS centreline arc-length through corners too (like the ellipse), so a dash flows around a
         // corner uniformly instead of the whole corner snapping to one on/off state at its midpoint - the latter cut a
         // dash short at the corner (a stub that wandered with the dash phase) when the run ended inside the corner arc.
+        // No corner special-casing here on purpose. The nearest-point arc is DISCONTINUOUS at a corner's bisector, and
+        // every attempt to patch that from inside this mask - picking the "more on" of the two edges, unioning their two
+        // coverages - trades one artifact for another, because the honest question is a DISTANCE to the dashed path and
+        // no sampling of the arc answers it. Instead the batch now DECLINES a dashed stroke thicker than its corner is
+        // round (RectBatchCollector.IsPenBatchable) and the compute expander takes it, which builds the dash pieces as
+        // real geometry. What is left here is the case this model is exact for: corners at least as round as the stroke.
         mask = DashTrimMaskCapped(s, s, perim, input.Stroke0.z, input.Stroke0.w, input.Stroke1.x, input.Stroke1.y,
-                            input.Stroke1.z, dPerp, halfW, input.Stroke1.w);
+                            input.Stroke1.z, dPerp * capScl, halfW * capScl, input.Stroke1.w);
     }
     return CompositeFillStroke(d, input.Color, input.StrokeColor, input.Stroke0.x, input.Stroke0.y, mask);
 }
@@ -376,8 +460,9 @@ float4 EllipseBatchPS(EllipsePSInput input) : SV_Target
         float s = EllipseArc(input.Local, input.Half, perim);
         float halfW = input.Stroke0.x * 0.5;
         float dPerp = d - input.Stroke0.y * halfW;
+        float capScl = ArcCapScale(EllipseCurvRadius(input.Local, input.Half), dPerp);
         mask = DashTrimMaskCapped(s, s, perim, input.Stroke0.z, input.Stroke0.w, input.Stroke1.x, input.Stroke1.y,
-                            input.Stroke1.z, dPerp, halfW, input.Stroke1.w);
+                            input.Stroke1.z, dPerp * capScl, halfW * capScl, input.Stroke1.w);
     }
     return CompositeFillStroke(d, input.Color, input.StrokeColor, input.Stroke0.x, input.Stroke0.y, mask);
 }
@@ -617,7 +702,7 @@ float4 GradientPS(GradPSInput input) : SV_Target
 
     bool ellipse = it.Geom1.z >= 0.5;
     float r = min(input.Radius, min(input.Half.x, input.Half.y));
-    int joinType = int(fmod(floor(it.Stroke1.w / 512.0), 8.0));
+    int joinType = int(fmod(floor(it.Stroke1.w / 4096.0), 8.0));
     float d = ellipse ? SdEllipse(input.Local, input.Half) : SdRoundRectJoin(input.Local, input.Half, r, joinType);
 
     float2 uv = input.Local / max(input.Half * 2.0, float2(1e-4, 1e-4)) + 0.5;   // 0..1 across the bounds
@@ -642,8 +727,9 @@ float4 GradientPS(GradPSInput input) : SV_Target
         float s = ellipse ? EllipseArc(input.Local, input.Half, perim)
                           : RoundRectArc(input.Local, input.Half, r, perim);
         float dPerp = d - it.Stroke0.y * halfW;
+        float capScl = ArcCapScale(ellipse ? EllipseCurvRadius(input.Local, input.Half) : RoundRectCurvRadius(input.Local, input.Half, r), dPerp);
         mask = DashTrimMask(s, s, perim, it.Stroke0.z, it.Stroke0.w, it.Stroke1.x, it.Stroke1.y,
-                            it.Stroke1.z, dPerp, halfW, it.Stroke1.w);
+                            it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w);
     }
     return CompositeFillStroke(d, fill, it.StrokeColor, it.Stroke0.x, it.Stroke0.y, mask);
 }
@@ -1180,7 +1266,7 @@ float4 PatternPS(PatternPSInput input) : SV_Target
 
     bool ellipse = it.Params.x < 0.0;   // negative baked corner radius = the ellipse shape flag (a rect passes radius >= 0)
     float r = min(input.Radius, min(input.Half.x, input.Half.y));
-    int joinType = int(fmod(floor(it.Stroke1.w / 512.0), 8.0));
+    int joinType = int(fmod(floor(it.Stroke1.w / 4096.0), 8.0));
     float d = ellipse ? SdEllipse(input.Local, input.Half) : SdRoundRectJoin(input.Local, input.Half, r, joinType);
 
     float2 p = input.Local + input.Half;   // fragment from the shape's TOP-LEFT (stable pattern origin at the corner)
@@ -1191,10 +1277,12 @@ float4 PatternPS(PatternPSInput input) : SV_Target
     {
         float halfW = it.Stroke0.x * 0.5;
         float perim;
-        float s = ellipse ? EllipseArc(input.Local, input.Half, perim) : RoundRectArc(input.Local, input.Half, r, perim);
+        float s = ellipse ? EllipseArc(input.Local, input.Half, perim)
+                          : RoundRectArc(input.Local, input.Half, r, perim);
         float dPerp = d - it.Stroke0.y * halfW;
+        float capScl = ArcCapScale(ellipse ? EllipseCurvRadius(input.Local, input.Half) : RoundRectCurvRadius(input.Local, input.Half, r), dPerp);
         mask = DashTrimMask(s, s, perim, it.Stroke0.z, it.Stroke0.w, it.Stroke1.x, it.Stroke1.y,
-                            it.Stroke1.z, dPerp, halfW, it.Stroke1.w);
+                            it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w);
     }
     return CompositeFillStroke(d, fill, it.StrokeColor, it.Stroke0.x, it.Stroke0.y, mask);
 }
@@ -1348,7 +1436,7 @@ float4 FractalPS(FractalPSInput input) : SV_Target
     FractalRectData it = items[input.InstId];
 
     float r = min(input.Radius, min(input.Half.x, input.Half.y));
-    int joinType = int(fmod(floor(it.Stroke1.w / 512.0), 8.0));
+    int joinType = int(fmod(floor(it.Stroke1.w / 4096.0), 8.0));
     float d = SdRoundRectJoin(input.Local, input.Half, r, joinType);
 
     // Fragment -> complex plane, aspect-correct: the smaller axis spans 3/zoom around the centre, so pixels stay square.
@@ -1508,8 +1596,9 @@ float4 FractalPS(FractalPSInput input) : SV_Target
         float perim;
         float s = RoundRectArc(input.Local, input.Half, r, perim);
         float dPerp = d - it.Stroke0.y * halfW;
+        float capScl = ArcCapScale(RoundRectCurvRadius(input.Local, input.Half, r), dPerp);
         mask = DashTrimMask(s, s, perim, it.Stroke0.z, it.Stroke0.w, it.Stroke1.x, it.Stroke1.y,
-                            it.Stroke1.z, dPerp, halfW, it.Stroke1.w);
+                            it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w);
     }
     return CompositeFillStroke(d, fill, it.StrokeColor, it.Stroke0.x, it.Stroke0.y, mask);
 }
