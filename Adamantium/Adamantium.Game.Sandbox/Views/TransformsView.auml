@@ -1,0 +1,75 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:m="clr-namespace:Adamantium.UI.Core.Media;assembly=Adamantium.UI.Core"
+      xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters">
+    <!-- DataContext is the TransformsViewModel. Every tile here is a rounded, STROKED rect - SDF-batch content, the same
+         kind the Layout tab uses - but each is drawn under its own rotation/shear/scale. That combination used to be
+         impossible: the bake folded an element's world into axis-aligned BOUNDS, and no axis-aligned rect can carry a
+         rotation or a shear, so a turned tile was refused by the batch and fell back to a draw of its own. Now the world
+         lives in the transform TABLE and the instance carries local geometry plus a slot index, so the shader applies a
+         full matrix and an arbitrary affine costs the batch nothing. Watch the draw-call count on the diagnostics plate
+         while dragging Spread: it stays put. -->
+    <Grid RowDefinitions="Auto,*" Margin="24">
+        <StackPanel Grid.Row="0" Orientation="Vertical">
+            <TextBlock Text="240 rounded, stroked rects — each under its OWN rotation and shear, all in one instanced draw."/>
+            <TextBlock Text="Rotation and Skew are affine: they cannot be baked into axis-aligned bounds, so before the transform table these tiles left the batch entirely."
+                       Foreground="#94A3B8" Margin="0,4,0,0"/>
+
+            <WrapPanel Orientation="Horizontal" Margin="0,14,0,0">
+                <StackPanel Orientation="Vertical" Width="220" Margin="0,0,18,8">
+                    <TextBlock Text="Rotation (deg)" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding Transforms.Rotation, Mode=TwoWay}" Minimum="0" Maximum="360" Width="200"/>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Width="220" Margin="0,0,18,8">
+                    <TextBlock Text="Skew X (deg)" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding Transforms.SkewX, Mode=TwoWay}" Minimum="-60" Maximum="60" Width="200"/>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Width="220" Margin="0,0,18,8">
+                    <TextBlock Text="Skew Y (deg)" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding Transforms.SkewY, Mode=TwoWay}" Minimum="-60" Maximum="60" Width="200"/>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Width="220" Margin="0,0,18,8">
+                    <TextBlock Text="Scale" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding Transforms.Scale, Mode=TwoWay}" Minimum="0.3" Maximum="1.6" Width="200"/>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Width="220" Margin="0,0,18,8">
+                    <TextBlock Text="Spread — per-tile difference (0 = one shared matrix)" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding Transforms.Spread, Mode=TwoWay}" Minimum="0" Maximum="6" Width="200"/>
+                </StackPanel>
+            </WrapPanel>
+        </StackPanel>
+
+        <ListBox Grid.Row="1" Margin="0,14,0,0" ItemsSource="{Binding Transforms.Tiles}">
+            <ListBox.ItemContainerStyle>
+                <Style Selector="ListBoxItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+                    <Setter Property="Padding" Value="0"/>
+                </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel Orientation="Horizontal" ItemWidth="86" ItemHeight="86"/>
+                </ItemsPanelTemplate>
+            </ListBox.ItemsPanel>
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <!-- RenderTransformOrigin is a FRACTION of the element's own size, so each tile turns and shears about
+                         its own centre whatever size it is given. -->
+                    <Border Width="56" Height="56" CornerRadius="12"
+                            Background="{Binding Color, Converter={conv:StringToBrushConverter}}"
+                            BorderBrush="#0F172A" BorderThickness="2"
+                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                            RenderTransformOrigin="0.5,0.5">
+                        <Border.RenderTransform>
+                            <m:Transform RotationAngle="{Binding Angle}"
+                                         SkewX="{Binding SkewX}"
+                                         SkewY="{Binding SkewY}"
+                                         ScaleX="{Binding Scale}"
+                                         ScaleY="{Binding Scale}"/>
+                        </Border.RenderTransform>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+    </Grid>
+</View>

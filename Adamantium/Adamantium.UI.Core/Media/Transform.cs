@@ -40,6 +40,15 @@ public class Transform : AnimatableUIComponent
     public static readonly AdamantiumProperty TranslateYProperty = AdamantiumProperty.Register(nameof(TranslateY),
         typeof (Double), typeof (Transform), new PropertyMetadata(default(Double), TransformPropertyChangedCallback));
 
+    /// <summary>Shear angles (degrees) about the rotation centre - <see cref="SkewX"/> slants horizontally with y (the
+    /// "italic" lean), <see cref="SkewY"/> vertically with x. WPF's SkewTransform AngleX/AngleY; folded into the same
+    /// single matrix, so a sheared element stays in the instanced batches like any other.</summary>
+    public static readonly AdamantiumProperty SkewXProperty = AdamantiumProperty.Register(nameof(SkewX),
+        typeof (Double), typeof (Transform), new PropertyMetadata(default(Double), TransformPropertyChangedCallback));
+
+    public static readonly AdamantiumProperty SkewYProperty = AdamantiumProperty.Register(nameof(SkewY),
+        typeof (Double), typeof (Transform), new PropertyMetadata(default(Double), TransformPropertyChangedCallback));
+
     private static void TransformPropertyChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
         if (a is Transform transform)
@@ -96,6 +105,18 @@ public class Transform : AnimatableUIComponent
         set => SetValue(TranslateYProperty, value);
     }
         
+    public Double SkewX
+    {
+        get => GetValue<Double>(SkewXProperty);
+        set => SetValue(SkewXProperty, value);
+    }
+
+    public Double SkewY
+    {
+        get => GetValue<Double>(SkewYProperty);
+        set => SetValue(SkewYProperty, value);
+    }
+
     public Double RotationCenterX
     {
         get => GetValue<Double>(RotationCenterXProperty);
@@ -195,7 +216,9 @@ public class Transform : AnimatableUIComponent
         RotationCenterX = RotationCenterX,
         RotationCenterY = RotationCenterY,
         TranslateX = TranslateX,
-        TranslateY = TranslateY
+        TranslateY = TranslateY,
+        SkewX = SkewX,
+        SkewY = SkewY
     };
 
     // The matrix arithmetic itself lives in TransformValues, so the compositor composes the SAME matrix from the SAME code -

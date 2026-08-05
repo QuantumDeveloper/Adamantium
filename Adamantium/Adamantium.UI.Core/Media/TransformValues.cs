@@ -1,3 +1,4 @@
+using System;
 using Adamantium.Mathematics;
 
 namespace Adamantium.UI.Core.Media;
@@ -23,6 +24,8 @@ public struct TransformValues
     public double RotationCenterY;
     public double TranslateX;
     public double TranslateY;
+    public double SkewX;
+    public double SkewY;
 
     public static TransformValues Identity => new() { ScaleX = 1.0, ScaleY = 1.0 };
 
@@ -41,6 +44,8 @@ public struct TransformValues
         else if (property == Transform.RotationCenterYProperty) RotationCenterY = value;
         else if (property == Transform.TranslateXProperty) TranslateX = value;
         else if (property == Transform.TranslateYProperty) TranslateY = value;
+        else if (property == Transform.SkewXProperty) SkewX = value;
+        else if (property == Transform.SkewYProperty) SkewY = value;
     }
 
     /// <summary>Compose these values into the transform matrix. Pure: no property reads, no shared state.</summary>
@@ -71,6 +76,21 @@ public struct TransformValues
             ref translation,
             out var matrix);
 
+        var toCenter = Matrix4x4.Translation(-(float)RotationCenterX, -(float)RotationCenterY, 0);
+        var fromCenter = Matrix4x4.Translation((float)RotationCenterX, (float)RotationCenterY, 0);
+
+        // SHEAR, around the same centre and applied FIRST - in the element's own space, before scale/rotate/translate.
+        // Row-vector convention (v * M), so x' = x + y*tan(SkewX) is M21 and y' = y + x*tan(SkewY) is M12. WPF splits this
+        // into a separate SkewTransform whose place is whatever a TransformGroup says; here the order is fixed, and
+        // innermost is the one that reads as "italicise this element" rather than "shear the world it sits in".
+        if (SkewX != 0 || SkewY != 0)
+        {
+            var skew = Matrix4x4.Identity;
+            skew.M21 = Math.Tan(MathHelper.DegreesToRadians(SkewX));
+            skew.M12 = Math.Tan(MathHelper.DegreesToRadians(SkewY));
+            matrix = toCenter * skew * fromCenter * matrix;
+        }
+
         // Perspective foreshortening around the rotation centre: w' = 1 - z/d, so points rotated toward the viewer
         // (negative z) grow and away shrink - the WPF-3D-tile look. Off (affine) when Perspective is 0. Composed as
         // T(-c) * M34(-1/d) * T(c) AFTER the affine transform: depth produced by the rotation feeds the divide.
@@ -79,8 +99,6 @@ public struct TransformValues
         {
             var persp = Matrix4x4.Identity;
             persp.M34 = -1.0 / d;
-            var toCenter = Matrix4x4.Translation(-(float)RotationCenterX, -(float)RotationCenterY, 0);
-            var fromCenter = Matrix4x4.Translation((float)RotationCenterX, (float)RotationCenterY, 0);
             matrix = matrix * toCenter * persp * fromCenter;
         }
 

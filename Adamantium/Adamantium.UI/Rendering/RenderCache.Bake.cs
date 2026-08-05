@@ -334,20 +334,19 @@ public partial class RenderCache
     }
 
     // A unit's bake transform + transform-table slot: node-local + the node's slot when under a motion node (matrix
-    // refreshed once per walk), else world + slot 0 (identity), or its own slot when the world is not axis-aligned.
+    // refreshed once per walk), else its OWN slot holding the world. NOTHING is baked into an instance any more.
     private Matrix4x4F ResolveBake(IGraphicsDevice device, IUIComponent component, Matrix4x4F world, out int slot)
     {
         var node = NodeOf(component);
         if (node == null)
         {
-            // An AXIS-ALIGNED world folds into the instance's own bounds (slot 0 = the identity matrix) - the cheapest
-            // bake and what nearly everything is. A ROTATED or sheared one cannot: an instance's bounds are an
-            // axis-aligned rect, so the matrix has to reach the shader intact - this unit gets its OWN table slot and
-            // keeps its bounds local. The shader multiplies by the slot matrix either way and does not care which it is.
-            // Before this, a slot was handed out by ROLE (only a motion node had one), so a rotated element outside one
-            // had nowhere to put its rotation: the batch refused it and it fell back to a per-unit draw - which is why
-            // FlipTile had to declare itself a motion node by hand just to be able to turn.
-            if (IsAxisAligned(world)) { slot = 0; return world; }
+            // The world goes to the TABLE, never into the instance's bounds. It used to fold in ("slot 0 = identity")
+            // whenever it was axis-aligned, which was almost everything - and that fold is what made a matrix rewrite
+            // move only PART of the frame: content that rides a slot follows it the moment the slot is written, while
+            // a world-baked instance keeps drawing where it was baked until something re-bakes it. Two ways of saying
+            // where a thing is, updated on different schedules, is a desync waiting for a frame to land between them.
+            // Now there is one way. Costs a slot per drawn element; SetMatrix skips the write when nothing changed, so
+            // a still frame is still free.
             slot = _transformTable.AcquireSlot(component.RenderId);
             _transformTable.SetMatrix(device, slot, world);
             return Matrix4x4F.Identity;

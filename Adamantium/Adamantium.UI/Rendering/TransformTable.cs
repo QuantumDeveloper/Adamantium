@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
@@ -70,12 +72,23 @@ internal sealed class TransformTable
     public bool TryGetSlot(Guid nodeId, out int slot) => _slotByNode.TryGetValue(nodeId, out slot);
 
     /// <summary>Writes one node's world matrix - THE per-move cost (64 bytes). Safe only when the slot's previous value
-    /// is no longer read by an in-flight frame or the change is what this frame draws (call from the build phase).</summary>
+    /// is no longer read by an in-flight frame or the change is what this frame draws (call from the build phase).
+    /// <para>An UNCHANGED matrix writes nothing. Nothing is world-baked into an instance any more, so every drawn element
+    /// resolves a slot on every walk and this would otherwise upload 64 bytes per element per frame - the cost the bake
+    /// used to avoid. Skipping the identical write puts it back: a still frame moves zero bytes, and only what actually
+    /// moved pays.</para></summary>
     public void SetMatrix(IGraphicsDevice device, int slot, in Matrix4x4F world)
     {
+        if (SameBytes(_cpu[slot], world)) return;
         _cpu[slot] = world;
         if (_gpu != null && slot < _gpuCapacity) _gpu.SetData(_cpu.AsSpan(slot, 1), (uint)(slot * 64));
     }
+
+    // BYTEWISE, not Matrix4x4F.Equals: that one compares NearEqual, so a sub-pixel scroll step would read as "unchanged"
+    // and the write would be skipped - the node would freeze on screen until the step grew past the tolerance.
+    private static bool SameBytes(in Matrix4x4F a, in Matrix4x4F b)
+        => MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref Unsafe.AsRef(in a), 1))
+            .SequenceEqual(MemoryMarshal.AsBytes(MemoryMarshal.CreateReadOnlySpan(ref Unsafe.AsRef(in b), 1)));
 
     /// <summary>Drops everything (device loss / cache reset).</summary>
     public void Dispose()
