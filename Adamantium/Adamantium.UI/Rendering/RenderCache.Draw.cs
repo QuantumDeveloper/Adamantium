@@ -166,18 +166,6 @@ public partial class RenderCache
             {
                 _transformTable.EnsureResources(device);
             }
-            _transformTable.BeginFrameStats();
-            // AGGREGATE, never assign: there is one table PER RENDER CACHE (per window/popup) and these counters are static,
-            // so a plain assignment let the last writer - typically an empty overlay window holding a single slot - erase
-            // the real window's numbers. Max for levels, sum for per-frame events; the reader zeroes them after logging.
-            var stats = _transformTable;
-            if (stats.SlotCount > Core.Diagnostics.RuntimeStats.TransformSlots)
-                Core.Diagnostics.RuntimeStats.TransformSlots = stats.SlotCount;
-            if (stats.Recreations > Core.Diagnostics.RuntimeStats.TransformRecreations)
-                Core.Diagnostics.RuntimeStats.TransformRecreations = stats.Recreations;
-            Core.Diagnostics.RuntimeStats.TransformWrites += stats.WritesLastFrame;
-            Core.Diagnostics.RuntimeStats.TransformAcquires += stats.AcquiresLastFrame;
-            Core.Diagnostics.RuntimeStats.TransformReleases += stats.ReleasesLastFrame;
             _rectBatch.TransformsAddress = _transformTable.DeviceAddress;
             _ellipseBatch.TransformsAddress = _transformTable.DeviceAddress;
             _gradientRectBatch.TransformsAddress = _transformTable.DeviceAddress;
