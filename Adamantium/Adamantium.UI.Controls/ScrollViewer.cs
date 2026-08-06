@@ -92,6 +92,52 @@ public class ScrollViewer : ContentControl
         MouseWheel += OnMouseWheel;
     }
 
+    // How much of the viewport a page keeps: a page that moved the WHOLE height would leave the reader with no line in
+    // common between the two screens, which is why every reader (and every browser) keeps a couple of lines.
+    private const double PageOverlap = 2 * LineStep;
+
+    /// <summary>Scrolls one viewport-worth, minus a couple of lines of overlap. False when there is nothing to scroll
+    /// or it is already parked at that end - the caller then leaves the key alone, so an enclosing viewer can take it
+    /// (the same hand-off the wheel does at its edge).</summary>
+    /// <remarks>Public and driven from the WINDOW rather than from a key handler here: routed keys travel up from the
+    /// FOCUSED element, and a ScrollViewer is deliberately not focusable - so with the focus outside it (or nowhere at
+    /// all) it never sees the key. Which is exactly the reading case, where a page gesture is wanted most.</remarks>
+    public bool PageVertically(bool back)
+    {
+        if (_presenter is not { CanScrollVertically: true }) return false;
+
+        var extent = _presenter.Extent;
+        var viewport = _presenter.Viewport;
+        if (extent.Height <= viewport.Height + 0.5) return false;
+
+        var max = extent.Height - viewport.Height;
+        var offset = ScrollOffset;
+        if (back ? offset.Y <= 0.5 : offset.Y >= max - 0.5) return false;
+
+        _presenter.AnimateScrollBy(new Vector2(0, back ? -Math.Max(viewport.Height - PageOverlap, LineStep)
+                                                      : Math.Max(viewport.Height - PageOverlap, LineStep)));
+        return true;
+    }
+
+    /// <summary>Jumps to the very top or the very bottom of the content (Home / End). Same contract as
+    /// <see cref="PageVertically"/>: false when there is nothing to scroll or it is already parked there, so the
+    /// caller can leave the key for someone else.</summary>
+    public bool ScrollToVerticalEdge(bool toStart)
+    {
+        if (_presenter is not { CanScrollVertically: true }) return false;
+
+        var extent = _presenter.Extent;
+        var viewport = _presenter.Viewport;
+        if (extent.Height <= viewport.Height + 0.5) return false;
+
+        var max = extent.Height - viewport.Height;
+        var offset = ScrollOffset;
+        if (toStart ? offset.Y <= 0.5 : offset.Y >= max - 0.5) return false;
+
+        _presenter.AnimateScrollBy(new Vector2(0, (toStart ? 0 : max) - offset.Y));
+        return true;
+    }
+
     /// <summary>Which axes a content drag pans (default <see cref="PanningMode.None"/> - scrollbars/wheel only). Opt in
     /// to touch-style panning per axis without it being forced on every ScrollViewer.</summary>
     public PanningMode PanningMode

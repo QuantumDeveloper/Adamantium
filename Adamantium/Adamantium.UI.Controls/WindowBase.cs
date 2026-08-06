@@ -83,7 +83,62 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         {
             target.PerformClick();
             e.Handled = true;
+            return;
         }
+
+        // Escape with nothing to cancel gives the keyboard focus back: the ring is put out and the keyboard leaves the
+        // control. Without this there was NO way to drop it - the ring only goes out when focus MOVES somewhere else,
+        // and clicking empty space moves it nowhere, so a ring lit by one Tab stayed lit for good. Last in line by
+        // construction: a dialog, a popup, an editor cancelling an edit all handle Escape on the way up and never get
+        // here.
+        if (e.Key == Key.Escape && FocusManager.Focused != null)
+        {
+            FocusManager.Release(FocusManager.Focused);
+            e.Handled = true;
+            return;
+        }
+
+        // The reading keys: PageDown / PageUp page the view, Home / End jump to its ends. Handled HERE rather than in
+        // ScrollViewer because routed keys travel up from the FOCUSED element, and a ScrollViewer is deliberately not
+        // focusable - so with the focus outside it, or nowhere at all (the ordinary reading state), it never sees them.
+        //
+        // Nothing is stolen: whatever wanted the key handled it on the way up - a text editor takes Home/End for the
+        // caret, a list or a tree takes them for the selection - and only what nobody wanted reaches the window.
+        //
+        // SPACE is deliberately NOT here, though a browser pages with it. In a browser the focus normally rests on the
+        // document; in an application it rests on a control, and space is the ACTIVATION key - a button, a toggle, a
+        // tab, a drop-down all wait for it. Bound to scrolling as well, it would do one thing or the other depending on
+        // where the focus happens to be, which is not a gesture anyone can predict.
+        var scrolled = e.Key switch
+        {
+            Key.PageDown => ScrollNearest(v => v.PageVertically(false)),
+            Key.PageUp => ScrollNearest(v => v.PageVertically(true)),
+            Key.Home => ScrollNearest(v => v.ScrollToVerticalEdge(true)),
+            Key.End => ScrollNearest(v => v.ScrollToVerticalEdge(false)),
+            _ => false
+        };
+        if (scrolled) e.Handled = true;
+    }
+
+    // The viewer a reading key means: the one the focus is inside (innermost first - a list inside a page scrolls
+    // itself), else the first on screen with somewhere to go, which is what "the page" means when the keyboard is
+    // nowhere in particular. The action returns false when that viewer cannot move, and the search goes on.
+    private bool ScrollNearest(Func<ScrollViewer, bool> scroll)
+    {
+        for (var node = FocusManager.Focused as IUIComponent; node != null; node = node.VisualParent)
+            if (node is ScrollViewer focused && scroll(focused)) return true;
+
+        return ScrollFirstScrollable(this, scroll);
+    }
+
+    private static bool ScrollFirstScrollable(IUIComponent root, Func<ScrollViewer, bool> scroll)
+    {
+        foreach (var child in root.VisualChildren)
+        {
+            if (child is ScrollViewer viewer && scroll(viewer)) return true;
+            if (ScrollFirstScrollable(child, scroll)) return true;
+        }
+        return false;
     }
 
     private static Button FindButton(IUIComponent root, Func<Button, bool> match)

@@ -1148,7 +1148,15 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     {
         IsFocused = e.OriginalSource == this;
         if (IsFocused && FocusManager.IsFocusVisible)
+        {
             AdornerHost()?.AdornerLayer.SetFocus(FocusVisualOwner());
+            // Tabbing past the bottom of a scrolled list left the focus ring somewhere off screen: the focus moved, the
+            // viewport did not. So the element the keyboard just landed on scrolls itself into sight, the minimum
+            // needed, through every enclosing viewer. Gated on IsFocusVisible - the same flag the ring uses - because
+            // it means "the keyboard put you here"; a CLICK needs no scrolling (you clicked what you could see), and
+            // scrolling under a click would move the thing out from under the cursor mid-gesture.
+            (FocusVisualOwner() as UIComponent)?.BringIntoView();
+        }
     }
 
     /// <summary>The control the focus ring belongs to: a focused TEMPLATE PART marks the control it is part of, never
