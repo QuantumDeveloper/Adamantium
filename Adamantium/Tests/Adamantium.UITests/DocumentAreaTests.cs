@@ -133,8 +133,32 @@ public class DocumentAreaTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(layout.ActiveWellGroup, Is.Not.Null);
-            Assert.That(layout.IsDocument(layout.ActiveWellGroup), Is.True, "and it is inside the area");
+            Assert.That(layout.ActiveWellGroup(null), Is.Not.Null);
+            Assert.That(layout.IsDocument(layout.ActiveWellGroup(null)), Is.True, "and it is inside the area");
+        });
+    }
+
+    /// <summary>Split the documents in two and a new document must open in the half being WORKED IN, not in whichever
+    /// half the structure lists first. Measured before the fix: the active pane was tracked but never asked, so
+    /// ActiveWellGroup answered "the first non-empty group" and every new tab landed in the left half.</summary>
+    [Test]
+    public void ANewDocumentGoesToTheSplitTheUserIsWorkingIn()
+    {
+        var layout = Editor("left", "right");
+        var leftGroup = layout.FindGroup("left");
+
+        // Split the document area: "right" moves out of the shared group into a second one beside it.
+        Assert.That(layout.MovePane("right", leftGroup, DockZone.Right), Is.True);
+        var rightGroup = layout.FindGroup("right");
+        Assert.That(rightGroup, Is.Not.SameAs(leftGroup), "the area must actually be split in two");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(layout.ActiveWellGroup("right"), Is.SameAs(rightGroup), "active on the right -> the right half");
+            Assert.That(layout.ActiveWellGroup("left"), Is.SameAs(leftGroup), "active on the left -> the left half");
+            // A tool (or nothing) is active: no half is being worked in, so the old behaviour stands.
+            Assert.That(layout.ActiveWellGroup(null), Is.SameAs(leftGroup), "nothing active -> the first group");
+            Assert.That(layout.ActiveWellGroup("inspector"), Is.SameAs(leftGroup), "a TOOL active -> the first group");
         });
     }
 

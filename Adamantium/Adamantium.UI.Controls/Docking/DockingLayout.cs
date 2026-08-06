@@ -57,26 +57,29 @@ public class DockingLayout
         return false;
     }
 
-    /// <summary>The document group a new document lands in - the ACTIVE one of the area once it has been split. Null
-    /// while the layout has no document area at all.</summary>
-    public PaneGroupNode ActiveWellGroup
+    /// <summary>The document group a new document lands in: the one holding <paramref name="activePaneId"/> once the
+    /// area has been split, else the first that exists. Null while the layout has no document area at all.</summary>
+    /// <remarks>The active pane is what says WHICH split the user is working in - splitting the documents in two and
+    /// then opening a file put it in the left half whichever half was being used, because this asked the structure
+    /// ("the first non-empty group") instead of asking what is active. The id is passed in rather than mirrored here:
+    /// the area owns that state, and a copy of it would be a second answer to drift out of step with the first.</remarks>
+    public PaneGroupNode ActiveWellGroup(string activePaneId)
     {
-        get
+        if (DocumentWell == null) return null;
+        if (DocumentWell is PaneGroupNode single) return single;
+
+        PaneGroupNode first = null;
+        PaneGroupNode firstNonEmpty = null;
+        foreach (var group in GroupsIn(DocumentWell))
         {
-            if (DocumentWell == null) return null;
-            if (DocumentWell is PaneGroupNode single) return single;
-
-            // The one that was last looked at, or the first that exists. "Last looked at" is not remembered yet, so the
-            // first non-empty group stands in - a placeholder that is honest rather than a guess dressed as a choice.
-            PaneGroupNode first = null;
-            foreach (var group in GroupsIn(DocumentWell))
-            {
-                first ??= group;
-                if (!group.IsEmpty) return group;
-            }
-
-            return first;
+            if (activePaneId != null && group.PaneIds.Contains(activePaneId)) return group;
+            first ??= group;
+            if (!group.IsEmpty) firstNonEmpty ??= group;
         }
+
+        // Nothing active INSIDE the documents (the active pane is a tool, or there is none): fall back to where a
+        // document would have gone before - the first group that holds anything.
+        return firstNonEmpty ?? first;
     }
 
     private bool IsWell(PaneNode node) => node != null && ReferenceEquals(WellOf(node), node);
