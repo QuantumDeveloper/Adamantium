@@ -560,7 +560,7 @@ public class DockingArea : Panel
         {
             home.Insert(System.Math.Min(spot.Index, home.PaneIds.Count), paneId);
         }
-        else if (spot.Zone is DockZone.Center && Layout.ActiveWellGroup is { } documents)
+        else if (spot.Zone is DockZone.Center && Layout.ActiveWellGroup(Owner._activePane) is { } documents)
         {
             documents.Add(paneId);
         }
@@ -623,7 +623,7 @@ public class DockingArea : Panel
         }
 
         // Into the ACTIVE group of the document area - which is the area itself until it has been split (rule 1.6.3).
-        if (zone is DockZone.Center && Layout.ActiveWellGroup is { } documents)
+        if (zone is DockZone.Center && Layout.ActiveWellGroup(Owner._activePane) is { } documents)
         {
             documents.Add(id);
             documents.ActiveIndex = documents.PaneIds.Count - 1;
