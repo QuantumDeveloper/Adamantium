@@ -36,24 +36,6 @@ internal sealed class TransformTable
     public int SlotCount => _count;
     public int GpuCapacity => _gpuCapacity;
 
-    // Per-frame counters (diagnostics plate). Every drawn element resolves a slot now, so the interesting question is how
-    // many of those actually WRITE: a settled scene should be zero. Non-zero every frame means slots are churning -
-    // acquired and released again - and each write is its own 64-byte upload.
-    private int _writes, _acquires, _releases;
-    public int WritesLastFrame { get; private set; }
-    public int AcquiresLastFrame { get; private set; }
-    public int ReleasesLastFrame { get; private set; }
-    public int Recreations { get; private set; }
-
-    /// <summary>Latch + reset the per-frame counters. Called once per frame from the render cache.</summary>
-    public void BeginFrameStats()
-    {
-        WritesLastFrame = _writes;
-        AcquiresLastFrame = _acquires;
-        ReleasesLastFrame = _releases;
-        _writes = _acquires = _releases = 0;
-    }
-
     /// <summary>(Re)creates the GPU buffer when capacity outgrew it. Call at a fence-safe point (BeginFrame); a
     /// (re)allocation re-uploads the whole live table (rare - capacity only doubles).</summary>
     public void EnsureResources(IGraphicsDevice device)
@@ -64,7 +46,6 @@ internal sealed class TransformTable
             BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
             MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal);
         _gpuCapacity = _cpu.Length;
-        Recreations++;
         if (_count > 0) _gpu.SetData(_cpu.AsSpan(0, _count), 0);
     }
 
@@ -72,7 +53,6 @@ internal sealed class TransformTable
     public int AcquireSlot(Guid nodeId)
     {
         if (_slotByNode.TryGetValue(nodeId, out var slot)) return slot;
-        _acquires++;   // a MISS: this id had no slot (a fresh element, or one whose slot was released and is now re-taken)
         if (_free.Count > 0) slot = _free.Pop();
         else
         {
@@ -87,7 +67,6 @@ internal sealed class TransformTable
     public void ReleaseSlot(Guid nodeId)
     {
         if (!_slotByNode.Remove(nodeId, out var slot)) return;
-        _releases++;
         _free.Push(slot);
     }
 
@@ -102,7 +81,6 @@ internal sealed class TransformTable
     public void SetMatrix(IGraphicsDevice device, int slot, in Matrix4x4F world)
     {
         if (SameBytes(_cpu[slot], world)) return;
-        _writes++;
         _cpu[slot] = world;
         if (_gpu != null && slot < _gpuCapacity) _gpu.SetData(_cpu.AsSpan(slot, 1), (uint)(slot * 64));
     }
