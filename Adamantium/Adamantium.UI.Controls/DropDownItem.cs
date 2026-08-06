@@ -15,6 +15,20 @@ public class DropDownItem : ListBoxItem
     // window's overlay layer, detached from the DropDown's VISUAL tree, so a visual-ancestor walk can't find the owner.
     internal DropDown Owner { get; set; }
 
+    /// <summary>The row the ARROWS are on while the list is open - where Enter would commit. Distinct from
+    /// <see cref="ListBoxItem.IsSelected"/> on purpose: selected is the value the control HAS, highlighted is the value
+    /// it WOULD take. Walking the list with the arrows must not change the former, or every step raises
+    /// SelectionChanged and fires whatever is bound to it - and Escape cannot take those back.</summary>
+    public static readonly AdamantiumProperty IsHighlightedProperty = AdamantiumProperty.Register(
+        nameof(IsHighlighted), typeof(bool), typeof(DropDownItem),
+        new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
+
+    public bool IsHighlighted
+    {
+        get => GetValue<bool>(IsHighlightedProperty);
+        set => SetValue(IsHighlightedProperty, value);
+    }
+
     protected override void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         // base sets IsPressed/Focus/Handled (its ListBox lookup is a harmless no-op with no ListBox ancestor here).
