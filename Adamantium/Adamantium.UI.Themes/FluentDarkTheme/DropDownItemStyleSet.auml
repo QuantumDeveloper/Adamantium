@@ -44,6 +44,12 @@
     </Style>
 
     <Style Selector="DropDownItem">
+        <!-- The row the ARROWS are on, which is not the same as the chosen one: it says where Enter would go, while the
+             accent keeps saying what the control holds right now. Reads like hover, because it is the keyboard's
+             equivalent of it - and stays BELOW the selected trigger, so the accent still wins on the current value. -->
+        <PropertyTrigger Property="IsHighlighted" Value="true">
+            <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+        </PropertyTrigger>
         <PropertyTrigger Property="IsMouseOver" Value="true">
             <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
         </PropertyTrigger>

@@ -58,6 +58,20 @@ public class DropDown : Selector
     /// <para>The focus deliberately never goes INTO the list. The popup's contents hang on the overlay with no visual
     /// path back, so a key pressed with the focus down there never travels through this control - which is exactly how
     /// an earlier attempt left both Escape and the arrows dead once the list was open.</para></summary>
+    /// <summary>The list closes when the keyboard leaves: an open popup is a modal-ish thing that belongs to the control
+    /// being worked in, and tabbing away used to leave it hanging over the page with nothing driving it - the header no
+    /// longer had the focus, so neither the arrows nor Escape reached it any more.</summary>
+    /// <remarks>A click on a ROW also takes the focus off the header, and that is not leaving: closing there would pull
+    /// the list out from under the click before the choice was made. So the row's owner is checked - only focus that
+    /// went somewhere else counts as away.</remarks>
+    protected override void OnLostFocus(RoutedEventArgs e)
+    {
+        base.OnLostFocus(e);
+        if (!IsDropDownOpen) return;
+        if (FocusManager.Focused is DropDownItem row && ReferenceEquals(row.Owner, this)) return;
+        IsDropDownOpen = false;
+    }
+
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
@@ -69,8 +83,7 @@ public class DropDown : Selector
             if (e.Key is not (Key.Enter or Key.Space or Key.DownArrow))
                 return;
 
-            _indexOnOpen = SelectedIndex;   // what Escape puts back
-            IsDropDownOpen = true;
+            IsDropDownOpen = true;   // opening sets the highlight to the current value (see OnIsDropDownOpenChanged)
             e.Handled = true;
             return;
         }
@@ -79,32 +92,54 @@ public class DropDown : Selector
         {
             case Key.DownArrow:
             case Key.UpArrow:
-                Step(e.Key == Key.DownArrow ? 1 : -1);
+                StepHighlight(e.Key == Key.DownArrow ? 1 : -1);
                 e.Handled = true;
                 break;
             case Key.Enter or Key.Space:
-                IsDropDownOpen = false;   // the highlighted row is already the selected one
+                Commit();
                 e.Handled = true;
                 break;
             case Key.Escape:
-                if (_indexOnOpen != SelectedIndex) SelectSingle(_indexOnOpen);
-                IsDropDownOpen = false;
+                IsDropDownOpen = false;   // nothing to put back: walking the list never changed the value
                 e.Handled = true;
                 break;
         }
     }
 
-    private int _indexOnOpen = -1;
+    /// <summary>The row the arrows are on. -1 = none. Only meaningful while the list is open; committed by Enter.</summary>
+    private int _highlightedIndex = -1;
 
-    // One row along, clamped at the ends - the same step the wheel takes over a closed drop-down.
-    private void Step(int delta)
+    // One row along, clamped at the ends - the same step the wheel takes over a CLOSED drop-down, except that there the
+    // step IS the choice (there is no list to walk and nothing to commit later).
+    private void StepHighlight(int delta)
     {
         var count = Items.Count;
         if (count == 0) return;
 
-        var from = SelectedIndex < 0 ? (delta > 0 ? -1 : count) : SelectedIndex;
-        var next = Math.Clamp(from + delta, 0, count - 1);
-        if (next != SelectedIndex) SelectSingle(next);
+        var from = _highlightedIndex < 0 ? (delta > 0 ? -1 : count) : _highlightedIndex;
+        Highlight(Math.Clamp(from + delta, 0, count - 1));
+    }
+
+    private void Highlight(int index)
+    {
+        if (_highlightedIndex == index) return;
+        SetHighlight(_highlightedIndex, false);
+        _highlightedIndex = index;
+        SetHighlight(_highlightedIndex, true);
+    }
+
+    private void SetHighlight(int index, bool highlighted)
+    {
+        if (index >= 0 && ItemContainerGenerator.ContainerFromIndex(index) is DropDownItem row)
+            row.IsHighlighted = highlighted;
+    }
+
+    // Enter takes the highlighted row - which is the ONLY moment the value changes, so everything bound to it hears
+    // about the choice once, not once per arrow key.
+    private void Commit()
+    {
+        if (_highlightedIndex >= 0 && _highlightedIndex != SelectedIndex) SelectSingle(_highlightedIndex);
+        IsDropDownOpen = false;
     }
 
     public DropDown()
@@ -248,7 +283,13 @@ public class DropDown : Selector
     private static void OnIsDropDownOpenChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
         var dd = (DropDown)a;
-        if (dd._popup != null) dd._popup.IsOpen = (bool)e.NewValue;
+        var open = (bool)e.NewValue;
+        if (dd._popup != null) dd._popup.IsOpen = open;
+
+        // The list always opens on the current value and closes with no highlight left behind - one place for it,
+        // whether it was opened by the keyboard, by a click on the header, or set from code.
+        if (open) dd.Highlight(dd.SelectedIndex);
+        else dd.Highlight(-1);
     }
 
     // The popup light-dismissed (a click outside the control + list) - reflect it so the next header click reopens.
@@ -277,6 +318,9 @@ public class DropDown : Selector
             row.ContentTemplateSelector = ItemTemplateSelector;
             row.Content = FormatForDisplay(item);   // friendly enum name when no ItemTemplate; raw item otherwise
             ApplyContainerSelection(row, item);
+            // Rows are made when the popup opens, i.e. AFTER the highlight was set - so a container asks for its own
+            // state on arrival rather than the highlight reaching for containers that do not exist yet.
+            row.IsHighlighted = Items.IndexOf(item) == _highlightedIndex;
         }
     }
 
@@ -286,6 +330,7 @@ public class DropDown : Selector
         {
             row.DataContext = null;
             row.IsSelected = false;
+            row.IsHighlighted = false;   // containers are recycled: a stale highlight would follow one into another row
         }
     }
 }
