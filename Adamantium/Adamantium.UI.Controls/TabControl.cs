@@ -1033,7 +1033,13 @@ public class TabControl : Selector
         base.OnApplyTemplate();
 
         _tabsHost = GetTemplateChild("PART_Tabs") as ItemsControl;
+        // Containers realized under the PREVIOUS template are still in OUR generator, but the tree they lived in went
+        // away with that template. ContainerOfTab asks this generator FIRST, so it kept answering with a detached
+        // TabItem - and everything measured from one lands nowhere: the selection bar could not find its way from the
+        // tab up to itself, decided it had nothing to point at, and hid. Which is why moving the strip to another edge
+        // and back left no bar at all. The strip's own hosts realize the tabs now, so ours has nothing to hold.
         _pinnedHost = GetTemplateChild("PART_PinnedTabs") as ItemsControl;
+        if (_tabsHost != null || _pinnedHost != null) ItemContainerGenerator.Clear();
         _contentHost = GetTemplateChild("PART_SelectedContentHost") as IUIComponent;
 
 
