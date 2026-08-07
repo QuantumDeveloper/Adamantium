@@ -41,6 +41,11 @@ public class PopupLayer
     /// taller than the window scrolls instead of clipping. Zero until the first sized pass.</summary>
     public Size WindowSize { get; private set; }
 
+    /// <summary>The window this layer belongs to. A popup's child is rendered DETACHED - it has no visual path back to
+    /// the window - so anything that has to walk out of an overlay (the focus ring looking for the layer to draw itself
+    /// on, most of all) is told the way back when the popup is put on the layer. Set by the window that owns the layer.</summary>
+    public IPopupHost Owner { get; init; }
+
     public void Add(Popup popup)
     {
         lock (_sync)
@@ -48,6 +53,11 @@ public class PopupLayer
             if (_popups.Contains(popup)) return;
             _popups.Add(popup);
         }
+        // HERE, not in Popup.Open: being ON the layer is what makes an overlay root belong to a window, and there is more
+        // than one way onto it - an OverlayWindow is added to the layer DIRECTLY, never through IsOpen. Registering in
+        // the IsOpen path alone left a dialog's content with no route back to the window, so the keyboard could move
+        // around inside it with no focus ring anywhere: the ring asks for the window's adorner layer and got null.
+        if (Owner != null && popup.ChildValue is { } overlayRoot) Popup.RegisterOverlayRoot(overlayRoot, Owner);
         // Its render units were disposed when it last closed, but its components are still geometry-VALID (closing doesn't
         // invalidate layout), so a clean reopen would record nothing and the cache would "reuse" the disposed units (the
         // fill + border vanish, only re-dirtied text rebuilds). Mark the whole subtree dirty so the next layout re-measures
@@ -62,6 +72,10 @@ public class PopupLayer
             _popups.Remove(popup);
             if (popup.ChildValue is IUIComponent c) _lastRect.Remove(c);   // ChildValue = lock-free field (see Roots): no component lock under _sync
         }
+        if (popup.ChildValue is not { } overlayRoot) return;
+        // Take the ring down BEFORE the way back out is forgotten - after that nothing inside can reach the layer.
+        (Owner as Adorners.IAdornerHost)?.AdornerLayer.ClearFocusWithin(overlayRoot);
+        Popup.UnregisterOverlayRoot(overlayRoot);
     }
 
     /// <summary>

@@ -82,18 +82,37 @@ public sealed class OverlayWindowManager
         KeepPinnedOnTop(window);
         SetActive(window);
         EnsureHostHooks();
+        // Escape has to be heard on the WINDOW ITSELF as well as on the host. A key routes UP from the focused element,
+        // and this window's content is hosted on the overlay - detached - so once the keyboard is inside it the route
+        // never passes through the host at all, and the host's handler heard nothing. Same reason Popup hooks Escape in
+        // two places. (Both may fire for one press; Close is guarded by CanClose and the second call finds it closed.)
+        window.KeyDown += OnHostKeyDown;
 
         var tcs = new TaskCompletionSource<object>();
         void OnClosed(object sender, EventArgs e)
         {
             window.Closed -= OnClosed;
+            window.KeyDown -= OnHostKeyDown;
             _host.PopupLayer.Remove(window.HostPopup);
             if (window.ScrimPopup != null) _host.PopupLayer.Remove(window.ScrimPopup);
             window.HostPopup = null;
             window.ScrimPopup = null;
             _windows.Remove(window);
-            SetActive(_windows.Count > 0 ? _windows[^1] : null);   // the next front-most becomes active
-            focusReturn.Restore(window);
+            var next = _windows.Count > 0 ? _windows[^1] : null;
+            SetActive(next);   // the next front-most becomes active
+            // ...and takes the keyboard with it, the way closing the front window on a desktop hands it to the one behind.
+            // NOT the captured return: that is where the focus was before THIS window opened, and a window is opened by
+            // CLICKING something - so the captured place is a button in the parent window, and closing the top overlay
+            // threw the keyboard back there over the heads of every overlay still open. The captured place is right only
+            // when the last one closes and there is nothing left to hand the keyboard to.
+            if (next != null)
+            {
+                next.TakeKeyboardBack();
+            }
+            else
+            {
+                focusReturn.Restore(window);
+            }
             if (_windows.Count == 0) RemoveHostHooks();
             tcs.TrySetResult(window.Result);
         }

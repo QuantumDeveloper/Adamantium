@@ -299,6 +299,9 @@ public class OverlayWindow : ContentControl
         // Any press within the window raises it to the front (like clicking a desktop window). MouseLeftButtonDown
         // bubbles, so a press on a child that does not handle it still reaches here.
         MouseLeftButtonDown += (_, _) => _manager?.BringToFront(this);
+        // A window is a place the keyboard can be sent to as a whole: Ctrl+Tab steps between it, the other overlays and
+        // the page behind, and comes back to where the keyboard was in each. A MODAL one is exempt by its own Tab trap.
+        KeyboardNavigation.SetIsFocusArea(this, true);
     }
 
     public override void OnApplyTemplate()
@@ -403,11 +406,14 @@ public class OverlayWindow : ContentControl
             pop.BeginAnimation(Transform.ScaleYProperty, new DoubleAnimation { From = 0.85, To = 1, Duration = duration, FillBehavior = FillBehavior.Stop });
         }
 
-        // A modal takes the keyboard with it. Without this the focus stayed on the page BEHIND: dimmed, unclickable,
-        // and still holding the ring - so the first Tab walked the background nobody could see, and the dialog's own
-        // buttons could only be reached with the mouse. The content may not be built yet (the host is filling it as we
-        // speak), so the attempt repeats over the next few layout passes and stops as soon as it lands.
-        if (IsModal) _focusTries = FocusAttempts;
+        // An opening window takes the keyboard with it - that is what opening a window means, modal or not. Without it
+        // the focus stayed on the page BEHIND, still holding the ring, so the first Tab walked the background and this
+        // window's own buttons could only be reached with the mouse. It also decides whether ESCAPE works on the first
+        // press: a key routes up from the focused element, so while the focus is still behind us the press reaches the
+        // parent window's own Escape - which gives the focus back and marks the key handled - and we never hear it. The
+        // content may not be built yet (the host is filling it as we speak), so the attempt repeats over the next few
+        // layout passes and stops as soon as it lands.
+        _focusTries = FocusAttempts;
 
         Opened?.Invoke(this, EventArgs.Empty);
     }
@@ -418,11 +424,19 @@ public class OverlayWindow : ContentControl
     protected override Size ArrangeOverride(Size finalSize)
     {
         var size = base.ArrangeOverride(finalSize);
-        TakeFocusIfModal();
+        TakeKeyboard();
         return size;
     }
 
-    private void TakeFocusIfModal()
+    /// <summary>Take the keyboard back - what the window BEHIND a closing one does. Immediately, since this window is
+    /// already built and laid out, with the same retry armed behind it in case it is not.</summary>
+    internal void TakeKeyboardBack()
+    {
+        _focusTries = FocusAttempts;
+        TakeKeyboard();
+    }
+
+    private void TakeKeyboard()
     {
         if (_focusTries <= 0) return;
         _focusTries--;

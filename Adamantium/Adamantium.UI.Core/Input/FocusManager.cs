@@ -1,4 +1,5 @@
-﻿using Adamantium.UI.Core.RoutedEvents;
+﻿using System.Runtime.CompilerServices;
+using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Core.Input;
 
@@ -40,29 +41,6 @@ public static class FocusManager
       }
    }
 
-   internal static void SetFocusScope(IInputComponent scope)
-   {
-      if (scope == null)
-      {
-         throw new ArgumentNullException(nameof(scope));
-      }
-
-      IInputComponent inputComponent = null;
-
-      if (!focusScopes.ContainsKey(scope))
-      {
-         inputComponent = FindFirstFocusableInScope(scope);
-         focusScopes.Add(scope, inputComponent);
-      }
-      else
-      {
-         Scope = scope;
-         inputComponent = focusScopes[scope];
-      }
-         
-      Focus(inputComponent);
-   }
-
    private static IEnumerable<IInputComponent> GetFocusScopeAncestors(IInputComponent scope)
    {
       var inputList = scope.GetSelfAndVisualAncestors().OfType<IInputComponent>();
@@ -73,19 +51,6 @@ public static class FocusManager
             yield return inputElement;
          }
       }
-   }
-
-   private static IInputComponent FindFirstFocusableInScope(IInputComponent scope)
-   {
-      var inputList = scope.GetSelfAndVisualAncestors().OfType<IInputComponent>();
-      foreach (var inputElement in inputList)
-      {
-         if (CanFocus(inputElement))
-         {
-            return inputElement;
-         }
-      }
-      return null;
    }
 
    public static Boolean CanFocus(IInputComponent inputComponent)
@@ -130,7 +95,7 @@ public static class FocusManager
          var scope = GetFocusScopeAncestors(component).FirstOrDefault();
          var previous = Focused;
          Focused = component;
-         lastFocused = component;
+         Remember(component);   // per WINDOW, so switching away and back comes back HERE - see FocusByRoot
 
          // Announce the move HERE, not only on the mouse path. Focus set programmatically - which is every keyboard
          // move, and every control that focuses itself - used to change nothing visible at all, because the events that
@@ -179,20 +144,53 @@ public static class FocusManager
          evt => new RoutedEventArgs(evt));
    }
 
-   private static IInputComponent lastFocused;
+   /// <summary>Where the focus was in each window. There is ONE focused element in the application - the same thing the
+   /// OS means by focus - but "where it was" is a question each window answers for itself, and the answer has to survive
+   /// the window being switched away from. A single global "last focused" answered it for the whole application, so
+   /// activating a second window restored the FIRST window's element: the new window came up with the keyboard pointing
+   /// somewhere else entirely, and navigation, which checks that the key arrived in the tree the focus is in, then
+   /// ignored every keystroke in it. Weak keys: remembering a place must not keep a closed window's tree alive.</summary>
+   private static readonly ConditionalWeakTable<IUIComponent, IInputComponent> FocusByRoot = new();
 
-   public static bool TryRestoreFocus(IInputComponent scope)
+   private static IUIComponent RootOf(IUIComponent node)
    {
-      if (lastFocused != null)
-      {
-         Focus(lastFocused);
-         return true;
-      }
-      else
-      {
-         SetFocusScope(scope);
+      while (node?.VisualParent is { } parent) node = parent;
+      return node;
+   }
+
+   private static void Remember(IInputComponent element)
+   {
+      if (RootOf(element) is not { } root) return;
+      FocusByRoot.Remove(root);
+      FocusByRoot.Add(root, element);
+   }
+
+   /// <summary>Puts the focus back where it was in <paramref name="root"/> - what a window does when it is activated.
+   /// False when this window has no place to go back to (it has never been focused, or what it remembers is gone), which
+   /// is how the caller knows to enter it at its first stop instead.</summary>
+   public static bool TryRestoreFocus(IInputComponent root)
+   {
+      if (root == null || !FocusByRoot.TryGetValue(root, out var remembered) || !CanFocus(remembered))
          return false;
-      }
+
+      // It has to still be IN this window: the remembered element may have been removed with a closed tab, or moved to
+      // another window entirely by a tear-off.
+      if (!ReferenceEquals(RootOf(remembered), root))
+         return false;
+
+      return Focus(remembered);
+   }
+
+   /// <summary>The window is no longer active: remember where the focus was in it and let it go. Keeping it would leave
+   /// the ring lit in a window the keyboard has left, and leave the ONE focused element pointing into a window that no
+   /// longer receives keys - which is what stopped the newly activated window from responding at all.</summary>
+   public static void LeaveWindow(IUIComponent root)
+   {
+      if (Focused == null || !ReferenceEquals(RootOf(Focused), root))
+         return;
+
+      Remember(Focused);
+      Release(Focused);
    }
 
    public static void SetFocusedElement(IInputComponent component, IInputComponent scope,

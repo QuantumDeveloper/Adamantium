@@ -150,6 +150,9 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         // Keyboard navigation is a static service, and a static class registers nothing until something touches it.
         // Here is the one place guaranteed to run before any element exists.
         KeyboardNavigation.Register();
+        // ...and the one fact it cannot work out for itself: which window an element hosted on the OVERLAY belongs to.
+        // Such an element has no visual path back, and only the popup layer knows the way - see Popup.HostOf.
+        KeyboardNavigation.HostOf = element => Popup.HostOf(element);
     }
 
     // A right-click on an element with a ContextMenu (its own or an ancestor's) opens it at the cursor. The right-button-up

@@ -55,6 +55,25 @@ public class AdornerLayer
             _focus.AttachStyles(style);
     }
 
+    /// <summary>Takes the focus ring down if it decorates something inside <paramref name="root"/> - what a closing
+    /// overlay calls for its own content. The ring is normally cleared by the element itself when it loses the focus, but
+    /// an element hosted on the overlay reaches this layer through the record its popup layer keeps, and that record is
+    /// gone by the time the content comes apart. The ring then had nobody left to take it down and hung in empty space
+    /// until something else happened to take the focus.</summary>
+    public void ClearFocusWithin(IUIComponent root)
+    {
+        if (root == null || _focus == null) return;
+
+        for (IUIComponent node = _focus.AdornedElement; node != null; node = node.VisualParent)
+        {
+            if (ReferenceEquals(node, root))
+            {
+                _focus = null;
+                return;
+            }
+        }
+    }
+
     /// <summary>Add a general overlay (a raw Adorner or a templatable one), rendered on top of the content. Idempotent.</summary>
     public void Add(IUIComponent overlay)
     {
