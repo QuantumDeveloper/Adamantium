@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
@@ -51,6 +51,22 @@ public partial class RenderCache
         public int SegIndex;      // Segment: index into that collector's recorded segment list; InstancedFlush: flush index
     }
     private readonly List<RenderOp> _ops = new();
+
+    // The transform-table version the op stream was recorded against, and whether it still holds. A recorded stream bakes
+    // THREE things against the transforms of its own frame: each Scissor op (a world-space rect), each per-unit draw (its
+    // full world, baked into RenderData - see ExecuteOps) and the batch segments (which follow their slot matrix LIVE).
+    // Once a matrix moves, those three no longer agree: the batched fill follows, the per-unit outline and the clip do
+    // not. Replaying then draws a frame that never existed - a clip one frame stale, a fill sliding out from under its
+    // own outline - which is exactly the flicker, and why it only shows with a render thread: that is when frames are
+    // replayed many times between records (measured: the flicker disappears the moment clean replay is disabled).
+    private ulong _opsMatrixVersion;
+
+    // Set by the applier when a packet folds a new layout snapshot in; cleared when a walk re-records the stream against
+    // that layout. While it is set, the retained stream describes an older frame than the snapshot does.
+    private bool _layoutChangedSinceRecord;
+
+    private bool OpsMatchTransforms =>
+        !_layoutChangedSinceRecord && (_transformTable == null || _transformTable.MatrixVersion == _opsMatrixVersion);
     private bool _recording;       // this frame runs the walk and is appending ops
     private bool _opsRecorded;     // _ops holds a complete frame from a prior walk
     private bool _opsReplayable;   // the recorded stream faithfully reproduces the frame (currently always true - see above)
@@ -64,6 +80,37 @@ public partial class RenderCache
 
     private const int MaxRetainedOps = 256;   // op stream past this -> a splice yields to a full walk that recompacts
     private readonly List<GroupPatch> _patchBuf = new();   // TrySplicedPatch: staged per-group patches (validated before mutation)
+
+    // Picks the transform-table copy this frame writes and draws from, and hands its address to every collector that
+    // exists. Called at the very top of Render AND again once the walk has (re)created the collectors, because the
+    // address moves with the copy: the shader reads the table through a constant pushed on every draw, so a replay -
+    // which re-records its draws but never reaches the walk's setup - must be given this frame's address too, or it
+    // would draw last frame's matrices while the moves were being written into the current copy.
+    private void BeginTransformFrame(IGraphicsDevice device)
+    {
+        if (device == null) return;
+
+        if (_transformTable == null)
+        {
+            _transformTable = new TransformTable();
+            _transformTable.EnsureResources(device);
+            _transformTable.SetMatrix(device, _transformTable.AcquireSlot(Guid.Empty), Matrix4x4F.Identity);
+        }
+        else
+        {
+            _transformTable.EnsureResources(device);
+        }
+
+        var address = _transformTable.DeviceAddress;
+        if (_rectBatch != null) _rectBatch.TransformsAddress = address;
+        if (_ellipseBatch != null) _ellipseBatch.TransformsAddress = address;
+        if (_gradientRectBatch != null) _gradientRectBatch.TransformsAddress = address;
+        if (_gradientEllipseBatch != null) _gradientEllipseBatch.TransformsAddress = address;
+        if (_patternBatch != null) _patternBatch.TransformsAddress = address;
+        if (_fractalBatch != null) _fractalBatch.TransformsAddress = address;
+        if (_textBatch != null) _textBatch.TransformsAddress = address;   // glyph VS fetches the block's node matrix by slot
+        if (_instancedFill != null) _instancedFill.TransformsAddress = address;
+    }
 
     /// <summary>Out-of-render-pass pass: recorded before BeginRendering (shared-surface latch copies).</summary>
     public void PreRender()
@@ -83,6 +130,10 @@ public partial class RenderCache
     /// units.</summary>
     public void Render(IGraphicsDevice device, Rect2D fullScissor)
     {
+        // This frame's transform-table copy, picked BEFORE anything writes a matrix or draws - the composited animations
+        // below write matrices, and the replay paths below draw without ever reaching the walk's setup block.
+        BeginTransformFrame(device);
+
         // The animations this thread plays by itself. BEFORE the clean-frame early-out on purpose: a composited animation
         // changes what the retained op stream draws (a matrix, a re-baked colour slot), so an otherwise CLEAN frame is
         // exactly when it must still apply - the loop can be stalled in a theme cascade and the spinner keeps turning.
@@ -90,7 +141,7 @@ public partial class RenderCache
 
         // Clean-frame replay: re-issue the last recorded walk's op stream and skip the per-unit loop (the retained buffers
         // still hold its bytes). Only a fully-Clean build qualifies; a Partial/Full re-walks and re-records.
-        if (device != null && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Clean)
+        if (device != null && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Clean && OpsMatchTransforms)
         {
             ExecuteOps(device, fullScissor);
             return;
@@ -101,7 +152,7 @@ public partial class RenderCache
         // ExecuteOps redraws batch segments from last frame's baked positions, so a MOVE would leave batched fills stale
         // while per-unit draws follow the new transform (the "outline runs ahead of its fill" tear) -> fall through to the walk.
         if (device != null && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Partial
-            && !LastBuildTransformDirty && !_partialSpliced && _rectBatch != null && TryPartialReplay(device, fullScissor))
+            && !LastBuildTransformDirty && OpsMatchTransforms && !_partialSpliced && _rectBatch != null && TryPartialReplay(device, fullScissor))
             return;
 
         // SPLICED partial patch: a dirty control's unit COUNT changed (hover background 0<->1, a live chart re-recording a
@@ -109,7 +160,7 @@ public partial class RenderCache
         // surgery (excise its old run, its re-baked items append as a new segment spliced into the op stream at the same
         // paint position) then replayed. O(dirty groups). Falls back to the full walk on anything not yet patchable.
         if (device != null && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Partial
-            && !LastBuildTransformDirty && _partialSpliced && _rectBatch != null && TrySplicedPatch(device, fullScissor))
+            && !LastBuildTransformDirty && OpsMatchTransforms && _partialSpliced && _rectBatch != null && TrySplicedPatch(device, fullScissor))
             return;
 
         var scissorNarrowed = false;   // whether the active scissor is currently narrower than fullScissor
@@ -154,33 +205,9 @@ public partial class RenderCache
             _gradientEllipseBatch.BeginFrame(device);
             _patternBatch.BeginFrame(device);
             _fractalBatch.BeginFrame(device);
-            // Transform table: identity at slot 0, (re)sized at this fence-safe point; the SDF collectors read the address
-            // per draw (BeginFrame may have reallocated the buffer).
-            if (_transformTable == null)
-            {
-                _transformTable = new TransformTable();
-                _transformTable.EnsureResources(device);
-                _transformTable.SetMatrix(device, _transformTable.AcquireSlot(Guid.Empty), Matrix4x4F.Identity);
-            }
-            else
-            {
-                _transformTable.EnsureResources(device);
-            }
-            _rectBatch.TransformsAddress = _transformTable.DeviceAddress;
-            _ellipseBatch.TransformsAddress = _transformTable.DeviceAddress;
-            _gradientRectBatch.TransformsAddress = _transformTable.DeviceAddress;
-            _gradientEllipseBatch.TransformsAddress = _transformTable.DeviceAddress;
-            _patternBatch.TransformsAddress = _transformTable.DeviceAddress;
-            _fractalBatch.TransformsAddress = _transformTable.DeviceAddress;
-            _textBatch.TransformsAddress = _transformTable.DeviceAddress;   // glyph VS fetches the block's node matrix by slot
+            // Transform table: this frame's copy, and its address on the collectors that were just (re)created above.
+            BeginTransformFrame(device);
             var sceneClean = LastBuildKind == RenderBuildKind.Clean;
-            _textBatch.SceneClean = sceneClean;
-            _rectBatch.SceneClean = sceneClean;
-            _ellipseBatch.SceneClean = sceneClean;
-            _gradientRectBatch.SceneClean = sceneClean;
-            _gradientEllipseBatch.SceneClean = sceneClean;
-            _patternBatch.SceneClean = sceneClean;
-            _fractalBatch.SceneClean = sceneClean;
             // Incremental upload: a Clean frame re-bakes byte-identical items into slots the buffers already hold, so Flush
             // skips the redundant upload (zero bytes move on an idle frame).
             if (InstancedFillCollector.Enabled)
@@ -551,6 +578,9 @@ public partial class RenderCache
         if (_recording)
         {
             _opsRecorded = true; _recording = false;
+            // The transform + layout state this op stream was recorded AGAINST. A replay is faithful only while it holds.
+            _opsMatrixVersion = _transformTable?.MatrixVersion ?? 0;
+            _layoutChangedSinceRecord = false;
         }
     }
 
@@ -679,6 +709,7 @@ public partial class RenderCache
     {
         if (_recording) _ops.Add(new RenderOp { Kind = RenderOpKind.Scissor, Scissor = scissor });
     }
+
 
     // Draw a fast-path partial by patching only the dirty tiles' batch slots, then replaying last frame's op stream. False
     // (-> full walk) if ANY dirty unit isn't a still-batchable rect we recorded a slot for (its bytes live elsewhere - a
@@ -978,3 +1009,4 @@ public partial class RenderCache
     }
 
 }
+

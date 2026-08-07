@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using Adamantium.Graphics.Core;
@@ -455,3 +455,5 @@ public partial class RenderCache
         return result;
     }
 }
+
+
