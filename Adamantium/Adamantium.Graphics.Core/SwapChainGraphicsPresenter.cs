@@ -52,7 +52,12 @@ namespace Adamantium.Graphics.Core
 
         private void CreateRenderTarget()
         {
-            renderTarget = ToDispose(GraphicsDevice.CreateRenderTarget(Width, Height, MSAALevel, SurfaceFormat, name: $"{Name}+RenderTarget"));
+            renderTargets = new IRenderTarget[FrameCopies];
+            for (var i = 0; i < renderTargets.Length; i++)
+            {
+                renderTargets[i] = ToDispose(GraphicsDevice.CreateRenderTarget(Width, Height, MSAALevel, SurfaceFormat,
+                    name: $"{Name}+RenderTarget{i}"));
+            }
         }
 
         SwapChainSupportDetails QuerySwapChainSupport(PhysicalDevice device)
@@ -375,9 +380,8 @@ namespace Adamantium.Graphics.Core
                 texture?.Dispose();
             }
 
-            RemoveAndDispose(ref depthBuffer);
-            RemoveAndDispose(ref renderTarget);
-            
+            DisposeFrameSurfaces();
+
             if (imageAvailableSemaphores != null)
             {
                 for (int i = 0; i < imageAvailableSemaphores.Length; i++)

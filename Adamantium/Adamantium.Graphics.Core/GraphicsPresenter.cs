@@ -9,8 +9,13 @@ namespace Adamantium.Graphics.Core
 {
     public abstract class GraphicsPresenter : DisposableObject
     {
-        protected IRenderTarget renderTarget;
-        protected IDepthStencilBuffer depthBuffer;
+        // ONE COLOUR TARGET AND DEPTH BUFFER PER FRAME IN FLIGHT, indexed by the device's frame slot - the same slot whose
+        // fence BeginDraw waits on, so the surfaces this frame draws into are provably free. A single shared pair meant
+        // the GPU could still be blitting frame N out of them while frame N+1 was already clearing and redrawing them,
+        // and the blit then published a half-drawn frame: whole-window flicker - missing scissors, text bleeding past a
+        // tab edge, backgrounds gone for one frame. Command buffers and fences were already per frame; these were not.
+        protected IRenderTarget[] renderTargets;
+        protected IDepthStencilBuffer[] depthBuffers;
         
         private PresentInterval presentInterval;
         protected uint currentImageIndex;
@@ -31,9 +36,19 @@ namespace Adamantium.Graphics.Core
 
         public MSAALevel MSAALevel => Description.MSAALevel;
 
-        public IRenderTarget RenderTarget => renderTarget;
+        /// <summary>How many copies of the frame surfaces to keep - the pipeline depth. A presenter that is read back
+        /// rather than presented (the designer's render-target presenter) overrides this to 1: it renders one frame and
+        /// waits, so a ring would only make "which copy holds the result" ambiguous.</summary>
+        protected virtual int FrameCopies => (int)Math.Max(1u, GraphicsDevice.MaxFramesInFlight);
 
-        public IDepthStencilBuffer DepthBuffer => depthBuffer;
+        protected int FrameSlot => renderTargets == null || renderTargets.Length == 0
+            ? 0
+            : (int)(GraphicsDevice.CurrentFrame % (uint)renderTargets.Length);
+
+        public IRenderTarget RenderTarget => renderTargets?[FrameSlot];
+
+        public IDepthStencilBuffer DepthBuffer =>
+            depthBuffers == null || depthBuffers.Length == 0 ? null : depthBuffers[FrameSlot % depthBuffers.Length];
         public Viewport Viewport { get; protected set; }
         
         public PresenterType PresenterType { get; private set; }
@@ -66,7 +81,33 @@ namespace Adamantium.Graphics.Core
 
         protected void CreateDepthBuffer()
         {
-            depthBuffer = ToDispose(GraphicsDevice.CreateDepthBuffer(Width, Height, DepthFormat, MSAALevel, name: $"{Name}+DepthBuffer"));
+            depthBuffers = new IDepthStencilBuffer[FrameCopies];
+            for (var i = 0; i < depthBuffers.Length; i++)
+            {
+                depthBuffers[i] = ToDispose(GraphicsDevice.CreateDepthBuffer(Width, Height, DepthFormat, MSAALevel,
+                    name: $"{Name}+DepthBuffer{i}"));
+            }
+        }
+
+        /// <summary>Frees every per-frame surface (both rings). Callers idle the device first - these images may still be
+        /// read by a frame in flight.</summary>
+        protected void DisposeFrameSurfaces()
+        {
+            if (depthBuffers != null)
+            {
+                for (var i = 0; i < depthBuffers.Length; i++)
+                {
+                    RemoveAndDispose(ref depthBuffers[i]);
+                }
+            }
+
+            if (renderTargets != null)
+            {
+                for (var i = 0; i < renderTargets.Length; i++)
+                {
+                    RemoveAndDispose(ref renderTargets[i]);
+                }
+            }
         }
 
         private void CreateViewPort()
