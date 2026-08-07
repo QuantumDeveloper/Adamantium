@@ -47,7 +47,7 @@ public class PopupRenderProcessor : EntityProcessor<WindowRenderService>
         // it is what flags dirty content (a re-measure clears IsGeometryValid) that the rebuild gate below reads.
         window.LayoutPopups();
 
-        var flat = Flatten(window.PopupRoots);
+        var flat = Flatten(window.PopupRoots, window);
         // Rebuild (component walk + rasterization) only when the open set / geometry / a popup's position changed.
         if (OverlayChanged(flat))
         {
@@ -108,13 +108,34 @@ public class PopupRenderProcessor : EntityProcessor<WindowRenderService>
 
     // Pre-order flatten of each popup subtree: BuildFromComponents renders a flat list in order, so a parent must come
     // before its children for correct layering. (The children are already measured/arranged by LayoutPopups.)
-    private static IReadOnlyList<IUIComponent> Flatten(IReadOnlyList<IUIComponent> roots)
+    // Each popup root, then the ADORNERS of what it hosts - so a focus ring inside an overlay is drawn with that overlay:
+    // above its own card, and below any overlay stacked on top of it. The adorner stage skips exactly these (it draws
+    // before the popups, where they would be buried); everything decorating the window's CONTENT stays there.
+    private static IReadOnlyList<IUIComponent> Flatten(IReadOnlyList<IUIComponent> roots, IWindow window)
     {
         var list = new List<IUIComponent>();
-        if (roots != null)
-            foreach (var root in roots)
-                FlattenInto(root, list);
+        if (roots == null) return list;
+
+        foreach (var root in roots)
+        {
+            FlattenInto(root, list);
+            foreach (var adorner in window.Adorners)
+            {
+                if (AdornsSomethingIn(adorner, root)) AdornerRenderProcessor.Collect(adorner, list);
+            }
+        }
+
         return list;
+    }
+
+    private static bool AdornsSomethingIn(IUIComponent adorner, IUIComponent root)
+    {
+        if (adorner is not Adamantium.UI.Controls.Adorners.Adorner { AdornedElement: { } target }) return false;
+
+        for (IUIComponent node = target; node != null; node = node.VisualParent)
+            if (ReferenceEquals(node, root)) return true;
+
+        return false;
     }
 
     private static void FlattenInto(IUIComponent component, List<IUIComponent> list)

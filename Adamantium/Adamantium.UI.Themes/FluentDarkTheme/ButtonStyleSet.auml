@@ -52,10 +52,10 @@
                                     ContentTemplate="{TemplateBinding ContentTemplate}"
                                     ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
                         </controls:Border>
-                        <!-- Two-tone focus ring as an overlay (no layout reflow): outer + inner 1px rings, lit on focus. -->
-                        <controls:Border x:Name="FocusOuter" CornerRadius="4" BorderThickness="1" BorderBrush="Transparent">
-                            <controls:Border x:Name="FocusInner" CornerRadius="3" BorderThickness="1" BorderBrush="Transparent"/>
-                        </controls:Border>
+                        <!-- No focus ring here: the application has ONE, drawn by the FocusAdorner on the window's adorner
+                             layer (see FocusAdornerStyleSet). A ring restated in a template is a second answer to the same
+                             question - and this one was the WHITE FocusStrokeColorOuter, so a focused button wore a white
+                             frame while every other control wore the accent one. -->
                     </controls:Grid>
                 </ControlTemplate>
             </Setter.Value>
@@ -73,10 +73,6 @@
         <PropertyTrigger Property="IsPressed" Value="true">
             <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
             <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundPressed}"/>
-        </PropertyTrigger>
-        <PropertyTrigger Property="IsFocused" Value="true">
-            <Setter TargetName="FocusOuter" Property="BorderBrush" Value="{ThemeResource FocusStrokeColorOuter}"/>
-            <Setter TargetName="FocusInner" Property="BorderBrush" Value="{ThemeResource FocusStrokeColorInner}"/>
         </PropertyTrigger>
         <PropertyTrigger Property="IsEnabled" Value="false">
             <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundDisabled}"/>

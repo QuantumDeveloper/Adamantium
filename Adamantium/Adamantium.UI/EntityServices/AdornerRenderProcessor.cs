@@ -49,6 +49,13 @@ public class AdornerRenderProcessor : EntityProcessor<WindowRenderService>
         _flat.Clear();
         foreach (var adorner in window.Adorners)
         {
+            // An adorner on something hosted by a POPUP is drawn by the popup stage instead, right behind the popup it
+            // belongs to. Drawn here it would sit under every overlay (a dialog's focus ring vanished entirely); drawn
+            // last, above them all, it floated over the overlays stacked on top of its own (a ring from the window
+            // hanging over four overlay windows). A decoration belongs in the layer of the thing it decorates.
+            if (IsHostedOnOverlay(adorner, window)) 
+                continue;
+            
             LayoutFrameAdorner(adorner);
             Flatten(adorner, _flat);
         }
@@ -56,6 +63,28 @@ public class AdornerRenderProcessor : EntityProcessor<WindowRenderService>
         _cache.BuildFromComponents(_flat, projection);
         _cache.ProcessCommands(projection, AssociatedService.RenderScale);
         _cache.PreRender();
+    }
+
+    /// <summary>Is what this adorner decorates hosted on the window's popup overlay (rather than in its content)?</summary>
+    internal static bool IsHostedOnOverlay(IUIComponent adorner, IWindow window)
+    {
+        if (adorner is not Adorner { AdornedElement: { } target }) return false;
+
+        foreach (var root in window.PopupRoots)
+        {
+            for (IUIComponent node = target; node != null; node = node.VisualParent)
+                if (ReferenceEquals(node, root)) return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>Themes + lays out a frame adorner and flattens its subtree into <paramref name="list"/>. Shared with the
+    /// popup stage, which draws the adorners of what IT hosts so they stack with it.</summary>
+    internal static void Collect(IUIComponent adorner, List<IUIComponent> list)
+    {
+        LayoutFrameAdorner(adorner);
+        Flatten(adorner, list);
     }
 
     private readonly List<IUIComponent> _flat = new();
