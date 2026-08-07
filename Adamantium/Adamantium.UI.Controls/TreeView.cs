@@ -449,14 +449,21 @@ public class TreeView : ItemsControl
         if (container is IInputComponent focusable && container.Visibility == Visibility.Visible)
         {
             FocusManager.Focus(focusable, NavigationMethod.Directional);
-            (container as UIComponent)?.BringIntoView();
-            return;
         }
 
+        // Scroll by the row's place in the PANEL, not by the container's current world position. The panel answers from
+        // the item's index, which is the same number before and after a scroll; a container answers with where it is
+        // drawn right now, which still carries the PREVIOUS offset until layout has run. Holding an arrow key issues a
+        // step per frame, so that lag made every step aim a little wrong and the next frame correct it - the list
+        // shivered by a couple of pixels instead of scrolling. The container path stays for panels that cannot place an
+        // item by index (non-uniform rows).
         if (ItemsHostPanel is VirtualizingPanel panel && panel.TryGetItemRect(index, out var rect))
         {
             EnclosingScrollViewer()?.BringIntoView(rect);
+            return;
         }
+
+        (container as UIComponent)?.BringIntoView();
     }
 
     private ScrollViewer EnclosingScrollViewer()
