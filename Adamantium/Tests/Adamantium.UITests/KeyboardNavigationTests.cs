@@ -1062,4 +1062,65 @@ public class KeyboardNavigationTests
             Assert.That(FocusManager.Focused, Is.SameAs(b));
         });
     }
+
+    /// <summary>Tab must not walk OUT of a cycle - what a modal dialog and an overlay are. While one is up the content
+    /// behind it is unclickable, so a Tab that left would put the keyboard where the mouse cannot follow: focused,
+    /// invisible, and reachable only by tabbing all the way round.</summary>
+    [Test]
+    public void TabCyclesInsideAModalAndNeverLeavesIt()
+    {
+        var outside = NewButton("outside");
+        var first = NewButton("first");
+        var last = NewButton("last");
+
+        var modalContent = new StackPanel();
+        modalContent.Children.Add(first);
+        modalContent.Children.Add(last);
+        var modal = new Border { Width = 100, Height = 60, Child = modalContent };
+        KeyboardNavigation.SetTabNavigation(modal, KeyboardNavigationMode.Cycle);
+
+        var page = new StackPanel();
+        page.Children.Add(outside);
+        page.Children.Add(modal);
+        Root(page);
+
+        FocusManager.Focus(first);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Next), Is.True);
+            Assert.That(FocusManager.Focused, Is.SameAs(last), "steps within the modal");
+            // Past the last stop it comes round to the first INSIDE, never out to `outside`.
+            Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Next), Is.True);
+            Assert.That(FocusManager.Focused, Is.SameAs(first), "wraps inside the modal");
+            // ...and backwards off the front wraps to the end of the modal, not to what precedes it in the page.
+            Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Previous), Is.True);
+            Assert.That(FocusManager.Focused, Is.SameAs(last), "shift-tab wraps inside too");
+        });
+    }
+
+    /// <summary>The same tree WITHOUT the cycle: Tab leaves as it always did - so the trap is the mode, not a change to
+    /// ordinary navigation.</summary>
+    [Test]
+    public void TabLeavesAContainerThatIsNotACycle()
+    {
+        var outside = NewButton("outside");
+        var first = NewButton("first");
+        var last = NewButton("last");
+
+        var content = new StackPanel();
+        content.Children.Add(first);
+        content.Children.Add(last);
+        var box = new Border { Width = 100, Height = 60, Child = content };
+
+        var page = new StackPanel();
+        page.Children.Add(box);
+        page.Children.Add(outside);
+        Root(page);
+
+        FocusManager.Focus(last);
+
+        Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Next), Is.True);
+        Assert.That(FocusManager.Focused, Is.SameAs(outside), "an ordinary container is left behind");
+    }
 }

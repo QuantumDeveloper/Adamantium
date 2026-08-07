@@ -15,5 +15,10 @@ public enum KeyboardNavigationMode
     /// <summary>The move stops at the container's edge instead of continuing outside it. For the ARROW keys over a field
     /// of tiles: at the edge of the grid the key does nothing, rather than throwing the focus onto whatever happens to
     /// sit beside the panel. Leaving is then Tab's job, which is a deliberate move rather than one arrow too many.</summary>
-    Contained
+    Contained,
+
+    /// <summary>Tab never leaves: past the last stop it comes round to the first one INSIDE this container. What a modal
+    /// dialog and an overlay need - while one is up, the rest of the window is not reachable by mouse either, so a Tab
+    /// that walked out into it would put the keyboard somewhere the user cannot see or click, with no way back.</summary>
+    Cycle
 }

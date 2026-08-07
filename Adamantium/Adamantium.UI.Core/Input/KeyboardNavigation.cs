@@ -219,24 +219,30 @@ public static class KeyboardNavigation
         IUIComponent child = IsTabbing(direction) ? OutermostSingleEntry(from) : from;
         for (var node = child.VisualParent; node != null; child = node, node = node.VisualParent)
         {
-            if (node is not INavigablePanel panel)
-                continue;
-
-            // A candidate with nothing focusable inside is not a dead end - keep asking the same panel for the one
-            // after it, or an empty container would stop the Tab where a user sees only a gap.
-            for (var candidate = panel.Navigate(child, direction);
-                 candidate != null;
-                 candidate = panel.Navigate(candidate, direction))
+            if (node is INavigablePanel panel)
             {
-                if (FirstStop(candidate, direction) is { } stop)
-                    return stop;
+                // A candidate with nothing focusable inside is not a dead end - keep asking the same panel for the one
+                // after it, or an empty container would stop the Tab where a user sees only a gap.
+                for (var candidate = panel.Navigate(child, direction);
+                     candidate != null;
+                     candidate = panel.Navigate(candidate, direction))
+                {
+                    if (FirstStop(candidate, direction) is { } stop)
+                        return stop;
+                }
+
+                // An arrow does not climb out of a container that keeps them: at the edge of a field of tiles the key
+                // does nothing at all, instead of throwing the focus onto whatever happens to sit beside the panel. One
+                // arrow too many is otherwise enough to lose your place, and getting back in takes a mouse.
+                if (!IsTabbing(direction) && GetDirectionalNavigation(node) == KeyboardNavigationMode.Contained)
+                    return null;
             }
 
-            // An arrow does not climb out of a container that keeps them: at the edge of a field of tiles the key does
-            // nothing at all, instead of throwing the focus onto whatever happens to sit beside the panel. One arrow
-            // too many is otherwise enough to lose your place, and getting back in takes a mouse.
-            if (!IsTabbing(direction) && GetDirectionalNavigation(node) == KeyboardNavigationMode.Contained)
-                return null;
+            // Nor does TAB climb out of a cycle - a modal dialog or an overlay. Past its last stop the walk comes round
+            // to its first, so the keyboard stays where the mouse is confined too. Asked of EVERY node on the way out,
+            // not only of panels: what carries the cycle is usually the modal's chrome (a Border, a card), not a panel.
+            if (IsTabbing(direction) && GetTabNavigation(node) == KeyboardNavigationMode.Cycle)
+                return FirstStop(node, direction);
         }
 
         // Off the end of the tree: Tab comes round again, an arrow key stops at the edge.
@@ -258,9 +264,15 @@ public static class KeyboardNavigation
 
     private static IInputComponent Wrap(IInputComponent from, FocusNavigationDirection direction)
     {
+        // Round again inside the innermost CYCLE this element sits in - a modal dialog or an overlay - and only failing
+        // that around the whole tree. Wrapping to the tree root regardless would walk a modal's Tab straight out into
+        // the page behind it, which is the one place the keyboard must not go.
         IUIComponent root = from;
-        while (root.VisualParent is { } parent)
-            root = parent;
+        for (IUIComponent node = from; node != null; node = node.VisualParent)
+        {
+            root = node;
+            if (GetTabNavigation(node) == KeyboardNavigationMode.Cycle) break;
+        }
 
         return FirstStop(root, direction);
     }

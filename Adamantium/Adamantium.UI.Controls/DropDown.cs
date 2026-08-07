@@ -157,7 +157,11 @@ public class DropDown : Selector
         if (count == 0) return;
         var from = SelectedIndex < 0 ? (e.Delta < 0 ? -1 : count) : SelectedIndex;   // start at an edge when unset
         var next = Math.Clamp(from + (e.Delta < 0 ? 1 : -1), 0, count - 1);
-        if (next != SelectedIndex) SelectedIndex = next;
+        if (next == SelectedIndex) return;   // already at that end of the list: leave the wheel unhandled so the page
+                                             // under the cursor keeps scrolling - the same chaining rule ScrollViewer
+                                             // follows at its own edge. Swallowing it here dead-ended the wheel on
+                                             // every drop-down it passed over.
+        SelectedIndex = next;
         e.Handled = true;
     }
 
@@ -216,6 +220,14 @@ public class DropDown : Selector
             _popup.IsOpen = IsDropDownOpen;
         }
         UpdateDisplayContent();
+    }
+
+    /// <summary>Let the template's parts go when the template does - see ScrollBar.OnRemoveTemplate.</summary>
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        if (_popup != null) _popup.Closed -= OnPopupClosed;
+        _popup = null;
     }
 
     // Clicking the header toggles the list. The popup's contents live in the overlay layer (not our visual subtree), so a
