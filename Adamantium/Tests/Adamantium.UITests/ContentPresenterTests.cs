@@ -178,9 +178,10 @@ public class ContentPresenterTests
         });
     }
 
-    // WPF-style DataContext adoption for DATA content rendered via a template - the crux that binds a data-bound
-    // TabControl body (PART_SelectedContentHost) to its own selected item view-model, not the TabControl's DataContext.
-    private sealed class ItemVm { public string Name { get; init; } }
+    // DataContext adoption for DATA content rendered via a template - the crux that binds a data-bound TabControl body
+    // (PART_SelectedContentHost) to its own selected item view-model, not the TabControl's DataContext. The context goes
+    // on the BUILT VISUAL, not on the presenter: the presenter's own properties may themselves be bound.
+    private sealed class ItemVm { public string Name { get; init; } public object Payload { get; init; } }
 
     private sealed class NameTemplateSelector : DataTemplateSelector
     {
@@ -195,13 +196,14 @@ public class ContentPresenterTests
     }
 
     [Test]
-    public void DataContent_BecomesDataContext_SoTemplateBindsToIt()
+    public void DataContent_BecomesTheBuiltVisualsDataContext_SoTemplateBindsToIt()
     {
         var vm = new ItemVm { Name = "Zed" };
+        var ambient = new ItemVm { Name = "Ambient" };
         var cp = new ContentPresenter
         {
             // Ambient context is deliberately something ELSE (mirrors PART_SelectedContentHost inheriting a TabControl's).
-            DataContext = new ItemVm { Name = "Ambient" },
+            DataContext = ambient,
             ContentTemplateSelector = new NameTemplateSelector(),
             Content = vm
         };
@@ -210,9 +212,39 @@ public class ContentPresenterTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(cp.DataContext, Is.SameAs(vm), "data content becomes the presenter's own DataContext");
             var tb = cp.VisualChildren.OfType<TextBlock>().First();
             Assert.That(tb.Text, Is.EqualTo("Zed"), "the built template's {Binding Name} resolves against the content view-model");
+            Assert.That(tb.DataContext, Is.SameAs(vm), "the content is the context of the visual built for it");
+            Assert.That(cp.DataContext, Is.SameAs(ambient),
+                "the presenter keeps its own context - its Content/ContentTemplate may be bound against it");
+        });
+    }
+
+    /// <summary>The presenter's own Content is BOUND (the ordinary case inside an item template), and the row is recycled
+    /// onto another item. Stamping the content onto the presenter's own DataContext broke exactly this: the value the
+    /// binding produced became the context the binding read from, and being a local write it masked inheritance for good,
+    /// so a virtualized list repeated its first screenful forever.</summary>
+    [Test]
+    public void BoundContent_FollowsTheContainerWhenItIsRecycled()
+    {
+        var row = new ContentPresenter { ContentTemplateSelector = new NameTemplateSelector() };
+        row.SetBinding(nameof(ContentPresenter.Content), new Binding("Payload"));
+        var host = new Adamantium.UI.Controls.Panels.StackPanel
+            { DataContext = new ItemVm { Payload = new ItemVm { Name = "first" } } };
+        host.Children.Add(row);
+        host.Measure(new Size(200, 100));
+        host.Arrange(new Rect(0, 0, 200, 100));
+        var before = row.VisualChildren.OfType<TextBlock>().First().Text;
+
+        host.DataContext = new ItemVm { Payload = new ItemVm { Name = "second" } };   // the container is rebound
+        host.Measure(new Size(200, 100), force: true);
+        host.Arrange(new Rect(0, 0, 200, 100));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(before, Is.EqualTo("first"));
+            Assert.That(row.VisualChildren.OfType<TextBlock>().First().Text, Is.EqualTo("second"),
+                "the rebound container's presenter re-resolves its Content and the kept visual follows the new item");
         });
     }
 
