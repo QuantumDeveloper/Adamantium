@@ -29,18 +29,22 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     private double _uL, _uT, _uR, _uB; // logical union of the pending segment (paint-order overlap test)
     private bool _hasUnion;
 
-    private Buffer<TItem> _gpu;
+    // ONE COPY PER FRAME IN FLIGHT. The pipeline is MaxFramesInFlight deep, so BeginDraw's fence proves only frame
+    // N-MaxFramesInFlight is done: the frames between it and this one are still reading. Writing a single shared buffer
+    // therefore rewrote instances under the frames drawing them - which is what made a fast scroll flicker across the
+    // WHOLE window, still parts included (slot indices come from draw order, so an item leaving the viewport shifts every
+    // later slot). The copy is chosen by the device's frame index, so the one written is the one whose last reader has
+    // already been waited for. Same scheme as ReusableBuffer, which is why per-unit geometry never had this problem.
+    private Buffer<TItem>[] _ring;
+    private int _current;              // ring slot this frame writes and draws from
+    private uint _writeFrame = uint.MaxValue;   // device frame the slot was last chosen for
     private int _gpuCapacity;
-    private bool _recreatedThisFrame;  // the GPU buffer was (re)allocated this frame -> its old contents are gone
 
-    // Last frame's baked items (a CPU mirror of what the GPU buffer holds) + how many were valid. The walk is
-    // deterministic and _renderUnits is retained across partial frames, so slot i holds the SAME item as last frame while
-    // the layout is stable (a hover). Comparing the freshly baked items to this and uploading only the CHANGED span moves
-    // a few hundred bytes on a hover instead of re-uploading every instance - the incremental-upload path for NON-clean
-    // frames (a clean frame skips it entirely via SceneClean). A scroll/structural change shifts most slots, so most
-    // differ and we upload ~everything (correct - no worse than the old full upload).
-    private TItem[] _prevItems;
-    private int _prevCount;
+    // Per copy: the bytes that copy currently holds, and how many of them are valid. The upload diffs the freshly baked
+    // items against THIS copy (not against last frame), so only what that copy is actually missing is sent - a still
+    // scene converges to zero bytes within a lap of the ring, and a scroll sends the span that moved.
+    private TItem[][] _mirror;
+    private int[] _mirrorCount;
 
     // Segments drawn THIS frame (each = a clip + a buffer range), retained for the clean-frame op replay. RenderCache
     // records an ordered op stream during the walk; on a fully-unchanged (Clean) frame it skips the walk entirely and
@@ -48,12 +52,6 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     // bytes). Cleared at BeginFrame; a segment's index is stable within the frame that recorded it.
     protected struct Segment { public Rect2D Scissor; public uint Count; public uint First; }
     private readonly List<Segment> _segments = new();
-
-    /// <summary>Set by the caller each frame BEFORE the walk: true when the render scene is provably unchanged since last
-    /// frame (RenderBuildKind.Clean). The walk still re-runs (re-bakes identical items, re-records identical draws), but
-    /// Flush then SKIPS the GPU upload - last frame's bytes are still in the retained buffer at the same offsets, so
-    /// re-uploading them is pure waste. This is the incremental-upload path: on an idle frame, zero bytes move.</summary>
-    public bool SceneClean { get; set; }
 
     protected BatchCollector(int initialCapacity) => Items = new TItem[initialCapacity];
 
@@ -73,28 +71,99 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     protected virtual bool UsesStorageBuffer => true;
 
     /// <summary>The batch buffer (its device address feeds the instanced shader when <see cref="UsesStorageBuffer"/>).</summary>
-    protected Buffer<TItem> GpuBuffer => _gpu;
+    protected Buffer<TItem> GpuBuffer => _ring?[_current];
 
     public void BeginFrame(IGraphicsDevice device)
     {
-        _prevCount = Count;   // last frame's total (Count still holds it) - the valid length of _prevItems for the diff
         Count = 0;
         _segmentStart = 0;
         _hasUnion = false;
-        _recreatedThisFrame = false;
         _segments.Clear();
-        if (_gpu == null || _gpuCapacity < Items.Length)
+        EnsureRing(device);
+        SelectSlot(device);
+        OnBeginFrame(device);
+    }
+
+    // (Re)allocates the whole ring when the CPU array outgrew it (or the pipeline depth changed). The outgoing buffers
+    // are handed to the device's deferred queue, NEVER disposed here: frames still in flight are reading them, and
+    // freeing one under a live frame is the same bug in a louder form.
+    // TEMP (flicker hunt): ADAMANTIUM_NO_RING=1 collapses the ring back to ONE copy - the pre-fix behaviour. Used to
+    // verify the write probe actually fires on a known violation, so its silence means something.
+    private static readonly bool RingDisabled = Environment.GetEnvironmentVariable("ADAMANTIUM_NO_RING") == "1";
+
+    private void EnsureRing(IGraphicsDevice device)
+    {
+        var copies = RingDisabled ? 1 : (int)Math.Max(1, device.MaxFramesInFlight);
+        if (_ring != null && _ring.Length == copies && _gpuCapacity >= Items.Length) return;
+
+        if (_ring != null)
         {
-            _gpu?.Dispose();
-            _gpu = UsesStorageBuffer
+            foreach (var buffer in _ring)
+            {
+                if (buffer != null) device.AddToDeferDisposeQueue(buffer);
+            }
+        }
+
+        _ring = new Buffer<TItem>[copies];
+        _mirror = new TItem[copies][];
+        _mirrorCount = new int[copies];
+        for (var i = 0; i < copies; i++)
+        {
+            _ring[i] = UsesStorageBuffer
                 ? Adamantium.Graphics.Buffer.New<TItem>(device, (uint)Items.Length,
                     BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
                     MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal)
                 : Adamantium.Graphics.Buffer.Vertex.New<TItem>(device, (uint)Items.Length, BufferMemoryUsage.UploadFromCpuToGpu);
-            _gpuCapacity = Items.Length;
-            _recreatedThisFrame = true;   // fresh buffer holds no prior data -> a SceneClean skip is unsafe this frame
+            _mirror[i] = new TItem[Items.Length];
+            _mirrorCount[i] = 0;   // a fresh buffer holds nothing -> everything differs -> first write sends it all
         }
-        OnBeginFrame(device);
+        _gpuCapacity = Items.Length;
+    }
+
+    // Advance on every WRITE, not by frame index. A copy written by one walk is read by every REPLAY frame that follows
+    // it - several, since the render thread draws far more often than the recorder records. Indexing by frame index put
+    // the next walk back on the same copy three frames later, overwriting it while those replays were still in flight
+    // (BeginDraw's fence only proves frame N-3 is done; the replays are N-1 and N-2). Round-robin per write gives each
+    // walk a copy no recent frame is reading, and by the time the ring wraps those frames are long retired.
+    private int _writeCursor;
+
+    private void SelectSlot(IGraphicsDevice device)
+    {
+        _current = _writeCursor % _ring.Length;
+        _writeCursor = (_writeCursor + 1) % _ring.Length;
+        _writeFrame = device.CurrentFrame;
+        if (_mirror[_current].Length < Items.Length) Array.Resize(ref _mirror[_current], Items.Length);
+    }
+
+    // A write that does NOT come from a walk (a partial patch replaying last frame's ops) still has to land in THIS
+    // frame's copy, and that copy is a lap behind - bring it up to the retained data first, by diff, then patch it.
+    private void PrepareRetainedWrite(IGraphicsDevice device)
+    {
+        if (_ring == null || device.CurrentFrame == _writeFrame) return;
+        SelectSlot(device);
+        UploadRange(0, Count);
+    }
+
+    // Sends [first, first+count) to the current copy, but only the one contiguous span that copy is actually missing.
+    private void UploadRange(int first, int count)
+    {
+        if (count <= 0) return;
+        var mirror = _mirror[_current];
+        var valid = _mirrorCount[_current];
+        int lo = -1, hi = -1;
+        for (var i = first; i < first + count; i++)
+        {
+            if (i < valid && SlotUnchanged(i, mirror)) continue;
+            if (lo < 0) lo = i;
+            hi = i;
+        }
+        if (lo >= 0)
+        {
+            _ring[_current].SetData(Items.AsSpan(lo, hi - lo + 1), (uint)(lo * Stride));
+            Items.AsSpan(lo, hi - lo + 1).CopyTo(mirror.AsSpan(lo));
+        }
+        var end = first + count;
+        if (end > _mirrorCount[_current]) _mirrorCount[_current] = end;
     }
 
     /// <summary>Per-frame hook for derived state (e.g. lazily creating the effect). Base does nothing.</summary>
@@ -115,33 +184,10 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         var segStart = _segmentStart;
         var count = Count - segStart;
 
-        // Upload strategy for this segment:
-        //  - buffer (re)allocated this frame  -> no prior GPU contents, upload the whole segment;
-        //  - SceneClean                        -> the retained buffer already holds these exact bytes, upload nothing;
-        //  - otherwise (a partial/full change) -> upload ONLY the [lo,hi] slots whose baked bytes differ from last frame.
-        if (_recreatedThisFrame)
-        {
-            _gpu.SetData(Items.AsSpan(segStart, count), (uint)(segStart * Stride));
-        }
-        else if (!SceneClean)
-        {
-            int lo = -1, hi = -1;
-            for (var i = segStart; i < Count; i++)
-            {
-                if (i < _prevCount && SlotUnchanged(i)) continue;
-                if (lo < 0) lo = i;
-                hi = i;
-            }
-            if (lo >= 0)
-                _gpu.SetData(Items.AsSpan(lo, hi - lo + 1), (uint)(lo * Stride));
-        }
-
-        // Mirror this segment into _prevItems for next frame's diff (skip only a clean frame - it is already identical).
-        if (!SceneClean || _recreatedThisFrame)
-        {
-            if (_prevItems == null || _prevItems.Length < Items.Length) Array.Resize(ref _prevItems, Items.Length);
-            Items.AsSpan(segStart, count).CopyTo(_prevItems.AsSpan(segStart));
-        }
+        // Send this segment to THIS frame's copy - only the span that copy is missing. An unchanged scene converges to
+        // zero bytes once every copy has seen it, which is what the old single-buffer "skip the upload when the scene is
+        // clean" bought, without the assumption that last frame's bytes are still there to be reused.
+        UploadRange(segStart, count);
 
         // Record the segment (clip + buffer range) and draw it. On a Clean frame the walk is skipped and RenderCache
         // replays this exact segment via DrawRecordedSegment (same code path, no upload) - so the immediate draw here
@@ -166,7 +212,7 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         if (s.Count == 0) return;   // fully excluded by a spliced patch (see ExcludeRun) - nothing left to draw
         device.SetScissors(s.Scissor);
         BindSegment(index);
-        DrawSegment(device, _gpu, s.Count, s.First, projection);
+        DrawSegment(device, _ring[_current], s.Count, s.First, projection);
         device.SetScissors(fullScissor);
     }
 
@@ -190,6 +236,18 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     }
 
     public Rect2D GetSegmentScissor(int index) => _segments[index].Scissor;
+
+    /// TEMP (flicker hunt): what this recorded segment actually draws, for the walk-vs-replay trace comparison.
+    public string DescribeSegment(int index)
+    {
+        if (index < 0 || index >= _segments.Count) return $"seg[{index}] MISSING (have {_segments.Count})";
+        var s = _segments[index];
+        var x = s.Scissor?.Offset?.X ?? -1;
+        var y = s.Scissor?.Offset?.Y ?? -1;
+        var w = s.Scissor?.Extent?.Width ?? 0;
+        var h = s.Scissor?.Extent?.Height ?? 0;
+        return $"first={s.First} count={s.Count} clip={x},{y} {w}x{h}";
+    }
 
     /// <summary>Shrinks segment <paramref name="segmentIndex"/> to end BEFORE <paramref name="first"/> and registers the
     /// remainder AFTER [first, first+count) as a NEW segment (same scissor), returning its index (-1 when nothing
@@ -220,13 +278,12 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     /// segment's index.</summary>
     public int AppendPatchSegment(IGraphicsDevice device, ReadOnlySpan<TItem> items, Rect2D scissor)
     {
+        PrepareRetainedWrite(device);
         var first = Count;
         EnsureCpuCapacity(first + items.Length);
         items.CopyTo(Items.AsSpan(first));
         Count = first + items.Length;
-        _gpu.SetData(Items.AsSpan(first, items.Length), (uint)(first * Stride));
-        if (_prevItems == null || _prevItems.Length < Items.Length) Array.Resize(ref _prevItems, Items.Length);
-        items.CopyTo(_prevItems.AsSpan(first));
+        UploadRange(first, items.Length);
         var idx = _segments.Count;
         _segments.Add(new Segment { Scissor = scissor, Count = (uint)items.Length, First = (uint)first });
         return idx;
@@ -241,9 +298,9 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     /// </summary>
     public void UpdateSlot(IGraphicsDevice device, int slot, TItem item)
     {
+        PrepareRetainedWrite(device);
         Items[slot] = item;
-        if (_prevItems != null && slot < _prevItems.Length) _prevItems[slot] = item;
-        _gpu.SetData(Items.AsSpan(slot, 1), (uint)(slot * Stride));
+        UploadRange(slot, 1);
     }
 
     /// <summary>Hook: capture per-segment state at record time (the text batch stashes the segment's atlas). Base no-op.</summary>
@@ -252,10 +309,10 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     /// <summary>Hook: restore the per-segment state captured by <see cref="OnSegmentRecorded"/> before its draw. Base no-op.</summary>
     protected virtual void BindSegment(int index) { }
 
-    // Did slot i bake byte-identical to last frame? A blittable per-item bytewise compare (the items are unmanaged
-    // Vector4F structs), SIMD-accelerated by SequenceEqual - cheap relative to the GPU upload it lets us skip.
-    private bool SlotUnchanged(int i)
-        => MemoryMarshal.AsBytes(Items.AsSpan(i, 1)).SequenceEqual(MemoryMarshal.AsBytes(_prevItems.AsSpan(i, 1)));
+    // Does slot i already hold, in this copy, exactly what we baked? A blittable per-item bytewise compare (the items are
+    // unmanaged Vector4F structs), SIMD-accelerated by SequenceEqual - cheap relative to the GPU upload it lets us skip.
+    private bool SlotUnchanged(int i, TItem[] mirror)
+        => MemoryMarshal.AsBytes(Items.AsSpan(i, 1)).SequenceEqual(MemoryMarshal.AsBytes(mirror.AsSpan(i, 1)));
 
     /// <summary>Emit the instanced draw for [firstInstance, firstInstance + count) of <paramref name="buffer"/>. The
     /// segment's scissor is already set; the derived type sets its own blend/depth/effect state + pass.</summary>
