@@ -6,8 +6,8 @@ namespace Adamantium.MVVM;
 /// Put alongside <see cref="BindableAttribute"/> on a field to also raise change notification for other members
 /// when this property changes — e.g. a computed property that depends on it:
 /// <code>[Bindable, Affects(nameof(FullName))] private string _firstName;</code>
-/// Name one or more members. (Affecting a generated command — to re-raise its CanExecuteChanged — lands once the
-/// engine ICommand gains CanExecuteChanged; until then only property notifications are raised.)
+/// Name one or more members. Naming a generated COMMAND re-raises its <c>CanExecuteChanged</c> instead — which is how a
+/// button or a menu row follows a command whose availability depends on this property.
 /// </summary>
 [AttributeUsage(AttributeTargets.Field, AllowMultiple = true)]
 public sealed class AffectsAttribute : Attribute
