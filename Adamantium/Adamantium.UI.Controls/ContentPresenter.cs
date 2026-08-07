@@ -75,13 +75,22 @@ public class ContentPresenter : InputUIComponent
         // ambient DataContext - the element brought its own bindings. Only SET (never clear), so an externally assigned
         // DataContext (ItemsControl.PrepareContainer sets it before Content) is matched, never clobbered.
         //
-        // NOTE: this handler is SHARED by the Content, ContentTemplate and ContentTemplateSelector changes, so it must key
-        // off the actual Content - never the incoming value, which for a template/selector change is the template/selector
-        // itself (that bug set DataContext to the DataTemplate, so a header/body template's {Binding}s resolved to nothing).
-        if (Content is not null and not IUIComponent)
-        {
-            DataContext = Content;
-        }
+        // The context goes on the visual the template BUILDS (see SetContentContext), never on the presenter itself. The
+        // presenter's own properties may be bound - <ContentPresenter Content="{Binding Header}"/> inside an item template
+        // is the ordinary case - and those bindings resolve against the presenter's DataContext. Stamping the CONTENT
+        // there makes the value a binding just produced decide what that binding reads next: it resolved Header against
+        // the item, then re-resolved it against the header, and settled on whatever it found. Worse, the stamp is a LOCAL
+        // value, so it masks inheritance for good: recycling the container onto another item no longer reaches the
+        // presenter, its Content binding never re-resolves, and the row keeps the name it first showed - a virtualized
+        // list then repeats its first screenful over and over.
+    }
+
+    /// <summary>Puts the content under the visual built for it, which is what a ContentTemplate's <c>{Binding}</c>s resolve
+    /// against. Re-applied on every content change, including the recycling fast-path below - that IS how a reused visual
+    /// follows its new item.</summary>
+    private void SetContentContext(object content)
+    {
+        if (_currentTemplateResult != null && _currentRoot is FundamentalUIComponent root) root.DataContext = content;
     }
 
     // Returns TRUE if it tore down and built a NEW visual (so the presenter must re-measure/arrange the new subtree),
@@ -103,7 +112,10 @@ public class ContentPresenter : InputUIComponent
         {
             var reuseTemplate = ContentTemplate ?? ContentTemplateSelector?.SelectTemplate(newContent, this);
             if (ReferenceEquals(reuseTemplate, _currentTemplate))
-                return false;   // reuse: no teardown, no rebuild (data updates via the reused visual's DataContext)
+            {
+                SetContentContext(newContent);   // point the kept visual at the new item; its {Binding}s re-resolve
+                return false;                    // reuse: no teardown, no rebuild
+            }
         }
 
         // Recycling fast-path 2: plain (no-template) content already hosted in the auto-generated TextBlock - just update
@@ -197,6 +209,7 @@ public class ContentPresenter : InputUIComponent
         {
             AddVisualChild(_currentRoot);
             AddLogicalChild(_currentRoot);
+            SetContentContext(newContent);
         }
     }
 
