@@ -206,7 +206,11 @@
                                                    IsHitTestVisible="False"/>
                                     </Grid>
                                 </TabStripScroller>
+                            <!-- Focusable=False: chrome, not a keyboard destination. Clicking it used to give it focus,
+                                 and the button template lights its focus ring on IsFocused - so a frame was left drawn
+                                 around it after every use. Tab still reaches the tabs themselves, which is what matters. -->
                             <ToggleButton x:Name="PART_TabOverflow" Grid.Row="1" Grid.Column="2" VerticalAlignment="Stretch"
+                                          Focusable="False"
                                           MinWidth="28" Padding="4 0" Visibility="Collapsed" BorderThickness="0"
                                           HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                           Background="{ResourceReference SolidBackgroundFillColorBase}">
@@ -325,6 +329,7 @@
                                 </Grid>
                             </TabStripScroller>
                             <ToggleButton x:Name="PART_TabOverflow" Grid.Column="1" VerticalAlignment="Stretch"
+                                          Focusable="False"
                                           MinWidth="28" Padding="4 0" Visibility="Collapsed" BorderThickness="0"
                                           HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                           Background="{ResourceReference SolidBackgroundFillColorBase}">
@@ -387,6 +392,7 @@
                                 </Grid>
                             </TabStripScroller>
                             <ToggleButton x:Name="PART_TabOverflow" Grid.Row="1" HorizontalAlignment="Stretch"
+                                          Focusable="False"
                                           MinHeight="24" Padding="0 4" Visibility="Collapsed" BorderThickness="0"
                                           HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                           Background="{ResourceReference SolidBackgroundFillColorBase}">
@@ -476,6 +482,7 @@
                                 </Grid>
                             </TabStripScroller>
                             <ToggleButton x:Name="PART_TabOverflow" Grid.Row="1" HorizontalAlignment="Stretch"
+                                          Focusable="False"
                                           MinHeight="24" Padding="0 4" Visibility="Collapsed" BorderThickness="0"
                                           HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                           Background="{ResourceReference SolidBackgroundFillColorBase}">

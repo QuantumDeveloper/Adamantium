@@ -118,6 +118,13 @@ public static class FocusManager
    {
       if (component != null)
       {
+         // Focusable is a REFUSAL, and it has to hold on every path into here - not just the mouse one, which was the
+         // only caller that asked. Keyboard navigation, a control focusing itself and any programmatic Focus() could all
+         // put the focus on an element that says it cannot take it; the element then reports IsFocused, and a template
+         // that draws its focus ring on IsFocused drew one around, say, a caption button - a frame left sitting in the
+         // window chrome after a click, on a control that is not a keyboard destination at all.
+         if (!CanFocus(component)) return false;
+
          if (ReferenceEquals(Focused, component)) return true;
 
          var scope = GetFocusScopeAncestors(component).FirstOrDefault();
