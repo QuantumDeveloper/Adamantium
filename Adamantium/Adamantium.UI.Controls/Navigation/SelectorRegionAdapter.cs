@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using Adamantium.Navigation;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Controls.Navigation;
 
@@ -53,29 +54,47 @@ public sealed class SelectorRegionAdapter : IRegionAdapter
         else if (selector.ItemTemplate == null && selector.ItemTemplateSelector == null)
             selector.ItemTemplateSelector = new ViewLocatorTemplateSelector(_viewLocator);
 
-        region.ActiveViewsChanged += (sender, e) =>
+        // A region is resolved by NAME and outlives any host bound to it (GetOrCreateRegion hands back the same instance),
+        // so these handlers MUST come off when this host goes away. Without that, re-opening the window left the previous
+        // TabControl still subscribed: it kept syncing its own dead item list, and - through SelectionChanged below - kept
+        // ACTIVATING view models on the live region, so two controls drove one region and the new tabs came out wrong.
+        void OnActiveViewsChanged(object sender, System.EventArgs e)
         {
             if (syncing) return;
             syncing = true;
             SyncItems();
             syncing = false;
-        };
+        }
 
-        region.PropertyChanged += (sender, e) =>
+        void OnRegionPropertyChanged(object sender, System.ComponentModel.PropertyChangedEventArgs e)
         {
             if (e.PropertyName != nameof(IRegion.CurrentViewModel) || syncing) return;
             syncing = true;
             selector.SelectedItem = region.CurrentViewModel;
             syncing = false;
-        };
+        }
 
-        selector.SelectionChanged += (sender, e) =>
+        void OnSelectionChanged(object sender, System.EventArgs e)
         {
             if (syncing || selector.SelectedItem == null) return;
             syncing = true;
             region.Activate(selector.SelectedItem);
             syncing = false;
-        };
+        }
+
+        region.ActiveViewsChanged += OnActiveViewsChanged;
+        region.PropertyChanged += OnRegionPropertyChanged;
+        selector.SelectionChanged += OnSelectionChanged;
+
+        selector.DetachedFromVisualTreeEvent += OnDetached;
+
+        void OnDetached(object sender, VisualTreeAttachmentEventArgs e)
+        {
+            selector.DetachedFromVisualTreeEvent -= OnDetached;
+            region.ActiveViewsChanged -= OnActiveViewsChanged;
+            region.PropertyChanged -= OnRegionPropertyChanged;
+            selector.SelectionChanged -= OnSelectionChanged;
+        }
 
         SyncItems();
         selector.SelectedItem = region.CurrentViewModel;
