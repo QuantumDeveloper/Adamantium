@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Core;
@@ -79,12 +79,13 @@ public class TextLayout : DisposableObject
         return _wordData.ToArray();
     }
 
-    private void CalculateRealTextDimensions()
+    // Takes the list explicitly: it is called mid-shaping, on data not yet published as _wordData.
+    private void CalculateRealTextDimensions(List<GlyphWordData> glyphsData)
     {
-        var minX = _wordData.Min(x => x.Rect.Left);
-        var maxX = _wordData.Max(x => x.Rect.Right);
-        var minY = _wordData.Min(x => x.Rect.Top);
-        var maxY = _wordData.Max(x => x.Rect.Bottom);
+        var minX = glyphsData.Min(x => x.Rect.Left);
+        var maxX = glyphsData.Max(x => x.Rect.Right);
+        var minY = glyphsData.Min(x => x.Rect.Top);
+        var maxY = glyphsData.Max(x => x.Rect.Bottom);
         RealTextDimensions = new Size(maxX - minX, maxY - minY);
     }
 
@@ -212,7 +213,10 @@ public class TextLayout : DisposableObject
             }
         }
 
-        _wordData = glyphsData;
+        // NOT published yet. The alignment passes below still SHIFT every glyph in this list, and the render thread reads
+        // _wordData whenever it bakes glyphs - publishing here handed it a list whose glyphs had been laid out but not yet
+        // aligned, so a frame that landed in that window drew the text at the wrong place (or off its own block, which
+        // reads as text vanishing for one frame). The list becomes _wordData once it is FINISHED, in one assignment.
         // The block's height is a FONT metric - the last line's baseline - NOT the ink extremes. Ink differs per
         // string (descenders, round overshoot), so measuring it made "Output" measure taller than "Errors" at the
         // same size, and same-size text changed height as its content changed. Descenders hang below the box, which
@@ -220,9 +224,9 @@ public class TextLayout : DisposableObject
         var lastBaseline = height + baseLine;
         height = lastBaseline;
 
-        CalculateRealTextDimensions();
-        
-        var maxX = _wordData.Max(x => x.Rect.Right);
+        CalculateRealTextDimensions(glyphsData);
+
+        var maxX = glyphsData.Max(x => x.Rect.Right);
         var finalRect = new Size(Math.Ceiling(maxX), Math.Ceiling(height));
         if (renderingParameters.TextArea.Width != Int32.MaxValue)
         {
@@ -235,6 +239,10 @@ public class TextLayout : DisposableObject
         }
         
         ArrangeText();
+
+        // Finished: hand the whole list over in one reference write. A reader either sees the previous layout or this
+        // one, never a half-aligned mixture.
+        _wordData = glyphsData;
 
         CalculatedLayoutSize = finalRect;
 
@@ -347,17 +355,17 @@ public class TextLayout : DisposableObject
 
         void ArrangeText()
         {
-            var minX = _wordData.Min(x => x.Rect.Left);
-            var maxX = _wordData.Max(x => x.Rect.Right);
-            var minY = _wordData.Min(x => x.Rect.Top);
+            var minX = glyphsData.Min(x => x.Rect.Left);
+            var maxX = glyphsData.Max(x => x.Rect.Right);
+            var minY = glyphsData.Min(x => x.Rect.Top);
             switch (renderingParameters.HorizontalTextAlignment)
             {
                 case HorizontalTextAlignment.Center:
                 {
-                    var maxLines = _wordData.Max(x => x.LineIndex);
+                    var maxLines = glyphsData.Max(x => x.LineIndex);
                     for (int i = 0; i <= maxLines; ++i)
                     {
-                        var glyphsForLine = _wordData.Where(x => x.LineIndex == i).ToArray();
+                        var glyphsForLine = glyphsData.Where(x => x.LineIndex == i).ToArray();
                         if (glyphsForLine.Length == 0) break;
 
                         // Centre by the INK extent (ignore leading/trailing spaces) so they don't pull the
@@ -380,10 +388,10 @@ public class TextLayout : DisposableObject
                 break;
                 case HorizontalTextAlignment.Right:
                 {
-                    var maxLines = _wordData.Max(x => x.LineIndex);
+                    var maxLines = glyphsData.Max(x => x.LineIndex);
                     for (int i = 0; i <= maxLines; ++i)
                     {
-                        var glyphsForLine = _wordData.Where(x => x.LineIndex == i).ToArray();
+                        var glyphsForLine = glyphsData.Where(x => x.LineIndex == i).ToArray();
                         if (glyphsForLine.Length == 0) break;
                         
                         // get max right point ignoring spaces in the end of the line
@@ -400,7 +408,7 @@ public class TextLayout : DisposableObject
                 break;
                 case HorizontalTextAlignment.Justify:
                 {
-                    var maxLines = _wordData.Max(x => x.LineIndex);
+                    var maxLines = glyphsData.Max(x => x.LineIndex);
                     for (int i = 0; i <= maxLines; ++i)
                     {
                         // The last line of a justified block stays ragged (left-aligned), per typography
@@ -412,7 +420,7 @@ public class TextLayout : DisposableObject
                         // each word's internal layout (letter spacing + kerning) untouched. We only SHIFT
                         // glyphs - never re-lay them - so sub-pixel positions and side bearings stay correct
                         // (the old code re-laid every glyph: int-truncated the pen and dropped the first LSB).
-                        var lineGlyphs = _wordData.Where(x => x.LineIndex == i).OrderBy(x => x.Rect.X).ToArray();
+                        var lineGlyphs = glyphsData.Where(x => x.LineIndex == i).OrderBy(x => x.Rect.X).ToArray();
                         if (lineGlyphs.Length == 0) continue;
 
                         int firstInk = -1, lastInk = -1;
@@ -459,12 +467,12 @@ public class TextLayout : DisposableObject
                     // baseline only (NO descent reserve below): almost all UI labels have no descender, and reserving
                     // descent space would push the optical centre a couple pixels high. Descenders simply hang below,
                     // as they should - the caps/x-height stay put regardless of the exact characters.
-                    var lineCount = _wordData.Max(x => x.LineIndex) + 1;
+                    var lineCount = glyphsData.Max(x => x.LineIndex) + 1;
                     var ascent = Font.Ascender * scale;
                     var blockHeight = (lineCount - 1) * lineHeight + ascent;
                     var blockTop = baseLine - ascent;                      // line 0's ascent top in the current coords
                     var diff = (finalRect.Height - blockHeight) / 2 - blockTop;
-                    foreach (var glyphWordData in _wordData)
+                    foreach (var glyphWordData in glyphsData)
                     {
                         var rect = glyphWordData.Rect;
                         rect.Y += (float)diff;
@@ -479,7 +487,7 @@ public class TextLayout : DisposableObject
                     // higher than one without at the same size (visible between inline Runs). (Top is the default
                     // no-op layout.)
                     var diff = finalRect.Height - lastBaseline;
-                    foreach (var glyphWordData in _wordData)
+                    foreach (var glyphWordData in glyphsData)
                     {
                         var rect = glyphWordData.Rect;
                         rect.Y += (float)diff;
