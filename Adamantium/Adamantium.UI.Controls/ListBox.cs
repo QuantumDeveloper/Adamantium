@@ -111,17 +111,20 @@ public class ListBox : Selector
         if (container is IInputComponent focusable && container.Visibility == Visibility.Visible)
         {
             FocusManager.Focus(focusable, NavigationMethod.Directional);
-            (container as UIComponent)?.BringIntoView();
-            return;
         }
 
-        // Not realized - the row is outside the window the panel is keeping. There is no visual to scroll to, but the
-        // panel can still say WHERE the row will be, and scrolling there materialises it: the view comes back to the
-        // selection now, and the focus lands on it as soon as it exists.
+        // Scroll by the row's place in the PANEL - it answers from the index, the same number before and after a scroll,
+        // whereas a container answers with where it is drawn right now, still carrying the previous offset until layout
+        // has run. With a held arrow key that lag makes each step aim slightly wrong and the next one correct it. Works
+        // for a row that was never realized too, which is the case this path already existed for. The container path
+        // remains for panels that cannot place an item by index.
         if (ItemsHostPanel is VirtualizingPanel panel && panel.TryGetItemRect(index, out var rect))
         {
             EnclosingScrollViewer()?.BringIntoView(rect);
+            return;
         }
+
+        (container as UIComponent)?.BringIntoView();
     }
 
     private ScrollViewer EnclosingScrollViewer()
