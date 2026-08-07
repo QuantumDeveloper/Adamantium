@@ -570,8 +570,17 @@ public class Grid: Panel
             var childFinalW = GetArrangeSize(colSegments, cell.ColumnIndex, cell.ColSpan);
             var childFinalH = GetArrangeSize(rowSegments, cell.RowIndex, cell.RowSpan);
 
+            // A Grid must never hand a child a non-finite rect. Arrange REJECTS one by throwing, and that exception
+            // unwinds the whole layout pass: every element after the offending one keeps its default slot, so a window
+            // renders with its content piled at the origin. Offsets can inherit a NaN from a track size, so the
+            // coordinates need the same guard the sizes get in GetArrangeSize.
+            if (!double.IsFinite(childFinalX)) childFinalX = 0;
+            if (!double.IsFinite(childFinalY)) childFinalY = 0;
+            if (!double.IsFinite(childFinalW)) childFinalW = 0;
+            if (!double.IsFinite(childFinalH)) childFinalH = 0;
+
             var rect = new Rect(childFinalX, childFinalY, childFinalW, childFinalH);
-            
+
             child.Arrange(rect);
             index++;
          }
@@ -649,7 +658,10 @@ public class Grid: Panel
          arrangedSize -= endSegment.Padding.BottomRight - startSegment.Padding.TopLeft;
       }
 
-      return arrangedSize;
+      // Never hand back a NEGATIVE or non-finite size: Arrange rejects such a rect by throwing, which aborts the whole
+      // pass and leaves every element after the offending one in its default slot. NB Math.Max(0, NaN) is NaN, so the
+      // NaN case needs its own test rather than a clamp.
+      return double.IsNaN(arrangedSize) || arrangedSize < 0 ? 0 : arrangedSize;
    }
 
    private double CalculateTotalSize(GridSegment[] segments)
@@ -700,7 +712,12 @@ public class Grid: Panel
          var starSegments = segments.Where(x => x.IsStar).ToArray();
          foreach (var starSegment in starSegments)
          {
-            if (availableSize > 0)
+            // `stars > 0` is load-bearing, not defensive: a "0*" track makes the TOTAL zero, and availableSize/0 is
+            // Infinity, which times this segment's own 0 stars is NaN. That NaN lands in Min, survives every later pass
+            // (nothing recomputes it once the grid is given zero space), and finally reaches Arrange - which REJECTS a
+            // NaN rect by throwing, aborting the whole layout pass. Everything after that point keeps its default slot,
+            // so a window renders with its content piled at the origin.
+            if (availableSize > 0 && stars > 0)
             {
                starSegment.Min = Math.Max((availableSize / stars) * starSegment.Stars, 0);
             }
@@ -724,9 +741,15 @@ public class Grid: Panel
             }
          }
       }
-      else
+      else if (finalSize > 0 && totalTakenSize > 0)
       {
-         var extraRatio = totalTakenSize/finalSize;
+         // Both guards are load-bearing. This branch shrinks the Auto tracks by how much they overflow, and the ratio is
+         // totalTakenSize/finalSize - which is 0/0 when the grid is arranged into ZERO space and holds nothing yet (a
+         // window's tab strip on its first pass). That NaN goes straight into Min, and nothing ever recomputes it: the
+         // later passes take the `totalTakenSize < finalSize` branch, which only writes STAR tracks. It survives into the
+         // track Offset, then into the child rect - and Arrange throws on a NaN rect, aborting the entire layout pass, so
+         // everything after that point stays at the origin. That is what left a whole window's content piled in a corner.
+         var extraRatio = totalTakenSize / finalSize;
          var autoSegments = segments.Where(x => x.IsAuto).ToArray();
          foreach (var segment in autoSegments)
          {
@@ -971,7 +994,7 @@ public class Grid: Panel
 
       var finalAvailableSize = Math.Max(availableSize - takenSize, 0);
 
-      if (finalAvailableSize > 0 && !Double.IsInfinity(availableSize))
+      if (finalAvailableSize > 0 && allStars > 0 && !Double.IsInfinity(availableSize))
       {
          for (int i = 0; i < segment.Length; ++i)
          {
