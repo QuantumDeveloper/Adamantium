@@ -230,6 +230,7 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
     {
         if (!IsItemsHost) return MeasurePlain(availableSize);
 
+        Size desired;
         _inLayout = true;
         try
         {
@@ -237,8 +238,18 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
             _passOffset = _offset;   // snapshot: the matching arrange positions against exactly this
             var extent = MeasureVirtualized(availableSize, _offset);
             _extent = extent;
-            // Occupy the viewport on a bounded axis, the extent on an axis the parent left unbounded.
+            // An UNBOUNDED axis is a question ("how big would you like to be?"), not a statement that everything is
+            // visible - a Grid star row probes its child unbounded to learn its natural size before resolving the row,
+            // so this arrives every single pass. Reading it as a viewport collapses the scroll range to nothing, which
+            // clamps the offset back to zero at the top of the NEXT measure: the list refuses to scroll and realizes
+            // only its first window. Keep the viewport we already know on such an axis; only a bounded one updates it,
+            // and only a never-measured axis falls back to the extent.
             _viewport = new Size(
+                double.IsInfinity(availableSize.Width) ? (_viewport.Width > 0 ? _viewport.Width : extent.Width) : availableSize.Width,
+                double.IsInfinity(availableSize.Height) ? (_viewport.Height > 0 ? _viewport.Height : extent.Height) : availableSize.Height);
+            // The DESIRED size still answers that question honestly: the extent on an unbounded axis, the slot on a
+            // bounded one. It is what the parent asked for and is independent of the viewport above.
+            desired = new Size(
                 double.IsInfinity(availableSize.Width) ? extent.Width : availableSize.Width,
                 double.IsInfinity(availableSize.Height) ? extent.Height : availableSize.Height);
             // The NEW extent can be SMALLER than the one _offset was clamped to above (e.g. the cells just shrank): an
@@ -260,7 +271,7 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         }
         finally { _inLayout = false; }
         RaiseMetrics();
-        return _viewport;
+        return desired;
     }
 
     protected override Size ArrangeOverride(Size finalSize)

@@ -263,11 +263,16 @@ public class ScrollContentPresenter : ContentPresenter, IScrollableContent
             ResolveInner();
             if (_inner != null)
             {
-                _viewport = new Size(
+                // An unbounded axis is the parent ASKING for our natural size (a Grid star row probes its child that way
+                // before it resolves the row), not telling us the whole content is on screen. Taking it for a viewport
+                // wipes the scroll range and zeroes the offset every pass - the list then refuses to scroll. The viewport
+                // is what ARRANGE hands us; measure only answers with a desired size.
+                if (!double.IsInfinity(availableSize.Width)) _viewport = new Size(availableSize.Width, _viewport.Height);
+                if (!double.IsInfinity(availableSize.Height)) _viewport = new Size(_viewport.Width, availableSize.Height);
+                RaiseMetricsChanged();
+                return new Size(
                     double.IsInfinity(availableSize.Width) ? _inner.Extent.Width : availableSize.Width,
                     double.IsInfinity(availableSize.Height) ? _inner.Extent.Height : availableSize.Height);
-                RaiseMetricsChanged();
-                return _viewport;
             }
         }
 

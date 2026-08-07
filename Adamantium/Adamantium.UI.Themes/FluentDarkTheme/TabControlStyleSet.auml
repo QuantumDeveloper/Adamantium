@@ -95,17 +95,19 @@
         </Setter>
     </Style>
 
-    <!-- The overflow flyout's list: a PIXEL-scrolling ScrollViewer (no CanContentScroll) capped by MaxHeight, mirroring the
-         DropDown's proven popup - item/logical scrolling reports "it all fits" when measured UNBOUNDED in an overlay and so
-         never scrolls; pixel scrolling caps + scrolls. Applied BY CLASS so this template lives ONCE for every placement's
-         overflow list. Only tens of tabs, so realizing them all (no virtualization) costs nothing here. -->
+    <!-- The overflow flyout's list: a ScrollViewer capped by MaxHeight that scrolls the CONTENT, so the list virtualizes -
+         it may hold every tab of a browser-sized session, and realizing them all would cost exactly what the strip already
+         costs at startup. The scroll stays pixel-smooth either way (the panel lays its rows out at absolute slots and the
+         presenter translates it). The bar is HIDDEN, not disabled - it overlays the rows' close button, and the wheel is
+         how this list is scrolled anyway. Applied BY CLASS so this template lives ONCE for every placement's overflow list. -->
     <Style Selector="ListBox.TabOverflowList">
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ListBox">
                     <ScrollViewer MaxHeight="360"
+                                  CanContentScroll="True"
                                   HorizontalScrollBarVisibility="Disabled"
-                                  VerticalScrollBarVisibility="Auto">
+                                  VerticalScrollBarVisibility="Hidden">
                         <ItemsPresenter x:Name="PART_ItemsPresenter"/>
                     </ScrollViewer>
                 </ControlTemplate>
