@@ -211,14 +211,18 @@ public static class TextureExtensions
             PipelineStageFlagBits.TransferBit
         );
         
-        // destination (swapchain) texture
+        // destination (swapchain) texture. The source side names the SAME stages the submit waits the imageAvailable
+        // semaphore on (colour output + transfer): a layout transition is a WRITE, and with TopOfPipe as its source it
+        // carried no execution dependency on that wait - so the transition could run against an image the presentation
+        // engine had not released yet (the layer reports it as WRITE_AFTER_READ vs vkAcquireNextImageKHR). Undefined as
+        // the old layout still discards the contents; what changes is WHEN the transition is allowed to happen.
         graphicsDevice.InsertImageMemoryBarrier(commandBuffer,
             dstTexture,
             0,
             AccessFlagBits.TransferWriteBit,
             ImageLayout.Undefined,
             ImageLayout.TransferDstOptimal,
-            PipelineStageFlagBits.TopOfPipeBit,
+            PipelineStageFlagBits.ColorAttachmentOutputBit | PipelineStageFlagBits.TransferBit,
             PipelineStageFlagBits.TransferBit
         );
 
