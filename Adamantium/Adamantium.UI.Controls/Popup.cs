@@ -59,6 +59,8 @@ public class Popup : MeasurableUIComponent, IContainer
 
     private IPopupHost _host;   // the window layer this popup is registered with while open
     private MouseButtonEventHandler _lightDismiss;   // window preview-press handler while an open, !KeepOpen popup is shown
+    private KeyEventHandler _escapeDismiss;          // ...and its keyboard half (Escape)
+    private IInputComponent _escapeContentRoot;      // the popup's own content root, hooked alongside the window (see HookEscape)
 
     public bool IsOpen
     {
@@ -257,6 +259,7 @@ public class Popup : MeasurableUIComponent, IContainer
         _focusReturn.Capture();   // where the keyboard was, so closing can put it back
         _host.PopupLayer.Add(this);
         if (!KeepOpen) HookLightDismiss();   // click-outside-to-close, hosted centrally here (see OnGlobalPreviewDown)
+        if (DismissOnEscape) HookEscape();   // ...and Escape, which a KeepOpen drawer wants just as much
     }
 
     private readonly FocusReturn _focusReturn = new();
@@ -265,6 +268,7 @@ public class Popup : MeasurableUIComponent, IContainer
     {
         var wasOpen = _host != null;
         UnhookLightDismiss();                    // while _host is still set
+        UnhookEscape();
         if (Child is IUIComponent overlayRoot) OverlayRootHost.Remove(overlayRoot);
         _host?.PopupLayer.Remove(this);
         _host = null;
@@ -288,6 +292,70 @@ public class Popup : MeasurableUIComponent, IContainer
     {
         if (_lightDismiss != null && _host is IInputComponent root)
             root.RemoveHandler(Mouse.PreviewMouseDownEvent, _lightDismiss);
+    }
+
+    // Escape is hooked SEPARATELY from the mouse dismiss, because the two are not the same question. Click-outside is
+    // about a flyout that any stray press should take away (KeepOpen). Escape is about ANY temporary layer over the
+    // page - a drawer stays put when you click the page behind it, and still has to answer Escape.
+    private void HookEscape()
+    {
+        if (_host is not IInputComponent root) return;
+        _escapeDismiss ??= OnGlobalPreviewKey;
+        root.AddHandler(Keyboard.PreviewKeyDownEvent, _escapeDismiss, handledEventsToo: true);
+
+        // ...and on the popup's OWN content root. PreviewKeyDown TUNNELS, so its route runs from the root of the focused
+        // element's tree down to that element - and this content lives in the overlay layer, a tree of its own. With only
+        // the window hooked, Escape worked until something inside the popup took focus and then stopped: the route no
+        // longer passed through the window at all. (A drawer with a button in it: click the button, Escape went dead.)
+        // Both hooks firing is harmless - the handler acts only for the innermost popup and bails on e.Handled.
+        _escapeContentRoot = Child as IInputComponent;
+        _escapeContentRoot?.AddHandler(Keyboard.PreviewKeyDownEvent, _escapeDismiss, handledEventsToo: true);
+
+        OpenDismissable.Add(this);
+    }
+
+    private void UnhookEscape()
+    {
+        OpenDismissable.Remove(this);
+        if (_escapeDismiss == null) return;
+        if (_host is IInputComponent root) root.RemoveHandler(Keyboard.PreviewKeyDownEvent, _escapeDismiss);
+        // Remove from the SAME object it was added to: Child can be swapped while the popup is open.
+        _escapeContentRoot?.RemoveHandler(Keyboard.PreviewKeyDownEvent, _escapeDismiss);
+        _escapeContentRoot = null;
+    }
+
+    // Escape-dismissable popups currently open, in the order they opened. Escape closes the INNERMOST, which is the
+    // last one here - a submenu goes before the menu that opened it, and one press closes one level, as everywhere else.
+    private static readonly List<Popup> OpenDismissable = new();
+
+    /// <summary>Escape dismisses this popup (default true). Off for a popup that is not a temporary layer at all - a
+    /// docked surface that happens to be portalled through one.</summary>
+    public static readonly AdamantiumProperty DismissOnEscapeProperty = AdamantiumProperty.Register(
+        nameof(DismissOnEscape), typeof(bool), typeof(Popup), new PropertyMetadata(true));
+
+    public bool DismissOnEscape
+    {
+        get => GetValue<bool>(DismissOnEscapeProperty);
+        set => SetValue(DismissOnEscapeProperty, value);
+    }
+
+    /// <summary>Escape was pressed on this popup. A host that OWNS it - a drawer that must slide out rather than
+    /// vanish - handles this and closes itself; left unhandled, the popup simply closes.</summary>
+    public event EventHandler<RoutedEventArgs> DismissRequested;
+
+    /// <remarks>On the window's PREVIEW stream because a popup lives in the overlay layer and not in the visual tree of
+    /// whatever opened it - a key pressed with the focus anywhere else would never travel through it. Only the
+    /// innermost open popup acts, and it marks the key handled, so one Escape closes one level instead of collapsing
+    /// the whole stack.</remarks>
+    private void OnGlobalPreviewKey(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Escape || e.Handled) return;
+        if (OpenDismissable.Count == 0 || !ReferenceEquals(OpenDismissable[^1], this)) return;
+
+        var args = new RoutedEventArgs();
+        DismissRequested?.Invoke(this, args);
+        if (!args.Handled) IsOpen = false;
+        e.Handled = true;
     }
 
     private void OnGlobalPreviewDown(object sender, MouseButtonEventArgs e)

@@ -98,18 +98,40 @@ public class SlidePanel : ContentControl
     {
         base.OnApplyTemplate();
         _popup = GetTemplateChild("PART_Popup") as Popup;
+        if (_popup != null) _popup.DismissRequested += OnPopupDismissRequested;
         _drawer = (GetTemplateChild("PART_Drawer") ?? _popup?.Child) as UIComponent;
 
-        if (_closeButton != null) _closeButton.Click -= OnCloseClick;
         _closeButton = GetTemplateChild("PART_CloseButton") as Button;
         if (_closeButton != null) _closeButton.Click += OnCloseClick;
 
         if (IsOpen) Open();
     }
 
+    /// <summary>Unhook what the template was hooked to. The parts go away with the template, so the handlers have to go
+    /// with them - and this is the hook that runs whether the template is REPLACED or simply dropped.</summary>
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        if (_popup != null) _popup.DismissRequested -= OnPopupDismissRequested;
+        if (_closeButton != null) _closeButton.Click -= OnCloseClick;
+        _popup = null;
+        _closeButton = null;
+        _drawer = null;
+    }
+
     // SetCurrentValue, NOT the CLR setter: closing from the x button must not write a Local value that would mask the
     // TwoWay IsOpen binding - otherwise the source (the toggle) couldn't reopen the panel afterwards (see ToggleButton).
     private void OnCloseClick(object sender, RoutedEventArgs e) => SetCurrentValue(IsOpenProperty, false);
+
+    /// <summary>Escape closes the drawer the same way its x button does - by asking THIS panel, so it slides out and the
+    /// toggle that opened it goes back up. Letting the popup close itself would snap the drawer away mid-animation and
+    /// leave IsOpen still true, i.e. a panel that is shut but believes it is open, which the toggle could not reopen.
+    /// </summary>
+    private void OnPopupDismissRequested(object sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        SetCurrentValue(IsOpenProperty, false);
+    }
 
     // Renders nothing where declared - its whole UI lives in the overlay via the Popup. Its template root (a zero-size
     // Popup) is arranged to fill the layout slot, and a UIComponent hit-tests its box by default (=> true), so without
