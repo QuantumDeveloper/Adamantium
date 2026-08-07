@@ -98,6 +98,8 @@ public class ColorPicker : Control
         base.OnApplyTemplate();
         DetachAreas();
 
+        DetachParts();   // a template swap re-runs this; drop the old wiring first
+
         _svArea = GetTemplateChild("PART_SVArea") as Border;
         _hueArea = GetTemplateChild("PART_HueArea") as Border;
         _alphaArea = GetTemplateChild("PART_AlphaArea") as Border;
@@ -136,6 +138,23 @@ public class ColorPicker : Control
         // Bootstrap the whole fan-out from the current SelectedColor, then reflect it onto the fresh parts.
         ApplyColor(SelectedColor);
         Commit();
+    }
+
+    /// <summary>Let the template's parts go when the template does - see ScrollBar.OnRemoveTemplate.</summary>
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        DetachParts();
+    }
+
+    private void DetachParts()
+    {
+        if (_svArea != null) _svArea.SizeChanged -= OnAreaSizeChanged;
+        if (_hueArea != null) _hueArea.SizeChanged -= OnAreaSizeChanged;
+        if (_alphaArea != null) _alphaArea.SizeChanged -= OnAreaSizeChanged;
+        _svArea = null;
+        _hueArea = null;
+        _alphaArea = null;
     }
 
     private void DetachAreas()

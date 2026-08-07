@@ -152,11 +152,30 @@ public class MenuItem : ItemsControl, IHeaderedItemsControl
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();   // can't find PART_ItemsPresenter yet - it lives in the submenu's lazily-built content
+        DetachParts();   // a template swap re-runs this; drop the old wiring first
+
         // The submenu's card + scroll host + items presenter build lazily on first open (Popup.ChildTemplate), so wire those
         // parts up when they arrive instead of up front - keeps a never-opened leaf from ever building that subtree.
-        if (GetTemplateChild("PART_SubmenuPopup") is Popup popup)
-            popup.ContentBuilt += OnSubmenuContentBuilt;
+        _submenuPopup = GetTemplateChild("PART_SubmenuPopup") as Popup;
+        if (_submenuPopup != null) _submenuPopup.ContentBuilt += OnSubmenuContentBuilt;
     }
+
+    /// <summary>Let the template's parts go when the template does - see ScrollBar.OnRemoveTemplate. This one matters
+    /// most of the family: the popup OUTLIVES nothing here, but the handler was never removed at all, and the popup
+    /// reference was not even kept - so there was no way to remove it later.</summary>
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        DetachParts();
+    }
+
+    private void DetachParts()
+    {
+        if (_submenuPopup != null) _submenuPopup.ContentBuilt -= OnSubmenuContentBuilt;
+        _submenuPopup = null;
+    }
+
+    private Popup _submenuPopup;
 
     private void OnSubmenuContentBuilt(object sender, EventArgs e)
     {

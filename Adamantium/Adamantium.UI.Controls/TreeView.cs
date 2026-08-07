@@ -179,6 +179,14 @@ public class TreeView : ItemsControl
         TryApplyDesiredOffset();   // a VerticalOffset bound before the template applied gets applied now (retried as the extent settles)
     }
 
+    /// <summary>Let the template's parts go when the template does - see ScrollBar.OnRemoveTemplate.</summary>
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        if (_scrollViewer != null) _scrollViewer.ScrollChanged -= OnScrollChanged;
+        _scrollViewer = null;
+    }
+
     // The scroll metrics moved: either publish the live offset to the bindable property (user scroll -> VM) or, while a
     // set offset is still pending (the extent wasn't tall enough yet), retry applying it now that the metrics grew.
     private void OnScrollChanged(object sender, EventArgs e)

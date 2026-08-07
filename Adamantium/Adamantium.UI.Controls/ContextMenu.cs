@@ -84,12 +84,15 @@ public class ContextMenu : ItemsControl
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
+        DetachParts();   // a template swap re-runs this; drop the old wiring first
+
         _popup = GetTemplateChild("PART_Popup") as Popup;
         _clickRoot = GetTemplateChild("PART_ItemsPresenter") as IInputComponent;
         _scroll = GetTemplateChild("PART_MenuScroll") as ScrollViewer;
         // Scrolling the list = browsing it, not navigating a submenu: close any open submenu so it doesn't ride along with
-        // the scrolled row it's anchored to.
-        if (_scroll != null) _scroll.ScrollChanged += (_, _) => CloseAllSubmenus();
+        // the scrolled row it's anchored to. A NAMED handler, not a lambda: a lambda cannot be taken off again, and this
+        // one has to come off when the template goes.
+        if (_scroll != null) _scroll.ScrollChanged += OnMenuScrolled;
         if (_popup != null)
         {
             _popup.PlacementTarget = PlacementTarget ?? this;
@@ -103,8 +106,32 @@ public class ContextMenu : ItemsControl
             _popup.IsOpen = IsOpen;
         }
         // Any leaf row's Click bubbles up to the items presenter - close the menu after the command has run.
-        _clickRoot?.AddHandler(MenuItem.ClickEvent, new RoutedEventHandler(OnItemClicked), handledEventsToo: true);
+        // The handler INSTANCE is kept: RemoveHandler matches on the delegate, so a freshly-made one would not take off
+        // the one that was added.
+        _itemClicked ??= OnItemClicked;
+        _clickRoot?.AddHandler(MenuItem.ClickEvent, _itemClicked, handledEventsToo: true);
     }
+
+    /// <summary>Let the template's parts go when the template does - see ScrollBar.OnRemoveTemplate.</summary>
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        DetachParts();
+    }
+
+    private void DetachParts()
+    {
+        if (_scroll != null) _scroll.ScrollChanged -= OnMenuScrolled;
+        if (_clickRoot != null && _itemClicked != null) _clickRoot.RemoveHandler(MenuItem.ClickEvent, _itemClicked);
+        if (_popup != null) _popup.Closed -= OnPopupClosed;
+        _scroll = null;
+        _clickRoot = null;
+        _popup = null;
+    }
+
+    private RoutedEventHandler _itemClicked;
+
+    private void OnMenuScrolled(object sender, EventArgs e) => CloseAllSubmenus();
 
     private void OnItemClicked(object sender, RoutedEventArgs e) => IsOpen = false;
 

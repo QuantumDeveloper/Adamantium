@@ -548,6 +548,23 @@ public class PaneGroup : TabControl, Panels.IPaneMinimum
         SyncChrome();
     }
 
+    /// <summary>Let the template's parts go when the template does - see ScrollBar.OnRemoveTemplate. The guarded
+    /// unhooks at the top of OnApplyTemplate cover a template that is REPLACED; this covers one that is dropped.</summary>
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        if (_flyout != null) _flyout.PropertyChanged -= OnFlyoutPropertyChanged;
+        if (_autoHideButton != null) _autoHideButton.Click -= OnAutoHideClicked;
+        if (_closeButton != null) _closeButton.Click -= OnCloseClicked;
+        if (_flyoutAutoHideButton != null) _flyoutAutoHideButton.Click -= OnAutoHideClicked;
+        if (_flyoutCloseButton != null) _flyoutCloseButton.Click -= OnCloseClicked;
+        _flyout = null;
+        _autoHideButton = null;
+        _closeButton = null;
+        _flyoutAutoHideButton = null;
+        _flyoutCloseButton = null;
+    }
+
     /// <summary>Auto-hide: a docked group folds away to the edge it sits on, leaving its panes as buttons on that edge's
     /// strip; a folded one - whether put away or merely being looked at - comes back into the layout, tabs and all. The
     /// area owns the move, because which state a panel is in belongs to the layout.

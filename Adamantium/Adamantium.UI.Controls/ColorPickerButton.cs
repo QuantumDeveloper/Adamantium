@@ -78,6 +78,14 @@ public class ColorPickerButton : Control
         }
     }
 
+    /// <summary>Let the template's parts go when the template does - see ScrollBar.OnRemoveTemplate.</summary>
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        if (_popup != null) _popup.Closed -= OnPopupClosed;
+        _popup = null;
+    }
+
     // Clicking the swatch toggles the flyout. The picker lives on the overlay, so its own drags never reach here.
     protected override void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {

@@ -197,6 +197,13 @@ public class RangeSlider : RangeLimitsBase
         }
     }
 
+    /// <summary>Let the template's parts go when the template does - see ScrollBar.OnRemoveTemplate.</summary>
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        DetachParts();
+    }
+
     private void DetachParts()
     {
         if (_track == null) return;

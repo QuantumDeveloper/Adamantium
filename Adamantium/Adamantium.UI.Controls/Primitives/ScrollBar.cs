@@ -102,6 +102,15 @@ public class ScrollBar : RangeBase
         if (_lineDownButton != null) _lineDownButton.Click += OnLineIncrease;
     }
 
+    /// <summary>Let the template's parts go when the template does. The same DetachParts the swap path uses - a
+    /// template that is REPLACED re-runs OnApplyTemplate and is covered there, but one that is simply dropped never
+    /// gets that call, and the wiring would outlive the parts it points at.</summary>
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        DetachParts();
+    }
+
     private void DetachParts()
     {
         if (_track != null)
