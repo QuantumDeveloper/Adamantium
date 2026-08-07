@@ -88,8 +88,9 @@ public static class Mouse
    /// made while ANOTHER application owns the pointer.</summary>
    public static INativeMouse Platform { get; set; }
 
-   /// <summary>The pointer in PHYSICAL screen coordinates.</summary>
-   public static Vector2 ScreenCoordinates
+   /// <summary>Where the pointer is on the DESKTOP - see <see cref="PixelPoint"/>. It is not a logical point and cannot
+   /// be compared with one: the desktop spans monitors that may not share a scale.</summary>
+   public static PixelPoint ScreenCoordinates
    {
       get => Platform?.Position ?? PrimaryDevice.GetScreenPosition();
       set

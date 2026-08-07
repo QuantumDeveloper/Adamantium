@@ -645,8 +645,21 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     public abstract IntPtr Handle { get; internal set; }
     public bool IsClosed { get; protected set; }
 
-    public abstract Vector2 PointToClient(Vector2 point);
-    public abstract Vector2 PointToScreen(Vector2 point);
+    public abstract Vector2 PointToClient(PixelPoint point);
+    public abstract PixelPoint PointToScreen(Vector2 point);
+
+    /// <summary>Where this window sits on the desktop, as ONE typed value. <see cref="Left"/>/<see cref="Top"/> hold the
+    /// same thing as bindable numbers (a position is authored and serialized as two numbers); everything that COMPUTES a
+    /// position uses this, so the units cannot be lost on the way - see <see cref="PixelPoint"/>.</summary>
+    public PixelPoint Position
+    {
+        get => new(Left, Top);
+        set
+        {
+            Left = value.X;
+            Top = value.Y;
+        }
+    }
     public void AttachContextAndInitialize(IUIContext context)
     {
         UIContext = context;
@@ -675,23 +688,24 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         
     }
 
-    public Vector2 ScreenToClient(Vector2 p)
+    public Vector2 ScreenToClient(PixelPoint p)
     {
         var point = new NativePoint((int)p.X, (int)p.Y);
         Win32Interop.ScreenToClient(Handle, ref point);
-        // Win32 returns PHYSICAL client px; the framework works in logical DIP -> divide by the DPI scale (identity at 100%).
-        return new Vector2(point.X / DpiScale.X, point.Y / DpiScale.Y);
+        // Win32 returns PHYSICAL client px; the framework works in logical DIP -> divide by THIS window's scale.
+        return new PixelPoint(point.X, point.Y).ToLogical(DpiScale);
     }
 
     /// <summary>A point of this window's client area (LOGICAL) to a desktop point (PHYSICAL). The asymmetry is the
     /// desktop's: monitors can differ in scale, so a screen point has no one scale to be logical in. Convert with the
     /// scale of the window the point concerns - see <see cref="Left"/>.</summary>
-    public Vector2 ClientToScreen(Vector2 p)
+    public PixelPoint ClientToScreen(Vector2 p)
     {
         // p is logical DIP -> back to physical client px before handing to Win32; the returned screen coords stay physical.
-        var point = new NativePoint((int)(p.X * DpiScale.X), (int)(p.Y * DpiScale.Y));
+        var physical = PixelPoint.FromLogical(p, DpiScale);
+        var point = new NativePoint((int)physical.X, (int)physical.Y);
         Win32Interop.ClientToScreen(Handle, ref point);
-        return point;
+        return new PixelPoint(point.X, point.Y);
     }
 
     public bool ShouldDisplayWindow { get; protected set; }
@@ -715,7 +729,7 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     /// <summary>Enter/leave RELATIVE mouse mode (hidden, centred cursor + synthesized raw delta) for a hosted game's
     /// mouse-look. Driven by a <see cref="Panels.RenderTargetPanel"/> per its <c>MouseLookMode</c>; delegates to the
     /// platform worker.</summary>
-    public void SetRelativeMouseMode(bool enabled, Adamantium.Mathematics.Vector2 restoreScreen) =>
+    public void SetRelativeMouseMode(bool enabled, PixelPoint restoreScreen) =>
         WindowWorkerService?.SetRelativeMouseMode(enabled, restoreScreen);
         
     public bool IsActive

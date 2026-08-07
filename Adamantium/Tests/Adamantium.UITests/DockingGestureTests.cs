@@ -34,7 +34,7 @@ public class DockingGestureTests
 
     private static Pane PaneOf(DockingArea area, string id) => area.PaneById(id);
 
-    private static TabTearOffEventArgs TearArgs(Pane pane) => new(pane, pane, new Vector2(300, 300));
+    private static TabTearOffEventArgs TearArgs(Pane pane) => new(pane, pane, new PixelPoint(300, 300));
 
     /// <summary>The application says no, and the gesture ends as if it had never crossed its threshold - the pane stays
     /// where it was and no window is opened.</summary>
@@ -88,7 +88,7 @@ public class DockingGestureTests
 
         PaneOf(area, "hierarchy").Allowed = DockZone.Center | DockZone.Edges;
 
-        Assert.That(area.TearOffGroup(tools, new Vector2(300, 300)), Is.False,
+        Assert.That(area.TearOffGroup(tools, new PixelPoint(300, 300)), Is.False,
             "the panel stays, because one of its panes may not leave with it");
     }
 

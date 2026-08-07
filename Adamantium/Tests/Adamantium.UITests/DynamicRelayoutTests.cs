@@ -18,8 +18,9 @@ public class DynamicRelayoutTests
     // descendants attach. Mirrors the window's role in WindowExtension's per-component update walk.
     private sealed class TestWindowRoot : Grid, IRootVisualComponent
     {
-        public Vector2 PointToClient(Vector2 point) => point;
-        public Vector2 PointToScreen(Vector2 point) => point;
+        public Vector2 PointToClient(PixelPoint point) => new((float)point.X, (float)point.Y);
+        public PixelPoint PointToScreen(Vector2 point) => new(point.X, point.Y);
+        public PixelPoint Position { get; set; }
         public void AttachContextAndInitialize(IUIContext context) { }
         public double Left { get; set; }
         public double Top { get; set; }

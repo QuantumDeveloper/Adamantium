@@ -137,7 +137,7 @@ public class MacOSWindowWorker : AdamantiumComponent, IWindowWorkerService
     }
 
     // TODO(macOS): relative mouse mode (CGAssociateMouseAndMouseCursorPosition + hide cursor) for game mouse-look.
-    public void SetRelativeMouseMode(bool enabled, Adamantium.Mathematics.Vector2 restoreScreen)
+    public void SetRelativeMouseMode(bool enabled, Adamantium.UI.Core.PixelPoint restoreScreen)
     {
     }
 

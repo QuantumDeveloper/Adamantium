@@ -36,8 +36,9 @@ public class LayoutPerfTests
     // virtualizes to the visible grid instead of realizing all items).
     private sealed class TestWindowRoot : Grid, IRootVisualComponent
     {
-        public Vector2 PointToClient(Vector2 point) => point;
-        public Vector2 PointToScreen(Vector2 point) => point;
+        public Vector2 PointToClient(PixelPoint point) => new((float)point.X, (float)point.Y);
+        public PixelPoint PointToScreen(Vector2 point) => new(point.X, point.Y);
+        public PixelPoint Position { get; set; }
         public void AttachContextAndInitialize(IUIContext context) { }
         public double Left { get; set; }
         public double Top { get; set; }

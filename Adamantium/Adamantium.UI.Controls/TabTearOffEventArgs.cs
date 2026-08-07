@@ -1,5 +1,6 @@
 using System;
 using Adamantium.Mathematics;
+using Adamantium.UI.Core;
 
 namespace Adamantium.UI.Controls;
 
@@ -7,7 +8,7 @@ namespace Adamantium.UI.Controls;
 /// and takes the item; leaving <see cref="Handled"/> false puts the tab back where it was.</summary>
 public class TabTearOffEventArgs : EventArgs
 {
-    public TabTearOffEventArgs(object item, TabItem container, Vector2 screenPosition)
+    public TabTearOffEventArgs(object item, TabItem container, PixelPoint screenPosition)
     {
         Item = item;
         Container = container;
@@ -21,7 +22,7 @@ public class TabTearOffEventArgs : EventArgs
     public TabItem Container { get; }
 
     /// <summary>Where the pointer let go, in SCREEN coordinates - where the new window should appear.</summary>
-    public Vector2 ScreenPosition { get; }
+    public PixelPoint ScreenPosition { get; }
 
     /// <summary>Set by a handler that took the item; false leaves the tab in place.</summary>
     public bool Handled { get; set; }

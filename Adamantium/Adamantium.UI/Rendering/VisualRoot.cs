@@ -47,6 +47,8 @@ internal sealed class VisualRoot : MeasurableUIComponent, IRootVisualComponent
     // Off-screen: no OS window, no context, identity screen<->client (the projection maps client space 1:1).
     public IUIContext UIContext => null;
     public void AttachContextAndInitialize(IUIContext context) { }
-    public Vector2 PointToClient(Vector2 point) => point;
-    public Vector2 PointToScreen(Vector2 point) => point;
+    // Identity: with no OS window there is no display scale to cross, so the two units coincide here.
+    public PixelPoint Position { get; set; }
+    public Vector2 PointToClient(PixelPoint point) => new((float)point.X, (float)point.Y);
+    public PixelPoint PointToScreen(Vector2 point) => new(point.X, point.Y);
 }

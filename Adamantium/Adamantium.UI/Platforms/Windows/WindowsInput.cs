@@ -15,12 +15,12 @@ internal sealed class WindowsInput : INativeMouse, INativeKeyboard, INativePlatf
     private const int KeyPressed = 0x8000;   // the high-order bit: the key is down
     private const int KeyToggled = 0x1;      // the low-order bit: the lock is lit
 
-    public Vector2 Position
+    public PixelPoint Position
     {
         get
         {
             Win32Interop.GetCursorPos(out var point);
-            return point;
+            return new PixelPoint(point.X, point.Y);
         }
         set => Win32Interop.SetCursorPos((int)value.X, (int)value.Y);
     }

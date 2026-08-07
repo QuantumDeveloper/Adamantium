@@ -216,7 +216,7 @@ public class DockingArea : Panel
 
         if (VisualOf(node) is not IUIComponent visual || visual.RenderSize.Width <= 0) return default;
 
-        var at = (visual.PointToScreen(Vector2.Zero) - this.PointToScreen(Vector2.Zero)) / DpiScale;
+        var at = (visual.PointToScreen(Vector2.Zero) - this.PointToScreen(Vector2.Zero)).ToLogical(DpiScale);
         return new Rect(at.X, at.Y, visual.RenderSize.Width, visual.RenderSize.Height);
     }
 
@@ -1085,7 +1085,7 @@ public class DockingArea : Panel
             if (pair.Key.State == PaneGroupState.Collapsed) continue;
 
             var group = pair.Value;
-            var at = (group.PointToScreen(Vector2.Zero) - origin) / scale;   // physical back to LOGICAL
+            var at = (group.PointToScreen(Vector2.Zero) - origin).ToLogical(scale);
             var size = group.RenderSize;
             if (point.X < at.X || point.Y < at.Y || point.X > at.X + size.Width || point.Y > at.Y + size.Height) continue;
 
@@ -1201,7 +1201,7 @@ public class DockingArea : Panel
     /// window of its own. Dragging a tab moves ONE pane; dragging the caption moves the panel - they are different moves,
     /// and which one happened must not depend on how many tabs are open.
     /// </summary>
-    internal bool TearOffGroup(PaneGroup control, Vector2 screenPosition)
+    internal bool TearOffGroup(PaneGroup control, PixelPoint screenPosition)
     {
         var node = NodeOf(control);
         if (node == null) return false;
@@ -1420,7 +1420,7 @@ public class DockingArea : Panel
     // difference is why the compass could not be aimed at all on 4K.
     private Vector2 PointerIn()
     {
-        return (Mouse.ScreenCoordinates - this.PointToScreen(Vector2.Zero)) / DpiScale;
+        return (Mouse.ScreenCoordinates - this.PointToScreen(Vector2.Zero)).ToLogical(DpiScale);
     }
 
     private Vector2 DpiScale => RootVisual is IWindow window ? window.DpiScale : Vector2.One;
@@ -1535,7 +1535,7 @@ public class DockingArea : Panel
     {
         if (group.GetTemplateChild("PART_TabStrip") is not TabStripScroller strip) return;
 
-        var at = (strip.PointToScreen(Vector2.Zero) - this.PointToScreen(Vector2.Zero)) / DpiScale;
+        var at = (strip.PointToScreen(Vector2.Zero) - this.PointToScreen(Vector2.Zero)).ToLogical(DpiScale);
         var along = strip.Orientation == Orientation.Vertical ? point.Y - at.Y : point.X - at.X;
 
         strip.PanNear(along, strip.AutoScrollMargin, strip.AutoScrollRate);
@@ -1552,7 +1552,7 @@ public class DockingArea : Panel
             if (group.ItemContainerGenerator.ContainerFromIndex(i) is not Pane pane) continue;
             if (pane.Visibility != Visibility.Visible) continue;
 
-            var at = (pane.PointToScreen(Vector2.Zero) - origin) / scale;
+            var at = (pane.PointToScreen(Vector2.Zero) - origin).ToLogical(scale);
             var size = pane.RenderSize;
             if (point.X < at.X || point.Y < at.Y || point.X > at.X + size.Width || point.Y > at.Y + size.Height) continue;
 

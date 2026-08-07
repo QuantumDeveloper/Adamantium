@@ -29,7 +29,7 @@ public class TabDragGestureTests
 
     private static void PressAt(TabItem tab, double x, double y)
     {
-        Mouse.PrimaryDevice.SetExternalPosition(tab, new Vector2((float)x, (float)y));
+        Mouse.PrimaryDevice.SetExternalPosition(tab, new PixelPoint(x, y));
         var args = new MouseButtonEventArgs(Mouse.PrimaryDevice, MouseButtons.Left, MouseButtonState.Pressed,
             InputModifiers.LeftMouseButton, 0) { RoutedEvent = InputUIComponent.MouseLeftButtonDownEvent };
         ((IObservableComponent)tab).RaiseEvent(args);
@@ -37,7 +37,7 @@ public class TabDragGestureTests
 
     private static void MoveTo(TabItem tab, double x, double y)
     {
-        Mouse.PrimaryDevice.SetExternalPosition(tab, new Vector2((float)x, (float)y));
+        Mouse.PrimaryDevice.SetExternalPosition(tab, new PixelPoint(x, y));
         var args = new MouseEventArgs(Mouse.PrimaryDevice, InputModifiers.None, 0)
         {
             RoutedEvent = Mouse.MouseMoveEvent
@@ -142,8 +142,9 @@ public class TabDragGestureTests
     /// focus needs a root to walk up to.</summary>
     private sealed class TestWindowRoot : Grid, IRootVisualComponent
     {
-        public Vector2 PointToClient(Vector2 point) => point;
-        public Vector2 PointToScreen(Vector2 point) => point;
+        public Vector2 PointToClient(PixelPoint point) => new((float)point.X, (float)point.Y);
+        public PixelPoint PointToScreen(Vector2 point) => new(point.X, point.Y);
+        public PixelPoint Position { get; set; }
         public void AttachContextAndInitialize(IUIContext context) { }
         public double Left { get; set; }
         public double Top { get; set; }

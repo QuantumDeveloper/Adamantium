@@ -9,6 +9,6 @@ namespace Adamantium.UI.Core.Input;
 /// </summary>
 public interface INativeMouse
 {
-    /// <summary>The pointer position in PHYSICAL screen coordinates.</summary>
-    Vector2 Position { get; set; }
+    /// <summary>Where the pointer is on the DESKTOP - see <see cref="PixelPoint"/> for why that has a type of its own.</summary>
+    PixelPoint Position { get; set; }
 }

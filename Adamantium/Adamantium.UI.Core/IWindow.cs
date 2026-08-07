@@ -112,9 +112,11 @@ public interface IWindow : IRootVisualComponent, IContentControl
     
     IDrawingContext GetDrawingContext();
 
-    Vector2 ScreenToClient(Vector2 p);
+    /// <summary>A desktop point (physical) in this window's client coordinates (logical DIP).</summary>
+    Vector2 ScreenToClient(PixelPoint p);
 
-    Vector2 ClientToScreen(Vector2 p);
+    /// <summary>A client point (logical DIP) as a desktop point (physical).</summary>
+    PixelPoint ClientToScreen(Vector2 p);
     
     event SizeChangedEventHandler ClientSizeChanged;
     event EventHandler<WindowClosingEventArgs> Closing;

@@ -492,6 +492,10 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         return new Vector2(physicalClient.X / dpi.X, physicalClient.Y / dpi.Y);
     }
 
+    // A DESKTOP point out of a Win32 message. Named, so the physical->typed step is visible at the boundary rather than
+    // an implicit conversion somewhere downstream.
+    private static PixelPoint ToPixel(Vector2 screen) => new(screen.X, screen.Y);
+
 
     // The OS move loop (a caption drag, ours included via BeginMoveDrag) runs INSIDE the window procedure and swallows
     // the mouse - no managed move/up arrives while it lasts. These two messages are the only view we get of a gesture
@@ -970,7 +974,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     // Called on the LOOP thread (from RenderTargetPanel via the window). Posts the enter/exit to the pump thread (cursor
     // hide/show + capture are HWND-thread-affine): enable in wParam; on disable the panel's RESTORE screen point packed
     // into lParam (two 32-bit ints in the 64-bit value), so the worker warps the cursor back without storing any position.
-    public void SetRelativeMouseMode(bool enabled, Vector2 restoreScreen)
+    public void SetRelativeMouseMode(bool enabled, PixelPoint restoreScreen)
     {
         if (window == null || window.Handle == IntPtr.Zero) return;
         var wp = enabled ? (IntPtr)1 : IntPtr.Zero;
@@ -1057,7 +1061,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
             Messages.GetWheelDelta(wParam),
             RawMouseEventType.MouseWheel,
             window,
-            window.PointToClient(Messages.PointFromLParam(lParam)),
+            window.PointToClient(ToPixel(Messages.PointFromLParam(lParam))),
             WindowsMouseDeviceExtension.GetKeyModifiers(windowMessage, wParam),
             MouseDevice.CurrentDevice, GetTimeStamp(),
             windowMessage == WindowMessages.MouseHwheel);
