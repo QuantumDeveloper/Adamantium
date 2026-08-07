@@ -38,7 +38,7 @@ internal sealed class Win32DropTarget : IDropTarget
             // Read the payload NOW: the source's data object is only guaranteed live inside this call, while the drop is
             // delivered to the view-model a frame later on the UI loop thread.
             _data = OleDataBridge.Read(data);
-            _effect = OleDataBridge.ToDropEffect(_sink.DragEnter(_window, _data, point, OleDataBridge.ToModifiers(keyState), _allowed));
+            _effect = OleDataBridge.ToDropEffect(_sink.DragEnter(_window, _data, new PixelPoint(point.X, point.Y), OleDataBridge.ToModifiers(keyState), _allowed));
             _helper?.DragEnter(_window.Handle, data, ref point, _effect);
         }
         catch (Exception)
@@ -54,7 +54,7 @@ internal sealed class Win32DropTarget : IDropTarget
         try
         {
             _allowed = OleDataBridge.ToEffects(effect);
-            _effect = OleDataBridge.ToDropEffect(_sink.DragOver(_window, point, OleDataBridge.ToModifiers(keyState), _allowed));
+            _effect = OleDataBridge.ToDropEffect(_sink.DragOver(_window, new PixelPoint(point.X, point.Y), OleDataBridge.ToModifiers(keyState), _allowed));
             _helper?.DragOver(ref point, _effect);
         }
         catch (Exception)
@@ -88,7 +88,7 @@ internal sealed class Win32DropTarget : IDropTarget
             _allowed = OleDataBridge.ToEffects(effect);
             // Re-read: a source may only fill the payload at drop time (deferred rendering).
             _data = OleDataBridge.Read(data) ?? _data;
-            _effect = OleDataBridge.ToDropEffect(_sink.Drop(_window, _data, point, OleDataBridge.ToModifiers(keyState), _allowed));
+            _effect = OleDataBridge.ToDropEffect(_sink.Drop(_window, _data, new PixelPoint(point.X, point.Y), OleDataBridge.ToModifiers(keyState), _allowed));
             _helper?.Drop(data, ref point, _effect);
         }
         catch (Exception)

@@ -67,13 +67,20 @@ public static class UIExtensions
       }
    }
 
-   public static Vector2 PointToClient(this IUIComponent visualComponent, Vector2 point)
+   /// <summary>A desktop point (physical) in this element's OWN logical coordinates: converted at the root, then back
+   /// down by everything between it and the element.</summary>
+   public static Vector2 PointToClient(this IUIComponent visualComponent, PixelPoint point)
    {
       var pair = GetRootAndAbsolutePosition(visualComponent);
-      return pair.Key.PointToClient(point + pair.Value);
+      // MINUS: the root gives the point in ITS coordinates, and the element sits at pair.Value inside it. This used to
+      // add - and to add the element's offset to the SCREEN point, before any conversion - which is the kind of mistake
+      // that compiles while every value in the expression is a bare vector. It was invisible because every caller asks
+      // this of a ROOT, where the offset is zero.
+      return pair.Key.PointToClient(point) - pair.Value;
    }
 
-   public static Vector2 PointToScreen(this IUIComponent visualComponent, Vector2 point)
+   /// <summary>A point of this element's own logical coordinates as a desktop point (physical pixels).</summary>
+   public static PixelPoint PointToScreen(this IUIComponent visualComponent, Vector2 point)
    {
       var pair = GetRootAndAbsolutePosition(visualComponent);
       return pair.Key.PointToScreen(point + pair.Value);

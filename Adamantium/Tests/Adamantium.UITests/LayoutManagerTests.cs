@@ -50,8 +50,9 @@ public class LayoutManagerTests
     // A visual root with a client viewport (for the visible-first test), mirroring a window's role.
     private sealed class TestWindowRoot : Grid, Adamantium.UI.Core.IRootVisualComponent
     {
-        public Vector2 PointToClient(Vector2 point) => point;
-        public Vector2 PointToScreen(Vector2 point) => point;
+        public Vector2 PointToClient(PixelPoint point) => new((float)point.X, (float)point.Y);
+        public PixelPoint PointToScreen(Vector2 point) => new(point.X, point.Y);
+        public PixelPoint Position { get; set; }
         public void AttachContextAndInitialize(Adamantium.UI.Core.IUIContext context) { }
         public double Left { get; set; }
         public double Top { get; set; }

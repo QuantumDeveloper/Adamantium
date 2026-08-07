@@ -17,12 +17,12 @@ namespace Adamantium.Game;
 
 public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopupHost
 {
-    public Vector2 PointToClient(Vector2 point)
+    public Vector2 PointToClient(PixelPoint point)
     {
         throw new NotImplementedException();
     }
 
-    public Vector2 PointToScreen(Vector2 point)
+    public PixelPoint PointToScreen(Vector2 point)
     {
         throw new NotImplementedException();
     }
@@ -142,6 +142,18 @@ public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopu
     {
         get => GetValue<double>(TopProperty);
         set => SetValue(TopProperty, value);
+    }
+
+    /// <summary>Where this surface sits on the desktop, as one typed value - <see cref="Left"/>/<see cref="Top"/> are
+    /// the same thing as bindable numbers. See <see cref="PixelPoint"/>.</summary>
+    public PixelPoint Position
+    {
+        get => new(Left, Top);
+        set
+        {
+            Left = value.X;
+            Top = value.Y;
+        }
     }
 
     public string Title
@@ -264,12 +276,12 @@ public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopu
         throw new ArgumentException("Window does not contain renderer and could not return DrawingContext");
     }
 
-    public Vector2 ScreenToClient(Vector2 p)
+    public Vector2 ScreenToClient(PixelPoint p)
     {
         throw new NotImplementedException();
     }
 
-    public Vector2 ClientToScreen(Vector2 p)
+    public PixelPoint ClientToScreen(Vector2 p)
     {
         throw new NotImplementedException();
     }

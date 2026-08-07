@@ -39,9 +39,8 @@ public class TabTearOffBehavior : Behavior<TabControl>
             Title = (e.Item as ViewModels.TabPageViewModel)?.Header ?? "Tab",
             ClientWidth = 640,
             ClientHeight = 480,
-            // Position is PHYSICAL, like the desktop point it comes from; the size beside it is logical. See WindowBase.Left.
-            Left = e.ScreenPosition.X - 60,
-            Top = e.ScreenPosition.Y - 20
+            // A desktop point offset by a desktop distance - both physical, and the types say so. See PixelPoint.
+            Position = e.ScreenPosition - new PixelPoint(60, 20)
         };
 
         // Showing a window belongs to the UI thread (Window.Show verifies it) while the tear-off is detected on the LOOP
@@ -64,12 +63,14 @@ public class TabTearOffBehavior : Behavior<TabControl>
             // The cursor is read HERE, live. e.ScreenPosition is where it was when the threshold was crossed, and this
             // runs later - on the UI thread, after the window was built - by which time the pointer has moved on (~27px
             // in a measured run). Aiming at the old position is what put the cursor below the caption instead of on it.
-            // Cursor and window position are both PHYSICAL; ClientWidth and the caption height are logical, so those two
-            // are the ones converted. See WindowBase.Left.
-            var scale = (_tabs.RootVisual as IWindow)?.DpiScale ?? new Mathematics.Vector2(1, 1);
-            var cursor = Adamantium.UI.Core.Input.Mouse.ScreenCoordinates;
-            window.Left = cursor.X - window.ClientWidth * scale.X / 2;
-            window.Top = cursor.Y - window.TitleBarHeight * scale.Y / 2;
+            // Where on the window the cursor is holding it, measured in the window's OWN logical units and turned into a
+            // desktop distance - FromLogical cannot be written without naming a scale, so the conversion cannot be the
+            // thing that is forgotten. The scale is the NEW window's, not the strip's: it may well have been born on
+            // another monitor, and that is exactly the case this went wrong in.
+            var grab = PixelPoint.FromLogical(
+                new Mathematics.Vector2((float)(window.ClientWidth / 2), (float)(window.TitleBarHeight / 2)),
+                window.DpiScale);
+            window.Position = Adamantium.UI.Core.Input.Mouse.ScreenCoordinates - grab;
 
             // Hand the still-held mouse button to the OS window-move loop: the window rides under the cursor until the
             // button comes up, WITH Aero Snap and edge snapping, because it is the platform's own move - not a position

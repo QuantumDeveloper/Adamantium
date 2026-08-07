@@ -145,7 +145,7 @@ public static partial class DragDrop
 
     // ------------------------------------------------------------------ session state (one drag at a time, app-global)
     private static IInputComponent _source;      // the pressed source; armed until the threshold, then dragging
-    private static Vector2 _startScreen;
+    private static PixelPoint _startScreen;
     private static bool _dragging;
     private static IDataPackage _data;
     private static byte[] _ghostBgra;
@@ -699,7 +699,7 @@ public static partial class DragDrop
     // Auto-scroll: when the cursor sits in the top/bottom edge band of the nearest ScrollViewer, scroll it steadily via a
     // TIMER (not per-move), so the speed is time-based (independent of how fast the mouse moves) and holding still at the
     // edge keeps scrolling. Speed = DragDrop.AutoScrollSpeed (px/sec) on the ScrollViewer, ramped by how deep into the band.
-    private static void AutoScroll(IUIComponent hit, IWindow window, Vector2 screen)
+    private static void AutoScroll(IUIComponent hit, IWindow window, PixelPoint screen)
     {
         var band = DragDropOptions.AutoScrollBand;
 
@@ -780,7 +780,7 @@ public static partial class DragDrop
     /// what VISUALS are under the point (that collector includes non-interactive ones) and takes the innermost
     /// scrollable among them, which is what "auto-scroll works anywhere" actually requires.
     /// </summary>
-    private static IEnumerable<ScrollViewer> ScrollablesUnder(IUIComponent hit, IWindow window, Vector2 screen)
+    private static IEnumerable<ScrollViewer> ScrollablesUnder(IUIComponent hit, IWindow window, PixelPoint screen)
     {
         var seen = new HashSet<ScrollViewer>();
         for (var c = hit; c != null; c = c.VisualParent)
@@ -920,7 +920,10 @@ public static partial class DragDrop
 
         // Tell the source the drag has begun - it records WHERE the payload came from now, before any target touches its
         // collections (so DragCompleted can remove it from the right place).
-        var startArgs = new DragDropEventArgs(_data, _source, _startScreen)
+        // In the SOURCE's own coordinates, like every other drag event carries. This used to hand over the raw desktop
+        // point: both were bare vectors, so it compiled, and it was right only at 100% and only in a window at the
+        // origin. See PixelPoint.
+        var startArgs = new DragDropEventArgs(_data, _source, SourceClientPoint(_startScreen))
         {
             // The origin collection (the source list's ItemsSource), so the VM can identify WHERE the drag came from by
             // reference - unambiguous after a Copy duplicates a value across lists.
@@ -1248,11 +1251,27 @@ public static partial class DragDrop
         return target;
     }
 
+    /// <summary>A desktop point in the drag SOURCE's own coordinates - what every drag event carries, so the one that
+    /// starts the gesture carries it too. A source with no window above it (a drag started programmatically on a
+    /// detached control) has no client space for the point to be in, and says so with the origin rather than passing a
+    /// desktop point off as a local one - which is what this used to do, and what only looked right at 100%.</summary>
+    private static Vector2 SourceClientPoint(PixelPoint screen)
+    {
+        if (_source is not IUIComponent source) return default;
+
+        for (IUIComponent node = source; node != null; node = node.VisualParent)
+        {
+            if (node is IRootVisualComponent) return source.PointToClient(screen);
+        }
+
+        return default;
+    }
+
     // The app window the physical-screen cursor is over, by the OS's own z-order: only the platform knows which window
     // is actually on top. Walking our own collection cannot - it would target whichever window comes first in the list
     // when two overlap, and would claim a hit even when ANOTHER application's window covers ours. The drag ghost is
     // click-through, so the OS never reports it. Falls back to client-bounds containment where no platform answers.
-    private static IWindow WindowUnderCursor(Vector2 screen)
+    private static IWindow WindowUnderCursor(PixelPoint screen)
     {
         var app = UIApplication.Current;
         if (app == null) return null;

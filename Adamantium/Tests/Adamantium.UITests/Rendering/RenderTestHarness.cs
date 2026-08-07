@@ -39,8 +39,9 @@ internal sealed class TestRoot : UIComponent, IRootVisualComponent
     public double ClientHeight { get; set; }
     public IUIContext UIContext => null;
     public void AttachContextAndInitialize(IUIContext context) { }
-    public Vector2 PointToClient(Vector2 point) => point;
-    public Vector2 PointToScreen(Vector2 point) => point;
+    public Vector2 PointToClient(PixelPoint point) => new((float)point.X, (float)point.Y);
+    public PixelPoint PointToScreen(Vector2 point) => new(point.X, point.Y);
+        public PixelPoint Position { get; set; }
 }
 
 /// <summary>A real control whose drawing output is fully scripted by <see cref="RenderAction"/>.</summary>

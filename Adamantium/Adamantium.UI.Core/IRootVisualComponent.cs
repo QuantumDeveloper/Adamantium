@@ -4,24 +4,22 @@ namespace Adamantium.UI.Core;
 
 public interface IRootVisualComponent : IUIComponent
 {
-   /// <summary>
-   /// Converts a point from screen to client coordinates.
-   /// </summary>
-   /// <param name="point">The point in screen coordinates.</param>
-   /// <returns>The point in client coordinates.</returns>
-   Vector2 PointToClient(Vector2 point);
+   /// <summary>A desktop point (physical pixels) in this surface's own LOGICAL coordinates. The one place the two
+   /// units meet, and it needs this surface's scale to do it - see <see cref="PixelPoint"/>.</summary>
+   Vector2 PointToClient(PixelPoint point);
 
-   /// <summary>
-   /// Converts a point from client to screen coordinates.
-   /// </summary>
-   /// <param name="point">The point in client coordinates.</param>
-   /// <returns>The point in screen coordinates.</returns>
-   Vector2 PointToScreen(Vector2 point);
-   
+   /// <summary>A point of this surface's own LOGICAL coordinates as a desktop point (physical pixels).</summary>
+   PixelPoint PointToScreen(Vector2 point);
+
    void AttachContextAndInitialize(IUIContext context);
-   
+
+   /// <summary>Where this surface sits on the DESKTOP, in physical pixels. <see cref="Left"/>/<see cref="Top"/> are the
+   /// same value as bindable numbers - a window's position is authored and serialized as two numbers - so anything that
+   /// COMPUTES a position works with this, and only the property boundary is loose.</summary>
+   PixelPoint Position { get; set; }
+
    double Left { get; set; }
-        
+
    double Top { get; set; }
         
    string Title { get; set; }

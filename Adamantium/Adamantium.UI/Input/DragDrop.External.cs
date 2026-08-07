@@ -88,21 +88,21 @@ public static partial class DragDrop
 
     /// <summary>The drag point in PHYSICAL screen coordinates. During an OS-driven drag it is the point the platform
     /// reported (authoritative, and the one the device position was published from), otherwise the live cursor.</summary>
-    private static Vector2 DragScreenPoint => _externalActive ? ExternalPoint : Mouse.ScreenCoordinates;
+    private static PixelPoint DragScreenPoint => _externalActive ? ExternalPoint : Mouse.ScreenCoordinates;
 
-    private static Vector2 ExternalPoint
+    private static PixelPoint ExternalPoint
     {
         get
         {
             var packed = System.Threading.Volatile.Read(ref _externalPointPacked);
-            return new Vector2((int)(packed >> 32), (int)packed);
+            return new PixelPoint((int)(packed >> 32), (int)packed);
         }
         set => System.Threading.Volatile.Write(ref _externalPointPacked, ((long)(int)value.X << 32) | (uint)(int)value.Y);
     }
 
     /// <summary>The window the drag is over: named by the platform for an OS drag (exact even with overlapping
     /// windows), found by screen coordinates for ours.</summary>
-    private static IWindow DragWindow(Vector2 screen) => _externalActive ? _externalWindow : WindowUnderCursor(screen);
+    private static IWindow DragWindow(PixelPoint screen) => _externalActive ? _externalWindow : WindowUnderCursor(screen);
 
     // ------------------------------------------------------------------ drop-in: native drop target per window
 
@@ -117,21 +117,21 @@ public static partial class DragDrop
     /// single static <see cref="DragDrop"/> class it is.</summary>
     private sealed class NativeDropSink : INativeDropSink
     {
-        public DragDropEffects DragEnter(IWindow window, IDataPackage data, Vector2 screenPoint, InputModifiers modifiers,
+        public DragDropEffects DragEnter(IWindow window, IDataPackage data, PixelPoint screenPoint, InputModifiers modifiers,
             DragDropEffects allowed) => ExternalDragOver(window, data, screenPoint, modifiers, allowed);
 
-        public DragDropEffects DragOver(IWindow window, Vector2 screenPoint, InputModifiers modifiers,
+        public DragDropEffects DragOver(IWindow window, PixelPoint screenPoint, InputModifiers modifiers,
             DragDropEffects allowed) => ExternalDragOver(window, _externalData, screenPoint, modifiers, allowed);
 
         public void DragLeave(IWindow window) => ExternalDragLeave();
 
-        public DragDropEffects Drop(IWindow window, IDataPackage data, Vector2 screenPoint, InputModifiers modifiers,
+        public DragDropEffects Drop(IWindow window, IDataPackage data, PixelPoint screenPoint, InputModifiers modifiers,
             DragDropEffects allowed) => ExternalDrop(window, data, screenPoint, modifiers, allowed);
     }
 
     // Platform thread. Record the state and schedule ONE update - a move storm collapses into a single pass, since
     // drag-over is idempotent state, not a stream of events. The answer is the last effect the engine settled on.
-    private static DragDropEffects ExternalDragOver(IWindow window, IDataPackage data, Vector2 screenPoint,
+    private static DragDropEffects ExternalDragOver(IWindow window, IDataPackage data, PixelPoint screenPoint,
         InputModifiers modifiers, DragDropEffects allowed)
     {
         _externalWindow = window;
@@ -158,7 +158,7 @@ public static partial class DragDrop
 
     // Platform thread. The drop is delivered on the loop thread a frame later; what we answer here is what the SOURCE
     // application is told happened - and it is the last DragOver's effect, which by release time names the real target.
-    private static DragDropEffects ExternalDrop(IWindow window, IDataPackage data, Vector2 screenPoint,
+    private static DragDropEffects ExternalDrop(IWindow window, IDataPackage data, PixelPoint screenPoint,
         InputModifiers modifiers, DragDropEffects allowed)
     {
         _externalWindow = window;

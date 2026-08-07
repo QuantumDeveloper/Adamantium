@@ -24,7 +24,7 @@ public class MouseDevice
 
     public Cursor OverrideCursor { get; set; }
 
-    private Vector2 Position;
+    private PixelPoint Position;
 
     // The window the current Position was measured against (set on every raw event). GetPosition falls back to it when the
     // relativeTo element has NO VisualParent path to a window - i.e. it lives on a popup overlay (a detached logical child).
@@ -111,7 +111,7 @@ public class MouseDevice
     /// auto-scroll, hit-test) would read a stale point. The native callback knows the real screen point, so it publishes
     /// it here and the whole drag-over path keeps working unchanged. Call on the UI loop thread.
     /// </summary>
-    public void SetExternalPosition(IInputComponent root, Vector2 screenPoint)
+    public void SetExternalPosition(IInputComponent root, PixelPoint screenPoint)
     {
         Position = screenPoint;
         _positionRoot = root;
@@ -127,9 +127,9 @@ public class MouseDevice
 
     }
 
-    /// <summary>The pointer in PHYSICAL screen coordinates: the live OS position when a platform is registered, else the
+    /// <summary>Where the pointer is on the DESKTOP: the live OS position when a platform is registered, else the
     /// last point an input event carried.</summary>
-    public Vector2 GetScreenPosition() => Mouse.Platform?.Position ?? Position;
+    public PixelPoint GetScreenPosition() => Mouse.Platform?.Position ?? Position;
 
     internal void UpdateButtonStates(InputModifiers buttons)
     {

@@ -193,7 +193,7 @@ public class RenderTargetPanel : Grid
 
    // Exact inverse of this.PointToScreen (screen -> panel-relative): the screen point in root-client coords minus the
    // ClipRectangle offsets PointToScreen accumulates, so the two compose to identity (no per-cycle drift).
-   private Vector2 ScreenToPanel(Vector2 screen)
+   private Vector2 ScreenToPanel(PixelPoint screen)
    {
       var rootLocal = RootVisual.PointToClient(screen);
       var offset = default(Mathematics.Vector2);

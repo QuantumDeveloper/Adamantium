@@ -40,7 +40,7 @@ public class MacOSPlatform : IApplicationPlatform
 
     // TODO(macOS): NSWindow.windowNumberAtPoint:belowWindowWithWindowNumber: -> the window number, mapped back to our
     // handle. Zero until then, which makes the drag fall back to client-bounds containment.
-    public IntPtr WindowFromScreenPoint(Adamantium.Mathematics.Vector2 point) => IntPtr.Zero;
+    public IntPtr WindowFromScreenPoint(Adamantium.UI.Core.PixelPoint point) => IntPtr.Zero;
 
     public static void Initialize(IContainerRegistry resolver)
     {

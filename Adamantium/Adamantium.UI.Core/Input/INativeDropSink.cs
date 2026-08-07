@@ -15,10 +15,10 @@ public interface INativeDropSink
 {
     /// <summary>The pointer entered <paramref name="window"/> carrying <paramref name="data"/> (already read out of the
     /// OS payload into a managed package). Returns the effect to show.</summary>
-    DragDropEffects DragEnter(IWindow window, IDataPackage data, Vector2 screenPoint, InputModifiers modifiers, DragDropEffects allowed);
+    DragDropEffects DragEnter(IWindow window, IDataPackage data, PixelPoint screenPoint, InputModifiers modifiers, DragDropEffects allowed);
 
     /// <summary>The pointer moved inside <paramref name="window"/> during a native drag. Returns the effect to show.</summary>
-    DragDropEffects DragOver(IWindow window, Vector2 screenPoint, InputModifiers modifiers, DragDropEffects allowed);
+    DragDropEffects DragOver(IWindow window, PixelPoint screenPoint, InputModifiers modifiers, DragDropEffects allowed);
 
     /// <summary>The pointer left <paramref name="window"/>, or the native drag was cancelled over it.</summary>
     void DragLeave(IWindow window);
@@ -26,5 +26,5 @@ public interface INativeDropSink
     /// <summary>The payload was released over <paramref name="window"/>. Returns the effect actually applied - the OS
     /// reports it back to the drag source (a Move tells the source app to delete the original, so never answer Move
     /// unless the drop really consumed it).</summary>
-    DragDropEffects Drop(IWindow window, IDataPackage data, Vector2 screenPoint, InputModifiers modifiers, DragDropEffects allowed);
+    DragDropEffects Drop(IWindow window, IDataPackage data, PixelPoint screenPoint, InputModifiers modifiers, DragDropEffects allowed);
 }

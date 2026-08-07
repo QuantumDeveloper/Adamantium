@@ -45,10 +45,23 @@ public static class PlatformSettings
              && bounds.Y + bounds.Height > screen.Y;
    }
 
-   /// <summary>True once the pointer has moved far enough from where it was pressed for the gesture to be a DRAG.
+   /// <summary>True once the pointer has moved far enough from where it was pressed for the gesture to be a DRAG. The
+   /// delta is LOGICAL - what a control measures in its own space, which is what every caller inside a control has.
    /// Per-axis, not radial: that is what the OS setting means, and it is what every other application on the desktop
-   /// does with it.</summary>
+   /// does with it.
+   /// <para>The OS reports the threshold in PHYSICAL pixels and it is compared as it comes. Exact at 100%, and slightly
+   /// eager on a scaled display - a 4px threshold read as 4 DIP is 6 physical px at 150%. Deliberate: making it exact
+   /// would need the window's scale at every call site, and no gesture turns on the difference. The physical overload
+   /// below is exact, and is what the drag engine uses, since it measures on the desktop.</para></summary>
    public static bool ExceedsDragThreshold(Vector2 delta)
+   {
+      var threshold = DragThreshold;
+      return Math.Abs(delta.X) > threshold.Width || Math.Abs(delta.Y) > threshold.Height;
+   }
+
+   /// <summary>The same question for a distance measured on the DESKTOP - between two cursor positions, say. Both sides
+   /// are physical here, so this one is exact at any scale.</summary>
+   public static bool ExceedsDragThreshold(PixelPoint delta)
    {
       var threshold = DragThreshold;
       return Math.Abs(delta.X) > threshold.Width || Math.Abs(delta.Y) > threshold.Height;
