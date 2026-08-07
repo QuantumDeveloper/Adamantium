@@ -30,6 +30,13 @@ public class MouseDevice
     // relativeTo element has NO VisualParent path to a window - i.e. it lives on a popup overlay (a detached logical child).
     private IInputComponent _positionRoot;
 
+    /// <summary>The window the pointer is actually OVER, as the OS sees it: the platform delivers a move to the topmost
+    /// window under the cursor and a LeaveWindow when it goes. Needed because hover is recomputed geometrically from the
+    /// SCREEN position (see RefreshMouseOver), which on its own cannot tell that another, opaque window is covering the
+    /// point - so a background window kept lighting up controls under a window in front of it. Clicks never had the
+    /// problem: those arrive already addressed to a window by the OS.</summary>
+    private IInputComponent _hoverRoot;
+
     private static MouseDevice currentDevice;
         
     public static MouseDevice CurrentDevice => currentDevice ??= new MouseDevice();
@@ -142,6 +149,7 @@ public class MouseDevice
         switch (e.EventType)
         {
             case RawMouseEventType.MouseMove:
+                _hoverRoot = e.RootComponent;   // the OS routed this move here, so this window is the one under the cursor
                 MouseMove(e.RootComponent, e.Position, e.InputModifiers, e.Timestamp);
                 break;
             case RawMouseEventType.LeaveWindow:
@@ -388,6 +396,7 @@ public class MouseDevice
     {
         // Mouse left the window entirely: everything in the hovered chain leaves, nothing enters - so IsMouseOver is
         // cleared along the whole chain, not just the root (where it used to stick on inner elements).
+        if (ReferenceEquals(_hoverRoot, rootComponent)) _hoverRoot = null;
         AncestorState.Transition(DirectlyOver, null, Mouse.MouseEnterEvent, Mouse.MouseLeaveEvent,
             evt => new MouseEventArgs(this, inputModifiers, timestamp) { RoutedEvent = evt });
         DirectlyOver = null;
@@ -428,6 +437,11 @@ public class MouseDevice
     public void RefreshMouseOver(IInputComponent root)
     {
         if (Captured != null || root is not IRootVisualComponent client) return;
+        // Only the window the pointer is genuinely over may re-evaluate hover. This runs on every layout update, from
+        // EVERY window, and works from the screen position alone - so without this gate a window behind an opaque one
+        // still found the cursor inside its own bounds and highlighted whatever sat under it. Hover bled through; the
+        // click did not, which is exactly how it looked.
+        if (!ReferenceEquals(root, _hoverRoot)) return;
 
         SetMouseOver(root, client.PointToClient(Position), InputModifiers.None, 0);
     }
