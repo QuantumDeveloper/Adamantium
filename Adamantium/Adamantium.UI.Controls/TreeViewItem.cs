@@ -153,22 +153,54 @@ public class TreeViewItem : ItemsControl, IHeaderedItemsControl, ISpringLoadable
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
+        DetachParts();   // a template swap re-runs this; drop the old wiring first
+
         // The expander is a ToggleButton whose CHECKED state mirrors IsExpanded (so ExpanderTemplate can rotate the arrow off
         // its own IsChecked trigger). Its click routes to the owner, which splices/removes the branch in the flat list.
         _expander = GetTemplateChild("PART_Expander") as ToggleButton;
         if (_expander != null)
         {
             _expander.IsChecked = IsExpanded;
-            _expander.Click += (_, _) => FindOwnerTreeView()?.ToggleRow(this);
+            _expander.Click += OnExpanderClick;
         }
         // Track hover on the HEADER row only. Root's mouse enter/leave is exactly "over this node's own row" - unlike
         // IsMouseOver, which would stay true over descendants (though the flat design has none nested, this stays correct).
-        if (GetTemplateChild("Root") is IInputComponent root)
+        // NAMED handlers kept in fields, not lambdas: RemoveHandler matches on the delegate, so a lambda - or a freshly
+        // made one - could never be taken off again.
+        _rowRoot = GetTemplateChild("Root") as IInputComponent;
+        if (_rowRoot != null)
         {
-            root.AddHandler(Mouse.MouseEnterEvent, new MouseEventHandler((_, _) => IsPointerOverHeader = true), true);
-            root.AddHandler(Mouse.MouseLeaveEvent, new MouseEventHandler((_, _) => IsPointerOverHeader = false), true);
+            _enterHeader ??= (_, _) => IsPointerOverHeader = true;
+            _leaveHeader ??= (_, _) => IsPointerOverHeader = false;
+            _rowRoot.AddHandler(Mouse.MouseEnterEvent, _enterHeader, true);
+            _rowRoot.AddHandler(Mouse.MouseLeaveEvent, _leaveHeader, true);
         }
     }
+
+    /// <summary>Let the template's parts go when the template does - see ScrollBar.OnRemoveTemplate.</summary>
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        DetachParts();
+    }
+
+    private void DetachParts()
+    {
+        if (_expander != null) _expander.Click -= OnExpanderClick;
+        if (_rowRoot != null)
+        {
+            if (_enterHeader != null) _rowRoot.RemoveHandler(Mouse.MouseEnterEvent, _enterHeader);
+            if (_leaveHeader != null) _rowRoot.RemoveHandler(Mouse.MouseLeaveEvent, _leaveHeader);
+        }
+        _expander = null;
+        _rowRoot = null;
+    }
+
+    private void OnExpanderClick(object sender, RoutedEventArgs e) => FindOwnerTreeView()?.ToggleRow(this);
+
+    private IInputComponent _rowRoot;
+    private MouseEventHandler _enterHeader;
+    private MouseEventHandler _leaveHeader;
 
     protected override void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {

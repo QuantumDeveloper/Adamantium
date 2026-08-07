@@ -65,6 +65,14 @@ public class ColorWheel : Control
         Commit();
     }
 
+    /// <summary>Let the template's parts go when the template does - see ScrollBar.OnRemoveTemplate.</summary>
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        if (_wheel != null) _wheel.SizeChanged -= OnWheelSizeChanged;
+        _wheel = null;
+    }
+
     private void OnWheelSizeChanged(object sender, SizeChangedEventArgs e) => UpdateThumb();
 
     // ---- Pointer drag over the wheel -----------------------------------------------------------------------------

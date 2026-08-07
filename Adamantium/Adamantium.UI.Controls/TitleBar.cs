@@ -175,6 +175,13 @@ public class TitleBar : Control
         if (_rightOverflowButton != null) _rightOverflowButton.Click += OnRightOverflowClick;
     }
 
+    /// <summary>Let the template's parts go when the template does - see ScrollBar.OnRemoveTemplate.</summary>
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        DetachParts();
+    }
+
     private void DetachParts()
     {
         if (_dragArea is IInputComponent dragInput) dragInput.MouseLeftButtonDown -= OnDragAreaMouseLeftButtonDown;

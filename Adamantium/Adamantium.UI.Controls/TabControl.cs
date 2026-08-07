@@ -1033,13 +1033,7 @@ public class TabControl : Selector
         base.OnApplyTemplate();
 
         _tabsHost = GetTemplateChild("PART_Tabs") as ItemsControl;
-        // Containers realized under the PREVIOUS template are still in OUR generator, but the tree they lived in went
-        // away with that template. ContainerOfTab asks this generator FIRST, so it kept answering with a detached
-        // TabItem - and everything measured from one lands nowhere: the selection bar could not find its way from the
-        // tab up to itself, decided it had nothing to point at, and hid. Which is why moving the strip to another edge
-        // and back left no bar at all. The strip's own hosts realize the tabs now, so ours has nothing to hold.
         _pinnedHost = GetTemplateChild("PART_PinnedTabs") as ItemsControl;
-        if (_tabsHost != null || _pinnedHost != null) ItemContainerGenerator.Clear();
         _contentHost = GetTemplateChild("PART_SelectedContentHost") as IUIComponent;
 
 
@@ -1065,6 +1059,26 @@ public class TabControl : Selector
         }
 
         WireTabStripAffordances();
+    }
+
+    /// <summary>The containers this control realized belonged to the template being taken away, so they go with it.
+    /// Kept here, on the REMOVAL hook, and not where the new template arrives: a template is applied more than once,
+    /// and clearing on the later pass threw away containers the strip's own hosts had just built - which emptied a
+    /// whole window built on a TabControl.</summary>
+    /// <remarks>Without this the generator kept answering with a TabItem whose tree went away, and everything measured
+    /// from one lands nowhere: the selection bar could not walk from the tab up to itself, concluded it had nothing to
+    /// point at, and hid for good - which is why moving the strip to another edge and back left no bar at all.</remarks>
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        ItemContainerGenerator.Clear();
+        _tabsHost = null;
+        _pinnedHost = null;
+        _rowIndicator = null;
+        _pinnedRowIndicator = null;
+        _indicator = null;
+        _indicatorPlaced = false;
+        _animatingIndicator = false;
     }
 
     // The indicator is placed from TWO complementary hooks, because neither alone covers every case:

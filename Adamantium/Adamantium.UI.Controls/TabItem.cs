@@ -295,11 +295,11 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
-        if (_closeButton != null) _closeButton.Click -= OnCloseButtonClick;
+        DetachParts();   // a template swap re-runs this; drop the old wiring first
+
         _closeButton = GetTemplateChild("PART_CloseButton") as ButtonBase;
         if (_closeButton != null) _closeButton.Click += OnCloseButtonClick;
 
-        if (_pinButton != null) _pinButton.Click -= OnPinButtonClick;
         _pinButton = GetTemplateChild("PART_PinButton") as ButtonBase;
         if (_pinButton != null) _pinButton.Click += OnPinButtonClick;
         SyncPinButtonState();
@@ -311,6 +311,21 @@ public class TabItem : ContentControl, ISelectable, ISpringLoadable
 
         if (_pinButton != null)
             KeyboardNavigation.SetIsTabStop(_pinButton, false);
+    }
+
+    /// <summary>Let the template's parts go when the template does - see ScrollBar.OnRemoveTemplate.</summary>
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        DetachParts();
+    }
+
+    private void DetachParts()
+    {
+        if (_closeButton != null) _closeButton.Click -= OnCloseButtonClick;
+        if (_pinButton != null) _pinButton.Click -= OnPinButtonClick;
+        _closeButton = null;
+        _pinButton = null;
     }
 
     /// <summary>A header the arrows moved to may be scrolled out of the strip - so bring it back into view, the same as

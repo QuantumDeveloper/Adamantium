@@ -45,7 +45,15 @@ public class OverlayWindow : ContentControl
         typeof(bool), typeof(OverlayWindow), new PropertyMetadata(true));
 
     public static readonly AdamantiumProperty IsModalProperty = AdamantiumProperty.Register(nameof(IsModal),
-        typeof(bool), typeof(OverlayWindow), new PropertyMetadata(false));
+        typeof(bool), typeof(OverlayWindow), new PropertyMetadata(false, OnIsModalChanged));
+
+    // A modal overlay TRAPS Tab: while it is up the content behind is dimmed and unclickable, so a Tab that walked out
+    // into it would put the keyboard somewhere the mouse cannot follow - focused, invisible, and with no way back
+    // except more Tab. A non-modal overlay is an ordinary panel and keeps the plain order.
+    private static void OnIsModalChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e) =>
+        KeyboardNavigation.SetTabNavigation(a, (bool)e.NewValue
+            ? KeyboardNavigationMode.Cycle
+            : KeyboardNavigationMode.Continue);
 
     public static readonly AdamantiumProperty CloseOnOverlayProperty = AdamantiumProperty.Register(nameof(CloseOnOverlay),
         typeof(bool), typeof(OverlayWindow), new PropertyMetadata(false));
@@ -334,6 +342,31 @@ public class OverlayWindow : ContentControl
         }
     }
 
+    /// <summary>Let the template's parts go when the template does - see ScrollBar.OnRemoveTemplate. The guarded
+    /// unhooks at the top of OnApplyTemplate cover a template that is REPLACED; this covers one that is dropped.</summary>
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        if (_closeButton != null) _closeButton.Click -= OnCloseClick;
+        if (_pinButton != null) _pinButton.Click -= OnPinClick;
+        if (_dragArea != null)
+        {
+            _dragArea.MouseLeftButtonDown -= OnDragPress;
+            _dragArea.MouseMove -= OnDragMove;
+            _dragArea.MouseLeftButtonUp -= OnDragRelease;
+        }
+        if (_resizeGrip != null)
+        {
+            _resizeGrip.MouseLeftButtonDown -= OnResizePress;
+            _resizeGrip.MouseMove -= OnResizeMove;
+            _resizeGrip.MouseLeftButtonUp -= OnResizeRelease;
+        }
+        _closeButton = null;
+        _pinButton = null;
+        _dragArea = null;
+        _resizeGrip = null;
+    }
+
     /// <summary>Closes the window with no result (same as the x button).</summary>
     public void Close() => Close(null);
 
@@ -370,7 +403,39 @@ public class OverlayWindow : ContentControl
             pop.BeginAnimation(Transform.ScaleYProperty, new DoubleAnimation { From = 0.85, To = 1, Duration = duration, FillBehavior = FillBehavior.Stop });
         }
 
+        // A modal takes the keyboard with it. Without this the focus stayed on the page BEHIND: dimmed, unclickable,
+        // and still holding the ring - so the first Tab walked the background nobody could see, and the dialog's own
+        // buttons could only be reached with the mouse. The content may not be built yet (the host is filling it as we
+        // speak), so the attempt repeats over the next few layout passes and stops as soon as it lands.
+        if (IsModal) _focusTries = FocusAttempts;
+
         Opened?.Invoke(this, EventArgs.Empty);
+    }
+
+    private const int FocusAttempts = 8;
+    private int _focusTries;
+
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        var size = base.ArrangeOverride(finalSize);
+        TakeFocusIfModal();
+        return size;
+    }
+
+    private void TakeFocusIfModal()
+    {
+        if (_focusTries <= 0) return;
+        _focusTries--;
+
+        // Already in here (the content focused itself, or the person clicked something): leave it alone.
+        for (IUIComponent node = FocusManager.Focused as IUIComponent; node != null; node = node.VisualParent)
+        {
+            if (!ReferenceEquals(node, this)) continue;
+            _focusTries = 0;
+            return;
+        }
+
+        if (KeyboardNavigation.MoveInto(this)) _focusTries = 0;
     }
 
     // --- input ---

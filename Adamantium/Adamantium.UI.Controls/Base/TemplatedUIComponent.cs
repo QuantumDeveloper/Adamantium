@@ -1,4 +1,6 @@
-﻿using Adamantium.UI.Core;
+﻿using System;
+using System.Linq;
+using Adamantium.UI.Core;
 using Adamantium.UI.Core.Controls;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.Core.Templates;
@@ -115,7 +117,8 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent, ITe
         templateResult = null;
         OnRemoveTemplate();
     }
-    
+
+
     // The template boundary is the crux of the two-tree model (docs/TREE_MODEL_DESIGN.md): parts are attached VISUAL-only,
     // so the logical tree stays shallow and dead-ends here. Inheritance is bridged by InheritanceParent (below); an UP
     // logical walk is bridged by TemplatedParent (UIExtensions.GetLogicalParentOrBridge), set on every part in ControlTemplate.Build.
