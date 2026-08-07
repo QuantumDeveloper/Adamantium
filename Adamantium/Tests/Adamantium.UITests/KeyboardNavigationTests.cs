@@ -1123,4 +1123,66 @@ public class KeyboardNavigationTests
         Assert.That(KeyboardNavigation.Move(FocusNavigationDirection.Next), Is.True);
         Assert.That(FocusManager.Focused, Is.SameAs(outside), "an ordinary container is left behind");
     }
+
+    // --- Ctrl+Tab: between AREAS, not between controls ---
+
+    private static Border Area(params Button[] stops)
+    {
+        var content = new StackPanel();
+        foreach (var stop in stops) content.Children.Add(stop);
+        var area = new Border { Width = 100, Height = 60, Child = content };
+        KeyboardNavigation.SetIsFocusArea(area, true);
+        return area;
+    }
+
+    /// <summary>Ctrl+Tab steps whole regions, and coming back to one comes back to where the keyboard was in it - which
+    /// is the point of an area over a plain Tab: stepping away and back must not cost you your place.</summary>
+    [Test]
+    public void CtrlTabStepsBetweenAreasAndRemembersThePlaceInEach()
+    {
+        var a1 = NewButton("a1");
+        var a2 = NewButton("a2");
+        var b1 = NewButton("b1");
+
+        var page = new StackPanel();
+        page.Children.Add(Area(a1, a2));
+        page.Children.Add(Area(b1));
+        Root(page);
+
+        FocusManager.Focus(a2);   // the SECOND stop of the first area, so "remembered" differs from "first"
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(KeyboardNavigation.MoveToArea(backwards: false), Is.True);
+            Assert.That(FocusManager.Focused, Is.SameAs(b1), "the next area is entered at its first stop");
+
+            Assert.That(KeyboardNavigation.MoveToArea(backwards: false), Is.True);
+            Assert.That(FocusManager.Focused, Is.SameAs(a2), "and coming back lands where the keyboard left, not on a1");
+        });
+    }
+
+    /// <summary>A modal declares its trap once - as a Tab cycle - and Ctrl+Tab honours the same declaration. Everything
+    /// outside a modal is unreachable by mouse, so it must not become reachable by an area step.</summary>
+    [Test]
+    public void CtrlTabDoesNotLeaveAModalCycle()
+    {
+        var inside = NewButton("inside");
+        var outside = NewButton("outside");
+
+        var modal = Area(inside);
+        KeyboardNavigation.SetTabNavigation(modal, KeyboardNavigationMode.Cycle);
+
+        var page = new StackPanel();
+        page.Children.Add(modal);
+        page.Children.Add(Area(outside));
+        Root(page);
+
+        FocusManager.Focus(inside);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(KeyboardNavigation.MoveToArea(backwards: false), Is.False);
+            Assert.That(FocusManager.Focused, Is.SameAs(inside), "the keyboard stays in the modal");
+        });
+    }
 }

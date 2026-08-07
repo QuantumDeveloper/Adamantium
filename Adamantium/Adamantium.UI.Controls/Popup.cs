@@ -224,6 +224,13 @@ public class Popup : MeasurableUIComponent, IContainer
     /// <summary>The window an element hosted on the overlay belongs to, for anything that has to walk OUT of a popup and
     /// cannot do it visually - the focus ring looking for the layer to draw itself on, most of all. Null for an element
     /// that is not inside an open popup.</summary>
+    /// <summary>Records that <paramref name="overlayRoot"/> is hosted on <paramref name="host"/>'s overlay. Called by the
+    /// LAYER, which is the one thing every route onto the overlay goes through - see PopupLayer.Add.</summary>
+    internal static void RegisterOverlayRoot(IUIComponent overlayRoot, IPopupHost host) =>
+        OverlayRootHost.AddOrUpdate(overlayRoot, host);
+
+    internal static void UnregisterOverlayRoot(IUIComponent overlayRoot) => OverlayRootHost.Remove(overlayRoot);
+
     public static IPopupHost HostOf(IUIComponent element)
     {
         for (var node = element; node != null; node = node.VisualParent)
@@ -255,7 +262,6 @@ public class Popup : MeasurableUIComponent, IContainer
         _host = FindPopupHost(anchor);
         if (_host == null) return;   // not in a window yet; OnAttachedToVisualTree retries
         if (Child is UIComponent child) child.DataContext = DataContext;
-        if (Child is IUIComponent overlayRoot) OverlayRootHost.AddOrUpdate(overlayRoot, _host);   // so nested popups find it
         _focusReturn.Capture();   // where the keyboard was, so closing can put it back
         _host.PopupLayer.Add(this);
         if (!KeepOpen) HookLightDismiss();   // click-outside-to-close, hosted centrally here (see OnGlobalPreviewDown)
@@ -269,8 +275,7 @@ public class Popup : MeasurableUIComponent, IContainer
         var wasOpen = _host != null;
         UnhookLightDismiss();                    // while _host is still set
         UnhookEscape();
-        if (Child is IUIComponent overlayRoot) OverlayRootHost.Remove(overlayRoot);
-        _host?.PopupLayer.Remove(this);
+        _host?.PopupLayer.Remove(this);   // the layer un-records the overlay root - see PopupLayer.Remove
         _host = null;
         // The focus goes back to whatever opened this - but only if it is still in here, where it is about to be
         // stranded. See FocusReturn.

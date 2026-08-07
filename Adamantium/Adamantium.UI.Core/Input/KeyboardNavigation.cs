@@ -55,6 +55,35 @@ public static class KeyboardNavigation
     public static void SetDirectionalNavigation(IAdamantiumComponent element, KeyboardNavigationMode value) =>
         element.SetValue(DirectionalNavigationProperty, value);
 
+    /// <summary>Declares this element a focus AREA: a whole region of the interface Ctrl+Tab steps between, the way Tab
+    /// steps between controls. Coming back to an area comes back to the place in it the keyboard left, so a Ctrl+Tab out
+    /// and back is not a way to lose your place. An overlay window declares itself one, and so does a window's content -
+    /// which is what lets the keyboard leave a non-modal overlay for the page behind it and return.</summary>
+    public static readonly AdamantiumProperty IsFocusAreaProperty = AdamantiumProperty.RegisterAttached(
+        "IsFocusArea", typeof(bool), typeof(AdamantiumComponent), new PropertyMetadata(false, OnIsFocusAreaChanged));
+
+    public static bool GetIsFocusArea(IAdamantiumComponent element) => element.GetValue<bool>(IsFocusAreaProperty);
+
+    public static void SetIsFocusArea(IAdamantiumComponent element, bool value) =>
+        element.SetValue(IsFocusAreaProperty, value);
+
+    // The declared areas, in the order they were declared. A LIST, not a tree walk: an overlay window is hosted on the
+    // popup layer, detached from the window's visual tree, so there is no one tree to walk that has them all. Declaration
+    // order is open order for overlays (the stack) and creation order for anything in a layout - the reading order in
+    // both cases. Weak, so declaring an area never keeps a closed window alive.
+    private static readonly List<WeakReference<IUIComponent>> Areas = [];
+
+    private static void OnIsFocusAreaChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is not IUIComponent area) return;
+
+        lock (Areas)
+        {
+            Areas.RemoveAll(w => !w.TryGetTarget(out var t) || ReferenceEquals(t, area));
+            if (e.NewValue is true) Areas.Add(new WeakReference<IUIComponent>(area));
+        }
+    }
+
     private static bool _registered;
 
     /// <summary>Hooks the key handler. A static class registers nothing until something touches it, so this is called
@@ -81,9 +110,11 @@ public static class KeyboardNavigation
         if (!ReferenceEquals(sender, e.OriginalSource) || e.OriginalSource is not IInputComponent focused)
             return;
 
+        // Areas remember their place for the same reason lists do - see LastEntered - so Ctrl+Tab away and back returns
+        // to where the keyboard was rather than to the area's first control.
         for (IUIComponent node = focused.VisualParent; node != null; node = node.VisualParent)
         {
-            if (GetTabNavigation(node) != KeyboardNavigationMode.Once)
+            if (GetTabNavigation(node) != KeyboardNavigationMode.Once && !GetIsFocusArea(node))
                 continue;
 
             LastEntered.Remove(node);
@@ -128,17 +159,100 @@ public static class KeyboardNavigation
         return true;
     }
 
+    /// <summary>Steps the focus to the next declared focus AREA (Ctrl+Tab), or the previous one (Ctrl+Shift+Tab). It
+    /// lands on the place the keyboard left in that area, or its first stop if it has never been in it. False when there
+    /// is nowhere to go: fewer than two areas can take the focus, or the keyboard is held inside a modal.</summary>
+    public static bool MoveToArea(bool backwards)
+    {
+        if (FocusManager.Focused is not { } current)
+            return false;
+
+        // A modal keeps the keyboard, and it says so the same way it says it to Tab. Everything outside it is dimmed and
+        // unclickable, so an area step out of it would put the focus where the mouse cannot follow.
+        for (IUIComponent node = current; node != null; node = node.VisualParent)
+        {
+            if (GetTabNavigation(node) == KeyboardNavigationMode.Cycle)
+                return false;
+        }
+
+        var areas = LiveAreas(current);
+        if (areas.Count < 2)
+            return false;
+
+        var here = AreaOf(current);
+        var from = here == null ? (backwards ? 0 : -1) : areas.IndexOf(here);
+        var step = backwards ? -1 : 1;
+
+        // Past an area with nothing to focus in it, rather than stopping there - an empty one is not a destination.
+        for (var i = 1; i <= areas.Count; i++)
+        {
+            var area = areas[((from + i * step) % areas.Count + areas.Count) % areas.Count];
+            if (ReferenceEquals(area, here))
+                continue;
+
+            var stop = LastEntered.TryGetValue(area, out var last) && IsStop(last, FocusNavigationDirection.Next)
+                ? last
+                : FirstStop(area, FocusNavigationDirection.Next);
+            if (stop == null)
+                continue;
+
+            FocusManager.Focus(stop, NavigationMethod.Tab);
+            return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>How to find the window an element belongs to when it is hosted DETACHED - an overlay's content has no
+    /// visual path back to the window it is shown in. Only the popup layer knows the way, so the control layer installs
+    /// this once; without it an area is placed by its visual root alone.</summary>
+    public static Func<IUIComponent, object> HostOf { get; set; }
+
+    // Which window an element belongs to: the one that hosts it if it is on an overlay, otherwise its own visual root.
+    private static object WindowOf(IUIComponent node) => HostOf?.Invoke(node) ?? RootOf(node);
+
+    /// <summary>The declared areas that can be stepped to from <paramref name="from"/>, in declaration order: on screen,
+    /// and belonging to the SAME window. A window keeps its areas until they are collected, and a closed one's are as
+    /// declared as any other - stepping into those would send the keyboard to a window nobody is looking at.</summary>
+    private static List<IUIComponent> LiveAreas(IUIComponent from)
+    {
+        var window = WindowOf(from);
+        var live = new List<IUIComponent>();
+        lock (Areas)
+        {
+            Areas.RemoveAll(w => !w.TryGetTarget(out _));
+            foreach (var weak in Areas)
+            {
+                if (!weak.TryGetTarget(out var area) || area.Visibility != Visibility.Visible) continue;
+                if (Equals(WindowOf(area), window)) live.Add(area);
+            }
+        }
+
+        return live;
+    }
+
+    /// <summary>The innermost area <paramref name="node"/> sits in, or null when it is in none.</summary>
+    private static IUIComponent AreaOf(IUIComponent node)
+    {
+        for (; node != null; node = node.VisualParent)
+        {
+            if (GetIsFocusArea(node)) return node;
+        }
+
+        return null;
+    }
+
     /// <summary>Steps the focus INTO <paramref name="container"/> - onto the first place inside it the focus can land.
     /// False when there is nowhere: a container whose content has not been built yet answers exactly that, which is how
     /// a caller knows to ask again once it has.
     /// <para>What "open this" means for a container that is not part of the tab order on its own - a tab's page, a
     /// wizard's next step - where the step in is a decision, not a Tab away.</para></summary>
-    public static bool MoveInto(IUIComponent container)
+    public static bool MoveInto(IUIComponent container, NavigationMethod method = NavigationMethod.Tab)
     {
         if (FirstStop(container, FocusNavigationDirection.Next) is not { } stop)
             return false;
 
-        FocusManager.Focus(stop, NavigationMethod.Tab);
+        FocusManager.Focus(stop, method);
         return true;
     }
 
@@ -150,6 +264,15 @@ public static class KeyboardNavigation
         // what is left over.
         if (e.Handled || sender is not IObservableComponent { ObservableParent: null })
             return;
+
+        // Ctrl+Tab steps between AREAS, not between controls - so it is answered before the ordinary tab order, and it is
+        // answered even when the focus is in another tree entirely (an overlay window is hosted detached, so the root
+        // check below would refuse it).
+        if (e.Key == Key.Tab && IsControlDown)
+        {
+            if (MoveToArea(IsShiftDown)) e.Handled = true;
+            return;
+        }
 
         var direction = DirectionOf(e.Key);
         if (direction == null)
@@ -201,6 +324,9 @@ public static class KeyboardNavigation
 
     private static bool IsShiftDown =>
         (Keyboard.Modifiers & (InputModifiers.LeftShift | InputModifiers.RightShift)) != 0;
+
+    private static bool IsControlDown =>
+        (Keyboard.Modifiers & (InputModifiers.LeftControl | InputModifiers.RightControl)) != 0;
 
     private static bool IsTabbing(FocusNavigationDirection direction) =>
         direction is FocusNavigationDirection.Next or FocusNavigationDirection.Previous;

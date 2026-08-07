@@ -45,8 +45,17 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     public IReadOnlyList<IUIComponent> Adorners => AdornerLayer.Adorners;
 
     /// <summary>The window's popup layer: open <see cref="Popup"/>s' children the renderer draws on top of the content,
-    /// within the window. A popup registers itself here (via <see cref="IPopupHost"/>) while open.</summary>
-    public PopupLayer PopupLayer { get; } = new PopupLayer();
+    /// within the window. A popup registers itself here (via <see cref="IPopupHost"/>) while open. The layer is told which
+    /// window owns it, so what it hosts can find the way back out - see PopupLayer.Owner.</summary>
+    public PopupLayer PopupLayer { get; }
+
+    protected WindowBase()
+    {
+        PopupLayer = new PopupLayer { Owner = this };
+        // The window's content is a focus AREA, so Ctrl+Tab can leave a non-modal overlay for the page behind it and
+        // come back to where the keyboard was - the overlays declare themselves areas too. See KeyboardNavigation.
+        KeyboardNavigation.SetIsFocusArea(this, true);
+    }
 
     public IReadOnlyList<IUIComponent> PopupRoots => PopupLayer.Roots;
 

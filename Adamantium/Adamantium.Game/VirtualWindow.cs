@@ -238,7 +238,12 @@ public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopu
     public IReadOnlyList<IUIComponent> Adorners => AdornerLayer.Adorners;
 
     // In-window popup overlay (tooltips, popups). Mirrors WindowBase; the render service's popup processor draws these.
-    public PopupLayer PopupLayer { get; } = new PopupLayer();
+    // Owner set for the same reason WindowBase sets it: what the layer hosts is drawn detached, so the way back out to
+    // this window (the focus ring's adorner layer) is recorded when a popup goes on.
+    public PopupLayer PopupLayer { get; }
+
+    public VirtualWindow() => PopupLayer = new PopupLayer { Owner = this };
+
     public IReadOnlyList<IUIComponent> PopupRoots => PopupLayer.Roots;
     public void LayoutPopups() => PopupLayer.UpdateLayout(new Size(ClientWidth, ClientHeight));
 
