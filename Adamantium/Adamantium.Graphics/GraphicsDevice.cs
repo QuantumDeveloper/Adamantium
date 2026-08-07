@@ -711,8 +711,13 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
         var barrier = new ImageMemoryBarrier2
         {
-            SrcStageMask = PipelineStageFlagBits2.ColorAttachmentOutputBit,
-            SrcAccessMask = AccessFlagBits2.ColorAttachmentWriteBit,
+            // The swapchain image is filled by a BLIT (EndDraw copies the resolved render target into it), not by
+            // colour-attachment writes, so the source side has to name the transfer stage as well. Naming only
+            // ColorAttachmentOutput left the layout transition unsynchronized with the blit that had just written the
+            // image - a WRITE_AFTER_WRITE hazard the layer reports by name, and one that lets the presented image
+            // carry a partially copied frame.
+            SrcStageMask = PipelineStageFlagBits2.ColorAttachmentOutputBit | PipelineStageFlagBits2.AllTransferBit,
+            SrcAccessMask = AccessFlagBits2.ColorAttachmentWriteBit | AccessFlagBits2.TransferWriteBit,
             DstStageMask = PipelineStageFlagBits2.BottomOfPipeBit,
             DstAccessMask = AccessFlagBits2.None,
             OldLayout = image.ImageLayout,
@@ -1154,7 +1159,12 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         if (Presenter is SwapChainGraphicsPresenter swapChainGraphicsPresenter)
         {
             waitSems.Add(ImageAvailableSemaphores[CurrentFrame]);
-            waitStageList.Add(PipelineStageFlagBits.ColorAttachmentOutputBit);
+            // The first thing this command buffer does to the acquired image is a LAYOUT TRANSITION into TransferDst,
+            // followed by the blit - both transfer-stage work. Waiting only at ColorAttachmentOutput left those two free
+            // to run before the image was actually available, so the frame was written into an image the presentation
+            // engine had not released yet: a WRITE_AFTER_READ against vkAcquireNextImageKHR, and on screen a frame that
+            // flickers as a whole regardless of what it contains.
+            waitStageList.Add(PipelineStageFlagBits.ColorAttachmentOutputBit | PipelineStageFlagBits.TransferBit);
             waitValues.Add(0);
             signalSems.Add(swapChainGraphicsPresenter.CurrentRenderFinishedSemaphore);
             signalValues.Add(0);
