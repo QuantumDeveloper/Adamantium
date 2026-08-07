@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using Adamantium.Core;
@@ -68,7 +68,12 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         public GeometryInstance[] Items = new GeometryInstance[64];
         public int Count;        // instances appended this frame (across all this key's flushes)
         public int Flushed;      // instances already drawn this frame (= firstInstance for the next flush)
-        public Buffer Gpu;       // instance SSBO (BDA); grown only at BeginFrame
+        // The instance data is rebuilt EVERY frame, so a single buffer was being overwritten while frames that drew from
+        // it were still in flight (measured: hundreds of such writes per second of scrolling). One buffer per frame in
+        // flight, picked by the device's frame slot - the same slot whose fence BeginDraw waits on. Gpu/GradGpu/PatGpu
+        // stay as "the copy this frame writes and draws", so the collect + draw code below is unchanged.
+        public Buffer[] GpuRing, GradGpuRing, PatGpuRing;
+        public Buffer Gpu;       // instance SSBO (BDA); = GpuRing[frame slot]
         public int GpuCapacity;
         public bool Recreated;   // grown this frame -> a clean-skip is unsafe (fresh buffer holds no prior bytes)
         public bool InPending;   // currently listed in _pendingKeys
@@ -148,51 +153,77 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     /// the frame fence, so last frame's GPU reads are done); a new key allocates lazily on its first add.</summary>
     public void BeginFrame()
     {
+        // Same rule as BatchCollector: advance per WRITE, not per frame index. These buffers are read by every replay
+        // frame that follows the walk that filled them, so returning to a copy by frame index overwrites one that
+        // in-flight replays are still drawing from.
+        var copies = (int)Math.Max(1u, _device.MaxFramesInFlight);
+        var slot = _writeCursor % copies;
+        _writeCursor = (_writeCursor + 1) % copies;
+
         foreach (var seg in _keys.Values)
         {
-            if (seg.Gpu != null && seg.GpuCapacity < seg.Items.Length)
+            if (seg.GpuRing != null && (seg.GpuRing.Length != copies || seg.GpuCapacity < seg.Items.Length))
             {
-                seg.Gpu.Dispose();
-                seg.Gpu = null;
+                DeferRing(seg.GpuRing);
+                seg.GpuRing = null;
             }
-            if (seg.Gpu == null && seg.MeshUploaded)
+            if (seg.GpuRing == null && seg.MeshUploaded)
             {
-                seg.Gpu = Buffer.New<GeometryInstance>(_device, (uint)seg.Items.Length,
-                    BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+                seg.GpuRing = new Buffer[copies];
+                for (var i = 0; i < copies; i++)
+                {
+                    seg.GpuRing[i] = Buffer.New<GeometryInstance>(_device, (uint)seg.Items.Length,
+                        BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+                }
                 seg.GpuCapacity = seg.Items.Length;
                 seg.Recreated = true;
             }
-            else seg.Recreated = false;
+            // The clean-skip below asks "does this buffer already hold the bytes?", and with a ring the answer is no: the
+            // copy this walk moves to was filled a lap ago and its contents belong to an older frame. Treat every copy
+            // change as a fresh buffer, or a scene that reports itself unchanged draws from an unwritten copy - which is
+            // exactly how the dropdown chevrons vanished until the pointer moved.
+            else seg.Recreated = true;
+            seg.Gpu = seg.GpuRing == null ? null : seg.GpuRing[slot];
 
             // Parallel grow/reset for the gradient instance buffer (only when this key has ever held gradient instances).
-            if (seg.GradGpu != null && seg.GradGpuCapacity < seg.GradItems.Length)
+            if (seg.GradGpuRing != null && (seg.GradGpuRing.Length != copies || seg.GradGpuCapacity < seg.GradItems.Length))
             {
-                seg.GradGpu.Dispose();
-                seg.GradGpu = null;
+                DeferRing(seg.GradGpuRing);
+                seg.GradGpuRing = null;
             }
-            if (seg.GradGpu == null && seg.MeshUploaded && seg.GradCount > 0)
+            if (seg.GradGpuRing == null && seg.MeshUploaded && seg.GradCount > 0)
             {
-                seg.GradGpu = Buffer.New<GradientGeometryInstance>(_device, (uint)seg.GradItems.Length,
-                    BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+                seg.GradGpuRing = new Buffer[copies];
+                for (var i = 0; i < copies; i++)
+                {
+                    seg.GradGpuRing[i] = Buffer.New<GradientGeometryInstance>(_device, (uint)seg.GradItems.Length,
+                        BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+                }
                 seg.GradGpuCapacity = seg.GradItems.Length;
                 seg.GradRecreated = true;
             }
-            else seg.GradRecreated = false;
+            else seg.GradRecreated = true;
+            seg.GradGpu = seg.GradGpuRing == null ? null : seg.GradGpuRing[slot];
 
             // Parallel grow/reset for the pattern instance buffer (only when this key has ever held pattern instances).
-            if (seg.PatGpu != null && seg.PatGpuCapacity < seg.PatItems.Length)
+            if (seg.PatGpuRing != null && (seg.PatGpuRing.Length != copies || seg.PatGpuCapacity < seg.PatItems.Length))
             {
-                seg.PatGpu.Dispose();
-                seg.PatGpu = null;
+                DeferRing(seg.PatGpuRing);
+                seg.PatGpuRing = null;
             }
-            if (seg.PatGpu == null && seg.MeshUploaded && seg.PatCount > 0)
+            if (seg.PatGpuRing == null && seg.MeshUploaded && seg.PatCount > 0)
             {
-                seg.PatGpu = Buffer.New<PatternGeometryInstance>(_device, (uint)seg.PatItems.Length,
-                    BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+                seg.PatGpuRing = new Buffer[copies];
+                for (var i = 0; i < copies; i++)
+                {
+                    seg.PatGpuRing[i] = Buffer.New<PatternGeometryInstance>(_device, (uint)seg.PatItems.Length,
+                        BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+                }
                 seg.PatGpuCapacity = seg.PatItems.Length;
                 seg.PatRecreated = true;
             }
-            else seg.PatRecreated = false;
+            else seg.PatRecreated = true;
+            seg.PatGpu = seg.PatGpuRing == null ? null : seg.PatGpuRing[slot];
 
             seg.Count = 0;
             seg.Flushed = 0;
@@ -206,6 +237,17 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         _pendingUnits.Clear();
         _hasUnion = false;
         _flushCount = 0;   // pooled flush records reused from index 0 this frame
+    }
+
+    private int _writeCursor;   // which ring copy the next walk writes (see BeginFrame)
+
+    // An outgoing ring may still be read by frames in flight - hand it to the device's deferred queue, never Dispose here.
+    private void DeferRing(Buffer[] ring)
+    {
+        foreach (var buffer in ring)
+        {
+            if (buffer != null) _device.AddToDeferDisposeQueue(buffer);
+        }
     }
 
     /// <summary>True if this unit's fill can join the instanced batch (solid arbitrary geometry with a drawable mesh).</summary>
@@ -224,8 +266,17 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         if (seg.Count + 1 > seg.Items.Length) Array.Resize(ref seg.Items, seg.Items.Length * 2);
         if (seg.Gpu == null)
         {
-            seg.Gpu = Buffer.New<GeometryInstance>(_device, (uint)seg.Items.Length,
-                BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+            // First add for this key (its mesh only just uploaded): build the WHOLE ring, not one buffer, or this key
+            // would spend its life writing a single copy under the frames drawing it.
+            var copies = (int)Math.Max(1u, _device.MaxFramesInFlight);
+            if (seg.GpuRing != null) DeferRing(seg.GpuRing);
+            seg.GpuRing = new Buffer[copies];
+            for (var i = 0; i < copies; i++)
+            {
+                seg.GpuRing[i] = Buffer.New<GeometryInstance>(_device, (uint)seg.Items.Length,
+                    BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+            }
+            seg.Gpu = seg.GpuRing[_writeCursor % copies];
             seg.GpuCapacity = seg.Items.Length;
             seg.Recreated = true;
         }
@@ -263,8 +314,15 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         if (seg.GradCount + 1 > seg.GradItems.Length) Array.Resize(ref seg.GradItems, seg.GradItems.Length * 2);
         if (seg.GradGpu == null)
         {
-            seg.GradGpu = Buffer.New<GradientGeometryInstance>(_device, (uint)seg.GradItems.Length,
-                BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+            var copies = (int)Math.Max(1u, _device.MaxFramesInFlight);
+            if (seg.GradGpuRing != null) DeferRing(seg.GradGpuRing);
+            seg.GradGpuRing = new Buffer[copies];
+            for (var i = 0; i < copies; i++)
+            {
+                seg.GradGpuRing[i] = Buffer.New<GradientGeometryInstance>(_device, (uint)seg.GradItems.Length,
+                    BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+            }
+            seg.GradGpu = seg.GradGpuRing[_writeCursor % copies];
             seg.GradGpuCapacity = seg.GradItems.Length;
             seg.GradRecreated = true;
         }
@@ -323,8 +381,15 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         if (seg.PatCount + 1 > seg.PatItems.Length) Array.Resize(ref seg.PatItems, seg.PatItems.Length * 2);
         if (seg.PatGpu == null)
         {
-            seg.PatGpu = Buffer.New<PatternGeometryInstance>(_device, (uint)seg.PatItems.Length,
-                BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+            var copies = (int)Math.Max(1u, _device.MaxFramesInFlight);
+            if (seg.PatGpuRing != null) DeferRing(seg.PatGpuRing);
+            seg.PatGpuRing = new Buffer[copies];
+            for (var i = 0; i < copies; i++)
+            {
+                seg.PatGpuRing[i] = Buffer.New<PatternGeometryInstance>(_device, (uint)seg.PatItems.Length,
+                    BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+            }
+            seg.PatGpu = seg.PatGpuRing[_writeCursor % copies];
             seg.PatGpuCapacity = seg.PatItems.Length;
             seg.PatRecreated = true;
         }
@@ -674,3 +739,4 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         return seg;
     }
 }
+
