@@ -10,12 +10,17 @@ namespace Adamantium.Graphics.Core
          CreateRenderTarget();
       }
       
+      // Read back, not presented: one frame is rendered and waited on, so a ring would only blur which copy holds the
+      // result the caller is about to save.
+      protected override int FrameCopies => 1;
+
       private void CreateRenderTarget()
       {
-         renderTarget = ToDispose(GraphicsDevice.CreateRenderTarget(Width, Height, MSAALevel, SurfaceFormat));
+         renderTargets = new IRenderTarget[1];
+         renderTargets[0] = ToDispose(GraphicsDevice.CreateRenderTarget(Width, Height, MSAALevel, SurfaceFormat));
       }
 
-      public ITexture ResolveTexture => renderTarget.ResolveTexture;
+      public ITexture ResolveTexture => renderTargets[0].ResolveTexture;
 
       /// <summary>
       /// Resize graphics presenter backBuffer according to width and height
@@ -35,9 +40,9 @@ namespace Adamantium.Graphics.Core
          // (same as SwapChainGraphicsPresenter).
          GraphicsDevice.DeviceWaitIdle();
 
-         RemoveAndDispose(ref depthBuffer);
-         RemoveAndDispose(ref renderTarget);
-         
+         DisposeFrameSurfaces();
+
+
          CreateDepthBuffer();
          CreateRenderTarget();
 
