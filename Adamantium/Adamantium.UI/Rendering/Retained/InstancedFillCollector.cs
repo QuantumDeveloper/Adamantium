@@ -587,10 +587,18 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         if (rec.Units.Count > 0)
         {
             _device.SetScissors(rec.Scissor);
-            foreach (var u in rec.Units) u.Render();
+            foreach (var u in rec.Units)
+            {
+                u.Render();
+            }
             _device.SetScissors(fullScissor);
         }
     }
+
+    private static bool ScissorSame(Rect2D a, Rect2D b) =>
+        a.Offset.X == b.Offset.X && a.Offset.Y == b.Offset.Y &&
+        a.Extent.Width == b.Extent.Width && a.Extent.Height == b.Extent.Height;
+
 
     // Shared InstancedFill device state (all keys draw the same way; only the mesh topology varies).
     /// <summary>Device address of the shared transform table - the vertex shader fetches each instance's slot matrix from

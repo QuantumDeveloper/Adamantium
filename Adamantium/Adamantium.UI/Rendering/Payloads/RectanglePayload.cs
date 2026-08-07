@@ -21,7 +21,9 @@ public class RectanglePayload(Brush brush, Rect destinationRect, CornerRadius co
     internal Brush LiveBrush => _brush;
     public Rect DestinationRect { get; } = destinationRect;
     public CornerRadius CornerRadius { get; } = cornerRadius;
-    public Pen Pen { get; } = pen;
+    // A COPY, taken on the record thread - the caller keeps editing its own pen (caps, join, dash array are all
+    // reachable) while the applier reads those very fields to build the stroke. Same fix as GeometryPayload.
+    public Pen Pen { get; } = pen?.CloneForRendering();
 
     public bool RequiresBufferRebuild(IRenderCachePolicy newState)
     {

@@ -65,9 +65,12 @@ public abstract class UIRenderComponent : DeferredDisposableObject
         Mesh = mesh;
         if (mesh != null) PrimitiveType = mesh.MeshTopology;
 
-        _vertices = mesh?.ToUIVertices();
+        _vertices = mesh?.ToUIVertices();   // already a fresh array - we own it
         _vertexCount = _vertices is { Length: > 0 } ? (uint)_vertices.Length : 0u;
-        _indices = mesh is { HasIndices: true } && _vertexCount > 0 ? mesh.Indices : null;
+        // COPY the indices. Taking mesh.Indices by reference aliased the live mesh's own array, so a later
+        // re-tessellation (which rewrites the mesh IN PLACE) silently changed the index data of an already-built unit -
+        // this component must hold a snapshot, exactly as it does for the vertices.
+        _indices = mesh is { HasIndices: true } && _vertexCount > 0 ? (int[])mesh.Indices.Clone() : null;
         _indexCount = _indices != null ? (uint)_indices.Length : 0u;
 
         // Do NOT allocate the GPU vertex/index buffer here. A BATCHED unit (e.g. a solid item-background rect) is drawn

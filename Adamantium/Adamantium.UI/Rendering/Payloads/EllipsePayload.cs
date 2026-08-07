@@ -31,7 +31,9 @@ public class EllipsePayload(
 
     public EllipseType EllipseType { get; } = ellipseType;
 
-    public Pen Pen { get; } = pen;
+    // A COPY, taken on the record thread - the caller keeps editing its own pen (caps, join, dash array are all
+    // reachable) while the applier reads those very fields to build the stroke. Same fix as GeometryPayload.
+    public Pen Pen { get; } = pen?.CloneForRendering();
 
     public bool RequiresBufferRebuild(IRenderCachePolicy newState)
     {
