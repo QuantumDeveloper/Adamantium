@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Graphics.Core;
@@ -24,9 +24,17 @@ public partial class RenderCache
                     device.SetScissors(op.Scissor);
                     break;
                 case RenderOpKind.Unit:
-                    // A per-unit draw baked its full world into RenderData at record time (it doesn't read the transform
-                    // slot), so a compositor-driven motion node (the theme-swap spinner's stroked arc) would replay frozen.
-                    // Re-point it at its owner's freshly-composited world before drawing.
+                    // A per-unit draw bakes its full world into RenderData at RECORD time and never reads the transform
+                    // slot - while every batched draw follows its slot matrix LIVE. So on any replay where something has
+                    // moved, the two disagree: measured on a scrolling tab strip, the batched fill had followed but this
+                    // Border was still drawn 48 px back, one scroll step behind. That gap is the flicker.
+                    //
+                    // Only the compositor-driven ones. Re-pointing EVERY per-unit draw looks like it fixes the opposite
+                    // problem (a per-unit outline lagging its batched fill), but it introduces the mirror of it: the
+                    // batched half still follows its slot matrix, which a replay does not recompute, so the two halves
+                    // end up a fraction of a step apart and the element jitters. Coherence on a replay comes from
+                    // refusing to replay once the layout moved (see _layoutChangedSinceRecord), not from updating one
+                    // half of the frame.
                     if (_compositedOwners.Count > 0 && op.Unit.Component is { } c && _compositedOwners.Contains(c))
                         op.Unit.Update(World(c), _projectionMatrix, _renderScale);
                     op.Unit.Render();
@@ -385,6 +393,7 @@ public partial class RenderCache
     {
         if (!_groupById.Remove(renderId, out var group)) return;
 
+
         foreach (var unit in group.Units)
             unit?.DeferDispose();
         RemoveFromOrder(group);
@@ -394,3 +403,4 @@ public partial class RenderCache
         _transformTable?.ReleaseSlot(renderId);
     }
 }
+

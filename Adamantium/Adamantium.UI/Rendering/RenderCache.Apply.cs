@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Rendering.Payloads;
@@ -90,6 +90,20 @@ public partial class RenderCache
         // Fold this packet's layout delta into the applier's snapshot replica - the only thing the draw pass reads for a
         // component's transform/size/clip. A full walk resets it and carries the whole scene.
         if (packet.SnapReset) _applySnap.Clear();
+
+        // A packet that changes the LAYOUT invalidates the retained op stream, whatever kind it calls itself. The stream
+        // bakes the layout of the frame that recorded it into its scissors and its per-unit worlds; folding a new snapshot
+        // in without re-recording leaves the two describing different frames, and a replay then draws that mixture - old
+        // clips and old per-unit positions under an already-updated snapshot. It is invisible to a write probe (nothing is
+        // written incorrectly) and to the validation layer (every command is legal); the frame is simply built from two
+        // moments at once. Measured: dozens of Clean packets per second of scrolling arrive carrying snapshot deltas, and
+        // the flicker disappears exactly when replay is refused.
+        // A packet that MOVES things leaves the recorded stream describing the previous positions. The per-unit draws are
+        // re-pointed at replay (see ExecuteOps), but a recorded SCISSOR is a world-space rect baked at record time and
+        // nothing re-derives it - so a move still has to force a rebuild. A packet that changes nothing about layout
+        // (a recolour) leaves the stream perfectly valid and keeps its replay.
+        if (packet.SnapDelta.Count > 0 || packet.MovedNodes.Count > 0) _layoutChangedSinceRecord = true;
+
         foreach (var entry in packet.SnapDelta) _applySnap[entry.Key] = entry.Value;
 
         switch (packet.Kind)
@@ -280,7 +294,17 @@ public partial class RenderCache
             {
                 // Recorded nothing. Clean -> draws what it already drew (a panel with no background); dirty -> now draws
                 // nothing, so its stale units must go. Same disambiguation as the full walk's ProcessRenderCommands.
-                if (!draw.WasGeometryValid) RemoveAndDeferDispose(draw.Component.RenderId);
+                // Re-rendered and drew nothing. That is an ordinary, frequent state - a hover background that just lost
+                // the pointer, a close button that faded out - and it happens dozens of times a second while a tab strip
+                // scrolls under a still cursor. EMPTY the group; do NOT drop it. Dropping it took the control out of the
+                // paint ORDER, so coming back a frame later it had to be re-inserted and its neighbours re-ranked, and
+                // whatever the retained stream still said about them no longer held. An empty group draws nothing at zero
+                // cost and keeps its rank, so the return is a refill instead of a structural change.
+                if (!draw.WasGeometryValid && _groupById.TryGetValue(draw.Component.RenderId, out var emptied))
+                {
+                    foreach (var unit in emptied.Units) unit?.DeferDispose();
+                    emptied.Units.Clear();
+                }
                 continue;
             }
 
@@ -340,3 +364,4 @@ public partial class RenderCache
     }
 
 }
+
