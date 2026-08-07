@@ -36,10 +36,42 @@ public class MenuItem : ItemsControl, IHeaderedItemsControl
         typeof(string), typeof(MenuItem), new PropertyMetadata(null));
 
     public static readonly AdamantiumProperty CommandProperty = AdamantiumProperty.Register(nameof(Command),
-        typeof(ICommand), typeof(MenuItem), new PropertyMetadata(null));
+        typeof(ICommand), typeof(MenuItem), new PropertyMetadata(null, OnCommandChanged));
 
     public static readonly AdamantiumProperty CommandParameterProperty = AdamantiumProperty.Register(nameof(CommandParameter),
-        typeof(object), typeof(MenuItem), new PropertyMetadata(null));
+        typeof(object), typeof(MenuItem), new PropertyMetadata(null, OnCommandParameterChanged));
+
+    // A row follows its command's availability, the way a button does: greyed out while the command says no, instead of
+    // looking ordinary and doing nothing when clicked. The subscription is WEAK (the relay holds the row weakly), so a
+    // command owned by a long-lived view-model does not keep a dismissed menu's rows alive - a menu is built and thrown
+    // away on every open, so that leak would be per-open.
+    private WeakCanExecuteChangedRelay<MenuItem> _commandRelay;
+
+    private static void OnCommandChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is MenuItem item) item.OnCommandChanged(e.NewValue as ICommand);
+    }
+
+    private static void OnCommandParameterChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is MenuItem item) item.UpdateCanExecute();
+    }
+
+    private void OnCommandChanged(ICommand newCommand)
+    {
+        _commandRelay?.Detach();
+        _commandRelay = newCommand != null
+            ? new WeakCanExecuteChangedRelay<MenuItem>(newCommand, this, static i => i.UpdateCanExecute())
+            : null;
+        UpdateCanExecute();
+    }
+
+    private void UpdateCanExecute()
+    {
+        // A PARENT row opens a submenu and runs nothing, so a command on it says nothing about whether it can be used.
+        var command = Command;
+        IsEnabled = HasItems || command == null || command.CanExecute(CommandParameter);
+    }
 
     // Read-only: true once the item has children (so it's a submenu parent, not a leaf). Drives the chevron + the flyout.
     public static readonly AdamantiumProperty HasItemsProperty = AdamantiumProperty.Register(nameof(HasItems),
@@ -94,7 +126,11 @@ public class MenuItem : ItemsControl, IHeaderedItemsControl
         remove => RemoveHandler(ClickEvent, value);
     }
 
-    private void OnItemsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e) => HasItems = Items.Count > 0;
+    private void OnItemsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+    {
+        HasItems = Items.Count > 0;
+        UpdateCanExecute();   // becoming (or ceasing to be) a parent changes whether a command decides this row's state
+    }
 
     // Submenu open/close side effects: on open, cap its scroll to the window; on close, recursively close every deeper
     // submenu (overlay popups aren't detached on close, so a nested one would otherwise linger).
