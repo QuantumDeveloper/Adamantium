@@ -162,7 +162,11 @@ namespace Adamantium.ProceduralGeometry.Shapes
                 bool isFull = Math.Abs(sweepAngle) >= 360.0;
                 int count = isFull ? tessellation : tessellation + 1;
 
-                float sign = isClockWise ? -1f : 1f;
+                // SAME mapping as the solid branch above (isClockWise -> +1). It was inverted here, so one flag meant
+                // opposite things in the two halves of this file: an ellipse's OUTLINE wound against its own FILL and
+                // against every other shape's outline (the rectangle emits TL->TR->BR->BL = clockwise on screen). The
+                // stroke expander walks the contour in order, so dashes, caps and arrow heads ran backwards on ellipses.
+                float sign = isClockWise ? 1f : -1f;
                 double startRad = MathHelper.DegreesToRadians(startAngle) * sign;
                 double stepRad = MathHelper.DegreesToRadians(sweepAngle / tessellation) * sign;
 
