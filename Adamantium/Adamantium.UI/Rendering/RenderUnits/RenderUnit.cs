@@ -233,7 +233,8 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
         }
         else if (UseGpuFill && FillFringeEffect != null && brush is (SolidColorBrush or GradientBrush or PatternBrush or NoiseBrush))
         {
-            geometry.ProcessGeometry(GeometryType.Both);
+            // A brush swap does not change the geometry, and re-tessellating here would put that write back on the
+            // render thread - the payload already tessellated on the record thread.
             ProcessFillFringe(geometry, brush);
         }
     }
@@ -309,7 +310,8 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
 {
     public GeometryRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
-        Payload.Geometry.ProcessGeometry(GeometryType.Both);
+        // No ProcessGeometry here: the payload tessellated on the RECORD thread (see GeometryPayload). The applier only
+        // freezes a copy of the result.
         _frozenMesh = FrozenMesh.From(Payload.Geometry.Mesh, Payload.Geometry.Bounds);   // freeze the tessellated mesh for the instanced path
         GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, Payload.Geometry.Mesh, Payload.Brush, BufferManager);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
@@ -396,7 +398,7 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
         // animation fast path). The brush is a cheap repoint, applied either way.
         if (rebuild)
         {
-            inputPayload.Geometry.ProcessGeometry(GeometryType.Both);
+            // Tessellated already, on the record thread that built inputPayload - the applier must not rebuild it here.
             _frozenMesh = FrozenMesh.From(inputPayload.Geometry.Mesh, inputPayload.Geometry.Bounds);   // re-freeze the re-tessellated mesh
             ((GeometryRenderComponent)GeometryRenderer).UpdateGeometry(inputPayload.Geometry.Mesh);
         }
