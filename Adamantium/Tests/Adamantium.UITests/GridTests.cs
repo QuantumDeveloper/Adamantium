@@ -2009,5 +2009,61 @@ namespace Adamantium.UITests
             Assert.That(body.Bounds.Y, Is.EqualTo(36).Within(0.5), "so the body moves down for it");
          });
       }
+
+      // Guards the INVARIANT a zero-sized pass must keep: no throw, and no non-finite track left behind. It is not a
+      // reproduction of the bug that prompted it - see the note below - so it passes with or without that fix.
+      //
+      // The bug: CalculateFinalGridSize's overflow branch computes totalTakenSize/finalSize, which is 0/0 = NaN when a
+      // grid is arranged into zero space while holding nothing, and divides every Auto track by it. Nothing recomputes
+      // those tracks afterwards (later passes only rewrite STAR tracks), so the NaN reaches the track offset and then a
+      // child's arrange rect - and Arrange REJECTS a non-finite rect by throwing, unwinding the whole layout pass. Every
+      // element after the offending one keeps its default slot, which is why a second window rendered with its content
+      // piled at the origin. Found by driving that window from code and reading its layout trace; reproducing it from a
+      // bare Grid did not work - a standalone grid measured at zero height leaves its rows out of the Auto set, so the
+      // guilty branch is never entered. Reproducing it needs the real template's path into that branch.
+      [Test]
+      public void ZeroSizedArrange_DoesNotPoisonAutoTracks()
+      {
+         // The shape of the tab strip's own grid, which is where this was found.
+         var grid = new Grid();
+         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(0, GridUnitType.Auto) });
+         grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(0, GridUnitType.Auto) });
+         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0, GridUnitType.Auto) });
+         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(0, GridUnitType.Auto) });
+         var top = new Rectangle { Height = 36, Stretch = Stretch.Fill };
+         var bottom = new Rectangle { Height = 64, Stretch = Stretch.Fill };
+         Grid.SetRow(top, 0);
+         Grid.SetColumn(top, 1);
+         Grid.SetRow(bottom, 1);
+         Grid.SetColumn(bottom, 1);
+         grid.Children.Add(top);
+         grid.Children.Add(bottom);
+
+         // The pass that poisoned it: a real width but ZERO height, which is what a window's strip gets while the client
+         // height is still unknown (measured off the app as Width 866 / Height 0).
+         grid.Measure(new Size(866, 0));
+         Assert.DoesNotThrow(() => grid.Arrange(new Rect(0, 0, 866, 0)), "a zero-height slot must not throw");
+         Assert.That(double.IsFinite(grid.RowDefinitions[0].ActualHeight), Is.True,
+            "the zero-height pass must not leave a NaN in the track");
+
+         // ...and the grid must still lay out normally afterwards, i.e. the zero pass left no NaN behind.
+         grid.InvalidateMeasure();
+         grid.Measure(new Size(200, 200));
+         Assert.DoesNotThrow(() => grid.Arrange(new Rect(0, 0, 200, 200)), "and must not poison the next real pass");
+
+         Assert.Multiple(() =>
+         {
+            Assert.That(double.IsFinite(top.Bounds.Y), Is.True, "the first Auto row keeps a finite offset");
+            Assert.That(double.IsFinite(top.Bounds.Height), Is.True, "and a finite height");
+            Assert.That(double.IsFinite(bottom.Bounds.Y), Is.True, "and so does the second");
+            Assert.That(double.IsFinite(bottom.Bounds.Height), Is.True, "and so does its height");
+            // The leftover height is shared out among the Auto rows, so the exact offset is the engine's business; what
+            // this test is about is that the second row still lands BELOW the first instead of on top of it.
+            Assert.That(bottom.Bounds.Y, Is.EqualTo(grid.RowDefinitions[0].ActualHeight).Within(0.5),
+               "the second row starts where the first one ends");
+            Assert.That(bottom.Bounds.Y, Is.GreaterThan(0), "it is not piled at the origin");
+         });
+      }
    }
 }
