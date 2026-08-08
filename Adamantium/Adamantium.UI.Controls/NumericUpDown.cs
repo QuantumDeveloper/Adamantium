@@ -155,10 +155,8 @@ public class NumericUpDown : RangeLimitsBase
     {
         // Unbounded unless told otherwise: a spinner over the 0..1 that RangeLimitsBase defaults to could not count to
         // two. Via metadata, never a constructor set - a set writes Local priority and would mask a {Binding} forever.
-        MinimumProperty.OverrideMetadata(typeof(NumericUpDown),
-            new PropertyMetadata(double.MinValue, OnMinimumChanged));
-        MaximumProperty.OverrideMetadata(typeof(NumericUpDown),
-            new PropertyMetadata(double.MaxValue, OnMaximumChanged));
+        MinimumProperty.OverrideMetadata(typeof(NumericUpDown), new PropertyMetadata(double.MinValue));
+        MaximumProperty.OverrideMetadata(typeof(NumericUpDown), new PropertyMetadata(double.MaxValue));
     }
 
     public NumericUpDown()

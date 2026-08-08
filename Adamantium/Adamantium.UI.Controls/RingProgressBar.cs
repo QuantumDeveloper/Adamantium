@@ -38,8 +38,8 @@ public class RingProgressBar : RangeBase
     static RingProgressBar()
     {
         // Progress convention: 0..100 (vs RangeBase's 0..1). A metadata default, NOT a constructor set - a set writes Local
-        // priority, which outranks and permanently masks a {Binding}/Style/Trigger on Maximum. Re-use RangeBase's callback.
-        MaximumProperty.OverrideMetadata(typeof(RingProgressBar), new PropertyMetadata(100.0, OnMaximumChanged));
+        // priority, which outranks and permanently masks a {Binding}/Style/Trigger on Maximum.
+        MaximumProperty.OverrideMetadata(typeof(RingProgressBar), new PropertyMetadata(100.0));
     }
 
     /// <summary>Stroke width of both the track ring and the accent arc, in DIPs.</summary>

@@ -34,9 +34,8 @@ public class ScrollBar : RangeBase
         // Nothing to scroll by default: Maximum == Minimum (range 0) makes the Track fill the whole trough with an inert
         // thumb (density 0 -> drag/page are no-ops). A real Maximum + ViewportSize (set directly or by a ScrollViewer)
         // turns it into a proportional, draggable thumb. The default 0 is a metadata default (NOT a constructor set,
-        // which writes Local priority and masks the {Binding}/direct Maximum a ScrollViewer applies). Re-use RangeBase's
-        // OnMaximumChanged so the re-coercion still fires.
-        MaximumProperty.OverrideMetadata(typeof(ScrollBar), new PropertyMetadata(0.0, OnMaximumChanged));
+        // which writes Local priority and masks the {Binding}/direct Maximum a ScrollViewer applies).
+        MaximumProperty.OverrideMetadata(typeof(ScrollBar), new PropertyMetadata(0.0));
     }
 
     public ScrollBar()

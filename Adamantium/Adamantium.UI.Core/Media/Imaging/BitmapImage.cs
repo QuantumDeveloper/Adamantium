@@ -79,14 +79,10 @@ public sealed class BitmapImage : BitmapSource
    {
       if (a is BitmapImage bitmap)
       {
-         var newLimit = (uint)e.NewValue;
-         if (e.OldValue != AdamantiumProperty.UnsetValue)
+         // A lowered limit evicts the difference (subtract this way round: unsigned wraps).
+         if (e.OldValue is uint oldLimit && e.NewValue is uint newLimit && newLimit < oldLimit)
          {
-            var oldLimit = (uint)e.OldValue;
-            if (newLimit < oldLimit)
-            {
-               bitmap.RemoveCacheItems(newLimit - oldLimit);
-            }
+            bitmap.RemoveCacheItems(oldLimit - newLimit);
          }
       }
    }

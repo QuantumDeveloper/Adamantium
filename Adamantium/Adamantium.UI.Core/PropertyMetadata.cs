@@ -27,6 +27,21 @@ public class PropertyMetadata
    public bool AffectsParentMeasure { get; set; }
    public bool AffectsParentArrange { get; set; }
 
+   /// <summary>Which fields this instance actually STATED - <see cref="MergedWith"/> takes the rest from the base, so
+   /// "silent" has to be distinguishable from "explicitly the default of its type".</summary>
+   [Flags]
+   private enum Stated
+   {
+      None = 0,
+      DefaultValue = 1,
+      Options = 2,
+      PropertyChangedCallback = 4,
+      CoerceValueCallback = 8,
+      UpdateSourceTrigger = 16,
+   }
+
+   private readonly Stated stated;
+
    public PropertyMetadata()
    {
    }
@@ -34,12 +49,14 @@ public class PropertyMetadata
    public PropertyMetadata(object defaultValue)
    {
       DefaultValue = defaultValue;
+      stated = Stated.DefaultValue;
    }
 
    public PropertyMetadata(object defaultValue, PropertyChangedCallback propertyChangedCallback)
    {
       DefaultValue = defaultValue;
       PropertyChangedCallback = propertyChangedCallback;
+      stated = Stated.DefaultValue | Stated.PropertyChangedCallback;
    }
 
    public PropertyMetadata(object defaultValue, PropertyMetadataOptions options)
@@ -47,6 +64,7 @@ public class PropertyMetadata
       DefaultValue = defaultValue;
       MetadataOptions = options;
       ParseMetadataOptions(options);
+      stated = Stated.DefaultValue | Stated.Options;
    }
 
    public PropertyMetadata(object defaultValue, PropertyChangedCallback propertyChangedCallback, CoerceValueCallback coerceValueCallback)
@@ -54,6 +72,7 @@ public class PropertyMetadata
       DefaultValue = defaultValue;
       PropertyChangedCallback = propertyChangedCallback;
       CoerceValueCallback = coerceValueCallback;
+      stated = Stated.DefaultValue | Stated.PropertyChangedCallback | Stated.CoerceValueCallback;
    }
 
    public PropertyMetadata(object defaultValue, PropertyMetadataOptions options, PropertyChangedCallback propertyChangedCallback)
@@ -62,8 +81,9 @@ public class PropertyMetadata
       PropertyChangedCallback = propertyChangedCallback;
       MetadataOptions = options;
       ParseMetadataOptions(options);
+      stated = Stated.DefaultValue | Stated.Options | Stated.PropertyChangedCallback;
    }
-      
+
    public PropertyMetadata(object defaultValue, PropertyMetadataOptions options, CoerceValueCallback coerceValueCallback)
    {
       DefaultValue = defaultValue;
@@ -71,6 +91,7 @@ public class PropertyMetadata
       CoerceValueCallback = coerceValueCallback;
       MetadataOptions = options;
       ParseMetadataOptions(options);
+      stated = Stated.DefaultValue | Stated.Options | Stated.CoerceValueCallback;
    }
 
    public PropertyMetadata(object defaultValue, PropertyMetadataOptions options, PropertyChangedCallback propertyChangedCallback, CoerceValueCallback coerceValueCallback)
@@ -80,8 +101,9 @@ public class PropertyMetadata
       CoerceValueCallback = coerceValueCallback;
       MetadataOptions = options;
       ParseMetadataOptions(options);
+      stated = Stated.DefaultValue | Stated.Options | Stated.PropertyChangedCallback | Stated.CoerceValueCallback;
    }
-      
+
    public PropertyMetadata(object defaultValue, PropertyMetadataOptions options, PropertyChangedCallback propertyChangedCallback, CoerceValueCallback coerceValueCallback, UpdateSourceTrigger defaultUpdateSourceTrigger)
    {
       DefaultValue = defaultValue;
@@ -90,6 +112,42 @@ public class PropertyMetadata
       MetadataOptions = options;
       ParseMetadataOptions(options);
       DefaultUpdateSourceTrigger = defaultUpdateSourceTrigger;
+      stated = Stated.DefaultValue | Stated.Options | Stated.PropertyChangedCallback | Stated.CoerceValueCallback |
+               Stated.UpdateSourceTrigger;
+   }
+
+   /// <summary>This metadata laid OVER <paramref name="baseMetadata"/>: whatever it did not state comes from the base.
+   /// Changed-callbacks chain base-first; coercion does not chain (two answers are not an answer) - the derived wins.</summary>
+   internal PropertyMetadata MergedWith(PropertyMetadata baseMetadata)
+   {
+      if (baseMetadata == null) return this;
+
+      var options = stated.HasFlag(Stated.Options) ? MetadataOptions : baseMetadata.MetadataOptions;
+      var defaultValue = stated.HasFlag(Stated.DefaultValue) ? DefaultValue : baseMetadata.DefaultValue;
+      var coerce = stated.HasFlag(Stated.CoerceValueCallback) ? CoerceValueCallback : baseMetadata.CoerceValueCallback;
+      var trigger = stated.HasFlag(Stated.UpdateSourceTrigger)
+         ? DefaultUpdateSourceTrigger
+         : baseMetadata.DefaultUpdateSourceTrigger;
+
+      return new PropertyMetadata(defaultValue, options,
+         Chain(baseMetadata.PropertyChangedCallback, PropertyChangedCallback), coerce, trigger);
+   }
+
+   // base + derived, minus anything already in base: a handler restated by an override must still run once per change.
+   private static PropertyChangedCallback Chain(PropertyChangedCallback baseCallback, PropertyChangedCallback derived)
+   {
+      if (baseCallback == null) return derived;
+      if (derived == null) return baseCallback;
+
+      var result = baseCallback;
+      foreach (var handler in derived.GetInvocationList())
+      {
+         var one = (PropertyChangedCallback)handler;
+         if (Array.IndexOf(result.GetInvocationList(), one) >= 0) continue;
+         result += one;
+      }
+
+      return result;
    }
 
    private void ParseMetadataOptions(PropertyMetadataOptions flags)

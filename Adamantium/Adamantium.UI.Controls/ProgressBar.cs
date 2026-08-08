@@ -26,9 +26,8 @@ public class ProgressBar : RangeBase
     static ProgressBar()
     {
         // Progress convention: a 0..100 range (vs RangeBase's 0..1). A metadata default, NOT a constructor set - a set
-        // writes Local priority, which outranks and permanently masks a {Binding}/Style/Trigger on Maximum. Re-use
-        // RangeBase's OnMaximumChanged so the re-coercion still fires.
-        MaximumProperty.OverrideMetadata(typeof(ProgressBar), new PropertyMetadata(100.0, OnMaximumChanged));
+        // writes Local priority, which outranks and permanently masks a {Binding}/Style/Trigger on Maximum.
+        MaximumProperty.OverrideMetadata(typeof(ProgressBar), new PropertyMetadata(100.0));
     }
 
     /// <summary>True while the operation's extent is unknown - the theme shows a moving/indefinite indicator instead of

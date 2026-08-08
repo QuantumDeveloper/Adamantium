@@ -1,5 +1,5 @@
 using System.Collections.Concurrent;
-﻿using Adamantium.UI.Core.Resources;
+using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Core;
@@ -56,12 +56,6 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             // the old value against it sees a type it cannot use (an implicit transition, for one, refuses to animate
             // from it). The default is published as authored; the first write is what runs the coercion.
             values[property].SetEffective(values[property].SetValue(metadata.DefaultValue, ValuePriority.Default));
-            if (metadata.DefaultValue != null)
-            {
-                var e = new AdamantiumPropertyChangedEventArgs(property, AdamantiumProperty.UnsetValue,
-                    metadata.DefaultValue);
-                metadata.PropertyChangedCallback?.Invoke(this, e);
-            }
         }
     }
 
@@ -599,16 +593,21 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             slots.SetEffective(effectiveAfterWrite);
         }
 
-        // The change is reported as the value the property now READS as - the coerced one. A callback that reacted to
-        // the raw request would be looking at a value the property never had.
-        var args = new AdamantiumPropertyChangedEventArgs(property, slotBefore, effectiveAfterWrite);
+        // What the property READ as before the write - both ends of the report are that, never a raw slot. A container
+        // never written has no effective value (the lazy slots of an attached property); there it is the default,
+        // resolved through the same path GetValue uses so an inheriting property reports its parent's value.
+        var oldReadValue = oldEffectiveValue == AdamantiumProperty.UnsetValue
+            ? GetDefaultValue(property)
+            : oldEffectiveValue;
+        var args = new AdamantiumPropertyChangedEventArgs(property, oldReadValue, effectiveAfterWrite);
 
-        // A write that leaves the EFFECTIVE value where it was is not a change, so it must not run the changed-callback.
-        // Running it anyway is how two properties that assign each other close a cycle with no exit: a presenter whose
-        // Content is bound to its own DataContext writes back the object it already sits on, the callback re-assigns the
-        // same DataContext, that refreshes the bindings, which writes Content again - the app died of a stack overflow.
-        // The equal-effective check below guards only invalidation and events, which is why the cycle ran above it.
-        if (!Equals(oldEffectiveValue, effectiveAfterWrite))
+        // A write that leaves the value the property READS as where it was is not a change, so it must not run the
+        // changed-callback. Running it anyway is how two properties that assign each other close a cycle with no exit:
+        // a presenter whose Content is bound to its own DataContext writes back the object it already sits on, the
+        // callback re-assigns the same DataContext, that refreshes the bindings, which writes Content again - the app
+        // died of a stack overflow. The equal check below guards only invalidation and events, which is why the cycle
+        // ran above it.
+        if (!Equals(oldReadValue, effectiveAfterWrite))
         {
             metadata.PropertyChangedCallback?.Invoke(this, args);
         }
@@ -618,14 +617,14 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         // re-entrantly (it writes the Animation slot) - that resolves cleanly via the equal-effective early-return below.
         if (priority != ValuePriority.Animation)
         {
-            OnValueSet(property, oldEffectiveValue, value, priority);
+            OnValueSet(property, oldReadValue, value, priority);
         }
 
         // Re-read under the lock: a changed-callback or a started transition above may have written another slot.
         object newEffectiveValue;
         newEffectiveValue = GetOrCalculateEffectiveValue(property);
 
-        if (Equals(oldEffectiveValue, newEffectiveValue))
+        if (Equals(oldReadValue, newEffectiveValue))
         {
             return;
         }
