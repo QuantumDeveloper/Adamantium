@@ -36,7 +36,9 @@ public class RibbonButton : Button
     // fields also make touching this type register the attached ones (its initializer touches Ribbon's).
     public static readonly AdamantiumProperty SizeProperty = Ribbon.SizeProperty;
 
-    public static readonly AdamantiumProperty MinSizeProperty = Ribbon.MinSizeProperty;
+    public static readonly AdamantiumProperty CollapseToMediumProperty = Ribbon.CollapseToMediumProperty;
+
+    public static readonly AdamantiumProperty CollapseToSmallProperty = Ribbon.CollapseToSmallProperty;
 
     public static readonly AdamantiumProperty MaxSizeProperty = Ribbon.MaxSizeProperty;
 
@@ -47,11 +49,18 @@ public class RibbonButton : Button
         set => SetValue(SizeProperty, value);
     }
 
-    /// <summary>The smallest this command may be shrunk to.</summary>
-    public RibbonSize MinSize
+    /// <summary>At which step of its group this command drops its big icon for a small one beside the label.</summary>
+    public RibbonCollapseThreshold CollapseToMedium
     {
-        get => GetValue<RibbonSize>(MinSizeProperty);
-        set => SetValue(MinSizeProperty, value);
+        get => GetValue<RibbonCollapseThreshold>(CollapseToMediumProperty);
+        set => SetValue(CollapseToMediumProperty, value);
+    }
+
+    /// <summary>...and at which step it drops the label too. A command nobody recognises without its words says Never.</summary>
+    public RibbonCollapseThreshold CollapseToSmall
+    {
+        get => GetValue<RibbonCollapseThreshold>(CollapseToSmallProperty);
+        set => SetValue(CollapseToSmallProperty, value);
     }
 
     /// <summary>The largest this command may be drawn at.</summary>
