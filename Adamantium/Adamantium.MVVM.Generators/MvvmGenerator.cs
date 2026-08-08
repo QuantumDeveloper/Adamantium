@@ -55,6 +55,16 @@ public sealed class MvvmGenerator : IIncrementalGenerator
         DiagnosticSeverity.Warning,
         isEnabledByDefault: true);
 
+    private static readonly DiagnosticDescriptor CanExecuteNotResolved = new(
+        "AMVVM004",
+        "[Command] CanExecute must name a bool member",
+        "CanExecute names '{0}', which is not a bool property, a bool [Bindable] field, or a bool method taking no " +
+        "argument (or the command's own argument) on this type or its bases. The command is generated WITHOUT a gate, " +
+        "so it would always be enabled",
+        "Adamantium.MVVM",
+        DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
     private const string ValidatingBaseName = "Adamantium.MVVM.AdamantiumValidatingViewModel";
     private const string ValidationAttributeName = "System.ComponentModel.DataAnnotations.ValidationAttribute";
 
@@ -82,6 +92,9 @@ public sealed class MvvmGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(command, static (spc, r) =>
         {
             if (Report(spc, r)) return;
+            // Reported ALONGSIDE the emit: the command still comes out (gateless), so the one diagnostic that matters
+            // is not buried under a "no such command" error at every binding site.
+            if (r.Value.Diagnostic is not null) spc.ReportDiagnostic(r.Value.Diagnostic.ToDiagnostic());
             spc.AddSource(r.Value.HintName, EmitCommand(r.Value));
         });
 
@@ -230,7 +243,11 @@ public sealed class MvvmGenerator : IIncrementalGenerator
             (true, true, true) => $"(arg, ct) => {method.Name}(arg, ct)",
         };
 
-        var canExecuteExpr = BuildCanExecute(type, canExecute, hasParam);
+        // At the ATTRIBUTE that names the gate, not the method - that is the text to change.
+        var attributeLocation = attr.ApplicationSyntaxReference is { } reference
+            ? LocationInfo.CreateFrom(reference.GetSyntax(ct).GetLocation())
+            : LocationInfo.CreateFrom(method);
+        var (canExecuteExpr, diagnostic) = BuildCanExecute(type, canExecute, hasParam, attributeLocation);
 
         return new(new CommandMemberInfo(
             NamespaceOf(type),
@@ -241,7 +258,8 @@ public sealed class MvvmGenerator : IIncrementalGenerator
             commandTypeFqn,
             executeExpr,
             canExecuteExpr,
-            Hint(type, commandName, "Command")), null);
+            Hint(type, commandName, "Command"),
+            diagnostic), null);
     }
 
     private static Result<ViewModelClassInfo> GetViewModel(GeneratorAttributeSyntaxContext ctx, CancellationToken ct)
@@ -467,20 +485,71 @@ public sealed class MvvmGenerator : IIncrementalGenerator
     private static bool IsCancellationToken(ITypeSymbol type) =>
         type?.ToDisplayString() == "System.Threading.CancellationToken";
 
-    // Builds the CanExecute delegate argument. A typed command needs a Func<T,bool>: pass the arg through if the
-    // user's CanExecute takes one, else ignore it ('_'); a non-typed command needs a parameterless Func<bool>.
-    private static string BuildCanExecute(INamedTypeSymbol type, string canExecute, bool hasParam)
+    /// <summary>The CanExecute delegate argument, or a diagnostic when the name resolves to nothing usable. A typed
+    /// command needs a Func&lt;T,bool&gt; (pass the arg through if the gate takes one, else ignore it); a non-typed one
+    /// a parameterless Func&lt;bool&gt;.</summary>
+    private static (string Expression, DiagnosticInfo Diagnostic) BuildCanExecute(
+        INamedTypeSymbol type, string canExecute, bool hasParam, LocationInfo location)
     {
-        if (string.IsNullOrEmpty(canExecute)) return null;
-        var member = type.GetMembers(canExecute).FirstOrDefault();
-        var isProperty = member is IPropertySymbol;
-        var takesArg = member is IMethodSymbol m && m.Parameters.Length == 1;
-        if (hasParam)
+        if (string.IsNullOrEmpty(canExecute)) return (null, null);
+
+        switch (FindGate(type, canExecute))
         {
-            if (isProperty) return $"_ => {canExecute}";
-            return takesArg ? $"arg => {canExecute}(arg)" : $"_ => {canExecute}()";
+            case IPropertySymbol { Type.SpecialType: SpecialType.System_Boolean }:
+                return (hasParam ? $"_ => {canExecute}" : $"() => {canExecute}", null);
+
+            case IMethodSymbol { ReturnType.SpecialType: SpecialType.System_Boolean, Parameters.Length: 0 }:
+                return (hasParam ? $"_ => {canExecute}()" : $"() => {canExecute}()", null);
+
+            // Only a TYPED command has an argument to give a one-argument gate.
+            case IMethodSymbol { ReturnType.SpecialType: SpecialType.System_Boolean, Parameters.Length: 1 } when hasParam:
+                return ($"arg => {canExecute}(arg)", null);
+
+            // No symbol yet: a [Bindable] field becomes a property in this same pass, so ask what it WILL be.
+            case null when WillGenerateBoolProperty(type, canExecute):
+                return (hasParam ? $"_ => {canExecute}" : $"() => {canExecute}", null);
+
+            default:
+                return (null, new DiagnosticInfo(CanExecuteNotResolved, location, canExecute));
         }
-        return isProperty ? $"() => {canExecute}" : $"() => {canExecute}()";
+    }
+
+    // The named member on the type or any base. A private member of a base is unreachable from the generated partial.
+    private static ISymbol FindGate(INamedTypeSymbol type, string name)
+    {
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            foreach (var member in current.GetMembers(name))
+            {
+                if (member is not IPropertySymbol and not IMethodSymbol) continue;
+                if (!ReferenceEquals(current, type) && member.DeclaredAccessibility == Accessibility.Private) continue;
+
+                return member;
+            }
+        }
+
+        return null;
+    }
+
+    // Will a [Bindable] bool FIELD here or on a base become a property of this name? (The generated property is public,
+    // so a base's counts; a [Bindable] partial property is already a symbol and is found by FindGate.)
+    private static bool WillGenerateBoolProperty(INamedTypeSymbol type, string name)
+    {
+        for (var current = type; current is not null; current = current.BaseType)
+        {
+            foreach (var member in current.GetMembers())
+            {
+                if (member is not IFieldSymbol { Type.SpecialType: SpecialType.System_Boolean } field) continue;
+                if (ToPropertyName(field.Name) != name) continue;
+
+                foreach (var attr in field.GetAttributes())
+                {
+                    if (attr.AttributeClass?.ToDisplayString() == BindableAttr) return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     // Generated command property names of the type, so [Affects] can tell a command from a property.
