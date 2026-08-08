@@ -1,0 +1,193 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions">
+    <!-- An editor shell: a ribbon band, a document surface, a status line. Exercises the three command sizes, commands
+         greying out on CanExecute, two-way toggles, ordinary controls inside a group, a separator breaking a column,
+         and the quick-access bar in the caption reading the SAME view model (see RibbonWindow.auml). -->
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <Ribbon Grid.Row="0">
+
+            <!-- ================= HOME ================= -->
+            <RibbonTab Header="Home">
+                <RibbonGroup Header="Clipboard">
+                    <!-- Split: the body pastes, the arrow offers the rarer ways to paste. Both halves are disabled
+                         together - the command gates the whole thing. -->
+                    <RibbonSplitButton Content="Paste" Command="{Binding PasteCommand}"
+                                       ToolTip="Paste the clipboard contents"
+                                       Icon="M4,2 L12,2 L12,14 L4,14 Z M6,2 L6,4 L10,4 L10,2">
+                        <RibbonSplitButton.DropDownMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Keep formatting" Command="{Binding PasteKeepFormattingCommand}"/>
+                                <MenuItem Header="Values only" Command="{Binding PasteValuesOnlyCommand}"/>
+                                <MenuItem Header="Paste special..." Command="{Binding PasteSpecialCommand}"/>
+                            </ContextMenu>
+                        </RibbonSplitButton.DropDownMenu>
+                    </RibbonSplitButton>
+                    <!-- Medium: small icon, label beside it - three stack into one column. -->
+                    <RibbonButton Content="Cut" MaxSize="Medium" Command="{Binding CutCommand}"
+                                  Icon="M3,2 L13,12 M13,2 L3,12"/>
+                    <RibbonButton Content="Copy" MaxSize="Medium" Command="{Binding CopyCommand}"
+                                  Icon="M3,3 L10,3 L10,11 L3,11 Z M6,6 L13,6 L13,14 L6,14 Z"/>
+                    <RibbonButton Content="Duplicate" MaxSize="Medium" Command="{Binding DuplicateCommand}"
+                                  Icon="M2,2 L10,2 L10,10 L2,10 Z M6,6 L14,6 L14,14 L6,14 Z"/>
+                </RibbonGroup>
+
+                <RibbonGroup Header="Scene">
+                    <RibbonButton Content="Entity" Command="{Binding AddEntityCommand}"
+                                  ToolTip="Add an empty entity"
+                                  Icon="M8,2 L8,14 M2,8 L14,8"/>
+                    <RibbonButton Content="Delete" MaxSize="Medium" Command="{Binding DeleteCommand}"
+                                  Icon="M3,4 L13,4 M5,4 L5,14 L11,14 L11,4 M6,2 L10,2"/>
+                    <RibbonButton Content="Select all" MaxSize="Medium" Command="{Binding SelectAllCommand}"
+                                  Icon="M2,2 L14,2 L14,14 L2,14 Z M5,5 L11,5 L11,11 L5,11 Z"/>
+                    <RibbonButton Content="Select none" MaxSize="Medium" Command="{Binding SelectNoneCommand}"
+                                  Icon="M2,2 L14,2 L14,14 L2,14 Z"/>
+                </RibbonGroup>
+
+                <RibbonGroup Header="View">
+                    <!-- The same flags drive the surface below and the View tab. -->
+                    <RibbonToggleButton Content="Wireframe" IsChecked="{Binding Wireframe, Mode=TwoWay}"
+                                        Icon="M8,2 L14,5 L14,11 L8,14 L2,11 L2,5 Z M2,5 L8,8 L14,5 M8,8 L8,14"/>
+                    <RibbonToggleButton Content="Grid" MaxSize="Medium" IsChecked="{Binding ShowGrid, Mode=TwoWay}"
+                                        Icon="M2,2 L14,2 L14,14 L2,14 Z M6,2 L6,14 M10,2 L10,14 M2,6 L14,6 M2,10 L14,10"/>
+                    <RibbonToggleButton Content="Gizmos" MaxSize="Medium" IsChecked="{Binding ShowGizmos, Mode=TwoWay}"
+                                        Icon="M8,14 L8,4 M8,4 L5,7 M8,4 L11,7 M2,14 L14,14"/>
+                    <!-- A separator ends the run beside it, so what follows starts a fresh column. -->
+                    <Separator/>
+                    <!-- A group hosts ORDINARY controls too. They state the same range through the ATTACHED form - a
+                         Slider has no reason to grow a `MaxSize` of its own. -->
+                    <CheckBox Content="Has selection" Ribbon.MaxSize="Medium" Margin="4 2"
+                              IsChecked="{Binding HasSelection, Mode=TwoWay}"/>
+                    <TextBlock Text="Grid size" Ribbon.MaxSize="Medium" Margin="6 4 4 0" FontSize="11"/>
+                    <Slider Ribbon.MaxSize="Medium" Width="120" Margin="4 2"
+                            Minimum="0.1" Maximum="4" Value="{Binding GridSize, Mode=TwoWay}"/>
+                </RibbonGroup>
+            </RibbonTab>
+
+            <!-- ================= MODELING ================= -->
+            <RibbonTab Header="Modeling">
+                <RibbonGroup Header="Primitives">
+                    <!-- Drops a menu instead of doing something. The rows are ordinary MenuItems, so submenus, Escape
+                         and light dismiss come with them. -->
+                    <RibbonDropDownButton Content="Add" ToolTip="Add a primitive"
+                                          Icon="M8,2 L8,14 M2,8 L14,8">
+                        <RibbonDropDownButton.DropDownMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Cube" Command="{Binding AddCubeCommand}"/>
+                                <MenuItem Header="Sphere" Command="{Binding AddSphereCommand}"/>
+                                <MenuItem Header="Plane" Command="{Binding AddPlaneCommand}"/>
+                                <MenuItem Header="Empty entity" Command="{Binding AddEntityCommand}"/>
+                            </ContextMenu>
+                        </RibbonDropDownButton.DropDownMenu>
+                    </RibbonDropDownButton>
+                    <RibbonButton Content="Cube" Command="{Binding AddCubeCommand}"
+                                  Icon="M8,2 L14,5 L14,11 L8,14 L2,11 L2,5 Z M2,5 L8,8 L14,5 M8,8 L8,14"/>
+                    <RibbonButton Content="Sphere" Command="{Binding AddSphereCommand}"
+                                  Icon="M8,2 A6,6 0 1 0 8,14 A6,6 0 1 0 8,2 M2,8 L14,8"/>
+                    <RibbonButton Content="Plane" Command="{Binding AddPlaneCommand}"
+                                  Icon="M2,10 L8,6 L14,10 L8,14 Z"/>
+                </RibbonGroup>
+
+                <RibbonGroup Header="Mesh">
+                    <RibbonButton Content="Extrude" MaxSize="Medium" Command="{Binding ExtrudeCommand}"
+                                  Icon="M2,9 L8,5 L14,9 L8,13 Z M8,5 L8,1"/>
+                    <RibbonButton Content="Bevel" MaxSize="Medium" Command="{Binding BevelCommand}"
+                                  Icon="M3,13 L3,6 L6,3 L13,3 M3,6 L13,6 L13,3 M13,6 L13,13 L3,13"/>
+                    <RibbonButton Content="Subdivide" MaxSize="Medium" Command="{Binding SubdivideCommand}"
+                                  Icon="M2,2 L14,2 L14,14 L2,14 Z M8,2 L8,14 M2,8 L14,8"/>
+                </RibbonGroup>
+
+                <RibbonGroup Header="Snapping">
+                    <RibbonToggleButton Content="Snap" IsChecked="{Binding SnapToGrid, Mode=TwoWay}"
+                                        Icon="M8,2 L8,14 M2,8 L14,8 M5,5 L11,11 M11,5 L5,11"/>
+                    <!-- Small: the icon alone, three to a column. MaxSize is a RANGE - the adaptive pass may only shrink. -->
+                    <RibbonToggleButton MaxSize="Small" ToolTip="Snap to vertices"
+                                        Icon="M3,3 L5,3 L5,5 L3,5 Z M11,3 L13,3 L13,5 L11,5 Z M3,11 L5,11 L5,13 L3,13 Z M11,11 L13,11 L13,13 L11,13 Z"/>
+                    <RibbonToggleButton MaxSize="Small" ToolTip="Snap to edges"
+                                        Icon="M3,3 L3,13 L13,13 M3,3 L13,13"/>
+                    <RibbonToggleButton MaxSize="Small" ToolTip="Snap to faces"
+                                        Icon="M3,5 L13,5 L13,13 L3,13 Z M3,5 L8,9 L13,5"/>
+                </RibbonGroup>
+            </RibbonTab>
+
+            <!-- ================= MATERIALS ================= -->
+            <RibbonTab Header="Materials">
+                <RibbonGroup Header="Library">
+                    <!-- The icon BOUND from the view model as plain path text; the binding converts it to a Geometry. -->
+                    <RibbonButton Content="New" Command="{Binding NewMaterialCommand}"
+                                  ToolTip="Create a material"
+                                  Icon="{Binding MaterialIcon}"/>
+                    <!-- ...and an icon that is not path data at all: a COLOUR, drawn as a disc by the command's own
+                         template. -->
+                    <RibbonButton Content="Swatch" MaxSize="Medium" Icon="Coral"
+                                  Command="{Binding NewMaterialCommand}"
+                                  ToolTip="A command whose icon is a colour, drawn by its own template">
+                        <RibbonButton.IconTemplate>
+                            <DataTemplate>
+                                <Ellipse Width="14" Height="14" EllipseType="EdgeToEdge" Fill="{Binding}"/>
+                            </DataTemplate>
+                        </RibbonButton.IconTemplate>
+                    </RibbonButton>
+                </RibbonGroup>
+
+                <RibbonGroup Header="Channels">
+                    <RibbonButton Content="Albedo" MaxSize="Medium" Command="{Binding EditAlbedoCommand}"
+                                  Icon="M8,2 A6,6 0 1 0 8,14 A6,6 0 1 0 8,2"/>
+                    <RibbonButton Content="Normal" MaxSize="Medium" Command="{Binding EditNormalCommand}"
+                                  Icon="M2,12 L8,4 L14,12 Z"/>
+                    <RibbonButton Content="Roughness" MaxSize="Medium" Command="{Binding EditRoughnessCommand}"
+                                  Icon="M2,11 L5,7 L8,11 L11,5 L14,11"/>
+                </RibbonGroup>
+
+                <RibbonGroup Header="Preview">
+                    <RibbonToggleButton Content="Wireframe" IsChecked="{Binding Wireframe, Mode=TwoWay}"
+                                        Icon="M8,2 L14,5 L14,11 L8,14 L2,11 L2,5 Z M2,5 L8,8 L14,5 M8,8 L8,14"/>
+                    <TextBlock Text="Shading" Ribbon.MaxSize="Medium" Margin="6 4 4 0" FontSize="11"/>
+                    <DropDown Ribbon.MaxSize="Medium" Width="140" Margin="4 2"
+                              ItemsSource="{Binding ShadingModes}"
+                              SelectedItem="{Binding ShadingMode, Mode=TwoWay}"/>
+                </RibbonGroup>
+            </RibbonTab>
+
+            <!-- ================= VIEW ================= -->
+            <RibbonTab Header="View">
+                <RibbonGroup Header="Display">
+                    <RibbonToggleButton Content="Grid" IsChecked="{Binding ShowGrid, Mode=TwoWay}"
+                                        Icon="M2,2 L14,2 L14,14 L2,14 Z M6,2 L6,14 M10,2 L10,14 M2,6 L14,6 M2,10 L14,10"/>
+                    <RibbonToggleButton Content="Gizmos" IsChecked="{Binding ShowGizmos, Mode=TwoWay}"
+                                        Icon="M8,14 L8,4 M8,4 L5,7 M8,4 L11,7 M2,14 L14,14"/>
+                    <RibbonToggleButton Content="Wireframe" IsChecked="{Binding Wireframe, Mode=TwoWay}"
+                                        Icon="M8,2 L14,5 L14,11 L8,14 L2,11 L2,5 Z M2,5 L8,8 L14,5 M8,8 L8,14"/>
+                </RibbonGroup>
+
+                <RibbonGroup Header="Selection">
+                    <RibbonButton Content="All" MaxSize="Medium" Command="{Binding SelectAllCommand}"
+                                  Icon="M2,2 L14,2 L14,14 L2,14 Z M5,5 L11,5 L11,11 L5,11 Z"/>
+                    <RibbonButton Content="None" MaxSize="Medium" Command="{Binding SelectNoneCommand}"
+                                  Icon="M2,2 L14,2 L14,14 L2,14 Z"/>
+                    <RibbonButton Content="Delete" MaxSize="Medium" Command="{Binding DeleteCommand}"
+                                  Icon="M3,4 L13,4 M5,4 L5,14 L11,14 L11,4 M6,2 L10,2"/>
+                </RibbonGroup>
+            </RibbonTab>
+        </Ribbon>
+
+        <!-- The "document": a stand-in surface the commands land on. -->
+        <Border Grid.Row="1" Margin="16" CornerRadius="6"
+                Background="{ResourceReference SolidBackgroundFillColorSecondary}"
+                BorderBrush="{ResourceReference ControlStrokeColorDefault}" BorderThickness="1">
+            <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="Scene view" FontSize="22" HorizontalAlignment="Center"
+                           Foreground="{ResourceReference TextFillColorPrimary}"/>
+                <TextBlock Text="{Binding Status}" FontSize="14" Margin="0 12 0 0" HorizontalAlignment="Center"
+                           Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <TextBlock Text="{Binding ShadingMode}" FontSize="13" Margin="0 16 0 0" HorizontalAlignment="Center"
+                           Foreground="{ResourceReference TextFillColorTertiary}"/>
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="2" Height="26" Background="{ResourceReference SolidBackgroundFillColorTertiary}">
+            <TextBlock Text="{Binding Status}" VerticalAlignment="Center" Margin="12 0" FontSize="12"
+                       Foreground="{ResourceReference TextFillColorSecondary}"/>
+        </Border>
+    </Grid>
+</View>

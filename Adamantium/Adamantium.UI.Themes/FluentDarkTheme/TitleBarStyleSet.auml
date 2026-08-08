@@ -21,10 +21,16 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TitleBar">
-                    <controls:Grid Background="{TemplateBinding Background}" ColumnDefinitions="Auto,*,Auto">
+                    <controls:Grid Background="{TemplateBinding Background}" ColumnDefinitions="Auto,Auto,*,Auto">
+
+                        <!-- A neutral slot before everything else: a quick-access bar, a search box, whatever the
+                             application puts there. -->
+                        <controls:ContentPresenter x:Name="PART_LeadingContent" Grid.Column="0"
+                                Content="{TemplateBinding LeadingContent}"
+                                VerticalAlignment="Center"/>
 
                         <!-- LEFT commands: interactive, sit before the drag area (so they stay clickable). -->
-                        <controls:ItemsControl Grid.Column="0" ItemsSource="{TemplateBinding LeftWindowCommands}"
+                        <controls:ItemsControl Grid.Column="1" ItemsSource="{TemplateBinding LeftWindowCommands}"
                                 VerticalAlignment="Stretch">
                             <controls:ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate><controls:StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
@@ -51,7 +57,7 @@
                              Clips so a long title doesn't spill onto the commands. The command columns (0 and 2) sit outside
                              this element, so their buttons stay clickable; the drag is initiated from managed input here
                              (see TitleBar), which respects z-order so overlays on top keep their clicks. -->
-                        <controls:Grid x:Name="PART_DragArea" Grid.Column="1" Background="Transparent" ClipToBounds="True">
+                        <controls:Grid x:Name="PART_DragArea" Grid.Column="2" Background="Transparent" ClipToBounds="True">
                             <controls:StackPanel Orientation="Horizontal" VerticalAlignment="Center"
                                     HorizontalAlignment="{TemplateBinding TitleAlignment}" Margin="12,0,0,0">
                                 <controls:ContentPresenter x:Name="PART_Icon" Content="{TemplateBinding Icon}"
@@ -63,7 +69,7 @@
                         </controls:Grid>
 
                         <!-- RIGHT zone (interactive): right commands + "..." overflow menu + the window buttons. -->
-                        <controls:StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Stretch">
+                        <controls:StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Stretch">
                             <controls:ItemsControl ItemsSource="{TemplateBinding RightWindowCommands}" VerticalAlignment="Stretch">
                                 <controls:ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate><controls:StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>

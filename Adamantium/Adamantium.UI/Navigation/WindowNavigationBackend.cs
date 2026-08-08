@@ -52,7 +52,12 @@ public sealed class WindowNavigationBackend : IWindowNavigationBackend
             // service + tracks the window off that. Calling AddWindow too would create the render service twice.
             window.Show();   // attaches + initializes if needed, and activates itself on first display (Window.Show)
             if (shell != null)
+            {
+                // So the shell's OWN bindings resolve too (a caption slot, a command bar authored on the window). The
+                // view keeps its own explicit DataContext from the ViewLocator.
+                shell.DataContext = contentViewModel;
                 shell.Content = _viewLocator.ResolveView(contentViewModel);   // load the chosen content into the live shell
+            }
             _windows[contentViewModel] = window;
             // Untrack on close (including the OS title-bar X, which never routes through CloseWindow) - otherwise a stale
             // entry makes a single-instance re-open just "activate" a dead window instead of opening a fresh one.
