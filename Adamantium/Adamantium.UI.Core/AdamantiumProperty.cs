@@ -80,9 +80,11 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
          throw new ArgumentNullException(nameof(metadata));
       }
 
+      // One declaration per type; a DERIVED type overrides, and its override layers over this one.
       if (defaultValues.ContainsKey(ownerType))
       {
-         throw new InvalidOperationException("Default value is already set for " + Name);
+         throw new InvalidOperationException(
+            $"Metadata for property '{Name}' is already declared for type '{ownerType.FullName}'.");
       }
 
       defaultValues.Add(ownerType, metadata);
@@ -104,20 +106,37 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
       return metadataCache.GetOrAdd(ownerType, ResolveDefaultMetadata);
    }
 
-   // Walks the type's ancestry for the nearest declared metadata (most-derived wins). Called once per concrete type, then
-   // cached - see metadataCache.
+   // Every declaration in the type's ancestry, folded base-first (see PropertyMetadata.MergedWith). Folded here and not
+   // at OverrideMetadata time: static constructors run in no guaranteed order, so a base's declaration may not exist yet.
    private PropertyMetadata ResolveDefaultMetadata(Type ownerType)
    {
-      while (ownerType != null)
+      List<PropertyMetadata> chain = null;
+      PropertyMetadata nearest = null;
+
+      for (var type = ownerType; type != null; type = type.GetTypeInfo().BaseType)
       {
-         if (defaultValues.TryGetValue(ownerType, out var result))
+         if (!defaultValues.TryGetValue(type, out var declared)) continue;
+
+         if (nearest == null)
          {
-            return result;
+            nearest = declared;   // one declaration is the common case - do not allocate for it
+            continue;
          }
-         ownerType = ownerType.GetTypeInfo().BaseType;
+
+         (chain ??= [nearest]).Add(declared);
       }
 
-      return null;
+      if (chain == null)
+         return nearest;
+
+      // Most-derived first, so fold from the base end.
+      var merged = chain[^1];
+      for (var i = chain.Count - 2; i >= 0; i--)
+      {
+         merged = chain[i].MergedWith(merged);
+      }
+
+      return merged;
    }
 
    /// <summary>

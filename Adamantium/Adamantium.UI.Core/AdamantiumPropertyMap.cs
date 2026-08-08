@@ -246,8 +246,8 @@ public static class AdamantiumPropertyMap
             }
             else
             {
-               throw new ArgumentNullException(
-                  $"Property {property.Name}is already registered for type {property.OwnerType}");
+               throw new InvalidOperationException(
+                  $"Property '{property.Name}' is already registered for type '{type.FullName}'.");
             }
          }
          else

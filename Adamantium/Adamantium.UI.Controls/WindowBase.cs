@@ -388,6 +388,18 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     public static readonly AdamantiumProperty RightWindowCommandsProperty = AdamantiumProperty.Register(nameof(RightWindowCommands),
         typeof(System.Collections.IEnumerable), typeof(WindowBase), new PropertyMetadata(null));
 
+    // Forwarded to TitleBar.LeadingContent by the default template.
+    public static readonly AdamantiumProperty TitleBarLeadingContentProperty = AdamantiumProperty.Register(
+        nameof(TitleBarLeadingContent), typeof(object), typeof(WindowBase),
+        new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure));
+
+    /// <summary>Content placed at the start of the custom caption, before the window commands.</summary>
+    public object TitleBarLeadingContent
+    {
+        get => GetValue(TitleBarLeadingContentProperty);
+        set => SetValue(TitleBarLeadingContentProperty, value);
+    }
+
     // Window icon/logo shown at the left of the custom title bar (forwarded to the TitleBar by the default template).
     public static readonly AdamantiumProperty IconProperty = AdamantiumProperty.Register(nameof(Icon),
         typeof(object), typeof(WindowBase), new PropertyMetadata(null));
@@ -480,7 +492,8 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     {
         if (!(adamantiumAdamantiumComponent is WindowBase component)) return;
         Size old = default;
-        if (e.OldValue == AdamantiumProperty.UnsetValue)
+        // Only concrete numbers are a size to push to the OS window or to report; the default is NaN (auto).
+        if (e.OldValue is not double oldWidth || double.IsNaN(oldWidth) || e.NewValue is not double newWidth)
             return;
 
         // NO forced full walks here any more. A client-size change (drag-resize, maximize) used to demand a whole-tree
@@ -501,10 +514,10 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         // after it opened (found on the docking compass overlay, which is re-sized to the area it covers).
         component.WindowWorkerService?.SetSize(component.ClientWidth, component.ClientHeight);
 
-        old.Width = (double) e.OldValue;
+        old.Width = oldWidth;
         old.Height = component.Height;
 
-        var newSize = new Size((double)e.NewValue, component.Height);
+        var newSize = new Size(newWidth, component.Height);
         var args = new SizeChangedEventArgs(old, newSize, true, false);
         args.RoutedEvent = ClientSizeChangedEvent;
         component.RaiseEvent(args);
@@ -513,15 +526,16 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     private static void ClientHeightChangedCallBack(AdamantiumComponent adamantiumAdamantiumComponent, AdamantiumPropertyChangedEventArgs e)
     {
         if (!(adamantiumAdamantiumComponent is WindowBase component)) return;
-        if (e.OldValue == AdamantiumProperty.UnsetValue)
+        // See ClientWidthChangedCallBack.
+        if (e.OldValue is not double oldHeight || double.IsNaN(oldHeight) || e.NewValue is not double newHeight)
             return;
 
         // No forced full walks - see ClientWidthChangedCallBack: the resize settle marks honestly now, so it splices.
 
         component.WindowWorkerService?.SetSize(component.ClientWidth, component.ClientHeight);
 
-        var old = new Size(component.Width, (double)e.OldValue);
-        var newSize = new Size(component.Width, (double)e.NewValue);
+        var old = new Size(component.Width, oldHeight);
+        var newSize = new Size(component.Width, newHeight);
         var args = new SizeChangedEventArgs(old, newSize, false, true);
         args.RoutedEvent = ClientSizeChangedEvent;
         component?.RaiseEvent(args);

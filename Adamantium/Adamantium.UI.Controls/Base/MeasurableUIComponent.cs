@@ -95,20 +95,28 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         remove => RemoveHandler(SizeChangedEvent, value);
     }
 
+    /// <summary>A real length - not an auto (NaN) one and not the Unset sentinel a cleared style/trigger leaves.</summary>
+    private static bool IsConcrete(object value, out double length)
+    {
+        length = 0;
+        if (value is not double d || double.IsNaN(d)) return false;
+
+        length = d;
+        return true;
+    }
+
     private static void WidthChangedCallBack(AdamantiumComponent adamantiumComponent, AdamantiumPropertyChangedEventArgs e)
     {
         if (adamantiumComponent is not MeasurableUIComponent o) return;
         Size old = default;
-        // Skip the boundary transitions where a value is first seeded from - or cleared back to - UnsetValue (a trigger
-        // or style setter being removed): there is no concrete double to report, and the cast below would throw. Layout
-        // re-measures on its own (Width AffectsMeasure), so no SizeChanged event is owed for the clear.
-        if (e.OldValue == AdamantiumProperty.UnsetValue || e.NewValue == AdamantiumProperty.UnsetValue)
+        // Only a transition between two CONCRETE widths is a size change; layout re-measures on its own anyway.
+        if (!IsConcrete(e.OldValue, out var oldWidth) || !IsConcrete(e.NewValue, out var newWidth))
             return;
 
-        old.Width = (double) e.OldValue;
+        old.Width = oldWidth;
         old.Height = o.Height;
-            
-        var newSize = new Size((double)e.NewValue, o.Height);
+
+        var newSize = new Size(newWidth, o.Height);
         var args = new SizeChangedEventArgs(old, newSize, true, false);
         args.RoutedEvent = SizeChangedEvent;
         o.OnSizeChanged(args);
@@ -118,12 +126,12 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     private static void HeightChangedCallBack(AdamantiumComponent adamantiumComponent, AdamantiumPropertyChangedEventArgs e)
     {
         if (!(adamantiumComponent is MeasurableUIComponent o)) return;
-        // See WidthChangedCallBack: ignore the UnsetValue boundary (a trigger/style value being seeded or cleared).
-        if (e.OldValue == AdamantiumProperty.UnsetValue || e.NewValue == AdamantiumProperty.UnsetValue)
+        // See WidthChangedCallBack.
+        if (!IsConcrete(e.OldValue, out var oldHeight) || !IsConcrete(e.NewValue, out var newHeight))
             return;
 
-        var old = new Size(o.Width, (double)e.OldValue);
-        var newSize = new Size(o.Width, (double)e.NewValue);
+        var old = new Size(o.Width, oldHeight);
+        var newSize = new Size(o.Width, newHeight);
         var args = new SizeChangedEventArgs(old, newSize, false, true);
         args.RoutedEvent = SizeChangedEvent;
         o.OnSizeChanged(args);
