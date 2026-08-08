@@ -45,6 +45,10 @@ public partial class MainViewModel
     [Command] private Task OpenWorkspace() =>
         _navigation.OpenWindowAsync<WorkspaceShellViewModel>(windowShell: "workspace", singleInstance: !_settings.AllowDuplicateWindows);
 
+    // Its own shell (RibbonWindow), so the caption can carry the quick-access bar.
+    [Command] private Task OpenRibbon() =>
+        _navigation.OpenWindowAsync<RibbonShellViewModel>(windowShell: "ribbon", singleInstance: true);
+
     [Command]
     private void ShowMessage()
     {
@@ -91,6 +95,7 @@ public partial class MainViewModel
     public IEnumerable RightWindowCommands => _rightWindowCommands ??= new()
     {
         new WindowCommand { IconData = "M1,2 L13,2 L13,12 L1,12 Z M1,5 L13,5",     Label = "Workspace", ToolTip = "Open workspace window", Command = OpenWorkspaceCommand },
+        new WindowCommand { IconData = "M1,1 L13,1 L13,13 L1,13 Z M1,4 L13,4 M4,4 L4,1 M3,7 L6,7 M3,10 L6,10 M8,6 L12,6 L12,11 L8,11 Z", Label = "Ribbon", ToolTip = "Open the ribbon window", Command = OpenRibbonCommand },
         new WindowCommand { IconData = "M1,2 L13,2 L13,12 L1,12 Z M4,6 L10,6 M4,9 L8,9", Label = "Dialog", ToolTip = "Show a confirm dialog", Command = ShowConfirmCommand },
         new WindowCommand { IconData = "M7,0 L14,7 L7,14 L0,7 Z",                  Label = "Help", ToolTip = "About Adamantium Sandbox", Command = ShowAboutCommand },
     };

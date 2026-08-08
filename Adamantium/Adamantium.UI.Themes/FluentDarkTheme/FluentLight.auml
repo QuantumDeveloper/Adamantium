@@ -41,6 +41,7 @@
         <StyleInclude Source="{x:Type fluentDark:ToolTipStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:TabControlStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:TabItemStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:RibbonStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:SlidePanelStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:OverlayWindowStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:TitleBarStyleSet}"/>

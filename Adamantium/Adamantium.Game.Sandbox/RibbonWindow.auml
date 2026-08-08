@@ -1,0 +1,14 @@
+<Window x:Namespace="Adamantium.Game.Sandbox"
+        xmlns="http://adamantium/ui"
+        xmlns:x="http://adamantium/ui/xaml/extensions"
+        x:CreateInDesignTime="False"
+        Title="Ribbon"
+        TitleBarHeight="38"
+        Width="1180"
+        Height="720">
+    <!-- The quick-access bar lives in the CAPTION, through the title bar's neutral content slot - no RibbonWindow type
+         needed, the caption is already our own control rather than the OS's. -->
+    <Window.TitleBarLeadingContent>
+        <RibbonQuickAccess ItemsSource="{Binding QuickAccess}" Margin="6 0 4 0"/>
+    </Window.TitleBarLeadingContent>
+</Window>

@@ -37,6 +37,7 @@
                                     Foreground="{TemplateBinding InactiveTitleBarForeground}"
                                     Title="{TemplateBinding Title}"
                                     Icon="{TemplateBinding Icon}"
+                                    LeadingContent="{TemplateBinding TitleBarLeadingContent}"
                                     LeftWindowCommands="{TemplateBinding LeftWindowCommands}"
                                     RightWindowCommands="{TemplateBinding RightWindowCommands}"/>
                             <!-- The SELECTOR travels too, not just the single template: a window given only a selector

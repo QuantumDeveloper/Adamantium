@@ -32,6 +32,17 @@ public class TitleBar : Control
     public static readonly AdamantiumProperty TitleAlignmentProperty = AdamantiumProperty.Register(nameof(TitleAlignment),
         typeof(HorizontalAlignment), typeof(TitleBar), new PropertyMetadata(HorizontalAlignment.Left));
 
+    /// <summary>Content at the very start of the caption, before the window commands. Deliberately a neutral slot: the
+    /// title bar shows what was put in it and knows nothing about what that is.</summary>
+    public static readonly AdamantiumProperty LeadingContentProperty = AdamantiumProperty.Register(nameof(LeadingContent),
+        typeof(object), typeof(TitleBar), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure));
+
+    public object LeadingContent
+    {
+        get => GetValue(LeadingContentProperty);
+        set => SetValue(LeadingContentProperty, value);
+    }
+
     public static readonly AdamantiumProperty ShowMinButtonProperty = AdamantiumProperty.Register(nameof(ShowMinButton),
         typeof(bool), typeof(TitleBar), new PropertyMetadata(true));
 
