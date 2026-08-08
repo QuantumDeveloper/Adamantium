@@ -385,14 +385,12 @@ public class BindingExpression : BindingExpressionBase
 
    private bool _syncingSlot;   // see UpdateSource: the slot refresh must not drive another write-back
 
-   // Minimal target-type coercion (no full converter pipeline): pass-through when assignable, ToString for a string
-   // target, else a best-effort Convert.ChangeType; on failure keep the raw value (lenient - used writing back to source).
+   // Lenient coercion: keeps the raw value when it can't be made to fit (used writing back to source).
    private static object Coerce(object value, Type targetType)
       => TryCoerce(value, targetType, out var result) ? result : value;
 
-   // Strict coercion: pass-through when assignable, ToString for a string target, else Convert.ChangeType. Returns
-   // false (with result=null) when the value can't be made to fit - the caller skips the assignment rather than push an
-   // incompatible value (which would throw, e.g. a string FallbackValue onto an ICommand/Brush property).
+   // Strict: false (result=null) when the value can't be made to fit, so the caller skips the assignment instead of
+   // pushing something that would throw.
    private static bool TryCoerce(object value, Type targetType, out object result)
    {
       result = value;
@@ -403,6 +401,22 @@ public class BindingExpression : BindingExpressionBase
          result = Convert.ChangeType(value, Nullable.GetUnderlyingType(targetType) ?? targetType, CultureInfo.CurrentCulture);
          return true;
       }
-      catch { result = null; return false; }
+      catch
+      {
+         // A string Convert.ChangeType cannot place (Geometry, Brush, Thickness...) still converts through the engine's
+         // TypeParser - the SAME conversion the markup compiler runs, so an attribute and a {Binding} land alike.
+         if (value is string)
+         {
+            var parsed = TypeCastFactory.CastFromString(value, targetType);
+            if (parsed != AdamantiumProperty.UnsetValue)
+            {
+               result = parsed;
+               return true;
+            }
+         }
+
+         result = null;
+         return false;
+      }
    }
 }
