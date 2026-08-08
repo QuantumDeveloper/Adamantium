@@ -703,57 +703,13 @@ public class Grid: Panel
          }
       }
 
-      if (totalTakenSize < finalSize)
+      // Spare room is the star tracks' to share; Auto keeps what the measure gave it, and a shortfall overflows.
+      var availableSize = Math.Max(finalSize - totalTakenSize, 0);
+      if (availableSize > 0 && stars > 0)   // a "0*" track alone makes stars 0, and the division NaN
       {
-
-         var availableSize = Math.Max(finalSize - totalTakenSize, 0);
-
-         //row/column offset for each GridSegment
-         var starSegments = segments.Where(x => x.IsStar).ToArray();
-         foreach (var starSegment in starSegments)
+         foreach (var starSegment in segments.Where(x => x.IsStar))
          {
-            // `stars > 0` is load-bearing, not defensive: a "0*" track makes the TOTAL zero, and availableSize/0 is
-            // Infinity, which times this segment's own 0 stars is NaN. That NaN lands in Min, survives every later pass
-            // (nothing recomputes it once the grid is given zero space), and finally reaches Arrange - which REJECTS a
-            // NaN rect by throwing, aborting the whole layout pass. Everything after that point keeps its default slot,
-            // so a window renders with its content piled at the origin.
-            if (availableSize > 0 && stars > 0)
-            {
-               starSegment.Min = Math.Max((availableSize / stars) * starSegment.Stars, 0);
-            }
-         }
-
-         if (starSegments.Length > 0)
-         {
-            availableSize = 0;
-         }
-
-         if (availableSize != 0)
-         {
-            var autoSegments = segments.Where(x => x.IsAuto).ToArray();
-            var freeSegmentSize = availableSize / autoSegments.Length;
-            foreach (var autoSegment in autoSegments)
-            {
-               if (availableSize > 0)
-               {
-                  autoSegment.Min += freeSegmentSize;
-               }
-            }
-         }
-      }
-      else if (finalSize > 0 && totalTakenSize > 0)
-      {
-         // Both guards are load-bearing. This branch shrinks the Auto tracks by how much they overflow, and the ratio is
-         // totalTakenSize/finalSize - which is 0/0 when the grid is arranged into ZERO space and holds nothing yet (a
-         // window's tab strip on its first pass). That NaN goes straight into Min, and nothing ever recomputes it: the
-         // later passes take the `totalTakenSize < finalSize` branch, which only writes STAR tracks. It survives into the
-         // track Offset, then into the child rect - and Arrange throws on a NaN rect, aborting the entire layout pass, so
-         // everything after that point stays at the origin. That is what left a whole window's content piled in a corner.
-         var extraRatio = totalTakenSize / finalSize;
-         var autoSegments = segments.Where(x => x.IsAuto).ToArray();
-         foreach (var segment in autoSegments)
-         {
-            segment.Min /= extraRatio;
+            starSegment.Min = Math.Max(availableSize / stars * starSegment.Stars, 0);
          }
       }
 
