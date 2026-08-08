@@ -205,35 +205,36 @@ public class RibbonTests
             Assert.That(a.Bounds.X, Is.EqualTo(40));
             Assert.That(b.Bounds, Is.EqualTo(new Rect(40, 20, 30, 20)));
             Assert.That(c.Bounds, Is.EqualTo(new Rect(40, 40, 30, 20)));
-            // A fourth small command starts a new column. Its Y is the band's centre - see
-            // AShortColumn_IsCentredAgainstATallOne.
-            Assert.That(d.Bounds, Is.EqualTo(new Rect(70, 20, 30, 20)), "a fourth small command starts a new column");
+            // A fourth small command starts a new column, on the SAME top line as the others.
+            Assert.That(d.Bounds, Is.EqualTo(new Rect(70, 0, 30, 20)), "a fourth small command starts a new column");
             Assert.That(panel.DesiredSize.Width, Is.EqualTo(100));
             Assert.That(panel.DesiredSize.Height, Is.EqualTo(60), "the tallest column is the group's height");
         });
     }
 
-    // Columns hold different numbers of commands, so each is CENTRED in the band rather than hung from its top -
-    // stacked from y=0 a short column floats above its neighbour.
+    // The BLOCK is centred in the band and every column starts on that one line. Centring each column separately looks
+    // right for two full columns and wrong the moment they differ: a column of one command floats at the middle while
+    // the column beside it stacks three from the top, and the rows stop lining up.
     [Test]
-    public void AShortColumn_IsCentredAgainstATallOne()
+    public void ColumnsShareOneTopLine_AndTheBlockIsCentred()
     {
         var large = Command(RibbonSize.Large, 40, 50);
         var a = Command(RibbonSize.Medium, 30, 20);
         var b = Command(RibbonSize.Medium, 30, 20);
         var c = Command(RibbonSize.Medium, 30, 20);
+        var lone = Command(RibbonSize.Medium, 30, 20);
 
         var panel = new RibbonGroupPanel();
-        foreach (var child in new IMeasurableComponent[] { large, a, b, c }) panel.Children.Add(child);
+        foreach (var child in new IMeasurableComponent[] { large, a, b, c, lone }) panel.Children.Add(child);
         panel.Measure(Size.Infinity);
-        panel.Arrange(new Rect(0, 0, panel.DesiredSize.Width, 60));   // a band taller than either column
+        panel.Arrange(new Rect(0, 0, panel.DesiredSize.Width, 80));   // a band taller than the tallest column
 
         Assert.Multiple(() =>
         {
-            Assert.That(large.Bounds.Y, Is.EqualTo(5), "50 tall in a 60 band -> 5 above and below");
-            Assert.That(a.Bounds.Y, Is.EqualTo(0), "60 of stacked smalls exactly fills it");
-            Assert.That(large.Bounds.Y + large.Bounds.Height / 2, Is.EqualTo(30), "both columns share the band's centre");
-            Assert.That(b.Bounds.Y + b.Bounds.Height / 2, Is.EqualTo(30));
+            Assert.That(a.Bounds.Y, Is.EqualTo(10), "the tallest column is 60 in an 80 band -> 10 above and below");
+            Assert.That(large.Bounds.Y, Is.EqualTo(10), "and the large one starts on the same line");
+            Assert.That(lone.Bounds.Y, Is.EqualTo(10), "as does a column holding a single command");
+            Assert.That(b.Bounds.Y, Is.EqualTo(30), "rows stack from there");
         });
     }
 

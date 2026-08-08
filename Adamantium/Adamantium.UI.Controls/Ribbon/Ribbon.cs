@@ -22,25 +22,41 @@ public class Ribbon : Selector
         typeof(RibbonSize), typeof(AdamantiumComponent),
         new PropertyMetadata(RibbonSize.Large, PropertyMetadataOptions.AffectsMeasure));
 
-    /// <summary>The smallest a command may be shrunk to. One unrecognisable without its label states Medium.</summary>
-    public static readonly AdamantiumProperty MinSizeProperty = AdamantiumProperty.RegisterAttached("MinSize",
-        typeof(RibbonSize), typeof(AdamantiumComponent), new PropertyMetadata(RibbonSize.Small));
-
-    /// <summary>The largest a command may be drawn at - and, until the adaptive pass exists, the size it is drawn at.</summary>
+    /// <summary>The size a command is drawn at while the tab has room - the author's intent, and the top of the ladder
+    /// the collapse thresholds walk down.</summary>
     public static readonly AdamantiumProperty MaxSizeProperty = AdamantiumProperty.RegisterAttached("MaxSize",
         typeof(RibbonSize), typeof(AdamantiumComponent), new PropertyMetadata(RibbonSize.Large));
+
+    /// <summary>At which step of its GROUP this command drops its big icon for a small one beside the label.</summary>
+    public static readonly AdamantiumProperty CollapseToMediumProperty = AdamantiumProperty.RegisterAttached("CollapseToMedium",
+        typeof(RibbonCollapseThreshold), typeof(AdamantiumComponent),
+        new PropertyMetadata(RibbonCollapseThreshold.WhenGroupIsMedium, PropertyMetadataOptions.AffectsMeasure));
+
+    /// <summary>...and at which step it drops the label too. A command nobody recognises without its words says
+    /// <see cref="RibbonCollapseThreshold.Never"/> here.</summary>
+    public static readonly AdamantiumProperty CollapseToSmallProperty = AdamantiumProperty.RegisterAttached("CollapseToSmall",
+        typeof(RibbonCollapseThreshold), typeof(AdamantiumComponent),
+        new PropertyMetadata(RibbonCollapseThreshold.WhenGroupIsSmall, PropertyMetadataOptions.AffectsMeasure));
 
     public static RibbonSize GetSize(IAdamantiumComponent element) => element.GetValue<RibbonSize>(SizeProperty);
 
     public static void SetSize(IAdamantiumComponent element, RibbonSize value) => element.SetValue(SizeProperty, value);
 
-    public static RibbonSize GetMinSize(IAdamantiumComponent element) => element.GetValue<RibbonSize>(MinSizeProperty);
-
-    public static void SetMinSize(IAdamantiumComponent element, RibbonSize value) => element.SetValue(MinSizeProperty, value);
-
     public static RibbonSize GetMaxSize(IAdamantiumComponent element) => element.GetValue<RibbonSize>(MaxSizeProperty);
 
     public static void SetMaxSize(IAdamantiumComponent element, RibbonSize value) => element.SetValue(MaxSizeProperty, value);
+
+    public static RibbonCollapseThreshold GetCollapseToMedium(IAdamantiumComponent element) =>
+        element.GetValue<RibbonCollapseThreshold>(CollapseToMediumProperty);
+
+    public static void SetCollapseToMedium(IAdamantiumComponent element, RibbonCollapseThreshold value) =>
+        element.SetValue(CollapseToMediumProperty, value);
+
+    public static RibbonCollapseThreshold GetCollapseToSmall(IAdamantiumComponent element) =>
+        element.GetValue<RibbonCollapseThreshold>(CollapseToSmallProperty);
+
+    public static void SetCollapseToSmall(IAdamantiumComponent element, RibbonCollapseThreshold value) =>
+        element.SetValue(CollapseToSmallProperty, value);
 
     /// <summary>The selected tab, shown by <c>PART_SelectedContentHost</c>. Read-only: it follows the selection.</summary>
     public static readonly AdamantiumProperty SelectedContentProperty = AdamantiumProperty.Register(nameof(SelectedContent),

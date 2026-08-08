@@ -47,10 +47,15 @@
                                     BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                                     BorderThickness="0 1 0 0"
                                     ClipToBounds="True">
+                                <!-- STRETCHED across, not left-aligned: the open tab has to be told how much room the
+                                     band actually has, because that arrange width is what the groups choose their
+                                     variants from. Sized to content instead, a tab would always be handed exactly what
+                                     it asked for and would never learn that the window had narrowed. The groups still
+                                     sit left - their panel lays them out from x=0 and reports only what it used. -->
                                 <controls:ContentPresenter x:Name="PART_SelectedContentHost"
                                         Content="{TemplateBinding SelectedContent}"
                                         ContentTemplate="{TemplateBinding ContentTemplate}"
-                                        HorizontalAlignment="Left"
+                                        HorizontalAlignment="Stretch"
                                         VerticalAlignment="Stretch"/>
                             </controls:Border>
                         </controls:Grid>
@@ -134,6 +139,19 @@
     <!-- A group: its commands in columns, its caption underneath, a rule down its right edge. -->
     <Style Selector="RibbonGroup">
         <Setter Property="Padding" Value="6 6 6 3"/>
+        <!-- The mark on the button a collapsed group becomes. Without it the icon - path data, like a command's - is
+             handed to a presenter with nothing to draw it, and comes out as the path TEXT: a strip of dashes. -->
+        <Setter Property="IconTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <controls:Grid Width="16" Height="16">
+                        <controls:Path Data="{Binding}" StrokeThickness="1" Fill="Transparent"
+                                       HorizontalAlignment="Left" VerticalAlignment="Top"
+                                       Stroke="{Ancestor ContentPresenter, Foreground}"/>
+                    </controls:Grid>
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
         <Setter Property="ItemsPanel">
             <Setter.Value>
                 <ItemsPanelTemplate>
@@ -143,18 +161,66 @@
         </Setter>
         <Setter Property="Template">
             <Setter.Value>
+                <!-- ONE template for both presentations, never swapped. PART_Content is the group's commands and
+                     caption as a SINGLE block, and the group MOVES it between PART_InlineHost and PART_PopupHost when it
+                     collapses - the same arrangement WPF's RibbonGroup uses (PART_TemplateContentControl /
+                     PART_PopupGrid). Swapping the template instead rebuilds the packing panel that the adaptive pass
+                     measures through, and that panel is the one thing that must survive: it holds the variants, their
+                     measured widths, and the sizes currently applied to the commands. -->
                 <ControlTemplate TargetType="RibbonGroup">
                     <controls:Grid ColumnDefinitions="*,Auto">
-                        <controls:Grid Grid.Column="0" RowDefinitions="*,Auto" Margin="{TemplateBinding Padding}">
-                            <controls:ItemsPresenter x:Name="PART_ItemsPresenter" Grid.Row="0"
-                                    VerticalAlignment="Top" HorizontalAlignment="Left"/>
-                            <controls:ContentPresenter Grid.Row="1"
-                                    Content="{TemplateBinding Header}"
-                                    ContentTemplate="{TemplateBinding HeaderTemplate}"
-                                    HorizontalAlignment="Center" VerticalAlignment="Bottom"
-                                    Margin="0 4 0 0" FontSize="11"
-                                    Foreground="{ResourceReference TextFillColorSecondary}"/>
+                        <controls:Grid Grid.Column="0">
+                            <controls:Border x:Name="PART_InlineHost">
+                                <controls:Grid x:Name="PART_Content" RowDefinitions="*,Auto"
+                                        Margin="{TemplateBinding Padding}">
+                                    <controls:ItemsPresenter x:Name="PART_ItemsPresenter" Grid.Row="0"
+                                            VerticalAlignment="Top" HorizontalAlignment="Left"/>
+                                    <controls:ContentPresenter Grid.Row="1"
+                                            Content="{TemplateBinding Header}"
+                                            ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                            HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                                            Margin="0 4 0 0" FontSize="11"
+                                            Foreground="{ResourceReference TextFillColorSecondary}"/>
+                                </controls:Grid>
+                            </controls:Border>
+
+                            <!-- Shown in place of the block above once the group has given up its layout. -->
+                            <controls:ToggleButton x:Name="PART_CollapsedButton"
+                                    Classes="CollapsedGroupButton"
+                                    Visibility="Collapsed"
+                                    Width="{TemplateBinding CollapsedWidth}"
+                                    ToolTip="{TemplateBinding Header}">
+                                <controls:Grid RowDefinitions="Auto,Auto,Auto" Margin="{TemplateBinding Padding}"
+                                        VerticalAlignment="Center">
+                                    <controls:Viewbox Grid.Row="0" Width="32" Height="32"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <controls:ContentPresenter x:Name="PART_Icon"
+                                                Content="{TemplateBinding Icon}"
+                                                ContentTemplate="{TemplateBinding IconTemplate}"
+                                                Foreground="{ResourceReference TextFillColorPrimary}"/>
+                                    </controls:Viewbox>
+                                    <controls:ContentPresenter Grid.Row="1" Margin="0 4 0 0" FontSize="11"
+                                            Content="{TemplateBinding Header}"
+                                            ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                                            Foreground="{ResourceReference TextFillColorSecondary}"/>
+                                    <controls:Path Grid.Row="2" Data="M0,0 L4,4 L8,0" StrokeThickness="1" Margin="0 3 0 0"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                                            Stroke="{ResourceReference TextFillColorSecondary}"/>
+                                </controls:Grid>
+                            </controls:ToggleButton>
+
+                            <!-- NOT clipped: our ClipToBounds is rectangular and this card is rounded (open debt in
+                                 TECH_DEBT.md). Its content is PART_Content, moved here by the group. -->
+                            <controls:Popup x:Name="PART_Popup" Placement="Bottom" FlipToFit="True">
+                                <controls:Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                        BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                        BorderThickness="1" CornerRadius="6" Padding="6">
+                                    <controls:Border x:Name="PART_PopupHost"/>
+                                </controls:Border>
+                            </controls:Popup>
                         </controls:Grid>
+
                         <controls:Rectangle x:Name="GroupRule" Grid.Column="1" Width="1" Margin="1 8 1 8"
                                 HorizontalAlignment="Right" VerticalAlignment="Stretch"
                                 Fill="{ResourceReference ControlStrokeColorDefault}"/>
@@ -169,6 +235,26 @@
         <PropertyTrigger Property="ShowSeparator" Value="false">
             <Setter TargetName="GroupRule" Property="Visibility" Value="Collapsed"/>
         </PropertyTrigger>
+    </Style>
+
+    <!-- Collapsed: the button takes the block's place. Only VISIBILITY changes here - which of the two hosts holds the
+         content is the group's own business, because moving it is not something a setter can express. -->
+    <Style Selector="RibbonGroup">
+        <PropertyTrigger Property="IsCollapsed" Value="true">
+            <Setter TargetName="PART_InlineHost" Property="Visibility" Value="Collapsed"/>
+            <Setter TargetName="PART_CollapsedButton" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+    </Style>
+
+    <Style Selector="ToggleButton.CollapsedGroupButton">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference SubtleFillColorTertiary}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="MinHeight" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="VerticalAlignment" Value="Stretch"/>
     </Style>
 
     <!-- ONE template covers all three sizes: the icon box and the label swap cells (and the label goes) via triggers on
@@ -375,7 +461,9 @@
                                     Content="{TemplateBinding Content}"
                                     ContentTemplate="{TemplateBinding ContentTemplate}"
                                     ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
-                            <!-- Large stacks the arrow UNDER the label; the smaller sizes put it after it (triggers below). -->
+                            <!-- Large stacks the arrow UNDER the label, the smaller sizes put it after - and BOTH are
+                                 here, chosen by visibility. Moving one glyph between cells with triggers is what left the
+                                 split button in a mixed state when the sizes stepped through each other. -->
                             <controls:Path x:Name="DropDownGlyph" Grid.Row="2" Grid.Column="0"
                                     Data="M0,0 L4,4 L8,0" StrokeThickness="1" Margin="0 3 0 0"
                                     HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -416,7 +504,6 @@
     <Style Selector="RibbonSplitButton" BasedOn="RibbonButton"/>
 
     <Style Selector="RibbonSplitButton">
-        <Setter Property="Padding" Value="0"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RibbonSplitButton">
@@ -425,8 +512,18 @@
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="{TemplateBinding CornerRadius}">
-                        <controls:Grid ColumnDefinitions="Auto,Auto,Auto">
-                            <controls:Border x:Name="ActionArea" Grid.Column="0" Padding="8 6" CornerRadius="4 0 0 4">
+                        <!-- Three cells in each direction: at Large the split is HORIZONTAL - action on top, arrow
+                             underneath - and the triggers below move the rule and the arrow into the right-hand column
+                             for the smaller sizes. A large command is a stack, so an arrow floating beside it reads as
+                             something that fell off rather than as the button's other half. -->
+                        <controls:Grid RowDefinitions="Auto,Auto,Auto" ColumnDefinitions="Auto,Auto,Auto"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}">
+                            <!-- The command's OWN padding, not a fixed one: the size triggers tighten Padding for Medium and Small, and a
+                                 hardcoded value here kept the split button 56x30 where its neighbours were 24x22 - a
+                                 column stretched to fit it, and the icons beside it floating in the slack. -->
+                            <controls:Border x:Name="ActionArea" Grid.Row="0" Grid.Column="0"
+                                    Padding="{TemplateBinding Padding}"
+                                    CornerRadius="4 4 0 0">
                                 <controls:Grid x:Name="Layout" RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,Auto"
                                         HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                         VerticalAlignment="{TemplateBinding VerticalContentAlignment}">
@@ -449,14 +546,14 @@
                                 </controls:Grid>
                             </controls:Border>
 
-                            <controls:Rectangle x:Name="SplitRule" Grid.Column="1" Width="1" Margin="0 5"
-                                    VerticalAlignment="Stretch"
+                            <controls:Rectangle x:Name="SplitRule" Grid.Row="1" Grid.Column="0" Height="1" Margin="5 0"
+                                    HorizontalAlignment="Stretch"
                                     Fill="{ResourceReference ControlStrokeColorDefault}"/>
 
-                            <!-- The arrow's own hit area: the control asks this part where the pointer is, so it must be
-                                 a real element with a size, not a glyph floating in the corner. -->
-                            <controls:Border x:Name="PART_DropDownArea" Grid.Column="2" Padding="5 6"
-                                    CornerRadius="0 4 4 0">
+                            <!-- A real element with a size, not a glyph in a corner: the control asks this part where the
+                                 pointer is. -->
+                            <controls:Border x:Name="PART_DropDownArea" Grid.Row="2" Grid.Column="0" Padding="5 3"
+                                    CornerRadius="0 0 4 4">
                                 <controls:Path x:Name="DropDownGlyph"
                                         Data="M0,0 L4,4 L8,0" StrokeThickness="1"
                                         HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -467,6 +564,31 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!-- Medium and Small are a ROW, so the split turns: the arrangement below is hidden and the one beside it shown.
+         Small drops the dividing rule as well - a 24px command cannot afford the furniture the large one wears. -->
+    <Style Selector="RibbonSplitButton">
+        <PropertyTrigger Property="Ribbon.Size" Value="Medium">
+            <Setter TargetName="ActionArea" Property="CornerRadius" Value="4 0 0 4"/>
+            <Setter TargetName="SplitRule" Property="Grid.Row" Value="0"/>
+            <Setter TargetName="SplitRule" Property="Grid.Column" Value="1"/>
+            <Setter TargetName="SplitRule" Property="Width" Value="1"/>
+            <Setter TargetName="SplitRule" Property="Height" Value="NaN"/>
+            <Setter TargetName="SplitRule" Property="Margin" Value="0 5"/>
+            <Setter TargetName="PART_DropDownArea" Property="Grid.Row" Value="0"/>
+            <Setter TargetName="PART_DropDownArea" Property="Grid.Column" Value="2"/>
+            <Setter TargetName="PART_DropDownArea" Property="Padding" Value="3 2"/>
+            <Setter TargetName="PART_DropDownArea" Property="CornerRadius" Value="0 4 4 0"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="Ribbon.Size" Value="Small">
+            <Setter TargetName="ActionArea" Property="CornerRadius" Value="4 0 0 4"/>
+            <Setter TargetName="SplitRule" Property="Visibility" Value="Collapsed"/>
+            <Setter TargetName="PART_DropDownArea" Property="Grid.Row" Value="0"/>
+            <Setter TargetName="PART_DropDownArea" Property="Grid.Column" Value="2"/>
+            <Setter TargetName="PART_DropDownArea" Property="Padding" Value="1 2"/>
+            <Setter TargetName="PART_DropDownArea" Property="CornerRadius" Value="0 4 4 0"/>
+        </PropertyTrigger>
     </Style>
 
     <Style Selector="RibbonSplitButton">
