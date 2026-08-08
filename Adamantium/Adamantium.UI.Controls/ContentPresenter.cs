@@ -26,6 +26,7 @@ public class ContentPresenter : InputUIComponent
     private bool _textIsGenerated;                             // is _currentRoot the TextBlock this presenter generated?
     private bool _lastContentRebuilt;                          // did the last measure REBUILD the visual (vs data-only reuse)?
     private Size _lastArrangeSize = new(double.NaN, double.NaN);   // last finalSize we actually walked in ArrangeOverride
+    private Size _lastMeasuredInner;   // what MeasureOverride last returned - WITHOUT this element's margin/transform
 
     public static readonly AdamantiumProperty ContentProperty = AdamantiumProperty.Register(nameof(Content),
         typeof(object), typeof(ContentPresenter), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, OnContentPropertyChanged));
@@ -328,16 +329,17 @@ public class ContentPresenter : InputUIComponent
         // changed, so the subtree's SIZE is unchanged - skip re-walking it. If the reused child's OWN size actually changed
         // (a string's text, an AffectsMeasure binding), it invalidated ITSELF, so IsMeasureValid is false and we fall
         // through to measure it. A genuine content REBUILD (_lastContentRebuilt) always measures the new subtree.
-        // NOT with a LayoutTransform: there DesiredSize is the OUTER (transformed) footprint, but MeasureOverride must
-        // return the INNER (untransformed) size - MeasureCore transforms it. Returning DesiredSize here would re-transform
-        // an already-transformed size and COMPOUND it every re-measure (a ZoomBox scaling this presenter exploded/collapsed
-        // the extent). Re-measure so we return the inner size.
+        // What is returned is the INNER size: MeasureCore adds this element's margin (and its LayoutTransform) on top.
+        // DesiredSize is the OUTER result of that, so returning IT compounds both on every skip - the margin grew by its
+        // own width per re-measure, which a ribbon group caption (Margin="0 4 0 0") turned into a caption climbing 4px up
+        // its group each time the tab was re-opened.
         if (!_lastContentRebuilt && _currentRoot is IMeasurableComponent { IsMeasureValid: true }
             && PreviousMeasureConstraint == availableSize
             && LayoutTransform == null)
-            return DesiredSize;
+            return _lastMeasuredInner;
 
         var size = base.MeasureOverride(availableSize);
+        _lastMeasuredInner = size;
 
         // A REBUILT content is very often a different size than the one the PARENT measured us at - and the rebuild
         // happens inside our own measure, which may have been requested directly (a tab strip measures a header with an
