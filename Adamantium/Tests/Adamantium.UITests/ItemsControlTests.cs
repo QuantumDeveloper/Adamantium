@@ -61,6 +61,49 @@ public class ItemsControlTests
         return result;
     });
 
+    // Records what the generator asked of it. A subclass hooking its containers has nowhere else to do it.
+    private sealed class RecordingItemsControl : ItemsControl
+    {
+        public readonly List<(IUIComponent Container, object Item)> Prepared = [];
+
+        protected internal override void PrepareContainer(IUIComponent container, object item)
+        {
+            Prepared.Add((container, item));
+            base.PrepareContainer(container, item);
+        }
+    }
+
+    // An item that is ALREADY a container is hosted as itself - but it is still a container being realized, and the
+    // control is still entitled to prepare it. Skipping that leaves every control that hooks its containers (a selection
+    // to reflect, an event to subscribe) silently inert for everything an author wrote in markup, with nothing to say so.
+    [Test]
+    public void AnItemThatIsItsOwnContainer_IsStillPrepared()
+    {
+        var authored = new Border();
+        var ic = new RecordingItemsControl { Template = ItemsPresenterTemplate() };
+        ic.Items.Add(authored);
+
+        ic.Measure(new Size(500, 500));
+        ic.Arrange(new Rect(0, 0, 500, 500));
+
+        Assert.That(ic.Prepared, Does.Contain((authored, (object)authored)));
+    }
+
+    // ...and preparing it must not rebind it to ITSELF: the base binds a container's content to its item, and here they
+    // are one object.
+    [Test]
+    public void PreparingItsOwnContainer_DoesNotMakeItItsOwnContent()
+    {
+        var authored = new ContentPresenter { Content = "written by hand" };
+        var ic = new ItemsControl { Template = ItemsPresenterTemplate() };
+        ic.Items.Add(authored);
+
+        ic.Measure(new Size(500, 500));
+        ic.Arrange(new Rect(0, 0, 500, 500));
+
+        Assert.That(authored.Content, Is.EqualTo("written by hand"));
+    }
+
     [Test]
     public void VirtualizingStackPanelRealizesOnlyVisibleWindow()
     {

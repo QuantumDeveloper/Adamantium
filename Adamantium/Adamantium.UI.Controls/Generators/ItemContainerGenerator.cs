@@ -155,6 +155,7 @@ public class ItemContainerGenerator
             if (_owner.IsItemItsOwnContainer(item))
             {
                 container = (IUIComponent)item;
+                _owner.PrepareContainer(container, item);
             }
             else if (rebinds >= minBinds &&
                      System.Diagnostics.Stopwatch.GetElapsedTime(budgetStart).TotalMilliseconds >= budgetMs)
@@ -209,8 +210,15 @@ public class ItemContainerGenerator
 
     private IUIComponent ProduceContainer(object item)
     {
-        // The item already is its own container (e.g. a Button authored directly): host it as-is, never recycle it.
-        if (_owner.IsItemItsOwnContainer(item)) return (IUIComponent)item;
+        // The item already is its own container (e.g. a Button authored directly): host it as-is and never recycle it.
+        // It is still PREPARED - a control hooking its containers (a selection to reflect, an event to subscribe) has
+        // nowhere else to do it, and skipping the call left everything an author wrote in markup silently inert.
+        if (_owner.IsItemItsOwnContainer(item))
+        {
+            var own = (IUIComponent)item;
+            _owner.PrepareContainer(own, item);
+            return own;
+        }
 
         var container = _recyclePool.Count > 0 ? _recyclePool.Pop() : _owner.GetContainerForItem(item);
         _generated.Add(container);

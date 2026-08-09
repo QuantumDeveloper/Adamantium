@@ -7,6 +7,98 @@
 
         <Ribbon Grid.Row="0">
 
+            <!-- "File": a command that opens a menu, so the flyout is the ContextMenu one already is. The two-pane
+                 version - recent files beside the commands - is a later step. -->
+            <Ribbon.ApplicationMenu>
+                <RibbonApplicationMenu Header="File" IsBackstage="{Binding IsBackstage}">
+                    <!-- A row with a PAGE opens it beside the rail and stays lit; a row without one is a command that
+                         runs and closes the backstage behind it. -->
+                    <RibbonApplicationMenuItem Content="New" Icon="M8,2 L8,14 M2,8 L14,8">
+                        <RibbonApplicationMenuItem.PageContent>
+                            <StackPanel>
+                                <TextBlock Text="New scene" FontSize="28" Margin="0 0 0 18"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="Empty scene" Command="{Binding NewSceneCommand}" Margin="0 0 10 0"/>
+                                    <Button Content="From template" Command="{Binding NewSceneCommand}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </RibbonApplicationMenuItem.PageContent>
+                    </RibbonApplicationMenuItem>
+
+                    <RibbonApplicationMenuItem Content="Open" Icon="M2,4 L7,4 L8,6 L14,6 L14,13 L2,13 Z">
+                        <RibbonApplicationMenuItem.PageContent>
+                            <StackPanel>
+                                <TextBlock Text="Recent scenes" FontSize="28" Margin="0 0 0 18"/>
+                                <Button Content="city-block.scene" Command="{Binding OpenSceneCommand}" Margin="0 0 0 6"/>
+                                <Button Content="character-rig.scene" Command="{Binding OpenSceneCommand}" Margin="0 0 0 6"/>
+                                <Button Content="lighting-study.scene" Command="{Binding OpenSceneCommand}"/>
+                            </StackPanel>
+                        </RibbonApplicationMenuItem.PageContent>
+                    </RibbonApplicationMenuItem>
+
+                    <RibbonApplicationMenuItem Content="Save" Command="{Binding SaveCommand}"
+                                               Icon="M3,2 L11,2 L13,4 L13,13 L3,13 Z M5,2 L5,6 L11,6 L11,2"/>
+
+                    <!-- The rows the pane-follows-the-pointer behaviour is worth seeing on: run the pointer down
+                         Import / Export / Print and the right half changes under it, with nothing clicked. -->
+                    <RibbonApplicationMenuItem Content="Import" Icon="M8,2 L8,10 M5,7 L8,10 L11,7 M3,13 L13,13">
+                        <RibbonApplicationMenuItem.PageContent>
+                            <StackPanel>
+                                <TextBlock Text="Import" FontSize="28" Margin="0 0 0 6"/>
+                                <TextBlock Text="Bring a mesh into the open scene." Opacity="0.7" Margin="0 0 0 18"/>
+                                <Button Content="Wavefront .obj" Command="{Binding ImportCommand}" CommandParameter=".obj" Margin="0 0 0 6"/>
+                                <Button Content="Autodesk .fbx" Command="{Binding ImportCommand}" CommandParameter=".fbx" Margin="0 0 0 6"/>
+                                <Button Content="Khronos .gltf" Command="{Binding ImportCommand}" CommandParameter=".gltf"/>
+                            </StackPanel>
+                        </RibbonApplicationMenuItem.PageContent>
+                    </RibbonApplicationMenuItem>
+
+                    <RibbonApplicationMenuItem Content="Export" Icon="M8,10 L8,2 M5,5 L8,2 L11,5 M3,13 L13,13">
+                        <RibbonApplicationMenuItem.PageContent>
+                            <StackPanel>
+                                <TextBlock Text="Export" FontSize="28" Margin="0 0 0 6"/>
+                                <TextBlock Text="Write the scene out in another format." Opacity="0.7" Margin="0 0 0 18"/>
+                                <Button Content="Wavefront .obj" Command="{Binding ExportCommand}" CommandParameter=".obj" Margin="0 0 0 6"/>
+                                <Button Content="Khronos .gltf" Command="{Binding ExportCommand}" CommandParameter=".gltf" Margin="0 0 0 6"/>
+                                <Button Content="Adamantium package" Command="{Binding ExportCommand}" CommandParameter=".apkg"/>
+                            </StackPanel>
+                        </RibbonApplicationMenuItem.PageContent>
+                    </RibbonApplicationMenuItem>
+
+                    <RibbonApplicationMenuItem Content="Print" Icon="M4,6 L4,2 L12,2 L12,6 M4,10 L12,10 L12,14 L4,14 Z M2,6 L14,6 L14,10 L2,10 Z">
+                        <RibbonApplicationMenuItem.PageContent>
+                            <StackPanel>
+                                <TextBlock Text="Print" FontSize="28" Margin="0 0 0 6"/>
+                                <TextBlock Text="A sheet of the viewport as it stands." Opacity="0.7" Margin="0 0 0 18"/>
+                                <TextBlock Text="Printer" Margin="0 0 0 4" Opacity="0.7"/>
+                                <DropDown Width="200" HorizontalAlignment="Left" SelectedIndex="0">
+                                    <DropDownItem Content="Microsoft Print to PDF"/>
+                                    <DropDownItem Content="Office printer (2nd floor)"/>
+                                </DropDown>
+                            </StackPanel>
+                        </RibbonApplicationMenuItem.PageContent>
+                    </RibbonApplicationMenuItem>
+
+                    <!-- What the dropped panel shows until the pointer picks a row. The backstage never needs it: it
+                         always stands on a chosen row. -->
+                    <RibbonApplicationMenu.AuxiliaryPaneContent>
+                        <StackPanel>
+                            <TextBlock Text="Recent scenes" FontSize="20" Margin="0 0 0 14"/>
+                            <TextBlock Text="city-block.scene" Margin="0 0 0 6" Opacity="0.75"/>
+                            <TextBlock Text="character-rig.scene" Margin="0 0 0 6" Opacity="0.75"/>
+                            <TextBlock Text="lighting-study.scene" Opacity="0.75"/>
+                        </StackPanel>
+                    </RibbonApplicationMenu.AuxiliaryPaneContent>
+
+                    <RibbonApplicationMenu.FooterPaneContent>
+                        <StackPanel Margin="0 0 0 12">
+                            <RibbonApplicationMenuItem Content="Exit" Command="{Binding ExitCommand}"
+                                                       Icon="M6,3 L3,3 L3,13 L6,13 M9,5 L12,8 L9,11 M12,8 L6,8"/>
+                        </StackPanel>
+                    </RibbonApplicationMenu.FooterPaneContent>
+                </RibbonApplicationMenu>
+            </Ribbon.ApplicationMenu>
+
             <!-- The SAME collection the caption bar lists. Two instances, one list: each shows itself only while the
                  placement names its own slot, so moving the bar moves nothing. -->
             <Ribbon.FooterContent>
@@ -69,6 +161,8 @@
                     <TextBlock Text="Grid size" Ribbon.MaxSize="Medium" Ribbon.CollapseToSmall="Never" Margin="6 4 4 0" FontSize="11"/>
                     <Slider Ribbon.MaxSize="Medium" Ribbon.CollapseToSmall="Never" Width="120" Margin="4 2"
                             Minimum="0.1" Maximum="4" Value="{Binding GridSize, Mode=TwoWay}"/>
+                    <CheckBox Content="Backstage" Ribbon.MaxSize="Medium" Ribbon.CollapseToSmall="Never" Margin="4 2"
+                              IsChecked="{Binding IsBackstage, Mode=TwoWay}"/>
                     <Separator/>
                     <RibbonButton Content="Move QAT" MaxSize="Medium" Command="{Binding MoveQuickAccessCommand}"
                                   ToolTip="Move the quick-access bar between the caption and the ribbon"

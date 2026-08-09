@@ -115,6 +115,25 @@ public partial class RibbonShellViewModel : IWindowAware
         Status = below ? "Quick access moved below the ribbon." : "Quick access moved back to the caption.";
     }
 
+    /// <summary>Which shape the File menu takes - the window-wide backstage, or the panel dropped under the button.</summary>
+    [Bindable] private bool _isBackstage = true;
+
+    [Command] private void Import(object format)
+    {
+        Status = $"Imported a {format} file.";
+    }
+
+    [Command] private void Export(object format)
+    {
+        Status = $"Exported the scene as {format}.";
+    }
+
+    [Command] private void NewScene() => Status = "New scene.";
+
+    [Command] private void OpenScene() => Status = "Opened a scene.";
+
+    [Command] private void Exit() => Status = "Exit requested.";
+
     [Command] private void Save() => Status = "Scene saved.";
 
     [Command] private void Undo() => Status = "Undone.";
