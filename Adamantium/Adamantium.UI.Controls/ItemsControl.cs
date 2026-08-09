@@ -204,9 +204,14 @@ public class ItemsControl : Control, IContainer
         return presenter;
     }
 
-    /// <summary>Binds a (new or recycled) container to <paramref name="item"/>: DataContext + content + item template.</summary>
+    /// <summary>Binds a (new or recycled) container to <paramref name="item"/>: DataContext + content + item template.
+    /// <para>A container that IS its own item has nothing to bind - it carries what its author wrote - and binding it
+    /// would make it its own content. Subclasses hooking their containers still get the call, and should guard only the
+    /// binding half the same way.</para></summary>
     protected internal virtual void PrepareContainer(IUIComponent container, object item)
     {
+        if (ReferenceEquals(container, item)) return;
+
         // A HierarchicalDataTemplate + a headered container (MenuItem / TreeViewItem) = one tree level: draw the item as
         // the header via the HDT, bind this container's OWN items to the node's children, and re-apply the SAME template to
         // them so the tree unrolls recursively. Set the child template + style BEFORE ItemsSource (setting the source is

@@ -95,6 +95,28 @@ public class Ribbon : Selector
         set => SetValue(IsMinimizedProperty, value);
     }
 
+    /// <summary>The "File" button at the head of the strip. A TYPED slot, unlike the footer's: nothing but an
+    /// application menu belongs there.</summary>
+    public static readonly AdamantiumProperty ApplicationMenuProperty = AdamantiumProperty.Register(nameof(ApplicationMenu),
+        typeof(RibbonApplicationMenu), typeof(Ribbon),
+        new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, OnApplicationMenuChanged));
+
+    public RibbonApplicationMenu ApplicationMenu
+    {
+        get => GetValue<RibbonApplicationMenu>(ApplicationMenuProperty);
+        set => SetValue(ApplicationMenuProperty, value);
+    }
+
+    // A logical child, so the menu is themed and the window's DataContext reaches its rows - the arrangement a
+    // ContextMenu held by a control already uses.
+    private static void OnApplicationMenuChanged(AdamantiumComponent sender, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (sender is not Ribbon ribbon) return;
+
+        if (e.OldValue is RibbonApplicationMenu old) ribbon.RemoveLogicalChild(old);
+        if (e.NewValue is RibbonApplicationMenu menu) ribbon.AddLogicalChild(menu);
+    }
+
     /// <summary>A row of the band's own, under the groups: whatever the application puts there. Neutral on purpose -
     /// the quick-access bar moved below the ribbon is the first tenant, a search box could be the next.</summary>
     public static readonly AdamantiumProperty FooterContentProperty = AdamantiumProperty.Register(nameof(FooterContent),
@@ -329,12 +351,17 @@ public class Ribbon : Selector
     {
         if (container is not RibbonTabHeader header) return;
 
-        // An authored tab carries its own label; a data item IS the label and is drawn through the ribbon's ItemTemplate.
-        var tab = item as RibbonTab;
-        header.DataContext = item;
-        header.Content = tab != null ? tab.Header : item;
-        header.ContentTemplate = tab?.HeaderTemplate ?? ItemTemplate;
-        header.ContentTemplateSelector = ItemTemplateSelector;
+        // A header written in markup already says what it says; only its SELECTED state is the strip's to reflect.
+        if (!ReferenceEquals(header, item))
+        {
+            // An authored tab carries its own label; a data item IS the label and is drawn through the ItemTemplate.
+            var tab = item as RibbonTab;
+            header.DataContext = item;
+            header.Content = tab != null ? tab.Header : item;
+            header.ContentTemplate = tab?.HeaderTemplate ?? ItemTemplate;
+            header.ContentTemplateSelector = ItemTemplateSelector;
+        }
+
         ApplyContainerSelection(header, item);
     }
 

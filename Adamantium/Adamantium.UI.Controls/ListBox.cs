@@ -334,10 +334,15 @@ public class ListBox : Selector
     {
         if (container is ListBoxItem listItem)
         {
-            listItem.DataContext = item;
-            listItem.ContentTemplate = ItemTemplate;
-            listItem.ContentTemplateSelector = ItemTemplateSelector;
-            listItem.Content = item;
+            // An authored row carries its own content; only its SELECTION is the list's to state.
+            if (!ReferenceEquals(listItem, item))
+            {
+                listItem.DataContext = item;
+                listItem.ContentTemplate = ItemTemplate;
+                listItem.ContentTemplateSelector = ItemTemplateSelector;
+                listItem.Content = item;
+            }
+
             listItem.IsSelected = IsItemSelected(item);   // recycled containers inherit the new item's selection state
         }
         else
