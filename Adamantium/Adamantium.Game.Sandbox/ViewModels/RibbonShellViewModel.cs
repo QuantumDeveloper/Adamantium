@@ -34,6 +34,10 @@ public partial class RibbonShellViewModel : IWindowAware
 
     [Bindable] private double _gridSize = 1.0;
 
+    /// <summary>Read by BOTH quick-access bars - the one in the caption and the one in the ribbon's footer row. Each
+    /// shows itself only while this names its own slot; the collection they list is this one view model's.</summary>
+    [Bindable] private RibbonQuickAccessPlacement _quickAccessPlacement = RibbonQuickAccessPlacement.Caption;
+
     [Bindable] private string _shadingMode = "Lit";
 
     /// <summary>An icon held as DATA - plain path text, converted to a Geometry by the binding.</summary>
@@ -103,6 +107,13 @@ public partial class RibbonShellViewModel : IWindowAware
     [Command] private void EditNormal() => Status = "Editing the normal channel.";
 
     [Command] private void EditRoughness() => Status = "Editing the roughness channel.";
+
+    [Command] private void MoveQuickAccess()
+    {
+        var below = QuickAccessPlacement == RibbonQuickAccessPlacement.Caption;
+        QuickAccessPlacement = below ? RibbonQuickAccessPlacement.BelowRibbon : RibbonQuickAccessPlacement.Caption;
+        Status = below ? "Quick access moved below the ribbon." : "Quick access moved back to the caption.";
+    }
 
     [Command] private void Save() => Status = "Scene saved.";
 

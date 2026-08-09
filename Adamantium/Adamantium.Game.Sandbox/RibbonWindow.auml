@@ -9,6 +9,8 @@
     <!-- The quick-access bar lives in the CAPTION, through the title bar's neutral content slot - no RibbonWindow type
          needed, the caption is already our own control rather than the OS's. -->
     <Window.TitleBarLeadingContent>
-        <RibbonQuickAccess ItemsSource="{Binding QuickAccess}" Margin="6 0 4 0"/>
+        <RibbonQuickAccess ItemsSource="{Binding QuickAccess}" Margin="6 0 4 0"
+                           Placement="{Binding QuickAccessPlacement}"
+                           Foreground="{Ancestor TitleBar, Foreground}"/>
     </Window.TitleBarLeadingContent>
 </Window>
