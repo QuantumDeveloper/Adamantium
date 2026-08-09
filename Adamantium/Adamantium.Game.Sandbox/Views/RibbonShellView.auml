@@ -40,7 +40,7 @@
                                   Icon="M3,4 L13,4 M5,4 L5,14 L11,14 L11,4 M6,2 L10,2"/>
                     <RibbonButton Content="Select all" MaxSize="Medium" CollapseToSmall="Never" Command="{Binding SelectAllCommand}"
                                   Icon="M2,2 L14,2 L14,14 L2,14 Z M5,5 L11,5 L11,11 L5,11 Z"/>
-                    <RibbonButton Content="Select none" MaxSize="Medium" CollapseToSmall="Never" Command="{Binding SelectNoneCommand}"
+                    <RibbonButton Content="Select none" MaxSize="Medium" Command="{Binding SelectNoneCommand}"
                                   Icon="M2,2 L14,2 L14,14 L2,14 Z"/>
                 </RibbonGroup>
 
