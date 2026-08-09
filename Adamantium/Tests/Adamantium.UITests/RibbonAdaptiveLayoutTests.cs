@@ -18,12 +18,16 @@ public class RibbonAdaptiveLayoutTests
     // A command whose width is decided by the size the group gave it - what a real command's Ribbon.Size triggers do.
     private sealed class SizedCommand : Border
     {
+        /// <summary>Medium is the icon and the label on ONE line, so a long label makes a command wider drawn medium
+        /// than drawn large. Measured on the live ribbon: "Select none" costs 84 medium against 66 large.</summary>
+        public bool LongLabel { get; init; }
+
         protected override Size MeasureOverride(Size availableSize)
         {
             Width = Ribbon.GetSize(this) switch
             {
                 RibbonSize.Large => 60,
-                RibbonSize.Medium => 40,
+                RibbonSize.Medium => LongLabel ? 90 : 40,
                 _ => 20
             };
             Height = 60;
@@ -80,6 +84,25 @@ public class RibbonAdaptiveLayoutTests
         return group;
     }
 
+    /// <summary>The shape whose ladder does NOT narrow step by step: one large command beside long-labelled mediums.
+    /// Drop the large one and the run gains a column instead of losing width - measured on the live ribbon's "Scene"
+    /// group, whose rungs cost 165, 183, 183.</summary>
+    private static RibbonGroup NonMonotonicGroup()
+    {
+        var group = Group(0);
+        group.Items.Add(new SizedCommand());
+
+        for (var i = 0; i < 3; i++)
+        {
+            var command = new SizedCommand { LongLabel = true };
+            Ribbon.SetMaxSize(command, RibbonSize.Medium);
+            Ribbon.SetCollapseToSmall(command, RibbonCollapseThreshold.Never);
+            group.Items.Add(command);
+        }
+
+        return group;
+    }
+
     private static (RibbonGroupsPanel Panel, RibbonGroup[] Groups) Row(params RibbonGroup[] groups)
     {
         var panel = new RibbonGroupsPanel();
@@ -96,6 +119,15 @@ public class RibbonAdaptiveLayoutTests
     private static IEnumerable<int> Variants(RibbonGroup[] groups) => groups.Select(g => g.CurrentVariant);
 
     private static double Occupied(RibbonGroup[] groups) => groups.Sum(g => g.WidthAt(g.CurrentVariant));
+
+    // Nothing left that would help: at the last variant, or the only step left is a collapse that would make it wider.
+    private static bool Exhausted(RibbonGroup group)
+    {
+        var next = group.CurrentVariant + 1;
+        if (next >= group.Variants.Count) return true;
+
+        return group.Variants[next].IsCollapsed && group.WidthAt(next) >= group.WidthAt(group.CurrentVariant);
+    }
 
     // The width a group is laid out at has to be the GROUP's, not its commands'. Missing the chrome, every group is
     // arranged narrower than it needs and the rule down its edge is pushed back over the commands - which is what the
@@ -164,6 +196,56 @@ public class RibbonAdaptiveLayoutTests
                 Assert.That(groups[i].Bounds.X, Is.GreaterThanOrEqualTo(groups[i - 1].Bounds.X + groups[i - 1].Bounds.Width),
                     $"at width {width}, group {i} starts inside group {i - 1}");
             }
+        }
+    }
+
+    // One group at a time, and each to the END of its own ladder - sizes down to the tightest, then collapsed - before
+    // the next one is touched at all. A group with room to stay whole stays whole.
+    [Test]
+    public void AGroupIsExhaustedBeforeTheNextIsTouched()
+    {
+        // Nine commands, so a group's tightest row of icons is still wider than the button - collapsing is a step that
+        // buys something, and the order it happens in is observable.
+        var (panel, groups) = Row(Group(9), Group(9), Group(9));
+        LayoutAt(panel, 2000);
+
+        for (var width = Occupied(groups); width >= 120; width -= 5)
+        {
+            LayoutAt(panel, width);
+
+            // Whatever the width, the picture reads left to right as: untouched groups, at most one part-way down, then
+            // exhausted ones. A group that has started giving way while the one to its right still has something left is
+            // the trade this order exists to avoid.
+            for (var i = 1; i < groups.Length; i++)
+            {
+                if (groups[i - 1].CurrentVariant == 0) continue;
+
+                Assert.That(Exhausted(groups[i]), Is.True,
+                    $"at width {width}, '{groups[i - 1].Header}' gave way while the group to its right still had steps");
+            }
+        }
+    }
+
+    // Whatever the tab does to a group, the group never ends up taking MORE room than it does drawn the way its author
+    // asked. Ladders are not monotonic, so stepping down them blindly can park a group on a rung that costs more - and
+    // collapsing off that rung compares against it, not against where the group started.
+    [Test]
+    public void ShrinkingAGroup_NeverMakesItWider()
+    {
+        var group = NonMonotonicGroup();
+        group.CollapsedWidth = 180;
+        var (panel, groups) = Row(group, Group(3));
+        LayoutAt(panel, 2000);
+
+        var roomiest = group.WidthAt(0);
+        Assert.That(group.WidthAt(1), Is.GreaterThan(roomiest), "precondition: the rung below rung 0 costs MORE");
+
+        for (var width = Occupied(groups); width >= 60; width -= 5)
+        {
+            LayoutAt(panel, width);
+
+            Assert.That(group.WidthAt(group.CurrentVariant), Is.LessThanOrEqualTo(roomiest),
+                $"at width {width} the group sits on rung {group.CurrentVariant} and is wider than it was whole");
         }
     }
 
@@ -260,6 +342,40 @@ public class RibbonAdaptiveLayoutTests
         Assert.That(Variants(groups), Is.All.EqualTo(0));
     }
 
+    // Narrow, widen A LITTLE, narrow again. The middle step grows a group back, and the third has to be able to take it
+    // away again - a group that shrank once and then never shrinks again is stuck at a size the tab cannot hold.
+    [Test]
+    public void AGroupGrownBackByAWidening_ShrinksAgainWhenTheTabNarrows()
+    {
+        var (panel, groups) = Row(Group(3), Group(3));
+        LayoutAt(panel, 2000);
+        var roomy = Occupied(groups);
+
+        LayoutAt(panel, roomy - 120);
+        var tight = groups.Select(g => g.CurrentVariant).ToArray();
+        Assert.That(tight, Is.Not.All.EqualTo(0), "precondition: something shrank");
+
+        LayoutAt(panel, roomy - 60);   // a LITTLE wider, enough to grow something back
+        LayoutAt(panel, roomy - 120);  // and back to where it was
+
+        Assert.That(Variants(groups), Is.EqualTo(tight), "the same width has to give the same answer");
+    }
+
+    // ...and the width it settles at must be one the tab can actually hold.
+    [Test]
+    public void AfterAWidenAndNarrow_TheGroupsStillFit()
+    {
+        var (panel, groups) = Row(Group(3), Group(3));
+        LayoutAt(panel, 2000);
+        var roomy = Occupied(groups);
+
+        LayoutAt(panel, roomy - 120);
+        LayoutAt(panel, roomy - 60);
+        LayoutAt(panel, roomy - 120);
+
+        Assert.That(Occupied(groups), Is.LessThanOrEqualTo(roomy - 120));
+    }
+
     // Sweeping the width one way must give a monotonic answer - a band that flickers while a window is dragged is the
     // failure. This passes with the grow-back margin at zero too, so it does NOT stand in for the hysteresis: it says
     // the choice is stable, not that the deadband is what makes it so.
@@ -299,25 +415,6 @@ public class RibbonAdaptiveLayoutTests
         for (var pass = 0; pass < 5; pass++) LayoutAt(panel, 300);
 
         Assert.That(Variants(groups), Is.EqualTo(settled));
-    }
-
-    // Everything shrinks before ANYTHING is given up wholesale: a tab with one collapsed group beside three roomy ones
-    // has thrown away more than the width asked it to.
-    [Test]
-    public void SizesAreExhaustedBeforeAnyGroupCollapses()
-    {
-        var (panel, groups) = Row(Group(3), Group(3));
-        LayoutAt(panel, 2000);
-        var tightest = groups[0].Variants.Count - 2;
-
-        // Wide enough for two tightest groups, and not a step more.
-        LayoutAt(panel, groups[0].WidthAt(tightest) + groups[1].WidthAt(tightest));
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(groups.Select(g => g.IsCollapsed), Is.All.False);
-            Assert.That(Variants(groups), Is.All.EqualTo(tightest));
-        });
     }
 
     // Out of size steps and still too wide: a group gives itself up entirely, and its commands go to the flyout its

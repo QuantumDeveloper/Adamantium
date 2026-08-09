@@ -74,15 +74,13 @@ public class RibbonGroupsPanel : Panel
 
         if (groups.Count == 0) return;
 
-        // Sizes everywhere first; only then is a group given up wholesale.
-        while (Total(groups) > available && Lower(groups, collapsing: false)) { }
-        while (Total(groups) > available && Lower(groups, collapsing: true)) { }
+        LowerUntilItFits(groups, available);
 
         // Only when the tab got WIDER: collapsing frees a lot at once, and re-solving would spend it on the neighbours -
         // narrowing by a pixel made the groups on the left spring back to full size.
         if (available > _decidedFor)
         {
-            while (Raise(groups, available - GrowBackMargin)) { }
+            RaiseWhileItStillFits(groups, available - GrowBackMargin);
         }
 
         _decidedFor = available;
@@ -95,20 +93,40 @@ public class RibbonGroupsPanel : Panel
         return total;
     }
 
-    // Lowest ShrinkPriority, and among equals the one furthest RIGHT. The same order serves collapsing.
-    private static bool Lower(List<RibbonGroup> groups, bool collapsing)
+    // ONE group at a time, each to the end of its own ladder - collapsed is simply its last step, not a separate pass.
+    // A group with room to stay whole stays whole.
+    private static void LowerUntilItFits(List<RibbonGroup> groups, double available)
+    {
+        while (Total(groups) > available)
+        {
+            if (!Lower(groups)) return;
+        }
+    }
+
+    // No width to test against here: Raise tries a step and puts it back itself if the result no longer fits.
+    private static void RaiseWhileItStillFits(List<RibbonGroup> groups, double limit)
+    {
+        while (true)
+        {
+            if (!Raise(groups, limit)) return;
+        }
+    }
+
+    // Lowest ShrinkPriority, and among equals the one furthest RIGHT - and it keeps being chosen until it has nothing
+    // left, so the tab gives way from its end inwards.
+    private static bool Lower(List<RibbonGroup> groups)
     {
         RibbonGroup pick = null;
         for (var i = 0; i < groups.Count; i++)
         {
             var group = groups[i];
-            if (!CanLower(group, collapsing)) continue;
+            if (NextNarrower(group) < 0) continue;
             if (pick == null || group.ShrinkPriority <= pick.ShrinkPriority) pick = group;
         }
 
         if (pick == null) return false;
 
-        pick.ApplyVariant(collapsing ? pick.Variants.Count - 1 : pick.CurrentVariant + 1);
+        pick.ApplyVariant(NextNarrower(pick));
         return true;
     }
 
@@ -133,14 +151,17 @@ public class RibbonGroupsPanel : Panel
         return false;
     }
 
-    // Size steps stop one short of the collapsed variant. Collapsing is refused when it would make the group WIDER - a
-    // group down to three icons is narrower than the button replacing it.
-    private static bool CanLower(RibbonGroup group, bool collapsing)
+    // A step has to BUY width, collapsing included. Ladders are not monotonic: dropping a group's only large command
+    // re-packs its rows into MORE columns, so the rung below can cost more than the one above it. -1 = nothing left.
+    private static int NextNarrower(RibbonGroup group)
     {
-        var last = group.Variants.Count - 1;
-        if (!collapsing) return group.CurrentVariant < last - 1;
+        var current = group.WidthAt(group.CurrentVariant);
+        for (var i = group.CurrentVariant + 1; i < group.Variants.Count; i++)
+        {
+            if (group.WidthAt(i) < current) return i;
+        }
 
-        return group.CurrentVariant < last && group.WidthAt(last) < group.WidthAt(group.CurrentVariant);
+        return -1;
     }
 
     private static double WidthOf(IMeasurableComponent child) =>
