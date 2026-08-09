@@ -7,6 +7,14 @@
 
         <Ribbon Grid.Row="0">
 
+            <!-- The SAME collection the caption bar lists. Two instances, one list: each shows itself only while the
+                 placement names its own slot, so moving the bar moves nothing. -->
+            <Ribbon.FooterContent>
+                <RibbonQuickAccess ItemsSource="{Binding QuickAccess}"
+                                   Placement="{Binding QuickAccessPlacement}"
+                                   Margin="6 2 6 3" HorizontalAlignment="Left"/>
+            </Ribbon.FooterContent>
+
             <!-- ================= HOME ================= -->
             <RibbonTab Header="Home">
                 <RibbonGroup Header="Clipboard" Icon="M4,2 L12,2 L12,14 L4,14 Z M6,2 L6,4 L10,4 L10,2">
@@ -61,6 +69,10 @@
                     <TextBlock Text="Grid size" Ribbon.MaxSize="Medium" Ribbon.CollapseToSmall="Never" Margin="6 4 4 0" FontSize="11"/>
                     <Slider Ribbon.MaxSize="Medium" Ribbon.CollapseToSmall="Never" Width="120" Margin="4 2"
                             Minimum="0.1" Maximum="4" Value="{Binding GridSize, Mode=TwoWay}"/>
+                    <Separator/>
+                    <RibbonButton Content="Move QAT" MaxSize="Medium" Command="{Binding MoveQuickAccessCommand}"
+                                  ToolTip="Move the quick-access bar between the caption and the ribbon"
+                                  Icon="M3,4 L13,4 M3,8 L13,8 M6,11 L8,13 L10,11"/>
                 </RibbonGroup>
             </RibbonTab>
 

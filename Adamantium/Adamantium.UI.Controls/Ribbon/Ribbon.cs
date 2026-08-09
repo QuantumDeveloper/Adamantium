@@ -84,6 +84,36 @@ public class Ribbon : Selector
         set => SetValue(GroupsAreaHeightProperty, value);
     }
 
+    /// <summary>Only the strip is shown; the open tab's groups move to a flyout a click on a header opens. Does NOT
+    /// change which tab is open - see docs/RIBBON_PLAN.md §5.</summary>
+    public static readonly AdamantiumProperty IsMinimizedProperty = AdamantiumProperty.Register(nameof(IsMinimized),
+        typeof(bool), typeof(Ribbon), new PropertyMetadata(false, PropertyMetadataOptions.AffectsMeasure, OnIsMinimizedChanged));
+
+    public bool IsMinimized
+    {
+        get => GetValue<bool>(IsMinimizedProperty);
+        set => SetValue(IsMinimizedProperty, value);
+    }
+
+    /// <summary>A row of the band's own, under the groups: whatever the application puts there. Neutral on purpose -
+    /// the quick-access bar moved below the ribbon is the first tenant, a search box could be the next.</summary>
+    public static readonly AdamantiumProperty FooterContentProperty = AdamantiumProperty.Register(nameof(FooterContent),
+        typeof(object), typeof(Ribbon), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure));
+
+    public object FooterContent
+    {
+        get => GetValue(FooterContentProperty);
+        set => SetValue(FooterContentProperty, value);
+    }
+
+    private static void OnIsMinimizedChanged(AdamantiumComponent sender, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (sender is not Ribbon ribbon) return;
+
+        ribbon.HostSelectedContent();
+        if (!ribbon.IsMinimized) ribbon.CloseFlyout();
+    }
+
     public Ribbon()
     {
         // Ctrl+Tab steps between the ribbon and what it sits above. A real write, as a window and an overlay do it:
@@ -155,10 +185,71 @@ public class Ribbon : Selector
     private int _enterTries;
     private LayoutManager _hookedManager;
 
+    private Decorators.Decorator _bandHost;
+    private Decorators.Decorator _flyoutHost;
+    private Popup _flyout;
+    private Primitives.ToggleButton _minimizeButton;
+
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
         _contentHost = GetTemplateChild("PART_SelectedContentHost") as IUIComponent;
+        _bandHost = GetTemplateChild("PART_BandHost") as Decorators.Decorator;
+        _flyoutHost = GetTemplateChild("PART_FlyoutHost") as Decorators.Decorator;
+
+        _flyout = GetTemplateChild("PART_Flyout") as Popup;
+        if (_flyout != null)
+        {
+            _flyout.PlacementTarget = this;
+            _flyout.KeepOpen = false;
+
+            // The strip is the target, and a press on a header is what OPENS the flyout - dismissing on that same press
+            // would close it before the click that asked for it arrived.
+            _flyout.IgnoreTargetPress = true;
+        }
+
+        if (_minimizeButton != null) _minimizeButton.Click -= OnMinimizeButtonClick;
+        _minimizeButton = GetTemplateChild("PART_MinimizeButton") as Primitives.ToggleButton;
+        if (_minimizeButton != null) _minimizeButton.Click += OnMinimizeButtonClick;
+
+        HostSelectedContent();
+    }
+
+    private void OnMinimizeButtonClick(object sender, RoutedEventArgs e) => IsMinimized = !IsMinimized;
+
+    // Minimizing MOVES the open tab rather than swapping the template, so the groups keep the variants and widths they
+    // worked out - the same trade a collapsed group makes.
+    private void HostSelectedContent()
+    {
+        if (_contentHost is not IMeasurableComponent content) return;
+
+        if (IsMinimized)
+        {
+            if (_flyoutHost != null) _flyoutHost.Child = content;
+            return;
+        }
+
+        if (_bandHost != null) _bandHost.Child = content;
+    }
+
+    /// <summary>A press on a header opens that tab; while the band is minimized it also drops the tab's groups down
+    /// over the content. Pressing the header of the tab already showing puts them away again.</summary>
+    internal void ClickTab(RibbonTabHeader header)
+    {
+        var wasShowing = _flyout is { IsOpen: true } && IsHeaderSelected(header);
+
+        SelectTab(header);
+
+        if (!IsMinimized || _flyout == null) return;
+
+        _flyout.IsOpen = !wasShowing;
+    }
+
+    internal void ToggleMinimized() => IsMinimized = !IsMinimized;
+
+    private void CloseFlyout()
+    {
+        if (_flyout != null) _flyout.IsOpen = false;
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)

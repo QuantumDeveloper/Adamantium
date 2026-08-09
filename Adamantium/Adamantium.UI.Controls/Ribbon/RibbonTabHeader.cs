@@ -70,7 +70,15 @@ public class RibbonTabHeader : ContentControl, ISelectable
 
         e.Handled = true;
         Focus();
-        Owner?.SelectTab(this);
+
+        // Double-click minimizes the band and restores it, as Office does. The first click has already opened this tab.
+        if (e.ClickCount >= 2)
+        {
+            Owner?.ToggleMinimized();
+            return;
+        }
+
+        Owner?.ClickTab(this);
     }
 
     /// <summary>Enter/Space OPENS the tab: picks it and steps into its first command. Tab keeps walking the headers.</summary>
