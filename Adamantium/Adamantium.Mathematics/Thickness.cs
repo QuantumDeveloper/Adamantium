@@ -24,10 +24,11 @@ public struct Thickness
       Bottom = lst[3];
    }
    
-   public Thickness(Double leftTop, Double rightBottom)
+   /// <summary>Two values read the way every XAML dialect reads them: HORIZONTAL, then VERTICAL.</summary>
+   public Thickness(Double horizontal, Double vertical)
    {
-      Left = Top = leftTop;
-      Right = Bottom = rightBottom;
+      Left = Right = horizontal;
+      Top = Bottom = vertical;
    }
 
    public Thickness(Double left, Double top, Double right, Double bottom)
