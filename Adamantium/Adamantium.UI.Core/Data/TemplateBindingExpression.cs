@@ -49,14 +49,22 @@ public class TemplateBindingExpression : BindingExpressionBase
         Init();
     }
 
+    // Source and target types need not match ({TemplateBinding OverflowButtonWidth} on a GridLength) - convert exactly
+    // as {Binding} does, and skip the write when the value cannot be made to fit rather than poison the slot.
     public override void UpdateSource()
     {
-        Source.SetValue(SourceProperty, Target.GetValue(TargetProperty), ValuePriority.Template);
+        if (TryCoerce(Target.GetValue(TargetProperty), SourceProperty.PropertyType, out var value))
+        {
+            Source.SetValue(SourceProperty, value, ValuePriority.Template);
+        }
     }
 
     public override void UpdateTarget()
     {
-        Target.SetValue(TargetProperty, Source.GetValue(SourceProperty), ValuePriority.Template);
+        if (TryCoerce(Source.GetValue(SourceProperty), TargetProperty.PropertyType, out var value))
+        {
+            Target.SetValue(TargetProperty, value, ValuePriority.Template);
+        }
     }
 
     private void Init()

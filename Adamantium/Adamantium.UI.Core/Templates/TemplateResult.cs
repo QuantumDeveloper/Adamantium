@@ -40,7 +40,9 @@ public class TemplateResult
         namesMap[name] = component;
     }
     
-    public void AddTemplateBinding(IUIComponent target, string targetProperty, TemplateBinding binding)
+    // Same reason as RegisterName: a template binding may target a NON-visual component (a ColumnDefinition width, a
+    // GradientStop offset), and the expression has always held its target as IAdamantiumComponent.
+    public void AddTemplateBinding(IAdamantiumComponent target, string targetProperty, TemplateBinding binding)
     {
         templateBindings.Add(new TemplateBindingExpression(null, target, targetProperty, binding));
     }

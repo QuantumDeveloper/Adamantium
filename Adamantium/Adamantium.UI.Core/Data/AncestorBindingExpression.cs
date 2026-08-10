@@ -275,7 +275,7 @@ public class AncestorBindingExpression : BindingExpressionBase
         // Write-back is authoritative (the user edited the target), so push at Local priority - a Binding-priority write
         // would be masked by any Local/Style value the ancestor property already holds.
         var value = RelativeBindingPipeline.ConvertBack(Target.GetValue(TargetProperty), _def.Converter, _def.ConverterParameter, _sourceProperty.PropertyType);
-        if (RelativeBindingPipeline.TryCoerce(value, _sourceProperty.PropertyType, out var coerced))
+        if (TryCoerce(value, _sourceProperty.PropertyType, out var coerced))
             _source.SetValue(_sourceProperty, coerced, ValuePriority.Local);
     }
 

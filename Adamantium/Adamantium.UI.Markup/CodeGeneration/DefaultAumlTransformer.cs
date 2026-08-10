@@ -8,6 +8,46 @@ namespace Adamantium.UI.Markup.CodeGeneration;
 
 public class DefaultAumlTransformer : IAumlTransformer
 {
+    private const string MarkupItemAttributeName = "Adamantium.UI.Core.MarkupItemAttribute";
+
+    // Tokens of a shorthand collection: commas or spaces, but only outside a markup extension, whose own arguments are
+    // separated the same way ("Auto, {Binding A, Mode=OneWay}, *").
+    private static IEnumerable<string> SplitShorthand(string text)
+    {
+        var depth = 0;
+        var start = 0;
+
+        for (var i = 0; i <= text.Length; i++)
+        {
+            if (i < text.Length)
+            {
+                if (text[i] == '{')
+                {
+                    depth++;
+                    continue;
+                }
+
+                if (text[i] == '}')
+                {
+                    depth--;
+                    continue;
+                }
+
+                if (depth > 0 || (text[i] != ',' && text[i] != ' '))
+                {
+                    continue;
+                }
+            }
+
+            var token = text.Substring(start, i - start).Trim();
+            start = i + 1;
+            if (token.Length > 0)
+            {
+                yield return token;
+            }
+        }
+    }
+
     public AumlMetadataContainer Transform(AumlDocument document, ITypeResolver typeResolver, IDiagnosticSink diagnostics)
     {
         var container = new AumlMetadataContainer(typeResolver)
@@ -362,7 +402,58 @@ public class DefaultAumlTransformer : IAumlTransformer
                     return directive;
             }
         }
-           
+
+        // A [MarkupItem] collection written as the shorthand string with a markup extension among the tokens -
+        // ColumnDefinitions="Auto,{TemplateBinding OverflowButtonWidth}" - becomes the element form the rest of the
+        // pipeline already understands: one item object per token, each with the declared item property set. A plain
+        // string keeps going to the TypeParser untouched.
+        void ExpandShorthandCollection(AumlAstPropertyNode propertyNode)
+        {
+            if (propertyNode.Property is not AumlAstPropertyReference { IsAttachedProperty: false } reference) return;
+            if (reference.TargetType is not { IsResolved: true }) return;
+            if (propertyNode.Values.Count != 1 || propertyNode.Values[0] is not AumlAstTextNode text) return;
+            if (text.Text.IndexOf('{') < 0) return;
+
+            var markupItem = typeResolver.Resolve(reference.TargetType.GetFullTypeName())?.GetAttribute(MarkupItemAttributeName);
+            if (markupItem == null) return;
+
+            markupItem.NamedArguments.TryGetValue("ItemType", out var itemTypeArgument);
+            markupItem.NamedArguments.TryGetValue("ItemProperty", out var itemPropertyArgument);
+            var itemPropertyName = itemPropertyArgument?.ToString();
+
+            var itemType = itemTypeArgument == null ? null : typeResolver.Resolve(itemTypeArgument.ToString());
+            var itemProperty = itemType?.GetAllProperties().FirstOrDefault(x => x.Name == itemPropertyName);
+            if (itemProperty == null)
+            {
+                diagnostics.ReportError(document.FileName,
+                    $"[MarkupItem] on {reference.TargetType.GetFullTypeName()} names no reachable item property. {propertyNode.GetLineInfo()}");
+                return;
+            }
+
+            var lineInfo = text.GetLineInfo();
+            var itemTypeReference = CreateResolved(itemType, lineInfo);
+            var itemPropertyTypeReference = CreateResolved(itemProperty.PropertyType, lineInfo);
+            var items = new List<IAumlAstValueNode>();
+
+            foreach (var token in SplitShorthand(text.Text))
+            {
+                var itemNode = new AumlAstObjectNode(lineInfo, itemTypeReference);
+                var value = token.StartsWith("{")
+                    ? MarkupExtensionParser.Parse(new ParserContext(null), token, lineInfo, document.NamespaceMappings.ToList())
+                    : new AumlAstTextNode(lineInfo, token);
+
+                itemNode.Children.Add(new AumlAstPropertyNode(
+                    lineInfo,
+                    new AumlAstPropertyReference(lineInfo, false, itemNode, itemTypeReference, itemPropertyTypeReference, itemPropertyName),
+                    value));
+
+                items.Add(itemNode);
+            }
+
+            propertyNode.Values = items;
+        }
+
+
         var entityType = EntityType.Unknown;
         var usings = new Dictionary<string, string>();
 
@@ -403,7 +494,9 @@ public class DefaultAumlTransformer : IAumlTransformer
                     }
                     break;
                 case AumlAstPropertyNode propertyNode:
-                    
+
+                    ExpandShorthandCollection(propertyNode);
+
                     for (int i = 0; i < propertyNode.Values.Count; i++)
                     {
                         var transformedValue = ProcessValueNode(propertyNode.Values[i]);

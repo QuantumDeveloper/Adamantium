@@ -269,7 +269,15 @@ public class CodeGenerationContext
                     // A template assigned to a PART's property inside a ControlTemplate goes to TEMPLATE priority (not the CLR
                     // setter's LOCAL), so a theme's own Template setter/trigger can still override it - same rule as every
                     // other templated-part property. Outside a template it stays a plain assignment.
-                    if (CurrentTemplate != null && !propRef.IsAttachedProperty && typeInfo != null && typeInfo.ImplementsInterface("IAdamantiumComponent"))
+                    if (propRef.IsAttachedProperty)
+                    {
+                        // An ATTACHED template (Ribbon.QuickAccessTemplate on a Slider) belongs to its owner's setter,
+                        // not to the element - the element has no such property and the assignment did not compile.
+                        var attachedTarget = isRoot ? "this" : CurrentParent;
+                        TextGenerator.WriteLine(
+                            $"{propRef.OwnerType.GetFullTypeName()}.Set{propRef.Name}({attachedTarget}, {templateName});");
+                    }
+                    else if (CurrentTemplate != null && typeInfo != null && typeInfo.ImplementsInterface("IAdamantiumComponent"))
                     {
                         var target = isRoot ? "this" : CurrentParent;
                         TextGenerator.WriteLine($"{target}.SetValue(\"{propRef.Name}\", {templateName}, Adamantium.UI.Core.ValuePriority.Template);");
@@ -694,6 +702,10 @@ public class CodeGenerationContext
                 {
                     TextGenerator.WriteLine($"{ParentName}.Add({childName});");
                 }
+                else if (MarkupCollectionFor(typeInfo, child) is { } collection)
+                {
+                    TextGenerator.WriteLine($"{elementName}.{collection}.Add({childName});");
+                }
                 else if (typeInfo.ImplementsInterface("IContainer"))
                 {
                     TextGenerator.WriteLine($"(({typeInfo.GetInterface("IContainer").FullName}){elementName}).AddOrSetChildComponent({childName});");
@@ -903,6 +915,27 @@ public class CodeGenerationContext
         }
     }
     
+    private const string MarkupItemAttributeName = "Adamantium.UI.Core.MarkupItemAttribute";
+
+    // A child element that is not a visual - <Grid><ColumnDefinition/></Grid> - belongs to the parent's [MarkupItem]
+    // collection that accepts it. Returns that property's name, or null when the child is an ordinary tree child.
+    private string MarkupCollectionFor(IResolvedType parentType, AumlAstObjectNode child)
+    {
+        var childType = Metadata.TypeResolver.Resolve(child.TypeReference.GetFullTypeName());
+        if (parentType == null || childType == null || childType.ImplementsInterface("IUIComponent")) return null;
+
+        foreach (var property in parentType.GetAllProperties())
+        {
+            var markupItem = property.PropertyType?.GetAttribute(MarkupItemAttributeName);
+            if (markupItem == null) continue;
+            if (!markupItem.NamedArguments.TryGetValue("ItemType", out var itemType) || itemType == null) continue;
+
+            if (childType.IsAssignableTo(itemType.ToString())) return property.Name;
+        }
+
+        return null;
+    }
+
     private string Quote(string str) => $"\"{str}\"";
     
     private string ProcessNestedValue(IAumlAstNode value, IDiagnosticSink diagnostics, bool isResource)
