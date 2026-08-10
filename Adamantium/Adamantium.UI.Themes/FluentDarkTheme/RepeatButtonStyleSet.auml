@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- Default chrome for a STANDALONE RepeatButton (spinners, steppers): the same look as Button, minus the focus
          ring. Matches by EXACT type, so a ScrollBar's page buttons (a ScrollBarPageButton subtype) stay untouched and
@@ -32,13 +31,13 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RepeatButton">
-                    <controls:Border x:Name="InnerBorder"
+                    <Border x:Name="InnerBorder"
                             CornerRadius="{TemplateBinding CornerRadius}"
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             Padding="{TemplateBinding Padding}">
-                        <controls:ContentPresenter
+                        <ContentPresenter
                                 x:Name="PART_ContentPresenter"
                                 HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                 VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
@@ -47,7 +46,7 @@
                                 Content="{TemplateBinding Content}"
                                 ContentTemplate="{TemplateBinding ContentTemplate}"
                                 ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
-                    </controls:Border>
+                    </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- The drag-drop insertion cue: a slim accent capsule showing where a dragged item will land. A real templated control,
          so the drop cue restyles PURELY here - the drag engine only creates it, sets its Orientation/IsFrame, and sizes it to
@@ -12,20 +11,20 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="DropInsertionIndicator">
-                    <controls:Grid>
-                        <controls:Border x:Name="BarH" Height="3" CornerRadius="1.5"
+                    <Grid>
+                        <Border x:Name="BarH" Height="3" CornerRadius="1.5"
                                          Background="{ThemeResource AccentFillColorDefault}"
                                          VerticalAlignment="Center" HorizontalAlignment="Stretch"/>
-                        <controls:Border x:Name="BarV" Width="3" CornerRadius="1.5"
+                        <Border x:Name="BarV" Width="3" CornerRadius="1.5"
                                          Background="{ThemeResource AccentFillColorDefault}"
                                          VerticalAlignment="Stretch" HorizontalAlignment="Center"
                                          Visibility="Collapsed"/>
-                        <controls:Border x:Name="Frame" BorderThickness="2" CornerRadius="3"
+                        <Border x:Name="Frame" BorderThickness="2" CornerRadius="3"
                                          BorderBrush="{ThemeResource AccentFillColorDefault}"
                                          Background="{ThemeResource AccentFillColorDefault}"
                                          Opacity="0.28"
                                          Visibility="Collapsed"/>
-                    </controls:Grid>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

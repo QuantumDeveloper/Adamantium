@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- A button that stays lit while checked. Same chrome as Button; the extra concern is one IsChecked trigger that
          paints the accent. Per the small-styles convention each concern is its own <Style Selector="ToggleButton">. -->
@@ -28,14 +27,14 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
-                    <controls:Grid>
-                        <controls:Border x:Name="InnerBorder"
+                    <Grid>
+                        <Border x:Name="InnerBorder"
                                 CornerRadius="{TemplateBinding CornerRadius}"
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 Padding="{TemplateBinding Padding}">
-                            <controls:ContentPresenter
+                            <ContentPresenter
                                     x:Name="PART_ContentPresenter"
                                     HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                     VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
@@ -44,9 +43,9 @@
                                     Content="{TemplateBinding Content}"
                                     ContentTemplate="{TemplateBinding ContentTemplate}"
                                     ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
-                        </controls:Border>
+                        </Border>
                         <!-- No focus ring here - the application has ONE, drawn by the FocusAdorner. See ButtonStyleSet. -->
-                    </controls:Grid>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

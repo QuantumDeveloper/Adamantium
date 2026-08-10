@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- ScrollViewer: a content host with two OVERLAY scrollbars (Fluent-style, no arrow buttons). The content
          presenter fills the whole area and scrolls UNDER the bars; the bars float on the right / bottom edges and the
@@ -17,22 +16,22 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ScrollViewer">
-                    <controls:Grid>
-                        <controls:ScrollContentPresenter
+                    <Grid>
+                        <ScrollContentPresenter
                             x:Name="PART_ScrollContentPresenter"
                             Content="{TemplateBinding Content}"
                             ContentTemplate="{TemplateBinding ContentTemplate}"/>
                         <!-- The vertical bar runs the FULL height (so it fills the bottom-right corner); the horizontal bar
                              stops one bar-thickness (12) short of the right, meeting the vertical bar's edge - no overlap in
                              the corner (they used to pile up there) and no transparent gap (the vertical bar covers it). -->
-                        <controls:ScrollBar
+                        <ScrollBar
                             x:Name="PART_VerticalScrollBar"
                             Orientation="Vertical"
                             HorizontalAlignment="Right"
                             VerticalAlignment="Stretch"
                             Opacity="0"
                             IsHitTestVisible="False"/>
-                        <controls:ScrollBar
+                        <ScrollBar
                             x:Name="PART_HorizontalScrollBar"
                             Orientation="Horizontal"
                             VerticalAlignment="Bottom"
@@ -40,7 +39,7 @@
                             MarginRight="12"
                             Opacity="0"
                             IsHitTestVisible="False"/>
-                    </controls:Grid>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

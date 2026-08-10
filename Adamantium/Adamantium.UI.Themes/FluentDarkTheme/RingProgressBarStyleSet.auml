@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- Circular progress gauge: a dim full ring under an accent arc RingProgressBar sweeps to Percentage. The control is
          always square (MeasureOverride), so Center alignment lets arrange settle onto that square. Per the small-styles
@@ -20,12 +19,12 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RingProgressBar">
-                    <controls:Grid>
-                        <controls:Ellipse Stroke="{ResourceReference ControlFillColorTertiary}"
+                    <Grid>
+                        <Ellipse Stroke="{ResourceReference ControlFillColorTertiary}"
                                 StrokeThickness="{TemplateBinding RingThickness}"
                                 Fill="Transparent"
                                 EllipseType="EdgeToEdge"/>
-                        <controls:Ellipse x:Name="PART_Indicator"
+                        <Ellipse x:Name="PART_Indicator"
                                 Stroke="{ThemeResource AccentFillColorDefault}"
                                 StrokeThickness="{TemplateBinding RingThickness}"
                                 Fill="Transparent"
@@ -33,7 +32,7 @@
                                 StartAngle="0"
                                 StopAngle="0"
                                 RenderTransformOrigin="0.5,0.5"/>
-                        <controls:TextBlock x:Name="PART_ValueText"
+                        <TextBlock x:Name="PART_ValueText"
                                 Text="{TemplateBinding ValueText}"
                                 Visibility="Collapsed"
                                 FontSize="15"
@@ -41,7 +40,7 @@
                                 VerticalAlignment="Center"
                                 VerticalTextAlignment="Center"
                                 Foreground="{TemplateBinding Foreground}"/>
-                    </controls:Grid>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

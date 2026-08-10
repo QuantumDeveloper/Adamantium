@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- A 20x20 box with a check glyph, then the content label. The box fills with the accent + the glyph fades in when
          checked. Per the small-styles convention each concern is its own <Style Selector="CheckBox">. -->
@@ -21,8 +20,8 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="CheckBox">
-                    <controls:StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <controls:Border x:Name="Box" 
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border x:Name="Box" 
                                          Width="20" 
                                          Height="20" 
                                          CornerRadius="4"
@@ -33,13 +32,13 @@
                             <!-- Two overlaid markers, only one ever shown: the check for IsChecked=true, a filled square
                                  for the indeterminate IsChecked=null (three-state). A Border holds a single child, so a
                                  Grid centres both over each other. -->
-                            <controls:Grid>
+                            <Grid>
                                 <!-- Geometry normalised to start at (0,0): a Path's box is its geometry bounds, so leading
                                      empty space (the old M4.5,10...) pushed the centred glyph down-right = the "crooked"
                                      look. The check sits on the accent-filled box, so it uses the theme's ON-ACCENT
                                      contrast colour (white on a dark accent, black on a light one) - it adapts live when
                                      the accent is cycled, matching the RadioButton dot / ToggleSwitch thumb. -->
-                                <controls:Path x:Name="CheckGlyph"
+                                <Path x:Name="CheckGlyph"
                                         Data="M0,4.5 L3.5,8 L10,0"
                                         Stroke="{ThemeResource AccentForegroundColor}"
                                         StrokeThickness="2"
@@ -47,7 +46,7 @@
                                         Opacity="0"
                                         HorizontalAlignment="Center"
                                         VerticalAlignment="Center"/>
-                                <controls:Border x:Name="IndeterminateGlyph"
+                                <Border x:Name="IndeterminateGlyph"
                                         Width="10"
                                         Height="10"
                                         CornerRadius="2"
@@ -55,16 +54,16 @@
                                         Opacity="0"
                                         HorizontalAlignment="Center"
                                         VerticalAlignment="Center"/>
-                            </controls:Grid>
-                        </controls:Border>
-                        <controls:ContentPresenter x:Name="PART_ContentPresenter"
+                            </Grid>
+                        </Border>
+                        <ContentPresenter x:Name="PART_ContentPresenter"
                                 Content="{TemplateBinding Content}"
                                 ContentTemplate="{TemplateBinding ContentTemplate}"
                                 Foreground="{TemplateBinding Foreground}"
                                 FontSize="{TemplateBinding FontSize}"
                                 VerticalAlignment="Center"
                                 Margin="8 0 0 0"/>
-                    </controls:StackPanel>
+                    </StackPanel>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- TreeView: the tree is FLATTENED into one virtualized list of rows (one per visible node, indented by depth), so a
          branch of thousands of siblings realizes only the viewport. The ItemsPanel is a VIRTUALIZING StackPanel; the
@@ -11,7 +10,7 @@
         <Setter Property="ItemsPanel">
             <Setter.Value>
                 <ItemsPanelTemplate>
-                    <controls:StackPanel Orientation="Vertical"/>
+                    <StackPanel Orientation="Vertical"/>
                 </ItemsPanelTemplate>
             </Setter.Value>
         </Setter>
@@ -21,16 +20,16 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TreeView">
-                    <controls:Border Background="{TemplateBinding Background}">
+                    <Border Background="{TemplateBinding Background}">
                         <!-- CanContentScroll=true so the ScrollViewer measures the items host at the VIEWPORT (not unbounded)
                              and delegates scrolling to the virtualizing panel - without it the panel sees infinite height and
                              realizes a fixed ~screenful, so items past it never appear. Horizontal scroll DISABLED so rows
                              stretch full-width (the whole row is clickable + the selection highlight spans it). -->
-                        <controls:ScrollViewer x:Name="PART_ScrollViewer" CanContentScroll="True"
+                        <ScrollViewer x:Name="PART_ScrollViewer" CanContentScroll="True"
                                                HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
-                            <controls:ItemsPresenter x:Name="PART_ItemsPresenter"/>
-                        </controls:ScrollViewer>
-                    </controls:Border>
+                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </ScrollViewer>
+                    </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -49,21 +48,21 @@
         <Setter Property="ExpanderTemplate">
             <Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
-                    <controls:Grid Width="16" Height="16" Background="Transparent">
-                        <controls:Path x:Name="ChevronRight" Data="M0,0 L5,4 L0,8 Z"
+                    <Grid Width="16" Height="16" Background="Transparent">
+                        <Path x:Name="ChevronRight" Data="M0,0 L5,4 L0,8 Z"
                                 Fill="{ResourceReference TextFillColorSecondary}"
                                 Width="5"
                                 Height="8"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"/>
-                        <controls:Path x:Name="ChevronDown" Data="M0,0 L8,0 L4,5 Z"
+                        <Path x:Name="ChevronDown" Data="M0,0 L8,0 L4,5 Z"
                                 Fill="{ResourceReference TextFillColorSecondary}"
                                 Width="8"
                                Height="5"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
                                 Visibility="Collapsed"/>
-                    </controls:Grid>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <PropertyTrigger Property="IsChecked" Value="true">
                             <Setter TargetName="ChevronRight" Property="Visibility" Value="Collapsed"/>
@@ -81,28 +80,28 @@
                 <ControlTemplate TargetType="TreeViewItem">
                     <!-- Root spans the full row width (Border stretches by default), so the selection fill + hover overlay run
                          edge-to-edge and the whole row is clickable at any depth. -->
-                    <controls:Border x:Name="Root" Background="Transparent" CornerRadius="4" MinHeight="26">
-                        <controls:Grid>
-                            <controls:Border x:Name="HoverOverlay" Background="Transparent" CornerRadius="4"/>
-                            <controls:Grid ColumnDefinitions="Auto,16,*" Margin="4 3 6 3">
+                    <Border x:Name="Root" Background="Transparent" CornerRadius="4" MinHeight="26">
+                        <Grid>
+                            <Border x:Name="HoverOverlay" Background="Transparent" CornerRadius="4"/>
+                            <Grid ColumnDefinitions="Auto,16,*" Margin="4 3 6 3">
                                 <!-- Depth indent: a zero-width spacer at depth 0, Depth × step further in at each level. -->
-                                <controls:Border Grid.Column="0" Width="{TemplateBinding Indent}"/>
+                                <Border Grid.Column="0" Width="{TemplateBinding Indent}"/>
                                 <!-- Pin the expander to its 16x16 glyph: the base ToggleButton style leaks MinHeight=32 +
                                      Padding via the IS-A selector, which inflated the button and pushed the arrow off its
                                      row centre. Un-inherit them here so the chevron sits dead-centre. -->
-                                <controls:ToggleButton x:Name="PART_Expander" Grid.Column="1"
+                                <ToggleButton x:Name="PART_Expander" Grid.Column="1"
                                         Template="{TemplateBinding ExpanderTemplate}"
                                         Width="16" Height="16" MinWidth="0" MinHeight="0" Padding="0"
                                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                <controls:ContentPresenter x:Name="PART_ContentPresenter" Grid.Column="2"
+                                <ContentPresenter x:Name="PART_ContentPresenter" Grid.Column="2"
                                         Content="{TemplateBinding Header}"
                                         ContentTemplate="{TemplateBinding HeaderTemplate}"
                                         Foreground="{TemplateBinding Foreground}"
                                         FontSize="{TemplateBinding FontSize}"
                                         VerticalAlignment="Center" Margin="4 0 0 0"/>
-                            </controls:Grid>
-                        </controls:Grid>
-                    </controls:Border>
+                            </Grid>
+                        </Grid>
+                    </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

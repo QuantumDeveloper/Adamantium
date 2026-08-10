@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- ONE template serves every variant: the rest/hover/pressed/disabled brushes live as properties on the control
          (Background + Background/Foreground PointerOver/Pressed/Disabled), and the triggers project them onto the chrome
@@ -35,14 +34,14 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
-                    <controls:Grid>
-                        <controls:Border x:Name="InnerBorder"
+                    <Grid>
+                        <Border x:Name="InnerBorder"
                                 CornerRadius="{TemplateBinding CornerRadius}"
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 Padding="{TemplateBinding Padding}">
-                            <controls:ContentPresenter
+                            <ContentPresenter
                                     x:Name="PART_ContentPresenter"
                                     HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                     VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
@@ -51,12 +50,12 @@
                                     Content="{TemplateBinding Content}"
                                     ContentTemplate="{TemplateBinding ContentTemplate}"
                                     ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
-                        </controls:Border>
+                        </Border>
                         <!-- No focus ring here: the application has ONE, drawn by the FocusAdorner on the window's adorner
                              layer (see FocusAdornerStyleSet). A ring restated in a template is a second answer to the same
                              question - and this one was the WHITE FocusStrokeColorOuter, so a focused button wore a white
                              frame while every other control wore the accent one. -->
-                    </controls:Grid>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

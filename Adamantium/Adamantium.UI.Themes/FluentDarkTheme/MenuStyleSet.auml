@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- MenuItem: a flyout row - icon | label (Header) | gesture hint or submenu chevron. A LEAF runs its command; a
          PARENT (one with child items) opens a submenu flyout to the right on hover. The child items live in PART_ItemsPresenter
@@ -15,7 +14,7 @@
             <Setter.Value>
                 <ItemsPanelTemplate>
                     <!-- Small mixed-height host: don't virtualize, so the separator takes its OWN 9px, not a 34px row cell. -->
-                    <controls:StackPanel Orientation="Vertical" IsVirtualizing="False"/>
+                    <StackPanel Orientation="Vertical" IsVirtualizing="False"/>
                 </ItemsPanelTemplate>
             </Setter.Value>
         </Setter>
@@ -25,54 +24,54 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="MenuItem">
-                    <controls:Grid>
+                    <Grid>
                         <!-- MinHeight lives on Root (a part), not on the MenuItem: a separator collapses Root, so its row
                              shrinks to just the rule instead of holding a full-height empty band. -->
-                        <controls:Border x:Name="Root" Background="{TemplateBinding Background}"
+                        <Border x:Name="Root" Background="{TemplateBinding Background}"
                                 CornerRadius="4" Padding="10 6 10 6" MinHeight="34">
                             <!-- Fixed icon gutter (column 0): always reserved so every row's label aligns whether or not it
                                  has an icon, and a checkmark/glyph has a consistent home - like a real menu. -->
-                            <controls:Grid ColumnDefinitions="28,*,Auto,Auto">
-                                <controls:ContentPresenter Grid.Column="0" Content="{TemplateBinding Icon}"
+                            <Grid ColumnDefinitions="28,*,Auto,Auto">
+                                <ContentPresenter Grid.Column="0" Content="{TemplateBinding Icon}"
                                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                <controls:ContentPresenter x:Name="PART_ContentPresenter" Grid.Column="1"
+                                <ContentPresenter x:Name="PART_ContentPresenter" Grid.Column="1"
                                         Content="{TemplateBinding Header}"
                                         ContentTemplate="{TemplateBinding HeaderTemplate}"
                                         Foreground="{TemplateBinding Foreground}"
                                         FontSize="{TemplateBinding FontSize}"
                                         HorizontalAlignment="Left" VerticalAlignment="Center"/>
-                                <controls:TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}"
+                                <TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}"
                                         Foreground="{ResourceReference TextFillColorSecondary}"
                                         FontSize="12" VerticalAlignment="Center" Margin="24 0 0 0"/>
                                 <!-- Vector chevron (not a glyph - a Path always renders regardless of the UI font's coverage). -->
-                                <controls:Path x:Name="Chevron" Grid.Column="3"
+                                <Path x:Name="Chevron" Grid.Column="3"
                                         Data="M0,0 L5,4 L0,8 Z"
                                         Fill="{ResourceReference TextFillColorSecondary}"
                                         Width="5" Height="8" Visibility="Collapsed"
                                         VerticalAlignment="Center" Margin="16 0 0 0"/>
-                            </controls:Grid>
-                        </controls:Border>
+                            </Grid>
+                        </Border>
                         <!-- No PlacementTarget: the popup falls back to its VisualParent (this template's root Grid, which
                              overlaps the row), so Placement=Right opens the submenu just past the row's right edge. -->
-                        <controls:Popup x:Name="PART_SubmenuPopup" Placement="Right" FlipToFit="True"
+                        <Popup x:Name="PART_SubmenuPopup" Placement="Right" FlipToFit="True"
                                 IsOpen="{TemplateBinding IsSubmenuOpen}">
                             <!-- The submenu's card + items host are built LAZILY on first open (ChildTemplate), not eagerly in
                                  every MenuItem's template - so a leaf that never opens a submenu never pays to build+theme it. -->
-                            <controls:Popup.ChildTemplate>
+                            <Popup.ChildTemplate>
                                 <ControlTemplate TargetType="Popup">
-                                    <controls:Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                    <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
                                             BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                                             BorderThickness="1" CornerRadius="6" Padding="4" MinWidth="160">
                                         <!-- Menu taller than the window: capped to the window (MaxHeight set in code) and scrolled
                                              by the ▲/▼ arrows the MenuScrollViewer grows - no scrollbar. A short menu is content-sized. -->
-                                        <controls:MenuScrollViewer x:Name="PART_MenuScroll">
-                                            <controls:ItemsPresenter x:Name="PART_ItemsPresenter"/>
-                                        </controls:MenuScrollViewer>
-                                    </controls:Border>
+                                        <MenuScrollViewer x:Name="PART_MenuScroll">
+                                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                        </MenuScrollViewer>
+                                    </Border>
                                 </ControlTemplate>
-                            </controls:Popup.ChildTemplate>
-                        </controls:Popup>
-                    </controls:Grid>
+                            </Popup.ChildTemplate>
+                        </Popup>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -96,7 +95,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Separator">
-                    <controls:Border Height="1" Margin="8 4 8 4"
+                    <Border Height="1" Margin="8 4 8 4"
                             Background="{ResourceReference ControlStrokeColorDefault}"/>
                 </ControlTemplate>
             </Setter.Value>
@@ -114,32 +113,32 @@
                     <!-- Arrows are RepeatButtons in their OWN rows (not overlaying content): a click scrolls a step and a
                          hold repeats it (mouse-captured, so it's stable). The * row bounds the presenter (the card has a
                          MaxHeight) so it scrolls; the Auto arrow rows are 0-tall when collapsed. -->
-                    <controls:Grid RowDefinitions="Auto,*,Auto">
-                        <controls:RepeatButton x:Name="PART_ScrollUp" Grid.Row="0" Height="18" Visibility="Collapsed"
+                    <Grid RowDefinitions="Auto,*,Auto">
+                        <RepeatButton x:Name="PART_ScrollUp" Grid.Row="0" Height="18" Visibility="Collapsed"
                                 Delay="300" Interval="40">
-                            <controls:RepeatButton.Template>
+                            <RepeatButton.Template>
                                 <ControlTemplate TargetType="RepeatButton">
-                                    <controls:Border Background="{ResourceReference CardBackgroundFillColorDefault}">
-                                        <controls:Path Data="M0,5 L5,0 L10,5 Z" Fill="{ResourceReference TextFillColorSecondary}"
+                                    <Border Background="{ResourceReference CardBackgroundFillColorDefault}">
+                                        <Path Data="M0,5 L5,0 L10,5 Z" Fill="{ResourceReference TextFillColorSecondary}"
                                                 Width="10" Height="5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </controls:Border>
+                                    </Border>
                                 </ControlTemplate>
-                            </controls:RepeatButton.Template>
-                        </controls:RepeatButton>
-                        <controls:ScrollContentPresenter x:Name="PART_ScrollContentPresenter" Grid.Row="1"
+                            </RepeatButton.Template>
+                        </RepeatButton>
+                        <ScrollContentPresenter x:Name="PART_ScrollContentPresenter" Grid.Row="1"
                                 Content="{TemplateBinding Content}"/>
-                        <controls:RepeatButton x:Name="PART_ScrollDown" Grid.Row="2" Height="18" Visibility="Collapsed"
+                        <RepeatButton x:Name="PART_ScrollDown" Grid.Row="2" Height="18" Visibility="Collapsed"
                                 Delay="300" Interval="40">
-                            <controls:RepeatButton.Template>
+                            <RepeatButton.Template>
                                 <ControlTemplate TargetType="RepeatButton">
-                                    <controls:Border Background="{ResourceReference CardBackgroundFillColorDefault}">
-                                        <controls:Path Data="M0,0 L10,0 L5,5 Z" Fill="{ResourceReference TextFillColorSecondary}"
+                                    <Border Background="{ResourceReference CardBackgroundFillColorDefault}">
+                                        <Path Data="M0,0 L10,0 L5,5 Z" Fill="{ResourceReference TextFillColorSecondary}"
                                                 Width="10" Height="5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </controls:Border>
+                                    </Border>
                                 </ControlTemplate>
-                            </controls:RepeatButton.Template>
-                        </controls:RepeatButton>
-                    </controls:Grid>
+                            </RepeatButton.Template>
+                        </RepeatButton>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -162,7 +161,7 @@
             <Setter.Value>
                 <ItemsPanelTemplate>
                     <!-- Small mixed-height host: don't virtualize, so the separator takes its OWN 9px, not a 34px row cell. -->
-                    <controls:StackPanel Orientation="Vertical" IsVirtualizing="False"/>
+                    <StackPanel Orientation="Vertical" IsVirtualizing="False"/>
                 </ItemsPanelTemplate>
             </Setter.Value>
         </Setter>
@@ -172,20 +171,20 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ContextMenu">
-                    <controls:Grid>
-                        <controls:Popup x:Name="PART_Popup" Placement="Bottom" FlipToFit="True" VerticalOffset="4">
-                            <controls:Border x:Name="PART_MenuRoot"
+                    <Grid>
+                        <Popup x:Name="PART_Popup" Placement="Bottom" FlipToFit="True" VerticalOffset="4">
+                            <Border x:Name="PART_MenuRoot"
                                     Background="{ResourceReference CardBackgroundFillColorDefault}"
                                     BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                                     BorderThickness="1" CornerRadius="6" Padding="4" MinWidth="160">
                                 <!-- Menu taller than the window: capped to the window (MaxHeight set in code) and scrolled by
                                      the ▲/▼ hover-arrows the MenuScrollViewer grows - no scrollbar. A short menu is content-sized. -->
-                                <controls:MenuScrollViewer x:Name="PART_MenuScroll">
-                                    <controls:ItemsPresenter x:Name="PART_ItemsPresenter"/>
-                                </controls:MenuScrollViewer>
-                            </controls:Border>
-                        </controls:Popup>
-                    </controls:Grid>
+                                <MenuScrollViewer x:Name="PART_MenuScroll">
+                                    <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                </MenuScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

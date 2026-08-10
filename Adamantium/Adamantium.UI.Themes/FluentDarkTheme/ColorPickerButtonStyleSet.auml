@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- ColorPickerButton: a swatch (its fill = SelectedBrush, which tracks SelectedColor) that opens a ColorPicker in a
          floating popup. The control toggles/positions the popup and light-dismisses in code; the picker's SelectedColor is
@@ -11,24 +10,24 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ColorPickerButton">
-                    <controls:Grid>
-                        <controls:Border x:Name="PART_Header"
+                    <Grid>
+                        <Border x:Name="PART_Header"
                                 CornerRadius="6"
                                 Background="{ResourceReference ControlFillColorDefault}"
                                 BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                                 BorderThickness="1"
                                 Padding="4">
-                            <controls:Border Background="{TemplateBinding SelectedBrush}"
+                            <Border Background="{TemplateBinding SelectedBrush}"
                                     CornerRadius="6"/>
-                        </controls:Border>
+                        </Border>
 
-                        <controls:Popup x:Name="PART_Popup"
+                        <Popup x:Name="PART_Popup"
                                 Placement="Bottom" FlipToFit="True" VerticalOffset="4">
                             <!-- DataContext is set to the ColorPickerButton in code (Popup.Open propagates it to the child),
                                  so this plain {Binding} resolves to our SelectedColor two-way. -->
-                            <controls:ColorPicker SelectedColor="{Binding SelectedColor, Mode=TwoWay}"/>
-                        </controls:Popup>
-                    </controls:Grid>
+                            <ColorPicker SelectedColor="{Binding SelectedColor, Mode=TwoWay}"/>
+                        </Popup>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

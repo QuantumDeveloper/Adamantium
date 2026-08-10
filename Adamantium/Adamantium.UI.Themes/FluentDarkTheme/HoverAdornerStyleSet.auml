@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- Designer HOVER frame: a thin accent outline wrapping the element under the cursor. The adorner stage sizes it to
          the hovered element's bounds; restyle it here. -->
@@ -9,7 +8,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="HoverAdorner">
-                    <controls:Border BorderThickness="1.5" CornerRadius="2"
+                    <Border BorderThickness="1.5" CornerRadius="2"
                                      BorderBrush="{ThemeResource AccentFillColorDefault}"/>
                 </ControlTemplate>
             </Setter.Value>

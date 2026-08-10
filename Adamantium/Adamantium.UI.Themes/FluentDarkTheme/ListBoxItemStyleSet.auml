@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- ListBoxItem: ONE template; the rest/hover/pressed/selected brushes live as properties on the control and the
          triggers project them onto the chrome via {TemplateBinding}. Per the small-styles convention each concern is its
@@ -36,13 +35,13 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ListBoxItem">
-                    <controls:Border x:Name="ItemBorder"
+                    <Border x:Name="ItemBorder"
                             CornerRadius="{TemplateBinding CornerRadius}"
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             Padding="{TemplateBinding Padding}">
-                        <controls:ContentPresenter
+                        <ContentPresenter
                                 x:Name="PART_ContentPresenter"
                                 HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                 VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
@@ -50,7 +49,7 @@
                                 Content="{TemplateBinding Content}"
                                 ContentTemplate="{TemplateBinding ContentTemplate}"
                                 ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
-                    </controls:Border>
+                    </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

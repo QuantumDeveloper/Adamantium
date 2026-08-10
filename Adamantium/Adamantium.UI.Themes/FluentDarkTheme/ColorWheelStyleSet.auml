@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- ColorWheel: a hue wheel (conic full spectrum) under a radial white->transparent overlay (saturation), a black
          value-dimming overlay whose opacity the control drives, and a dragged thumb. Angle = hue (0 at top, clockwise, to
@@ -10,13 +9,13 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ColorWheel">
-                    <controls:Border x:Name="PART_Wheel"
+                    <Border x:Name="PART_Wheel"
                                      Width="220"
                                      Height="220">
-                        <controls:Grid>
+                        <Grid>
                             <!-- Hue ring: a full-spectrum conic sweep, red at the top going clockwise. -->
-                            <controls:Ellipse>
-                                <controls:Ellipse.Fill>
+                            <Ellipse>
+                                <Ellipse.Fill>
                                     <ConicGradientBrush Center="0.5,0.5">
                                         <GradientStop Color="#FFFF0000" Offset="0"/>
                                         <GradientStop Color="#FFFFFF00" Offset="0.1667"/>
@@ -26,27 +25,27 @@
                                         <GradientStop Color="#FFFF00FF" Offset="0.8333"/>
                                         <GradientStop Color="#FFFF0000" Offset="1"/>
                                     </ConicGradientBrush>
-                                </controls:Ellipse.Fill>
-                            </controls:Ellipse>
+                                </Ellipse.Fill>
+                            </Ellipse>
 
                             <!-- Saturation: white at the centre fading to transparent at the rim. -->
-                            <controls:Ellipse>
-                                <controls:Ellipse.Fill>
+                            <Ellipse>
+                                <Ellipse.Fill>
                                     <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
                                         <GradientStop Color="#FFFFFFFF" Offset="0"/>
                                         <GradientStop Color="#00FFFFFF" Offset="1"/>
                                     </RadialGradientBrush>
-                                </controls:Ellipse.Fill>
-                            </controls:Ellipse>
+                                </Ellipse.Fill>
+                            </Ellipse>
 
                             <!-- Value dimming: a black circle whose Opacity the control sets to (1 - Value). -->
-                            <controls:Border x:Name="PART_ValueOverlay"
+                            <Border x:Name="PART_ValueOverlay"
                                              Background="Black"
                                              CornerRadius="110"
                                              Opacity="0"/>
 
                             <!-- Selector thumb, positioned by the control via Margin. -->
-                            <controls:Border x:Name="PART_Thumb"
+                            <Border x:Name="PART_Thumb"
                                              Width="16"
                                              Height="16"
                                              CornerRadius="8"
@@ -54,8 +53,8 @@
                                              BorderBrush="White"
                                              HorizontalAlignment="Left"
                                              VerticalAlignment="Top"/>
-                        </controls:Grid>
-                    </controls:Border>
+                        </Grid>
+                    </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

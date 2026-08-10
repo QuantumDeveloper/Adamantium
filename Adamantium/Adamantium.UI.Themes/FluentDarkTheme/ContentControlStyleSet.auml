@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
     <Style Selector="ContentControl">
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ContentControl">
-                    <controls:Border Background="{TemplateBinding Background}">
-                        <controls:ContentPresenter
+                    <Border Background="{TemplateBinding Background}">
+                        <ContentPresenter
                             x:Name="PART_ContentPresenter"
                             HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                             VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
@@ -16,7 +15,7 @@
                             ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"
                             ContentTransition="{TemplateBinding ContentTransition}"
                             TransitionDuration="{TemplateBinding TransitionDuration}"/>
-                    </controls:Border>
+                    </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

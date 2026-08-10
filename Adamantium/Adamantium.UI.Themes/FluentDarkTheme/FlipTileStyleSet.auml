@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- FlipTile: custom-rendered (draws its front/back in OnRender, no ControlTemplate), so the theme can only seed
          its properties. FrontBrush is the tile face shown until it flips - a subtle veil over the board's card

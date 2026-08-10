@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- ItemsControl: a Border around a ScrollViewer that hosts the items. CanContentScroll=true so the ScrollViewer
          delegates scrolling to the virtualizing items panel (item scrolling, not pixel translation). PART_ItemsPresenter
@@ -11,13 +10,13 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ItemsControl">
-                    <controls:Border Background="{TemplateBinding Background}">
-                        <controls:ScrollViewer CanContentScroll="True"
+                    <Border Background="{TemplateBinding Background}">
+                        <ScrollViewer CanContentScroll="True"
                                                HorizontalScrollBarVisibility="Disabled"
                                                VerticalScrollBarVisibility="Auto">
-                            <controls:ItemsPresenter x:Name="PART_ItemsPresenter"/>
-                        </controls:ScrollViewer>
-                    </controls:Border>
+                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </ScrollViewer>
+                    </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -41,7 +40,7 @@
             <Setter.Value>
                 <DataTemplate>
                     <!-- A Shape, not a Border: the dashes live on Shape.StrokeDashArray. -->
-                    <controls:Rectangle IsHitTestVisible="False" Fill="Transparent" StrokeThickness="2"
+                    <Rectangle IsHitTestVisible="False" Fill="Transparent" StrokeThickness="2"
                                         StrokeDashArray="4,3"
                                         Stroke="{ThemeResource AccentFillColorDefault}"/>
                 </DataTemplate>
@@ -56,12 +55,12 @@
                     <!-- No margin here: the PANEL insets the card by the REAL item's margin (read from a realized tile) so
                          cards line up exactly with the real tiles and keep the same inter-tile gaps for any list. A faint
                          static border outlines the card even at the pulse's low point. -->
-                    <controls:Border CornerRadius="4" BorderThickness="1" IsHitTestVisible="False"
+                    <Border CornerRadius="4" BorderThickness="1" IsHitTestVisible="False"
                                      Background="{ObservableResource SkeletonPulseFill}">
-                        <controls:Border.BorderBrush>
+                        <Border.BorderBrush>
                             <SolidColorBrush Color="#FFFFFFFF" Opacity="0.10"/>
-                        </controls:Border.BorderBrush>
-                    </controls:Border>
+                        </Border.BorderBrush>
+                    </Border>
                 </DataTemplate>
             </Setter.Value>
         </Setter>
