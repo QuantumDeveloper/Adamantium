@@ -34,6 +34,9 @@ public class RibbonDropDownButton : RibbonToggleButton
         if (e.NewValue is ContextMenu menu)
         {
             button.AddLogicalChild(menu);
+            // The BUTTON owns the close (IsChecked drives the flyout), so its own press must not light-dismiss first -
+            // the dismiss would close, the click would re-open, and the second press would look like it did nothing.
+            menu.IgnoreTargetPress = true;
             menu.PropertyChanged += button.OnMenuPropertyChanged;
         }
     }

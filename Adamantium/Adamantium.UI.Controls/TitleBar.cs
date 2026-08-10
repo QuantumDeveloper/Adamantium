@@ -173,6 +173,9 @@ public class TitleBar : Control
         _closeButton = GetTemplateChild("PART_CloseButton") as ButtonBase;
         _rightOverflowButton = GetTemplateChild("PART_RightOverflowButton") as ButtonBase;
         _rightOverflowMenu = GetTemplateChild("PART_RightOverflowMenu") as ContextMenu;
+        // Same as the ribbon's chevron: the button owns the close, so its own press must not light-dismiss first.
+        if (_rightOverflowMenu != null) 
+            _rightOverflowMenu.IgnoreTargetPress = true;
         _dragArea = GetTemplateChild("PART_DragArea") as IUIComponent;
 
         // Caption drag is MANAGED (not a geometric HTCAPTION), so it respects z-order: the drag only starts when the
