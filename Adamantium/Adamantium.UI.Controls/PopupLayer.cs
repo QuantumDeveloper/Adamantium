@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using Adamantium.Mathematics;
@@ -63,6 +63,12 @@ public class PopupLayer
         // fill + border vanish, only re-dirtied text rebuilds). Mark the whole subtree dirty so the next layout re-measures
         // it and the render cache re-records its units.
         if (popup.ChildValue is { } child) InvalidateSubtree(child);
+        // ...and the same reason the registration lives here: the content JOINS the window's visual root here, which is
+        // what gives it the lifecycle every other element gets - a control inside a popup finally hears OnAttached, and
+        // its suspended triggers start again. The LAYOUT of this subtree stays this layer's job (see RemeasureIfDirty):
+        // the manager drains only what registered with it, and an item generated before the popup went on the layer
+        // registered against a root that was not yet this one.
+        AttachToOwner(popup.ChildValue as UIComponent);
     }
 
     public void Remove(Popup popup)
@@ -76,6 +82,18 @@ public class PopupLayer
         // Take the ring down BEFORE the way back out is forgotten - after that nothing inside can reach the layer.
         (Owner as Adorners.IAdornerHost)?.AdornerLayer.ClearFocusWithin(overlayRoot);
         Popup.UnregisterOverlayRoot(overlayRoot);
+        (overlayRoot as UIComponent)?.DetachFromRoot();
+    }
+
+    // The root the content joins is the owning WINDOW's - the same one that already measures, arranges and draws it on
+    // this layer. Nothing becomes anyone's visual child: only the answer to "which root do I live in" changes, so a walk
+    // from the root still does not reach overlay content.
+    private void AttachToOwner(UIComponent content)
+    {
+        if (content == null) return;
+
+        var root = (Owner as IUIComponent)?.RootVisual ?? Owner as IRootVisualComponent;
+        content.AttachToRoot(root, ownsLayout: true);
     }
 
     /// <summary>

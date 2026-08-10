@@ -36,13 +36,12 @@ public class RibbonQuickAccessMenuItem : MenuItem
         Click += OnPicked;
     }
 
-    /// <summary>Asked here because a menu row never gets an ATTACH: it is drawn from its menu's popup, on a subtree that
-    /// is never attached to the window's visual tree at all. Being measured is what a row reliably gets on every opening,
-    /// and it is exactly the moment before it is shown - which is when what it says has to be true.</summary>
-    protected override Size MeasureOverride(Size availableSize)
+    /// <summary>The menu is built once and opened many times, so the row is asked again on every showing - which is what
+    /// an attach now is for popup content (see <see cref="PopupLayer"/>).</summary>
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
+        base.OnAttachedToVisualTree(e);
         Refresh();
-        return base.MeasureOverride(availableSize);
     }
 
     /// <summary>The menu is built once and opened many times, and what it should say depends on the command it was
