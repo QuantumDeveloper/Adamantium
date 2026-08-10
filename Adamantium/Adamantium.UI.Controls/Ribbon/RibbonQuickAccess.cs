@@ -119,6 +119,9 @@ public class RibbonQuickAccess : ItemsControl
         _overflowMenu = GetTemplateChild("PART_OverflowMenu") as ContextMenu;
         if (_overflowMenu != null)
         {
+            // The chevron closes what it opened: without this the press dismisses the list first and the click then
+            // re-opens it, so the second press looks like it does nothing.
+            _overflowMenu.IgnoreTargetPress = true;
             _overflowMenu.PropertyChanged += OnOverflowMenuChanged;
         }
     }

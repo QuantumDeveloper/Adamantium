@@ -55,6 +55,13 @@ public class ContextMenu : ItemsControl
     public double HorizontalOffset { get; set; }
     public double VerticalOffset { get; set; }
 
+    /// <summary>Whether a press on the PLACEMENT TARGET leaves the menu open. For a menu dropped by a BUTTON, yes: the
+    /// press that would dismiss it is the same one the button turns into "close", and without this the second press
+    /// looks like it does nothing (light dismiss closes, the click re-opens).
+    /// <para>Off by default, and it has to be: a right-click menu's target is whatever was clicked - often a whole panel
+    /// - and exempting its subtree means the menu never light-dismisses at all.</para></summary>
+    public bool IgnoreTargetPress { get; set; }
+
     // A flyout occupies NO space where it is authored - its rows live in the popup overlay. Measuring to zero is not
     // enough: a stretching slot arranges it to the whole cell anyway, and being last in z-order it then swallows every
     // press meant for what it sits over (the quick-access buttons went dead under their own overflow menu).
@@ -116,10 +123,7 @@ public class ContextMenu : ItemsControl
             _popup.VerticalOffset = VerticalOffset;
             _popup.FlipToFit = true;
             _popup.KeepOpen = false;                     // click-outside-to-close (submenu overlays included), owned by Popup
-            // ...but the TARGET is not "outside". Without this the press that opens the menu also dismisses it: the
-            // popup light-dismisses first, the button's click then re-opens it, and a toggle can never close what it
-            // opened - the second press looks like it does nothing.
-            _popup.IgnoreTargetPress = true;
+            _popup.IgnoreTargetPress = IgnoreTargetPress;
             _popup.Closed -= OnPopupClosed;
             _popup.Closed += OnPopupClosed;
             _popup.IsOpen = IsOpen;
@@ -166,6 +170,9 @@ public class ContextMenu : ItemsControl
             menu._popup.Placement = menu.Placement;
             menu._popup.HorizontalOffset = menu.HorizontalOffset;
             menu._popup.VerticalOffset = menu.VerticalOffset;
+            // Re-stated here as well: an owner that wires the menu (a drop-down button) sets this while the menu may not
+            // be templated yet, so the value read once in OnApplyTemplate would be the stale default.
+            menu._popup.IgnoreTargetPress = menu.IgnoreTargetPress;
             menu._popup.IsOpen = (bool)e.NewValue;
         }
         if ((bool)e.NewValue)
