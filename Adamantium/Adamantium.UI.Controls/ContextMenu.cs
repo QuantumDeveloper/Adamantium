@@ -55,6 +55,21 @@ public class ContextMenu : ItemsControl
     public double HorizontalOffset { get; set; }
     public double VerticalOffset { get; set; }
 
+    // A flyout occupies NO space where it is authored - its rows live in the popup overlay. Measuring to zero is not
+    // enough: a stretching slot arranges it to the whole cell anyway, and being last in z-order it then swallows every
+    // press meant for what it sits over (the quick-access buttons went dead under their own overflow menu).
+    protected override Size MeasureOverride(Size availableSize)
+    {
+        base.MeasureOverride(availableSize);
+        return Size.Zero;
+    }
+
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        base.ArrangeOverride(Size.Zero);
+        return Size.Zero;
+    }
+
     /// <summary>Opens the menu positioned against <paramref name="target"/>.</summary>
     public void Open(UIComponent target)
     {
@@ -101,6 +116,10 @@ public class ContextMenu : ItemsControl
             _popup.VerticalOffset = VerticalOffset;
             _popup.FlipToFit = true;
             _popup.KeepOpen = false;                     // click-outside-to-close (submenu overlays included), owned by Popup
+            // ...but the TARGET is not "outside". Without this the press that opens the menu also dismisses it: the
+            // popup light-dismisses first, the button's click then re-opens it, and a toggle can never close what it
+            // opened - the second press looks like it does nothing.
+            _popup.IgnoreTargetPress = true;
             _popup.Closed -= OnPopupClosed;
             _popup.Closed += OnPopupClosed;
             _popup.IsOpen = IsOpen;
