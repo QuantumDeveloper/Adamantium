@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- Caption/border colours: theme defaults the user can override on the window (accent when focused, neutral when not). -->
     <Style Selector="Window">
@@ -26,12 +25,12 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Window">
-                    <controls:Border x:Name="PART_WindowBorder" Background="{TemplateBinding Background}"
+                    <Border x:Name="PART_WindowBorder" Background="{TemplateBinding Background}"
                             BorderThickness="1" BorderBrush="{ResourceReference ControlStrokeColorDefault}">
-                        <controls:Grid RowDefinitions="Auto,*">
+                        <Grid RowDefinitions="Auto,*">
                             <!-- The caption's height comes from the WINDOW (Window.TitleBarHeight), so code that needs
                                  it reads one property instead of measuring a template part. -->
-                            <controls:TitleBar x:Name="PART_TitleBar" Grid.Row="0"
+                            <TitleBar x:Name="PART_TitleBar" Grid.Row="0"
                                     Height="{TemplateBinding TitleBarHeight}"
                                     Background="{TemplateBinding InactiveTitleBarBackground}"
                                     Foreground="{TemplateBinding InactiveTitleBarForeground}"
@@ -43,11 +42,11 @@
                             <!-- The SELECTOR travels too, not just the single template: a window given only a selector
                                  (one template per content type - the usual shape for a view-model host) had nothing to
                                  build with and fell back to showing Content.ToString(). -->
-                            <controls:ContentPresenter x:Name="PART_ContentPresenter" Grid.Row="1"
+                            <ContentPresenter x:Name="PART_ContentPresenter" Grid.Row="1"
                                     Content="{TemplateBinding Content}"
                                     ContentTemplate="{TemplateBinding ContentTemplate}"
                                     ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
-                            <controls:ResizeGripper x:Name="PART_ResizeGripper" Grid.Row="1"
+                            <ResizeGripper x:Name="PART_ResizeGripper" Grid.Row="1"
                                     HorizontalAlignment="Right" VerticalAlignment="Bottom"
                                     Width="26" Height="26" Visibility="Collapsed"/>
                             <!-- Theme-swap busy overlay. The ENGINE owns the state (Window.IsThemeChanging, mirrored from the
@@ -57,40 +56,40 @@
                                  not element Opacity, so it does not fade the child). On top (drawn last). The Ring spinner
                                  animates a RenderTransform, which the compositor plays on the RENDER thread - so it keeps
                                  turning even while the loop thread is in the cascade. Collapsed by default; the trigger raises it. -->
-                            <controls:Border x:Name="PART_ThemeOverlay" Grid.Row="1"
+                            <Border x:Name="PART_ThemeOverlay" Grid.Row="1"
                                     Background="{ResourceReference SmokeFillColorDefault}"
                                     Visibility="Collapsed">
-                                <controls:StackPanel Orientation="Vertical"
+                                <StackPanel Orientation="Vertical"
                                         HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <!-- Template set INLINE (Local), so the theme's BusyIndicator Template setter can't
                                          re-template it during the swap it covers. A re-templated spinner gets a brand-new
                                          RingSpin owner the busy loop can't re-record while the cascade runs, so the
                                          compositor has nothing to drive and it freezes. Fixed template = a stable, recorded
                                          owner the render thread keeps spinning; the ring color stays live via {ThemeResource}. -->
-                                    <controls:BusyIndicator x:Name="PART_ThemeSpinner" IsActive="False"
+                                    <BusyIndicator x:Name="PART_ThemeSpinner" IsActive="False"
                                             Width="48" Height="48" HorizontalAlignment="Center">
-                                        <controls:BusyIndicator.Template>
+                                        <BusyIndicator.Template>
                                             <ControlTemplate TargetType="BusyIndicator">
-                                                <controls:Grid>
-                                                    <controls:Ellipse Stroke="{ResourceReference ControlFillColorTertiary}"
+                                                <Grid>
+                                                    <Ellipse Stroke="{ResourceReference ControlFillColorTertiary}"
                                                                       StrokeThickness="4" Fill="Transparent" EllipseType="EdgeToEdge"/>
-                                                    <controls:Ellipse Stroke="{ThemeResource AccentFillColorDefault}"
+                                                    <Ellipse Stroke="{ThemeResource AccentFillColorDefault}"
                                                                       StrokeThickness="4" Fill="Transparent" EllipseType="EdgeToEdge"
                                                                       StartAngle="0" StopAngle="90" RenderTransformOrigin="0.5,0.5">
-                                                        <controls:Ellipse.RenderTransform>
+                                                        <Ellipse.RenderTransform>
                                                             <Transform x:Name="RingSpin"/>
-                                                        </controls:Ellipse.RenderTransform>
-                                                    </controls:Ellipse>
-                                                </controls:Grid>
+                                                        </Ellipse.RenderTransform>
+                                                    </Ellipse>
+                                                </Grid>
                                             </ControlTemplate>
-                                        </controls:BusyIndicator.Template>
-                                    </controls:BusyIndicator>
-                                    <controls:TextBlock Text="{TemplateBinding LoadingIndicatorText}" HorizontalAlignment="Center"
+                                        </BusyIndicator.Template>
+                                    </BusyIndicator>
+                                    <TextBlock Text="{TemplateBinding LoadingIndicatorText}" HorizontalAlignment="Center"
                                             Margin="0,18,0,0" Foreground="{ResourceReference TextFillColorSecondary}"/>
-                                </controls:StackPanel>
-                            </controls:Border>
-                        </controls:Grid>
-                    </controls:Border>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

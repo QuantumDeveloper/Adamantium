@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- A ring with a centre dot, then the content label. The ring fills with the accent + the dot fades in when
          checked. Per the small-styles convention each concern is its own <Style Selector="RadioButton">. -->
@@ -20,30 +19,30 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <controls:StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <controls:Grid Width="20" 
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Grid Width="20" 
                                        Height="20" 
                                        VerticalAlignment="Center">
-                            <controls:Ellipse x:Name="OuterRing"
+                            <Ellipse x:Name="OuterRing"
                                               Fill="{TemplateBinding Background}"
                                               Stroke="{TemplateBinding BorderBrush}"
                                               StrokeThickness="1"/>
-                            <controls:Ellipse x:Name="Dot"
+                            <Ellipse x:Name="Dot"
                                               Width="10"
                                               Height="10"
                                               Fill="{ThemeResource AccentForegroundColor}"
                                               Opacity="0"
                                               HorizontalAlignment="Center"
                                               VerticalAlignment="Center"/>
-                        </controls:Grid>
-                        <controls:ContentPresenter x:Name="PART_ContentPresenter"
+                        </Grid>
+                        <ContentPresenter x:Name="PART_ContentPresenter"
                                                    Content="{TemplateBinding Content}"
                                                    ContentTemplate="{TemplateBinding ContentTemplate}"
                                                    Foreground="{TemplateBinding Foreground}"
                                                    FontSize="{TemplateBinding FontSize}"
                                                    VerticalAlignment="Center"
                                                    Margin="8 0 0 0"/>
-                    </controls:StackPanel>
+                    </StackPanel>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

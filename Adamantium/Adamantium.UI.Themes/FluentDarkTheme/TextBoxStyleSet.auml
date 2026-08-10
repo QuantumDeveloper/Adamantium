@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- TextBox: a templated single-line editor. The template is a themed Border (chrome) wrapping PART_TextPresenter -
          the surface that renders text/caret/selection and hosts the caret-following horizontal scroll (the Border clips,
@@ -28,21 +27,21 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TextBox">
-                    <controls:Border x:Name="PART_Border"
+                    <Border x:Name="PART_Border"
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="{TemplateBinding CornerRadius}"
                             Padding="{TemplateBinding Padding}"
                             ClipToBounds="True">
-                        <controls:ScrollViewer x:Name="PART_ContentHost"
+                        <ScrollViewer x:Name="PART_ContentHost"
                                 HorizontalScrollBarVisibility="{TemplateBinding HorizontalScrollBarVisibility}"
                                 VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}">
-                            <controls:TextPresenter x:Name="PART_TextPresenter"
+                            <TextPresenter x:Name="PART_TextPresenter"
                                     HorizontalAlignment="Stretch"
                                     VerticalAlignment="Stretch"/>
-                        </controls:ScrollViewer>
-                    </controls:Border>
+                        </ScrollViewer>
+                    </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

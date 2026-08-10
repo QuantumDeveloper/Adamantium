@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- TilesHost: a 3D flip-tile board. As an ItemsControl subclass it needs its OWN template (selectors match the
          exact type, not the base), so it gets the same Border>ScrollViewer>ItemsPresenter host as ItemsControl -
@@ -15,13 +14,13 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TilesHost">
-                    <controls:Border Background="{TemplateBinding Background}">
-                        <controls:ScrollViewer CanContentScroll="True"
+                    <Border Background="{TemplateBinding Background}">
+                        <ScrollViewer CanContentScroll="True"
                                                HorizontalScrollBarVisibility="Auto"
                                                VerticalScrollBarVisibility="Auto">
-                            <controls:ItemsPresenter x:Name="PART_ItemsPresenter"/>
-                        </controls:ScrollViewer>
-                    </controls:Border>
+                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </ScrollViewer>
+                    </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

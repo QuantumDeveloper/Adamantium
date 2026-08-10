@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- DropDown: a header (PART_Header, shows DisplayContent = selected item or placeholder, plus a chevron) over a
          Popup list (PART_Popup -> Border -> ScrollViewer -> PART_ItemsPresenter). The control opens/closes and positions
@@ -22,7 +21,7 @@
         <Setter Property="ItemsPanel">
             <Setter.Value>
                 <ItemsPanelTemplate>
-                    <controls:StackPanel Orientation="Vertical"/>
+                    <StackPanel Orientation="Vertical"/>
                 </ItemsPanelTemplate>
             </Setter.Value>
         </Setter>
@@ -32,15 +31,15 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="DropDown">
-                    <controls:Grid>
-                        <controls:Border x:Name="PART_Header"
+                    <Grid>
+                        <Border x:Name="PART_Header"
                                 CornerRadius="{TemplateBinding CornerRadius}"
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 Padding="{TemplateBinding Padding}">
-                            <controls:Grid ColumnDefinitions="*,Auto">
-                                <controls:ContentPresenter
+                            <Grid ColumnDefinitions="*,Auto">
+                                <ContentPresenter
                                         x:Name="PART_ContentPresenter"
                                         HorizontalAlignment="Left"
                                         VerticalAlignment="Center"
@@ -49,31 +48,31 @@
                                         Content="{TemplateBinding DisplayContent}"
                                         ContentTemplate="{TemplateBinding ItemTemplate}"
                                         ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"/>
-                                <controls:Path x:Name="Chevron" Grid.Column="1"
+                                <Path x:Name="Chevron" Grid.Column="1"
                                         Data="M0,0 L8,0 L4,5 Z"
                                         Fill="{ResourceReference TextFillColorSecondary}"
                                         Width="8" Height="5"
                                         Margin="8 0 0 0"
                                         VerticalAlignment="Center"/>
-                            </controls:Grid>
-                        </controls:Border>
+                            </Grid>
+                        </Border>
 
-                        <controls:Popup x:Name="PART_Popup"
+                        <Popup x:Name="PART_Popup"
                                 Placement="Bottom" FlipToFit="True" VerticalOffset="2">
-                            <controls:Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                            <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
                                     BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                                     BorderThickness="1"
                                     CornerRadius="4"
                                     Padding="2"
                                     MinWidth="{TemplateBinding ActualWidth}">
-                                <controls:ScrollViewer MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                                <ScrollViewer MaxHeight="{TemplateBinding MaxDropDownHeight}"
                                         HorizontalScrollBarVisibility="Disabled"
                                         VerticalScrollBarVisibility="Auto">
-                                    <controls:ItemsPresenter x:Name="PART_ItemsPresenter"/>
-                                </controls:ScrollViewer>
-                            </controls:Border>
-                        </controls:Popup>
-                    </controls:Grid>
+                                    <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

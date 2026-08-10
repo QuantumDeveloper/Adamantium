@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- GridSplitter: a draggable divider that resizes the Grid rows/columns on either side of it. A Thumb subtype - the
          drag mechanics come from Thumb (in code), so this style is just the LOOK: a thin subtle bar that lights up accent
@@ -12,7 +11,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="GridSplitter">
-                    <controls:Border Background="{TemplateBinding Background}"/>
+                    <Border Background="{TemplateBinding Background}"/>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

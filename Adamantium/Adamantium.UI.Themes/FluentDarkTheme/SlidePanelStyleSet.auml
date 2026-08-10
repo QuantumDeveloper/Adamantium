@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- SlidePanel: a panel that slides in from a window edge and overlays everything (hosted in the popup/overlay layer
          via an edge-docked Popup). The template = Popup(PART_Popup) > Border(PART_Drawer) chrome > header row (title +
@@ -20,10 +19,10 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="SlidePanel">
-                    <controls:Popup x:Name="PART_Popup"
+                    <Popup x:Name="PART_Popup"
                                     DockEdge="{TemplateBinding Placement}"
                                     DockFill="{TemplateBinding FullWindow}">
-                        <controls:Border x:Name="PART_Drawer"
+                        <Border x:Name="PART_Drawer"
                                 Width="{TemplateBinding Width}"
                                 Height="{TemplateBinding Height}"
                                 Background="{TemplateBinding Background}"
@@ -34,7 +33,7 @@
                                 ClipToBounds="True">
                             <Grid RowDefinitions="Auto,*">
                                 <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
-                                    <controls:ContentPresenter Grid.Column="0"
+                                    <ContentPresenter Grid.Column="0"
                                             Content="{TemplateBinding Header}"
                                             Foreground="{TemplateBinding Foreground}"
                                             FontSize="18"
@@ -48,13 +47,13 @@
                                                    Foreground="{ResourceReference TextFillColorSecondary}"/>
                                     </Button>
                                 </Grid>
-                                <controls:ContentPresenter Grid.Row="1"
+                                <ContentPresenter Grid.Row="1"
                                         Content="{TemplateBinding Content}"
                                         ContentTemplate="{TemplateBinding ContentTemplate}"
                                         ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
                             </Grid>
-                        </controls:Border>
-                    </controls:Popup>
+                        </Border>
+                    </Popup>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

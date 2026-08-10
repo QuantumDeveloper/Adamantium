@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- A clean thumb+trough scrollbar (no arrow buttons), one template for BOTH orientations: the Track flips via its
          Orientation, and it creates the thumb + the two (invisible, hit-testable) page repeat-buttons itself. Per the
@@ -21,27 +20,27 @@
                          corner triangle (outside the arc) transparent, so bright content shows through there as a stray
                          "dead pixel". Square fills its box -> no corner show-through. The thumb (inside, over the trough)
                          stays rounded. -->
-                    <controls:Border Background="{TemplateBinding Background}"
+                    <Border Background="{TemplateBinding Background}"
                                      CornerRadius="0">
                         <!-- The Track is pure layout now; the template supplies its parts (a grey thumb + two invisible,
                              hit-testable page areas). -->
-                        <controls:Track x:Name="PART_Track"
+                        <Track x:Name="PART_Track"
                                 Orientation="{TemplateBinding Orientation}"
                                 Minimum="{TemplateBinding Minimum}"
                                 Maximum="{TemplateBinding Maximum}"
                                 Value="{TemplateBinding Value}"
                                 ViewportSize="{TemplateBinding ViewportSize}">
-                            <controls:Track.DecreaseRepeatButton>
-                                <controls:ScrollBarPageButton Focusable="false"/>
-                            </controls:Track.DecreaseRepeatButton>
-                            <controls:Track.Thumb>
-                                <controls:Thumb/>
-                            </controls:Track.Thumb>
-                            <controls:Track.IncreaseRepeatButton>
-                                <controls:ScrollBarPageButton Focusable="false"/>
-                            </controls:Track.IncreaseRepeatButton>
-                        </controls:Track>
-                    </controls:Border>
+                            <Track.DecreaseRepeatButton>
+                                <ScrollBarPageButton Focusable="false"/>
+                            </Track.DecreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb/>
+                            </Track.Thumb>
+                            <Track.IncreaseRepeatButton>
+                                <ScrollBarPageButton Focusable="false"/>
+                            </Track.IncreaseRepeatButton>
+                        </Track>
+                    </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

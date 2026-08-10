@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- The loading-indicator pack. The BusyIndicator control has NO look of its own - only IsActive - so every indicator
          here is purely a theme template, selected by class (<BusyIndicator Classes="Dots"/>), the same way ProgressBar.Ring
@@ -21,27 +20,27 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="BusyIndicator">
-                    <controls:Grid>
+                    <Grid>
                         <!-- The dim full ring the arc travels over. -->
-                        <controls:Ellipse Stroke="{ResourceReference ControlFillColorTertiary}"
+                        <Ellipse Stroke="{ResourceReference ControlFillColorTertiary}"
                                           StrokeThickness="4"
                                           Fill="Transparent"
                                           EllipseType="EdgeToEdge"/>
                         <!-- The accent arc; it is the ARC that spins. RenderTransformOrigin is a FRACTION of the element's
                              own size, so the arc turns about its centre at ANY size the control is given - an absolute
                              pixel centre would be correct only at the one size this template happened to be written for. -->
-                        <controls:Ellipse Stroke="{ThemeResource AccentFillColorDefault}"
+                        <Ellipse Stroke="{ThemeResource AccentFillColorDefault}"
                                           StrokeThickness="4"
                                           Fill="Transparent"
                                           EllipseType="EdgeToEdge"
                                           StartAngle="0"
                                           StopAngle="90"
                                           RenderTransformOrigin="0.5,0.5">
-                            <controls:Ellipse.RenderTransform>
+                            <Ellipse.RenderTransform>
                                 <Transform x:Name="RingSpin"/>
-                            </controls:Ellipse.RenderTransform>
-                        </controls:Ellipse>
-                    </controls:Grid>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -70,32 +69,32 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="BusyIndicator">
-                    <controls:StackPanel Orientation="Horizontal">
-                        <controls:Ellipse Width="10" Height="10" Margin="3,0"
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="10" Height="10" Margin="3,0"
                                           Fill="{ThemeResource AccentFillColorDefault}"
                                           EllipseType="EdgeToEdge"
                                           RenderTransformOrigin="0.5,0.5">
-                            <controls:Ellipse.RenderTransform>
+                            <Ellipse.RenderTransform>
                                 <Transform x:Name="Dot1"/>
-                            </controls:Ellipse.RenderTransform>
-                        </controls:Ellipse>
-                        <controls:Ellipse Width="10" Height="10" Margin="3,0"
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                        <Ellipse Width="10" Height="10" Margin="3,0"
                                           Fill="{ThemeResource AccentFillColorDefault}"
                                           EllipseType="EdgeToEdge"
                                           RenderTransformOrigin="0.5,0.5">
-                            <controls:Ellipse.RenderTransform>
+                            <Ellipse.RenderTransform>
                                 <Transform x:Name="Dot2"/>
-                            </controls:Ellipse.RenderTransform>
-                        </controls:Ellipse>
-                        <controls:Ellipse Width="10" Height="10" Margin="3,0"
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                        <Ellipse Width="10" Height="10" Margin="3,0"
                                           Fill="{ThemeResource AccentFillColorDefault}"
                                           EllipseType="EdgeToEdge"
                                           RenderTransformOrigin="0.5,0.5">
-                            <controls:Ellipse.RenderTransform>
+                            <Ellipse.RenderTransform>
                                 <Transform x:Name="Dot3"/>
-                            </controls:Ellipse.RenderTransform>
-                        </controls:Ellipse>
-                    </controls:StackPanel>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                    </StackPanel>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -143,18 +142,18 @@
                 <ControlTemplate TargetType="BusyIndicator">
                     <!-- ClipToBounds is what makes it a SWEEP and not a stripe wandering across the page: the pill runs
                          from off the left edge to off the right one and the track hides it outside itself. -->
-                    <controls:Border Background="{ResourceReference ControlFillColorTertiary}"
+                    <Border Background="{ResourceReference ControlFillColorTertiary}"
                                      CornerRadius="2"
                                      ClipToBounds="True">
-                        <controls:Border x:Name="BarPill"
+                        <Border x:Name="BarPill"
                                          Width="56" Height="4" CornerRadius="2"
                                          HorizontalAlignment="Left"
                                          Background="{ThemeResource AccentFillColorDefault}">
-                            <controls:Border.RenderTransform>
+                            <Border.RenderTransform>
                                 <Transform x:Name="BarSlide" TranslateX="-56"/>
-                            </controls:Border.RenderTransform>
-                        </controls:Border>
-                    </controls:Border>
+                            </Border.RenderTransform>
+                        </Border>
+                    </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -183,28 +182,28 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="BusyIndicator">
-                    <controls:Grid>
-                        <controls:Ellipse x:Name="Ripple1"
+                    <Grid>
+                        <Ellipse x:Name="Ripple1"
                                           Stroke="{ThemeResource AccentFillColorDefault}"
                                           StrokeThickness="3"
                                           Fill="Transparent"
                                           EllipseType="EdgeToEdge"
                                           RenderTransformOrigin="0.5,0.5">
-                            <controls:Ellipse.RenderTransform>
+                            <Ellipse.RenderTransform>
                                 <Transform x:Name="RippleScale1" ScaleX="0.2" ScaleY="0.2"/>
-                            </controls:Ellipse.RenderTransform>
-                        </controls:Ellipse>
-                        <controls:Ellipse x:Name="Ripple2"
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                        <Ellipse x:Name="Ripple2"
                                           Stroke="{ThemeResource AccentFillColorDefault}"
                                           StrokeThickness="3"
                                           Fill="Transparent"
                                           EllipseType="EdgeToEdge"
                                           RenderTransformOrigin="0.5,0.5">
-                            <controls:Ellipse.RenderTransform>
+                            <Ellipse.RenderTransform>
                                 <Transform x:Name="RippleScale2" ScaleX="0.2" ScaleY="0.2"/>
-                            </controls:Ellipse.RenderTransform>
-                        </controls:Ellipse>
-                    </controls:Grid>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -256,7 +255,7 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="BusyIndicator">
-                    <controls:Ellipse x:Name="ArcStroke"
+                    <Ellipse x:Name="ArcStroke"
                                       Stroke="{ThemeResource AccentFillColorDefault}"
                                       StrokeThickness="4"
                                       StartLineCap="ConvexRound"
@@ -266,10 +265,10 @@
                                       StrokeTrimStart="0"
                                       StrokeTrimEnd="0.1"
                                       RenderTransformOrigin="0.5,0.5">
-                        <controls:Ellipse.RenderTransform>
+                        <Ellipse.RenderTransform>
                             <Transform x:Name="ArcSpin"/>
-                        </controls:Ellipse.RenderTransform>
-                    </controls:Ellipse>
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -319,7 +318,7 @@
                          The numbers are in pixels (the array is not scaled by thickness): a dash must be longer than the
                          stroke is thick or it reads as a dot, and a ROUND dash cap adds half the thickness at each end,
                          fattening the dash and eating the gap. Flat caps, dash a little shorter than the gap. -->
-                    <controls:Rectangle x:Name="AntsRing"
+                    <Rectangle x:Name="AntsRing"
                                         CornerRadius="2"
                                         Stroke="{ThemeResource AccentFillColorDefault}"
                                         StrokeThickness="3"
@@ -368,15 +367,15 @@
                          cannot come back. See docs/TECH_DEBT.md for the clip gap itself, which is still open.
                          The colours are themed resources (a white glare on dark, a dark sweep on light); a gradient STOP
                          takes a resource reference just like an element property. -->
-                    <controls:Rectangle CornerRadius="6" Stroke="Transparent">
-                        <controls:Rectangle.Fill>
+                    <Rectangle CornerRadius="6" Stroke="Transparent">
+                        <Rectangle.Fill>
                             <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
                                 <GradientStop x:Name="ShimmerLead" Color="{ResourceReference ShimmerTrackColor}" Offset="0"/>
                                 <GradientStop x:Name="ShimmerPeak" Color="{ResourceReference ShimmerPeakColor}" Offset="0.15"/>
                                 <GradientStop x:Name="ShimmerTrail" Color="{ResourceReference ShimmerTrackColor}" Offset="0.3"/>
                             </LinearGradientBrush>
-                        </controls:Rectangle.Fill>
-                    </controls:Rectangle>
+                        </Rectangle.Fill>
+                    </Rectangle>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -423,32 +422,32 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="BusyIndicator">
-                    <controls:StackPanel Orientation="Horizontal">
+                    <StackPanel Orientation="Horizontal">
                         <!-- Perspective is what makes this a FLIP and not a horizontal squash: without the depth
                              foreshortening a Y-rotation is just a width scale. Origin at the centre so each card turns
                              about its own middle. -->
-                        <controls:Border Width="18" Height="26" Margin="4,0" CornerRadius="3"
+                        <Border Width="18" Height="26" Margin="4,0" CornerRadius="3"
                                          Background="{ThemeResource AccentFillColorDefault}"
                                          RenderTransformOrigin="0.5,0.5">
-                            <controls:Border.RenderTransform>
+                            <Border.RenderTransform>
                                 <Transform x:Name="Flip1" Perspective="240"/>
-                            </controls:Border.RenderTransform>
-                        </controls:Border>
-                        <controls:Border Width="18" Height="26" Margin="4,0" CornerRadius="3"
+                            </Border.RenderTransform>
+                        </Border>
+                        <Border Width="18" Height="26" Margin="4,0" CornerRadius="3"
                                          Background="{ThemeResource AccentFillColorDefault}"
                                          RenderTransformOrigin="0.5,0.5">
-                            <controls:Border.RenderTransform>
+                            <Border.RenderTransform>
                                 <Transform x:Name="Flip2" Perspective="240"/>
-                            </controls:Border.RenderTransform>
-                        </controls:Border>
-                        <controls:Border Width="18" Height="26" Margin="4,0" CornerRadius="3"
+                            </Border.RenderTransform>
+                        </Border>
+                        <Border Width="18" Height="26" Margin="4,0" CornerRadius="3"
                                          Background="{ThemeResource AccentFillColorDefault}"
                                          RenderTransformOrigin="0.5,0.5">
-                            <controls:Border.RenderTransform>
+                            <Border.RenderTransform>
                                 <Transform x:Name="Flip3" Perspective="240"/>
-                            </controls:Border.RenderTransform>
-                        </controls:Border>
-                    </controls:StackPanel>
+                            </Border.RenderTransform>
+                        </Border>
+                    </StackPanel>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -493,33 +492,33 @@
                 <ControlTemplate TargetType="BusyIndicator">
                     <!-- Origin at the BOTTOM centre (0.5,1): a bar must grow UPWARD out of the floor, not out of its own
                          middle - with a centred origin it would stretch both ways and the row would have no baseline. -->
-                    <controls:StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
-                        <controls:Border Width="5" Height="28" Margin="2,0" CornerRadius="2"
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
+                        <Border Width="5" Height="28" Margin="2,0" CornerRadius="2"
                                          Background="{ThemeResource AccentFillColorDefault}"
                                          RenderTransformOrigin="0.5,1">
-                            <controls:Border.RenderTransform><Transform x:Name="Eq1" ScaleY="0.3"/></controls:Border.RenderTransform>
-                        </controls:Border>
-                        <controls:Border Width="5" Height="28" Margin="2,0" CornerRadius="2"
+                            <Border.RenderTransform><Transform x:Name="Eq1" ScaleY="0.3"/></Border.RenderTransform>
+                        </Border>
+                        <Border Width="5" Height="28" Margin="2,0" CornerRadius="2"
                                          Background="{ThemeResource AccentFillColorDefault}"
                                          RenderTransformOrigin="0.5,1">
-                            <controls:Border.RenderTransform><Transform x:Name="Eq2" ScaleY="0.3"/></controls:Border.RenderTransform>
-                        </controls:Border>
-                        <controls:Border Width="5" Height="28" Margin="2,0" CornerRadius="2"
+                            <Border.RenderTransform><Transform x:Name="Eq2" ScaleY="0.3"/></Border.RenderTransform>
+                        </Border>
+                        <Border Width="5" Height="28" Margin="2,0" CornerRadius="2"
                                          Background="{ThemeResource AccentFillColorDefault}"
                                          RenderTransformOrigin="0.5,1">
-                            <controls:Border.RenderTransform><Transform x:Name="Eq3" ScaleY="0.3"/></controls:Border.RenderTransform>
-                        </controls:Border>
-                        <controls:Border Width="5" Height="28" Margin="2,0" CornerRadius="2"
+                            <Border.RenderTransform><Transform x:Name="Eq3" ScaleY="0.3"/></Border.RenderTransform>
+                        </Border>
+                        <Border Width="5" Height="28" Margin="2,0" CornerRadius="2"
                                          Background="{ThemeResource AccentFillColorDefault}"
                                          RenderTransformOrigin="0.5,1">
-                            <controls:Border.RenderTransform><Transform x:Name="Eq4" ScaleY="0.3"/></controls:Border.RenderTransform>
-                        </controls:Border>
-                        <controls:Border Width="5" Height="28" Margin="2,0" CornerRadius="2"
+                            <Border.RenderTransform><Transform x:Name="Eq4" ScaleY="0.3"/></Border.RenderTransform>
+                        </Border>
+                        <Border Width="5" Height="28" Margin="2,0" CornerRadius="2"
                                          Background="{ThemeResource AccentFillColorDefault}"
                                          RenderTransformOrigin="0.5,1">
-                            <controls:Border.RenderTransform><Transform x:Name="Eq5" ScaleY="0.3"/></controls:Border.RenderTransform>
-                        </controls:Border>
-                    </controls:StackPanel>
+                            <Border.RenderTransform><Transform x:Name="Eq5" ScaleY="0.3"/></Border.RenderTransform>
+                        </Border>
+                    </StackPanel>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
@@ -578,26 +577,26 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="BusyIndicator">
-                    <controls:Grid>
-                        <controls:Ellipse x:Name="BeatHalo"
+                    <Grid>
+                        <Ellipse x:Name="BeatHalo"
                                           Fill="{ThemeResource AccentFillColorDefault}"
                                           Opacity="0.25"
                                           EllipseType="EdgeToEdge"
                                           RenderTransformOrigin="0.5,0.5">
-                            <controls:Ellipse.RenderTransform>
+                            <Ellipse.RenderTransform>
                                 <Transform x:Name="BeatHaloScale" ScaleX="0.6" ScaleY="0.6"/>
-                            </controls:Ellipse.RenderTransform>
-                        </controls:Ellipse>
-                        <controls:Ellipse Width="20" Height="20"
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                        <Ellipse Width="20" Height="20"
                                           Fill="{ThemeResource AccentFillColorDefault}"
                                           EllipseType="EdgeToEdge"
                                           HorizontalAlignment="Center" VerticalAlignment="Center"
                                           RenderTransformOrigin="0.5,0.5">
-                            <controls:Ellipse.RenderTransform>
+                            <Ellipse.RenderTransform>
                                 <Transform x:Name="BeatCore"/>
-                            </controls:Ellipse.RenderTransform>
-                        </controls:Ellipse>
-                    </controls:Grid>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

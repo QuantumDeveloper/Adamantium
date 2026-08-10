@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- ListBox: a themed Border around a ScrollViewer hosting the items. CanContentScroll=true so the ScrollViewer
          delegates to the virtualizing items panel (item scrolling). PART_ItemsPresenter is the items host; its panel
@@ -16,16 +15,16 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="ListBox">
-                    <controls:Border Background="{TemplateBinding Background}"
+                    <Border Background="{TemplateBinding Background}"
                                      BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                                      BorderThickness="1"
                                      CornerRadius="4">
-                        <controls:ScrollViewer CanContentScroll="True"
+                        <ScrollViewer CanContentScroll="True"
                                                HorizontalScrollBarVisibility="{TemplateBinding HorizontalScrollBarVisibility}"
                                                VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}">
-                            <controls:ItemsPresenter x:Name="PART_ItemsPresenter"/>
-                        </controls:ScrollViewer>
-                    </controls:Border>
+                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </ScrollViewer>
+                    </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

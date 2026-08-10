@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- OverlayWindow: a draggable in-window "child window" (analog of MahApps SimpleChildWindow). The template is the chrome
          card - Border(PART_Window) > accent title bar (PART_TitleThumb is a transparent Grid over the icon+title that starts
@@ -28,50 +27,50 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="OverlayWindow">
-                    <controls:Border x:Name="PART_Window"
+                    <Border x:Name="PART_Window"
                             MinWidth="300"
                             Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="{TemplateBinding CornerRadius}"
                             ClipToBounds="True">
-                        <controls:Grid RowDefinitions="Auto,*">
+                        <Grid RowDefinitions="Auto,*">
 
                             <!-- Title bar: PART_TitleThumb (transparent, hit-testable) drags the whole strip; pin + close sit
                                  in their own columns so they stay clickable. -->
-                            <controls:Grid x:Name="PART_TitleBar" Grid.Row="0" ColumnDefinitions="*,Auto,Auto"
+                            <Grid x:Name="PART_TitleBar" Grid.Row="0" ColumnDefinitions="*,Auto,Auto"
                                     Background="{TemplateBinding TitleBarBackground}" Height="40">
-                                <controls:Grid x:Name="PART_TitleThumb" Grid.Column="0" Background="Transparent">
-                                    <controls:StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
-                                        <controls:ContentPresenter x:Name="PART_Icon" Content="{TemplateBinding Icon}"
+                                <Grid x:Name="PART_TitleThumb" Grid.Column="0" Background="Transparent">
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
+                                        <ContentPresenter x:Name="PART_Icon" Content="{TemplateBinding Icon}"
                                                 Foreground="{TemplateBinding TitleForeground}"
                                                 VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                        <controls:ContentPresenter x:Name="PART_Title" Content="{TemplateBinding Title}"
+                                        <ContentPresenter x:Name="PART_Title" Content="{TemplateBinding Title}"
                                                 Foreground="{TemplateBinding TitleForeground}" FontSize="15"
                                                 VerticalAlignment="Center"/>
-                                    </controls:StackPanel>
-                                </controls:Grid>
+                                    </StackPanel>
+                                </Grid>
 
-                                <controls:Button x:Name="PART_PinButton" Grid.Column="1" Visibility="Collapsed"
+                                <Button x:Name="PART_PinButton" Grid.Column="1" Visibility="Collapsed"
                                         Classes="CaptionButton" Height="40" MinWidth="46" VerticalAlignment="Stretch">
                                     <!-- Thumbtack, symmetric about x=7: cap (5..9), flared shoulders (3..11), tapering neck
                                          (6..8), point at (7,12) - the classic push-pin silhouette. -->
-                                    <controls:Path x:Name="PinGlyph"
+                                    <Path x:Name="PinGlyph"
                                             Data="M5,2 L9,2 L9,4 L11,6 L11,7 L8,7 L8,10 L7,12 L6,10 L6,7 L3,7 L3,6 L5,4 Z"
                                             Stroke="{TemplateBinding TitleForeground}" StrokeThickness="1" Fill="Transparent"
                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </controls:Button>
+                                </Button>
 
-                                <controls:Button x:Name="PART_CloseButton" Grid.Column="2"
+                                <Button x:Name="PART_CloseButton" Grid.Column="2"
                                         Classes="CaptionButton CloseButton" Height="40" MinWidth="46"
                                         VerticalAlignment="Stretch">
-                                    <controls:Path Data="M0,0 L10,10 M10,0 L0,10"
+                                    <Path Data="M0,0 L10,10 M10,0 L0,10"
                                             Stroke="{TemplateBinding TitleForeground}" StrokeThickness="1"
                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </controls:Button>
-                            </controls:Grid>
+                                </Button>
+                            </Grid>
 
-                            <controls:ContentPresenter x:Name="PART_ContentPresenter" Grid.Row="1"
+                            <ContentPresenter x:Name="PART_ContentPresenter" Grid.Row="1"
                                     Content="{TemplateBinding Content}"
                                     ContentTemplate="{TemplateBinding ContentTemplate}"
                                     ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"
@@ -81,11 +80,11 @@
                                  corner so the cursor sits right on them). PublishToWindow=False: this is an in-window card,
                                  not the OS window, so it must NOT drive the native window resize - OverlayWindow resizes
                                  itself with a managed drag. -->
-                            <controls:ResizeGripper x:Name="PART_ResizeGrip" Grid.Row="1" Visibility="Collapsed"
+                            <ResizeGripper x:Name="PART_ResizeGrip" Grid.Row="1" Visibility="Collapsed"
                                     PublishToWindow="False" Width="18" Height="18"
                                     HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
-                        </controls:Grid>
-                    </controls:Border>
+                        </Grid>
+                    </Border>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

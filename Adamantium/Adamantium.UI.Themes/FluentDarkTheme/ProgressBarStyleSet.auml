@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- Linear progress bar: a track with a left-anchored PART_Indicator the control sizes to the filled fraction. The
          circular gauge is a separate control, RingProgressBar (see RingProgressBarStyleSet). Per the small-styles
@@ -19,16 +18,16 @@
                      fill nested inside the track would collapse the whole bar. The fill overlays the track from the left
                      and the control sets its Width to the filled fraction. -->
                 <ControlTemplate TargetType="ProgressBar">
-                    <controls:Grid>
-                        <controls:Border x:Name="PART_Track" Height="6" CornerRadius="3"
+                    <Grid>
+                        <Border x:Name="PART_Track" Height="6" CornerRadius="3"
                                 Background="{ResourceReference ControlFillColorTertiary}"
                                 VerticalAlignment="Center"/>
-                        <controls:Border x:Name="PART_Indicator" Height="6" CornerRadius="3"
+                        <Border x:Name="PART_Indicator" Height="6" CornerRadius="3"
                                 Background="{ThemeResource AccentFillColorDefault}"
                                 HorizontalAlignment="Left"
                                 VerticalAlignment="Center"
                                 Width="0"/>
-                    </controls:Grid>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
