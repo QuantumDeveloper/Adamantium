@@ -102,7 +102,7 @@ public class SelfBindingExpression : BindingExpressionBase
         if (_sourceProperty == null || _def.Mode != BindingMode.TwoWay || _segments.Length != 1) return;
         // Write-back is authoritative - push at Local so an existing Local/Style value on the source property doesn't mask it.
         var value = RelativeBindingPipeline.ConvertBack(Target.GetValue(TargetProperty), _def.Converter, _def.ConverterParameter, _sourceProperty.PropertyType);
-        if (RelativeBindingPipeline.TryCoerce(value, _sourceProperty.PropertyType, out var coerced))
+        if (TryCoerce(value, _sourceProperty.PropertyType, out var coerced))
             Target.SetValue(_sourceProperty, coerced, ValuePriority.Local);
     }
 }

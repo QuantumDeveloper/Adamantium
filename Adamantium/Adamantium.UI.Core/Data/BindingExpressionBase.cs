@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 
 namespace Adamantium.UI.Core.Data;
 
@@ -70,4 +71,41 @@ public abstract class BindingExpressionBase
    public abstract void EstablishConnection();
    public abstract void CloseConnection();
 
+   // Lenient coercion: keeps the raw value when it can't be made to fit (used writing back to source).
+   internal static object Coerce(object value, Type targetType)
+      => TryCoerce(value, targetType, out var result) ? result : value;
+
+   // Strict: false (result=null) when the value can't be made to fit, so the caller skips the assignment instead of
+   // pushing something that would throw.
+   internal static bool TryCoerce(object value, Type targetType, out object result)
+   {
+      result = value;
+      if (value == null || targetType == null || targetType.IsInstanceOfType(value)) return true;
+      if (targetType == typeof(string))
+      {
+         result = value.ToString();
+         return true;
+      }
+
+      try
+      {
+         result = Convert.ChangeType(value, Nullable.GetUnderlyingType(targetType) ?? targetType, CultureInfo.CurrentCulture);
+         return true;
+      }
+      catch
+      {
+         // What Convert.ChangeType cannot place still converts through the engine's TypeParser - the SAME conversion the
+         // markup compiler runs, so a bound value and an authored attribute land alike (a string -> Brush/Geometry, a
+         // double -> GridLength).
+         var parsed = TypeCastFactory.CastFromString(value, targetType);
+         if (parsed != AdamantiumProperty.UnsetValue)
+         {
+            result = parsed;
+            return true;
+         }
+
+         result = null;
+         return false;
+      }
+   }
 }

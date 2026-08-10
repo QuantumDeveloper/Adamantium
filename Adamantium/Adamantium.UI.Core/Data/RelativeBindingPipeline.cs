@@ -66,7 +66,7 @@ internal static class RelativeBindingPipeline
 
         if (value == null) value = targetNullValue ?? fallback;
         if (value == null) return Unset;
-        return TryCoerce(value, targetType, out var coerced) ? coerced : Unset;
+        return BindingExpressionBase.TryCoerce(value, targetType, out var coerced) ? coerced : Unset;
     }
 
     /// <summary>Best-effort back-conversion for a TwoWay write.</summary>
@@ -75,18 +75,4 @@ internal static class RelativeBindingPipeline
             ? converter.ConvertBack(value, sourceType, converterParameter, CultureInfo.CurrentCulture)
             : value;
 
-    // Pass-through when assignable, ToString for a string target, else Convert.ChangeType; false when it can't fit (the
-    // caller then skips the assignment rather than push an incompatible value). Mirrors BindingExpression.TryCoerce.
-    internal static bool TryCoerce(object value, Type targetType, out object result)
-    {
-        result = value;
-        if (value == null || targetType == null || targetType.IsInstanceOfType(value)) return true;
-        if (targetType == typeof(string)) { result = value.ToString(); return true; }
-        try
-        {
-            result = Convert.ChangeType(value, Nullable.GetUnderlyingType(targetType) ?? targetType, CultureInfo.CurrentCulture);
-            return true;
-        }
-        catch { result = null; return false; }
-    }
 }
