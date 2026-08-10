@@ -5,7 +5,11 @@
          and the quick-access bar in the caption reading the SAME view model (see RibbonWindow.auml). -->
     <Grid RowDefinitions="Auto,*,Auto">
 
-        <Ribbon Grid.Row="0">
+        <!-- The ribbon states WHAT was asked and what it looks like; this shell decides what its own quick-access items
+             are made of and owns the list. Bound once here - the properties inherit down to every command in the band. -->
+        <Ribbon Grid.Row="0" x:Name="Band"
+                Ribbon.AddToQuickAccessCommand="{Binding AddToQuickAccessCommand}"
+                Ribbon.RemoveFromQuickAccessCommand="{Binding RemoveFromQuickAccessCommand}">
 
             <!-- "File": a command that opens a menu, so the flyout is the ContextMenu one already is. The two-pane
                  version - recent files beside the commands - is a later step. -->
@@ -79,6 +83,26 @@
                         </RibbonApplicationMenuItem.PageContent>
                     </RibbonApplicationMenuItem>
 
+                    <!-- The ONE place commands are moved to the quick-access bar from - the application's own page, as
+                         Word's is its own dialog. The ribbon only furnishes the list and carries the request. -->
+                    <RibbonApplicationMenuItem Content="Customize" Icon="M8,5 A3,3 0 1 0 8,11 A3,3 0 1 0 8,5 M8,1 L8,3 M8,13 L8,15 M1,8 L3,8 M13,8 L15,8">
+                        <RibbonApplicationMenuItem.PageContent>
+                            <StackPanel>
+                                <TextBlock Text="Quick access" FontSize="28" Margin="0 0 0 6"/>
+                                <TextBlock Text="Pick the commands worth keeping one click away." Opacity="0.7" Margin="0 0 0 18"/>
+                                <ItemsControl ItemsSource="{Binding QuickAccessCandidates, ElementName=Band}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Content="{Binding Content}" Margin="0 0 0 4" HorizontalAlignment="Left"
+                                                    Command="{Binding ToggleQuickAccess, ElementName=Band}"
+                                                    CommandParameter="{Binding}"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </RibbonApplicationMenuItem.PageContent>
+                    </RibbonApplicationMenuItem>
+
                     <!-- What the dropped panel shows until the pointer picks a row. The backstage never needs it: it
                          always stands on a chosen row. -->
                     <RibbonApplicationMenu.AuxiliaryPaneContent>
@@ -104,6 +128,7 @@
             <Ribbon.FooterContent>
                 <RibbonQuickAccess ItemsSource="{Binding QuickAccess}"
                                    Placement="{Binding QuickAccessPlacement}"
+                                   Ribbon.RemoveFromQuickAccessCommand="{Binding RemoveFromQuickAccessCommand}"
                                    Margin="6 2 6 3" HorizontalAlignment="Left"/>
             </Ribbon.FooterContent>
 
@@ -115,11 +140,15 @@
                     <RibbonSplitButton Content="Paste" Command="{Binding PasteCommand}"
                                        ToolTip="Paste the clipboard contents"
                                        Icon="M4,2 L12,2 L12,14 L4,14 Z M6,2 L6,4 L10,4 L10,2">
+                        <!-- The rows are DATA, not MenuItem controls: that is what lets this command sit in the
+                             quick-access bar and keep its arrow - the bar builds its own menu from the same list. -->
                         <RibbonSplitButton.DropDownMenu>
-                            <ContextMenu>
-                                <MenuItem Header="Keep formatting" Command="{Binding PasteKeepFormattingCommand}"/>
-                                <MenuItem Header="Values only" Command="{Binding PasteValuesOnlyCommand}"/>
-                                <MenuItem Header="Paste special..." Command="{Binding PasteSpecialCommand}"/>
+                            <ContextMenu ItemsSource="{Binding PasteOptions}">
+                                <ContextMenu.ItemTemplate>
+                                    <DataTemplate>
+                                        <MenuItem Header="{Binding Header}" Command="{Binding Command}"/>
+                                    </DataTemplate>
+                                </ContextMenu.ItemTemplate>
                             </ContextMenu>
                         </RibbonSplitButton.DropDownMenu>
                     </RibbonSplitButton>
@@ -148,10 +177,36 @@
                     <!-- The same flags drive the surface below and the View tab. -->
                     <RibbonToggleButton Content="Wireframe" IsChecked="{Binding Wireframe, Mode=TwoWay}"
                                         Icon="M8,2 L14,5 L14,11 L8,14 L2,11 L2,5 Z M2,5 L8,8 L14,5 M8,8 L8,14"/>
+                    <!-- A toggle states its compact form itself: the theme knows how a checked command should LOOK in
+                         the caption, but only this view knows WHICH state it stands for. -->
                     <RibbonToggleButton Content="Grid" MaxSize="Medium" IsChecked="{Binding ShowGrid, Mode=TwoWay}"
-                                        Icon="M2,2 L14,2 L14,14 L2,14 Z M6,2 L6,14 M10,2 L10,14 M2,6 L14,6 M2,10 L14,10"/>
+                                        Icon="M2,2 L14,2 L14,14 L2,14 Z M6,2 L6,14 M10,2 L10,14 M2,6 L14,6 M2,10 L14,10">
+                        <Ribbon.QuickAccessTemplate>
+                            <DataTemplate>
+                                <ToggleButton Classes="QuickAccessButton"
+                                              ToolTip="{Binding ToolTip}"
+                                              IsChecked="{Ancestor RibbonQuickAccess, DataContext.ShowGrid, Mode=TwoWay}">
+                                    <Path Data="{Binding Icon}"
+                                          Stroke="{Ancestor RibbonQuickAccess, Foreground}" StrokeThickness="1"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </ToggleButton>
+                            </DataTemplate>
+                        </Ribbon.QuickAccessTemplate>
+                    </RibbonToggleButton>
                     <RibbonToggleButton Content="Gizmos" MaxSize="Medium" IsChecked="{Binding ShowGizmos, Mode=TwoWay}"
-                                        Icon="M8,14 L8,4 M8,4 L5,7 M8,4 L11,7 M2,14 L14,14"/>
+                                        Icon="M8,14 L8,4 M8,4 L5,7 M8,4 L11,7 M2,14 L14,14">
+                        <Ribbon.QuickAccessTemplate>
+                            <DataTemplate>
+                                <ToggleButton Classes="QuickAccessButton"
+                                              ToolTip="{Binding ToolTip}"
+                                              IsChecked="{Ancestor RibbonQuickAccess, DataContext.ShowGizmos, Mode=TwoWay}">
+                                    <Path Data="{Binding Icon}"
+                                          Stroke="{Ancestor RibbonQuickAccess, Foreground}" StrokeThickness="1"
+                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </ToggleButton>
+                            </DataTemplate>
+                        </Ribbon.QuickAccessTemplate>
+                    </RibbonToggleButton>
                     <!-- A separator ends the run beside it, so what follows starts a fresh column. -->
                     <Separator/>
                     <!-- A group hosts ORDINARY controls too. They state the same range through the ATTACHED form - a
@@ -159,7 +214,11 @@
                     <CheckBox Content="Has selection" Ribbon.MaxSize="Medium" Ribbon.CollapseToSmall="Never" Margin="4 2"
                               IsChecked="{Binding HasSelection, Mode=TwoWay}"/>
                     <TextBlock Text="Grid size" Ribbon.MaxSize="Medium" Ribbon.CollapseToSmall="Never" Margin="6 4 4 0" FontSize="11"/>
-                    <Slider Ribbon.MaxSize="Medium" Ribbon.CollapseToSmall="Never" Width="120" Margin="4 2"
+                    <!-- Not offered to the quick-access bar at all: a 120-wide control does not belong in a caption
+                         strip shared with the window title. Word makes the same call - its zoom slider lives in the
+                         status bar and cannot be added either. -->
+                    <Slider Ribbon.MaxSize="Medium" Ribbon.CollapseToSmall="Never" Ribbon.CanAddToQuickAccess="False"
+                            Width="120" Margin="4 2"
                             Minimum="0.1" Maximum="4" Value="{Binding GridSize, Mode=TwoWay}"/>
                     <CheckBox Content="Backstage" Ribbon.MaxSize="Medium" Ribbon.CollapseToSmall="Never" Margin="4 2"
                               IsChecked="{Binding IsBackstage, Mode=TwoWay}"/>
@@ -173,16 +232,17 @@
             <!-- ================= MODELING ================= -->
             <RibbonTab Header="Modeling">
                 <RibbonGroup Header="Primitives" Icon="M8,2 L14,5 L14,11 L8,14 L2,11 L2,5 Z">
-                    <!-- Drops a menu instead of doing something. The rows are ordinary MenuItems, so submenus, Escape
-                         and light dismiss come with them. -->
+                    <!-- Drops a menu instead of doing something. The rows are DATA: a menu of MenuItem CONTROLS cannot
+                         be in two places, so it would reach the quick-access bar as an arrow over nothing. -->
                     <RibbonDropDownButton Content="Add" ToolTip="Add a primitive"
                                           Icon="M8,2 L8,14 M2,8 L14,8">
                         <RibbonDropDownButton.DropDownMenu>
-                            <ContextMenu>
-                                <MenuItem Header="Cube" Command="{Binding AddCubeCommand}"/>
-                                <MenuItem Header="Sphere" Command="{Binding AddSphereCommand}"/>
-                                <MenuItem Header="Plane" Command="{Binding AddPlaneCommand}"/>
-                                <MenuItem Header="Empty entity" Command="{Binding AddEntityCommand}"/>
+                            <ContextMenu ItemsSource="{Binding PrimitiveOptions}">
+                                <ContextMenu.ItemTemplate>
+                                    <DataTemplate>
+                                        <MenuItem Header="{Binding Header}" Command="{Binding Command}"/>
+                                    </DataTemplate>
+                                </ContextMenu.ItemTemplate>
                             </ContextMenu>
                         </RibbonDropDownButton.DropDownMenu>
                     </RibbonDropDownButton>

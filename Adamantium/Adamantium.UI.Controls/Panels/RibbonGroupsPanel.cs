@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
@@ -69,7 +69,10 @@ public class RibbonGroupsPanel : Panel
         var groups = new List<RibbonGroup>();
         foreach (var child in Children)
         {
-            if (child is RibbonGroup group && group.Visibility == Visibility.Visible) groups.Add(group);
+            if (child is RibbonGroup group && group.Visibility == Visibility.Visible)
+            {
+                groups.Add(group);
+            }
         }
 
         if (groups.Count == 0) return;
@@ -121,7 +124,10 @@ public class RibbonGroupsPanel : Panel
         {
             var group = groups[i];
             if (NextNarrower(group) < 0) continue;
-            if (pick == null || group.ShrinkPriority <= pick.ShrinkPriority) pick = group;
+            if (pick == null || group.ShrinkPriority <= pick.ShrinkPriority)
+            {
+                pick = group;
+            }
         }
 
         if (pick == null) return false;
@@ -138,7 +144,10 @@ public class RibbonGroupsPanel : Panel
         {
             var group = groups[i];
             if (group.CurrentVariant <= 0) continue;
-            if (pick == null || group.ShrinkPriority >= pick.ShrinkPriority) pick = group;
+            if (pick == null || group.ShrinkPriority >= pick.ShrinkPriority)
+            {
+                pick = group;
+            }
         }
 
         if (pick == null) return false;

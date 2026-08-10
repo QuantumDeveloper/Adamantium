@@ -104,6 +104,24 @@ public class RibbonGroup : ItemsControl, IHeaderedItemsControl
         return size;
     }
 
+    /// <summary>A command in a group can be sent to the quick-access bar, so it is equipped with the entry that asks -
+    /// here, because the theme cannot: a style setter hands every command the SAME object, and a menu has one
+    /// <see cref="ContextMenu.PlacementTarget"/>. One menu per command, made where the command is taken in.
+    /// <para>Only when the command has none of its own. An author who wrote a menu keeps it exactly as written, and adds
+    /// <see cref="RibbonQuickAccessMenuItem"/> to it themselves - a row appearing in someone's menu unasked is worse
+    /// than one they placed.</para></summary>
+    protected internal override void PrepareContainer(IUIComponent container, object item)
+    {
+        base.PrepareContainer(container, item);
+
+        if (container is not Base.InputUIComponent command || command.ContextMenu != null) return;
+        if (!Ribbon.GetCanAddToQuickAccess(command)) return;
+
+        var menu = new ContextMenu();
+        menu.Items.Add(new RibbonQuickAccessMenuItem());
+        command.ContextMenu = menu;
+    }
+
     /// <summary>Draw this group as <paramref name="index"/> from now on.</summary>
     public void ApplyVariant(int index)
     {

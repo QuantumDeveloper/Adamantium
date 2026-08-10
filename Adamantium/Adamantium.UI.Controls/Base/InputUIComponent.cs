@@ -1020,15 +1020,9 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     {
         if (!IsInitialized) return null;
 
-        if (this is IWindow) return this as IWindow;
-
-        var parent = LogicalParent;
-        while (parent is not IWindow)
-        {
-            parent = parent.LogicalParent;
-        }
-
-        return parent as IWindow;
+        // The shared walk: it bridges template boundaries by TemplatedParent, and it STOPS - the loop this replaces
+        // dereferenced its way past the root and threw for anything not under a window yet.
+        return this.GetSelfAndLogicalAncestors().OfType<IWindow>().FirstOrDefault();
     }
     
     private static void OnIsInitializedChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)

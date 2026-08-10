@@ -50,11 +50,7 @@ public class DropDownItem : ListBoxItem
     }
 
     // Fallback for an authored DropDownItem (no PrepareContainer): the popup child keeps a LOGICAL link to the DropDown
-    // even though the visual tree is broken, so walk logical parents.
-    private DropDown FindOwnerLogically()
-    {
-        for (IFundamentalUIComponent node = this; node != null; node = node.LogicalParent)
-            if (node is DropDown dd) return dd;
-        return null;
-    }
+    // even though the visual tree is broken. The SHARED walk, which bridges template boundaries by TemplatedParent - a
+    // raw LogicalParent loop dead-ends at the first template part between the row and its list.
+    private DropDown FindOwnerLogically() => this.GetSelfAndLogicalAncestors().OfType<DropDown>().FirstOrDefault();
 }

@@ -1,3 +1,5 @@
+﻿using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Media;
@@ -26,6 +28,121 @@ public class RibbonQuickAccess : ItemsControl
     private static void OnPlacementChanged(AdamantiumComponent sender, AdamantiumPropertyChangedEventArgs e)
     {
         (sender as RibbonQuickAccess)?.ShowOnlyInItsOwnSlot();
+    }
+
+    /// <summary>The commands the caption had no room for. They are not lost - the bar offers them under its chevron,
+    /// which is the whole difference between a bar that overflows and one that runs off the edge.</summary>
+    public static readonly AdamantiumProperty OverflowItemsProperty = AdamantiumProperty.Register(nameof(OverflowItems),
+        typeof(IEnumerable), typeof(RibbonQuickAccess), new PropertyMetadata(null));
+
+    public static readonly AdamantiumProperty HasOverflowItemsProperty = AdamantiumProperty.Register(
+        nameof(HasOverflowItems), typeof(bool), typeof(RibbonQuickAccess), new PropertyMetadata(false));
+
+    /// <summary>Open state of the overflow list. <see cref="Primitives.ToggleButton.IsChecked"/> on the chevron IS this,
+    /// the way a drop-down command marks itself while its menu is down.</summary>
+    public static readonly AdamantiumProperty IsOverflowOpenProperty = AdamantiumProperty.Register(nameof(IsOverflowOpen),
+        typeof(bool), typeof(RibbonQuickAccess), new PropertyMetadata(false));
+
+    /// <summary>What the chevron costs. The panel reserves it from the buttons' budget ALWAYS - a budget that depended on
+    /// whether the chevron is currently shown would flip-flop, and the caption would re-lay-out every frame.</summary>
+    public static readonly AdamantiumProperty OverflowButtonWidthProperty = AdamantiumProperty.Register(
+        nameof(OverflowButtonWidth), typeof(double), typeof(RibbonQuickAccess),
+        new PropertyMetadata(28.0, PropertyMetadataOptions.AffectsMeasure));
+
+    public IEnumerable OverflowItems
+    {
+        get => GetValue<IEnumerable>(OverflowItemsProperty);
+        private set => SetValue(OverflowItemsProperty, value);
+    }
+
+    public bool HasOverflowItems
+    {
+        get => GetValue<bool>(HasOverflowItemsProperty);
+        private set => SetValue(HasOverflowItemsProperty, value);
+    }
+
+    public bool IsOverflowOpen
+    {
+        get => GetValue<bool>(IsOverflowOpenProperty);
+        set => SetValue(IsOverflowOpenProperty, value);
+    }
+
+    public double OverflowButtonWidth
+    {
+        get => GetValue<double>(OverflowButtonWidthProperty);
+        set => SetValue(OverflowButtonWidthProperty, value);
+    }
+
+    /// <summary>Told by the panel, which is the only thing that knows what fit. The ITEMS are published, not the
+    /// containers: the overflow list draws them through its own template, and a container can only be in one place.</summary>
+    internal void SetOverflow(IReadOnlyList<IUIComponent> hidden)
+    {
+        var items = new List<object>(hidden.Count);
+        foreach (var container in hidden)
+        {
+            var index = ItemContainerGenerator.IndexFromContainer(container);
+            items.Add(index >= 0 && index < Items.Count ? Items[index] : container);
+        }
+
+        OverflowItems = items;
+        HasOverflowItems = items.Count > 0;
+
+        if (items.Count == 0)
+        {
+            IsOverflowOpen = false;
+        }
+    }
+
+    private Primitives.ButtonBase _overflowButton;
+    private ContextMenu _overflowMenu;
+
+    public override void OnApplyTemplate()
+    {
+        base.OnApplyTemplate();
+
+        if (_overflowButton != null)
+        {
+            _overflowButton.Click -= OnOverflowClick;
+        }
+
+        _overflowButton = GetTemplateChild("PART_OverflowButton") as Primitives.ButtonBase;
+        if (_overflowButton != null)
+        {
+            _overflowButton.Click += OnOverflowClick;
+        }
+
+        if (_overflowMenu != null)
+        {
+            _overflowMenu.PropertyChanged -= OnOverflowMenuChanged;
+        }
+
+        _overflowMenu = GetTemplateChild("PART_OverflowMenu") as ContextMenu;
+        if (_overflowMenu != null)
+        {
+            _overflowMenu.PropertyChanged += OnOverflowMenuChanged;
+        }
+    }
+
+    // Two-state: the second press puts the list away. What "open" means is asked of the MENU - a state mirrored onto the
+    // button would have to be put back in step every time the list closed itself (a pick, Escape, a press outside).
+    private void OnOverflowClick(object sender, RoutedEventArgs e)
+    {
+        if (_overflowMenu == null) return;
+
+        if (_overflowMenu.IsOpen)
+        {
+            _overflowMenu.IsOpen = false;
+            return;
+        }
+
+        _overflowMenu.Open(_overflowButton);
+    }
+
+    private void OnOverflowMenuChanged(object sender, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (e.Property != ContextMenu.IsOpenProperty) return;
+
+        IsOverflowOpen = Equals(e.NewValue, true);
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
