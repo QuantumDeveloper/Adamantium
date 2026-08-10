@@ -46,6 +46,14 @@ public interface IUIComponent : IFundamentalUIComponent
     bool ClipsAdorners { get; }
 
     IRootVisualComponent RootVisual { get; }
+
+    /// <summary>The subtree root that OWNS this element's layout, when that is not the visual root: overlay content is
+    /// drawn by the window but measured and arranged by the popup layer, which alone knows its constraint (unbounded)
+    /// and its slot (the computed position). Null everywhere else, where the visual root owns layout as usual.
+    /// <para>Two owners running in one frame is not a slowdown but a CRASH: both drive the same virtualizing panel, and
+    /// its generator is re-entered mid-enumeration.</para></summary>
+    IUIComponent LayoutRoot { get; }
+
     Int32 ZIndex { get; set; }
     bool IsAttachedToVisualTree { get; }
 

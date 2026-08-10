@@ -52,6 +52,14 @@ public sealed class LayoutManager
         // RootVisual is cached + kept current by the attach/detach walk, so read it directly (O(1)) - For() is on the
         // invalidation hot path. A not-yet-attached / plain test tree has RootVisual == null; fall back to the walk to its
         // local top (the same key the pass is driven from, so the resolved manager is identical either way).
+        // Overlay content is DRAWN by the window but laid out by the popup layer, which alone knows its constraint and
+        // its slot. Its invalidations must therefore resolve here, to a manager of its own - joining the window's queue
+        // put two owners on one virtualizing panel and re-entered its generator mid-enumeration.
+        if (node.LayoutRoot is { } owner)
+        {
+            return GetOrCreate(owner);
+        }
+
         var root = node.RootVisual;
         if (root != null)
         {

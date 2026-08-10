@@ -739,6 +739,9 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     private void AttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         RootVisual = e.Root;
+        // Inherited down the subtree, so every node inside overlay content answers with the same owner. Null in the main
+        // tree, where the visual root owns layout as it always did.
+        LayoutRoot = _isLayoutBoundary ? this : (VisualParent as UIComponent)?.LayoutRoot;
 
         // While detached, a control's cached render units are freed (RenderCache.ReconcileDetachedControls). On re-attach
         // it is still geometry-valid, so its Render() would record nothing and it would draw blank (e.g. a TabItem body
@@ -767,6 +770,8 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     {
         // Clear the root link so IsAttachedToVisualTree (=> RootVisual != null) flips to false for this subtree.
         RootVisual = null;
+        LayoutRoot = null;
+        _isLayoutBoundary = false;
 
         // Off screen: nothing it drives should keep costing a frame. A looping loading pulse is the case that made this
         // necessary - see FundamentalUIComponent.SuspendTriggerActions.
@@ -784,9 +789,36 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         }
     }
 
+    /// <summary>Joins a subtree that has NO visual parent to a root - what a popup's content needs. The content is drawn
+    /// by the window's overlay and never becomes anyone's visual child, so the ordinary attach (driven by
+    /// <see cref="SetVisualParent"/>) never reaches it: without this it would never learn which root it lives in, and
+    /// with it the two things attaching does - re-recording what was freed while it was away, and restarting the
+    /// triggers that were suspended - would keep passing popups by.
+    /// <para><paramref name="ownsLayout"/> keeps the layout where it was: this subtree becomes its own
+    /// <see cref="LayoutRoot"/>, so its invalidations resolve to a manager of its own instead of joining the window's
+    /// queue, which the popup layer is already driving.</para></summary>
+    internal void AttachToRoot(IRootVisualComponent root, bool ownsLayout = false)
+    {
+        if (root == null || ReferenceEquals(RootVisual, root)) return;
+
+        _isLayoutBoundary = ownsLayout;
+        AttachedToVisualTree(new VisualTreeAttachmentEventArgs(root, this));
+    }
+
+    internal void DetachFromRoot()
+    {
+        if (RootVisual == null) return;
+
+        DetachedFromVisualTree(new VisualTreeAttachmentEventArgs(RootVisual, this));
+    }
+
+    private bool _isLayoutBoundary;
+
+    public IUIComponent LayoutRoot { get; private set; }
+
     protected virtual void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
-         
+
     }
 
     protected virtual void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
