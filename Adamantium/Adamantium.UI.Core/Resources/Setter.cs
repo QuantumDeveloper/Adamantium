@@ -17,8 +17,10 @@ public class Setter : ISetter, IEquatable<Setter>
 
     public string Property { get; set; }
     public Object Value { get; set; }
-    
+
     public string TargetName { get; set; }
+
+    public int DeclarationOrder { get; set; }
 
     public void Apply(IFundamentalUIComponent component, Style style, ITheme theme)
     {
