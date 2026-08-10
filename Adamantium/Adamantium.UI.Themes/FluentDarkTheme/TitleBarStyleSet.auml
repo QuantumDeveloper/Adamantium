@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <StyleSet xmlns="http://adamantium/ui"
-          xmlns:x="http://adamantium/ui/xaml/extensions"
-          xmlns:controls="http://adamantium/ui">
+          xmlns:x="http://adamantium/ui/xaml/extensions">
 
     <!-- TitleBar: the custom-chrome caption. A draggable caption area (icon + title) on the left and the
          minimize / maximize-restore / close buttons on the right. The control resolves the window it is hosted in and
@@ -21,87 +20,100 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TitleBar">
-                    <controls:Grid Background="{TemplateBinding Background}" ColumnDefinitions="Auto,Auto,*,Auto">
+                    <Grid Background="{TemplateBinding Background}" ColumnDefinitions="Auto,Auto,*,Auto">
 
                         <!-- A neutral slot before everything else: a quick-access bar, a search box, whatever the
                              application puts there. -->
-                        <controls:ContentPresenter x:Name="PART_LeadingContent" Grid.Column="0"
+                        <ContentPresenter x:Name="PART_LeadingContent" Grid.Column="0"
                                 Content="{TemplateBinding LeadingContent}"
                                 VerticalAlignment="Center"/>
 
                         <!-- LEFT commands: interactive, sit before the drag area (so they stay clickable). -->
-                        <controls:ItemsControl Grid.Column="1" ItemsSource="{TemplateBinding LeftWindowCommands}"
+                        <ItemsControl Grid.Column="1" ItemsSource="{TemplateBinding LeftWindowCommands}"
                                 VerticalAlignment="Stretch">
-                            <controls:ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate><controls:StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
-                            </controls:ItemsControl.ItemsPanel>
-                            <controls:ItemsControl.ItemTemplate>
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <controls:Button Classes="CaptionButton" VerticalAlignment="Stretch"
+                                    <Button Classes="CaptionButton" VerticalAlignment="Stretch"
                                             ToolTip="{Binding ToolTip}"
                                             Command="{Binding Command}"
                                             CommandParameter="{Binding CommandParameter}">
                                         <!-- {Ancestor} walks the visual tree up to the hosting TitleBar and binds its LIVE
                                              Foreground, so a command icon follows the SAME active/inactive colour as the
                                              title text + window buttons (and re-resolves if the tree rebuilds). -->
-                                        <controls:Path Data="{Binding Icon}"
+                                        <Path Data="{Binding Icon}"
                                                 Stroke="{Ancestor TitleBar, Foreground}" StrokeThickness="1"
                                                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </controls:Button>
+                                    </Button>
                                 </DataTemplate>
-                            </controls:ItemsControl.ItemTemplate>
-                        </controls:ItemsControl>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
 
                         <!-- THE draggable zone: icon + title, fills the middle `*` column. Transparent = invisible but fully
                              hit-testable (hit-testing is decoupled from Background in this engine), so the whole strip drags.
                              Clips so a long title doesn't spill onto the commands. The command columns (0 and 2) sit outside
                              this element, so their buttons stay clickable; the drag is initiated from managed input here
                              (see TitleBar), which respects z-order so overlays on top keep their clicks. -->
-                        <controls:Grid x:Name="PART_DragArea" Grid.Column="2" Background="Transparent" ClipToBounds="True">
-                            <controls:StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                        <Grid x:Name="PART_DragArea" Grid.Column="2" Background="Transparent" ClipToBounds="True">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
                                     HorizontalAlignment="{TemplateBinding TitleAlignment}" Margin="12,0,0,0">
-                                <controls:ContentPresenter x:Name="PART_Icon" Content="{TemplateBinding Icon}"
+                                <ContentPresenter x:Name="PART_Icon" Content="{TemplateBinding Icon}"
                                         VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <controls:TextBlock x:Name="PART_Title" Text="{TemplateBinding Title}"
+                                <TextBlock x:Name="PART_Title" Text="{TemplateBinding Title}"
                                         Foreground="{TemplateBinding Foreground}" FontSize="{TemplateBinding FontSize}"
                                         VerticalAlignment="Center"/>
-                            </controls:StackPanel>
-                        </controls:Grid>
+                            </StackPanel>
+                        </Grid>
 
                         <!-- RIGHT zone (interactive): right commands + "..." overflow menu + the window buttons. -->
-                        <controls:StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Stretch">
-                            <controls:ItemsControl ItemsSource="{TemplateBinding RightWindowCommands}" VerticalAlignment="Stretch">
-                                <controls:ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate><controls:StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
-                                </controls:ItemsControl.ItemsPanel>
-                                <controls:ItemsControl.ItemTemplate>
+                        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Stretch">
+                            <ItemsControl ItemsSource="{TemplateBinding RightWindowCommands}" VerticalAlignment="Stretch">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <controls:Button Classes="CaptionButton" VerticalAlignment="Stretch"
+                                        <Button Classes="CaptionButton" VerticalAlignment="Stretch"
                                                 ToolTip="{Binding ToolTip}"
                                                 Command="{Binding Command}"
                                                 CommandParameter="{Binding CommandParameter}">
-                                            <controls:Path Data="{Binding Icon}"
+                                            <Path Data="{Binding Icon}"
                                                     Stroke="{Ancestor TitleBar, Foreground}" StrokeThickness="1"
                                                     HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                        </controls:Button>
+                                        </Button>
                                     </DataTemplate>
-                                </controls:ItemsControl.ItemTemplate>
-                            </controls:ItemsControl>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
 
-                            <controls:Button x:Name="PART_RightOverflowButton" Classes="CaptionButton" VerticalAlignment="Stretch">
-                                <controls:Path Data="M0,4 L2,4 L2,6 L0,6 Z M4,4 L6,4 L6,6 L4,6 Z M8,4 L10,4 L10,6 L8,6 Z"
+                            <!-- Drops a list, so the second press has to put it away - but a Button, not a ToggleButton:
+                                 Button.CaptionButton would not name a ToggleButton (they are siblings under ButtonBase)
+                                 and it would fall back to the default toggle look. The open state is the menu's. -->
+                            <Button x:Name="PART_RightOverflowButton" Classes="CaptionButton" VerticalAlignment="Stretch">
+                                <Path Data="M0,4 L2,4 L2,6 L0,6 Z M4,4 L6,4 L6,6 L4,6 Z M8,4 L10,4 L10,6 L8,6 Z"
                                         Fill="{TemplateBinding Foreground}"
                                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </controls:Button>
+                            </Button>
 
-                            <controls:ContextMenu x:Name="PART_RightOverflowMenu" ItemsSource="{TemplateBinding RightWindowCommands}">
-                                <controls:ContextMenu.ItemTemplate>
+                            <ContextMenu x:Name="PART_RightOverflowMenu" ItemsSource="{TemplateBinding RightWindowCommands}">
+                                <ContextMenu.ItemTemplate>
                                     <DataTemplate>
-                                        <controls:MenuItem Header="{Binding OverflowLabel}"
-                                                Command="{Binding Command}" CommandParameter="{Binding CommandParameter}"/>
+                                        <MenuItem Header="{Binding OverflowLabel}"
+                                                Command="{Binding Command}" CommandParameter="{Binding CommandParameter}">
+                                            <MenuItem.Icon>
+                                                <!-- The ROW's foreground: a popup is a detached subtree, so {Ancestor}
+                                                     cannot reach the TitleBar from here. -->
+                                                <Path Data="{Binding Icon}"
+                                                        Stroke="{Ancestor MenuItem, Foreground}"
+                                                        StrokeThickness="1"
+                                                        HorizontalAlignment="Center"
+                                                        VerticalAlignment="Center"/>
+                                            </MenuItem.Icon>
+                                        </MenuItem>
                                     </DataTemplate>
-                                </controls:ContextMenu.ItemTemplate>
-                            </controls:ContextMenu>
+                                </ContextMenu.ItemTemplate>
+                            </ContextMenu>
 
                             <!-- Window buttons. Flat caption buttons (Button.CaptionButton); close highlights red. VECTOR Path
                                  icons (SVG Data + Stroke), NOT font glyphs - crisp and font-independent.
@@ -109,32 +121,32 @@
                                  wins over a style setter, so this is the one that is guaranteed to hold. Without it a
                                  click left the button focused and the button template drew its focus ring around it -
                                  a frame sitting in the caption long after the click. -->
-                            <controls:StackPanel x:Name="PART_ButtonsPanel" Orientation="Horizontal" VerticalAlignment="Stretch">
-                            <controls:Button x:Name="PART_MinButton" Classes="CaptionButton" Focusable="False" Height="{TemplateBinding Height}">
-                                <controls:Path Data="M0,5 L10,5"
+                            <StackPanel x:Name="PART_ButtonsPanel" Orientation="Horizontal" VerticalAlignment="Stretch">
+                            <Button x:Name="PART_MinButton" Classes="CaptionButton" Focusable="False" Height="{TemplateBinding Height}">
+                                <Path Data="M0,5 L10,5"
                                         Stroke="{TemplateBinding Foreground}" StrokeThickness="1"
                                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </controls:Button>
+                            </Button>
                             <!-- Maximize <-> restore: two overlaid glyphs, only one shown; the IsWindowMaximized trigger
                                  swaps their Opacity (the CheckBox pattern). -->
-                            <controls:Button x:Name="PART_MaxButton" Classes="CaptionButton" Focusable="False" Height="{TemplateBinding Height}">
-                                <controls:Grid>
-                                    <controls:Path x:Name="MaximizeGlyph" Data="M0,0 L10,0 L10,10 L0,10 Z"
+                            <Button x:Name="PART_MaxButton" Classes="CaptionButton" Focusable="False" Height="{TemplateBinding Height}">
+                                <Grid>
+                                    <Path x:Name="MaximizeGlyph" Data="M0,0 L10,0 L10,10 L0,10 Z"
                                             Stroke="{TemplateBinding Foreground}" StrokeThickness="1"
                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    <controls:Path x:Name="RestoreGlyph" Data="M0,3 L7,3 L7,10 L0,10 Z M3,3 L3,0 L10,0 L10,7 L7,7"
+                                    <Path x:Name="RestoreGlyph" Data="M0,3 L7,3 L7,10 L0,10 Z M3,3 L3,0 L10,0 L10,7 L7,7"
                                             Stroke="{TemplateBinding Foreground}" StrokeThickness="1" Opacity="0"
                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </controls:Grid>
-                            </controls:Button>
-                            <controls:Button x:Name="PART_CloseButton" Classes="CaptionButton CloseButton" Focusable="False" Height="{TemplateBinding Height}">
-                                <controls:Path Data="M0,0 L10,10 M10,0 L0,10"
+                                </Grid>
+                            </Button>
+                            <Button x:Name="PART_CloseButton" Classes="CaptionButton CloseButton" Focusable="False" Height="{TemplateBinding Height}">
+                                <Path Data="M0,0 L10,10 M10,0 L0,10"
                                         Stroke="{TemplateBinding Foreground}" StrokeThickness="1"
                                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </controls:Button>
-                            </controls:StackPanel>
-                        </controls:StackPanel>
-                    </controls:Grid>
+                            </Button>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>

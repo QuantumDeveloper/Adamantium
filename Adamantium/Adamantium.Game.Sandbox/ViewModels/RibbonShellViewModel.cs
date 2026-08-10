@@ -1,8 +1,10 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using Adamantium.Core.Commands;
 using Adamantium.MVVM;
 using Adamantium.Navigation;
 using Adamantium.UI.Controls;
+using Adamantium.UI.Core;
 
 namespace Adamantium.Game.Sandbox.ViewModels;
 
@@ -53,6 +55,28 @@ public partial class RibbonShellViewModel : IWindowAware
     [Command] private void PasteValuesOnly() => Status = "Pasted the values only.";
 
     [Command] private void PasteSpecial() => Status = "Paste special...";
+
+    /// <summary>The rows of Paste's drop-down, as DATA - which is what lets the command be put in the quick-access bar
+    /// and keep its arrow there. Built on first read: the commands are generated, so they exist by then.</summary>
+    public IReadOnlyList<MenuCommand> PasteOptions => _pasteOptions ??=
+    [
+        new MenuCommand { Header = "Keep formatting", Command = PasteKeepFormattingCommand },
+        new MenuCommand { Header = "Values only", Command = PasteValuesOnlyCommand },
+        new MenuCommand { Header = "Paste special...", Command = PasteSpecialCommand }
+    ];
+
+    private IReadOnlyList<MenuCommand> _pasteOptions;
+
+    /// <summary>The rows of Add's drop-down - data for the same reason.</summary>
+    public IReadOnlyList<MenuCommand> PrimitiveOptions => _primitiveOptions ??=
+    [
+        new MenuCommand { Header = "Cube", Command = AddCubeCommand },
+        new MenuCommand { Header = "Sphere", Command = AddSphereCommand },
+        new MenuCommand { Header = "Plane", Command = AddPlaneCommand },
+        new MenuCommand { Header = "Empty entity", Command = AddEntityCommand }
+    ];
+
+    private IReadOnlyList<MenuCommand> _primitiveOptions;
 
     [Command(CanExecute = nameof(HasSelection))] private void Cut()
     {
@@ -107,6 +131,63 @@ public partial class RibbonShellViewModel : IWindowAware
     [Command] private void EditNormal() => Status = "Editing the normal channel.";
 
     [Command] private void EditRoughness() => Status = "Editing the roughness channel.";
+
+    // The ribbon hands over a DESCRIPTION and never touches this collection - the shell decides what its own items are
+    // made of. Here they are WindowCommands, the type the caption bar already lists.
+    [Command] private void AddToQuickAccess(object request)
+    {
+        if (request is not RibbonQuickAccessEventArgs asked) return;
+
+
+        QuickAccess.Add(new QuickAccessCommand
+        {
+            IconData = asked.Icon as string,
+            Label = asked.Command is ContentControl content ? content.Content?.ToString() : null,
+            ToolTip = asked.ToolTip as string,
+            Command = asked.Action,
+            CommandParameter = asked.ActionParameter,
+            // What is not a button (a slider) hands over its own compact form; a button leaves this null and is drawn
+            // by the bar's default.
+            QuickAccessTemplate = asked.Template,
+            DropDownItems = asked.DropDownItems,
+            DropDownItemTemplate = asked.DropDownItemTemplate
+        });
+
+        // Where it came FROM, so the ribbon's own copy can be unmarked when it is taken back out - the request to remove
+        // arrives from the bar's button, which knows nothing of the command it was made from.
+        if (asked.Action != null)
+        {
+            _cameFrom[asked.Action] = asked.Command;
+        }
+
+        Ribbon.SetIsInQuickAccess(asked.Command, true);
+        Status = "Added to the quick-access bar.";
+    }
+
+    private readonly Dictionary<ICommand, IUIComponent> _cameFrom = [];
+
+    [Command] private void RemoveFromQuickAccess(object request)
+    {
+        if (request is not RibbonQuickAccessEventArgs asked) return;
+
+        for (var i = QuickAccess.Count - 1; i >= 0; i--)
+        {
+            if (ReferenceEquals(QuickAccess[i].Command, asked.Action))
+            {
+                QuickAccess.RemoveAt(i);
+            }
+        }
+
+        // The ribbon's command, not whatever asked - a press on the bar's own button asks with ITSELF.
+        var onTheRibbon = asked.Command;
+        if (asked.Action != null && _cameFrom.Remove(asked.Action, out var source))
+        {
+            onTheRibbon = source;
+        }
+
+        Ribbon.SetIsInQuickAccess(onTheRibbon, false);
+        Status = "Removed from the quick-access bar.";
+    }
 
     [Command] private void MoveQuickAccess()
     {

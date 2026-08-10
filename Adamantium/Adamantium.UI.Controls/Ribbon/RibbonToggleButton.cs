@@ -9,12 +9,10 @@ namespace Adamantium.UI.Controls;
 public class RibbonToggleButton : ToggleButton
 {
     /// <summary>What marks the command, drawn by <see cref="IconTemplate"/> - see <see cref="RibbonButton.IconProperty"/>
-    /// for why it is data rather than a control.</summary>
-    public static readonly AdamantiumProperty IconProperty = AdamantiumProperty.Register(nameof(Icon),
-        typeof(object), typeof(RibbonToggleButton), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure));
+    /// for why it is data rather than a control, and the SAME property object the ribbon attaches.</summary>
+    public static readonly AdamantiumProperty IconProperty = Ribbon.IconProperty;
 
-    public static readonly AdamantiumProperty IconTemplateProperty = AdamantiumProperty.Register(nameof(IconTemplate),
-        typeof(DataTemplate), typeof(RibbonToggleButton), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure));
+    public static readonly AdamantiumProperty IconTemplateProperty = Ribbon.IconTemplateProperty;
 
     public object Icon
     {

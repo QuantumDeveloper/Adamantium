@@ -27,6 +27,7 @@ public class ContentPresenter : InputUIComponent
     private bool _lastContentRebuilt;                          // did the last measure REBUILD the visual (vs data-only reuse)?
     private Size _lastArrangeSize = new(double.NaN, double.NaN);   // last finalSize we actually walked in ArrangeOverride
     private Size _lastMeasuredInner;   // what MeasureOverride last returned - WITHOUT this element's margin/transform
+    private Size _lastContentDesired;  // ...and the content size that produced it - the cache is only good while it holds
 
     public static readonly AdamantiumProperty ContentProperty = AdamantiumProperty.Register(nameof(Content),
         typeof(object), typeof(ContentPresenter), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, OnContentPropertyChanged));
@@ -333,13 +334,20 @@ public class ContentPresenter : InputUIComponent
         // DesiredSize is the OUTER result of that, so returning IT compounds both on every skip - the margin grew by its
         // own width per re-measure, which a ribbon group caption (Margin="0 4 0 0") turned into a caption climbing 4px up
         // its group each time the tab was re-opened.
-        if (!_lastContentRebuilt && _currentRoot is IMeasurableComponent { IsMeasureValid: true }
+        // ...and only while the content is STILL the size that produced the cached answer. "Valid" does not mean
+        // "unchanged": the layout pass re-measures a dirty child before it reaches the parent, so by our turn the child
+        // can be valid AND a different size, and answering from the cache reports a size that no longer exists.
+        // Measured: a quick-access bar gaining a button grew to 122 while its presenter kept saying 94, so the caption's
+        // Auto column never widened and the window title never stepped aside - until a resize re-measured everything.
+        if (!_lastContentRebuilt && _currentRoot is IMeasurableComponent { IsMeasureValid: true } measured
             && PreviousMeasureConstraint == availableSize
-            && LayoutTransform == null)
+            && LayoutTransform == null
+            && measured.DesiredSize == _lastContentDesired)
             return _lastMeasuredInner;
 
         var size = base.MeasureOverride(availableSize);
         _lastMeasuredInner = size;
+        _lastContentDesired = _currentRoot is IMeasurableComponent content ? content.DesiredSize : default;
 
         // A REBUILT content is very often a different size than the one the PARENT measured us at - and the rebuild
         // happens inside our own measure, which may have been requested directly (a tab strip measures a header with an

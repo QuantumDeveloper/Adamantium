@@ -41,6 +41,8 @@
          the edge sharpens it. -->
     <!-- Same state layer as the dark palette: the bar underneath is the ACCENT in either theme, so the overlay follows the
          accent, not the window base. -->
+    <SolidColorBrush x:Key="OnAccentShadePointerOver" Color="#33000000"/>
+    <SolidColorBrush x:Key="OnAccentShadePressed" Color="#59000000"/>
     <SolidColorBrush x:Key="OnAccentOverlayPointerOver" Color="#40FFFFFF"/>
     <SolidColorBrush x:Key="OnAccentOverlayPressed" Color="#73FFFFFF"/>
 

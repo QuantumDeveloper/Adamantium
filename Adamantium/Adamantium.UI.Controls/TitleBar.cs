@@ -215,9 +215,20 @@ public class TitleBar : Control
             window.DragMove();
     }
 
-    // "..." button: open the overflow menu (all right commands) against the button. Safe, layout-loop-free overflow -
-    // full command access when the caption is too narrow to show every button.
-    private void OnRightOverflowClick(object sender, RoutedEventArgs e) => _rightOverflowMenu?.Open(_rightOverflowButton as UIComponent);
+    // "..." button: open the overflow menu (all right commands) against the button. Two-state - the second press puts the
+    // list away - and what "open" means is asked of the MENU, which is the only thing that hears it close itself.
+    private void OnRightOverflowClick(object sender, RoutedEventArgs e)
+    {
+        if (_rightOverflowMenu == null) return;
+
+        if (_rightOverflowMenu.IsOpen)
+        {
+            _rightOverflowMenu.IsOpen = false;
+            return;
+        }
+
+        _rightOverflowMenu.Open(_rightOverflowButton as UIComponent);
+    }
 
     // After arrange, publish the drag-area element's bounds (in window-client coords) as the window's ONE draggable
     // caption region. The worker's WM_NCHITTEST checks a point against this rect only - a plain Rect, safe to read from

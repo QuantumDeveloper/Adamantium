@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Linq;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Media;
@@ -171,12 +171,18 @@ public class RibbonApplicationMenu : Selector
         if (menu.IsOpen && menu.IsBackstage)
         {
             // Opening onto a blank half is not a state anyone asked for: the first row that HAS a page opens with it.
-            if (menu.SelectedItem == null) menu.SelectFirstPage();
+            if (menu.SelectedItem == null)
+            {
+                menu.SelectFirstPage();
+            }
             menu.MeasureCaption();
         }
 
         // Closing takes the pointer with it, and a stale preview would be what the panel opened on next time.
-        if (!menu.IsOpen) menu._pointedAt = null;
+        if (!menu.IsOpen)
+        {
+            menu._pointedAt = null;
+        }
 
         menu.UpdateSelectedPage();
         menu.ReflectOpenState();
@@ -234,15 +240,30 @@ public class RibbonApplicationMenu : Selector
     {
         base.OnApplyTemplate();
 
-        if (_button != null) _button.Click -= OnButtonClick;
+        if (_button != null)
+        {
+            _button.Click -= OnButtonClick;
+        }
         _button = GetTemplateChild("PART_Button") as Primitives.ToggleButton;
-        if (_button != null) _button.Click += OnButtonClick;
+        if (_button != null)
+        {
+            _button.Click += OnButtonClick;
+        }
 
-        if (_backButton != null) _backButton.Click -= OnBackClick;
+        if (_backButton != null)
+        {
+            _backButton.Click -= OnBackClick;
+        }
         _backButton = GetTemplateChild("PART_BackButton") as Primitives.ButtonBase;
-        if (_backButton != null) _backButton.Click += OnBackClick;
+        if (_backButton != null)
+        {
+            _backButton.Click += OnBackClick;
+        }
 
-        if (_popup != null) _popup.Closed -= OnPopupClosed;
+        if (_popup != null)
+        {
+            _popup.Closed -= OnPopupClosed;
+        }
         _popup = GetTemplateChild("PART_Popup") as Popup;
         if (_popup != null)
         {
@@ -263,8 +284,14 @@ public class RibbonApplicationMenu : Selector
 
     private void ReflectOpenState()
     {
-        if (_popup != null) _popup.IsOpen = IsOpen;
-        if (_button != null) _button.SetCurrentValue(Primitives.ToggleButton.IsCheckedProperty, IsOpen);
+        if (_popup != null)
+        {
+            _popup.IsOpen = IsOpen;
+        }
+        if (_button != null)
+        {
+            _button.SetCurrentValue(Primitives.ToggleButton.IsCheckedProperty, IsOpen);
+        }
     }
 
     /// <summary>Escape leaves the backstage, the way it leaves any other layer that took the window.</summary>
@@ -288,7 +315,10 @@ public class RibbonApplicationMenu : Selector
         // panel is already showing it, and pinning it is what the pointer does.
         if (row.PageContent != null)
         {
-            if (IsBackstage) SelectSingle(IndexOfItem(row));
+            if (IsBackstage)
+            {
+                SelectSingle(IndexOfItem(row));
+            }
             else _pointedAt = row;
 
             UpdateSelectedPage();
@@ -303,7 +333,10 @@ public class RibbonApplicationMenu : Selector
     protected internal override IUIComponent GetContainerForItem(object item)
     {
         var row = new RibbonApplicationMenuItem();
-        if (ItemContainerStyle != null) row.AttachStyles(ItemContainerStyle);
+        if (ItemContainerStyle != null)
+        {
+            row.AttachStyles(ItemContainerStyle);
+        }
         return row;
     }
 

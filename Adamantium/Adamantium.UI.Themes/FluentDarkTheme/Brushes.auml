@@ -41,6 +41,10 @@
          these two if a theme's accent is pale enough to want a dark overlay instead. -->
     <SolidColorBrush x:Key="OnAccentOverlayPointerOver" Color="#40FFFFFF"/>
     <SolidColorBrush x:Key="OnAccentOverlayPressed" Color="#73FFFFFF"/>
+    <!-- DARKENING overlays for accent surfaces. Lightening an already-light accent barely registers; a caption button
+         has to answer the pointer unmistakably, and Office darkens for exactly that reason. -->
+    <SolidColorBrush x:Key="OnAccentShadePointerOver" Color="#33000000"/>
+    <SolidColorBrush x:Key="OnAccentShadePressed" Color="#59000000"/>
 
     <!-- The strip of a PUT-AWAY panel. A folded panel is nothing but its tabs, and without a fill of its own it reads as
          a row of labels floating on the background - there is no way to tell "this panel is put away" from "these are

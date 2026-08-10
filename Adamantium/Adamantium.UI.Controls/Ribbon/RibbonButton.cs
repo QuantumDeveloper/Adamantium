@@ -11,13 +11,12 @@ public class RibbonButton : Button
 {
     /// <summary>What marks the command - DATA drawn by <see cref="IconTemplate"/>, the same shape
     /// <see cref="TabItem.Icon"/> has: one command may be drawn in two places at once (its group and the quick-access
-    /// bar), and a control can only be in one.</summary>
-    public static readonly AdamantiumProperty IconProperty = AdamantiumProperty.Register(nameof(Icon),
-        typeof(object), typeof(RibbonButton), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure));
+    /// bar), and a control can only be in one. The SAME property object the ribbon attaches, so anything that has to
+    /// read a command's icon without knowing its type can.</summary>
+    public static readonly AdamantiumProperty IconProperty = Ribbon.IconProperty;
 
     /// <summary>How <see cref="Icon"/> is drawn. The theme default renders path data.</summary>
-    public static readonly AdamantiumProperty IconTemplateProperty = AdamantiumProperty.Register(nameof(IconTemplate),
-        typeof(DataTemplate), typeof(RibbonButton), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure));
+    public static readonly AdamantiumProperty IconTemplateProperty = Ribbon.IconTemplateProperty;
 
     public object Icon
     {

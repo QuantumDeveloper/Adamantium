@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using System.Collections.Specialized;
+using Adamantium.Core.Commands;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.RoutedEvents;
@@ -26,6 +27,40 @@ public class Ribbon : Selector
     /// the collapse thresholds walk down.</summary>
     public static readonly AdamantiumProperty MaxSizeProperty = AdamantiumProperty.RegisterAttached("MaxSize",
         typeof(RibbonSize), typeof(AdamantiumComponent), new PropertyMetadata(RibbonSize.Large));
+
+    /// <summary>What marks a command - DATA drawn by <see cref="IconTemplateProperty"/>. ATTACHED for the same reason
+    /// the sizes are: the commands share no base, and the quick-access bar has to read the icon of whatever it was
+    /// handed. One command may be drawn in two places at once, and a control can only be in one.</summary>
+    public static readonly AdamantiumProperty IconProperty = AdamantiumProperty.RegisterAttached("Icon",
+        typeof(object), typeof(AdamantiumComponent), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure));
+
+    /// <summary>How the icon is drawn. The theme default renders path data.</summary>
+    public static readonly AdamantiumProperty IconTemplateProperty = AdamantiumProperty.RegisterAttached("IconTemplate",
+        typeof(DataTemplate), typeof(AdamantiumComponent), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure));
+
+    public static object GetIcon(IAdamantiumComponent element) => element.GetValue(IconProperty);
+
+    public static void SetIcon(IAdamantiumComponent element, object value) => element.SetValue(IconProperty, value);
+
+    public static DataTemplate GetIconTemplate(IAdamantiumComponent element) =>
+        element.GetValue<DataTemplate>(IconTemplateProperty);
+
+    public static void SetIconTemplate(IAdamantiumComponent element, DataTemplate value) =>
+        element.SetValue(IconTemplateProperty, value);
+
+    /// <summary>How this command draws itself SMALL, in the quick-access bar. Unset means the bar's default: an icon
+    /// button. A command that is not a button - a slider, a drop-down - states its own compact form here, which is what
+    /// lets the bar hold it without the ribbon knowing a thing about its kind.
+    /// <para>The visual is not moved and not shared: the bar builds its own from this template, so the command keeps
+    /// standing in the ribbon at the same time.</para></summary>
+    public static readonly AdamantiumProperty QuickAccessTemplateProperty = AdamantiumProperty.RegisterAttached(
+        "QuickAccessTemplate", typeof(DataTemplate), typeof(AdamantiumComponent), new PropertyMetadata(null));
+
+    public static DataTemplate GetQuickAccessTemplate(IAdamantiumComponent element) =>
+        element.GetValue<DataTemplate>(QuickAccessTemplateProperty);
+
+    public static void SetQuickAccessTemplate(IAdamantiumComponent element, DataTemplate value) =>
+        element.SetValue(QuickAccessTemplateProperty, value);
 
     /// <summary>At which step of its GROUP this command drops its big icon for a small one beside the label.</summary>
     public static readonly AdamantiumProperty CollapseToMediumProperty = AdamantiumProperty.RegisterAttached("CollapseToMedium",
@@ -57,6 +92,136 @@ public class Ribbon : Selector
 
     public static void SetCollapseToSmall(IAdamantiumComponent element, RibbonCollapseThreshold value) =>
         element.SetValue(CollapseToSmallProperty, value);
+
+    // --- Putting a command in the quick-access bar -------------------------------------------------------------------
+    //
+    // The bar's collection belongs to the APPLICATION and holds whatever type it chose, so the ribbon never writes into
+    // it. It only reports the request and states what the command looks like; the application builds its own kind of
+    // item and answers. That also means the ribbon cannot know what is already in the bar - IsInQuickAccess is the
+    // application's answer to that, not the ribbon's record.
+
+    /// <summary>Whether this command may be offered to the bar at all. A separator, or a control that would be
+    /// meaningless as one small button, says no.</summary>
+    public static readonly AdamantiumProperty CanAddToQuickAccessProperty = AdamantiumProperty.RegisterAttached(
+        "CanAddToQuickAccess", typeof(bool), typeof(AdamantiumComponent), new PropertyMetadata(true));
+
+    /// <summary>Set BY THE APPLICATION: this command is in the bar already. The ribbon reads it to offer "remove"
+    /// instead of "add" - it holds no list of its own to check against.</summary>
+    public static readonly AdamantiumProperty IsInQuickAccessProperty = AdamantiumProperty.RegisterAttached(
+        "IsInQuickAccess", typeof(bool), typeof(AdamantiumComponent), new PropertyMetadata(false));
+
+    /// <summary>Run when a command asks to join the bar, with a <see cref="RibbonQuickAccessEventArgs"/> as its
+    /// parameter. INHERITED, so it is bound once on the ribbon and every command in the band finds it.</summary>
+    public static readonly AdamantiumProperty AddToQuickAccessCommandProperty = AdamantiumProperty.RegisterAttached(
+        "AddToQuickAccessCommand", typeof(ICommand), typeof(AdamantiumComponent),
+        new PropertyMetadata(null, PropertyMetadataOptions.Inherits));
+
+    public static readonly AdamantiumProperty RemoveFromQuickAccessCommandProperty = AdamantiumProperty.RegisterAttached(
+        "RemoveFromQuickAccessCommand", typeof(ICommand), typeof(AdamantiumComponent),
+        new PropertyMetadata(null, PropertyMetadataOptions.Inherits));
+
+    public static readonly RoutedEvent AddToQuickAccessRequestedEvent = EventManager.RegisterRoutedEvent(
+        "AddToQuickAccessRequested", RoutingStrategy.Bubble, typeof(EventHandler<RibbonQuickAccessEventArgs>), typeof(Ribbon));
+
+    public static readonly RoutedEvent RemoveFromQuickAccessRequestedEvent = EventManager.RegisterRoutedEvent(
+        "RemoveFromQuickAccessRequested", RoutingStrategy.Bubble, typeof(EventHandler<RibbonQuickAccessEventArgs>), typeof(Ribbon));
+
+    public static bool GetCanAddToQuickAccess(IAdamantiumComponent element) =>
+        element.GetValue<bool>(CanAddToQuickAccessProperty);
+
+    public static void SetCanAddToQuickAccess(IAdamantiumComponent element, bool value) =>
+        element.SetValue(CanAddToQuickAccessProperty, value);
+
+    public static bool GetIsInQuickAccess(IAdamantiumComponent element) =>
+        element.GetValue<bool>(IsInQuickAccessProperty);
+
+    public static void SetIsInQuickAccess(IAdamantiumComponent element, bool value) =>
+        element.SetValue(IsInQuickAccessProperty, value);
+
+    public static ICommand GetAddToQuickAccessCommand(IAdamantiumComponent element) =>
+        element.GetValue<ICommand>(AddToQuickAccessCommandProperty);
+
+    public static void SetAddToQuickAccessCommand(IAdamantiumComponent element, ICommand value) =>
+        element.SetValue(AddToQuickAccessCommandProperty, value);
+
+    public static ICommand GetRemoveFromQuickAccessCommand(IAdamantiumComponent element) =>
+        element.GetValue<ICommand>(RemoveFromQuickAccessCommandProperty);
+
+    public static void SetRemoveFromQuickAccessCommand(IAdamantiumComponent element, ICommand value) =>
+        element.SetValue(RemoveFromQuickAccessCommandProperty, value);
+
+    /// <summary>Every command in the band that may go in the bar, tab by tab and group by group. Walked over the ITEMS
+    /// rather than the visual tree: only the open tab is ever realized, and a list that showed one tab's commands would
+    /// be no use for choosing.
+    /// <para>There is exactly one place to move commands from, and this is what furnishes it - a per-command context
+    /// menu cannot be it, because <see cref="Base.InputUIComponent.ContextMenu"/> holds ONE menu and the author's would
+    /// replace ours (or ours theirs).</para></summary>
+    public IEnumerable<IUIComponent> QuickAccessCandidates
+    {
+        get
+        {
+            foreach (var item in Items)
+            {
+                if (item is not RibbonTab tab) continue;
+
+                foreach (var groupItem in tab.Items)
+                {
+                    if (groupItem is not RibbonGroup group) continue;
+
+                    foreach (var command in group.Items)
+                    {
+                        if (command is IUIComponent ui && GetCanAddToQuickAccess(ui))
+                        {
+                            yield return ui;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// <summary>Puts the command given as its parameter in the bar, or takes it out - whichever it is not. This is what
+    /// a customisation page's rows run, so that asking is BINDABLE: without it the only way to ask from markup would be
+    /// a view model reaching for control types, or a behaviour, and neither is a thing an ordinary screen should need.</summary>
+    public ICommand ToggleQuickAccess => _toggleQuickAccess ??= new ToggleQuickAccessCommand();
+
+    private ICommand _toggleQuickAccess;
+
+    private sealed class ToggleQuickAccessCommand : ICommand
+    {
+        public event EventHandler CanExecuteChanged;
+
+        public bool CanExecute(object parameter = null) =>
+            parameter is IUIComponent command && GetCanAddToQuickAccess(command);
+
+        public void Execute(object parameter = null)
+        {
+            if (parameter is not IUIComponent command) return;
+
+            RequestQuickAccess(command, !GetIsInQuickAccess(command));
+        }
+
+        public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Asks for <paramref name="command"/> to be put in the bar (or taken out of it): raises the routed event
+    /// and runs the bound command with the same argument. Both, because a host with code hears the event, and a view
+    /// with only a view model binds the command.</summary>
+    public static void RequestQuickAccess(IUIComponent command, bool add)
+    {
+        if (command == null || !GetCanAddToQuickAccess(command)) return;
+
+        var args = new RibbonQuickAccessEventArgs(
+            add ? AddToQuickAccessRequestedEvent : RemoveFromQuickAccessRequestedEvent, command);
+
+        (command as IObservableComponent)?.RaiseEvent(args);
+
+        var bound = add ? GetAddToQuickAccessCommand(command) : GetRemoveFromQuickAccessCommand(command);
+        if (bound?.CanExecute(args) == true)
+        {
+            bound.Execute(args);
+        }
+    }
 
     /// <summary>The selected tab, shown by <c>PART_SelectedContentHost</c>. Read-only: it follows the selection.</summary>
     public static readonly AdamantiumProperty SelectedContentProperty = AdamantiumProperty.Register(nameof(SelectedContent),
@@ -113,8 +278,14 @@ public class Ribbon : Selector
     {
         if (sender is not Ribbon ribbon) return;
 
-        if (e.OldValue is RibbonApplicationMenu old) ribbon.RemoveLogicalChild(old);
-        if (e.NewValue is RibbonApplicationMenu menu) ribbon.AddLogicalChild(menu);
+        if (e.OldValue is RibbonApplicationMenu old)
+        {
+            ribbon.RemoveLogicalChild(old);
+        }
+        if (e.NewValue is RibbonApplicationMenu menu)
+        {
+            ribbon.AddLogicalChild(menu);
+        }
     }
 
     /// <summary>A row of the band's own, under the groups: whatever the application puts there. Neutral on purpose -
@@ -133,7 +304,10 @@ public class Ribbon : Selector
         if (sender is not Ribbon ribbon) return;
 
         ribbon.HostSelectedContent();
-        if (!ribbon.IsMinimized) ribbon.CloseFlyout();
+        if (!ribbon.IsMinimized)
+        {
+            ribbon.CloseFlyout();
+        }
     }
 
     public Ribbon()
@@ -230,9 +404,15 @@ public class Ribbon : Selector
             _flyout.IgnoreTargetPress = true;
         }
 
-        if (_minimizeButton != null) _minimizeButton.Click -= OnMinimizeButtonClick;
+        if (_minimizeButton != null)
+        {
+            _minimizeButton.Click -= OnMinimizeButtonClick;
+        }
         _minimizeButton = GetTemplateChild("PART_MinimizeButton") as Primitives.ToggleButton;
-        if (_minimizeButton != null) _minimizeButton.Click += OnMinimizeButtonClick;
+        if (_minimizeButton != null)
+        {
+            _minimizeButton.Click += OnMinimizeButtonClick;
+        }
 
         HostSelectedContent();
     }
@@ -247,11 +427,17 @@ public class Ribbon : Selector
 
         if (IsMinimized)
         {
-            if (_flyoutHost != null) _flyoutHost.Child = content;
+            if (_flyoutHost != null)
+            {
+                _flyoutHost.Child = content;
+            }
             return;
         }
 
-        if (_bandHost != null) _bandHost.Child = content;
+        if (_bandHost != null)
+        {
+            _bandHost.Child = content;
+        }
     }
 
     /// <summary>A press on a header opens that tab; while the band is minimized it also drops the tab's groups down
@@ -271,7 +457,10 @@ public class Ribbon : Selector
 
     private void CloseFlyout()
     {
-        if (_flyout != null) _flyout.IsOpen = false;
+        if (_flyout != null)
+        {
+            _flyout.IsOpen = false;
+        }
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
