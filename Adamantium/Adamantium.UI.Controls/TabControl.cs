@@ -1481,11 +1481,37 @@ public class TabControl : Selector
 
     private void OnTabStripScrollStateChanged(object sender, EventArgs e) => RefreshTabStripAffordances();
 
+    // What the theme fades the strip's edges on. Stated HERE rather than read off the scroller, because a trigger
+    // watches the templated control - and the fade has to be a sibling OVER the scroller, or it would pan with the tabs.
+    public static readonly AdamantiumProperty CanScrollTabsBackProperty = AdamantiumProperty.RegisterReadOnly(
+        nameof(CanScrollTabsBack), typeof(bool), typeof(TabControl), new PropertyMetadata(false));
+
+    public static readonly AdamantiumProperty CanScrollTabsForwardProperty = AdamantiumProperty.RegisterReadOnly(
+        nameof(CanScrollTabsForward), typeof(bool), typeof(TabControl), new PropertyMetadata(false));
+
+    /// <summary>Whether tabs have gone past the strip's near edge.</summary>
+    public bool CanScrollTabsBack
+    {
+        get => GetValue<bool>(CanScrollTabsBackProperty);
+        private set => SetValue(CanScrollTabsBackProperty, value);
+    }
+
+    /// <summary>...and past its far edge.</summary>
+    public bool CanScrollTabsForward
+    {
+        get => GetValue<bool>(CanScrollTabsForwardProperty);
+        private set => SetValue(CanScrollTabsForwardProperty, value);
+    }
+
     // The overflow ▾ shows whenever the strip overflows (can scroll either way) and the toggle is on.
     private void RefreshTabStripAffordances()
     {
+        // The edge fades come FIRST: they belong to the strip whether or not this template has a ▾ to hide.
+        CanScrollTabsBack = _tabStrip?.CanScrollBack ?? false;
+        CanScrollTabsForward = _tabStrip?.CanScrollForward ?? false;
+
         if (_overflow == null) return;
-        var overflowing = (_tabStrip?.CanScrollBack ?? false) || (_tabStrip?.CanScrollForward ?? false);
+        var overflowing = CanScrollTabsBack || CanScrollTabsForward;
         var visibility = ShowTabOverflowMenu && overflowing ? Visibility.Visible : Visibility.Collapsed;
         if (_overflow.Visibility == visibility) return;
 

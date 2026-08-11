@@ -83,4 +83,14 @@
     <math:Color x:Key="ShimmerPeakColor">#59000000</math:Color>
     <math:Color x:Key="ShimmerTrackColor">#14000000</math:Color>
 
+    <!-- The edge fade (see the Dark palette): the same surface, this palette's colour. -->
+    <math:Color x:Key="EdgeFadeColor">#E6DFDFDF</math:Color>
+    <math:Color x:Key="EdgeFadeColorTransparent">#00DFDFDF</math:Color>
+
+    <!-- The key-tip badge (see the Dark palette): the mirror of it. A DARK plate with light text, because a light one
+         on a light band is exactly the badge that goes missing. -->
+    <SolidColorBrush x:Key="KeyTipPlateFill" Color="#2B2B2B"/>
+    <SolidColorBrush x:Key="KeyTipPlateStroke" Color="#0D0D0D"/>
+    <SolidColorBrush x:Key="KeyTipForeground" Color="#F5F5F5"/>
+
 </ResourceDictionary>

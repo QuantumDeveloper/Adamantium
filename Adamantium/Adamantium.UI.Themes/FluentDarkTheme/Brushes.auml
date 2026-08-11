@@ -89,4 +89,19 @@
          the flanking stops need a colour. Keep the two in step - they are the same surface. -->
     <math:Color x:Key="ShimmerTrackColor">#14FFFFFF</math:Color>
 
+    <!-- The fade at the edge of a strip that has more beyond it - a ribbon band, a tab strip. Deliberately a shade
+         DARKER than the surface it sits on, so it reads as a vignette rather than as a patch of the same grey; equal to
+         the surface, it only dims what is under it and says nothing. Both ends must be THE SAME colour: fading to a
+         plain transparent black would drag a grey haze across the interpolation. -->
+    <math:Color x:Key="EdgeFadeColor">#E6161616</math:Color>
+    <math:Color x:Key="EdgeFadeColorTransparent">#00161616</math:Color>
+
+    <!-- The key-tip badge. Its own tokens, and INVERTED against the palette on purpose: the badge lands on whatever the
+         command it marks is made of - the band, an icon, the accent of an open tab - and a plate in the palette's own
+         surface colour goes missing on the first of those it happens to match. On the dark theme it is a LIGHT plate
+         with dark text; the light theme states the mirror. Opaque: a translucent badge over a glyph is unreadable. -->
+    <SolidColorBrush x:Key="KeyTipPlateFill" Color="#F2F2F2"/>
+    <SolidColorBrush x:Key="KeyTipPlateStroke" Color="#5A5A5A"/>
+    <SolidColorBrush x:Key="KeyTipForeground" Color="#101010"/>
+
 </ResourceDictionary>
