@@ -208,6 +208,33 @@
                                                    IsHitTestVisible="False"/>
                                     </Grid>
                                 </TabStripScroller>
+                            <!-- The strip has no arrows (it pans on the wheel), so the fade is the ONLY thing saying
+                                 there are tabs past the edge. A SIBLING of the scroller, in its cell: inside it, it
+                                 would pan away with the tabs it is meant to be dissolving. -->
+                            <Border x:Name="BackFade" Grid.Row="1" Grid.Column="1"
+                                    Width="39"
+                                    HorizontalAlignment="Left"
+                                    Visibility="Collapsed"
+                                    IsHitTestVisible="False">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                        <GradientStop Offset="0" Color="{ResourceReference EdgeFadeColor}"/>
+                                        <GradientStop Offset="1" Color="{ResourceReference EdgeFadeColorTransparent}"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+                            <Border x:Name="ForwardFade" Grid.Row="1" Grid.Column="1"
+                                    Width="39"
+                                    HorizontalAlignment="Right"
+                                    Visibility="Collapsed"
+                                    IsHitTestVisible="False">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                        <GradientStop Offset="0" Color="{ResourceReference EdgeFadeColorTransparent}"/>
+                                        <GradientStop Offset="1" Color="{ResourceReference EdgeFadeColor}"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
                             <!-- Focusable=False: chrome, not a keyboard destination. Clicking it used to give it focus,
                                  and the button template lights its focus ring on IsFocused - so a frame was left drawn
                                  around it after every use. Tab still reaches the tabs themselves, which is what matters. -->
@@ -270,6 +297,13 @@
                         <PropertyTrigger Property="HasUnpinnedTabs" Value="false">
                             <Setter TargetName="PART_TabStrip" Property="Visibility" Value="Collapsed"/>
                         </PropertyTrigger>
+                        <!-- Shown only where something has actually gone past that edge. -->
+                        <PropertyTrigger Property="CanScrollTabsBack" Value="true">
+                            <Setter TargetName="BackFade" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="CanScrollTabsForward" Value="true">
+                            <Setter TargetName="ForwardFade" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
                         <!-- ONE row: the pinned list moves down beside the others, in the first column, and stops
                              spanning the width. The tabs themselves are unchanged - only where their list sits. -->
                         <PropertyTrigger Property="PinnedTabsPlacement" Value="SameRow">
@@ -330,6 +364,31 @@
                                                IsHitTestVisible="False"/>
                                 </Grid>
                             </TabStripScroller>
+                            <!-- See the Top template: a sibling of the scroller, never inside it. -->
+                            <Border x:Name="BackFade" Grid.Column="0"
+                                    Width="39"
+                                    HorizontalAlignment="Left"
+                                    Visibility="Collapsed"
+                                    IsHitTestVisible="False">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                        <GradientStop Offset="0" Color="{ResourceReference EdgeFadeColor}"/>
+                                        <GradientStop Offset="1" Color="{ResourceReference EdgeFadeColorTransparent}"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+                            <Border x:Name="ForwardFade" Grid.Column="0"
+                                    Width="39"
+                                    HorizontalAlignment="Right"
+                                    Visibility="Collapsed"
+                                    IsHitTestVisible="False">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                                        <GradientStop Offset="0" Color="{ResourceReference EdgeFadeColorTransparent}"/>
+                                        <GradientStop Offset="1" Color="{ResourceReference EdgeFadeColor}"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
                             <ToggleButton x:Name="PART_TabOverflow" Grid.Column="1" VerticalAlignment="Stretch"
                                           Focusable="False"
                                           MinWidth="28" Padding="4 0" Visibility="Collapsed" BorderThickness="0"
@@ -358,6 +417,12 @@
                         </PropertyTrigger>
                         <PropertyTrigger Property="SelectionIndicatorPlacement" Value="Outer">
                             <Setter TargetName="PART_SelectionIndicator" Property="VerticalAlignment" Value="Bottom"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="CanScrollTabsBack" Value="true">
+                            <Setter TargetName="BackFade" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="CanScrollTabsForward" Value="true">
+                            <Setter TargetName="ForwardFade" Property="Visibility" Value="Visible"/>
                         </PropertyTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -393,6 +458,31 @@
                                                IsHitTestVisible="False"/>
                                 </Grid>
                             </TabStripScroller>
+                            <!-- Vertical strip: the fade runs top and bottom. Sibling of the scroller (see Top). -->
+                            <Border x:Name="BackFade" Grid.Row="0"
+                                    Height="39"
+                                    VerticalAlignment="Top"
+                                    Visibility="Collapsed"
+                                    IsHitTestVisible="False">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Offset="0" Color="{ResourceReference EdgeFadeColor}"/>
+                                        <GradientStop Offset="1" Color="{ResourceReference EdgeFadeColorTransparent}"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+                            <Border x:Name="ForwardFade" Grid.Row="0"
+                                    Height="39"
+                                    VerticalAlignment="Bottom"
+                                    Visibility="Collapsed"
+                                    IsHitTestVisible="False">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Offset="0" Color="{ResourceReference EdgeFadeColorTransparent}"/>
+                                        <GradientStop Offset="1" Color="{ResourceReference EdgeFadeColor}"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
                             <ToggleButton x:Name="PART_TabOverflow" Grid.Row="1" HorizontalAlignment="Stretch"
                                           Focusable="False"
                                           MinHeight="24" Padding="0 4" Visibility="Collapsed" BorderThickness="0"
@@ -435,6 +525,12 @@
                         </PropertyTrigger>
                         <PropertyTrigger Property="SelectionIndicatorPlacement" Value="Outer">
                             <Setter TargetName="PART_SelectionIndicator" Property="HorizontalAlignment" Value="Left"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="CanScrollTabsBack" Value="true">
+                            <Setter TargetName="BackFade" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="CanScrollTabsForward" Value="true">
+                            <Setter TargetName="ForwardFade" Property="Visibility" Value="Visible"/>
                         </PropertyTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -483,6 +579,31 @@
                                                IsHitTestVisible="False"/>
                                 </Grid>
                             </TabStripScroller>
+                            <!-- Vertical strip: the fade runs top and bottom. Sibling of the scroller (see Top). -->
+                            <Border x:Name="BackFade" Grid.Row="0"
+                                    Height="39"
+                                    VerticalAlignment="Top"
+                                    Visibility="Collapsed"
+                                    IsHitTestVisible="False">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Offset="0" Color="{ResourceReference EdgeFadeColor}"/>
+                                        <GradientStop Offset="1" Color="{ResourceReference EdgeFadeColorTransparent}"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
+                            <Border x:Name="ForwardFade" Grid.Row="0"
+                                    Height="39"
+                                    VerticalAlignment="Bottom"
+                                    Visibility="Collapsed"
+                                    IsHitTestVisible="False">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Offset="0" Color="{ResourceReference EdgeFadeColorTransparent}"/>
+                                        <GradientStop Offset="1" Color="{ResourceReference EdgeFadeColor}"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                            </Border>
                             <ToggleButton x:Name="PART_TabOverflow" Grid.Row="1" HorizontalAlignment="Stretch"
                                           Focusable="False"
                                           MinHeight="24" Padding="0 4" Visibility="Collapsed" BorderThickness="0"
@@ -511,6 +632,12 @@
                         </PropertyTrigger>
                         <PropertyTrigger Property="SelectionIndicatorPlacement" Value="Outer">
                             <Setter TargetName="PART_SelectionIndicator" Property="HorizontalAlignment" Value="Right"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="CanScrollTabsBack" Value="true">
+                            <Setter TargetName="BackFade" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                        <PropertyTrigger Property="CanScrollTabsForward" Value="true">
+                            <Setter TargetName="ForwardFade" Property="Visibility" Value="Visible"/>
                         </PropertyTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
