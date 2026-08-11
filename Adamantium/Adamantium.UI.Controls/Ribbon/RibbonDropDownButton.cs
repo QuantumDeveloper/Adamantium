@@ -8,8 +8,17 @@ namespace Adamantium.UI.Controls;
 /// submenus and <c>ItemsSource</c> are already answered.
 /// <para><see cref="Primitives.ToggleButton.IsChecked"/> IS the open state; there is no second property saying the same
 /// thing, and the theme's checked look is what marks the command while its menu is down.</para></summary>
-public class RibbonDropDownButton : RibbonToggleButton
+public class RibbonDropDownButton : RibbonToggleButton, IKeyTipTarget
 {
+    /// <summary>Reached by its key tip: drop the menu AND step the keyboard into it. A command opened from the keyboard
+    /// has to stay reachable from it - the rows are drawn in the overlay, so a plain click-equivalent leaves the
+    /// keyboard standing on the button with a list open in front of it and no way in.</summary>
+    public void PressKeyTip()
+    {
+        IsChecked = true;
+        DropDownMenu?.MoveKeyboardInsideWhenReady();
+    }
+
     public static readonly AdamantiumProperty DropDownMenuProperty = AdamantiumProperty.Register(nameof(DropDownMenu),
         typeof(ContextMenu), typeof(RibbonDropDownButton), new PropertyMetadata(null, OnDropDownMenuChanged));
 

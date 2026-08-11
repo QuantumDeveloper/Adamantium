@@ -132,6 +132,53 @@ public partial class RibbonShellViewModel : IWindowAware
 
     [Command] private void EditRoughness() => Status = "Editing the roughness channel.";
 
+    /// <summary>The gallery's choices. DATA, so the dropped-down gallery can build its own cells from the same template.</summary>
+    private static readonly MaterialSwatch[] MaterialChoices =
+    [
+        new MaterialSwatch { Name = "Steel", Fill = "#8A8F98" },
+        new MaterialSwatch { Name = "Copper", Fill = "#B87333" },
+        new MaterialSwatch { Name = "Gold", Fill = "#D4AF37" },
+        new MaterialSwatch { Name = "Jade", Fill = "#4FA37A" },
+        new MaterialSwatch { Name = "Cobalt", Fill = "#3B6FD4" },
+        new MaterialSwatch { Name = "Ruby", Fill = "#C0334A" },
+        new MaterialSwatch { Name = "Slate", Fill = "#4A5058" },
+        new MaterialSwatch { Name = "Sand", Fill = "#C9B48A" },
+        new MaterialSwatch { Name = "Ivory", Fill = "#E8E2D4" },
+        new MaterialSwatch { Name = "Basalt", Fill = "#2E3238" },
+        new MaterialSwatch { Name = "Moss", Fill = "#6B7A45" },
+        new MaterialSwatch { Name = "Plum", Fill = "#7A4A85" }
+    ];
+
+    public IReadOnlyList<MaterialSwatch> Materials => MaterialChoices;
+
+    [Bindable] private MaterialSwatch _selectedMaterial = MaterialChoices[0];
+
+    // Home carries a real editor's worth of groups, so the band's LAST resort - scrolling, once every group has been
+    // collapsed and it still does not fit - is reachable by dragging the window narrow.
+    [Command] private void AlignLeft() => Status = "Aligned to the left.";
+
+    [Command] private void AlignCenter() => Status = "Centred.";
+
+    [Command] private void Distribute() => Status = "Distributed evenly.";
+
+    [Command] private void GroupSelection() => Status = "Grouped the selection.";
+
+    [Command] private void BringForward() => Status = "Brought forward.";
+
+    [Command] private void SendBackward() => Status = "Sent backward.";
+
+    [Command] private void AddLight() => Status = "Added a light.";
+
+    [Command] private void BakeLighting() => Status = "Baking the lighting.";
+
+    [Command] private void AddCollider() => Status = "Added a collider.";
+
+    [Command] private void Simulate() => Status = "Simulating.";
+
+    [Command] private void Measure() => Status = "Measuring.";
+
+    [Command] private void Annotate() => Status = "Annotating.";
+
     // The ribbon hands over a DESCRIPTION and never touches this collection - the shell decides what its own items are
     // made of. Here they are WindowCommands, the type the caption bar already lists.
     [Command] private void AddToQuickAccess(object request)

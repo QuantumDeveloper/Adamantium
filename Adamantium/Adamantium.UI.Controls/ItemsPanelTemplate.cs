@@ -1,6 +1,7 @@
 using System;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Extensions;
 using Adamantium.UI.Core.Templates;
 
 namespace Adamantium.UI.Controls;
@@ -27,11 +28,31 @@ public class ItemsPanelTemplate : UiTemplate
     public static ItemsPanelTemplate Default { get; } =
         new(() => new TemplateResult { RootComponent = new StackPanel { Orientation = Orientation.Vertical } });
 
+    /// <summary>The panel is a templated part like any other, so it may state its settings as {TemplateBinding} against
+    /// the control whose items it hosts - which is how a gallery tells its grid how many columns this size is drawn in.</summary>
     public override TemplateResult Build(IUIComponent templatedParent)
     {
         if (_builder == null)
             throw new InvalidOperationException("ItemsPanelTemplate has no builder.");
 
-        return _builder();
+        var result = _builder();
+        result.HostComponent = templatedParent;
+
+        if (templatedParent == null) return result;
+
+        result.RootComponent.TraverseVisualTree(component => ((FundamentalUIComponent)component).TemplatedParent = templatedParent);
+
+        foreach (var binding in result.TemplateBindings)
+        {
+            binding.Source = templatedParent;
+            binding.EstablishConnection();
+        }
+
+        foreach (var binding in result.Bindings)
+        {
+            binding.EstablishConnection();
+        }
+
+        return result;
     }
 }

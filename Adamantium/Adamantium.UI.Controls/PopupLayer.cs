@@ -112,6 +112,12 @@ public class PopupLayer
         {
             if (popup.ChildValue is not MeasurableUIComponent child) continue;
 
+            // One tick per frame while the popup is on the layer. This subtree is laid out HERE and nowhere else - the
+            // window's LayoutManager never runs over it (it is the layer's, by LayoutRoot), so its LayoutUpdated never
+            // fires for it. Anything that must wait for the content - a menu opened from the keyboard cannot step into
+            // rows that do not exist yet - waits on this and retries until its condition holds.
+            popup.NotifyLayerPass();
+
             // Full-window overlay (e.g. a modal dialog scrim): cover the whole window at the origin - no edge, no target.
             if (popup.FillWindow)
             {

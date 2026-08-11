@@ -268,6 +268,13 @@ public class Popup : MeasurableUIComponent, IContainer
         if (DismissOnEscape) HookEscape();   // ...and Escape, which a KeepOpen drawer wants just as much
     }
 
+    /// <summary>Raised once per frame while this popup is on the layer, from the pass that lays its content out - the
+    /// only place that happens. What waits on it retries until its own condition holds; there is no single "ready"
+    /// instant to hand out, because the content keeps being re-measured as it changes.</summary>
+    internal event EventHandler LayerPass;
+
+    internal void NotifyLayerPass() => LayerPass?.Invoke(this, EventArgs.Empty);
+
     private readonly FocusReturn _focusReturn = new();
 
     private void Close()

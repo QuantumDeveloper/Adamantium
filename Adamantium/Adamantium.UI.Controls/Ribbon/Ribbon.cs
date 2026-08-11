@@ -3,6 +3,7 @@ using System.Collections.Specialized;
 using Adamantium.Core.Commands;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
+using Adamantium.UI.Core.Media.Animation;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.Core.Templates;
 
@@ -243,6 +244,18 @@ public class Ribbon : Selector
     /// <summary>Three rows of small commands plus a caption.</summary>
     public const double DefaultGroupsAreaHeight = 106;
 
+    /// <summary>How long the minimized band takes to slide out and back. A THEME metric - the motion is part of how the
+    /// ribbon looks, not of what it does. Zero makes it appear at once.</summary>
+    public static readonly AdamantiumProperty FlyoutTransitionDurationProperty = AdamantiumProperty.Register(
+        nameof(FlyoutTransitionDuration), typeof(TimeSpan), typeof(Ribbon),
+        new PropertyMetadata(TimeSpan.FromMilliseconds(160)));
+
+    public TimeSpan FlyoutTransitionDuration
+    {
+        get => GetValue<TimeSpan>(FlyoutTransitionDurationProperty);
+        set => SetValue(FlyoutTransitionDurationProperty, value);
+    }
+
     public double GroupsAreaHeight
     {
         get => GetValue<double>(GroupsAreaHeightProperty);
@@ -376,6 +389,13 @@ public class Ribbon : Selector
     }
 
     private IUIComponent _contentHost;
+    private IUIComponent _strip;                 // the tab headers - a key-tip level, without the tab bodies
+    private IUIComponent _applicationMenuHost;   // "File", which stands at the head of the strip
+
+    /// <summary>Where the selected tab is shown - what a tab header hands the key-tip session as its next level, since
+    /// a tab's commands live here and not under the strip.</summary>
+    internal IUIComponent SelectedContentHost => _contentHost;
+
     private RibbonTabHeader _enterFrom;
     private IUIComponent _enterReplacing;
     private int _enterTries;
@@ -390,6 +410,8 @@ public class Ribbon : Selector
     {
         base.OnApplyTemplate();
         _contentHost = GetTemplateChild("PART_SelectedContentHost") as IUIComponent;
+        _strip = GetTemplateChild("PART_ItemsPresenter") as IUIComponent;
+        _applicationMenuHost = GetTemplateChild("PART_ApplicationMenuHost") as IUIComponent;
         _bandHost = GetTemplateChild("PART_BandHost") as Decorators.Decorator;
         _flyoutHost = GetTemplateChild("PART_FlyoutHost") as Decorators.Decorator;
 
@@ -450,17 +472,82 @@ public class Ribbon : Selector
 
         if (!IsMinimized || _flyout == null) return;
 
-        _flyout.IsOpen = !wasShowing;
+        if (wasShowing) CloseFlyout();
+        else OpenFlyout();
     }
 
     internal void ToggleMinimized() => IsMinimized = !IsMinimized;
 
+    // --- Showing and putting away the minimized band ------------------------------------------------------------------
+    //
+    // It SLIDES, because a band that appears whole in one frame reads as a different surface arriving rather than as the
+    // ribbon's own band coming back. The theme frames it in a fixed-height clip; what moves is a transform on the host
+    // inside it - a compositor channel, so the motion costs nothing per frame and never re-runs the adaptive pass.
+
+    // The transform the theme put on PART_FlyoutHost. Null = a theme that did not ask for the motion; then it just shows.
+    private Core.Media.Transform FlyoutSlide => _flyoutHost?.RenderTransform;
+
+    private bool _flyoutClosing;
+
+    private void OpenFlyout()
+    {
+        if (_flyout == null) return;
+
+        _flyoutClosing = false;
+
+        var slide = FlyoutSlide;
+        if (slide == null)
+        {
+            _flyout.IsOpen = true;
+            return;
+        }
+
+        // Start it hidden, and only begin moving once the overlay has actually been laid out: content raised THIS frame
+        // is still 0x0, and a transform on nothing plays out unseen (the same trap the theme-swap spinner hit).
+        slide.TranslateY = -GroupsAreaHeight;
+        _flyout.LayerPass += OnFlyoutFirstPass;
+        _flyout.IsOpen = true;
+    }
+
+    private void OnFlyoutFirstPass(object sender, EventArgs e)
+    {
+        _flyout.LayerPass -= OnFlyoutFirstPass;
+        Animate(0);
+    }
+
     private void CloseFlyout()
     {
-        if (_flyout != null)
+        if (_flyout is not { IsOpen: true }) return;
+
+        var slide = FlyoutSlide;
+        if (slide == null)
         {
             _flyout.IsOpen = false;
+            return;
         }
+
+        // The popup has to OUTLIVE the motion, so it is taken off the layer by the animation's completion - and only if
+        // nothing re-opened it in the meantime.
+        _flyoutClosing = true;
+        _flyout.LayerPass -= OnFlyoutFirstPass;
+        Animate(-GroupsAreaHeight, () =>
+        {
+            if (_flyoutClosing && _flyout != null) _flyout.IsOpen = false;
+        });
+    }
+
+    private void Animate(double to, Action completed = null)
+    {
+        var slide = FlyoutSlide;
+        if (slide == null) return;
+
+        slide.BeginAnimation(Core.Media.Transform.TranslateYProperty, new DoubleAnimation
+        {
+            From = slide.TranslateY,
+            To = to,
+            Duration = FlyoutTransitionDuration,
+            Easing = new CubicEasing { Mode = EasingMode.Out }
+        }, completed);
     }
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
@@ -471,6 +558,8 @@ public class Ribbon : Selector
             _hookedManager = LayoutManager.For(this);
             _hookedManager.LayoutUpdated += OnLayoutSettled;
         }
+
+        HookKeyTips();
     }
 
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
@@ -481,9 +570,180 @@ public class Ribbon : Selector
             _hookedManager.LayoutUpdated -= OnLayoutSettled;
             _hookedManager = null;
         }
+
+        UnhookKeyTips();
     }
 
-    private void OnLayoutSettled(object sender, EventArgs e) => EnterSelectedContent();
+    private void OnLayoutSettled(object sender, EventArgs e)
+    {
+        EnterSelectedContent();
+        // A tab's commands are not in the tree at the moment its header is pressed - the band shows them on the pass
+        // that follows - so the level is re-read once layout has settled.
+        _keyTips?.Refresh();
+    }
+
+    // ---- key tips (Office's Alt) -----------------------------------------------------------------------------------
+
+    private KeyTipSession _keyTips;
+    private IInputComponent _keyTipRoot;
+    private KeyEventHandler _keyTipKeys;
+    private KeyEventHandler _keyTipUp;
+    private TextInputEventHandler _keyTipText;
+    private MouseButtonEventHandler _keyTipPress;
+
+    /// <summary>Alt is heard at the WINDOW, not at the band: the mode starts wherever the keyboard happens to be, and
+    /// its first level covers the caption too - the quick-access bar wears badges there, as in Office.</summary>
+    private void HookKeyTips()
+    {
+        if (_keyTipRoot != null || RootVisual is not IInputComponent root) return;
+
+        _keyTipRoot = root;
+        _keyTipKeys ??= OnKeyTipKey;
+        _keyTipPress ??= OnKeyTipPress;
+        _keyTipText ??= OnKeyTipText;
+        _keyTipUp ??= OnKeyTipKeyUp;
+        _keyTipRoot.AddHandler(Keyboard.PreviewKeyDownEvent, _keyTipKeys, handledEventsToo: true);
+        _keyTipRoot.AddHandler(Keyboard.PreviewKeyUpEvent, _keyTipUp, handledEventsToo: true);
+        _keyTipRoot.AddHandler(Keyboard.PreviewTextInputEvent, _keyTipText, handledEventsToo: true);
+        _keyTipRoot.AddHandler(Mouse.PreviewMouseDownEvent, _keyTipPress, handledEventsToo: true);
+    }
+
+    private void UnhookKeyTips()
+    {
+        if (_keyTipRoot == null) return;
+
+        _keyTipRoot.RemoveHandler(Keyboard.PreviewKeyDownEvent, _keyTipKeys);
+        _keyTipRoot.RemoveHandler(Keyboard.PreviewKeyUpEvent, _keyTipUp);
+        _keyTipRoot.RemoveHandler(Keyboard.PreviewTextInputEvent, _keyTipText);
+        _keyTipRoot.RemoveHandler(Mouse.PreviewMouseDownEvent, _keyTipPress);
+        _keyTipRoot = null;
+        _keyTips?.End();
+    }
+
+    /// <summary>Letters come from the TEXT stream, not from the key: what a key produces depends on the keyboard
+    /// layout, and matching a virtual key against the badge would mean the letters shown could only ever be typed on a
+    /// Latin layout. Office matches what was actually typed, and so does this.</summary>
+    private void OnKeyTipText(object sender, TextInputEventArgs e)
+    {
+        if (_keyTips is not { IsActive: true } || string.IsNullOrEmpty(e.Text)) return;
+
+        // While Alt is still HELD a letter is half of a shortcut (Alt+H), not a key tip - Office acts on the letters
+        // only once Alt is off. Holding it and typing let every repeat of the pair walk a level deeper and then wipe
+        // the badges, which read as the ribbon running through them by itself.
+        // AUTOREPEAT is not a second keystroke either, for the same reason. Both are still swallowed: they were aimed
+        // at the mode.
+        if (_altDown || _lastKeyRepeated)
+        {
+            e.Handled = true;
+            return;
+        }
+
+        // Both readings of the same keystroke: what it typed, and the letter that key carries on a Latin keyboard. On a
+        // Russian layout the first is "р" and the second "H" - and a band labelled in English answers only to the
+        // second, so without it the key tips could not be reached at all.
+        e.Handled = _keyTips.Press(e.Text[0], _lastKeyLetter);
+        _lastKeyLetter = null;
+    }
+
+    private char? _lastKeyLetter;
+    private bool _lastKeyRepeated;
+    private Key? _heldKey;   // the key that has not come back up - see OnKeyTipKey
+
+    // Alt went down with nothing pressed since - so its RELEASE is a request for key tips rather than half a shortcut.
+    private bool _altAlone;
+    private bool _altDown;
+
+    private void OnKeyTipKeyUp(object sender, KeyEventArgs e)
+    {
+        if (e.Key == _heldKey) _heldKey = null;
+        if (e.Key is not (Key.Alt or Key.LeftAlt or Key.RightAlt)) return;
+
+        _altDown = false;
+        if (_altAlone) Toggle();
+        _altAlone = false;
+        e.Handled = true;
+    }
+
+    // Reaching for the pointer means the keyboard route was abandoned - Office drops the badges on any press.
+    private void OnKeyTipPress(object sender, MouseButtonEventArgs e) => _keyTips?.End();
+
+    private void OnKeyTipKey(object sender, KeyEventArgs e)
+    {
+        // What counts as a REPEAT is worked out here rather than taken from the event: measured, the platform's own
+        // flag misses the first repetition entirely - a second KeyDown arrives 500ms after the press (the system's
+        // autorepeat delay) still claiming IsRepeated=false, and that one descended into a tab and then ran a command
+        // inside it off a single held key. A key that was never released cannot be a new keystroke, whatever the flag
+        // says. Set BEFORE any branch: an early return left it stale from the keystroke before.
+        _lastKeyRepeated = e.IsRepeated || e.Key == _heldKey;
+        _heldKey = e.Key;
+        // Alt does NOT act on the way down. Holding it repeats KeyDown at the system's autorepeat rate, and toggling on
+        // each one flicked the badges on and off many times a second - which read as "it chose something for me".
+        // The mode turns over when the key is RELEASED, and only if nothing was pressed in between: Alt+F4 is a
+        // shortcut, not a request for key tips. Key.Alt is what actually arrives (the virtual key, 0x12); the sided
+        // ones are listed so a platform that distinguishes them still works.
+        if (e.Key is Key.Alt or Key.LeftAlt or Key.RightAlt)
+        {
+            _altDown = true;
+            if (!e.IsRepeated) _altAlone = true;
+            e.Handled = true;
+            return;
+        }
+
+        // Something else went down while Alt was held: that is a shortcut, so the release must not show key tips.
+        _altAlone = false;
+
+        if (_keyTips is not { IsActive: true }) return;
+
+        if (e.Key == Key.Escape)
+        {
+            _keyTips.Escape();
+            e.Handled = true;
+            return;
+        }
+
+        // Letters are acted on in the text stream (see OnKeyTipText), which is where the LAYOUT is honoured - but the
+        // Latin letter this key carries is remembered here, as the second reading of the same keystroke. The key itself
+        // must not travel further, or a key tip would also type into whatever holds the keyboard.
+        _lastKeyLetter = KeyChar(e.Key);
+        if (_lastKeyLetter != null) e.Handled = true;
+    }
+
+    private void Toggle()
+    {
+        if (_keyTips is { IsActive: true })
+        {
+            _keyTips.End();
+            return;
+        }
+
+        _keyTips = new KeyTipSession(TopLevelRoots(), (RootVisual as Adorners.IAdornerHost)?.AdornerLayer);
+        _keyTips.Begin();
+    }
+
+    /// <summary>What the FIRST level is gathered from - named places, not "the window": the tab strip, the application
+    /// menu, and every quick-access bar the window shows. Walking a common ancestor would badge the open tab's commands
+    /// too, and those are the level below.</summary>
+    private IReadOnlyList<IUIComponent> TopLevelRoots()
+    {
+        var roots = new List<IUIComponent>();
+        if (_strip != null) roots.Add(_strip);
+        if (_applicationMenuHost != null) roots.Add(_applicationMenuHost);
+
+        foreach (var bar in (RootVisual as IUIComponent)?.GetVisualDescendants().OfType<RibbonQuickAccess>()
+                            ?? [])
+        {
+            if (bar.Visibility == Visibility.Visible) roots.Add(bar);
+        }
+
+        return roots;
+    }
+
+    private static char? KeyChar(Key key) => key switch
+    {
+        >= Key.A and <= Key.Z => (char)('A' + (key - Key.A)),
+        >= Key.D0 and <= Key.D9 => (char)('0' + (key - Key.D0)),
+        _ => null
+    };
 
     /// <summary>Enter on a header OPENS that tab: picks it, then focuses its first command (Tab goes on walking the
     /// headers, so this is the way in). The page does not exist yet, so the step in stays PENDING until layout settles.</summary>
@@ -540,6 +800,9 @@ public class Ribbon : Selector
     {
         if (container is not RibbonTabHeader header) return;
 
+        // A tab is a LEVEL of key tips, not a command: its letters select it and then show what it holds.
+        KeyTipService.SetIsScope(header, true);
+
         // A header written in markup already says what it says; only its SELECTED state is the strip's to reflect.
         if (!ReferenceEquals(header, item))
         {
@@ -549,6 +812,10 @@ public class Ribbon : Selector
             header.Content = tab != null ? tab.Header : item;
             header.ContentTemplate = tab?.HeaderTemplate ?? ItemTemplate;
             header.ContentTemplateSelector = ItemTemplateSelector;
+
+            // The letters are stated on the TAB, where the author writes it; the header is what wears the badge.
+            if (tab != null && KeyTipService.GetKeyTip(tab) is { Length: > 0 } stated)
+                KeyTipService.SetKeyTip(header, stated);
         }
 
         ApplyContainerSelection(header, item);

@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
@@ -9,6 +10,11 @@ namespace Adamantium.UI.Controls.Panels;
 /// that virtualizes, and would give every group one probed width.</summary>
 public class RibbonGroupsPanel : Panel
 {
+    public RibbonGroupsPanel()
+    {
+        GotKeyboardFocus += OnFocusEntered;
+    }
+
     /// <summary>A ROW: Up/Down must not become "the next group" through the generic order-based walk.</summary>
     public override IUIComponent Navigate(IUIComponent from, FocusNavigationDirection direction)
     {
@@ -39,6 +45,7 @@ public class RibbonGroupsPanel : Panel
         ChooseVariants(finalSize.Width);
 
         double x = 0;
+        _slots.Clear();
         foreach (var child in Children)
         {
             if (child.Visibility != Visibility.Visible) continue;
@@ -47,12 +54,122 @@ public class RibbonGroupsPanel : Panel
             child.Measure(new Size(double.PositiveInfinity, finalSize.Height));
 
             var width = WidthOf(child);
-            // Full band height, so every caption sits on one line.
-            child.Arrange(new Rect(x, 0, width, finalSize.Height));
+            _slots.Add((child, x, width));
+            // Full band height, so every caption sits on one line. Shifted by the scroll, which is the LAST resort -
+            // everything above has already been shrunk and collapsed (see docs/RIBBON_PLAN.md §3.3-3.4).
+            child.Arrange(new Rect(x - Offset, 0, width, finalSize.Height));
             x += width;
         }
 
-        return new Size(x, finalSize.Height);
+        _extent = x;
+        _viewport = finalSize.Width;
+        Clamp();
+        return new Size(finalSize.Width, finalSize.Height);
+    }
+
+    // --- Scrolling the row (§3.4) ------------------------------------------------------------------------------------
+    //
+    // Not a ScrollViewer: a bar under the band would eat height from a strip that has none to spare, and it is chrome
+    // nobody asked for. The row moves by WHOLE GROUPS behind two repeat buttons that overlay its edges - a half-shown
+    // group reads as damage rather than as "there is more".
+
+    private readonly List<(IMeasurableComponent Child, double Start, double Width)> _slots = [];   // unscrolled
+    private double _extent;
+    private double _viewport;
+
+    /// <summary>How far the row is scrolled. Not a property with a callback: the panel is the only thing that moves it,
+    /// and every move already re-arranges.</summary>
+    public double Offset { get; private set; }
+
+    public bool CanScrollBack => Offset > 0.5;
+
+    public bool CanScrollForward => _extent - Offset > _viewport + 0.5;
+
+    /// <summary>Told after every arrange, so the tab can show or hide its arrows and edge fades. The tab owns the
+    /// chrome because the panel is inside its items presenter, where a template cannot reach it.</summary>
+    public event EventHandler ScrollStateChanged;
+
+    /// <summary>One GROUP back. Office steps by group, not by pixels: what a scroll ends on has to be a whole command
+    /// set, or the row reads as clipped.</summary>
+    public void ScrollBack() => ScrollTo(PreviousEdge());
+
+    public void ScrollForward() => ScrollTo(NextEdge());
+
+    private double PreviousEdge()
+    {
+        var target = 0.0;
+        foreach (var slot in _slots)
+        {
+            if (slot.Start >= Offset - 0.5) break;
+            target = slot.Start;
+        }
+
+        return target;
+    }
+
+    private double NextEdge()
+    {
+        foreach (var slot in _slots)
+        {
+            if (slot.Start > Offset + 0.5) return slot.Start;
+        }
+
+        return Offset;
+    }
+
+    /// <summary>Tab and the arrows may land on a group that is scrolled off - focus you cannot see is worse than no
+    /// focus at all, so the row follows the keyboard.</summary>
+    private void OnFocusEntered(object sender, KeyboardGotFocusEventArgs e)
+    {
+        var slot = SlotContaining(e.NewFocus as IUIComponent);
+        if (slot == null) return;
+
+        var (_, start, width) = slot.Value;
+        if (start < Offset)
+        {
+            ScrollTo(start);
+        }
+        else if (start + width > Offset + _viewport)
+        {
+            // Its far edge, unless the group is wider than the row - then its near edge, so it starts where it can be read.
+            ScrollTo(Math.Min(start, start + width - _viewport));
+        }
+    }
+
+    private (IMeasurableComponent Child, double Start, double Width)? SlotContaining(IUIComponent focused)
+    {
+        while (focused != null)
+        {
+            foreach (var slot in _slots)
+            {
+                if (ReferenceEquals(slot.Child, focused)) return slot;
+            }
+
+            focused = focused.VisualParent as IUIComponent;
+        }
+
+        return null;
+    }
+
+    private void ScrollTo(double offset)
+    {
+        if (Math.Abs(offset - Offset) < 0.5) return;
+
+        Offset = offset;
+        Clamp();
+        InvalidateArrange();
+    }
+
+    // A row that shrank (a wider window, a collapsed group) must not leave the view hanging past its end.
+    private void Clamp()
+    {
+        var max = Math.Max(0, _extent - _viewport);
+        var clamped = Math.Min(Math.Max(0, Offset), max);
+        var changed = Math.Abs(clamped - Offset) > 0.5;
+        Offset = clamped;
+
+        ScrollStateChanged?.Invoke(this, EventArgs.Empty);
+        if (changed) InvalidateArrange();
     }
 
     // --- Choosing which variant each group is drawn at ---------------------------------------------------------------
@@ -164,9 +281,16 @@ public class RibbonGroupsPanel : Panel
     // re-packs its rows into MORE columns, so the rung below can cost more than the one above it. -1 = nothing left.
     private static int NextNarrower(RibbonGroup group)
     {
+        var steps = group.ShrinkSteps;
+        if (steps == RibbonGroupShrinkSteps.None) return -1;
+
+        var variants = group.Variants;
         var current = group.WidthAt(group.CurrentVariant);
-        for (var i = group.CurrentVariant + 1; i < group.Variants.Count; i++)
+        for (var i = group.CurrentVariant + 1; i < variants.Count; i++)
         {
+            var step = variants[i].IsCollapsed ? RibbonGroupShrinkSteps.Collapse : RibbonGroupShrinkSteps.Sizes;
+            if ((steps & step) == 0) continue;
+
             if (group.WidthAt(i) < current) return i;
         }
 
