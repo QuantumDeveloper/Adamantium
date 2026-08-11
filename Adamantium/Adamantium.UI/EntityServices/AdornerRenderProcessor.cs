@@ -1,6 +1,7 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Adamantium.Core;
 using Adamantium.ECS;
+using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Adorners;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
@@ -56,7 +57,7 @@ public class AdornerRenderProcessor : EntityProcessor<WindowRenderService>
             if (IsHostedOnOverlay(adorner, window)) 
                 continue;
             
-            LayoutFrameAdorner(adorner);
+            LayoutAdorner(adorner);
             Flatten(adorner, _flat);
         }
 
@@ -83,18 +84,19 @@ public class AdornerRenderProcessor : EntityProcessor<WindowRenderService>
     /// popup stage, which draws the adorners of what IT hosts so they stack with it.</summary>
     internal static void Collect(IUIComponent adorner, List<IUIComponent> list)
     {
-        LayoutFrameAdorner(adorner);
+        LayoutAdorner(adorner);
         Flatten(adorner, list);
     }
 
     private readonly List<IUIComponent> _flat = new();
 
-    // A frame adorner (selection / hover) wraps its whole element: apply the theme once so its ControlTemplate resolves,
-    // then size it to the adorned element's bounds every frame (the element can move/resize). If the theme has no template
-    // for it, Template stays null and the adorner falls back to its own OnRender - so the designer frames never disappear.
-    private static void LayoutFrameAdorner(IUIComponent adorner)
+    // Apply the theme once so the adorner's ControlTemplate resolves, then lay it out every frame (the element can
+    // move/resize). A frame (selection / hover) fills its element; a BADGE (a key tip) measures to its own content and
+    // asks where to sit - it hangs off an edge. If the theme has no template, Template stays null and the adorner falls
+    // back to its own OnRender, so the designer frames never disappear.
+    private static void LayoutAdorner(IUIComponent adorner)
     {
-        if (adorner is not Adorner a || !a.FillsAdornedBounds || a.AdornedElement == null)
+        if (adorner is not Adorner a || a.AdornedElement == null)
             return;
 
         if (!a.ThemeApplied)
@@ -104,12 +106,19 @@ public class AdornerRenderProcessor : EntityProcessor<WindowRenderService>
                 manager.ApplyTheme(theme, a);
         }
 
-        if (a.Template != null)
+        if (a.Template == null) return;
+
+        if (a.FillsAdornedBounds)
         {
             var bounds = a.AdornedBounds;
             ((IMeasurableComponent)a).Measure(bounds.Size, true);
             ((IMeasurableComponent)a).Arrange(bounds, true);
+            return;
         }
+
+        var measurable = (IMeasurableComponent)a;
+        measurable.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity), true);
+        measurable.Arrange(a.PlaceIn(measurable.DesiredSize), true);
     }
 
     private static void Flatten(IUIComponent component, List<IUIComponent> list)

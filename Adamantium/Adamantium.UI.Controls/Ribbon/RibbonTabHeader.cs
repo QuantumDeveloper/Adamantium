@@ -9,8 +9,16 @@ namespace Adamantium.UI.Controls;
 /// <summary>A tab's label in the ribbon's strip - the item container the <see cref="Ribbon"/> generates. It stands FOR
 /// a <see cref="RibbonTab"/> rather than being it: the tab is the body in the groups area, and one control cannot be
 /// in both places.</summary>
-public class RibbonTabHeader : ContentControl, ISelectable
+public class RibbonTabHeader : ContentControl, ISelectable, IKeyTipTarget, IKeyTipScope
 {
+    /// <summary>Its key tip selects the tab - the same thing a click on it does, flyout and all - and then the band
+    /// shows that tab's commands, which are the next level's badges.</summary>
+    public void PressKeyTip() => Owner?.ClickTab(this);
+
+    /// <summary>The band, not this header: a tab's commands are shown by the ribbon's content host, not underneath the
+    /// strip. Asked after the tab is selected, so what it holds is what the level offers.</summary>
+    public Core.IUIComponent KeyTipContent => Owner?.SelectedContentHost;
+
     public static readonly AdamantiumProperty IsSelectedProperty = AdamantiumProperty.Register(nameof(IsSelected),
         typeof(bool), typeof(RibbonTabHeader), new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
 

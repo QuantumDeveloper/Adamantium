@@ -33,6 +33,7 @@
         <StyleInclude Source="{x:Type fluentDark:SelectionAdornerStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:HoverAdornerStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:FocusAdornerStyleSet}"/>
+        <StyleInclude Source="{x:Type fluentDark:KeyTipAdornerStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:TilesHostStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:FlipTileStyleSet}"/>
         <StyleInclude Source="{x:Type fluentDark:DropDownStyleSet}"/>

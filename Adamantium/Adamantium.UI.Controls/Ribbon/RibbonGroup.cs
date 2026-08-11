@@ -263,6 +263,17 @@ public class RibbonGroup : ItemsControl, IHeaderedItemsControl
         set => SetValue(IsDropDownOpenProperty, value);
     }
 
+    /// <summary>Which steps of its ladder this group may take. <see cref="RibbonGroupShrinkSteps.None"/> pins it whole.</summary>
+    public static readonly AdamantiumProperty ShrinkStepsProperty = AdamantiumProperty.Register(nameof(ShrinkSteps),
+        typeof(RibbonGroupShrinkSteps), typeof(RibbonGroup),
+        new PropertyMetadata(RibbonGroupShrinkSteps.All, PropertyMetadataOptions.AffectsMeasure));
+
+    public RibbonGroupShrinkSteps ShrinkSteps
+    {
+        get => GetValue<RibbonGroupShrinkSteps>(ShrinkStepsProperty);
+        set => SetValue(ShrinkStepsProperty, value);
+    }
+
     /// <summary>What the collapsed button is worth in width - a THEME metric, not a measurement.</summary>
     public static readonly AdamantiumProperty CollapsedWidthProperty = AdamantiumProperty.Register(nameof(CollapsedWidth),
         typeof(double), typeof(RibbonGroup), new PropertyMetadata(64.0, PropertyMetadataOptions.AffectsMeasure));

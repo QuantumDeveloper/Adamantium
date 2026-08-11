@@ -1,4 +1,6 @@
+using System;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.UI.Core.Templates;
 
 namespace Adamantium.UI.Controls;
@@ -27,9 +29,77 @@ public class RibbonTab : ItemsControl, IHeaderedItemsControl
         set => SetValue(HeaderTemplateProperty, value);
     }
 
+    // --- Scrolling the row (§3.4) ------------------------------------------------------------------------------------
+    //
+    // The last resort, once shrinking and collapsing have run out. The tab owns the CHROME - two repeat buttons over the
+    // row's edges and a fade under each - because the panel that does the scrolling lives inside the items presenter,
+    // where a template cannot reach it. The arrows OVERLAY the row rather than taking width from it: reserving space
+    // for them would make the width depend on the very answer it produces (see RibbonQuickAccessPanel for what that
+    // costs), and paying two buttons' width on every tab that never scrolls is worse than drawing over an edge.
+
+    public static readonly AdamantiumProperty CanScrollBackProperty = AdamantiumProperty.Register(nameof(CanScrollBack),
+        typeof(bool), typeof(RibbonTab), new PropertyMetadata(false));
+
+    public static readonly AdamantiumProperty CanScrollForwardProperty = AdamantiumProperty.Register(
+        nameof(CanScrollForward), typeof(bool), typeof(RibbonTab), new PropertyMetadata(false));
+
+    /// <summary>Whether anything of the row is off its left edge - what the theme shows the back arrow and the fade on.</summary>
+    public bool CanScrollBack
+    {
+        get => GetValue<bool>(CanScrollBackProperty);
+        private set => SetValue(CanScrollBackProperty, value);
+    }
+
+    public bool CanScrollForward
+    {
+        get => GetValue<bool>(CanScrollForwardProperty);
+        private set => SetValue(CanScrollForwardProperty, value);
+    }
+
+    private Panels.RibbonGroupsPanel _row;
+
+    public override void OnApplyTemplate()
+    {
+        base.OnApplyTemplate();
+        AttachRow();
+
+        if (GetTemplateChild("PART_ScrollBack") is Primitives.ButtonBase back) back.Click += (_, _) => _row?.ScrollBack();
+        if (GetTemplateChild("PART_ScrollForward") is Primitives.ButtonBase forward) forward.Click += (_, _) => _row?.ScrollForward();
+    }
+
+    // The panel is built by the ItemsPanelTemplate, so it is not a named part - but the items host is exactly what
+    // ItemsHostPanel answers. It can be rebuilt under us (the ItemsPanel setter), hence the re-checks below.
+    private void AttachRow()
+    {
+        var row = ItemsHostPanel as Panels.RibbonGroupsPanel;
+        if (ReferenceEquals(row, _row)) return;
+
+        if (_row != null) _row.ScrollStateChanged -= OnScrollStateChanged;
+        _row = row;
+        if (_row != null) _row.ScrollStateChanged += OnScrollStateChanged;
+        OnScrollStateChanged(this, EventArgs.Empty);
+    }
+
+    private void OnScrollStateChanged(object sender, EventArgs e)
+    {
+        CanScrollBack = _row?.CanScrollBack == true;
+        CanScrollForward = _row?.CanScrollForward == true;
+    }
+
+    protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToVisualTree(e);
+        // The row is generated with the items, which is later than the template - so look again once we are live.
+        AttachRow();
+    }
+
     public RibbonTab()
     {
-        Items.CollectionChanged += (_, _) => RefreshSeparators();
+        Items.CollectionChanged += (_, _) =>
+        {
+            RefreshSeparators();
+            AttachRow();
+        };
     }
 
     // Which group is last is a fact about the LIST, so only the tab can answer it.

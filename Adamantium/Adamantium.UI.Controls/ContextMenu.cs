@@ -77,6 +77,27 @@ public class ContextMenu : ItemsControl
         return Size.Zero;
     }
 
+    /// <summary>Puts the keyboard on the menu's first row. What a menu opened BY THE KEYBOARD owes its user - the rows
+    /// are drawn in the overlay, so nothing in the opener's own tree can be stepped into. False while the flyout has
+    /// not been built yet, which is why the caller waits for a layout pass before asking.</summary>
+    internal void MoveKeyboardInsideWhenReady()
+    {
+        if (_popup == null) return;
+
+        // Not now: the rows are generated when the flyout is measured, which happens on the popup layer's next pass.
+        // That pass is also the only thing that can tell us they exist - the window's layout never touches this
+        // subtree - so listen to it and step in on the first tick where there is something to step into.
+        _popup.LayerPass -= OnLayerPass;
+        _popup.LayerPass += OnLayerPass;
+    }
+
+    private void OnLayerPass(object sender, EventArgs e)
+    {
+        if (_popup?.Child is not { } content || !Core.Input.KeyboardNavigation.MoveInto(content)) return;
+
+        _popup.LayerPass -= OnLayerPass;
+    }
+
     /// <summary>Opens the menu positioned against <paramref name="target"/>.</summary>
     public void Open(UIComponent target)
     {

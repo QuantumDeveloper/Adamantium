@@ -292,19 +292,37 @@ public class MenuItem : ItemsControl, IHeaderedItemsControl
     protected override void OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonUp(sender, e);
+        if (Invoke()) e.Handled = true;
+    }
+
+    /// <summary>Enter and Space do what a click does. A menu row is not a <see cref="Primitives.ButtonBase"/> - it is an
+    /// items control, because it may hold a submenu - so it inherits none of the button's key handling, and a menu the
+    /// keyboard had walked into could be looked at but never used.</summary>
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        base.OnKeyDown(e);
+        if (e.Handled || e.IsRepeated || e.Key is not (Key.Enter or Key.Space)) return;
+
+        if (Invoke()) e.Handled = true;
+    }
+
+    /// <summary>Opens the submenu of a parent row, or runs a leaf and announces the click so the flyout closes. Shared
+    /// by the pointer and the keyboard - one row, one meaning of "chosen".</summary>
+    private bool Invoke()
+    {
         if (HasItems)
         {
-            // A parent row: a click just (re)opens its submenu, it doesn't dismiss the menu.
+            // A parent row: choosing it just (re)opens its submenu, it does not dismiss the menu.
             IsSubmenuOpen = true;
-            e.Handled = true;
-            return;
+            return true;
         }
-        // A leaf: run the command and announce the click so the flyout closes.
-        if (!IsEnabled) return;
-        e.Handled = true;
+
+        if (!IsEnabled) return false;
+
         if (Command != null && Command.CanExecute(CommandParameter))
             Command.Execute(CommandParameter);
         RaiseEvent(new RoutedEventArgs(ClickEvent, this) { RoutedEvent = ClickEvent });
+        return true;
     }
 
     // Close the submenus of THIS item's siblings (the other rows in the same menu), so hovering across rows swaps which

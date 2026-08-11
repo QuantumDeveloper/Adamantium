@@ -467,7 +467,7 @@ public class RibbonAdaptiveLayoutTests
     }
 
     // A tab narrower than even the collapsed buttons still lays out and still answers - it runs out of variants, not out
-    // of answers. (Scrolling the band is the last resort, and a later step.)
+    // of answers, and then the band scrolls (§3.4).
     [Test]
     public void ATabTooNarrowForEvenTheButtons_StopsAtCollapsed()
     {
@@ -475,5 +475,60 @@ public class RibbonAdaptiveLayoutTests
 
         Assert.DoesNotThrow(() => LayoutAt(panel, 10));
         Assert.That(groups.Select(g => g.IsCollapsed), Is.All.True);
+    }
+
+    // --- Which steps a group is ALLOWED to take (RibbonGroup.ShrinkSteps) --------------------------------------------
+
+    // Pinned: the row gives way elsewhere, and once there is nowhere else it scrolls instead.
+    [Test]
+    public void AGroupWithNoStepsIsDrawnWholeHoweverNarrowTheTab()
+    {
+        var pinned = Group(3);
+        pinned.ShrinkSteps = RibbonGroupShrinkSteps.None;
+        var (panel, _) = Row(pinned, Group(3));
+
+        LayoutAt(panel, 2000);
+        var whole = pinned.WidthAt(0);
+        LayoutAt(panel, 120);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(pinned.CurrentVariant, Is.Zero);
+            Assert.That(pinned.IsCollapsed, Is.False);
+            Assert.That(pinned.Bounds.Width, Is.EqualTo(whole));
+            Assert.That(panel.CanScrollForward, Is.True, "nowhere left to give way, so the row moves");
+        });
+    }
+
+    // Sizes but no collapse: it narrows as far as its commands allow and never becomes a button.
+    [Test]
+    public void AGroupThatMayResizeButNotCollapse_NeverBecomesAButton()
+    {
+        var limited = Group(3);
+        limited.ShrinkSteps = RibbonGroupShrinkSteps.Sizes;
+        var (panel, _) = Row(limited, Group(3));
+
+        LayoutAt(panel, 2000);
+        LayoutAt(panel, 60);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(limited.IsCollapsed, Is.False);
+            Assert.That(limited.CurrentVariant, Is.GreaterThan(0), "it did give what it could");
+        });
+    }
+
+    // Collapse but no sizes: whole, or a button, and nothing between.
+    [Test]
+    public void AGroupThatMayOnlyCollapse_SkipsStraightToTheButton()
+    {
+        var either = Group(3, fixedSize: true);
+        either.ShrinkSteps = RibbonGroupShrinkSteps.Collapse;
+        var (panel, _) = Row(either);
+
+        LayoutAt(panel, 2000);
+        LayoutAt(panel, 80);
+
+        Assert.That(either.IsCollapsed, Is.True);
     }
 }

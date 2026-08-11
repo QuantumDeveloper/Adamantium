@@ -1,3 +1,4 @@
+using Adamantium.Mathematics;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Shapes;
 using Adamantium.UI.Core;
@@ -68,6 +69,11 @@ public class Adorner : TemplatedUIComponent
     /// target). The adorner stage themes it and re-lays it out to <see cref="AdornedBounds"/> each frame. False for a cue
     /// placed at a specific spot (the drop insertion indicator), which the drag engine sizes and positions itself.</summary>
     public virtual bool FillsAdornedBounds => false;
+
+    /// <summary>Where the adorner goes in the adorned element's space, once it knows how big it came out. A frame fills
+    /// the target; a BADGE (a key tip) hangs off an edge and is the reason this is asked at all - the stage used to lay
+    /// out frames only, so anything else was themed but never sized and drew nothing.</summary>
+    public virtual Rect PlaceIn(Size desired) => AdornedBounds;
 
     /// <summary>Set by the adorner stage once it has applied the theme (so a themed frame is templated, not re-themed each
     /// frame). Reset if the adorner is reused for a different element.</summary>
