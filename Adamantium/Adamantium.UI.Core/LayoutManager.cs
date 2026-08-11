@@ -142,6 +142,7 @@ public sealed class LayoutManager
     /// <summary>True when this root owes no layout work at all (nothing queued, nothing deferred to the next pass).</summary>
     public bool IsSettled => _toStyle.IsEmpty && _toMeasure.IsEmpty && _toArrange.IsEmpty && _toMeasureNextPass.Count == 0;
 
+
     /// <summary>
     /// Runs one layout pass: drain style (themes can change templates, so it precedes measure), then measure, then arrange,
     /// ancestors-first within each. Re-dirtying during the pass loops until all queues drain.
@@ -275,8 +276,13 @@ public sealed class LayoutManager
         if (control.IsArrangeValid) return;
         if (!control.IsMeasureValid)
         {
-            // Its measure was re-dirtied after this arrange was queued; defer to a later iteration (re-enqueue, don't drop).
-            _toArrange.Enqueue(node);
+            // Its measure was re-dirtied after this arrange was queued; defer to a later iteration (re-enqueue, don't drop)
+            // - but ONLY while the node is still ours. A node that LEFT this tree (a rebuilt template, a closed popup, a
+            // recycled container) keeps its stale arrange entry here while its measure invalidation goes to whatever root
+            // owns it now, so this manager can never make it measure-valid: re-queueing it spins the pass to its iteration
+            // cap every frame and the root NEVER settles. Whoever re-attaches it re-registers it (see
+            // MeasurableUIComponent.OnAttachedToVisualTree), so dropping it here loses nothing.
+            if (ReferenceEquals(For(node), this)) _toArrange.Enqueue(node);
             return;
         }
 
