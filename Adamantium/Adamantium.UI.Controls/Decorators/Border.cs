@@ -121,16 +121,26 @@ public class Border : Decorator
       // batches; the ring goes through the per-unit path. Only record draws that produce visible pixels - a transparent
       // brush would otherwise still build a fill unit + fringe every frame (the ListBox FPS drop); hit-testing is
       // bounds-based, so nothing depends on the invisible draw.
+      // BOTH onto whole pixels, and through the same rounding. A fill's edge is where two surfaces meet, and off the
+      // grid it lands at partial coverage: a soft end where a plate should stop dead, and a hairline down the join of
+      // two flush plates. Snapping only one of the two is worse than snapping neither - the ring and the fill under it
+      // then disagree by a fraction of a pixel, which is a visible kink along the edge where they meet. Shared
+      // coordinates round identically, so the two stay registered. No-op under anything but a plain offset.
+      var outer = outerRect;
+      var inner = innerRect;
+      this.Snap(ref inner);
+      this.Snap(ref outer);
+
       if (Background.IsVisible())
-         ctx.DrawRectangle(Background, innerRect, innerRadius);
+         ctx.DrawRectangle(Background, inner, innerRadius);
 
       if (hasThickness && BorderBrush.IsVisible())
       {
          var combined = new CombinedGeometry
          {
             GeometryCombineMode = GeometryCombineMode.Exclude,
-            Geometry1 = new RectangleGeometry(outerRect, cornerRadius),
-            Geometry2 = new RectangleGeometry(innerRect, innerRadius)
+            Geometry1 = new RectangleGeometry(outer, cornerRadius),
+            Geometry2 = new RectangleGeometry(inner, innerRadius)
          };
          ctx.DrawGeometry(BorderBrush, combined);
       }

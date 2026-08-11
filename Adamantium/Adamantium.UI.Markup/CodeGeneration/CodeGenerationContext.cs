@@ -217,7 +217,28 @@ public class CodeGenerationContext
 
                 var value = prop.Values[0];
 
-                
+                // {x:Null} - state NOTHING, on purpose. What turns a themed default off: a style setter puts a value in,
+                // and with no way to write "none" the only way back would be a second property whose whole job is to say
+                // "ignore the first one". Handled before the type lookup below: nothing has no type.
+                if (value is AumlAstNullValueNode)
+                {
+                    var nullTarget = isRoot ? "this" : CurrentParent;
+                    if (propRef.IsAttachedProperty)
+                    {
+                        TextGenerator.WriteLine($"{propRef.OwnerType.GetFullTypeName()}.Set{propRef.Name}({nullTarget}, null);");
+                    }
+                    else if (typeInfo != null && typeInfo.ImplementsInterface("IAdamantiumComponent"))
+                    {
+                        TextGenerator.WriteLine($"{nullTarget}.SetValue(\"{propRef.Name}\", null);");
+                    }
+                    else
+                    {
+                        TextGenerator.WriteLine($"{nullTarget}.{propRef.Name} = null;");
+                    }
+
+                    continue;
+                }
+
                 var valueTypeName = value.TypeReference.GetFullTypeName();
                 var valueResolvedType = Metadata.TypeResolver.Resolve(valueTypeName);
 
@@ -311,6 +332,15 @@ public class CodeGenerationContext
                             {
                                 TextGenerator.WriteLine(
                                     $"{symbolName} = new {Metadata.DefaultTypeContainer.ResourceReference.FullName}(\"{key}\");");
+                            }
+                            else if (typeInfo != null && !typeInfo.ImplementsInterface("IAdamantiumComponent"))
+                            {
+                                // A plain markup object (a template selector, a converter): no property store to defer
+                                // into and no place in the tree, so resolve the key now and assign the CLR property.
+                                var target = isRoot ? "this" : CurrentParent;
+                                TextGenerator.WriteLine(
+                                    $"{target}.{propRef.Name} = ({resolvedType.FullName})" +
+                                    $"({Metadata.DefaultTypeContainer.ResourceResolver.FullName}.ResolveNow(\"{key}\"));");
                             }
                             else
                             {

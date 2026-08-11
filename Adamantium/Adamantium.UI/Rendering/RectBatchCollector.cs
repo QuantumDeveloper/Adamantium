@@ -183,7 +183,8 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
         item = new RectItem
         {
             Bounds = new Vector4F((float)(r.X * sx + tx), (float)(r.Y * sy + ty), (float)(r.Width * sx), (float)(r.Height * sy)),
-            Params = new Vector4F((float)(p.CornerRadius.TopLeft * sx), transformSlot, 0, 0),
+            // .z = 1 means "no fringe": the shader takes the edge hard instead of fading it over a pixel.
+            Params = new Vector4F((float)(p.CornerRadius.TopLeft * sx), transformSlot, p.AntiAlias ? 0 : 1, 0),
             Color = color,
             StrokeColor = strokeColor,
             Stroke0 = stroke0,

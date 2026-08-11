@@ -379,18 +379,19 @@ public class DefaultAumlTransformer : IAumlTransformer
         IAumlAstValueNode ProcessDirectiveValue(AumlAstDirective directive)
         {
             var directiveBody = (directive.Value as AumlAstTextNode)?.Text;
-            if (string.IsNullOrWhiteSpace(directiveBody))
-            {
-                diagnostics.ReportError(document.FileName, $"Directive '{directive.Name}' is missing a value. {directive.GetLineInfo()}");
-                return directive;
-            }
 
             switch (directive.Name)
             {
+                // The one directive that carries no value: saying nothing IS its value.
+                case "Null":
+                    return new AumlAstNullValueNode(directive.GetLineInfo());
+
                 case "Type":
+                    if (MissingValue(directive, directiveBody)) return directive;
+
                     // Используем тот же механизм, что и в парсере, чтобы распознать имя типа
                     var typeRef = MarkupExtensionParser.ParseTypeName(new ParserContext(null), directiveBody, directive.GetLineInfo(), document.NamespaceMappings.ToList());
-                    
+
                     // Резолвим его в конкретный IResolvedType
                     var resolvedTypeRef = ProcessTypeReference(typeRef, directive.GetLineInfo());
 
@@ -398,9 +399,19 @@ public class DefaultAumlTransformer : IAumlTransformer
                     return new AumlAstTypeReferenceValueNode(directive.GetLineInfo(), resolvedTypeRef);
                
                 default:
+                    if (MissingValue(directive, directiveBody)) return directive;
+
                     diagnostics.ReportError(document.FileName, $"Unknown directive 'x:{directive.Name}'. {directive.GetLineInfo()}");
                     return directive;
             }
+        }
+
+        bool MissingValue(AumlAstDirective directive, string body)
+        {
+            if (!string.IsNullOrWhiteSpace(body)) return false;
+
+            diagnostics.ReportError(document.FileName, $"Directive '{directive.Name}' is missing a value. {directive.GetLineInfo()}");
+            return true;
         }
 
         // A [MarkupItem] collection written as the shorthand string with a markup extension among the tokens -
@@ -503,22 +514,6 @@ public class DefaultAumlTransformer : IAumlTransformer
                         propertyNode.Values[i] = transformedValue;
                         queue.Enqueue(transformedValue);
                     }
-                    
-                    //if (propertyNode.Property is AumlAstPropertyReference propertyReference)
-                    //{
-                    //    if (propertyReference.Name == "Name")
-                    //    {
-                    //        if (propertyNode.Values[0] is AumlAstTextNode textNode)
-                    //        {
-                    //            container.NamedElements.Add(new NamedElement(textNode.Text, propertyReference.ParentNode));
-                    //        }
-                    //    }
-                        
-                    //    foreach (var value in propertyNode.Values)
-                    //    {
-                    //        queue.Enqueue(value);
-                    //    }
-                    //}
                     
                     break;
                 case AumlAstDirective directive:

@@ -16,13 +16,56 @@
         <Setter Property="GroupsAreaHeight" Value="106"/>
     </Style>
 
-    <!-- Headers in a row at their own widths - the same shape a tab strip has, until contextual ledges need their own panel. -->
+    <!-- The right-click menu every command in a band is given, unless its author wrote one. A TEMPLATE, because each
+         command needs its own menu - a menu points at ONE command - and a setter would hand them all the same object. -->
+    <Style Selector="Ribbon">
+        <Setter Property="Ribbon.CommandContextMenuTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <ContextMenu>
+                        <RibbonQuickAccessMenuItem/>
+                    </ContextMenu>
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The strip's OWN panel, not a TabPanel: the ledge has to travel and be clipped with the tabs under it. -->
     <Style Selector="Ribbon">
         <Setter Property="ItemsPanel">
             <Setter.Value>
                 <ItemsPanelTemplate>
-                    <TabPanel Orientation="Horizontal"/>
+                    <RibbonTabPanel LedgeHeight="18"/>
                 </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The ledge over a contextual run: the group's colour carrying its title (docs/RIBBON_PLAN.md §4). -->
+    <Style Selector="RibbonContextualLedge">
+        <Setter Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Padding" Value="8 0"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RibbonContextualLedge">
+                    <!-- Never clipped and never wider than its run: the PANEL widens the tabs until the title fits
+                         (RibbonTabPanel.Widen). Flush and square, like the tabs under it. -->
+                    <Border Background="{TemplateBinding Accent}"
+                            UseAnalyticAA="False">
+                        <ContentPresenter x:Name="PART_ContentPresenter"
+                                Height="{TemplateBinding TitleHeight}"
+                                VerticalAlignment="Top"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                Margin="{TemplateBinding Padding}"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                    </Border>
+                </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
@@ -180,9 +223,11 @@
             <Setter.Value>
                 <ControlTemplate TargetType="RibbonTabHeader">
                     <Grid>
+                        <!-- Square and un-antialiased: plates meeting edge to edge, and a soft edge leaves a hairline
+                             down each join (see docs/RIBBON_PLAN.md §4.4). -->
                         <Border x:Name="Chrome"
                                 Background="{TemplateBinding Background}"
-                                CornerRadius="4 4 0 0"
+                                UseAnalyticAA="False"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter x:Name="PART_ContentPresenter"
                                     HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
@@ -213,6 +258,27 @@
             <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundSelected}"/>
             <Setter TargetName="Underline" Property="Opacity" Value="1"/>
         </PropertyTrigger>
+    </Style>
+
+    <!-- AFTER the state triggers above, so the open contextual tab keeps its context. -->
+    <Style Selector="RibbonTabHeader">
+        <PropertyTrigger Property="IsContextual" Value="true">
+            <Setter TargetName="Chrome" Property="Background" Value="{TemplateBinding Accent}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
+            <Setter TargetName="Underline" Property="Fill" Value="{TemplateBinding Accent}"/>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- Open AND contextual: the ordinary open fill; what marks it is the rule under it, in the context's colour. -->
+    <Style Selector="RibbonTabHeader">
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="IsContextual" Value="true"/>
+                <Condition Property="IsSelected" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="Chrome" Property="Background" Value="{TemplateBinding BackgroundSelected}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundSelected}"/>
+        </MultiTrigger>
     </Style>
 
     <!-- A tab is its groups in a row, plus the last-resort scroll: a full-height arrow at each edge with a fade BESIDE it
@@ -901,12 +967,14 @@
         <Setter Property="BackgroundPressed" Value="{ResourceReference OnAccentOverlayPressed}"/>
         <Setter Property="Foreground" Value="{ThemeResource AccentForegroundColor}"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="CornerRadius" Value="4 4 0 0"/>
+        <Setter Property="CornerRadius" Value="0"/>
         <Setter Property="Padding" Value="16 7"/>
         <Setter Property="FontSize" Value="13"/>
         <Setter Property="MinWidth" Value="0"/>
         <Setter Property="MinHeight" Value="0"/>
-        <Setter Property="Focusable" Value="False"/>
+        <!-- A DESTINATION, unlike the minimize chevron beside the strip: it opens the backstage, so the keyboard has to
+             be able to stand on it. It heads the strip, so Left off the first tab reaches it. -->
+        <Setter Property="Focusable" Value="True"/>
         <Setter Property="VerticalAlignment" Value="Stretch"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -915,9 +983,11 @@
                 <ControlTemplate TargetType="ToggleButton">
                     <Border x:Name="Chrome"
                             Background="{TemplateBinding Background}"
-                            CornerRadius="{TemplateBinding CornerRadius}">
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            UseAnalyticAA="False">
                         <Border x:Name="Overlay"
                                 CornerRadius="{TemplateBinding CornerRadius}"
+                                UseAnalyticAA="False"
                                 Padding="{TemplateBinding Padding}">
                             <ContentPresenter x:Name="PART_ContentPresenter"
                                     Content="{TemplateBinding Content}"
@@ -1394,37 +1464,35 @@
     </Style>
 
     <!-- A DATA item in the bar. Most commands are an icon button; one that brought its OWN compact form (a slider, a
-         drop-down) is drawn by that instead - the selector owns the choice, because an ItemTemplate would win over it
-         and it would never be asked. An authored control is its own container and reaches neither. -->
+         drop-down) is drawn by that instead - the bar's selector owns the choice, because an ItemTemplate would win over
+         it and it would never be asked. An authored control is its own container and reaches neither.
+         The theme states the LOOK of the ordinary case only: an application that puts its own selector on the bar to add
+         a case of its own keeps this button for everything else. -->
     <Style Selector="RibbonQuickAccess">
-        <Setter Property="ItemTemplateSelector">
+        <Setter Property="DefaultItemTemplate">
             <Setter.Value>
-                <RibbonQuickAccessTemplateSelector>
-                    <RibbonQuickAccessTemplateSelector.Default>
-                        <DataTemplate>
-                            <!-- Taking a command back out is done HERE, on the button itself, the way Office does it -
-                                 having to find the command again in the ribbon to undo a one-click addition is a poor
-                                 trade. -->
-                            <Button Classes="QuickAccessButton"
-                                    Ribbon.IsInQuickAccess="True"
-                                    ToolTip="{Binding ToolTip}"
-                                    Command="{Binding Command}"
-                                    CommandParameter="{Binding CommandParameter}">
-                                <Button.ContextMenu>
-                                    <ContextMenu>
-                                        <RibbonQuickAccessMenuItem/>
-                                    </ContextMenu>
-                                </Button.ContextMenu>
-                                <!-- The BAR's foreground, not the caption's: below the ribbon there is no TitleBar to
-                                     ask, and the icons would come out with no stroke at all. The caption instance takes
-                                     its colour from the title bar, so they still follow its active/inactive state. -->
-                                <Path Data="{Binding Icon}"
-                                        Stroke="{Ancestor RibbonQuickAccess, Foreground}" StrokeThickness="1"
-                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Button>
-                        </DataTemplate>
-                    </RibbonQuickAccessTemplateSelector.Default>
-                </RibbonQuickAccessTemplateSelector>
+                <DataTemplate>
+                    <!-- Taking a command back out is done HERE, on the button itself, the way Office does it -
+                         having to find the command again in the ribbon to undo a one-click addition is a poor
+                         trade. -->
+                    <Button Classes="QuickAccessButton"
+                            Ribbon.IsInQuickAccess="True"
+                            ToolTip="{Binding ToolTip}"
+                            Command="{Binding Command}"
+                            CommandParameter="{Binding CommandParameter}">
+                        <Button.ContextMenu>
+                            <ContextMenu>
+                                <RibbonQuickAccessMenuItem/>
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                        <!-- The BAR's foreground, not the caption's: below the ribbon there is no TitleBar to
+                             ask, and the icons would come out with no stroke at all. The caption instance takes
+                             its colour from the title bar, so they still follow its active/inactive state. -->
+                        <Path Data="{Binding Icon}"
+                                Stroke="{Ancestor RibbonQuickAccess, Foreground}" StrokeThickness="1"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Button>
+                </DataTemplate>
             </Setter.Value>
         </Setter>
     </Style>

@@ -78,7 +78,12 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
       brush,
       destinationRect,
       corners,
-      pen);
+      pen)
+      {
+         // Whether this shape wants a fringe is the COMPONENT's answer, and here is the only place the component is
+         // known - by record time it is gone.
+         AntiAlias = _currentComponent?.UseAnalyticAA ?? true
+      };
       CreateCommand(payload);
 
       return this;

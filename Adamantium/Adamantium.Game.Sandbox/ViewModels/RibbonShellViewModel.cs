@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using Adamantium.Core.Commands;
 using Adamantium.MVVM;
@@ -78,6 +79,21 @@ public partial class RibbonShellViewModel : IWindowAware
 
     private IReadOnlyList<MenuCommand> _primitiveOptions;
 
+    /// <summary>The rows of the right-click menu THIS shell wants on its snapping commands, instead of the one the
+    /// ribbon offers. Nothing about them is the ribbon's business - they are the view model's own list, drawn by the
+    /// template the view points <c>Ribbon.CommandContextMenuTemplate</c> at.</summary>
+    public IReadOnlyList<MenuCommand> SnapMenuRows => _snapMenuRows ??=
+    [
+        new MenuCommand { Header = "Snap settings...", Command = SnapSettingsCommand },
+        new MenuCommand { Header = "Clear all snaps", Command = ClearSnapsCommand }
+    ];
+
+    private IReadOnlyList<MenuCommand> _snapMenuRows;
+
+    [Command] private void SnapSettings() => Status = "Snap settings...";
+
+    [Command] private void ClearSnaps() => Status = "Snaps cleared.";
+
     [Command(CanExecute = nameof(HasSelection))] private void Cut()
     {
         HasClipboard = true;
@@ -153,6 +169,17 @@ public partial class RibbonShellViewModel : IWindowAware
 
     [Bindable] private MaterialSwatch _selectedMaterial = MaterialChoices[0];
 
+    /// <summary>What the contextual tabs hang on: switch it and "Mesh tools" appears in the strip with its own tabs.
+    /// The ribbon only reads it - appearing is an offer, so the open tab is not pulled out from under anyone.</summary>
+    [Bindable] private bool _hasMeshSelection;
+
+    /// <summary>A second context, so the strip has to order two of them and draw two ledges.</summary>
+    [Bindable] private bool _hasLightSelection;
+
+    /// <summary>Whether the contexts draw their ledge. Off, the colour of the tabs is the only thing saying which
+    /// belong together - and the strip stops paying the ledge row's height.</summary>
+    [Bindable] private bool _showContextHeader = true;
+
     // Home carries a real editor's worth of groups, so the band's LAST resort - scrolling, once every group has been
     // collapsed and it still does not fit - is reachable by dragging the window narrow.
     [Command] private void AlignLeft() => Status = "Aligned to the left.";
@@ -186,11 +213,12 @@ public partial class RibbonShellViewModel : IWindowAware
         if (request is not RibbonQuickAccessEventArgs asked) return;
 
 
-        QuickAccess.Add(new QuickAccessCommand
+        var item = new QuickAccessCommand
         {
             IconData = asked.Icon as string,
-            Label = asked.Command is ContentControl content ? content.Content?.ToString() : null,
+            Label = asked.Label,
             ToolTip = asked.ToolTip as string,
+            Key = asked.Key,
             Command = asked.Action,
             CommandParameter = asked.ActionParameter,
             // What is not a button (a slider) hands over its own compact form; a button leaves this null and is drawn
@@ -198,20 +226,60 @@ public partial class RibbonShellViewModel : IWindowAware
             QuickAccessTemplate = asked.Template,
             DropDownItems = asked.DropDownItems,
             DropDownItemTemplate = asked.DropDownItemTemplate
-        });
+        };
 
-        // Where it came FROM, so the ribbon's own copy can be unmarked when it is taken back out - the request to remove
-        // arrives from the bar's button, which knows nothing of the command it was made from.
-        if (asked.Action != null)
-        {
-            _cameFrom[asked.Action] = asked.Command;
-        }
+        // A command WITH a state is one this view model already keeps a property for, so the item shows THAT property -
+        // the button in the caption and the button in the ribbon end up two views of one value. Which command is which is
+        // said in the markup by key; nothing here holds a control.
+        Mirror(item, asked.Key as string);
 
-        Ribbon.SetIsInQuickAccess(asked.Command, true);
+        QuickAccess.Add(item);
+
+        // Nothing is written back to the ribbon: it is pointed at this collection (Ribbon.QuickAccessItems in the view)
+        // and recognises its own commands in it by key. A view model that kept the ribbon's control to mark it would be
+        // holding a control.
         Status = "Added to the quick-access bar.";
     }
 
-    private readonly Dictionary<ICommand, IUIComponent> _cameFrom = [];
+    // Which of this view model's own states each named command shows. A command that names none stays a plain button.
+    private void Mirror(QuickAccessCommand item, string key)
+    {
+        switch (key)
+        {
+            case "ShowGrid":
+                Mirror(item, nameof(ShowGrid), () => ShowGrid, value => ShowGrid = value);
+                break;
+            case "ShowGizmos":
+                Mirror(item, nameof(ShowGizmos), () => ShowGizmos, value => ShowGizmos = value);
+                break;
+            case "Wireframe":
+                Mirror(item, nameof(Wireframe), () => Wireframe, value => Wireframe = value);
+                break;
+            case "SnapToGrid":
+                Mirror(item, nameof(SnapToGrid), () => SnapToGrid, value => SnapToGrid = value);
+                break;
+        }
+    }
+
+    // ONE value, two views of it: writing either side lands on the property, and the other side is told. No guard is
+    // needed - a write that changes nothing raises nothing.
+    private void Mirror(QuickAccessCommand item, string property, Func<bool> read, Action<bool> write)
+    {
+        item.IsChecked = read();
+        item.PropertyChanged += (_, _) => write(item.IsChecked == true);
+
+        void Follow(object sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != property) return;
+
+            item.IsChecked = read();
+        }
+
+        PropertyChanged += Follow;
+        _mirrors[item] = Follow;
+    }
+
+    private readonly Dictionary<QuickAccessCommand, System.ComponentModel.PropertyChangedEventHandler> _mirrors = [];
 
     [Command] private void RemoveFromQuickAccess(object request)
     {
@@ -219,20 +287,20 @@ public partial class RibbonShellViewModel : IWindowAware
 
         for (var i = QuickAccess.Count - 1; i >= 0; i--)
         {
-            if (ReferenceEquals(QuickAccess[i].Command, asked.Action))
+            var item = QuickAccess[i] as QuickAccessCommand;
+            var same = asked.Key != null
+                ? Equals(item?.Key, asked.Key)
+                : item?.Command != null && ReferenceEquals(item.Command, asked.Action);
+            if (!same) continue;
+
+            if (_mirrors.Remove(item, out var follow))
             {
-                QuickAccess.RemoveAt(i);
+                PropertyChanged -= follow;
             }
+
+            QuickAccess.RemoveAt(i);
         }
 
-        // The ribbon's command, not whatever asked - a press on the bar's own button asks with ITSELF.
-        var onTheRibbon = asked.Command;
-        if (asked.Action != null && _cameFrom.Remove(asked.Action, out var source))
-        {
-            onTheRibbon = source;
-        }
-
-        Ribbon.SetIsInQuickAccess(onTheRibbon, false);
         Status = "Removed from the quick-access bar.";
     }
 

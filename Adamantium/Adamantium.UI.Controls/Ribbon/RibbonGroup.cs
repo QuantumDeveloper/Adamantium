@@ -104,9 +104,10 @@ public class RibbonGroup : ItemsControl, IHeaderedItemsControl
         return size;
     }
 
-    /// <summary>A command in a group can be sent to the quick-access bar, so it is equipped with the entry that asks -
-    /// here, because the theme cannot: a style setter hands every command the SAME object, and a menu has one
-    /// <see cref="ContextMenu.PlacementTarget"/>. One menu per command, made where the command is taken in.
+    /// <summary>A command in a group can be sent to the quick-access bar, so it is equipped with the menu that asks -
+    /// built HERE, one per command, because a menu has a single <see cref="ContextMenu.PlacementTarget"/> and cannot be
+    /// shared. WHAT is in it is not decided here: it comes from
+    /// <see cref="Ribbon.CommandContextMenuTemplateProperty"/>, which the theme states.
     /// <para>Only when the command has none of its own. An author who wrote a menu keeps it exactly as written, and adds
     /// <see cref="RibbonQuickAccessMenuItem"/> to it themselves - a row appearing in someone's menu unasked is worse
     /// than one they placed.</para></summary>
@@ -114,12 +115,26 @@ public class RibbonGroup : ItemsControl, IHeaderedItemsControl
     {
         base.PrepareContainer(container, item);
 
-        if (container is not Base.InputUIComponent command || command.ContextMenu != null) return;
+        if (container is not Base.InputUIComponent command) return;
         if (!Ribbon.GetCanAddToQuickAccess(command)) return;
 
-        var menu = new ContextMenu();
-        menu.Items.Add(new RibbonQuickAccessMenuItem());
-        command.ContextMenu = menu;
+        // A command the author named nothing by gets an identity of its own. Without one it cannot be told apart at all:
+        // it would be put in the bar again on every asking (the ribbon never recognising its own copy) and could then
+        // never be taken back out, the request naming nothing for the application to match. An author's key wins; a
+        // command that RUNS something is matched by that too, so this only fills the gap where there is neither.
+        if (Ribbon.GetQuickAccessKey(command) == null)
+        {
+            Ribbon.SetQuickAccessKey(command, new RibbonCommandIdentity());
+        }
+
+        if (command.ContextMenu != null) return;
+
+        // Asked of the GROUP, not of the command: a container is prepared before it is put in the tree, so nothing has
+        // inherited down to it yet.
+        if (Ribbon.GetCommandContextMenuTemplate(this)?.Build(command).RootComponent is ContextMenu menu)
+        {
+            command.ContextMenu = menu;
+        }
     }
 
     /// <summary>Draw this group as <paramref name="index"/> from now on.</summary>

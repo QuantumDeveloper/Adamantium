@@ -80,7 +80,10 @@ public class DropDown : Selector
 
         if (!IsDropDownOpen)
         {
-            if (e.Key is not (Key.Enter or Key.Space or Key.DownArrow))
+            // Enter and Space open it - NOT an arrow. In this engine the arrows are how the keyboard moves BETWEEN
+            // controls, so a closed drop-down that answered one would both open itself unasked and swallow the key,
+            // trapping the walk on it. Opening is a choice; passing over is not.
+            if (e.Key is not (Key.Enter or Key.Space))
                 return;
 
             IsDropDownOpen = true;   // opening sets the highlight to the current value (see OnIsDropDownOpenChanged)

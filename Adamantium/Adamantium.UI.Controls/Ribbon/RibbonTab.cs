@@ -29,6 +29,30 @@ public class RibbonTab : ItemsControl, IHeaderedItemsControl
         set => SetValue(HeaderTemplateProperty, value);
     }
 
+    /// <summary>The context this tab belongs to, or null for an ordinary tab. While the group is inactive the tab is
+    /// not in the strip at all; while it is active the tab stands with the group's other tabs, under their ledge.
+    /// <para>Settable directly (from code, or bound to a view model that owns the contexts). In markup a tab names its
+    /// group by <see cref="ContextualGroupKey"/> instead, and the ribbon fills this in.</para></summary>
+    public static readonly AdamantiumProperty ContextualGroupProperty = AdamantiumProperty.Register(
+        nameof(ContextualGroup), typeof(RibbonContextualGroup), typeof(RibbonTab), new PropertyMetadata(null));
+
+    /// <summary>The <see cref="RibbonContextualGroup.Key"/> of the group in <see cref="Ribbon.ContextualGroups"/> this
+    /// tab belongs to. An explicitly set <see cref="ContextualGroup"/> wins over it.</summary>
+    public static readonly AdamantiumProperty ContextualGroupKeyProperty = AdamantiumProperty.Register(
+        nameof(ContextualGroupKey), typeof(string), typeof(RibbonTab), new PropertyMetadata(null));
+
+    public RibbonContextualGroup ContextualGroup
+    {
+        get => GetValue<RibbonContextualGroup>(ContextualGroupProperty);
+        set => SetValue(ContextualGroupProperty, value);
+    }
+
+    public string ContextualGroupKey
+    {
+        get => GetValue<string>(ContextualGroupKeyProperty);
+        set => SetValue(ContextualGroupKeyProperty, value);
+    }
+
     // --- Scrolling the row (§3.4) ------------------------------------------------------------------------------------
     //
     // The last resort, once shrinking and collapsing have run out. The tab owns the CHROME - two repeat buttons over the

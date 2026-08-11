@@ -1,3 +1,4 @@
+using Adamantium.Core.Commands;
 using Adamantium.UI.Core.Templates;
 
 namespace Adamantium.UI.Controls;
@@ -9,4 +10,14 @@ namespace Adamantium.UI.Controls;
 public interface IQuickAccessItem
 {
     DataTemplate QuickAccessTemplate { get; }
+
+    /// <summary>What the application calls the command this item stands for (<see cref="Ribbon.QuickAccessKeyProperty"/>).
+    /// The bar stamps it on the visual it builds, so a request to take the item back out names the same command the
+    /// request to put it in did - which is the only identity an item that is not a command has.</summary>
+    object Key { get; }
+
+    /// <summary>What the item RUNS, when it runs anything. The ordinary way a command in the ribbon is recognised in the
+    /// bar: it is the same <see cref="ICommand"/>. A command that runs nothing - one that only carries a state - has to
+    /// be named by <see cref="Key"/> instead.</summary>
+    ICommand Action { get; }
 }

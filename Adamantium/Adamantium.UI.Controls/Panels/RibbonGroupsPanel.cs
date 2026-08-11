@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
@@ -15,13 +16,21 @@ public class RibbonGroupsPanel : Panel
         GotKeyboardFocus += OnFocusEntered;
     }
 
-    /// <summary>A ROW: Up/Down must not become "the next group" through the generic order-based walk.</summary>
+    /// <summary>A ROW: Up/Down must not become "the next group" through the generic order-based walk. UP is the one
+    /// exception - out of the top of the band is the STRIP, and the walk cannot find it on its own: the two live in
+    /// separate subtrees of the ribbon's template, and the panel between them answers only by child order.</summary>
     public override IUIComponent Navigate(IUIComponent from, FocusNavigationDirection direction)
     {
-        if (IsArrow(direction) && IsVertical(direction)) return null;
+        if (IsArrow(direction) && IsVertical(direction))
+        {
+            return IsForward(direction) ? null : SelectedHeader();
+        }
 
         return base.Navigate(from, direction);
     }
+
+    private IUIComponent SelectedHeader() =>
+        this.GetVisualAncestors().OfType<Ribbon>().FirstOrDefault()?.SelectedHeader;
 
     protected override Size MeasureOverride(Size availableSize)
     {

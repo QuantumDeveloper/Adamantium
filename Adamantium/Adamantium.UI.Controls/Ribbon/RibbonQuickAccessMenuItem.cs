@@ -44,12 +44,21 @@ public class RibbonQuickAccessMenuItem : MenuItem
         Refresh();
     }
 
+    /// <summary>...and again the moment the row learns WHERE it is. On the very first showing the visual attach above
+    /// runs before the row has a logical parent, so it cannot yet see the menu it is in - <see cref="Target"/> comes back
+    /// null and the row states the wrong thing until the menu is opened a second time.</summary>
+    protected override void OnAttachedToLogicalTree(LogicalTreeAttachmentEventArgs e)
+    {
+        base.OnAttachedToLogicalTree(e);
+        Refresh();
+    }
+
     /// <summary>The menu is built once and opened many times, and what it should say depends on the command it was
     /// opened on THIS time.</summary>
     public void Refresh()
     {
         var target = Target;
-        IsInQuickAccess = target != null && Ribbon.GetIsInQuickAccess(target);
+        IsInQuickAccess = target != null && Ribbon.IsShownInQuickAccess(target);
         IsEnabled = target != null && Ribbon.GetCanAddToQuickAccess(target);
     }
 
@@ -58,7 +67,7 @@ public class RibbonQuickAccessMenuItem : MenuItem
         var target = Target;
         if (target == null) return;
 
-        Ribbon.RequestQuickAccess(target, !Ribbon.GetIsInQuickAccess(target));
+        Ribbon.RequestQuickAccess(target, !Ribbon.IsShownInQuickAccess(target));
         Refresh();
     }
 }

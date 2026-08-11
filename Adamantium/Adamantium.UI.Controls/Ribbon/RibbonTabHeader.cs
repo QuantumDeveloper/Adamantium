@@ -32,6 +32,51 @@ public class RibbonTabHeader : ContentControl, ISelectable, IKeyTipTarget, IKeyT
     public static readonly AdamantiumProperty ForegroundSelectedProperty = AdamantiumProperty.Register(
         nameof(ForegroundSelected), typeof(Brush), typeof(RibbonTabHeader), new PropertyMetadata(default(Brush)));
 
+    /// <summary>The context its tab belongs to, copied here by the ribbon when the container is prepared. The STRIP is
+    /// what needs it - the panel cuts its runs from neighbouring headers, and the theme paints the header in the
+    /// group's colour - and the strip holds headers, not tabs.</summary>
+    public static readonly AdamantiumProperty ContextualGroupProperty = AdamantiumProperty.Register(
+        nameof(ContextualGroup), typeof(RibbonContextualGroup), typeof(RibbonTabHeader),
+        new PropertyMetadata(null, PropertyMetadataOptions.AffectsParentMeasure, OnContextualGroupChanged));
+
+    /// <summary>The group's colour, projected onto this header. Its own property, so a theme trigger can use it while
+    /// an ordinary header (null group, null accent) keeps the plain look.</summary>
+    public static readonly AdamantiumProperty AccentProperty = AdamantiumProperty.Register(nameof(Accent),
+        typeof(Brush), typeof(RibbonTabHeader), new PropertyMetadata(default(Brush), PropertyMetadataOptions.AffectsRender));
+
+    public RibbonContextualGroup ContextualGroup
+    {
+        get => GetValue<RibbonContextualGroup>(ContextualGroupProperty);
+        set => SetValue(ContextualGroupProperty, value);
+    }
+
+    public Brush Accent
+    {
+        get => GetValue<Brush>(AccentProperty);
+        set => SetValue(AccentProperty, value);
+    }
+
+    /// <summary>Whether this header stands for a contextual tab. A trigger cannot ask "is <see cref="Accent"/> set", so
+    /// the fact is stated as its own flag - and it is the ONE thing the colouring hangs on, which is what tells at a
+    /// glance which tabs belong together even when their ledge is turned off.</summary>
+    public static readonly AdamantiumProperty IsContextualProperty = AdamantiumProperty.RegisterReadOnly(
+        nameof(IsContextual), typeof(bool), typeof(RibbonTabHeader),
+        new PropertyMetadata(false, PropertyMetadataOptions.AffectsRender));
+
+    public bool IsContextual
+    {
+        get => GetValue<bool>(IsContextualProperty);
+        private set => SetValue(IsContextualProperty, value);
+    }
+
+    private static void OnContextualGroupChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is not RibbonTabHeader header) return;
+
+        header.Accent = header.ContextualGroup?.Accent;
+        header.IsContextual = header.ContextualGroup != null;
+    }
+
     static RibbonTabHeader()
     {
         FocusableProperty.OverrideMetadata(typeof(RibbonTabHeader), new PropertyMetadata(true));
@@ -89,13 +134,16 @@ public class RibbonTabHeader : ContentControl, ISelectable, IKeyTipTarget, IKeyT
         Owner?.ClickTab(this);
     }
 
-    /// <summary>Enter/Space OPENS the tab: picks it and steps into its first command. Tab keeps walking the headers.</summary>
+    /// <summary>Enter/Space OPENS the tab: picks it and steps into its first command. Tab keeps walking the headers.
+    /// <para>DOWN does the same, because that is where the commands are. The generic outward walk cannot answer it: the
+    /// strip and the groups area are separate subtrees of the ribbon's template, and the panel between them can only
+    /// answer by the order its own children stand in.</para></summary>
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
         if (e.Handled || e.OriginalSource != this) return;
 
-        if (e.Key is not (Key.Enter or Key.Space)) return;
+        if (e.Key is not (Key.Enter or Key.Space or Key.DownArrow)) return;
 
         Owner?.EnterTab(this);
         e.Handled = true;

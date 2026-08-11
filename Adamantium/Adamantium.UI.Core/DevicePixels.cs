@@ -36,7 +36,7 @@ public static class DevicePixels
         if (!Origin(element, out var at, out var scale)) return false;
 
         rect = Snapped(rect, at, scale);
-        thickness = Math.Max(1.0, Math.Round(thickness * scale.X)) / scale.X;
+        thickness = Math.Max(1.0, Math.Round(thickness * scale.X, MidpointRounding.AwayFromZero)) / scale.X;
         return true;
     }
 
@@ -46,7 +46,7 @@ public static class DevicePixels
     {
         if (!Origin(element, out _, out var scale)) return length;
 
-        return Math.Round(length * scale.X) / scale.X;
+        return Math.Round(length * scale.X, MidpointRounding.AwayFromZero) / scale.X;
     }
 
     /// <summary>Where <paramref name="element"/> sits in its window (DIPs) and what a DIP is worth in pixels there.
@@ -85,8 +85,14 @@ public static class DevicePixels
     }
 
     // A local coordinate taken to the nearest pixel boundary and brought back into local units.
+    //
+    // AwayFromZero, NOT the default. At a fractional scale a whole number of DIPs lands on HALF a pixel - at 150% every
+    // integer coordinate does - so essentially every edge is a midpoint case. The default rounds midpoints to the nearest
+    // EVEN pixel, which means the direction flips with parity: 58.5 goes down to 58 while 85.5 goes up to 86. Two edges
+    // half a pixel out then move OPPOSITE ways, and neighbours that should line up end up a pixel apart - which is
+    // exactly what made two tabs of the same height look different at 150%.
     private static double Edge(double local, double origin, double scale)
     {
-        return Math.Round((origin + local) * scale) / scale - origin;
+        return Math.Round((origin + local) * scale, MidpointRounding.AwayFromZero) / scale - origin;
     }
 }

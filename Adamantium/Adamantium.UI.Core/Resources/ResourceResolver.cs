@@ -22,6 +22,17 @@ public static class ResourceResolver
         return (T)resource;
     }
 
+    // A {ResourceReference} on a plain markup object - a template selector, a converter, anything the author writes as an
+    // element but that is not part of the property system. There is no property store to defer into and no place in the
+    // tree to be scoped from, so the key is resolved AT ONCE and flat: the Local scope first (the dictionary that
+    // declared it is already registered by the time the object is built), then Theme, then Global.
+    public static object ResolveNow(string key)
+    {
+        var resourceManager = UIAppContext.Current.ResourceManager;
+
+        return resourceManager.FindResourceInScope(key, ResourceScope.Local) ?? resourceManager.FindResource(key);
+    }
+
     // A {ResourceReference} used DIRECTLY on a component property (not via a Setter/trigger). The target is any
     // AdamantiumComponent, NOT only a UI element: a resource reference is a property-system feature, so it applies to a
     // GradientStop.Color, a Pen's brush, any animatable component - the same way WPF's Static/DynamicResource work on any
