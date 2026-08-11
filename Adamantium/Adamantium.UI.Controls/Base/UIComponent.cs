@@ -59,6 +59,20 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         if (d is UIComponent component) component._zIndex = component.GetValue<int>(ZIndexProperty);
     }
 
+    /// <summary>Whether this component's shapes are drawn with analytic anti-aliasing. On (the default) an edge fades
+    /// over about a pixel, which is what a curve or a slanted line needs. An axis-aligned RECTANGLE sitting on whole
+    /// pixels needs none of it - and pays for it: coverage is a half exactly on the edge, so two abutting rectangles
+    /// compose to about three quarters and leave a dark hairline down the join. Turn it off there.
+    /// <para>Per component rather than a rule in the renderer: only the author knows whether a shape is one of those.</para></summary>
+    public static readonly AdamantiumProperty UseAnalyticAAProperty = AdamantiumProperty.Register(nameof(UseAnalyticAA),
+        typeof(Boolean), typeof(UIComponent), new PropertyMetadata(true, PropertyMetadataOptions.AffectsRender));
+
+    public Boolean UseAnalyticAA
+    {
+        get => GetValue<Boolean>(UseAnalyticAAProperty);
+        set => SetValue(UseAnalyticAAProperty, value);
+    }
+
     public static readonly AdamantiumProperty VisibilityProperty = AdamantiumProperty.Register(nameof(Visibility),
         typeof(Visibility), typeof(UIComponent),
         new PropertyMetadata(Visibility.Visible,

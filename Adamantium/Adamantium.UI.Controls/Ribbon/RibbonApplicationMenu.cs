@@ -282,11 +282,33 @@ public class RibbonApplicationMenu : Selector
 
     private void OnPopupClosed(object sender, EventArgs e) => IsOpen = false;
 
+    /// <summary>Opened, the backstage takes the window - so the keyboard has to come with it, or it is left standing on
+    /// the button behind a page that now covers everything.
+    /// <para>Not straight away: the rows are built when the overlay is first measured, and only the popup layer's pass
+    /// can say that they exist - the window's own layout never touches this subtree. So listen to that pass and step in
+    /// on the first tick where there is something to step into. Same seam a context menu needs.</para></summary>
+    private void MoveKeyboardInside()
+    {
+        if (_popup == null) return;
+
+        _popup.LayerPass -= OnLayerPass;
+        _popup.LayerPass += OnLayerPass;
+    }
+
+    private void OnLayerPass(object sender, EventArgs e)
+    {
+        if (_popup?.Child is not { } content || !Core.Input.KeyboardNavigation.MoveInto(content)) return;
+
+        _popup.LayerPass -= OnLayerPass;
+    }
+
     private void ReflectOpenState()
     {
         if (_popup != null)
         {
             _popup.IsOpen = IsOpen;
+            if (IsOpen) MoveKeyboardInside();
+            else _popup.LayerPass -= OnLayerPass;
         }
         if (_button != null)
         {

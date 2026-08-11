@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Collections.Specialized;
 using Adamantium.Core.Commands;
 using Adamantium.UI.Core;
@@ -63,6 +65,22 @@ public class Ribbon : Selector
     public static void SetQuickAccessTemplate(IAdamantiumComponent element, DataTemplate value) =>
         element.SetValue(QuickAccessTemplateProperty, value);
 
+    /// <summary>What the APPLICATION calls this command. The bar is handed a description, never the control, so an
+    /// application that has to recognise the command it was asked about - to point its own item at the same state, say -
+    /// needs a name for it that outlives the visual. Reaches the application as
+    /// <see cref="RibbonQuickAccessEventArgs.Key"/>.
+    /// <para>INHERITS, so the bar can stamp it once on the container it builds for an item and every visual inside that
+    /// container - the button the user actually right-clicks - answers with the same key.</para></summary>
+    public static readonly AdamantiumProperty QuickAccessKeyProperty = AdamantiumProperty.RegisterAttached(
+        "QuickAccessKey", typeof(object), typeof(AdamantiumComponent),
+        new PropertyMetadata(null, PropertyMetadataOptions.Inherits));
+
+    public static object GetQuickAccessKey(IAdamantiumComponent element) =>
+        element.GetValue<object>(QuickAccessKeyProperty);
+
+    public static void SetQuickAccessKey(IAdamantiumComponent element, object value) =>
+        element.SetValue(QuickAccessKeyProperty, value);
+
     /// <summary>At which step of its GROUP this command drops its big icon for a small one beside the label.</summary>
     public static readonly AdamantiumProperty CollapseToMediumProperty = AdamantiumProperty.RegisterAttached("CollapseToMedium",
         typeof(RibbonCollapseThreshold), typeof(AdamantiumComponent),
@@ -98,18 +116,78 @@ public class Ribbon : Selector
     //
     // The bar's collection belongs to the APPLICATION and holds whatever type it chose, so the ribbon never writes into
     // it. It only reports the request and states what the command looks like; the application builds its own kind of
-    // item and answers. That also means the ribbon cannot know what is already in the bar - IsInQuickAccess is the
-    // application's answer to that, not the ribbon's record.
+    // item and answers.
+    //
+    // What is in the bar already, the ribbon READS: point it at the same collection the bar shows (QuickAccessItems) and
+    // it recognises its own commands there by their key. The application is left holding no record of the ribbon at all -
+    // which matters, because the only record it could keep is a reference to a control, and a view model that holds a
+    // control has stopped being a view model.
 
     /// <summary>Whether this command may be offered to the bar at all. A separator, or a control that would be
     /// meaningless as one small button, says no.</summary>
     public static readonly AdamantiumProperty CanAddToQuickAccessProperty = AdamantiumProperty.RegisterAttached(
         "CanAddToQuickAccess", typeof(bool), typeof(AdamantiumComponent), new PropertyMetadata(true));
 
-    /// <summary>Set BY THE APPLICATION: this command is in the bar already. The ribbon reads it to offer "remove"
-    /// instead of "add" - it holds no list of its own to check against.</summary>
+    /// <summary>The right-click menu a command in a group is given when it wrote none of its own. A TEMPLATE and not a
+    /// menu: a <see cref="ContextMenu"/> is a logical child with a single <see cref="ContextMenu.PlacementTarget"/>, so
+    /// every command needs its OWN - and a style setter hands them all the same object. A template builds a fresh one per
+    /// command, which is what puts the menu's contents back in the theme instead of in code.
+    /// <para>INHERITED, so it is stated once on the ribbon (the theme does) and every group finds it. Unset means a
+    /// command is given no menu at all.</para></summary>
+    public static readonly AdamantiumProperty CommandContextMenuTemplateProperty = AdamantiumProperty.RegisterAttached(
+        "CommandContextMenuTemplate", typeof(DataTemplate), typeof(AdamantiumComponent),
+        new PropertyMetadata(null, PropertyMetadataOptions.Inherits));
+
+    public static DataTemplate GetCommandContextMenuTemplate(IAdamantiumComponent element) =>
+        element.GetValue<DataTemplate>(CommandContextMenuTemplateProperty);
+
+    public static void SetCommandContextMenuTemplate(IAdamantiumComponent element, DataTemplate value) =>
+        element.SetValue(CommandContextMenuTemplateProperty, value);
+
+    /// <summary>States outright that this visual stands for a command already in the bar - what the bar's OWN buttons
+    /// say, being in it. A command in the ribbon does not need it: it is recognised by its
+    /// <see cref="QuickAccessKeyProperty"/> in <see cref="QuickAccessItemsProperty"/>.</summary>
     public static readonly AdamantiumProperty IsInQuickAccessProperty = AdamantiumProperty.RegisterAttached(
         "IsInQuickAccess", typeof(bool), typeof(AdamantiumComponent), new PropertyMetadata(false));
+
+    /// <summary>The bar's collection, as the ribbon sees it - bind it to the same list the
+    /// <see cref="RibbonQuickAccess"/> shows. INHERITED, so it is bound once on the ribbon and every command in the band
+    /// can ask whether it is in there. Read only: the ribbon never writes into a collection it does not own.</summary>
+    public static readonly AdamantiumProperty QuickAccessItemsProperty = AdamantiumProperty.RegisterAttached(
+        "QuickAccessItems", typeof(IEnumerable), typeof(AdamantiumComponent),
+        new PropertyMetadata(null, PropertyMetadataOptions.Inherits));
+
+    public static IEnumerable GetQuickAccessItems(IAdamantiumComponent element) =>
+        element.GetValue<IEnumerable>(QuickAccessItemsProperty);
+
+    public static void SetQuickAccessItems(IAdamantiumComponent element, IEnumerable value) =>
+        element.SetValue(QuickAccessItemsProperty, value);
+
+    /// <summary>Whether this command is in the bar right now: either the visual says so outright, or an item with its key
+    /// is in the collection the ribbon was pointed at. Asked afresh every time the menu opens, so no one has to keep the
+    /// answer in step.</summary>
+    public static bool IsShownInQuickAccess(IAdamantiumComponent command)
+    {
+        if (command == null) return false;
+        if (GetIsInQuickAccess(command)) return true;
+
+        var items = GetQuickAccessItems(command);
+        if (items == null) return false;
+
+        var key = GetQuickAccessKey(command);
+        var action = (command as Primitives.ButtonBase)?.Command;
+        if (key == null && action == null) return false;
+
+        foreach (var item in items)
+        {
+            if (item is not IQuickAccessItem quick) continue;
+
+            if (key != null && Equals(quick.Key, key)) return true;
+            if (action != null && ReferenceEquals(quick.Action, action)) return true;
+        }
+
+        return false;
+    }
 
     /// <summary>Run when a command asks to join the bar, with a <see cref="RibbonQuickAccessEventArgs"/> as its
     /// parameter. INHERITED, so it is bound once on the ribbon and every command in the band finds it.</summary>
@@ -199,7 +277,7 @@ public class Ribbon : Selector
         {
             if (parameter is not IUIComponent command) return;
 
-            RequestQuickAccess(command, !GetIsInQuickAccess(command));
+            RequestQuickAccess(command, !IsShownInQuickAccess(command));
         }
 
         public void RaiseCanExecuteChanged() => CanExecuteChanged?.Invoke(this, EventArgs.Empty);
@@ -330,6 +408,7 @@ public class Ribbon : Selector
         KeyboardNavigation.SetIsFocusArea(this, true);
         SelectionChanged += (_, _) => UpdateSelectedContent();
         Items.CollectionChanged += OnItemsChanged;
+        PropertyChanged += OnOwnDataContextChanged;
     }
 
     public object SelectedContent
@@ -367,6 +446,11 @@ public class Ribbon : Selector
         var index = IndexOfHeader(header);
         if (index >= 0) SelectedIndex = index;
     }
+
+    /// <summary>The strip's container for the open tab, or null before one is realized. What Up out of the band comes
+    /// back to.</summary>
+    internal RibbonTabHeader SelectedHeader =>
+        SelectedIndex >= 0 ? ItemContainerGenerator?.ContainerFromIndex(SelectedIndex) as RibbonTabHeader : null;
 
     /// <summary>Whether <paramref name="header"/> stands for the selected tab - asked by a header realized after the
     /// selection was made, since the selection only reflects onto containers when it changes.</summary>
@@ -818,6 +902,12 @@ public class Ribbon : Selector
                 KeyTipService.SetKeyTip(header, stated);
         }
 
+        // The STRIP needs to know the context: the panel cuts its ledges from neighbouring headers and the theme paints
+        // the header in the group's colour. The strip holds headers, so the tab's group is copied onto its header.
+        header.ContextualGroup = GroupOf(item as RibbonTab);
+        Watch(header.ContextualGroup);
+        header.Visibility = IsShown(header.ContextualGroup) ? Visibility.Visible : Visibility.Collapsed;
+
         ApplyContainerSelection(header, item);
     }
 
@@ -827,5 +917,190 @@ public class Ribbon : Selector
 
         header.DataContext = null;
         header.IsSelected = false;
+    }
+
+    // --- Contextual groups (docs/RIBBON_PLAN.md §4) --------------------------------------------------------------------
+    //
+    // A group is a DESCRIPTION several tabs point at, so the ribbon does not own a list of them: it learns which groups
+    // exist from the tabs themselves and watches each one it meets. Activation is the group's own business - the ribbon
+    // only answers it, by putting the tabs in the strip and stamping WHEN so the panel can order them.
+
+    /// <summary>The contexts this ribbon knows about, declared once here. A tab names the one it belongs to by key.</summary>
+    public static readonly AdamantiumProperty ContextualGroupsProperty = AdamantiumProperty.Register(
+        nameof(ContextualGroups), typeof(RibbonContextualGroups), typeof(Ribbon),
+        new PropertyMetadata(null, OnContextualGroupsChanged));
+
+    private RibbonContextualGroups _contextualGroups;
+
+    public RibbonContextualGroups ContextualGroups
+    {
+        get
+        {
+            if (_contextualGroups == null) SetValue(ContextualGroupsProperty, new RibbonContextualGroups());
+            return _contextualGroups;
+        }
+        set => SetValue(ContextualGroupsProperty, value);
+    }
+
+    private static void OnContextualGroupsChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is not Ribbon ribbon) return;
+
+        if (e.OldValue is RibbonContextualGroups old)
+        {
+            old.CollectionChanged -= ribbon.OnContextualGroupsCollectionChanged;
+            foreach (var group in old) ribbon.Release(group);
+        }
+
+        ribbon._contextualGroups = e.NewValue as RibbonContextualGroups;
+        if (ribbon._contextualGroups == null) return;
+
+        ribbon._contextualGroups.CollectionChanged += ribbon.OnContextualGroupsCollectionChanged;
+        foreach (var group in ribbon._contextualGroups) ribbon.Adopt(group);
+    }
+
+    private void OnContextualGroupsCollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.OldItems != null)
+        {
+            foreach (var item in e.OldItems)
+            {
+                if (item is RibbonContextualGroup group) Release(group);
+            }
+        }
+
+        if (e.NewItems != null)
+        {
+            foreach (var item in e.NewItems)
+            {
+                if (item is RibbonContextualGroup group) Adopt(group);
+            }
+        }
+
+        RefreshContextualTabs();
+    }
+
+    /// <summary>A group stands OUTSIDE the tree, so nothing hands it a DataContext - and an <c>IsActive="{Binding}"</c>
+    /// would have nothing to resolve against and would never fire, leaving its tabs hidden for good. What a component
+    /// off the tree reaches a DataContext through is its inheritance parent, the same seam a Transform uses.</summary>
+    private void Adopt(RibbonContextualGroup group)
+    {
+        if (group == null) return;
+
+        group.InheritanceParent = this;
+
+        // A group is BUILT and bound before it is added here, so its bindings were established with no parent and
+        // therefore no DataContext - and nothing else would ever re-run them: a group has no attach event of its own.
+        // Re-establish now, and again when the ribbon's own DataContext arrives (the usual order is: build the tree,
+        // then hand it its data). Exactly the seam Transform needs for <Transform ScaleX="{Binding Zoom}"/>.
+        Core.Data.BindingEngine.RefreshBindings(group);
+        Watch(group);
+    }
+
+    private void OnOwnDataContextChanged(object sender, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (e.Property?.Name != "DataContext" || _contextualGroups == null) return;
+
+        foreach (var group in _contextualGroups) Core.Data.BindingEngine.RefreshBindings(group);
+    }
+
+    private void Release(RibbonContextualGroup group)
+    {
+        if (group == null || !_watched.Remove(group)) return;
+
+        group.PropertyChanged -= OnContextualGroupChanged;
+        group.InheritanceParent = null;
+    }
+
+    private readonly HashSet<RibbonContextualGroup> _watched = [];
+    private long _activations;
+
+    private static bool IsShown(RibbonContextualGroup group) => group == null || group.IsActive;
+
+    // The tab states its group directly (code, or a view model that owns the contexts) or names it by key. The object
+    // wins: a key is only how MARKUP points at one, since a group is not a visual and cannot be named as an element.
+    private RibbonContextualGroup GroupOf(RibbonTab tab)
+    {
+        if (tab == null) return null;
+        if (tab.ContextualGroup is { } stated) return stated;
+
+        var key = tab.ContextualGroupKey;
+        if (string.IsNullOrEmpty(key) || _contextualGroups == null) return null;
+
+        foreach (var group in _contextualGroups)
+        {
+            if (group.Key == key) return group;
+        }
+
+        return null;
+    }
+
+    private void Watch(RibbonContextualGroup group)
+    {
+        if (group == null || !_watched.Add(group)) return;
+
+        // Stamped now if it arrived already active, so a group switched on before the ribbon was built still has an
+        // order - otherwise every such group sorts as "oldest" and the strip's order depends on nothing.
+        if (group.IsActive) group.ActivatedAt = ++_activations;
+        group.PropertyChanged += OnContextualGroupChanged;
+    }
+
+    private void OnContextualGroupChanged(object sender, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (sender is not RibbonContextualGroup group) return;
+
+        // What the STRIP draws from the group - its title, its colour, whether it has a ledge at all - is read during
+        // the panel's own measure, so a change to any of it has to ask for one. Nothing else would: the group is not in
+        // the tree, and a property on it invalidates nothing by itself.
+        if (e.Property == RibbonContextualGroup.ShowHeaderProperty ||
+            e.Property == RibbonContextualGroup.HeaderProperty ||
+            e.Property == RibbonContextualGroup.AccentProperty)
+        {
+            RefreshContextualTabs();
+            (ItemsHostPanel as IMeasurableComponent)?.InvalidateMeasure();
+            return;
+        }
+
+        if (e.Property != RibbonContextualGroup.IsActiveProperty) return;
+
+        if (group.IsActive) group.ActivatedAt = ++_activations;
+
+        RefreshContextualTabs();
+    }
+
+    private void RefreshContextualTabs()
+    {
+        var selectionLost = false;
+
+        for (var i = 0; i < Items.Count; i++)
+        {
+            if (ItemContainerGenerator?.ContainerFromIndex(i) is not RibbonTabHeader header) continue;
+
+            var shown = IsShown(header.ContextualGroup);
+            header.Visibility = shown ? Visibility.Visible : Visibility.Collapsed;
+            header.Accent = header.ContextualGroup?.Accent;
+
+            if (!shown && i == SelectedIndex) selectionLost = true;
+        }
+
+        // VisibilityProperty carries AffectsMeasure but NOT AffectsParentMeasure, so hiding a tab invalidates only its
+        // OWN measure - and the strip's whole shape (which tabs are in it, where the runs fall, how tall the ledge row
+        // is) is decided in the PANEL's. Ask for it, or the strip keeps the arrangement it had before the context came.
+        (ItemsHostPanel as IMeasurableComponent)?.InvalidateMeasure();
+
+        // Appearing is an OFFER, not an order: a group switching on must not pull the open tab out from under someone
+        // mid-edit. Only losing the open tab forces a move - and to the last ORDINARY tab, never to a neighbouring
+        // contextual one, which may be the next to go.
+        if (selectionLost) SelectedIndex = LastOrdinaryTab();
+    }
+
+    private int LastOrdinaryTab()
+    {
+        for (var i = Items.Count - 1; i >= 0; i--)
+        {
+            if (Items[i] is RibbonTab tab && GroupOf(tab) == null) return i;
+        }
+
+        return -1;
     }
 }

@@ -8,12 +8,43 @@
         Height="720">
     <!-- The quick-access bar lives in the CAPTION, through the title bar's neutral content slot - no RibbonWindow type
          needed, the caption is already our own control rather than the OS's. -->
+    <!-- The compact forms this shell draws its commands with. Declared once, referenced by key: a template nested
+         inside a selector inside a property element is unreadable, and these are the shell's vocabulary, not one
+         control's detail. -->
+    <ResourceContext.Resources>
+        <DataTemplate x:Key="QuickAccessToggleTemplate">
+            <ToggleButton Classes="QuickAccessButton"
+                          Ribbon.IsInQuickAccess="True"
+                          ToolTip="{Binding ToolTip}"
+                          IsChecked="{Binding IsChecked, Mode=TwoWay}">
+                <!-- Taking it back out is done here too - the same row the ordinary button offers. -->
+                <ToggleButton.ContextMenu>
+                    <ContextMenu>
+                        <RibbonQuickAccessMenuItem/>
+                    </ContextMenu>
+                </ToggleButton.ContextMenu>
+                <Path Data="{Binding Icon}"
+                      Stroke="{Ancestor RibbonQuickAccess, Foreground}"
+                      StrokeThickness="1"
+                      HorizontalAlignment="Center"
+                      VerticalAlignment="Center"/>
+            </ToggleButton>
+        </DataTemplate>
+    </ResourceContext.Resources>
+
     <Window.TitleBarLeadingContent>
         <!-- The bar lives in the CAPTION, outside the ribbon, so nothing inherits down to it - the command that takes a
              button back out is bound here, on the bar itself. -->
         <RibbonQuickAccess ItemsSource="{Binding QuickAccess}" Margin="6 0 4 0"
                            Placement="{Binding QuickAccessPlacement}"
                            Ribbon.RemoveFromQuickAccessCommand="{Binding RemoveFromQuickAccessCommand}"
-                           Foreground="{Ancestor TitleBar, Foreground}"/>
+                           Foreground="{Ancestor TitleBar, Foreground}">
+            <!-- WHICH visual a command gets is decided HERE, by the shell, because the items are the shell's own type.
+                 The engine's default selector only knows "did the command bring a form of its own"; it has no business
+                 knowing that this application's commands can be ON or OFF. -->
+            <RibbonQuickAccess.ItemTemplateSelector>
+                <ShellQuickAccessTemplateSelector Toggle="{ResourceReference QuickAccessToggleTemplate}"/>
+            </RibbonQuickAccess.ItemTemplateSelector>
+        </RibbonQuickAccess>
     </Window.TitleBarLeadingContent>
 </Window>

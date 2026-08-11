@@ -13,6 +13,13 @@ namespace Adamantium.UI.Controls;
 /// to a <see cref="Ribbon"/>: the two meet at a collection in the shell's view model. See docs/RIBBON_PLAN.md §7.1.</summary>
 public class RibbonQuickAccess : ItemsControl
 {
+    static RibbonQuickAccess()
+    {
+        // The bar's own choice, so the theme states only the LOOK. Stateless, hence shared as the metadata default.
+        ItemTemplateSelectorProperty.OverrideMetadata(typeof(RibbonQuickAccess),
+            new PropertyMetadata(new RibbonQuickAccessTemplateSelector()));
+    }
+
     /// <summary>Where the bar is shown. The application hosts an instance in BOTH slots, bound to the one collection,
     /// and each shows itself only while this names the slot it is standing in.</summary>
     public static readonly AdamantiumProperty PlacementProperty = AdamantiumProperty.Register(nameof(Placement),
@@ -28,6 +35,19 @@ public class RibbonQuickAccess : ItemsControl
     private static void OnPlacementChanged(AdamantiumComponent sender, AdamantiumPropertyChangedEventArgs e)
     {
         (sender as RibbonQuickAccess)?.ShowOnlyInItsOwnSlot();
+    }
+
+    /// <summary>How an ordinary item is drawn - the icon button the theme states. The THEME owns the look; which items
+    /// are ordinary is the selector's decision, and an application replacing that decision
+    /// (<see cref="ItemsControl.ItemTemplateSelector"/>) keeps this look for everything it does not treat specially.</summary>
+    public static readonly AdamantiumProperty DefaultItemTemplateProperty = AdamantiumProperty.Register(
+        nameof(DefaultItemTemplate), typeof(Core.Templates.DataTemplate), typeof(RibbonQuickAccess),
+        new PropertyMetadata(null));
+
+    public Core.Templates.DataTemplate DefaultItemTemplate
+    {
+        get => GetValue<Core.Templates.DataTemplate>(DefaultItemTemplateProperty);
+        set => SetValue(DefaultItemTemplateProperty, value);
     }
 
     /// <summary>The commands the caption had no room for. They are not lost - the bar offers them under its chevron,
@@ -152,6 +172,19 @@ public class RibbonQuickAccess : ItemsControl
     {
         base.OnAttachedToVisualTree(e);
         ShowOnlyInItsOwnSlot();
+    }
+
+    /// <summary>Stamps the item's key on its visual, so a request raised from inside the bar names the command the item
+    /// stands for. Without it the only identity a bar item has is the command it runs - and an item that runs none (a
+    /// state a command shows, a slider) could be put in and never taken out.</summary>
+    protected internal override void PrepareContainer(IUIComponent container, object item)
+    {
+        base.PrepareContainer(container, item);
+
+        if (item is IQuickAccessItem quick && quick.Key != null)
+        {
+            Ribbon.SetQuickAccessKey(container, quick.Key);
+        }
     }
 
     // Which slot this instance stands in is a fact about the tree, not something the application should have to repeat:

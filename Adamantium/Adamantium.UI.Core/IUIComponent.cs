@@ -55,6 +55,11 @@ public interface IUIComponent : IFundamentalUIComponent
     IUIComponent LayoutRoot { get; }
 
     Int32 ZIndex { get; set; }
+
+    /// <summary>Whether this component's shapes are anti-aliased. Off for an axis-aligned rectangle on whole pixels,
+    /// which needs no fringe and is only harmed by one - see UIComponent.UseAnalyticAA.</summary>
+    Boolean UseAnalyticAA { get; set; }
+
     bool IsAttachedToVisualTree { get; }
 
     /// <summary>A render MOTION NODE: this element's subtree translates as a unit (a transform-only-scrolled panel).

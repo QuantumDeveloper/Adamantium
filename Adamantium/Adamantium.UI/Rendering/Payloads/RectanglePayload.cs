@@ -25,6 +25,10 @@ public class RectanglePayload(Brush brush, Rect destinationRect, CornerRadius co
     // reachable) while the applier reads those very fields to build the stroke. Same fix as GeometryPayload.
     public Pen Pen { get; } = pen?.CloneForRendering();
 
+    /// <summary>False = draw the edges hard. Taken from the drawing component's UseAnalyticAA at RECORD time, because
+    /// that is where the component is known; the batch carries it to the shader.</summary>
+    public bool AntiAlias { get; init; } = true;
+
     public bool RequiresBufferRebuild(IRenderCachePolicy newState)
     {
         if (newState is not RectanglePayload payload) return true;
@@ -37,7 +41,7 @@ public class RectanglePayload(Brush brush, Rect destinationRect, CornerRadius co
         if (other is null) return false;
         if (ReferenceEquals(this, other)) return true;
         return Equals(Brush, other.Brush) && DestinationRect.Equals(other.DestinationRect) &&
-               CornerRadius.Equals(other.CornerRadius) && Equals(Pen, other.Pen);
+               CornerRadius.Equals(other.CornerRadius) && Equals(Pen, other.Pen) && AntiAlias == other.AntiAlias;
     }
 
     public override bool Equals(object obj)
@@ -50,6 +54,6 @@ public class RectanglePayload(Brush brush, Rect destinationRect, CornerRadius co
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(Brush, DestinationRect, CornerRadius, Pen);
+        return HashCode.Combine(Brush, DestinationRect, CornerRadius, Pen, AntiAlias);
     }
 }

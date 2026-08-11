@@ -134,17 +134,64 @@ public class RibbonQuickAccessTransferTests
         Assert.That(asked, Is.Zero);
     }
 
-    // The ribbon holds NO list of what is in the bar - the application states it, and the ribbon only reads it back.
+    // The ribbon holds NO list of its own: it is POINTED at the application's, and reads its own commands out of it.
+    // Nobody writes a mark back - a view model that did would have to keep the ribbon's control to write it on.
+    private sealed class BarItem : IQuickAccessItem
+    {
+        public Adamantium.UI.Core.Templates.DataTemplate QuickAccessTemplate => null;
+
+        public object Key { get; set; }
+
+        public ICommand Action { get; set; }
+    }
+
     [Test]
-    public void MembershipIsWhateverTheApplicationSaysItIs()
+    public void ACommandIsRecognisedInTheBarByTheCommandItRuns()
+    {
+        var run = new Spy();
+        var button = Command();
+        button.Command = run;
+
+        Ribbon.SetQuickAccessItems(button, new object[] { new BarItem { Action = run } });
+
+        Assert.That(Ribbon.IsShownInQuickAccess(button), Is.True);
+    }
+
+    [Test]
+    public void ACommandThatRunsNothingIsRecognisedByItsKey()
+    {
+        var toggle = Command();
+        Ribbon.SetQuickAccessKey(toggle, "ShowGrid");
+
+        Ribbon.SetQuickAccessItems(toggle, new object[] { new BarItem { Key = "ShowGrid" } });
+
+        Assert.That(Ribbon.IsShownInQuickAccess(toggle), Is.True);
+    }
+
+    [Test]
+    public void ACommandTheBarDoesNotHoldIsNotInIt()
+    {
+        var button = Command();
+        button.Command = new Spy();
+        Ribbon.SetQuickAccessKey(button, "Save");
+
+        Ribbon.SetQuickAccessItems(button, new object[] { new BarItem { Key = "Open", Action = new Spy() } });
+
+        Assert.That(Ribbon.IsShownInQuickAccess(button), Is.False);
+    }
+
+    // The bar's own buttons are IN it by standing there - they carry no key of the ribbon's and run the application's
+    // command, not the ribbon command's.
+    [Test]
+    public void AVisualThatStatesItOutrightIsInTheBar()
     {
         var button = Command();
 
-        Assert.That(Ribbon.GetIsInQuickAccess(button), Is.False, "nothing is in the bar until someone says so");
+        Assert.That(Ribbon.IsShownInQuickAccess(button), Is.False, "nothing is in the bar until something says so");
 
         Ribbon.SetIsInQuickAccess(button, true);
 
-        Assert.That(Ribbon.GetIsInQuickAccess(button), Is.True);
+        Assert.That(Ribbon.IsShownInQuickAccess(button), Is.True);
     }
 
     // The one place commands are moved from has to offer the WHOLE band, not the tab that happens to be open: only the

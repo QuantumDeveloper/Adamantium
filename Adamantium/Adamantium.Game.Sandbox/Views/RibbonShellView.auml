@@ -6,10 +6,13 @@
     <Grid RowDefinitions="Auto,*,Auto">
 
         <!-- The ribbon states WHAT was asked and what it looks like; this shell decides what its own quick-access items
-             are made of and owns the list. Bound once here - the properties inherit down to every command in the band. -->
+             are made of and owns the list. Bound once here - the properties inherit down to every command in the band.
+             The list itself is bound too, READ-ONLY: that is how a command knows to offer "remove" rather than "add",
+             without anyone writing a mark back into the ribbon. -->
         <Ribbon Grid.Row="0" x:Name="Band"
                 Ribbon.AddToQuickAccessCommand="{Binding AddToQuickAccessCommand}"
-                Ribbon.RemoveFromQuickAccessCommand="{Binding RemoveFromQuickAccessCommand}">
+                Ribbon.RemoveFromQuickAccessCommand="{Binding RemoveFromQuickAccessCommand}"
+                Ribbon.QuickAccessItems="{Binding QuickAccess}">
 
             <!-- "File": a command that opens a menu, so the flyout is the ContextMenu one already is. The two-pane
                  version - recent files beside the commands - is a later step. -->
@@ -176,39 +179,23 @@
                 </RibbonGroup>
 
                 <RibbonGroup Header="View" Icon="M2,8 A6,4 0 0 0 14,8 A6,4 0 0 0 2,8 M8,6 A2,2 0 1 0 8,10 A2,2 0 1 0 8,6">
-                    <!-- The same flags drive the surface below and the View tab. -->
-                    <RibbonToggleButton Content="Wireframe" IsChecked="{Binding Wireframe, Mode=TwoWay}"
+                    <!-- The same flags drive the surface below and the View tab. `Ribbon.QuickAccessKey` NAMES the
+                         command: put one in the quick-access bar and the shell points its item at the same flag, so the
+                         button in the caption and this one are two views of one value - not two values kept in step. -->
+                    <RibbonToggleButton Content="Wireframe"
+                                        Ribbon.QuickAccessKey="Wireframe"
+                                        IsChecked="{Binding Wireframe, Mode=TwoWay}"
                                         Icon="M8,2 L14,5 L14,11 L8,14 L2,11 L2,5 Z M2,5 L8,8 L14,5 M8,8 L8,14"/>
-                    <!-- A toggle states its compact form itself: the theme knows how a checked command should LOOK in
-                         the caption, but only this view knows WHICH state it stands for. -->
-                    <RibbonToggleButton Content="Grid" MaxSize="Medium" IsChecked="{Binding ShowGrid, Mode=TwoWay}"
-                                        Icon="M2,2 L14,2 L14,14 L2,14 Z M6,2 L6,14 M10,2 L10,14 M2,6 L14,6 M2,10 L14,10">
-                        <Ribbon.QuickAccessTemplate>
-                            <DataTemplate>
-                                <ToggleButton Classes="QuickAccessButton"
-                                              ToolTip="{Binding ToolTip}"
-                                              IsChecked="{Ancestor RibbonQuickAccess, DataContext.ShowGrid, Mode=TwoWay}">
-                                    <Path Data="{Binding Icon}"
-                                          Stroke="{Ancestor RibbonQuickAccess, Foreground}" StrokeThickness="1"
-                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </ToggleButton>
-                            </DataTemplate>
-                        </Ribbon.QuickAccessTemplate>
-                    </RibbonToggleButton>
-                    <RibbonToggleButton Content="Gizmos" MaxSize="Medium" IsChecked="{Binding ShowGizmos, Mode=TwoWay}"
-                                        Icon="M8,14 L8,4 M8,4 L5,7 M8,4 L11,7 M2,14 L14,14">
-                        <Ribbon.QuickAccessTemplate>
-                            <DataTemplate>
-                                <ToggleButton Classes="QuickAccessButton"
-                                              ToolTip="{Binding ToolTip}"
-                                              IsChecked="{Ancestor RibbonQuickAccess, DataContext.ShowGizmos, Mode=TwoWay}">
-                                    <Path Data="{Binding Icon}"
-                                          Stroke="{Ancestor RibbonQuickAccess, Foreground}" StrokeThickness="1"
-                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </ToggleButton>
-                            </DataTemplate>
-                        </Ribbon.QuickAccessTemplate>
-                    </RibbonToggleButton>
+                    <RibbonToggleButton Content="Grid"
+                                        MaxSize="Medium"
+                                        Ribbon.QuickAccessKey="ShowGrid"
+                                        IsChecked="{Binding ShowGrid, Mode=TwoWay}"
+                                        Icon="M2,2 L14,2 L14,14 L2,14 Z M6,2 L6,14 M10,2 L10,14 M2,6 L14,6 M2,10 L14,10"/>
+                    <RibbonToggleButton Content="Gizmos"
+                                        MaxSize="Medium"
+                                        Ribbon.QuickAccessKey="ShowGizmos"
+                                        IsChecked="{Binding ShowGizmos, Mode=TwoWay}"
+                                        Icon="M8,14 L8,4 M8,4 L5,7 M8,4 L11,7 M2,14 L14,14"/>
                     <!-- A separator ends the run beside it, so what follows starts a fresh column. -->
                     <Separator/>
                     <!-- A group hosts ORDINARY controls too. They state the same range through the ATTACHED form - a
@@ -288,6 +275,23 @@
                                   Icon="M5,3 L13,8 L5,13 Z"/>
                 </RibbonGroup>
 
+                <!-- What the contextual tabs hang on. Two toggles rather than a real selection: the point on show is
+                     the STRIP - one context, two contexts, and the order they arrive in. -->
+                <RibbonGroup Header="Context" ShrinkSteps="None" Icon="M2,2 L14,2 L14,14 L2,14 Z M5,5 L11,5 L11,11 L5,11 Z">
+                    <RibbonToggleButton Content="Mesh" MaxSize="Medium"
+                                        IsChecked="{Binding HasMeshSelection, Mode=TwoWay}"
+                                        ToolTip="Pretend a mesh is selected - its tabs appear"
+                                        Icon="M8,2 L14,5 L14,11 L8,14 L2,11 L2,5 Z M2,5 L8,8 L14,5 M8,8 L8,14"/>
+                    <RibbonToggleButton Content="Light" MaxSize="Medium"
+                                        IsChecked="{Binding HasLightSelection, Mode=TwoWay}"
+                                        ToolTip="...and a second context, to see two ledges at once"
+                                        Icon="M8,2 L8,4 M8,12 L8,14 M2,8 L4,8 M12,8 L14,8 M8,5 A3,3 0 1 0 8,11 A3,3 0 1 0 8,5"/>
+                    <RibbonToggleButton Content="Ledge" MaxSize="Medium"
+                                        IsChecked="{Binding ShowContextHeader, Mode=TwoWay}"
+                                        ToolTip="The ledge over a context's tabs - off, their colour carries it and the strip stops paying its height"
+                                        Icon="M2,4 L14,4 L14,7 L2,7 Z M2,10 L6,10 M8,10 L14,10"/>
+                </RibbonGroup>
+
                 <RibbonGroup Header="Tools" ShrinkSteps="None" Icon="M3,13 L13,3 M10,3 L13,3 L13,6">
                     <RibbonButton Content="Measure" MaxSize="Medium" Command="{Binding MeasureCommand}"
                                   Icon="M2,6 L14,6 L14,10 L2,10 Z M5,6 L5,8 M8,6 L8,8 M11,6 L11,8"/>
@@ -330,8 +334,28 @@
                                   Icon="M2,2 L14,2 L14,14 L2,14 Z M8,2 L8,14 M2,8 L14,8"/>
                 </RibbonGroup>
 
-                <RibbonGroup Header="Snapping" Icon="M8,2 L8,14 M2,8 L14,8 M5,5 L11,11 M11,5 L5,11">
-                    <RibbonToggleButton Content="Snap" IsChecked="{Binding SnapToGrid, Mode=TwoWay}"
+                <RibbonGroup Header="Snapping"
+                             Icon="M8,2 L8,14 M2,8 L14,8 M5,5 L11,11 M11,5 L5,11">
+                    <!-- THIS group's commands get the shell's OWN right-click menu instead of the ribbon's. The property
+                         is inherited, so the same attribute on <Ribbon> would speak for the whole band; written here it
+                         overrides just this group. Its rows are DATA from the view model - nothing about them reaches
+                         the ribbon. Write {x:Null} instead and the commands get no menu at all. -->
+                    <Ribbon.CommandContextMenuTemplate>
+                        <DataTemplate>
+                            <ContextMenu ItemsSource="{Binding SnapMenuRows}">
+                                <ContextMenu.ItemTemplate>
+                                    <DataTemplate>
+                                        <MenuItem Header="{Binding Header}"
+                                                  Command="{Binding Command}"/>
+                                    </DataTemplate>
+                                </ContextMenu.ItemTemplate>
+                            </ContextMenu>
+                        </DataTemplate>
+                    </Ribbon.CommandContextMenuTemplate>
+
+                    <RibbonToggleButton Content="Snap"
+                                        Ribbon.QuickAccessKey="SnapToGrid"
+                                        IsChecked="{Binding SnapToGrid, Mode=TwoWay}"
                                         Icon="M8,2 L8,14 M2,8 L14,8 M5,5 L11,11 M11,5 L5,11"/>
                     <!-- Small: the icon alone, three to a column. MaxSize is a RANGE - the adaptive pass may only shrink. -->
                     <RibbonToggleButton MaxSize="Small" ToolTip="Snap to vertices"
@@ -385,11 +409,17 @@
             <!-- ================= VIEW ================= -->
             <RibbonTab Header="View" KeyTipService.KeyTip="V">
                 <RibbonGroup Header="Display" Icon="M2,2 L14,2 L14,14 L2,14 Z M6,2 L6,14 M10,2 L10,14">
-                    <RibbonToggleButton Content="Grid" IsChecked="{Binding ShowGrid, Mode=TwoWay}"
+                    <RibbonToggleButton Content="Grid"
+                                        Ribbon.QuickAccessKey="ShowGrid"
+                                        IsChecked="{Binding ShowGrid, Mode=TwoWay}"
                                         Icon="M2,2 L14,2 L14,14 L2,14 Z M6,2 L6,14 M10,2 L10,14 M2,6 L14,6 M2,10 L14,10"/>
-                    <RibbonToggleButton Content="Gizmos" IsChecked="{Binding ShowGizmos, Mode=TwoWay}"
+                    <RibbonToggleButton Content="Gizmos"
+                                        Ribbon.QuickAccessKey="ShowGizmos"
+                                        IsChecked="{Binding ShowGizmos, Mode=TwoWay}"
                                         Icon="M8,14 L8,4 M8,4 L5,7 M8,4 L11,7 M2,14 L14,14"/>
-                    <RibbonToggleButton Content="Wireframe" IsChecked="{Binding Wireframe, Mode=TwoWay}"
+                    <RibbonToggleButton Content="Wireframe"
+                                        Ribbon.QuickAccessKey="Wireframe"
+                                        IsChecked="{Binding Wireframe, Mode=TwoWay}"
                                         Icon="M8,2 L14,5 L14,11 L8,14 L2,11 L2,5 Z M2,5 L8,8 L14,5 M8,8 L8,14"/>
                 </RibbonGroup>
 
@@ -400,6 +430,54 @@
                                   Icon="M2,2 L14,2 L14,14 L2,14 Z"/>
                     <RibbonButton Content="Delete" MaxSize="Medium" Command="{Binding DeleteCommand}"
                                   Icon="M3,4 L13,4 M5,4 L5,14 L11,14 L11,4 M6,2 L10,2"/>
+                </RibbonGroup>
+            </RibbonTab>
+
+            <!-- ================= CONTEXTUAL ================= -->
+            <!-- Tabs that turn up under a task. The contexts are declared once on the ribbon; a tab names the one it
+                 belongs to by key, because a group is not a visual and cannot be pointed at as an element. -->
+            <Ribbon.ContextualGroups>
+                <RibbonContextualGroup Key="MeshTools"
+                                       Header="MESH TOOLS"
+                                       Accent="#B85C2E"
+                                       ShowHeader="{Binding ShowContextHeader}"
+                                       IsActive="{Binding HasMeshSelection}"/>
+                <RibbonContextualGroup Key="LightTools"
+                                       Header="LIGHT TOOLS"
+                                       Accent="#3F7CBF"
+                                       ShowHeader="{Binding ShowContextHeader}"
+                                       IsActive="{Binding HasLightSelection}"/>
+            </Ribbon.ContextualGroups>
+
+            <!-- TWO tabs in one context: they stand together under ONE ledge spanning both. -->
+            <RibbonTab Header="Geometry" ContextualGroupKey="MeshTools" KeyTipService.KeyTip="G">
+                <RibbonGroup Header="Edit" Icon="M2,2 L14,2 L14,14 L2,14 Z M8,2 L8,14">
+                    <RibbonButton Content="Extrude" Command="{Binding ExtrudeCommand}"
+                                  Icon="M8,2 L14,5 L14,11 L8,14 L2,11 L2,5 Z M8,8 L8,14"/>
+                    <RibbonButton Content="Bevel" MaxSize="Medium" Command="{Binding BevelCommand}"
+                                  Icon="M3,13 L6,3 L10,3 L13,13 Z"/>
+                    <RibbonButton Content="Subdivide" MaxSize="Medium" Command="{Binding SubdivideCommand}"
+                                  Icon="M2,2 L14,2 L14,14 L2,14 Z M8,2 L8,14 M2,8 L14,8"/>
+                </RibbonGroup>
+            </RibbonTab>
+
+            <RibbonTab Header="UV" ContextualGroupKey="MeshTools" KeyTipService.KeyTip="U">
+                <RibbonGroup Header="Unwrap" Icon="M2,2 L14,2 L14,14 L2,14 Z M2,8 L14,8 M8,2 L8,14">
+                    <RibbonButton Content="Unwrap" Command="{Binding SubdivideCommand}"
+                                  Icon="M2,2 L14,2 L14,14 L2,14 Z M5,2 L5,14 M11,2 L11,14"/>
+                    <RibbonButton Content="Measure" MaxSize="Medium" Command="{Binding MeasureCommand}"
+                                  Icon="M2,6 L14,6 L14,10 L2,10 Z M5,6 L5,8 M8,6 L8,8 M11,6 L11,8"/>
+                </RibbonGroup>
+            </RibbonTab>
+
+            <!-- A SECOND context, so the strip has to order two of them - the one switched on last stands furthest
+                 right and does not shift what someone was already aiming at. -->
+            <RibbonTab Header="Light" ContextualGroupKey="LightTools" KeyTipService.KeyTip="L">
+                <RibbonGroup Header="Emission" Icon="M8,5 A3,3 0 1 0 8,11 A3,3 0 1 0 8,5">
+                    <RibbonButton Content="Bake" Command="{Binding BakeLightingCommand}"
+                                  Icon="M3,12 L13,12 M5,12 L5,7 M8,12 L8,4 M11,12 L11,9"/>
+                    <RibbonButton Content="Add light" MaxSize="Medium" Command="{Binding AddLightCommand}"
+                                  Icon="M8,2 L8,4 M8,12 L8,14 M2,8 L4,8 M12,8 L14,8 M8,5 A3,3 0 1 0 8,11 A3,3 0 1 0 8,5"/>
                 </RibbonGroup>
             </RibbonTab>
         </Ribbon>

@@ -69,7 +69,17 @@ namespace Adamantium.UI.Generators
                     
                     aumlDoc.RelativeFilePath = relativePath;
                     aumlDoc.RootNamespace = rootNamespace;
-                    
+
+                    foreach (var finding in QuickAccessMenuCheck.Run(aumlDoc))
+                    {
+                        spc.ReportDiagnostic(Diagnostic.Create("AUI010", "Ribbon",
+                            $"{relativePath}({finding.Line},{finding.Position}): {finding.Command} states its menu as MenuItem CONTROLS. " +
+                            "Taken into the quick-access bar it will drop an EMPTY menu - a ContextMenu is a logical child and " +
+                            "cannot be in two places, so only the row DATA travels. State the rows as ItemsSource + ItemTemplate, " +
+                            "or say Ribbon.CanAddToQuickAccess=\"False\" if this command is not for the bar.",
+                            DiagnosticSeverity.Warning, DiagnosticSeverity.Warning, true, 1));
+                    }
+
                     metadata.Add(aumlDoc);
                 }
 

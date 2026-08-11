@@ -22,6 +22,8 @@ public class RibbonQuickAccessEventArgs : RoutedEventArgs
         Command = command;
 
         Icon = Ribbon.GetIcon(command);
+        Key = Ribbon.GetQuickAccessKey(command);
+        Label = (command as ContentControl)?.Content?.ToString();
         Template = Ribbon.GetQuickAccessTemplate(command);
         ToolTip = command is AdamantiumComponent component ? ToolTipService.GetToolTip(component) : null;
 
@@ -49,10 +51,18 @@ public class RibbonQuickAccessEventArgs : RoutedEventArgs
     /// <summary>What marks the command - the small icon it draws in the bar.</summary>
     public object Icon { get; }
 
+    /// <summary>What the application calls this command (<see cref="Ribbon.QuickAccessKeyProperty"/>), or null for one
+    /// it never named. This is the identity to answer by - the control above is not.</summary>
+    public object Key { get; }
+
     /// <summary>The command's own COMPACT form (see <see cref="Ribbon.QuickAccessTemplateProperty"/>), or null to be
     /// drawn as an ordinary icon button. This is what a slider or a drop-down hands over instead of pretending to be a
     /// button - the bar builds a fresh visual from it, it is not the ribbon's control on loan.</summary>
     public DataTemplate Template { get; }
+
+    /// <summary>What the command calls itself - its words, for a bar that shows them (an overflow row does). Handed over
+    /// as text, so no one has to reach into the control to read its content.</summary>
+    public string Label { get; }
 
     public object ToolTip { get; }
 

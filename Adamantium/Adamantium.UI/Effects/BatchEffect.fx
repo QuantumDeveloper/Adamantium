@@ -55,7 +55,10 @@ float2 SlotPixelScale(float4x4 nodeWorld)
     return ViewportSize.x < 1.0 ? float2(1.0, 1.0) : scale;   // no viewport supplied: leave the bake untouched
 }
 
-float4 CompositeFillStroke(float d, float4 fill, float4 stroke, float width, float align, float strokeMask)
+// `crisp` (0/1) takes the edges HARD instead of fading them over a pixel. An axis-aligned rectangle sitting on whole
+// pixels needs no fade: coverage is exactly a half ON the edge, so two abutting rectangles compose to about three
+// quarters and leave a dark hairline down their join. Off by default - a curve or a slanted edge still needs the fade.
+float4 CompositeFillStroke(float d, float4 fill, float4 stroke, float width, float align, float strokeMask, float crisp)
 {
     float aa = max(fwidth(d), 1e-5);
     float covFill = saturate(0.5 - d / aa);
@@ -63,6 +66,14 @@ float4 CompositeFillStroke(float d, float4 fill, float4 stroke, float width, flo
     float halfW = width * 0.5;
     float dRing = abs(d - align * halfW) - halfW;            // signed distance to the stroke ring
     float covStroke = (width > 0.0) ? saturate(0.5 - dRing / aa) * saturate(strokeMask) : 0.0;
+
+    // The crisp answer OVERWRITES the two coverages rather than being folded into their expressions: the anti-aliased
+    // path then compiles to exactly what it did before this option existed.
+    if (crisp > 0.5)
+    {
+        covFill = step(d, 0.0);
+        covStroke = (width > 0.0) ? step(dRing, 0.0) * saturate(strokeMask) : 0.0;
+    }
 
     float fa = fill.a * covFill;                             // fill effective (straight) alpha
     float sa = stroke.a * covStroke;                         // stroke effective (straight) alpha
@@ -313,6 +324,7 @@ struct PSInput
     float4 StrokeColor : COLOR1;
     float4 Stroke0  : TEXCOORD3;
     float4 Stroke1  : TEXCOORD4;
+    float  Crisp    : TEXCOORD5;   // 1 = no fringe (see CompositeFillStroke)
 };
 
 // Signed distance to a rounded box (iq): negative inside, 0 on the edge, positive outside.
@@ -356,7 +368,7 @@ float4 RectBatchPS(PSInput input) : SV_Target
         mask = DashTrimMaskCapped(s, s, perim, input.Stroke0.z, input.Stroke0.w, input.Stroke1.x, input.Stroke1.y,
                             input.Stroke1.z, dPerp * capScl, halfW * capScl, input.Stroke1.w);
     }
-    return CompositeFillStroke(d, input.Color, input.StrokeColor, input.Stroke0.x, input.Stroke0.y, mask);
+    return CompositeFillStroke(d, input.Color, input.StrokeColor, input.Stroke0.x, input.Stroke0.y, mask, input.Crisp);
 }
 
 // ---- InstancedFill pass: general retained geometry instancing (§4h/§4j) --------------------------------------------
@@ -521,6 +533,7 @@ PSInput RectBatchInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_I
     o.StrokeColor = item.StrokeColor;
     o.Stroke0 = float4(widthPx, item.Stroke0.y, item.Stroke0.z * iso, item.Stroke0.w * iso);
     o.Stroke1 = float4(item.Stroke1.x * iso, item.Stroke1.y, item.Stroke1.z, item.Stroke1.w);
+    o.Crisp = item.Params.z;
     return o;
 }
 
@@ -566,7 +579,7 @@ float4 EllipseBatchPS(EllipsePSInput input) : SV_Target
         mask = DashTrimMaskCapped(s, s, perim, input.Stroke0.z, input.Stroke0.w, input.Stroke1.x, input.Stroke1.y,
                             input.Stroke1.z, dPerp * capScl, halfW * capScl, input.Stroke1.w);
     }
-    return CompositeFillStroke(d, input.Color, input.StrokeColor, input.Stroke0.x, input.Stroke0.y, mask);
+    return CompositeFillStroke(d, input.Color, input.StrokeColor, input.Stroke0.x, input.Stroke0.y, mask, 0.0);
 }
 
 // ---- EllipseBatchInstanced: the SAME SDF ellipse batch, per-instance EllipseItem read from a BDA STORAGE buffer by
@@ -850,7 +863,7 @@ float4 GradientPS(GradPSInput input) : SV_Target
         mask = DashTrimMask(s, s, perim, it.Stroke0.z * sc, it.Stroke0.w * sc, it.Stroke1.x * sc, it.Stroke1.y,
                             it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w);
     }
-    return CompositeFillStroke(d, fill, it.StrokeColor, widthPx, it.Stroke0.y, mask);
+    return CompositeFillStroke(d, fill, it.StrokeColor, widthPx, it.Stroke0.y, mask, 0.0);
 }
 
 // ---- GradientFill: general instanced geometry (a shared tessellated mesh drawn N times) whose FILL is a LINEAR/RADIAL
@@ -1465,7 +1478,7 @@ float4 PatternPS(PatternPSInput input) : SV_Target
         mask = DashTrimMask(s, s, perim, it.Stroke0.z * sc, it.Stroke0.w * sc, it.Stroke1.x * sc, it.Stroke1.y,
                             it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w);
     }
-    return CompositeFillStroke(d, fill, it.StrokeColor, widthPx, it.Stroke0.y, mask);
+    return CompositeFillStroke(d, fill, it.StrokeColor, widthPx, it.Stroke0.y, mask, 0.0);
 }
 
 // ---- PatternFill: general instanced geometry (a shared tessellated mesh drawn N times) whose FILL is a PROCEDURAL
@@ -1814,7 +1827,7 @@ float4 FractalPS(FractalPSInput input) : SV_Target
         mask = DashTrimMask(s, s, perim, it.Stroke0.z * sc, it.Stroke0.w * sc, it.Stroke1.x * sc, it.Stroke1.y,
                             it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w);
     }
-    return CompositeFillStroke(d, fill, it.StrokeColor, widthPx, it.Stroke0.y, mask);
+    return CompositeFillStroke(d, fill, it.StrokeColor, widthPx, it.Stroke0.y, mask, 0.0);
 }
 
 // =====================================================================================================================

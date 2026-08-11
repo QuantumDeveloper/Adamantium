@@ -16,6 +16,10 @@ public class RibbonQuickAccessTemplateTests
     private class Item : IQuickAccessItem
     {
         public DataTemplate QuickAccessTemplate { get; set; }
+
+        public object Key { get; set; }
+
+        public Adamantium.Core.Commands.ICommand Action { get; set; }
     }
 
     private static RibbonQuickAccess Bar(params object[] items)
@@ -75,5 +79,26 @@ public class RibbonQuickAccessTemplateTests
 
         Assert.That(Built<Slider>(container), Is.Not.Null, "the command's own compact form must win over the default");
         Assert.That(Built<Button>(container), Is.Null, "and the default must not be built as well");
+    }
+
+    // What the bar builds must answer with the command's key, down to the button the user actually presses: a request
+    // raised there is how an item that runs no command asks to be taken back out.
+    [Test]
+    public void TheItemsKeyReachesTheVisualTheRequestIsRaisedOn()
+    {
+        var bar = Bar(new Item { Key = "ShowGrid" });
+        var container = bar.ItemContainerGenerator.ContainerFromIndex(0);
+
+        Assert.That(Ribbon.GetQuickAccessKey(container), Is.EqualTo("ShowGrid"));
+        Assert.That(Ribbon.GetQuickAccessKey(Built<Button>(container)), Is.EqualTo("ShowGrid"));
+    }
+
+    [Test]
+    public void AnItemThatNamesNothingStampsNothing()
+    {
+        var bar = Bar(new Item());
+        var container = bar.ItemContainerGenerator.ContainerFromIndex(0);
+
+        Assert.That(Ribbon.GetQuickAccessKey(container), Is.Null);
     }
 }
