@@ -16,6 +16,10 @@ internal static class RenderDirtyBridge
         VisualTreeNotifications.Detached += RenderDirty.MarkStructural;
         VisualTreeNotifications.VisibilityChanged += RenderDirty.MarkStructural;
 
+        // Its clip changed -> the ops for its whole subtree carry a different scissor, so the recorded frame no longer
+        // describes this one. STRUCTURAL, like a show/hide: what is re-recorded is not just this element's own draws.
+        VisualTreeNotifications.ClipChanged += RenderDirty.MarkStructural;
+
         // The content it draws is stale -> it must re-render.
         VisualTreeNotifications.ContentInvalidated += RenderDirty.MarkGeometry;
 

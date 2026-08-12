@@ -27,6 +27,10 @@ public static class VisualTreeNotifications
     /// <summary>An element's Visibility changed - it draws now, or it no longer does.</summary>
     public static event Action<IUIComponent> VisibilityChanged;
 
+    /// <summary>An element's CLIP changed - it began, or stopped, cutting its whole subtree to its bounds. Its own
+    /// content is untouched; what changed is the shape of everything drawn beneath it.</summary>
+    public static event Action<IUIComponent> ClipChanged;
+
     /// <summary>An element's CONTENT is stale: what it draws is not what it drew (a new size, a new shape, new text).</summary>
     public static event Action<IUIComponent> ContentInvalidated;
 
@@ -45,6 +49,7 @@ public static class VisualTreeNotifications
     public static void RaiseAttached(IUIComponent component) { if (component != null) Attached?.Invoke(component); }
     public static void RaiseDetached(IUIComponent component) { if (component != null) Detached?.Invoke(component); }
     public static void RaiseVisibilityChanged(IUIComponent component) { if (component != null) VisibilityChanged?.Invoke(component); }
+    public static void RaiseClipChanged(IUIComponent component) { if (component != null) ClipChanged?.Invoke(component); }
     public static void RaiseContentInvalidated(IUIComponent component) { if (component != null) ContentInvalidated?.Invoke(component); }
     public static void RaisePaintInvalidated(IUIComponent component) { if (component != null) PaintInvalidated?.Invoke(component); }
     public static void RaiseMoved(IUIComponent component) { if (component != null) Moved?.Invoke(component); }

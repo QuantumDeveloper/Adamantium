@@ -241,6 +241,8 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
 
     protected IResourceFactory ResourceFactory => Context.ResourceFactory;
     protected IDrawCommand DrawCommand { get; set; }
+    /// <summary>The record-time state of the command this unit draws - see IRenderUnit.RenderData.</summary>
+    public RenderData RenderData => DrawCommand?.RenderData;
     protected IGraphicsDevice GraphicsDevice => Context.GraphicsDevice;
 
     public IUIComponent Component => DrawCommand.Component;
@@ -370,6 +372,18 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
     // through the pattern instanced-fill path - the SAME procedural brushes the SDF rect batch handles, now on any shape.
     // Returns the shared-mesh key, the frozen mesh, the brush, and the shape's LOCAL bounds (the shader maps a fragment's
     // local pos to the pattern origin).
+    /// <summary>The distance field a halo on this geometry reads, baked once per SHAPE and shared by every element that
+    /// wears it. Null when the mesh has no boundary to measure from - then the element simply wears no band.</summary>
+    internal ITexture HaloField(out Rect localBounds, out double range)
+    {
+        localBounds = default;
+        range = 0;
+        if (_frozenMesh is not { HasPoints: true } fm) return null;
+
+        localBounds = fm.Bounds;
+        return Context.HaloFields.GetOrCreate(fm, ResourceFactory, out range);
+    }
+
     /// <summary>This geometry's fill as one TEXTURED instance: the shared mesh, its local box, and the texture to bind.
     /// False for anything but an ImageBrush, or while its source is still decoding (the next re-render picks it up).</summary>
     public bool TryGetInstancedTexturedFill(out GeometryKey key, out object mesh, out ImageBrush brush,

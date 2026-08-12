@@ -161,6 +161,9 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
          _currentComponent.WorldTransform,
          _currentComponent.ClipToBounds,
          _currentComponent.ClipRectangle);
+      // Baked HERE, on the record thread: the aura/shadow objects are edited from the loop thread, so the renderer gets
+      // values, never the live objects.
+      renderData.Halo = HaloBake.From(_currentComponent.Aura, _currentComponent.Shadow);
       //renderData.CustomEffect = _currentComponent.Effect TODO: implement custom effects for controls
       return renderData;
    }

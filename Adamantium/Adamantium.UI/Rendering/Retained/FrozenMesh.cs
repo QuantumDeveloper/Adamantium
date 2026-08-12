@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using Adamantium.Mathematics;
 using System;
 using System.Runtime.InteropServices;
 using Adamantium.Graphics.Core;
@@ -28,9 +30,15 @@ internal sealed class FrozenMesh
     /// has no closed boundary to feather.</summary>
     public FringeVertex[] Ring { get; }
 
+    /// <summary>The mesh's closed boundary loops in LOCAL space - the same ones the ring is built from, kept because a
+    /// halo needs a distance field baked from them and re-deriving loops on the render thread would mean reading the
+    /// live mesh again.</summary>
+    public List<(Vector2[] Points, bool IsClosed)> Loops { get; }
+
     private FrozenMesh(UIVertex[] vertices, int[] indices, PrimitiveType topology, Rect bounds, GeometryKey key,
-        FringeVertex[] ring)
+        FringeVertex[] ring, List<(Vector2[] Points, bool IsClosed)> loops)
     {
+        Loops = loops;
         Vertices = vertices;
         Indices = indices;
         Topology = topology;
@@ -52,7 +60,7 @@ internal sealed class FrozenMesh
         var loops = FillBoundary.ExtractLoops(mesh);
         var ring = loops != null ? FringeGeometry.BuildRing(FringeGeometry.Build(loops)) : [];
         return new FrozenMesh(vertices, indices, mesh.MeshTopology, bounds,
-            GeometryKey.ArbitraryMesh(Fingerprint(vertices, indices)), ring);
+            GeometryKey.ArbitraryMesh(Fingerprint(vertices, indices)), ring, loops);
     }
 
     // Stable content hash of the LOCAL mesh (vertex bytes + indices): identical tessellations share a key/segment, and ANY
