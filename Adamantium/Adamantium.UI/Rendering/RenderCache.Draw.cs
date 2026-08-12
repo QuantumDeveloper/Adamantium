@@ -603,6 +603,27 @@ public partial class RenderCache
                 }
                 pgru.FillInstanced = false;
             }
+            else if (device != null && InstancedFillCollector.Enabled && unit is GeometryRenderUnit tgru && _instancedFill.CanBatchTextured(tgru))
+            {
+                // General instanced TEXTURED fill (arbitrary geometry, textured-fill pass): as the gradient and pattern
+                // ones - the fill body is skipped (FillInstanced) and the unit's fringe/stroke draw at the flush.
+                if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                var texBake = ResolveBake(device, unit.Component, wt, out var slot4TexFill);
+                if (_instancedFill.TryAddTextured(tgru, texBake, scissor, LogicalBounds(unit.Component, wt), slot4TexFill))
+                {
+                    tgru.FillInstanced = true;
+                    if (_recording)
+                    {
+                        group.PatchableRectOnly = false;
+                        if (tgru.HasPerUnitOverlay) MarkNodeNotAware(unit.Component);
+                    }
+                    _batchScissor = scissor;
+                    _batchOpen = true;
+                    continue;
+                }
+                tgru.FillInstanced = false;
+            }
             else if (device != null && (_rectBatch.Active || _ellipseBatch.Active || _gradientRectBatch.Active || _gradientEllipseBatch.Active || _patternBatch.Active || _fractalBatch.Active || _textBatch.Active || (_instancedFill?.Active ?? false)))
             {
                 // A non-batchable unit that overlaps any pending batch: flush them first so this unit paints OVER them, as

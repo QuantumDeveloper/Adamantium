@@ -47,6 +47,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     private static readonly int InstanceStride = Marshal.SizeOf<GeometryInstance>();
     private static readonly int GradInstanceStride = Marshal.SizeOf<GradientGeometryInstance>();
     private static readonly int PatInstanceStride = Marshal.SizeOf<PatternGeometryInstance>();
+    private static readonly int TexInstanceStride = Marshal.SizeOf<TexGeometryInstance>();
 
     // Per-key GPU + per-frame accumulation state. The mesh buffers are immutable once uploaded; the instance buffer is
     // rewritten each frame (grown only at BeginFrame).
@@ -94,6 +95,17 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         public Buffer PatGpu;
         public int PatGpuCapacity;
         public bool PatRecreated;
+
+        // Parallel TEXTURED instance state for this key's shared mesh (an ImageBrush fill on the same geometry). The
+        // texture is NOT part of the key: one is bound per DRAW, so a texture change splits the run, not the segment.
+        public TexGeometryInstance[] TexItems = new TexGeometryInstance[16];
+        public int TexCount;
+        public int TexFlushed;
+        public Buffer[] TexGpuRing;
+        public Buffer TexGpu;
+        public int TexGpuCapacity;
+        public bool TexRecreated;
+        public ITexture PendingTexture;   // what the instances appended since the last run all sample
     }
 
     private readonly GraphicsDevice _device;
@@ -119,9 +131,11 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         public readonly List<(KeySegment Seg, uint First, uint Count)> Keys = new();
         public readonly List<(KeySegment Seg, uint First, uint Count)> GradKeys = new();
         public readonly List<(KeySegment Seg, uint First, uint Count)> PatKeys = new();
+        // Textured runs carry their TEXTURE: one is bound per draw, so a run ends where the texture changes.
+        public readonly List<(KeySegment Seg, uint First, uint Count, ITexture Texture)> TexKeys = new();
         public readonly List<IRenderUnit> Units = new();
         public Rect2D Scissor;
-        public void Reset() { Keys.Clear(); GradKeys.Clear(); PatKeys.Clear(); Units.Clear(); }
+        public void Reset() { Keys.Clear(); GradKeys.Clear(); PatKeys.Clear(); TexKeys.Clear(); Units.Clear(); }
     }
     private readonly List<FlushRecord> _flushRecords = new();
     private int _flushCount;   // records used this frame (pooled objects reused up to this count)
@@ -225,12 +239,35 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             else seg.PatRecreated = true;
             seg.PatGpu = seg.PatGpuRing == null ? null : seg.PatGpuRing[slot];
 
+            // Parallel grow/reset for the textured instance buffer (only when this key has ever held textured instances).
+            if (seg.TexGpuRing != null && (seg.TexGpuRing.Length != copies || seg.TexGpuCapacity < seg.TexItems.Length))
+            {
+                DeferRing(seg.TexGpuRing);
+                seg.TexGpuRing = null;
+            }
+            if (seg.TexGpuRing == null && seg.MeshUploaded && seg.TexCount > 0)
+            {
+                seg.TexGpuRing = new Buffer[copies];
+                for (var i = 0; i < copies; i++)
+                {
+                    seg.TexGpuRing[i] = Buffer.New<TexGeometryInstance>(_device, (uint)seg.TexItems.Length,
+                        BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+                }
+                seg.TexGpuCapacity = seg.TexItems.Length;
+                seg.TexRecreated = true;
+            }
+            else seg.TexRecreated = true;
+            seg.TexGpu = seg.TexGpuRing == null ? null : seg.TexGpuRing[slot];
+
             seg.Count = 0;
             seg.Flushed = 0;
             seg.GradCount = 0;
             seg.GradFlushed = 0;
             seg.PatCount = 0;
             seg.PatFlushed = 0;
+            seg.TexCount = 0;
+            seg.TexFlushed = 0;
+            seg.PendingTexture = null;
             seg.InPending = false;
         }
         _pendingKeys.Clear();
@@ -367,6 +404,84 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         return inst;
     }
 
+    public bool CanBatchTextured(GeometryRenderUnit unit) => unit.TryGetInstancedTexturedFill(out _, out _, out _, out _, out _, out _);
+
+    /// <summary>Collect one instanceable TEXTURED fill. The texture is bound per DRAW, so a change of texture inside one
+    /// mesh ends the current run rather than the segment - the instances stay contiguous and each run remembers what to
+    /// bind. False if it can't be batched (no frozen mesh, or the source is still decoding).</summary>
+    public bool TryAddTextured(GeometryRenderUnit unit, Matrix4x4F local, Rect2D scissor, Rect logicalBounds, int transformSlot)
+    {
+        if (!unit.TryGetInstancedTexturedFill(out var key, out var meshObj, out var brush, out var localBounds, out var opacity, out var texture)) return false;
+        if (meshObj is not FrozenMesh mesh) return false;
+        var seg = GetOrCreate(key, mesh);
+        if (seg == null) return false;
+
+        // A second texture on the SAME mesh has to start its own run: one draw binds one texture.
+        if (seg.PendingTexture != null && seg.PendingTexture != texture && seg.TexCount > seg.TexFlushed) return false;
+
+        if (seg.TexCount + 1 > seg.TexItems.Length) Array.Resize(ref seg.TexItems, seg.TexItems.Length * 2);
+        if (seg.TexGpu == null)
+        {
+            var copies = (int)Math.Max(1u, _device.MaxFramesInFlight);
+            if (seg.TexGpuRing != null) DeferRing(seg.TexGpuRing);
+            seg.TexGpuRing = new Buffer[copies];
+            for (var i = 0; i < copies; i++)
+            {
+                seg.TexGpuRing[i] = Buffer.New<TexGeometryInstance>(_device, (uint)seg.TexItems.Length,
+                    BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+            }
+            seg.TexGpu = seg.TexGpuRing[_writeCursor % copies];
+            seg.TexGpuCapacity = seg.TexItems.Length;
+            seg.TexRecreated = true;
+        }
+        if (seg.TexCount + 1 > seg.TexGpuCapacity) return false;
+
+        seg.TexItems[seg.TexCount++] = BuildTexturedInstance(brush, local, localBounds, opacity, transformSlot);
+        seg.PendingTexture = texture;
+
+        _scissor = scissor;
+        if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
+        AddPendingUnit(unit);
+        if (!_hasUnion) { _uL = logicalBounds.X; _uT = logicalBounds.Y; _uR = logicalBounds.Right; _uB = logicalBounds.Bottom; _hasUnion = true; }
+        else
+        {
+            if (logicalBounds.X < _uL) _uL = logicalBounds.X;
+            if (logicalBounds.Y < _uT) _uT = logicalBounds.Y;
+            if (logicalBounds.Right > _uR) _uR = logicalBounds.Right;
+            if (logicalBounds.Bottom > _uB) _uB = logicalBounds.Bottom;
+        }
+        return true;
+    }
+
+    // Pack an ImageBrush + world + local bounds into one textured instance. The tiling arithmetic is the SAME one the
+    // SDF textured batch uses (ImageTiling), fed the shape's LOCAL box - the geometry PS works in local mesh coords, so
+    // the drawn rect is expressed as a fraction of that box rather than in device pixels.
+    private static TexGeometryInstance BuildTexturedInstance(ImageBrush brush, Matrix4x4F local, Rect localBounds,
+        double opacity, int transformSlot)
+    {
+        var box = localBounds.Width > 0 && localBounds.Height > 0 ? localBounds : new Rect(0, 0, 1, 1);
+        var (drawn, uvRect, uvRepeat) = ImageTiling.Layout(brush, box, local.M11, local.M22);
+
+        var tint = brush.Tint.ToVector4();
+        tint.W *= (float)(opacity * brush.Opacity);
+
+        return new TexGeometryInstance
+        {
+            Local = local,
+            // Only a single copy that does NOT fill the shape has an outside to keep clear; a tiled one covers everything.
+            Params = new Vector4F(brush.TileMode == TileMode.None ? 1f : 0f, 0, 0, transformSlot),
+            LocalBounds = new Vector4F((float)box.X, (float)box.Y, (float)box.Width, (float)box.Height),
+            Drawn = new Vector4F(
+                (float)((drawn.X - box.X) / box.Width),
+                (float)((drawn.Y - box.Y) / box.Height),
+                (float)(drawn.Width / box.Width),
+                (float)(drawn.Height / box.Height)),
+            UvRect = uvRect,
+            UvRepeat = uvRepeat,
+            Tint = tint
+        };
+    }
+
     public bool CanBatchPattern(GeometryRenderUnit unit) => unit.TryGetInstancedPatternFill(out _, out _, out _, out _, out _);
 
     /// <summary>Collect one instanceable PATTERN/NOISE fill: append its per-instance world + pattern to its key's pattern
@@ -491,6 +606,15 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
                 rec.PatKeys.Add((seg, (uint)seg.PatFlushed, (uint)pcount));
                 seg.PatFlushed = seg.PatCount;
             }
+            var tcount = seg.TexCount - seg.TexFlushed;
+            if (tcount > 0)
+            {
+                if (!SceneClean || seg.TexRecreated)
+                    seg.TexGpu.SetData(seg.TexItems.AsSpan(seg.TexFlushed, tcount), (uint)(seg.TexFlushed * TexInstanceStride));
+                rec.TexKeys.Add((seg, (uint)seg.TexFlushed, (uint)tcount, seg.PendingTexture));
+                seg.TexFlushed = seg.TexCount;
+                seg.PendingTexture = null;   // the run is closed; the next texture starts a fresh one
+            }
             seg.InPending = false;
         }
         foreach (var u in _pendingUnits) rec.Units.Add(u);
@@ -588,6 +712,32 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             _device.SetScissors(fullScissor);
         }
 
+        // Textured instanced fills for this group (same shared meshes, textured pass + per-instance textured buffer).
+        // ONE texture per draw, so each run binds its own - a run ends where the texture changes.
+        if (rec.TexKeys.Count > 0)
+        {
+            SetupInstancedState(projection);
+            _device.SetScissors(rec.Scissor);
+            foreach (var (seg, first, count, texture) in rec.TexKeys)
+            {
+                // NO texture, NO draw: the heap path passes a texture as an INDEX written into push data by whoever bound
+                // one last, so drawing without binding samples whatever descriptor sits there - in practice the glyph
+                // atlas, smeared across the frame. See TexRectCollector.DrawSegment.
+                if (texture == null) continue;
+                _effect.InstancesAddress.SetValue(seg.TexGpu.GetDeviceAddress() + (ulong)(first * TexInstanceStride));
+                _effect.SourceTexture.SetResource(texture);
+                _effect.SourceSampler.SetResource(_device.SamplerStates.LinearClampToEdge);
+                _device.SetVertexBuffer(seg.VtxBuffer);
+                _device.PrimitiveTopology = seg.Topology;
+                _effect.BatchTexFillPass.Apply();
+                if (seg.Indexed)
+                    _device.DrawIndexed(seg.VtxBuffer, seg.IdxBuffer, instanceCount: count, indexCount: seg.IndexCount);
+                else
+                    _device.Draw(seg.VertexCount, count);
+            }
+            _device.SetScissors(fullScissor);
+        }
+
         // The gradient instances' fringe: shared ring, same instance buffer, coloured by the gradient per fragment.
         if (rec.GradKeys.Count > 0 && AnalyticAa.Enabled)
         {
@@ -615,6 +765,25 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
                 _effect.InstancesAddress.SetValue(seg.PatGpu.GetDeviceAddress() + (ulong)(first * PatInstanceStride));
                 _device.SetVertexBuffer(seg.RingBuffer);
                 _effect.BatchPatternFringePass.Apply();
+                _device.Draw(seg.RingVertexCount, count);
+            }
+            _device.SetScissors(fullScissor);
+        }
+
+        // The textured instances' fringe: same ring, same instance buffer, and the SAME texture the body sampled - the
+        // ring samples the picture rather than taking one flat colour, so the edge is the shape's own edge.
+        if (rec.TexKeys.Count > 0 && AnalyticAa.Enabled)
+        {
+            SetupFringeState(projection);
+            _device.SetScissors(rec.Scissor);
+            foreach (var (seg, first, count, texture) in rec.TexKeys)
+            {
+                if (seg.RingBuffer == null || texture == null) continue;
+                _effect.InstancesAddress.SetValue(seg.TexGpu.GetDeviceAddress() + (ulong)(first * TexInstanceStride));
+                _effect.SourceTexture.SetResource(texture);
+                _effect.SourceSampler.SetResource(_device.SamplerStates.LinearClampToEdge);
+                _device.SetVertexBuffer(seg.RingBuffer);
+                _effect.BatchTexFringePass.Apply();
                 _device.Draw(seg.RingVertexCount, count);
             }
             _device.SetScissors(fullScissor);

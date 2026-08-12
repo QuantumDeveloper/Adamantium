@@ -1662,6 +1662,122 @@ float4 PatternFillPS(PatFillPSInput input) : SV_Target
     return PatternFillColor(pd, pTopLeft, centerRel, max(it.LocalBounds.w * 0.5, 1.0));
 }
 
+// ---- TexFill: general instanced geometry (a shared tessellated mesh drawn N times) whose FILL is SAMPLED from a
+// texture - the textured sibling of GradientFill/PatternFill, so an ImageBrush works on ANY geometry (Path/Polygon) and
+// N such shapes cost ONE draw instead of N. A tessellated mesh carries neither an SDF nor a usable uv0, so the picture
+// is mapped across the shape's own LOCAL bounding box, with the same tiling arithmetic the SDF textured batch uses.
+// WHICH texture is not in the record: one texture is bound per DRAW, exactly as TexRectCollector does per segment.
+struct TexGeomData
+{
+    float4x4 Local;      // element local -> SLOT space (the slot's matrix is applied on top, from the transform table)
+    float4 Params;       // .x = clip flag (1 = ONE copy that must not spill outside its drawn rect); .w = transform slot
+    float4 LocalBounds;  // shape local bounds: minXY, sizeXY - the box the picture is mapped across
+    float4 Drawn;        // the drawn rect inside that box: offsetXY, scaleXY, both in 0..1 of the box
+    float4 UvRect;       // the sub-rectangle of the source one copy samples
+    float4 UvRepeat;     // .xy copies per axis, .z mirror flags (1 = X, 2 = Y)
+    float4 Tint;
+};
+
+struct TexFillPSInput
+{
+    float4 Position : SV_Position;
+    float2 Local : TEXCOORD0;                   // varying: fragment's local mesh xy
+    nointerpolation uint InstId : TEXCOORD1;    // instance -> re-read TexGeomData in the PS (light signature)
+};
+
+[shader("vertex")]
+TexFillPSInput TexFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
+{
+    TexGeomData* items = (TexGeomData*)InstancesAddress;
+    TexGeomData it = items[instanceId];
+    float4x4* transforms = (float4x4*)TransformsAddress;
+    float4 world = mul(mul(float4(v.position.xyz, 1.0), it.Local), transforms[(uint)it.Params.w]);
+
+    TexFillPSInput o;
+    o.Position = mul(world, Projection);
+    o.Local = v.position.xy;
+    o.InstId = instanceId;
+    return o;
+}
+
+[shader("fragment")]
+float4 TexFillPS(TexFillPSInput input) : SV_Target
+{
+    TexGeomData* items = (TexGeomData*)InstancesAddress;
+    TexGeomData it = items[input.InstId];
+
+    // 0..1 across the shape's box -> the drawn rect's own space -> the source's sub-rectangle, repeated.
+    float2 t = (input.Local - it.LocalBounds.xy) / max(it.LocalBounds.zw, float2(1e-4, 1e-4));
+    float2 n = (t - it.Drawn.xy) / max(it.Drawn.zw, float2(1e-4, 1e-4));
+    float2 nn = n * it.UvRepeat.xy;
+    float2 wrapped = frac(nn);
+    float2 mirrored = abs(frac(nn * 0.5) * 2.0 - 1.0);
+    float2 pick = float2(step(0.5, fmod(it.UvRepeat.z, 2.0)), step(0.5, floor(it.UvRepeat.z * 0.5)));
+    float2 uv = it.UvRect.xy + lerp(wrapped, mirrored, pick) * it.UvRect.zw;
+
+    // SampleLevel, not Sample: frac() makes uv discontinuous at every tile seam, and the derivative Sample picks its mip
+    // by spikes there - one column of pixels from the smallest mip, i.e. a thin line down each seam.
+    float4 color = SourceTexture.SampleLevel(SourceSampler, uv, 0.0) * it.Tint;
+
+    // ONE copy that does not fill the shape (Uniform / None): outside its drawn rect there is nothing to paint.
+    float inside = step(0.0, n.x) * step(n.x, 1.0) * step(0.0, n.y) * step(n.y, 1.0);
+    color.a *= lerp(1.0, inside, it.Params.x);
+
+    return color;
+}
+
+struct TexFringePSInput
+{
+    float4 Position : SV_Position;
+    float2 Local    : TEXCOORD0;
+    float Coverage  : TEXCOORD1;
+    nointerpolation uint InstId : TEXCOORD2;
+};
+
+// The analytic-AA fringe of those textured instances: the SAME shared ring and the SAME instance buffer as the body, so
+// N elements cost one draw instead of N. Unlike the pattern fringe - which takes the brush's low colour - a picture has
+// no single edge colour, so the ring SAMPLES it, which is what makes the edge of a textured shape read as that shape's
+// own edge rather than a coloured halo.
+[shader("vertex")]
+TexFringePSInput InstancedTexFringeVS(FringeVertex v, uint instanceId : SV_InstanceID)
+{
+    TexGeomData* items = (TexGeomData*)InstancesAddress;
+    TexGeomData it = items[instanceId];
+    float4x4* transforms = (float4x4*)TransformsAddress;
+    float4x4 m = mul(mul(it.Local, transforms[(uint)it.Params.w]), Projection);
+
+    TexFringePSInput o;
+    float coverage;
+    o.Position = ExpandFringe(v, m, coverage);
+    o.Local = v.Position;
+    o.Coverage = coverage;
+    o.InstId = instanceId;
+    return o;
+}
+
+[shader("fragment")]
+float4 TexFringePS(TexFringePSInput input) : SV_Target
+{
+    TexGeomData* items = (TexGeomData*)InstancesAddress;
+    TexGeomData it = items[input.InstId];
+
+    // The ring is expanded a pixel OUTWARD, so its outer edge lies just outside the shape's box: clamp before mapping,
+    // or the band would sample past the picture (and the single-copy clip below would erase the fringe entirely).
+    float2 t = saturate((input.Local - it.LocalBounds.xy) / max(it.LocalBounds.zw, float2(1e-4, 1e-4)));
+    float2 n = (t - it.Drawn.xy) / max(it.Drawn.zw, float2(1e-4, 1e-4));
+    float2 nn = n * it.UvRepeat.xy;
+    float2 wrapped = frac(nn);
+    float2 mirrored = abs(frac(nn * 0.5) * 2.0 - 1.0);
+    float2 pick = float2(step(0.5, fmod(it.UvRepeat.z, 2.0)), step(0.5, floor(it.UvRepeat.z * 0.5)));
+    float2 uv = it.UvRect.xy + lerp(wrapped, mirrored, pick) * it.UvRect.zw;
+
+    float4 color = SourceTexture.SampleLevel(SourceSampler, uv, 0.0) * it.Tint;
+    float inside = step(0.0, n.x) * step(n.x, 1.0) * step(0.0, n.y) * step(n.y, 1.0);
+    color.a *= lerp(1.0, inside, it.Params.x) * input.Coverage;
+
+    return color;
+}
+
 // ---- Fractal batch: the SAME SDF rounded-rect (self-AA shape + shared stroke), but the FILL is an escape-time FRACTAL
 // (Julia/Mandelbrot) iterated per fragment - resolution-independent, no texture. Per-instance FractalRectData from a BDA
 // storage buffer by SV_InstanceID; the PS re-reads the record, maps the fragment to the complex plane, iterates z=z²+c and
@@ -2002,6 +2118,22 @@ technique Batch
         Profile = 6.6;
         VertexShader = PatternFillVS;
         PixelShader = PatternFillPS;
+    }
+
+    // Instanced TEXTURED fill on arbitrary geometry: the shared mesh drawn N times, each instance sampling the bound
+    // texture across its own local box. Solid/gradient/pattern fills use pass Fill/GradientFill/PatternFill.
+    pass TexFill
+    {
+        Profile = 5.1;
+        VertexShader = TexFillVS;
+        PixelShader = TexFillPS;
+    }
+
+    pass TexFringe
+    {
+        Profile = 5.1;
+        VertexShader = InstancedTexFringeVS;
+        PixelShader = TexFringePS;
     }
 
     // SDF ellipse/circle fills - per-instance EllipseData from a BDA storage buffer by SV_InstanceID; quad from SV_VertexID.
