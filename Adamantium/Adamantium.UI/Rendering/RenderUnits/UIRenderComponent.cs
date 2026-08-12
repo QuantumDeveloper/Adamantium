@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Extensions;
@@ -140,16 +141,22 @@ public class StrokeRenderComponent : UIRenderComponent
 
     public override void Render()
     {
+        // Same rule as the fill: a stroke brush this path cannot paint draws NOTHING, rather than falling through with
+        // no pass applied and inheriting whatever the last draw bound.
+        if (Pen?.Brush is not SolidColorBrush solidColor)
+        {
+            UnpaintableBrush.ReportOnce(Pen?.Brush);
+            return;
+        }
+
         var world = RenderData.TransformMatrix;
         UIBasicEffect.Wvp.SetValue(world * RenderData.ProjectionMatrix);
         UIBasicEffect.Opacity.SetValue(RenderData.Opacity);
-        if (Pen.Brush is SolidColorBrush solidColor)
-        {
-            var fill = solidColor.Color.ToVector4();
-            fill.W *= (float)solidColor.Opacity;   // fold the brush's own Opacity into the colour alpha
-            UIBasicEffect.FillColor.SetValue(fill);
-            UIBasicEffect.BasicSolidColorPass.Apply();
-        }
+
+        var fill = solidColor.Color.ToVector4();
+        fill.W *= (float)solidColor.Opacity;   // fold the brush's own Opacity into the colour alpha
+        UIBasicEffect.FillColor.SetValue(fill);
+        UIBasicEffect.BasicSolidColorPass.Apply();
         base.Render();
     }
 }
@@ -165,24 +172,55 @@ public class GeometryRenderComponent : UIRenderComponent
     
     public override void Render()
     {
+        // A brush this path cannot paint is DRAWN NOT AT ALL. It used to fall through to base.Render() with no pass
+        // applied, so the geometry was drawn with whatever effect state the PREVIOUS draw left bound - in practice the
+        // glyph pass, which smeared the font atlas across the frame and cost hours to trace. Nothing on screen is the
+        // honest answer; the batches paint every brush that has a batch, and one that does not belongs to neither path.
+        if (Background is not SolidColorBrush solidColor)
+        {
+            UnpaintableBrush.ReportOnce(Background);
+            return;
+        }
+
         var world = RenderData.TransformMatrix;
         UIBasicEffect.Wvp.SetValue(world * RenderData.ProjectionMatrix);
         UIBasicEffect.Opacity.SetValue(RenderData.Opacity);
-        if (Background is SolidColorBrush solidColor)
+
+        var fill = solidColor.Color.ToVector4();
+        fill.W *= (float)solidColor.Opacity;   // fold the brush's own Opacity into the colour alpha
+        UIBasicEffect.FillColor.SetValue(fill);
+        // Fully transparent fill -> force zero opacity. Value check (not `== Brushes.Transparent`) so a FROZEN clone of
+        // Transparent - a different instance from the shared static - is still recognised (payload brushes are frozen).
+        if (solidColor.Color.A == 0)
         {
-            var fill = solidColor.Color.ToVector4();
-            fill.W *= (float)solidColor.Opacity;   // fold the brush's own Opacity into the colour alpha
-            UIBasicEffect.FillColor.SetValue(fill);
-            // Fully transparent fill -> force zero opacity. Value check (not `== Brushes.Transparent`) so a FROZEN clone of
-            // Transparent - a different instance from the shared static - is still recognised (payload brushes are frozen).
-            if (solidColor.Color.A == 0)
-            {
-                UIBasicEffect.Opacity.SetValue(0f);
-            }
-            UIBasicEffect.BasicSolidColorPass.Apply();
+            UIBasicEffect.Opacity.SetValue(0f);
         }
-        
+        UIBasicEffect.BasicSolidColorPass.Apply();
+
         base.Render();
+    }
+}
+
+/// <summary>Says ONCE per brush type that the per-unit path was handed something it cannot paint. Once, because this sits
+/// in a per-frame draw: a message per frame would be a flood, and the useful information - WHICH brush has no per-unit
+/// form - is the same every time.</summary>
+internal static class UnpaintableBrush
+{
+    private static readonly HashSet<Type> Reported = [];
+
+    public static void ReportOnce(Brush brush)
+    {
+        var type = brush?.GetType();
+        if (type == null) return;
+
+        lock (Reported)
+        {
+            if (!Reported.Add(type)) return;
+        }
+
+        Serilog.Log.Logger.Warning(
+            "{Brush} has no per-unit draw: a shape filled with it and REJECTED by the batches draws nothing. " +
+            "Either give the batch a path for it, or give this brush a per-unit form.", type.Name);
     }
 }
 

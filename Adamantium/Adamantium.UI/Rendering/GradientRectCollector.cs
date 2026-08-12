@@ -25,7 +25,8 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
 
     // Batchable = a gradient (linear/radial) fill, a batchable pen (none or a solid stroke the SDF shader draws), and
     // uniform corner radius. Mirrors RectangleRenderUnit.IsGradientBatchable.
-    public bool CanBatch(RectanglePayload p)
+    /// <summary>THE one statement of what this batch draws - the render unit asks THIS, never its own copy.</summary>
+    public static bool WantsBatch(RectanglePayload p)
     {
         if (!Enabled) return false;
         if (p.Brush is not GradientBrush g) return false;
@@ -34,6 +35,8 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
         var c = p.CornerRadius;
         return c.TopLeft == c.TopRight && c.TopRight == c.BottomRight && c.BottomRight == c.BottomLeft;
     }
+
+    public bool CanBatch(RectanglePayload p) => WantsBatch(p);
 
     // Bake one gradient rounded-rect fill. False only if it can't be baked (rotated/sheared world or a GPU-buffer
     // overflow this frame) - the caller draws it per-unit.

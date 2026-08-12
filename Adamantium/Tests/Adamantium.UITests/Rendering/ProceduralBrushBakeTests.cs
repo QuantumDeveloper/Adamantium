@@ -46,6 +46,22 @@ public class ProceduralBrushBakeTests
         });
     }
 
+    // The textured batch takes the SAMPLED fills and nothing else - a procedural one has its own pass, and routing it
+    // here would sample a texture that is not there.
+    [Test]
+    public void TexturedFills_CanBatch_ButProceduralOnesDoNot()
+    {
+        var collector = new TexRectCollector();
+        Assert.Multiple(() =>
+        {
+            Assert.That(collector.CanBatch(Payload(new ImageBrush())), Is.True, "an image fill batches into the textured pass");
+            Assert.That(collector.CanBatch(Payload(new NineSliceBrush())), Is.True, "and so does a nine-slice");
+            Assert.That(collector.CanBatch(Payload(new PatternBrush())), Is.False, "a pattern fill has its own pass");
+            Assert.That(collector.CanBatch(Payload(new SolidColorBrush(new Color(255, 0, 0, 255)))), Is.False);
+            Assert.That(collector.CanBatch(Payload(null)), Is.False);
+        });
+    }
+
     [Test]
     public void PatternBrush_Bakes_TypeCellAndZeroNoise()
     {

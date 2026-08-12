@@ -1422,6 +1422,14 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             throw new ArgumentNullException("Effect pass should be applied before executing draw");
         }
 
+        // A pass applied with an unbound resource carries an out-of-heap index; drawing it puts ANOTHER effect's live
+        // descriptor on screen - an evening went into chasing the glyph atlas smeared across a frame that way. Skip the
+        // draw; the pass has already said which parameter nobody bound.
+        if (!CurrentEffectPass.ResourcesBound)
+        {
+            return;
+        }
+
         var commandBuffer = commandBuffers[CurrentFrame];
         SetDrawingState(commandBuffer);
 
@@ -1432,6 +1440,13 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     // buffer (its capacity exceeds the live geometry). 0 means "the whole buffer" (its ElementCount), as before.
     public void DrawIndexed(IBuffer vertexBuffer, IBuffer indexBuffer, uint instanceCount = 1, uint indexCount = 0)
     {
+        // Same refusal as Draw: an unbound resource means an out-of-heap index, and drawing with one shows another
+        // effect's texture.
+        if (CurrentEffectPass is { ResourcesBound: false })
+        {
+            return;
+        }
+
         ulong offset = 0;
         var commandBuffer = commandBuffers[CurrentFrame];
 

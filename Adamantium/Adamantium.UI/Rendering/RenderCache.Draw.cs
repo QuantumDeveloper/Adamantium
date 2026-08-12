@@ -27,6 +27,7 @@ public partial class RenderCache
     private GradientEllipseCollector _gradientEllipseBatch;   // SDF family: ellipses with a linear/radial GRADIENT fill
     private PatternRectCollector _patternBatch;   // SDF family: rounded rects with a PROCEDURAL pattern fill (checker/stripes/dots/grid)
     private FractalRectCollector _fractalBatch;   // SDF family: rounded rects with an escape-time FRACTAL fill (Julia/Mandelbrot)
+    private TexRectCollector _texRectBatch;   // SDF family: rounded rects whose fill is SAMPLED from a texture (ImageBrush / NineSliceBrush)
     private Rect2D _batchScissor;
     private bool _batchOpen;
 
@@ -47,7 +48,7 @@ public partial class RenderCache
         public RenderOpKind Kind;
         public Rect2D Scissor;    // Scissor
         public IRenderUnit Unit;  // Unit
-        public byte Batch;        // Segment: which collector (0 rect, 1 ellipse, 2 text, 3 gradient-rect, 4 gradient-ellipse, 5 pattern, 6 fractal)
+        public byte Batch;        // Segment: which collector (0 rect, 1 ellipse, 2 text, 3 gradient-rect, 4 gradient-ellipse, 5 pattern, 6 fractal, 7 textured)
         public int SegIndex;      // Segment: index into that collector's recorded segment list; InstancedFlush: flush index
     }
     private readonly List<RenderOp> _ops = new();
@@ -108,6 +109,7 @@ public partial class RenderCache
         if (_gradientEllipseBatch != null) _gradientEllipseBatch.TransformsAddress = address;
         if (_patternBatch != null) _patternBatch.TransformsAddress = address;
         if (_fractalBatch != null) _fractalBatch.TransformsAddress = address;
+        if (_texRectBatch != null) _texRectBatch.TransformsAddress = address;
         if (_textBatch != null) _textBatch.TransformsAddress = address;   // glyph VS fetches the block's node matrix by slot
         if (_instancedFill != null) _instancedFill.TransformsAddress = address;
     }
@@ -205,6 +207,9 @@ public partial class RenderCache
             _gradientEllipseBatch.BeginFrame(device);
             _patternBatch.BeginFrame(device);
             _fractalBatch.BeginFrame(device);
+            // Created lazily (below, on the first textured fill) - but once it exists it needs its frame reset like any
+            // other collector. Leaving it out is what made a nine-slice draw for exactly ONE frame and then vanish.
+            _texRectBatch?.BeginFrame(device);
             // Transform table: this frame's copy, and its address on the collectors that were just (re)created above.
             BeginTransformFrame(device);
             var sceneClean = LastBuildKind == RenderBuildKind.Clean;
@@ -434,6 +439,44 @@ public partial class RenderCache
                 fru.EnsureMachinery();
                 unit.Update(wt, _projectionMatrix, _renderScale);
             }
+            else if (device != null && unit is RectangleRenderUnit xru && TexRectCollector.WantsBatch(xru.RectPayload))
+            {
+                // A rounded rect whose fill is SAMPLED from a texture (ImageBrush / NineSliceBrush). ONE texture per
+                // segment, so a different source flushes the batch - the same rule the text batch follows for its atlas.
+                // A source still decoding has no texture yet: draw nothing this frame and let the re-render pick it up.
+                var texture = xru.BrushTexture();
+                if (texture == null)
+                {
+                    continue;
+                }
+                // Created on FIRST use, not with the other collectors: its GPU ring is dead weight in the windows that
+                // never draw a textured fill - which is most of them - and enough caches paying for it at once ran the
+                // device out of memory.
+                if (_texRectBatch == null)
+                {
+                    _texRectBatch = new TexRectCollector { TransformsAddress = _transformTable?.DeviceAddress ?? 0 };
+                    _texRectBatch.BeginFrame(device);
+                }
+                var texBounds = LogicalBounds(unit.Component, wt);
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_texRectBatch.SameTexture(texture)
+                    || OverlapsHigherLayer(6, texBounds))   // 6 = textured layer
+                {
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                }
+                var texBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Tex);
+                if (_texRectBatch.TryAdd(xru.RectPayload, texBakeWorld, xru.FillOpacity, scissor, texBounds, texture, slot4Tex))
+                {
+                    if (_recording)
+                    {
+                        group.PatchableRectOnly = false;
+                    }
+                    _batchScissor = scissor;
+                    _batchOpen = true;
+                    continue;
+                }
+                xru.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
+            }
             else if (device != null && unit is TextRenderUnit tru && tru.TextComponent is { } tc && _textBatch.CanBatch(tc, out var atlas))
             {
                 if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_textBatch.SameAtlas(atlas))
@@ -584,7 +627,7 @@ public partial class RenderCache
         }
     }
 
-    // The batches flush bottom-up (rect < ellipse < gradient-rect < gradient-ellipse < pattern < fractal < instanced < text), so a
+    // The batches flush bottom-up (rect < ellipse < gradient-rect < gradient-ellipse < pattern < fractal < textured < instanced < text), so a
     // HIGHER-layer batch draws ON TOP. A unit going into `layer` that OVERLAPS a pending higher-layer batch would be drawn
     // UNDER it - yet that batch holds units EARLIER in paint order, so this (later) unit belongs on top (a solid thumb
     // sitting on a gradient bar, a solid overlay over gradient content). Returning true here flushes the pending batches
@@ -617,12 +660,17 @@ public partial class RenderCache
             return true;
         }
 
-        if (layer < 6 && (_instancedFill?.OverlapsPending(lb) ?? false))
+        if (layer < 6 && (_texRectBatch?.OverlapsPending(lb) ?? false))
         {
             return true;
         }
 
-        if (layer < 7 && _textBatch.OverlapsPending(lb))
+        if (layer < 7 && (_instancedFill?.OverlapsPending(lb) ?? false))
+        {
+            return true;
+        }
+
+        if (layer < 8 && _textBatch.OverlapsPending(lb))
         {
             return true;
         }

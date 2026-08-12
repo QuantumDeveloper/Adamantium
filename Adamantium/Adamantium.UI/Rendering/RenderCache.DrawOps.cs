@@ -48,6 +48,7 @@ public partial class RenderCache
                         case 4: _gradientEllipseBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
                         case 5: _patternBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
                         case 6: _fractalBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
+                        case 7: _texRectBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
                         default: _textBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
                     }
                     break;
@@ -76,6 +77,7 @@ public partial class RenderCache
         RecordSegment(4, _gradientEllipseBatch.Flush(device, fullScissor, _projectionMatrix));
         RecordSegment(5, _patternBatch.Flush(device, fullScissor, _projectionMatrix));   // pattern layer: after gradients, before instanced
         RecordSegment(6, _fractalBatch.Flush(device, fullScissor, _projectionMatrix));   // fractal layer: after pattern, before instanced
+        if (_texRectBatch != null) RecordSegment(7, _texRectBatch.Flush(device, fullScissor, _projectionMatrix));   // textured layer: after fractal, before instanced
         // The general instanced-fill flush is retained too: Flush records the group and returns its index, replayed via
         // ReplayFlush - so a vector icon no longer disables replay for the whole window.
         if (_instancedFill != null)
