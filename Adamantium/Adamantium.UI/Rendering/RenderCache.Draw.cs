@@ -477,6 +477,40 @@ public partial class RenderCache
                 xru.EnsureMachinery();
                 unit.Update(wt, _projectionMatrix, _renderScale);
             }
+            else if (device != null && unit is EllipseRenderUnit xeru && TexRectCollector.WantsBatchEllipse(xeru.EllipsePayload))
+            {
+                // A full ellipse whose fill is SAMPLED from a texture: the SAME textured batch and layer as the rect, the
+                // shader branching to the ellipse SDF on the negative baked corner radius. Same texture-per-segment rule.
+                var texEllTexture = xeru.BrushTexture();
+                if (texEllTexture == null)
+                {
+                    continue;
+                }
+                if (_texRectBatch == null)
+                {
+                    _texRectBatch = new TexRectCollector { TransformsAddress = _transformTable?.DeviceAddress ?? 0 };
+                    _texRectBatch.BeginFrame(device);
+                }
+                var texEllBounds = LogicalBounds(unit.Component, wt);
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_texRectBatch.SameTexture(texEllTexture)
+                    || OverlapsHigherLayer(6, texEllBounds))   // 6 = textured layer
+                {
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                }
+                var texEllBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4TexEll);
+                if (_texRectBatch.TryAddEllipse(xeru.EllipsePayload, texEllBakeWorld, xeru.FillOpacity, scissor, texEllBounds, texEllTexture, slot4TexEll))
+                {
+                    if (_recording)
+                    {
+                        group.PatchableRectOnly = false;
+                    }
+                    _batchScissor = scissor;
+                    _batchOpen = true;
+                    continue;
+                }
+                xeru.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
+            }
             else if (device != null && unit is TextRenderUnit tru && tru.TextComponent is { } tc && _textBatch.CanBatch(tc, out var atlas))
             {
                 if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_textBatch.SameAtlas(atlas))

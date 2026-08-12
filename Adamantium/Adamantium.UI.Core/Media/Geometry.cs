@@ -90,9 +90,15 @@ public abstract class Geometry : AdamantiumComponent
       }
    }
 
+   /// <summary>Bumped every time the content is invalidated. A geometry can be REFILLED in place (a Polygon reopens its
+   /// one StreamGeometry with new points on every render), so the instance stays the same while what it describes does
+   /// not - and a render payload comparing instances alone would call that "unchanged" and keep the stale GPU mesh.</summary>
+   public int Version { get; private set; }
+
    public void InvalidateGeometry()
    {
       IsProcessed = false;
+      Version++;
    }
    
    protected internal abstract void ProcessGeometryCore(GeometryType geometryType);

@@ -212,14 +212,19 @@ public class DropDown : Selector
     public override void OnApplyTemplate()
     {
         base.OnApplyTemplate();
+        // The list card lives in the popup's lazily-built ChildTemplate, so base.OnApplyTemplate cannot find
+        // PART_ItemsPresenter yet - it is connected when the content arrives on first open.
         _popup = GetTemplateChild("PART_Popup") as Popup;
         if (_popup != null)
         {
             _popup.PlacementTarget = this;              // position against the control (== the header)
             _popup.KeepOpen = false;                    // click-outside-to-close, owned by Popup now
             _popup.IgnoreTargetPress = true;            // a header press is handled by us (toggle) - don't dismiss+reopen
+            _popup.DataContext = this;                  // the card binds our ActualWidth / MaxDropDownHeight through it
             _popup.Closed -= OnPopupClosed;
             _popup.Closed += OnPopupClosed;
+            _popup.ContentBuilt -= OnPopupContentBuilt;
+            _popup.ContentBuilt += OnPopupContentBuilt;
             _popup.IsOpen = IsDropDownOpen;
         }
         UpdateDisplayContent();
@@ -229,8 +234,21 @@ public class DropDown : Selector
     public override void OnRemoveTemplate()
     {
         base.OnRemoveTemplate();
-        if (_popup != null) _popup.Closed -= OnPopupClosed;
+        if (_popup != null)
+        {
+            _popup.Closed -= OnPopupClosed;
+            _popup.ContentBuilt -= OnPopupContentBuilt;
+        }
         _popup = null;
+    }
+
+    // The items host only exists once the popup has built its deferred content - connect it then.
+    private void OnPopupContentBuilt(object sender, EventArgs e)
+    {
+        if (((Popup)sender).FindContentChild("PART_ItemsPresenter") is ItemsPresenter presenter)
+        {
+            ConnectPresenter(presenter);
+        }
     }
 
     // Clicking the header toggles the list. The popup's contents live in the overlay layer (not our visual subtree), so a

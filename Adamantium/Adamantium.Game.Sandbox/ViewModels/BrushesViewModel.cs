@@ -1,6 +1,7 @@
 using System;
 using Adamantium.Mathematics;
 using Adamantium.MVVM;
+using Adamantium.UI.Core.Collections;
 using Adamantium.UI.Core.Media.Imaging;
 using Adamantium.UI.Core.Media;
 
@@ -79,6 +80,17 @@ public partial class BrushesViewModel : TabPageViewModel
 
     // One number for both axes: a square tile is what a texture is normally drawn as, and two sliders would be noise.
     partial void OnImageTileChanged(double value) => LiveImage.TileSize = new Size(value, value);
+    partial void OnImageWidthChanged(double value)
+    {
+        ImageTriangle = Triangle(value, _imageHeight);
+        ImageStar = Star(value, _imageHeight);
+    }
+
+    partial void OnImageHeightChanged(double value)
+    {
+        ImageTriangle = Triangle(_imageWidth, value);
+        ImageStar = Star(_imageWidth, value);
+    }
 
     /// <summary>The brush the "live mesh" rectangle fills with: four corner colours blended bilinearly, driven by four
     /// pickers. No axis and no stops - which is what makes it a different animal from the linear/radial family.</summary>
@@ -148,6 +160,59 @@ public partial class BrushesViewModel : TabPageViewModel
     partial void OnSliceDrawCenterChanged(bool value) => LiveNineSlice.DrawCenter = value;
     partial void OnSliceTileCenterChanged(bool value) => LiveNineSlice.TileCenter = value;
     partial void OnSliceTintChanged(Color value) => LiveNineSlice.Tint = value;
+
+    /// <summary>The figures a live stand can paint its brush onto - each stand picks its own, so two brushes can be
+    /// compared on different shapes side by side. The rectangle and the ellipse go through their own SDF batches while
+    /// the triangle is tessellated geometry, so the choice is also which render path the brush is riding.</summary>
+    public PreviewShape[] PreviewShapes { get; } = Enum.GetValues<PreviewShape>();
+
+    [Bindable] private PreviewShape _patternShape = PreviewShape.Rectangle;
+    [Bindable] private PreviewShape _noiseShape = PreviewShape.Rectangle;
+    [Bindable] private PreviewShape _meshShape = PreviewShape.Rectangle;
+    [Bindable] private PreviewShape _imageShape = PreviewShape.Rectangle;
+
+    /// <summary>The five-pointed star every stand can wear: the concave one of the four, so a fill has to survive
+    /// reflex corners and a tessellation that is nothing like a quad.</summary>
+    public PointsCollection FixedStar { get; } = Star(300, 200);
+
+    /// <summary>The image stand's triangle and star, sized by the same Width/Height sliders the other figures follow -
+    /// a Polygon holds authored coordinates rather than stretching to a slot, so the points are computed here.</summary>
+    [Bindable] private PointsCollection _imageTriangle = Triangle(320, 200);
+    [Bindable] private PointsCollection _imageStar = Star(320, 200);
+
+    private static PointsCollection Triangle(double width, double height) =>
+        new([new Vector2(width / 2, 0), new Vector2(width, height), new Vector2(0, height)]);
+
+    // Ten points on a circle, alternating the full radius and the 0.382 of it that makes a star read as one; first point
+    // straight up, so it stands the way a star is drawn rather than resting on a vertex.
+    //
+    // ONE radius for both axes - scaling x and y apart turns a star into a splat - and the result is then fitted into the
+    // box and shifted so its bounding box starts at the ORIGIN. That last part is not cosmetic: a Shape measures from its
+    // origin to its far edge, so a leading gap would be baked into the element's size and the figure would DRIFT as the
+    // box is dragged instead of scaling with it.
+    private static PointsCollection Star(double width, double height)
+    {
+        const double innerRatio = 0.382;
+        var unit = new Vector2[10];
+        var min = new Vector2(double.MaxValue, double.MaxValue);
+        var max = new Vector2(double.MinValue, double.MinValue);
+        for (var i = 0; i < unit.Length; i++)
+        {
+            var angle = -Math.PI / 2 + i * Math.PI / 5;
+            var radius = i % 2 == 0 ? 1.0 : innerRatio;
+            unit[i] = new Vector2(Math.Cos(angle) * radius, Math.Sin(angle) * radius);
+            min = Vector2.Min(min, unit[i]);
+            max = Vector2.Max(max, unit[i]);
+        }
+
+        var scale = Math.Min(width / (max.X - min.X), height / (max.Y - min.Y));
+        var points = new Vector2[unit.Length];
+        for (var i = 0; i < unit.Length; i++)
+        {
+            points[i] = new Vector2((unit[i].X - min.X) * scale, (unit[i].Y - min.Y) * scale);
+        }
+        return new PointsCollection(points);
+    }
 
     /// <summary>All procedural pattern types (Checkerboard..Hatch; the reserved noise slot has no name so GetValues skips
     /// it) - the source for the "Pattern type" dropdown.</summary>

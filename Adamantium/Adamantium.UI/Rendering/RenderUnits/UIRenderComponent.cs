@@ -8,6 +8,7 @@ using Adamantium.Graphics.Core.Vertices;
 using Adamantium.Graphics.Fonts;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
+using Adamantium.UI.Core;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Effects.Generated;
@@ -163,20 +164,37 @@ public class StrokeRenderComponent : UIRenderComponent
 
 public class GeometryRenderComponent : UIRenderComponent
 {
-    public GeometryRenderComponent(IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, Mesh mesh, Brush background, GpuBufferManager bufferManager) : base(graphicsDevice, uiBasicEffect, mesh, bufferManager)
+    private readonly IResourceFactory _resourceFactory;
+
+    public GeometryRenderComponent(IGraphicsDevice graphicsDevice, UIBasicEffect uiBasicEffect, Mesh mesh, Brush background, GpuBufferManager bufferManager, IResourceFactory resourceFactory = null) : base(graphicsDevice, uiBasicEffect, mesh, bufferManager)
     {
         Background = background;
+        _resourceFactory = resourceFactory;
     }
-    
+
     public Brush Background { get; set; }
-    
+
     public override void Render()
     {
+        // The brush's CURRENT appearance, not the one it had when this was recorded: Background holds the live brush and
+        // republishes its snapshot on every change, so dragging a brush parameter shows up without a re-record. A brush
+        // that is already frozen is its own snapshot, so this is a no-op for the paths that hand one over.
+        var brush = Background?.Snapshot ?? Background;
+
+        // A picture on ARBITRARY geometry. The rounded rect and the ellipse sample their texture in the SDF batches; a
+        // tessellated shape has no SDF, so it is drawn here - one draw per shape, not instanced (which is where the
+        // gradient and pattern fills started too).
+        if (brush is ImageBrush image)
+        {
+            RenderTextured(image);
+            return;
+        }
+
         // A brush this path cannot paint is DRAWN NOT AT ALL. It used to fall through to base.Render() with no pass
         // applied, so the geometry was drawn with whatever effect state the PREVIOUS draw left bound - in practice the
         // glyph pass, which smeared the font atlas across the frame and cost hours to trace. Nothing on screen is the
         // honest answer; the batches paint every brush that has a batch, and one that does not belongs to neither path.
-        if (Background is not SolidColorBrush solidColor)
+        if (brush is not SolidColorBrush solidColor)
         {
             UnpaintableBrush.ReportOnce(Background);
             return;
@@ -196,6 +214,56 @@ public class GeometryRenderComponent : UIRenderComponent
             UIBasicEffect.Opacity.SetValue(0f);
         }
         UIBasicEffect.BasicSolidColorPass.Apply();
+
+        base.Render();
+    }
+
+    // Map the picture across the shape's own LOCAL box (a tessellated mesh carries no usable uv0) with the SAME tiling
+    // arithmetic the textured batch uses, so a brush looks identical whichever shape it is on. A source still decoding
+    // has no texture yet: draw nothing this frame and let the re-render pick it up.
+    private void RenderTextured(ImageBrush image)
+    {
+        var texture = TexRectCollector.BrushTexture(image, _resourceFactory);
+        if (texture == null)
+        {
+            return;
+        }
+
+        var world = RenderData.TransformMatrix;
+        var bounds = Mesh.Bounds;
+        var box = new Rect(
+            bounds.Center.X - bounds.HalfExtent.X,
+            bounds.Center.Y - bounds.HalfExtent.Y,
+            bounds.Size.X,
+            bounds.Size.Y);
+        if (box.Width <= 0 || box.Height <= 0)
+        {
+            return;
+        }
+
+        // The mesh is in LOCAL units and the world scale is applied by the vertex shader, so a tile is sized against the
+        // scale here - otherwise the picture would tile by local units and change density with the element's scale.
+        var (drawn, uvRect, uvRepeat) = ImageTiling.Layout(image, box, world.M11, world.M22);
+        var tint = image.Tint.ToVector4();
+        tint.W *= (float)image.Opacity;
+
+        UIBasicEffect.Wvp.SetValue(world * RenderData.ProjectionMatrix);
+        UIBasicEffect.World.SetValue(world);
+        UIBasicEffect.Opacity.SetValue(RenderData.Opacity);
+        UIBasicEffect.FillBounds.SetValue(new Vector4F((float)box.X, (float)box.Y, (float)box.Width, (float)box.Height));
+        UIBasicEffect.TexDrawn.SetValue(new Vector4F(
+            (float)((drawn.X - box.X) / box.Width),
+            (float)((drawn.Y - box.Y) / box.Height),
+            (float)(drawn.Width / box.Width),
+            (float)(drawn.Height / box.Height)));
+        UIBasicEffect.TexUvRect.SetValue(uvRect);
+        UIBasicEffect.TexUvRepeat.SetValue(uvRepeat);
+        UIBasicEffect.TexTint.SetValue(tint);
+        // Only a single copy that does NOT fill the shape has an outside to keep clear; a tiled one covers everything.
+        UIBasicEffect.TexClip.SetValue(image.TileMode == TileMode.None ? 1f : 0f);
+        UIBasicEffect.ShaderTexture.SetResource(texture);
+        UIBasicEffect.SampleType.SetResource(((GraphicsDevice)GraphicsDevice).SamplerStates.LinearClampToEdge);
+        UIBasicEffect.BasicTexturedFillPass.Apply();
 
         base.Render();
     }
