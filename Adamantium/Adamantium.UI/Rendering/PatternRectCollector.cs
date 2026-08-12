@@ -121,47 +121,18 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
             return false;   // rotation/shear -> per-unit
         }
 
-        int type;
-        Color color1;
-        Color color2;
-        var midColor = new Color(0, 0, 0, 0);   // gradient-map MID colour (NoiseBrush only); transparent = off
-        double cell;
-        double brushOpacity;
-        var noise = Vector4F.Zero;
-
-        if (brush is PatternBrush pat)
-        {
-            type = (int)pat.Pattern;
-            color1 = pat.Color1;
-            color2 = pat.Color2;
-            cell = pat.CellSize;
-            brushOpacity = pat.Opacity;
-            // Bake the hatch line normal (cos/sin) here so the shader needs NO trig (its pattern PS is at the NVVM limit).
-            var ha = pat.HatchAngle * Math.PI / 180.0;
-            noise = new Vector4F((float)Math.Cos(ha), (float)Math.Sin(ha), 0, 0);
-        }
-        else if (brush is NoiseBrush n)
-        {
-            // shader contract: PatternMix type 4 = simplex FBM; 7/8/9 = perlin/value/worley FBM (same noise record)
-            type = n.NoiseType == NoiseType.Simplex ? 4 : 6 + (int)n.NoiseType;
-            color1 = n.Color1;
-            color2 = n.Color2;
-            midColor = n.MidColor;
-            cell = n.Scale;
-            brushOpacity = n.Opacity;
-            // Animate flag packed into the SIGN of octaves (no spare slot): negative = advance by the shared Time.
-            var octEnc = n.Animate ? -(float)Math.Max(1, n.Octaves) : n.Octaves;
-            noise = new Vector4F(octEnc, (float)n.Seed, (float)n.Lacunarity, (float)n.Gain);
-            // CombustibleVoronoi ignores lacunarity/gain, so reuse .w as the palette flag (1 = fire, 0 = the brush's own ramp).
-            if (n.NoiseType == NoiseType.CombustibleVoronoi)
-            {
-                noise.W = n.UseFirePalette ? 1f : 0f;
-            }
-        }
-        else
+        if (!PatternBrushRecord.TryDescribe(brush, out var brushRecord))
         {
             return false;
         }
+
+        var type = brushRecord.Type;
+        var color1 = brushRecord.Color1;
+        var color2 = brushRecord.Color2;
+        var midColor = brushRecord.MidColor;
+        var cell = brushRecord.Cell;
+        var brushOpacity = brushRecord.Opacity;
+        var noise = brushRecord.Noise;
 
         var sx = world.M11; var sy = world.M22; var tx = world.M41; var ty = world.M42;
         var alpha = (float)(opacity * brushOpacity);

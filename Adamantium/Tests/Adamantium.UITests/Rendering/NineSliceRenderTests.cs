@@ -331,25 +331,4 @@ public class NineSliceRenderTests
         Assert.That(pixels[i + 3], Is.GreaterThan(200), "and it is opaque");
     }
 
-    // A factory that makes REAL textures on the test device - the stubs elsewhere refuse, because nothing else in the
-    // suite samples one.
-    private sealed class DeviceResourceFactory : IResourceFactory
-    {
-        private readonly IGraphicsDevice _device;
-
-        public DeviceResourceFactory(IGraphicsDevice device) => _device = device;
-
-        public ITexture CreateTexture(TextureDescription description, byte[] pixelData)
-            => _device.CreateTexture(description, pixelData);
-
-        public ITexture CreateTextureArray(TextureDescription description, IReadOnlyList<byte[]> layers)
-            => _device.CreateTextureArray(description, layers);
-
-        public ITexture ImportSharedSurface(SharedSurfaceDescriptor descriptor) => throw new NotSupportedException();
-
-        public IRenderTarget CreateRenderTarget(uint width, uint height, MSAALevel msaa, SurfaceFormat format, ImageLayout desiredLayout)
-            => throw new NotSupportedException();
-
-        public FontRenderer GetFontRenderer(IGraphicsDevice graphicsDevice) => throw new NotSupportedException();
-    }
 }

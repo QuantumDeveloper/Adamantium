@@ -12,7 +12,16 @@ public class GeometryPayload(Brush brush, Geometry geometry, Pen pen = null) : I
 
     public Brush Brush => _brush?.Snapshot;
 
+    /// <summary>The LIVE brush, by reference. What draws per-unit holds THIS and dereferences its snapshot per draw:
+    /// holding the snapshot object instead freezes the fill at record time, so dragging a brush's own parameters
+    /// changed nothing on screen until something else forced a re-record.</summary>
+    internal Brush LiveBrush => _brush;
+
     public Geometry Geometry { get; } = Tessellate(geometry);
+
+    /// <summary>What the geometry held WHEN THIS PAYLOAD WAS RECORDED. The instance is not enough: a Polygon reopens its
+    /// one StreamGeometry with new points, so the same object describes a different shape from one record to the next.</summary>
+    public int GeometryVersion { get; } = geometry?.Version ?? 0;
 
     /// <summary>Tessellate HERE, where the payload is built - inside component.Render, on the RECORD thread. It used to
     /// happen in the render unit instead, which the applier constructs: that put an IN-PLACE rebuild of the live
@@ -36,7 +45,8 @@ public class GeometryPayload(Brush brush, Geometry geometry, Pen pen = null) : I
     {
         if (other is null) return false;
         if (ReferenceEquals(this, other)) return true;
-        return Equals(Brush, other.Brush) && Geometry.Equals(other.Geometry) && Equals(Pen, other.Pen);
+        return Equals(Brush, other.Brush) && Geometry.Equals(other.Geometry)
+               && GeometryVersion == other.GeometryVersion && Equals(Pen, other.Pen);
     }
 
     public override bool Equals(object obj)
@@ -49,13 +59,16 @@ public class GeometryPayload(Brush brush, Geometry geometry, Pen pen = null) : I
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(Brush, Geometry, Pen);
+        return HashCode.Combine(Brush, Geometry, GeometryVersion, Pen);
     }
 
     public bool RequiresBufferRebuild(IRenderCachePolicy newState)
     {
         if (newState is not GeometryPayload geometryPayload) return true;
-        
-        return Geometry != geometryPayload.Geometry;
+
+        // NOT the instance alone: a Polygon reuses ONE StreamGeometry and reopens it with new points, so the reference
+        // is identical while the shape is not. That read as "nothing to rebuild" and the GPU kept the mesh tessellated
+        // from the first record - the figure stopped resizing and only its slot moved.
+        return Geometry != geometryPayload.Geometry || GeometryVersion != geometryPayload.GeometryVersion;
     }
 }

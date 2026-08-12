@@ -19,6 +19,17 @@ float zNear;
 float zFar;
 float opacity = 1;
 
+// A TEXTURED fill on ARBITRARY tessellated geometry (Polygon/Path). The rounded rect and the ellipse sample a texture in
+// their SDF batches, but a tessellated shape has neither an SDF nor a usable uv0 - the mesh carries the outline, not a
+// mapping - so the picture is mapped across the shape's own LOCAL bounding box here instead. Same tiling arithmetic as
+// the batch (ImageTiling): WHICH part of the source one copy takes and HOW MANY copies fit.
+float4 fillBounds;    // the shape's local box (x, y, w, h) the picture is mapped across
+float4 texDrawn;      // the drawn rect INSIDE that box, as (offsetX, offsetY, scaleX, scaleY) in 0..1 of it
+float4 texUvRect;     // the sub-rectangle of the source one copy samples
+float4 texUvRepeat;   // .xy copies per axis, .z mirror flags (1 = X, 2 = Y)
+float4 texTint = float4(1, 1, 1, 1);
+float texClip;        // 1 = ONE copy that must not spill outside its drawn rect (Uniform / None)
+
 VERTEX_OUTPUT UIVertexShader(UI_VERTEX input)
 {
     VERTEX_OUTPUT output;
@@ -49,6 +60,41 @@ float4 Textured_PS(VERTEX_OUTPUT input) : SV_TARGET
    return color;
 }
 
+// The shape's own box, not the mesh's uv0: a tessellated outline has no mapping baked into it.
+VERTEX_OUTPUT TexturedFillVS(UI_VERTEX input)
+{
+    VERTEX_OUTPUT output;
+    output.position = mul(float4(input.position.xyz, 1), wvp);
+    output.normal = normalize(mul(float4(input.normal, 0.0), world).xyz);
+    output.uv0 = (input.position.xy - fillBounds.xy) / max(fillBounds.zw, float2(1e-4, 1e-4));
+    output.uv1 = input.uv1;
+
+    return output;
+}
+
+float4 TexturedFill_PS(VERTEX_OUTPUT input) : SV_TARGET
+{
+    // 0..1 across the shape's box -> the drawn rect's own space -> the source's sub-rectangle, repeated.
+    float2 n = (input.uv0 - texDrawn.xy) / max(texDrawn.zw, float2(1e-4, 1e-4));
+    float2 nn = n * texUvRepeat.xy;
+    float2 wrapped = frac(nn);
+    // MIRRORED repeat: every other copy runs backwards, so a picture never drawn to tile still meets its own reflection.
+    float2 mirrored = abs(frac(nn * 0.5) * 2.0 - 1.0);
+    float2 pick = float2(step(0.5, fmod(texUvRepeat.z, 2.0)), step(0.5, floor(texUvRepeat.z * 0.5)));
+    float2 uv = texUvRect.xy + lerp(wrapped, mirrored, pick) * texUvRect.zw;
+
+    // SampleLevel, not Sample: frac() makes uv discontinuous at every tile seam, and the derivative Sample picks its mip
+    // by spikes there - one column of pixels drawn from the smallest mip, i.e. a thin line down each seam.
+    float4 color = shaderTexture.SampleLevel(sampleType, uv, 0.0) * texTint;
+
+    // ONE copy that does not fill the shape (Uniform / None): outside its drawn rect there is nothing to paint.
+    float inside = step(0.0, n.x) * step(n.x, 1.0) * step(0.0, n.y) * step(n.y, 1.0);
+    color.a *= lerp(1.0, inside, texClip);
+    color.a *= opacity;
+
+    return color;
+}
+
 float4 TexturedArray_PS(VERTEX_OUTPUT input) : SV_TARGET
 {
    float4 color = shaderTextureArray.Sample(sampleType, float3(input.uv0, textureLayer));
@@ -72,6 +118,13 @@ technique Basic
 		Profile = 5.1;
 		VertexShader = UIVertexShader;
 		PixelShader = Textured_PS;
+	}
+
+	pass TexturedFill
+	{
+		Profile = 5.1;
+		VertexShader = TexturedFillVS;
+		PixelShader = TexturedFill_PS;
 	}
 
 	pass TexturedArray

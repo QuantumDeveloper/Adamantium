@@ -23,9 +23,15 @@
 
                         <Popup x:Name="PART_Popup"
                                 Placement="Bottom" FlipToFit="True" VerticalOffset="4">
-                            <!-- DataContext is set to the ColorPickerButton in code (Popup.Open propagates it to the child),
-                                 so this plain {Binding} resolves to our SelectedColor two-way. -->
-                            <ColorPicker SelectedColor="{Binding SelectedColor, Mode=TwoWay}"/>
+                            <!-- The picker is built LAZILY on first open (ChildTemplate), not eagerly in every swatch's
+                                 template - a whole ColorPicker per swatch is far too much to build for a flyout most of
+                                 them never open. DataContext is set to the ColorPickerButton in code (Popup.Open
+                                 propagates it to the child), so this plain {Binding} resolves to our SelectedColor two-way. -->
+                            <Popup.ChildTemplate>
+                                <ControlTemplate TargetType="Popup">
+                                    <ColorPicker SelectedColor="{Binding SelectedColor, Mode=TwoWay}"/>
+                                </ControlTemplate>
+                            </Popup.ChildTemplate>
                         </Popup>
                     </Grid>
                 </ControlTemplate>

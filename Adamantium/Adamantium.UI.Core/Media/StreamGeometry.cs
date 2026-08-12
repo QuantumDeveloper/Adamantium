@@ -19,6 +19,11 @@ public sealed class StreamGeometry : Geometry
     public StreamGeometryContext Open()
     {
         context = new StreamGeometryContext();
+        // Reopening REPLACES the figures, so the tessellated mesh no longer describes this geometry. Without saying so,
+        // ProcessGeometry sees IsProcessed and keeps the mesh built from the FIRST content for good - and a Polygon
+        // (which reopens its one StreamGeometry on every render) would draw its original outline forever while layout
+        // moved and resized the slot under it.
+        InvalidateGeometry();
         return context;
     }
 

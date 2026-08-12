@@ -4,7 +4,9 @@ using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.EffectsFramework;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Media;
+using Adamantium.UI.Core.Media.Imaging;
 using Adamantium.UI.Rendering.Payloads;
 using Adamantium.Vulkan.Core;
 
@@ -63,6 +65,21 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
         base.DrawSegment(device, buffer, count, firstInstance, projection);
     }
 
+    /// <summary>The GPU texture a brush samples, or null - either it is not a textured brush, or its source is still
+    /// decoding (in which case the next re-render picks it up, the way ImageRenderUnit does). ONE statement of "which
+    /// brushes carry a texture", asked by every render unit that can route here rather than restated per shape.</summary>
+    internal static ITexture BrushTexture(Brush brush, IResourceFactory factory)
+    {
+        var source = brush switch
+        {
+            ImageBrush image => image.Source,
+            NineSliceBrush nine => nine.Source,
+            _ => null
+        };
+
+        return source is BitmapSource bitmap ? bitmap.GetOrCreateTexture(factory) : null;
+    }
+
     /// <summary>Whether this fill belongs to the textured batch at all. STATIC because it is asked before the collector
     /// exists: one is built on the first textured fill a cache meets, and most caches never meet one.</summary>
     public static bool WantsBatch(RectanglePayload p) => Enabled && p.Brush is ImageBrush or NineSliceBrush;
@@ -81,7 +98,7 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
         {
             return false;
         }
-        if (!Bake(p, world, opacity, transformSlot, out var baked))
+        if (!Bake(p.Brush, p.DestinationRect, p.CornerRadius.TopLeft, world, opacity, transformSlot, out var baked))
         {
             return false;
         }
@@ -95,9 +112,44 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
         return true;
     }
 
+    /// <summary>Ellipse variant: a full ellipse with a textured fill batches into the SAME textured pass, the shape told
+    /// apart by a NEGATIVE baked corner radius (TexRectPS branches SdEllipse for it) - the trick PatternRectCollector
+    /// uses, so no second pass and no second batch lifecycle. A <see cref="NineSliceBrush"/> does NOT come here: nine
+    /// quads cut on four straight lines have no meaning on a curve, which is why CSS border-image is rect-only too.</summary>
+    public static bool WantsBatchEllipse(EllipsePayload p)
+    {
+        if (!Enabled) return false;
+        if (p.Brush is not ImageBrush) return false;
+        if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
+        return p.StartAngle <= 0.0 && p.SweepAngle >= 360.0;
+    }
+
+    public bool CanBatchEllipse(EllipsePayload p) => WantsBatchEllipse(p);
+
+    public bool TryAddEllipse(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds,
+        ITexture texture, int transformSlot = 0)
+    {
+        EnsureCpuCapacity(Count + 1);
+        if (Count + 1 > GpuCapacity)
+        {
+            return false;
+        }
+        if (!Bake(p.Brush, p.DestinationRect, -1.0, world, opacity, transformSlot, out var baked))
+        {
+            return false;
+        }
+
+        _texture = texture;
+        Items[Count++] = baked[0];
+        MarkPending(scissor, logicalBounds);
+        return true;
+    }
+
     // Bake a textured fill into 1 or 9 instance records. Position -> world; false on a rotated/sheared world (the
-    // axis-aligned instance cannot hold it) so the caller falls back to the per-unit path.
-    private static bool Bake(RectanglePayload p, Matrix4x4F world, double opacity, int transformSlot, out TexRectItem[] items)
+    // axis-aligned instance cannot hold it) so the caller falls back to the per-unit path. A NEGATIVE cornerRadius is
+    // the ELLIPSE shape flag and is passed through unscaled; a rect's radius scales with the world like everything else.
+    private static bool Bake(Brush brush, Rect destinationRect, double cornerRadius, Matrix4x4F world, double opacity,
+        int transformSlot, out TexRectItem[] items)
     {
         items = null;
         const float eps = 1e-4f;
@@ -110,11 +162,11 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
         var sy = world.M22;
         var tx = world.M41;
         var ty = world.M42;
-        var r = p.DestinationRect;
+        var r = destinationRect;
         var bounds = new Rect(r.X * sx + tx, r.Y * sy + ty, r.Width * sx, r.Height * sy);
-        var radius = (float)(p.CornerRadius.TopLeft * sx);
+        var radius = cornerRadius < 0 ? -1f : (float)(cornerRadius * sx);
 
-        items = p.Brush switch
+        items = brush switch
         {
             NineSliceBrush nine => NineSlice.Bake(nine, bounds, opacity, transformSlot, sx, sy),
             ImageBrush image => [Single(image, bounds, radius, opacity, transformSlot, sx, sy)],

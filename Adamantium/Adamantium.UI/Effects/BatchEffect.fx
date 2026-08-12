@@ -1507,8 +1507,13 @@ float4 TexRectPS(TexPSInput input) : SV_Target
     TexRectData* items = (TexRectData*)InstancesAddress;
     TexRectData it = items[input.InstId];
 
+    // A NEGATIVE baked corner radius is the ELLIPSE shape flag (a rect passes radius >= 0) - same signal the pattern
+    // pass uses. Branch-free (a ?: in this pass has device-lost form on this driver): both distances, picked by a step.
+    float isEllipse = step(it.Params.x, -0.0001);
     float r = min(input.Radius, min(input.Half.x, input.Half.y));
-    float d = SdRoundRectJoin(input.Local, input.Half, r, 2);   // round join: the plain Euclidean offset, no stroke here
+    float d = lerp(SdRoundRectJoin(input.Local, input.Half, r, 2),   // round join: the plain Euclidean offset, no stroke here
+                   SdEllipse(input.Local, input.Half),
+                   isEllipse);
 
     // 0..1 across the shape, then into the source's sub-rectangle. The REPEAT is done here with frac() rather than by a
     // wrapping sampler: the sampler would wrap the WHOLE texture, and a slice needs its own strip wrapped.
@@ -1535,7 +1540,7 @@ float4 TexRectPS(TexPSInput input) : SV_Target
     float aa = max(fwidth(d), 1e-4);
     float ramp = saturate(0.5 - d / aa);
     float crisp = step(d, 0.0);
-    fill.a *= lerp(crisp, ramp, step(0.001, r));
+    fill.a *= lerp(crisp, ramp, max(step(0.001, r), isEllipse));   // an ellipse is ALL curve, so it always earns the ramp
     return fill;
 }
 

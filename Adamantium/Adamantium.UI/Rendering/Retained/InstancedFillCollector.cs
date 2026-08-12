@@ -417,42 +417,15 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         double opacity, int transformSlot)
     {
         var inst = new PatternGeometryInstance { Local = local };
-        int type;
-        Color color1;
-        Color color2;
-        var midColor = new Color(0, 0, 0, 0);
-        double cell;
-        double brushOpacity;
-        var noise = Vector4F.Zero;
+        PatternBrushRecord.TryDescribe(brush, out var record);   // the caller already refused anything else
 
-        if (brush is PatternBrush pat)
-        {
-            type = (int)pat.Pattern;
-            color1 = pat.Color1;
-            color2 = pat.Color2;
-            cell = pat.CellSize;
-            brushOpacity = pat.Opacity;
-        }
-        else
-        {
-            var n = (NoiseBrush)brush;
-            type = n.NoiseType == NoiseType.Simplex ? 4 : 6 + (int)n.NoiseType;
-            color1 = n.Color1;
-            color2 = n.Color2;
-            midColor = n.MidColor;
-            cell = n.Scale;
-            brushOpacity = n.Opacity;
-            var octEnc = n.Animate ? -(float)Math.Max(1, n.Octaves) : n.Octaves;
-            noise = new Vector4F(octEnc, (float)n.Seed, (float)n.Lacunarity, (float)n.Gain);
-            if (n.NoiseType == NoiseType.CombustibleVoronoi) noise.W = n.UseFirePalette ? 1f : 0f;
-        }
+        var alpha = (float)(opacity * record.Opacity);
+        var c1 = record.Color1.ToVector4(); c1.W *= alpha;
+        var c2 = record.Color2.ToVector4(); c2.W *= alpha;
+        var c3 = record.MidColor.ToVector4(); c3.W *= alpha;
+        var noise = record.Noise;
 
-        var alpha = (float)(opacity * brushOpacity);
-        var c1 = color1.ToVector4(); c1.W *= alpha;
-        var c2 = color2.ToVector4(); c2.W *= alpha;
-        var c3 = midColor.ToVector4(); c3.W *= alpha;
-
-        inst.Params = new Vector4F(0, type, (float)cell, transformSlot);
+        inst.Params = new Vector4F(0, record.Type, (float)record.Cell, transformSlot);
         inst.LocalBounds = new Vector4F((float)localBounds.X, (float)localBounds.Y, (float)localBounds.Width, (float)localBounds.Height);
         inst.Color1 = c1;
         inst.Color2 = c2;

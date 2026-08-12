@@ -313,7 +313,7 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
         // No ProcessGeometry here: the payload tessellated on the RECORD thread (see GeometryPayload). The applier only
         // freezes a copy of the result.
         _frozenMesh = FrozenMesh.From(Payload.Geometry.Mesh, Payload.Geometry.Bounds);   // freeze the tessellated mesh for the instanced path
-        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, Payload.Geometry.Mesh, Payload.Brush, BufferManager);
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, Payload.Geometry.Mesh, Payload.LiveBrush, BufferManager, ResourceFactory);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
         ProcessFillFringe(Payload.Geometry, Payload.Brush);
         ProcessStrokeData(Payload.Pen, Payload.Geometry);
@@ -402,7 +402,7 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
             _frozenMesh = FrozenMesh.From(inputPayload.Geometry.Mesh, inputPayload.Geometry.Bounds);   // re-freeze the re-tessellated mesh
             ((GeometryRenderComponent)GeometryRenderer).UpdateGeometry(inputPayload.Geometry.Mesh);
         }
-        ((GeometryRenderComponent)GeometryRenderer).Background = inputPayload.Brush;
+        ((GeometryRenderComponent)GeometryRenderer).Background = inputPayload.LiveBrush;
 
         DrawCommand = drawCommand;
         Payload = inputPayload;
@@ -477,17 +477,7 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
     /// source is still decoding (in which case the next re-render picks it up, the way ImageRenderUnit does).
     /// <para>Lives here because the resource factory does: the textured batch needs the texture but has no business
     /// holding a factory.</para></summary>
-    internal ITexture BrushTexture()
-    {
-        var source = Payload.Brush switch
-        {
-            ImageBrush image => image.Source,
-            NineSliceBrush nine => nine.Source,
-            _ => null
-        };
-
-        return source is BitmapSource bitmap ? bitmap.GetOrCreateTexture(ResourceFactory) : null;
-    }
+    internal ITexture BrushTexture() => TexRectCollector.BrushTexture(Payload.Brush, ResourceFactory);
 
     // Whether a batch will draw this rect - ASKED OF THE BATCH, never re-stated here. "The batch draws it" means this
     // unit builds ZERO machinery: no tessellation, no geometry/fringe/stroke, no GPU buffers, which is what makes a big
@@ -518,7 +508,7 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
     {
         var g = new RectangleGeometry(payload.DestinationRect, payload.CornerRadius);
         g.ProcessGeometry(GeometryType.Both);
-        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, payload.Brush, BufferManager);
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, payload.Brush, BufferManager, ResourceFactory);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
         ProcessFillFringe(g, payload.Brush);
         ProcessStrokeData(payload.Pen, g);
@@ -535,7 +525,7 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
         if (GeometryRenderer != null) return;
         var g = new RectangleGeometry(Payload.DestinationRect, Payload.CornerRadius);
         g.ProcessGeometry(GeometryType.Both);
-        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, Payload.Brush, BufferManager);
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, Payload.Brush, BufferManager, ResourceFactory);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
     }
 
@@ -565,7 +555,7 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
             rectangleGeometry.ProcessGeometry(GeometryType.Both);
             ((GeometryRenderComponent)GeometryRenderer).UpdateGeometry(rectangleGeometry.Mesh);
         }
-        ((GeometryRenderComponent)GeometryRenderer).Background = inputPayload.Brush;
+        ((GeometryRenderComponent)GeometryRenderer).Background = inputPayload.LiveBrush;
         DrawCommand = drawCommand;
         Payload = inputPayload;
         GeometryRenderer.RenderData = DrawCommand.RenderData;
@@ -606,6 +596,9 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
     // The batch reads the fill opacity here: a batchable ellipse has no GeometryRenderer to carry RenderData.
     public double FillOpacity => DrawCommand?.RenderData?.Opacity ?? 1.0;
 
+    /// <summary>The GPU texture this ellipse's brush samples, or null - see the rect's twin; both defer to the batch.</summary>
+    internal ITexture BrushTexture() => TexRectCollector.BrushTexture(Payload.Brush, ResourceFactory);
+
     // An ellipse the SDF batch will draw (solid fill, no pen, FULL ellipse): the batch shader reconstructs it from an
     // implicit field and self-anti-aliases, so this unit needs NO tessellated body and NO AA fringe. Building them per
     // ellipse is pure waste (and their per-unit GPU buffers are exactly what strained device memory). Mirrors
@@ -620,13 +613,17 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
     // gradient cases, build ZERO per-unit machinery. Mirrors PatternRectCollector.CanBatchEllipse.
     private static bool IsPatternBatchable(EllipsePayload p) => PatternRectCollector.WantsBatchEllipse(p);
 
+    // A full ellipse whose fill is SAMPLED from a texture routes into the textured SDF batch - again, ZERO per-unit
+    // machinery. Mirrors TexRectCollector.CanBatchEllipse.
+    private static bool IsTexBatchable(EllipsePayload p) => TexRectCollector.WantsBatchEllipse(p);
+
     public EllipseRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
         // A batchable ellipse is drawn ENTIRELY by the SDF batch (resolution-independent, self-AA) - build ZERO per-unit
         // machinery: no tessellation, no geometry/fringe/stroke, no GPU buffers. The rare rejected case (rotated/sheared
         // world, or per-frame overflow) builds its body lazily in Render via EnsureMachinery. A gradient fill routes to
         // the gradient ellipse batch, also machinery-free.
-        if (IsSdfBatchable(Payload) || IsGradientBatchable(Payload) || IsPatternBatchable(Payload)) return;
+        if (IsSdfBatchable(Payload) || IsGradientBatchable(Payload) || IsPatternBatchable(Payload) || IsTexBatchable(Payload)) return;
         BuildMachinery(Payload);
     }
 
@@ -635,7 +632,7 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
     {
         var g = new EllipseGeometry(payload.DestinationRect, payload.StartAngle, payload.SweepAngle, payload.EllipseType);
         g.ProcessGeometry(GeometryType.Both);
-        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, payload.Brush, BufferManager);
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, payload.Brush, BufferManager, ResourceFactory);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
         ProcessFillFringe(g, payload.Brush);
         ProcessStrokeData(payload.Pen, g);
@@ -648,7 +645,7 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
         if (GeometryRenderer != null) return;
         var g = new EllipseGeometry(Payload.DestinationRect, Payload.StartAngle, Payload.SweepAngle, Payload.EllipseType);
         g.ProcessGeometry(GeometryType.Both);
-        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, Payload.Brush, BufferManager);
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, Payload.Brush, BufferManager, ResourceFactory);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
     }
 
@@ -662,7 +659,8 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
         {
             DrawCommand = drawCommand;
             Payload = inputPayload;
-            if (!IsSdfBatchable(inputPayload) && !IsGradientBatchable(inputPayload)) BuildMachinery(inputPayload);
+            if (!IsSdfBatchable(inputPayload) && !IsGradientBatchable(inputPayload)
+                && !IsPatternBatchable(inputPayload) && !IsTexBatchable(inputPayload)) BuildMachinery(inputPayload);
             return;
         }
 
@@ -678,7 +676,7 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
             ellipseGeometry.ProcessGeometry(GeometryType.Both);
             ((GeometryRenderComponent)GeometryRenderer).UpdateGeometry(ellipseGeometry.Mesh);
         }
-        ((GeometryRenderComponent)GeometryRenderer).Background = inputPayload.Brush;
+        ((GeometryRenderComponent)GeometryRenderer).Background = inputPayload.LiveBrush;
         DrawCommand = drawCommand;
         Payload = inputPayload;
         GeometryRenderer.RenderData = drawCommand.RenderData;

@@ -59,18 +59,27 @@
 
                         <Popup x:Name="PART_Popup"
                                 Placement="Bottom" FlipToFit="True" VerticalOffset="2">
-                            <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
-                                    BorderBrush="{ResourceReference ControlStrokeColorDefault}"
-                                    BorderThickness="1"
-                                    CornerRadius="4"
-                                    Padding="2"
-                                    MinWidth="{TemplateBinding ActualWidth}">
-                                <ScrollViewer MaxHeight="{TemplateBinding MaxDropDownHeight}"
-                                        HorizontalScrollBarVisibility="Disabled"
-                                        VerticalScrollBarVisibility="Auto">
-                                    <ItemsPresenter x:Name="PART_ItemsPresenter"/>
-                                </ScrollViewer>
-                            </Border>
+                            <!-- The list card + scroll host + items presenter build LAZILY on first open (ChildTemplate),
+                                 not eagerly in every DropDown's template - a closed list costs a card, two scrollbars and
+                                 a container per item, and most lists are never opened. The popup's DataContext is set to
+                                 the DropDown in code, so these plain {Binding}s reach it: {TemplateBinding} cannot, since
+                                 a ChildTemplate is built against the POPUP, not the control that owns it. -->
+                            <Popup.ChildTemplate>
+                                <ControlTemplate TargetType="Popup">
+                                    <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                            BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                            BorderThickness="1"
+                                            CornerRadius="4"
+                                            Padding="2"
+                                            MinWidth="{Binding ActualWidth}">
+                                        <ScrollViewer MaxHeight="{Binding MaxDropDownHeight}"
+                                                HorizontalScrollBarVisibility="Disabled"
+                                                VerticalScrollBarVisibility="Auto">
+                                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                        </ScrollViewer>
+                                    </Border>
+                                </ControlTemplate>
+                            </Popup.ChildTemplate>
                         </Popup>
                     </Grid>
                 </ControlTemplate>
