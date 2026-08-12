@@ -1662,6 +1662,137 @@ float4 PatternFillPS(PatFillPSInput input) : SV_Target
     return PatternFillColor(pd, pTopLeft, centerRel, max(it.LocalBounds.w * 0.5, 1.0));
 }
 
+// ---- Halo batch: the soft band UNDER a shape - an aura (no direction) or a shadow (offset), which are one arithmetic.
+// No offscreen target and no blur kernel: the band IS the shape's own signed distance, read further out and shaped by a
+// falloff, so a thousand shadowed cards stay a handful of instanced draws instead of a thousand raster passes.
+struct HaloRectData
+{
+    float4 Bounds;   // the SHAPE's rect in slot units (the drawn quad is grown from it in the VS)
+    float4 Params;   // .x corner radius, .y transform slot, .z shape (0 rect, 1 ellipse), .w inner flag
+    float4 Band;     // .xy offset, .z spread, .w softness - slot units
+    float4 Color;
+    float4 Field;    // .x = the distance range a SAMPLED field encodes, slot units (0 for an analytic shape)
+};
+
+struct HaloPSInput
+{
+    float4 Position : SV_Position;
+    float2 Local    : TEXCOORD0;   // fragment from the SHAPE's centre, device px
+    float2 Half     : TEXCOORD1;   // the shape's half-size, device px
+    float Radius    : TEXCOORD2;
+    float Scale     : TEXCOORD3;
+    nointerpolation uint InstId : TEXCOORD4;
+};
+
+[shader("vertex")]
+HaloPSInput HaloRectInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
+{
+    HaloRectData* items = (HaloRectData*)InstancesAddress;
+    HaloRectData it = items[instanceId];
+
+    HaloPSInput o;
+    float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
+    float4x4* transforms = (float4x4*)TransformsAddress;
+    float4x4 nodeWorld = transforms[(uint)it.Params.y];
+    float2 px = SlotPixelScale(nodeWorld);
+    float iso = min(px.x, px.y);
+
+    // The quad has to hold the whole band: how far it is thrown, plus the solid rim, plus the fade. An INNER band never
+    // leaves the shape, so it grows by nothing. One pixel on top, for the coverage ramp at the very edge.
+    float reach = it.Band.z + it.Band.w + max(abs(it.Band.x), abs(it.Band.y));
+    float outsetPx = lerp(max(reach, 0.0) * iso, 0.0, step(0.5, it.Params.w)) + 1.0;
+
+    float2 localPos = it.Bounds.xy + corner * it.Bounds.zw + (corner * 2.0 - 1.0) * (outsetPx / px);
+    float4 worldPos = mul(float4(localPos, 0.0, 1.0), nodeWorld);
+    o.Position = mul(worldPos, Projection);
+    o.Half   = it.Bounds.zw * 0.5 * px;
+    o.Local  = (corner - 0.5) * it.Bounds.zw * px + (corner * 2.0 - 1.0) * outsetPx;
+    o.Radius = it.Params.x * iso;
+    o.Scale  = iso;
+    o.InstId = instanceId;
+    return o;
+}
+
+// The shape, at an inflation: rect and ellipse from the same call so the branch is a lerp, not a jump.
+float HaloShapeDistance(float2 p, float2 half, float radius, float inflate, float isEllipse)
+{
+    float2 h = max(half + inflate, float2(0.01, 0.01));
+    float r = clamp(radius + inflate, 0.0, min(h.x, h.y));
+    return lerp(SdRoundRectJoin(p, h, r, 2), SdEllipse(p, h), isEllipse);
+}
+
+// ARBITRARY geometry has no closed-form distance, so it is READ from a field baked per shape (HaloField). Same units,
+// same pass, same falloff as the analytic shapes - which is the whole point of doing it this way rather than widening
+// the AA ring: one halo, three kinds of shape.
+// The field covers the shape's box grown by `range` on every side; 0.5 is exactly on the outline.
+float HaloFieldDistance(float2 p, float2 half, float rangePx, float inflate, out float fade)
+{
+    float2 padded = half + rangePx;
+    float2 uv = (p + padded) / max(padded * 2.0, float2(1e-4, 1e-4));
+    float2 uvIn = saturate(uv);
+    float enc = SourceTexture.SampleLevel(SourceSampler, uvIn, 0.0).r;
+
+    // AT its range the field stops knowing: it encodes a CLAMP, not a distance. Cutting the band off there with a hard
+    // test does not work - the lookup is FILTERED, so texels on the boundary interpolate below the threshold and light
+    // up a faint contour of the baked box, which is the ghost rectangle around a big glow. Fade the band out over the
+    // last of the range instead, so it always reaches zero inside what the field can answer for.
+    fade = saturate((1.0 - enc) / 0.12);
+
+    // OUTSIDE the box the clamped lookup keeps returning the edge texel, whose distance then never grows. Add how far
+    // the fragment actually is from the box: a point out there is at least that much further from the shape.
+    float outsidePx = length((uv - uvIn) * padded * 2.0);
+
+    return (enc - 0.5) * 2.0 * rangePx - inflate + outsidePx;
+}
+
+[shader("fragment")]
+float4 HaloRectPS(HaloPSInput input) : SV_Target
+{
+    HaloRectData* items = (HaloRectData*)InstancesAddress;
+    HaloRectData it = items[input.InstId];
+
+    float isEllipse = it.Params.z;
+    float inner = it.Params.w;
+    float sc = input.Scale;
+    float2 offset = it.Band.xy * sc;
+    float softness = max(it.Band.w * sc, 0.5);
+    // An inner band grows INWARD, so its spread shrinks the source shape instead of inflating it.
+    float spread = lerp(it.Band.z, -it.Band.z, step(0.5, inner)) * sc;
+
+    // Shape 2 = a SAMPLED field (arbitrary geometry); 0/1 are the analytic rect and ellipse. Branch-free: both are
+    // evaluated and picked, because a ?: in this family has device-lost form on this driver.
+    float sampled = step(1.5, isEllipse);
+    float analyticShape = saturate(isEllipse);   // 0 rect, 1 ellipse - shape 2 never uses it, but must not extrapolate
+    float rangePx = it.Field.x * sc;
+    float bandFade, shapeFade;
+    float dBand = lerp(HaloShapeDistance(input.Local - offset, input.Half, input.Radius, spread, analyticShape),
+                       HaloFieldDistance(input.Local - offset, input.Half, rangePx, spread, bandFade), sampled);
+    float dShape = lerp(HaloShapeDistance(input.Local, input.Half, input.Radius, 0.0, analyticShape),
+                        HaloFieldDistance(input.Local, input.Half, rangePx, 0.0, shapeFade), sampled);
+
+    // Outer: full strength inside the thrown shape, faded to nothing one softness outside it. Inner: the mirror.
+    // The curve is QUADRATIC, not a smoothstep: a smoothstep keeps too much brightness half-way out, and at a large
+    // radius that blooms a detailed silhouette into round blobs - a star turns into a snowflake. Falling off faster
+    // makes the band hug the outline it belongs to.
+    float tOuter = saturate(dBand / softness);
+    float tInner = saturate(-dBand / softness);
+    float aOuter = (1.0 - tOuter) * (1.0 - tOuter);
+    float aInner = (1.0 - tInner) * (1.0 - tInner);
+    float a = lerp(aOuter, aInner, step(0.5, inner));
+
+    // Clipped to the correct side of the REAL outline, as CSS clips a box-shadow: an outer band is not painted beneath
+    // the shape (or a translucent card would darken itself), an inner one never leaves it.
+    float aa = max(fwidth(dShape), 1e-4);
+    a *= lerp(saturate(dShape / aa + 0.5), saturate(-dShape / aa + 0.5), step(0.5, inner));
+
+    // A sampled band also fades out as the field runs out of range - see HaloFieldDistance.
+    a *= lerp(1.0, bandFade, sampled);
+
+    float4 color = it.Color;
+    color.a *= saturate(a);
+    return color;
+}
+
 // ---- TexFill: general instanced geometry (a shared tessellated mesh drawn N times) whose FILL is SAMPLED from a
 // texture - the textured sibling of GradientFill/PatternFill, so an ImageBrush works on ANY geometry (Path/Polygon) and
 // N such shapes cost ONE draw instead of N. A tessellated mesh carries neither an SDF nor a usable uv0, so the picture
@@ -2118,6 +2249,14 @@ technique Batch
         Profile = 6.6;
         VertexShader = PatternFillVS;
         PixelShader = PatternFillPS;
+    }
+
+    // The soft band under a shape (aura / shadow). Drawn BEFORE every fill in its clip group, so it lands under them.
+    pass Halo
+    {
+        Profile = 5.1;
+        VertexShader = HaloRectInstancedVS;
+        PixelShader = HaloRectPS;
     }
 
     // Instanced TEXTURED fill on arbitrary geometry: the shared mesh drawn N times, each instance sampling the bound

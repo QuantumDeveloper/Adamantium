@@ -22,6 +22,14 @@ public interface IUIComponent : IFundamentalUIComponent
     Visibility Visibility { get; set; }
     Rect Bounds { get; set; }
     Rect ClipRectangle { get; }
+
+    /// <summary>The soft band around this component's outline, if it wears one. Read at RECORD time and baked into the
+    /// draw command - never dereferenced by the renderer, which is editing-thread state.</summary>
+    Media.Aura Aura { get; set; }
+
+    /// <summary>The shadow this component casts, if any. Same record-time rule as <see cref="Aura"/>.</summary>
+    Media.Shadow Shadow { get; set; }
+
     Vector2 ClipPosition { get; set; }
     IUIComponent VisualParent { get; }
 

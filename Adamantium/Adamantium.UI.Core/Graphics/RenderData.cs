@@ -25,6 +25,11 @@ public class RenderData
     
     public Matrix4x4F ProjectionMatrix { get; set; }
 
+    /// <summary>The soft bands drawn UNDER this command's shape (an aura, a shadow, or both), baked from the element's
+    /// live <see cref="Media.Aura"/>/<see cref="Media.Shadow"/> at RECORD time. Null when it wears none - which is the
+    /// overwhelmingly common case, so nothing is allocated for it.</summary>
+    public Media.HaloBand[] Halo { get; set; }
+
     // Viewport zoom multiplier (designer renders ClientSize x RenderScale; the projection stays logical). 1 = on-screen
     // 1:1. Analytic AA reads it so the fringe stays ~1 DEVICE px under zoom (TransformMatrix carries only the logical
     // local->world scale; the zoom lives in the viewport, not the projection - see WindowRendererBase.RenderScale).

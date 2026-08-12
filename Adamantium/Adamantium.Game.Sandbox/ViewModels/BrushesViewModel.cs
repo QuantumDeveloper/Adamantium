@@ -171,6 +171,72 @@ public partial class BrushesViewModel : TabPageViewModel
     [Bindable] private PreviewShape _meshShape = PreviewShape.Rectangle;
     [Bindable] private PreviewShape _imageShape = PreviewShape.Rectangle;
 
+    // --- Aura / Shadow stand -------------------------------------------------------------------------------------
+    // Two live objects the sliders drive in place: the element holds THESE, and each property change raises their
+    // Changed, so the band re-records without the stand rebuilding anything.
+    public Aura LiveAura { get; } = new Aura
+    {
+        Radius = 28,
+        Spread = 0,
+        Color = new Color(56, 189, 248, 255),
+        Opacity = 0.9
+    };
+
+    public Shadow LiveShadow { get; } = new Shadow
+    {
+        OffsetY = 10,
+        BlurRadius = 18,
+        Spread = 0,
+        Color = new Color(0, 0, 0, 255),
+        Opacity = 0.55
+    };
+
+    [Bindable] private double _auraRadius = 28;
+    [Bindable] private double _auraSpread;
+    [Bindable] private Color _auraColor = new Color(56, 189, 248, 255);
+    [Bindable] private double _auraOpacity = 0.9;
+    [Bindable] private bool _auraInner;
+
+    [Bindable] private double _shadowOffsetX;
+    [Bindable] private double _shadowOffsetY = 10;
+    [Bindable] private double _shadowBlur = 18;
+    [Bindable] private double _shadowSpread;
+    [Bindable] private Color _shadowColor = Colors.Black;
+    [Bindable] private double _shadowOpacity = 0.55;
+    [Bindable] private bool _shadowInner;
+
+    // The band is drawn OUTSIDE the element and the engine does not grow the layout for it - that is the author's job.
+    // The stand makes the point live: drag the margin down and watch the glow get cut off by the panel.
+    /// <summary>Every shape: the rect and the ellipse compute their distance, the triangle and the star READ one baked
+    /// per mesh - same pass, same falloff, so there is nothing to leave out.</summary>
+    public PreviewShape[] HaloShapes { get; } = Enum.GetValues<PreviewShape>();
+
+    /// <summary>The halo stand's figures. Its box is 180x120 rather than the size sliders of the image stand, so these
+    /// are fixed - what moves here is the BAND, not the shape.</summary>
+    public PointsCollection HaloTriangle { get; } = Triangle(180, 120);
+    public PointsCollection HaloStar { get; } = Star(180, 120);
+
+    // Off by default: with it on and a small margin the stand looks broken rather than instructive. Ticking it is the
+    // point - it shows what ANY clipping ancestor does to a band the author left no room for.
+    [Bindable] private bool _haloClip;
+    [Bindable] private double _haloMargin = 40;
+    [Bindable] private double _haloRadius = 16;
+    [Bindable] private PreviewShape _haloShape = PreviewShape.Rectangle;
+
+    partial void OnAuraRadiusChanged(double value) => LiveAura.Radius = value;
+    partial void OnAuraSpreadChanged(double value) => LiveAura.Spread = value;
+    partial void OnAuraColorChanged(Color value) => LiveAura.Color = value;
+    partial void OnAuraOpacityChanged(double value) => LiveAura.Opacity = value;
+    partial void OnAuraInnerChanged(bool value) => LiveAura.Inner = value;
+
+    partial void OnShadowOffsetXChanged(double value) => LiveShadow.OffsetX = value;
+    partial void OnShadowOffsetYChanged(double value) => LiveShadow.OffsetY = value;
+    partial void OnShadowBlurChanged(double value) => LiveShadow.BlurRadius = value;
+    partial void OnShadowSpreadChanged(double value) => LiveShadow.Spread = value;
+    partial void OnShadowColorChanged(Color value) => LiveShadow.Color = value;
+    partial void OnShadowOpacityChanged(double value) => LiveShadow.Opacity = value;
+    partial void OnShadowInnerChanged(bool value) => LiveShadow.Inner = value;
+
     /// <summary>The five-pointed star every stand can wear: the concave one of the four, so a fill has to survive
     /// reflex corners and a tessellation that is nothing like a quad.</summary>
     public PointsCollection FixedStar { get; } = Star(300, 200);

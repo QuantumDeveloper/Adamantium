@@ -28,6 +28,13 @@ public partial class RenderCache
     private PatternRectCollector _patternBatch;   // SDF family: rounded rects with a PROCEDURAL pattern fill (checker/stripes/dots/grid)
     private FractalRectCollector _fractalBatch;   // SDF family: rounded rects with an escape-time FRACTAL fill (Julia/Mandelbrot)
     private TexRectCollector _texRectBatch;   // SDF family: rounded rects whose fill is SAMPLED from a texture (ImageBrush / NineSliceBrush)
+    // The soft band (aura / shadow) in its TWO paint positions. An OUTER band goes under every fill; an INNER one over
+    // them - drawn under, it would simply be covered by the shape's own fill. Both lazy: most windows have neither.
+    private HaloRectCollector _haloUnder;
+    private HaloRectCollector _haloOver;
+    // Whose inner band is pending. Its OWN fill must not flush it - the fill is added right after the band and the two
+    // belong together; anyone ELSE overlapping it still forces a flush, or a later sibling would be painted over.
+    private IUIComponent _haloOverOwner;
     private Rect2D _batchScissor;
     private bool _batchOpen;
 
@@ -110,6 +117,8 @@ public partial class RenderCache
         if (_patternBatch != null) _patternBatch.TransformsAddress = address;
         if (_fractalBatch != null) _fractalBatch.TransformsAddress = address;
         if (_texRectBatch != null) _texRectBatch.TransformsAddress = address;
+        if (_haloUnder != null) _haloUnder.TransformsAddress = address;
+        if (_haloOver != null) _haloOver.TransformsAddress = address;
         if (_textBatch != null) _textBatch.TransformsAddress = address;   // glyph VS fetches the block's node matrix by slot
         if (_instancedFill != null) _instancedFill.TransformsAddress = address;
     }
@@ -210,6 +219,9 @@ public partial class RenderCache
             // Created lazily (below, on the first textured fill) - but once it exists it needs its frame reset like any
             // other collector. Leaving it out is what made a nine-slice draw for exactly ONE frame and then vanish.
             _texRectBatch?.BeginFrame(device);
+            _haloUnder?.BeginFrame(device);
+            _haloOver?.BeginFrame(device);
+            _haloOverOwner = null;
             // Transform table: this frame's copy, and its address on the collectors that were just (re)created above.
             BeginTransformFrame(device);
             var sceneClean = LastBuildKind == RenderBuildKind.Clean;
@@ -267,13 +279,35 @@ public partial class RenderCache
             unit.SetEffectiveOpacity(EffectiveOpacity(unit.Component));
             unit.Update(wt, _projectionMatrix, _renderScale);
 
+            // The unit's soft bands (aura / shadow), if it wears any. NOT an alternative to its fill - an addition, so it
+            // is collected before the routing chain and drawn first at the flush, which is what puts it UNDER the fills.
+            if (device != null && HaloRectCollector.WantsBatch(unit.RenderData))
+            {
+                // The band reaches PAST the element, so the overlap test uses the grown box: what it must not be drawn
+                // under is whatever the band itself covers, not just what the element covers.
+                var bandBounds = LogicalBounds(unit.Component, wt)
+                    .Inflate(HaloRectCollector.MaxReach(unit.RenderData.Halo));
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(-1, bandBounds))
+                {
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                }
+                // Both sides are collected HERE, before the fill - only their FLUSH positions differ, and the flush is
+                // what decides paint order. Collecting the inner one later would mean finding this unit again.
+                var under = CollectHalo(device, unit, wt, scissor, inner: false);
+                var over = CollectHalo(device, unit, wt, scissor, inner: true);
+                if ((under || over) && _recording)
+                {
+                    group.PatchableRectOnly = false;   // a band is not a rect slot; the fast-path patch can't reproduce it
+                }
+            }
+
             // Batches: item-background rects (lower layer) + text (upper layer), each one instanced draw. A clip-group
             // change (scissor, or the text atlas) flushes BOTH together (rect-under-text order); a non-batchable unit that
             // overlaps either flushes both first so it paints on top.
             if (device != null && unit is RectangleRenderUnit rru && _rectBatch.CanBatch(rru.RectPayload))
             {
                 var rectBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(0, rectBounds))   // 0 = rect layer
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(0, rectBounds, unit.Component))   // 0 = rect layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var bakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Rect);
                 if (_rectBatch.TryAdd(rru.RectPayload, bakeWorld, rru.FillOpacity, scissor, rectBounds, slot4Rect))
@@ -304,7 +338,7 @@ public partial class RenderCache
                 // A rounded rect with a LINEAR/RADIAL gradient fill: same SDF-batch family, different pass (the pixel shader
                 // evaluates the gradient). Shares the clip group with the other batches.
                 var gradRectBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(2, gradRectBounds))   // 2 = gradient-rect layer
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(2, gradRectBounds, unit.Component))   // 2 = gradient-rect layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var gradBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Grad);
                 if (_gradientRectBatch.TryAdd(grru.RectPayload, gradBakeWorld, grru.FillOpacity, scissor, gradRectBounds, slot4Grad))
@@ -325,7 +359,7 @@ public partial class RenderCache
             else if (device != null && unit is EllipseRenderUnit eru && _ellipseBatch.CanBatch(eru.EllipsePayload))
             {
                 var ellipseBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(1, ellipseBounds))   // 1 = ellipse layer
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(1, ellipseBounds, unit.Component))   // 1 = ellipse layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var bakeWorld = ResolveBake(device, unit.Component, wt, out var slot4El);
                 if (_ellipseBatch.TryAdd(eru.EllipsePayload, bakeWorld, eru.FillOpacity, scissor, ellipseBounds, slot4El))
@@ -348,7 +382,7 @@ public partial class RenderCache
             {
                 // A full ellipse with a LINEAR/RADIAL gradient fill: gradient sibling of the solid ellipse SDF batch.
                 var gradElBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(3, gradElBounds))   // 3 = gradient-ellipse layer
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(3, gradElBounds, unit.Component))   // 3 = gradient-ellipse layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var gradElBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4GradEl);
                 if (_gradientEllipseBatch.TryAdd(geru.EllipsePayload, gradElBakeWorld, geru.FillOpacity, scissor, gradElBounds, slot4GradEl))
@@ -372,7 +406,7 @@ public partial class RenderCache
                 // jagged tessellated edges), the shader branching to the ellipse SDF on the negative baked corner radius.
                 // Same clip group + layer 4 as the pattern rect.
                 var patElBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(4, patElBounds))   // 4 = pattern layer
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(4, patElBounds, unit.Component))   // 4 = pattern layer
                 {
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }
@@ -395,7 +429,7 @@ public partial class RenderCache
                 // A rounded rect with a PROCEDURAL PATTERN fill (checkerboard/stripes/dots/grid): a new SDF-batch sibling,
                 // its own pass evaluates the pattern per fragment. Shares the clip group with the other batches.
                 var patternBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(4, patternBounds))   // 4 = pattern layer
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(4, patternBounds, unit.Component))   // 4 = pattern layer
                 {
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }
@@ -421,7 +455,7 @@ public partial class RenderCache
                 // iterates z=z²+c per fragment. Shares the clip group with the other batches; auto-morph is a shader-side
                 // Time drift, so this batch is not paint/slot-patchable (no _sdfSlotByUnit entry) - a full walk re-records it.
                 var fractalBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(5, fractalBounds))   // 5 = fractal layer
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(5, fractalBounds, unit.Component))   // 5 = fractal layer
                 {
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }
@@ -459,7 +493,7 @@ public partial class RenderCache
                 }
                 var texBounds = LogicalBounds(unit.Component, wt);
                 if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_texRectBatch.SameTexture(texture)
-                    || OverlapsHigherLayer(6, texBounds))   // 6 = textured layer
+                    || OverlapsHigherLayer(6, texBounds, unit.Component))   // 6 = textured layer
                 {
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }
@@ -493,7 +527,7 @@ public partial class RenderCache
                 }
                 var texEllBounds = LogicalBounds(unit.Component, wt);
                 if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_texRectBatch.SameTexture(texEllTexture)
-                    || OverlapsHigherLayer(6, texEllBounds))   // 6 = textured layer
+                    || OverlapsHigherLayer(6, texEllBounds, unit.Component))   // 6 = textured layer
                 {
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }
@@ -688,8 +722,23 @@ public partial class RenderCache
     // sitting on a gradient bar, a solid overlay over gradient content). Returning true here flushes the pending batches
     // first, dropping this unit into a fresh cycle that draws after them = correct paint order. Same-or-lower layers keep
     // their insertion order and are fine as-is; disjoint content never overlaps, so same-material tiles pay only O(1) checks.
-    private bool OverlapsHigherLayer(int layer, Rect lb)
+    private bool OverlapsHigherLayer(int layer, Rect lb, IUIComponent owner = null)
     {
+        // Layer -1 is the halo band: it sits under EVERY fill, so a pending rect that overlaps it was painted earlier and
+        // has to be flushed first - otherwise a panel's own background, batched before its child was reached, covers the
+        // child's glow completely.
+        if (layer < 0 && _rectBatch.OverlapsPending(lb))
+        {
+            return true;
+        }
+
+        // The INNER band sits above every fill, so anything below text that overlaps a pending one has to flush first -
+        // otherwise a later element's fill would be drawn over a glow that belongs to the element before it.
+        if (layer < 8 && _haloOver != null && !ReferenceEquals(owner, _haloOverOwner) && _haloOver.OverlapsPending(lb))
+        {
+            return true;
+        }
+
         if (layer < 1 && _ellipseBatch.OverlapsPending(lb))
         {
             return true;

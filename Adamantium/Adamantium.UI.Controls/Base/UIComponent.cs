@@ -114,9 +114,21 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     // only when this is set. Default false so content that intentionally overflows its bounds - drop shadows, the
     // analytic-AA fill fringe, glyph effect padding, render-transformed children - is never clipped unless asked. A
     // ScrollViewer's content host, and a control mid content-transition, set it to true.
+    // AffectsRender: turning a clip on or off changes WHAT IS DRAWN - the scissor every descendant is drawn under. Without
+    // it the frame kept whatever the last walk recorded, so a clip toggled at runtime (a binding, a trigger, a content
+    // transition switching one on) did nothing until something else happened to force a redraw.
     public static readonly AdamantiumProperty ClipToBoundsProperty = AdamantiumProperty.Register(nameof(ClipToBounds),
         typeof(Boolean), typeof(UIComponent),
-        new PropertyMetadata(false, PropertyMetadataOptions.BindsTwoWayByDefault));
+        new PropertyMetadata(false, PropertyMetadataOptions.BindsTwoWayByDefault | PropertyMetadataOptions.AffectsRender,
+            OnClipToBoundsChanged));
+
+    // AffectsRender alone only re-renders THIS element, and a clip owner usually draws nothing of its own - so the frame
+    // kept the scissors the last walk recorded and the change was invisible until something else forced a re-record.
+    // The clip belongs to the whole subtree, so it is announced as its own fact and the renderer treats it as structural.
+    private static void OnClipToBoundsChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is UIComponent component) VisualTreeNotifications.RaiseClipChanged(component);
+    }
 
     public static readonly AdamantiumProperty IsEnabledProperty = AdamantiumProperty.Register(nameof(IsEnabled),
         typeof(Boolean), typeof(UIComponent),
@@ -151,6 +163,47 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         if (d is UIComponent component)
             component._selfOpacity = component.GetValue<Double>(SelfOpacityProperty);
     }
+
+    // A soft band around (or inside) this element's outline. Two properties rather than one with the offset zeroed:
+    // a shadow has a DIRECTION and an aura does not, and a name that lies about that is a name you have to look up.
+    // Neither grows the layout - see the remarks on the types themselves, and leave the room with Margin.
+    public static readonly AdamantiumProperty AuraProperty = AdamantiumProperty.Register(nameof(Aura),
+        typeof(Aura), typeof(UIComponent),
+        new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender, OnAuraChanged));
+
+    public static readonly AdamantiumProperty ShadowProperty = AdamantiumProperty.Register(nameof(Shadow),
+        typeof(Shadow), typeof(UIComponent),
+        new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender, OnShadowChanged));
+
+    public Aura Aura
+    {
+        get => GetValue<Aura>(AuraProperty);
+        set => SetValue(AuraProperty, value);
+    }
+
+    public Shadow Shadow
+    {
+        get => GetValue<Shadow>(ShadowProperty);
+        set => SetValue(ShadowProperty, value);
+    }
+
+    // AffectsRender above covers a new INSTANCE; a value changed INSIDE the one already set raises Changed instead, and
+    // that has to re-record too - otherwise animating a glow's radius does nothing until something else moves.
+    private static void OnAuraChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is not UIComponent component) return;
+        if (e.OldValue is Aura old) old.Changed -= component.OnHaloChanged;
+        if (e.NewValue is Aura aura) aura.Changed += component.OnHaloChanged;
+    }
+
+    private static void OnShadowChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (d is not UIComponent component) return;
+        if (e.OldValue is Shadow old) old.Changed -= component.OnHaloChanged;
+        if (e.NewValue is Shadow shadow) shadow.Changed += component.OnHaloChanged;
+    }
+
+    private void OnHaloChanged(object sender, EventArgs e) => InvalidateRender(false);
 
     private double _opacity = 1.0;       // hot-path mirror of Opacity (see OnOpacityChanged)
     private double _selfOpacity = 1.0;   // hot-path mirror of SelfOpacity

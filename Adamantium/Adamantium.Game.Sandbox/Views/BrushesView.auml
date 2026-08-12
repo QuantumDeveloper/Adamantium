@@ -6,6 +6,99 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Orientation="Vertical" Margin="24">
 
+            <!-- Aura and Shadow: the soft band around a shape. Two properties rather than one with the offset zeroed -
+                 a shadow has a DIRECTION and an aura does not. Both are the shape's own signed distance read further out,
+                 so they batch with everything else: no offscreen target, no blur pass.
+                 The panel CLIPS on purpose - drag Margin down and watch the band get cut off. That is the one thing the
+                 engine will not do for you: the band is drawn outside the element's bounds, and the room is the author's. -->
+            <TextBlock Text="Aura / Shadow — live (the band is drawn OUTSIDE the element; the margin is yours to leave)" FontSize="18" Margin="0,0,0,10"/>
+            <StackPanel Orientation="Horizontal" MarginBottom="20">
+                <!-- A MID-TONE backdrop on purpose: the other stands sit on near-black, but a dark shadow is invisible
+                     there and a bright aura blows out. This one has to show both at once. -->
+                <Border Width="420" Height="300" Margin="10" Background="#485061">
+                    <!-- The clip goes HERE when it is asked for, not on the panel: this box is exactly the figure plus its
+                         margin, so the margin then decides how much of the band survives. On the panel it would never
+                         bite - the panel is far bigger than any band - and the rule would stay invisible. -->
+                    <Grid HorizontalAlignment="Center" VerticalAlignment="Center" ClipToBounds="{Binding HaloClip}">
+                        <Rectangle Width="180" Height="120"
+                                   Fill="#E2E8F0"
+                                   Margin="{Binding HaloMargin, Converter={conv:DoubleToThicknessConverter}}"
+                                   CornerRadius="{Binding HaloRadius, Converter={conv:DoubleToCornerRadiusConverter}}"
+                                   Aura="{Binding LiveAura}"
+                                   Shadow="{Binding LiveShadow}"
+                                   Visibility="{Binding HaloShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Rectangle}"/>
+                        <Ellipse Width="180" Height="120"
+                                 Fill="#E2E8F0"
+                                 Margin="{Binding HaloMargin, Converter={conv:DoubleToThicknessConverter}}"
+                                 Aura="{Binding LiveAura}"
+                                 Shadow="{Binding LiveShadow}"
+                                 Visibility="{Binding HaloShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Ellipse}"/>
+                        <!-- Tessellated shapes: their band reads a distance field baked per mesh, so it follows a
+                             concave outline - the star's notches keep their own glow instead of being bridged over. -->
+                        <Polygon Points="{Binding HaloTriangle}"
+                                 Fill="#E2E8F0"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center"
+                                 Margin="{Binding HaloMargin, Converter={conv:DoubleToThicknessConverter}}"
+                                 Aura="{Binding LiveAura}"
+                                 Shadow="{Binding LiveShadow}"
+                                 Visibility="{Binding HaloShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Triangle}"/>
+                        <Polygon Points="{Binding HaloStar}"
+                                 Fill="#E2E8F0"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center"
+                                 Margin="{Binding HaloMargin, Converter={conv:DoubleToThicknessConverter}}"
+                                 Aura="{Binding LiveAura}"
+                                 Shadow="{Binding LiveShadow}"
+                                 Visibility="{Binding HaloShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Star}"/>
+                    </Grid>
+                </Border>
+                <StackPanel Orientation="Vertical" Width="300" MarginLeft="16" VerticalAlignment="Center">
+                    <TextBlock Text="Paint it on" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <DropDown ItemsSource="{Binding HaloShapes}" SelectedItem="{Binding HaloShape, Mode=TwoWay}" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Vertical" Visibility="{Binding HaloShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Rectangle}">
+                        <TextBlock Text="Corner radius" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <Slider Value="{Binding HaloRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="60" Width="280" MarginBottom="10"/>
+                    </StackPanel>
+                    <!-- Margin is LAYOUT, not a band parameter - it does nothing to the glow itself. It is here only to
+                         show the one rule the engine will not keep for you: bounds are never grown to fit a band, so a
+                         clipping ancestor cuts whatever the author left no room for. Hence it lives with the clip. -->
+                    <CheckBox Content="Clip to the element's box" IsChecked="{Binding HaloClip, Mode=TwoWay}" MarginBottom="4"/>
+                    <TextBlock Text="Margin — layout, not a band setting. With the clip on, drop it below the radius and the band is cut: bounds are never grown to fit a glow."
+                               TextWrapping="WrapByWords" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding HaloMargin, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="70" Width="280" MarginBottom="14"/>
+
+                    <TextBlock Text="AURA — no direction" FontSize="14" MarginBottom="6"/>
+                    <TextBlock Text="Radius — how far it reaches" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding AuraRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="60" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Spread — solid rim before the fade" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding AuraSpread, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="30" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Opacity" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding AuraOpacity, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="280" MarginBottom="10"/>
+                    <CheckBox Content="Inner (glow inward — needs no margin at all)" IsChecked="{Binding AuraInner, Mode=TwoWay}" MarginBottom="6"/>
+                    <TextBlock Text="Colour" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding AuraColor, Mode=TwoWay}"/>
+                </StackPanel>
+                <!-- The shadow's own column: the two sets are independent, and stacking them made one tall strip nobody
+                     could take in at a glance. -->
+                <StackPanel Orientation="Vertical" Width="300" MarginLeft="24" VerticalAlignment="Center">
+                    <TextBlock Text="SHADOW — thrown where the light is not" FontSize="14" MarginBottom="6"/>
+                    <TextBlock Text="Offset X / Y" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding ShadowOffsetX, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="-40" Maximum="40" Width="280" MarginBottom="6"/>
+                    <Slider Value="{Binding ShadowOffsetY, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="-40" Maximum="40" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Blur radius — how soft the edge is" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding ShadowBlur, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="60" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Spread — how HIGH it floats (negative peeks out from one edge)"
+                               TextWrapping="WrapByWords" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding ShadowSpread, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="-20" Maximum="30" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Opacity" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding ShadowOpacity, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="280" MarginBottom="10"/>
+                    <CheckBox Content="Inner (inset — the pressed look)" IsChecked="{Binding ShadowInner, Mode=TwoWay}" MarginBottom="6"/>
+                    <TextBlock Text="Colour" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding ShadowColor, Mode=TwoWay}"/>
+                </StackPanel>
+            </StackPanel>
+
             <!-- One labelled swatch per noise type. At the TOP so any shader device-lost is caught on launch. -->
             <TextBlock Text="Noise types (all selectable in the live panel below)" FontSize="18" Margin="0,0,0,10"/>
             <WrapPanel Orientation="Horizontal">

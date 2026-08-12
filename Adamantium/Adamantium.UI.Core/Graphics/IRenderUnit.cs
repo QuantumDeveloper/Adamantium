@@ -5,6 +5,10 @@ namespace Adamantium.UI.Core.Graphics;
 public interface IRenderUnit : IDisposable
 {
     IUIComponent Component { get; }
+
+    /// <summary>The per-command state captured at RECORD time (opacity, transform, clip, halo bands). The draw path
+    /// reads VALUES from here; the live element is edited on another thread and must never be dereferenced there.</summary>
+    RenderData RenderData { get; }
     /// <summary>Set the effective alpha (element opacity composed down the tree) the unit's colours bake with, before a
     /// bake/re-bake. The draw path composes it from the frozen snapshot, not the live property.</summary>
     void SetEffectiveOpacity(float opacity);

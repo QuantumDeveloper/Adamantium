@@ -25,6 +25,11 @@ public sealed class RenderUnitContext
         BufferManager = bufferManager;
     }
 
+    /// <summary>Distance fields baked for halos on arbitrary geometry, keyed by the SHAPE, not by the element: meshes are
+    /// shared, so a thousand identical badges bake one field between them. Lives here because the cache has to outlive
+    /// any one unit and be shared by all of them - the same reason everything else in this bundle does.</summary>
+    internal HaloFieldCache HaloFields { get; } = new();
+
     public IGraphicsDevice GraphicsDevice { get; }
     public IResourceFactory ResourceFactory { get; }
     public UIBasicEffect UIBasicEffect { get; }

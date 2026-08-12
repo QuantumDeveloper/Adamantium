@@ -78,6 +78,7 @@ internal sealed class FakeRenderUnit : IRenderUnit
     public FakeRenderUnit(IDrawCommand command) => _command = command;
 
     public IUIComponent Component => _command.Component;
+    public RenderData RenderData => _command.RenderData;
     public Type PayloadType => _command.Payload.GetType();
 
     public float EffectiveOpacity { get; private set; } = 1f;
