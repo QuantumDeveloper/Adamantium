@@ -28,7 +28,8 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
     // Batchable = a visible solid fill + a batchable pen (none, or a SOLID stroke the SDF shader draws analytically), a
     // FULL ellipse (StartAngle 0 .. SweepAngle 360). A sector/arc, a non-solid/dashed/trimmed pen, a gradient/image fill,
     // or Enabled=off falls back to the per-unit tessellated draw. Lock-step with EllipseRenderUnit.IsSdfBatchable.
-    public bool CanBatch(EllipsePayload p)
+    /// <summary>THE one statement of what this batch draws - the render unit asks THIS, never its own copy.</summary>
+    public static bool WantsBatch(EllipsePayload p)
     {
         if (!Enabled) return false;
         if (p.Brush is not (null or SolidColorBrush)) return false;
@@ -46,6 +47,8 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
         // unfinished, so arcs still take the tessellated path. Re-enable together with the EdgeToEdge check.
         return p.StartAngle <= 0.0 && p.SweepAngle >= 360.0;
     }
+
+    public bool CanBatch(EllipsePayload p) => WantsBatch(p);
 
     // Bake one solid ellipse fill (bounds -> world, colour straight with opacity folded in) into the pending segment.
     // False only if it can't be baked (rotated/sheared world or a GPU-buffer overflow this frame) - the caller then draws

@@ -18,6 +18,14 @@ float4x4 Projection;
 // other pass ignores it. Unset (0) = no drift, so a static fractal renders fine before the loop starts feeding it.
 float Time;
 
+// The source of the TEXTURED pass - ONE texture per segment, bound by TexRectCollector before its draw (the text batch
+// binds its atlas the same way). Not an array and not bindless: this driver's shader-object compiler is documented to
+// fall over on richer texture use, and a segment break per texture costs a handful of draws per frame in UI.
+// t2/s2, NOT t1/s1: the glyph atlas of FontEffect.fx sits at t1, and the descriptor slots are shared across the frame -
+// bound at t1 this sampler read the atlas and every nine-slice came out drawn with letters.
+Texture2D SourceTexture : register(t2);
+SamplerState SourceSampler : register(s2);
+
 // GPU-resident TRANSFORM TABLE (see Rendering/TransformTable.cs): one world matrix per MOTION NODE (a scrolled panel, an
 // animating tile), fetched by the per-instance slot index. Slot 0 is ALWAYS identity, so world-baked instances (index 0)
 // render unchanged - the migration path: content moves to node-LOCAL bounds + a real slot incrementally, and from then on
@@ -835,17 +843,16 @@ float4 GradientPS(GradPSInput input) : SV_Target
 
     float2 uv = input.Local / max(input.Half * 2.0, float2(1e-4, 1e-4)) + 0.5;   // 0..1 across the bounds
     int packedW = int(it.Params.w + 0.5);                       // Params.w packs spread (low 3 bits) + interp mode (>> 3)
-    // MESH gradient (type 4) DEFERRED - it is NOT the ternary issue: the GRADIENT pass just flakes vkCreateShadersEXT COMPILE
-    // with ANY extra code (tested branch-free too: ~25% window launch). All C# kept (MeshGradientBrush / GradientBake type 4 /
-    // GradientRectCollector); re-enable ONE of these on a saner driver (branch-free preferred - no ?: which device-losts):
-    //   float4 grad = GradColor(it, GradSpread(GradParam(it, uv), packedW & 7), fwidth(gt), packedW >> 3);
-    //   float4 mesh = lerp(lerp(it.Stop0, it.Stop1, uv.x), lerp(it.Stop2, it.Stop3, uv.x), uv.y);
-    //   float4 fill = lerp(grad, mesh, step(3.5, it.Params.y));
     float gt = GradSpread(GradParam(it, uv), packedW & 7);
     // Wrap-aware AA width: at a conic/repeat seam gt jumps 1->0 so fwidth(gt) spikes to ~1 (the whole gradient collapses to
     // hard-stop ramps -> a coloured line). Shifting by half a turn moves the discontinuity to the far side, so min() picks
     // the TRUE small derivative everywhere. Harmless for linear/radial (min keeps the real value).
-    float4 fill = GradColor(it, gt, min(fwidth(gt), fwidth(frac(gt + 0.5))), packedW >> 3);
+    float4 grad = GradColor(it, gt, min(fwidth(gt), fwidth(frac(gt + 0.5))), packedW >> 3);
+    // MESH gradient (type 4): four CORNER colours blended bilinearly across the shape - no axis, no stops, so the
+    // gradient maths above has nothing meaningful to chew on for it (GradientBake packs zero geometry). The corners ride
+    // the stop slots. Selected BRANCH-FREE: this pass has a history of device-losing on a ?:, so both are computed.
+    float4 mesh = lerp(lerp(it.Stop0, it.Stop1, uv.x), lerp(it.Stop2, it.Stop3, uv.x), uv.y);
+    float4 fill = lerp(grad, mesh, step(3.5, it.Params.y));
 
     // The stroke record is baked in SLOT units; the SDF above is in device pixels, so its LENGTHS convert (align, trim
     // and the packed cap/join flags are unitless). Arc length `perim` already comes out in pixels, so dashes match.
@@ -926,7 +933,11 @@ float4 GradGeomColor(GradGeomData it, float2 local)
 
     float2 uv = (local - it.LocalBounds.xy) / max(it.LocalBounds.zw, float2(1e-4, 1e-4));
     float gt = GradSpread(GradParam(gd, uv), int(gd.Params.w));
-    return GradColor(gd, gt, min(fwidth(gt), fwidth(frac(gt + 0.5))), int(it.Params.w));   // wrap-aware AA (conic/repeat seam)
+    float4 grad = GradColor(gd, gt, min(fwidth(gt), fwidth(frac(gt + 0.5))), int(it.Params.w));   // wrap-aware AA (conic/repeat seam)
+    // MESH (type 4) here too: a mesh brush has NO axis geometry, so without this branch the maths above runs on zeros and
+    // walks the stop table with a meaningless parameter. Same branch-free select as the rect pass.
+    float4 mesh = lerp(lerp(gd.Stop0, gd.Stop1, uv.x), lerp(gd.Stop2, gd.Stop3, uv.x), uv.y);
+    return lerp(grad, mesh, step(3.5, gd.Params.y));
 }
 
 [shader("fragment")]
@@ -1444,6 +1455,90 @@ float4 PatternFillColor(PatternRectData it, float2 pTopLeft, float2 centerRel, f
     return fill;
 }
 
+// ---- TEXTURED rounded rect: the first fill of this batch whose colour is SAMPLED rather than computed. Deliberately the
+// SHORTEST pixel shader here - SDF, one uv wrap, one sample, one multiply - because this driver flakes on
+// vkCreateShadersEXT the moment a pass grows (see the MeshGradient note above). No stroke: a textured fill with a pen
+// falls back to the per-unit path rather than dragging the stroke machinery in.
+struct TexRectData
+{
+    float4 Bounds;     // NODE-local x, y, w, h
+    float4 Params;     // .x corner radius, .y transform slot, .z/.w reserved
+    float4 UvRect;     // sub-rectangle of the source: x, y, w, h (normalised)
+    float4 UvRepeat;   // how many times UvRect repeats across the bounds, per axis (1 = stretch)
+    float4 Tint;       // multiplied into the sample, straight RGBA
+};
+
+struct TexPSInput
+{
+    float4 Position : SV_Position;
+    float2 Local    : TEXCOORD0;   // fragment relative to the rect CENTRE (SDF space, device px)
+    float2 Half     : TEXCOORD1;   // rect half-size
+    float  Radius   : TEXCOORD2;   // corner radius
+    nointerpolation uint InstId : TEXCOORD3;
+};
+
+[shader("vertex")]
+TexPSInput TexRectInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
+{
+    TexRectData* items = (TexRectData*)InstancesAddress;
+    TexRectData it = items[instanceId];
+
+    TexPSInput o;
+    float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
+    float4x4* transforms = (float4x4*)TransformsAddress;
+    float4x4 nodeWorld = transforms[(uint)it.Params.y];
+    float2 px = SlotPixelScale(nodeWorld);
+    float iso = min(px.x, px.y);
+
+    // One pixel of outset so the analytic edge has room to feather (no stroke, so no width to account for).
+    float2 localPos = it.Bounds.xy + corner * it.Bounds.zw + (corner * 2.0 - 1.0) * (1.0 / px);
+    float4 worldPos = mul(float4(localPos, 0.0, 1.0), nodeWorld);
+    o.Position = mul(worldPos, Projection);
+    o.Half   = it.Bounds.zw * 0.5 * px;
+    o.Local  = (corner - 0.5) * it.Bounds.zw * px + (corner * 2.0 - 1.0);
+    o.Radius = it.Params.x * iso;
+    o.InstId = instanceId;
+    return o;
+}
+
+[shader("fragment")]
+float4 TexRectPS(TexPSInput input) : SV_Target
+{
+    TexRectData* items = (TexRectData*)InstancesAddress;
+    TexRectData it = items[input.InstId];
+
+    float r = min(input.Radius, min(input.Half.x, input.Half.y));
+    float d = SdRoundRectJoin(input.Local, input.Half, r, 2);   // round join: the plain Euclidean offset, no stroke here
+
+    // 0..1 across the shape, then into the source's sub-rectangle. The REPEAT is done here with frac() rather than by a
+    // wrapping sampler: the sampler would wrap the WHOLE texture, and a slice needs its own strip wrapped.
+    float2 t = input.Local / max(input.Half * 2.0, float2(1e-4, 1e-4)) + 0.5;
+    float2 n = t * it.UvRepeat.xy;
+    float2 wrapped = frac(n);
+    // MIRRORED repeat: every other copy runs backwards, so a picture that was never drawn to tile still meets its own
+    // reflection at the seam. A triangle wave, not a branch - UvRepeat.z carries the two axis flags (1 = X, 2 = Y).
+    float2 mirrored = abs(frac(n * 0.5) * 2.0 - 1.0);
+    // Branch-free (a ?: in this family has device-lost form): flag 1 = mirror X, 2 = mirror Y, 3 = both.
+    float flags = it.UvRepeat.z;
+    float2 pick = float2(step(0.5, fmod(flags, 2.0)), step(0.5, floor(flags * 0.5)));
+    float2 uv = it.UvRect.xy + lerp(wrapped, mirrored, pick) * it.UvRect.zw;
+
+    // SampleLevel, not Sample: frac() above makes uv DISCONTINUOUS at every tile seam, so the hardware's derivative -
+    // which is what Sample picks a mip level by - spikes there and that one column of pixels is drawn from the smallest
+    // mip. That is the thin line down each seam. The level is explicit here because the footprint is ours to state.
+    float4 fill = SourceTexture.SampleLevel(SourceSampler, uv, 0.0) * it.Tint;
+
+    // A SQUARE piece is drawn CRISP, not feathered. Nine-slice cuts a picture into nine quads that share edges, and a
+    // coverage ramp puts 0.5 on both sides of every shared edge - alpha-composited that is ~0.75, a dark hairline down
+    // every joint. Feathering is for a shape with a curve to it, so only a corner radius earns the ramp.
+    // Branch-free (a ?: in this pass has device-lost form on this driver): pick between the two with a step on the radius.
+    float aa = max(fwidth(d), 1e-4);
+    float ramp = saturate(0.5 - d / aa);
+    float crisp = step(d, 0.0);
+    fill.a *= lerp(crisp, ramp, step(0.001, r));
+    return fill;
+}
+
 [shader("fragment")]
 float4 PatternPS(PatternPSInput input) : SV_Target
 {
@@ -1931,6 +2026,16 @@ technique Batch
         Profile = 6.6;
         VertexShader = PatternRectInstancedVS;
         PixelShader = PatternPS;
+    }
+
+    // SDF rounded-rect fills whose colour is SAMPLED from a texture (per-instance TexRectData; ONE texture bound per
+    // segment). An ImageBrush is one instance; a NineSliceBrush is nine, so a whole skinned frame is still one draw.
+    pass TexRect
+    {
+        EffectName = "BatchEffect";
+        Profile = 6.6;
+        VertexShader = TexRectInstancedVS;
+        PixelShader = TexRectPS;
     }
 
     // SDF rounded-rect fills with an escape-time FRACTAL fill (per-instance FractalRectData; the PS iterates z=z²+c and

@@ -178,6 +178,26 @@
 		<Content Include="Textures\elephant.png">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</Content>
+		<None Remove="Textures\nine-slice-frame.png" />
+		<Content Include="Textures\nine-slice-frame.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\nine-slice-stone.png" />
+		<Content Include="Textures\nine-slice-stone.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\nine-slice-scifi.png" />
+		<Content Include="Textures\nine-slice-scifi.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\nine-slice-parchment.png" />
+		<Content Include="Textures\nine-slice-parchment.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
+		<None Remove="Textures\tile-sample.png" />
+		<Content Include="Textures\tile-sample.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</Content>
 		<None Remove="Textures\RotatingEarth2.gif" />
 		<Content Include="Textures\RotatingEarth2.gif">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

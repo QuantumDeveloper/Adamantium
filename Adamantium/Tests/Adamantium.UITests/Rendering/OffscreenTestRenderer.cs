@@ -76,6 +76,16 @@ internal sealed class OffscreenTestRenderer : IDisposable
     /// Renders one frame of <paramref name="root"/> into the offscreen target. Returns false if the frame
     /// couldn't begin. On return the GPU is idle, so the target is safe to read back / save.
     /// </summary>
+    /// <summary>Renders again WITHOUT rebuilding - the CLEAN frame an idle window draws, which replays the recorded op
+    /// stream instead of walking the tree. A test that only ever calls <see cref="RenderFrame"/> never sees that path,
+    /// and it is a different one: it is where a collector that misses its per-frame reset stops drawing.</summary>
+    public bool RenderAgain(IRootVisualComponent root)
+    {
+        var projection = root.GetProjectionMatrix();
+        _renderCache.ProcessCommands(projection, 1.0);
+        return Present();
+    }
+
     public bool RenderFrame(IRootVisualComponent root)
     {
         var projection = root.GetProjectionMatrix();
@@ -91,6 +101,15 @@ internal sealed class OffscreenTestRenderer : IDisposable
             _adornerCache.BuildFromComponents(adorners, projection);
             _adornerCache.ProcessCommands(projection, 1.0);
         }
+
+        return Present();
+    }
+
+    // The GPU half of a frame, shared by the rebuilding and the clean path.
+    private bool Present()
+    {
+        var adorners = Adorners;
+        var hasAdorners = adorners is { Count: > 0 };
 
         _device.ClearColor = ClearColor;
         _device.SetRenderTargets(_presenter.RenderTarget);

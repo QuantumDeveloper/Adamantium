@@ -473,34 +473,32 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
     // into the instanced draw. See RectBatchEffect.fx.
     public RectanglePayload RectPayload => Payload;
 
-    // A rect that the item-background SDF batch will draw (solid fill, no pen, uniform corners): the batch shader
-    // reconstructs the rounded rect from a signed-distance field and self-anti-aliases, so this unit needs NO analytic-AA
-    // FRINGE. Building one per rect is pure waste - and its per-tile GPU buffer, rebuilt on every resize, is exactly what
-    // exhausted device memory (vkAllocateMemory=ErrorOutOfDeviceMemory) while dragging the size slider. Mirrors
-    // RectBatchCollector.CanBatch so "no fringe built" == "the batch will draw it". Geometry-identity instancing phase 4.
-    private static bool IsSdfBatchable(RectanglePayload p)
+    /// <summary>The GPU texture this rect's brush samples, or null - either the brush is not a textured one, or its
+    /// source is still decoding (in which case the next re-render picks it up, the way ImageRenderUnit does).
+    /// <para>Lives here because the resource factory does: the textured batch needs the texture but has no business
+    /// holding a factory.</para></summary>
+    internal ITexture BrushTexture()
     {
-        if (!RectBatchCollector.Enabled) return false;
-        if (p.Brush is not (null or SolidColorBrush)) return false;
-        if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
-        var hasFill = p.Brush is SolidColorBrush { Color.A: > 0 };
-        var hasStroke = p.Pen is { Brush: SolidColorBrush { Color.A: > 0 } };
-        if (!hasFill && !hasStroke) return false;
-        var c = p.CornerRadius;
-        return c.TopLeft == c.TopRight && c.TopRight == c.BottomRight && c.BottomRight == c.BottomLeft;
+        var source = Payload.Brush switch
+        {
+            ImageBrush image => image.Source,
+            NineSliceBrush nine => nine.Source,
+            _ => null
+        };
+
+        return source is BitmapSource bitmap ? bitmap.GetOrCreateTexture(ResourceFactory) : null;
     }
+
+    // Whether a batch will draw this rect - ASKED OF THE BATCH, never re-stated here. "The batch draws it" means this
+    // unit builds ZERO machinery: no tessellation, no geometry/fringe/stroke, no GPU buffers, which is what makes a big
+    // virtualized tile grid cheap. Re-stating the rules here is exactly how they drifted: the ellipse collector learned
+    // about a stopless mesh brush and its twin here did not, and the mismatch drew garbage.
+    private static bool IsSdfBatchable(RectanglePayload p) => RectBatchCollector.WantsBatch(p);
 
     // A rect the GRADIENT SDF batch (GradientRectCollector) will draw: a linear/radial gradient fill, a batchable pen,
     // uniform corners. Like IsSdfBatchable it means "build ZERO per-unit machinery" - the batch's pixel shader draws the
     // gradient + self-AAs. Mirrors GradientRectCollector.CanBatch.
-    private static bool IsGradientBatchable(RectanglePayload p)
-    {
-        if (!GradientRectCollector.Enabled) return false;
-        if (p.Brush is not GradientBrush g || g.GradientStops.Count == 0) return false;
-        if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
-        var c = p.CornerRadius;
-        return c.TopLeft == c.TopRight && c.TopRight == c.BottomRight && c.BottomRight == c.BottomLeft;
-    }
+    private static bool IsGradientBatchable(RectanglePayload p) => GradientRectCollector.WantsBatch(p);
 
     public RectangleRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
@@ -612,36 +610,15 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
     // implicit field and self-anti-aliases, so this unit needs NO tessellated body and NO AA fringe. Building them per
     // ellipse is pure waste (and their per-unit GPU buffers are exactly what strained device memory). Mirrors
     // EllipseBatchCollector.CanBatch so "no machinery built" == "the batch will draw it".
-    private static bool IsSdfBatchable(EllipsePayload p)
-    {
-        if (!EllipseBatchCollector.Enabled) return false;
-        if (p.Brush is not (null or SolidColorBrush)) return false;
-        if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
-        var hasFill = p.Brush is SolidColorBrush { Color.A: > 0 };
-        var hasStroke = p.Pen is { Brush: SolidColorBrush { Color.A: > 0 } };
-        if (!hasFill && !hasStroke) return false;
-        return p.StartAngle <= 0.0 && p.SweepAngle >= 360.0;   // arcs: see the TODO in EllipseBatchCollector.CanBatch
-    }
+    private static bool IsSdfBatchable(EllipsePayload p) => EllipseBatchCollector.WantsBatch(p);
 
     // A full ellipse the GRADIENT ellipse SDF batch will draw (linear/radial gradient fill). Like IsSdfBatchable it means
     // "build ZERO per-unit machinery". Mirrors GradientEllipseCollector.CanBatch.
-    private static bool IsGradientBatchable(EllipsePayload p)
-    {
-        if (!GradientEllipseCollector.Enabled) return false;
-        if (p.Brush is not GradientBrush g || g.GradientStops.Count == 0) return false;
-        if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
-        return p.StartAngle <= 0.0 && p.SweepAngle >= 360.0;
-    }
+    private static bool IsGradientBatchable(EllipsePayload p) => GradientEllipseCollector.WantsBatch(p);
 
     // A full ellipse with a PROCEDURAL pattern/noise fill routes into the pattern SDF batch (self-AA) - like the solid/
     // gradient cases, build ZERO per-unit machinery. Mirrors PatternRectCollector.CanBatchEllipse.
-    private static bool IsPatternBatchable(EllipsePayload p)
-    {
-        if (!PatternRectCollector.Enabled) return false;
-        if (p.Brush is not (PatternBrush or NoiseBrush)) return false;
-        if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
-        return p.StartAngle <= 0.0 && p.SweepAngle >= 360.0;
-    }
+    private static bool IsPatternBatchable(EllipsePayload p) => PatternRectCollector.WantsBatchEllipse(p);
 
     public EllipseRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {

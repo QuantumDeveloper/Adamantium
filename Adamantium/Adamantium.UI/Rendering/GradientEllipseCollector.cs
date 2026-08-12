@@ -19,13 +19,17 @@ internal sealed class GradientEllipseCollector : SdfBatchCollector<GradientRectI
     protected override IEffectPass DrawPass => Effect.BatchGradientPass;
 
     // Batchable = a gradient (linear/radial) fill, a batchable pen, a FULL ellipse. Mirrors EllipseRenderUnit.IsGradientBatchable.
-    public bool CanBatch(EllipsePayload p)
+    /// <summary>THE one statement of what this batch draws - the render unit asks THIS, never its own copy.</summary>
+    public static bool WantsBatch(EllipsePayload p)
     {
         if (!Enabled) return false;
-        if (p.Brush is not GradientBrush g || g.GradientStops.Count == 0) return false;
+        if (p.Brush is not GradientBrush g) return false;
+        if (g is not MeshGradientBrush && g.GradientStops.Count == 0) return false;   // mesh carries corners, not stops
         if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
         return p.StartAngle <= 0.0 && p.SweepAngle >= 360.0;
     }
+
+    public bool CanBatch(EllipsePayload p) => WantsBatch(p);
 
     public bool TryAdd(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0)
     {

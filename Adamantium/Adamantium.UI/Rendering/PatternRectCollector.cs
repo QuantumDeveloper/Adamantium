@@ -34,7 +34,8 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
 
     // Batchable = a PROCEDURAL fill (PatternBrush or NoiseBrush - both bake into this pass), a batchable pen (none or a
     // solid stroke the SDF shader draws), and uniform corner radius. Mirrors GradientRectCollector.CanBatch.
-    public bool CanBatch(RectanglePayload p)
+    /// <summary>THE one statement of what this batch draws - the render unit asks THIS, never its own copy.</summary>
+    public static bool WantsBatch(RectanglePayload p)
     {
         if (!Enabled)
         {
@@ -51,6 +52,8 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
         var c = p.CornerRadius;
         return c.TopLeft == c.TopRight && c.TopRight == c.BottomRight && c.BottomRight == c.BottomLeft;
     }
+
+    public bool CanBatch(RectanglePayload p) => WantsBatch(p);
 
     // Bake one pattern rounded-rect fill. False only if it can't be baked (rotated/sheared world or a GPU-buffer overflow
     // this frame) - the caller draws it per-unit (pattern per-unit not yet supported; the demo stays axis-aligned).
@@ -77,13 +80,16 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
     // Ellipse variant: a full ellipse with a procedural fill batches into the SAME pattern pass (SDF self-AA, no jagged
     // tessellated edges) - the shader branches to the ellipse SDF on the NEGATIVE baked corner radius. Mirrors
     // GradientEllipseCollector.CanBatch/TryAdd but reuses this collector so no separate batch lifecycle is needed.
-    public bool CanBatchEllipse(EllipsePayload p)
+    /// <summary>THE one statement for the ellipse form - the render unit asks THIS, never its own copy.</summary>
+    public static bool WantsBatchEllipse(EllipsePayload p)
     {
         if (!Enabled) return false;
         if (p.Brush is not (PatternBrush or NoiseBrush)) return false;
         if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
         return p.StartAngle <= 0.0 && p.SweepAngle >= 360.0;
     }
+
+    public bool CanBatchEllipse(EllipsePayload p) => WantsBatchEllipse(p);
 
     public bool TryAddEllipse(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0)
     {

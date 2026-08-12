@@ -139,10 +139,14 @@ public sealed class EffectPass : DisposableObject, IEffectPass
     // per-draw delegate/closure.
     private enum HeapResourceKind { ShaderResource, Sampler, Uav }
 
+    /// <inheritdoc />
+    public bool ResourcesBound { get; private set; } = true;
+
     private unsafe void ApplyHeap()
     {
         Effect.CurrentTechnique = Technique;
         graphicsDevice.CurrentEffectPass = this;
+        ResourcesBound = true;
         stages.Clear();
 
         var resourceLinker = (EffectResourceLinker)Effect.ResourceLinker;
@@ -239,8 +243,17 @@ public sealed class EffectPass : DisposableObject, IEffectPass
                 };
                 uint basePushOffset = parameterPushOffsets[link.Parameter];
                 for (int resIdx = 0; resIdx < resources.Length; resIdx++)
-                    *(uint*)(push + basePushOffset + (uint)(resIdx * 4)) =
-                        resources[resIdx]?.GlobalHeapOffset ?? uint.MaxValue;
+                {
+                    var slot = resources[resIdx]?.GlobalHeapOffset ?? uint.MaxValue;
+                    // Nothing bound. The index is out of the heap, so the draw would sample whatever the driver finds
+                    // there - in practice another effect's live descriptor. Mark the pass and let the device refuse.
+                    if (slot == uint.MaxValue)
+                    {
+                        ResourcesBound = false;
+                        UnboundResource.ReportOnce(Effect.Name, link.Parameter?.Name);
+                    }
+                    *(uint*)(push + basePushOffset + (uint)(resIdx * 4)) = slot;
+                }
             }
         }
     }

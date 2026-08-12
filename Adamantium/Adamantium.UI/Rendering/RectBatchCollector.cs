@@ -27,7 +27,10 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
     // Batchable = a visible solid fill + a batchable pen (none, or a SOLID stroke the SDF shader draws analytically),
     // uniform corner radius. Gradient/image fill, a non-solid/dashed/trimmed pen, per-corner radii, or Enabled=off fall
     // back to the per-unit draw. Must stay in lock-step with EllipseRenderUnit/RectangleRenderUnit.IsSdfBatchable.
-    public bool CanBatch(RectanglePayload p)
+    /// <summary>THE one statement of what this batch draws. Static because the render UNIT has to ask the same question
+    /// before it builds anything - a unit that answered it on its own copy of the rules is how they drift apart, and a
+    /// drifted answer means either wasted per-unit machinery or a shape drawn twice.</summary>
+    public static bool WantsBatch(RectanglePayload p)
     {
         if (!Enabled) return false;
         if (p.Brush is not (null or SolidColorBrush)) return false;   // gradient/image FILL -> fallback
@@ -39,6 +42,8 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
         var c = p.CornerRadius;
         return c.TopLeft == c.TopRight && c.TopRight == c.BottomRight && c.BottomRight == c.BottomLeft;
     }
+
+    public bool CanBatch(RectanglePayload p) => WantsBatch(p);
 
     // A pen the SDF stroke shader can draw analytically: none, or a SOLID-colour stroke. Dashes are supported as a single
     // ON/GAP period (a 2-element array); a longer custom pattern still falls back to the compute expander. Trim, dash
