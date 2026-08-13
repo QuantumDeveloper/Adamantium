@@ -188,7 +188,7 @@ public class GeometryRenderComponent : UIRenderComponent
         // A picture on ARBITRARY geometry. The rounded rect and the ellipse sample their texture in the SDF batches; a
         // tessellated shape has no SDF, so it is drawn here - one draw per shape, not instanced (which is where the
         // gradient and pattern fills started too).
-        if (brush is ImageBrush image)
+        if (brush is TileBrush image)
         {
             RenderTextured(image);
             return;
@@ -225,7 +225,7 @@ public class GeometryRenderComponent : UIRenderComponent
     // Map the picture across the shape's own LOCAL box (a tessellated mesh carries no usable uv0) with the SAME tiling
     // arithmetic the textured batch uses, so a brush looks identical whichever shape it is on. A source still decoding
     // has no texture yet: draw nothing this frame and let the re-render pick it up.
-    private void RenderTextured(ImageBrush image)
+    private void RenderTextured(TileBrush image)
     {
         var world = RenderData.TransformMatrix;
         var bounds = Mesh.Bounds;

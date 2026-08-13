@@ -72,7 +72,7 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
     {
         var source = brush switch
         {
-            ImageBrush image => image.Source,
+            TileBrush tile => tile.ContentSource,
             NineSliceBrush nine => nine.Source,
             _ => null
         };
@@ -85,7 +85,7 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
         // aspect Stretch asked for (see ImageTiling.BakeSize). A nine-slice always fills its box.
         if (source is DrawingImage vector)
         {
-            var bakeSize = brush is ImageBrush imageBrush ? ImageTiling.BakeSize(imageBrush, size) : size;
+            var bakeSize = brush is TileBrush tileBrush ? ImageTiling.BakeSize(tileBrush, size) : size;
             var baked = DrawingImageRaster.Get(vector, bakeSize);
             if (baked != null)
             {
@@ -100,7 +100,7 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
 
     /// <summary>Whether this fill belongs to the textured batch at all. STATIC because it is asked before the collector
     /// exists: one is built on the first textured fill a cache meets, and most caches never meet one.</summary>
-    public static bool WantsBatch(RectanglePayload p) => Enabled && p.Brush is ImageBrush or NineSliceBrush;
+    public static bool WantsBatch(RectanglePayload p) => Enabled && p.Brush is TileBrush or NineSliceBrush;
 
     public bool CanBatch(RectanglePayload p) => WantsBatch(p);
 
@@ -137,7 +137,7 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
     public static bool WantsBatchEllipse(EllipsePayload p)
     {
         if (!Enabled) return false;
-        if (p.Brush is not ImageBrush) return false;
+        if (p.Brush is not TileBrush) return false;
         if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
         return p.StartAngle <= 0.0 && p.SweepAngle >= 360.0;
     }
@@ -187,7 +187,7 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
         items = brush switch
         {
             NineSliceBrush nine => NineSlice.Bake(nine, bounds, opacity, transformSlot, sx, sy),
-            ImageBrush image => [Single(image, bounds, radius, opacity, transformSlot, sx, sy)],
+            TileBrush tile => [Single(tile, bounds, radius, opacity, transformSlot, sx, sy)],
             _ => null
         };
         return items != null;
@@ -195,7 +195,7 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
 
     // One record for the plain textured fill. WHERE it is drawn and WHAT it samples come from the brush's tiling and
     // stretch (see ImageTiling) - stretched across the shape, fitted inside it, or repeated.
-    private static TexRectItem Single(ImageBrush brush, Rect bounds, float radius, double opacity, int transformSlot,
+    private static TexRectItem Single(TileBrush brush, Rect bounds, float radius, double opacity, int transformSlot,
         double scaleX, double scaleY)
     {
         var tint = brush.Tint.ToVector4();

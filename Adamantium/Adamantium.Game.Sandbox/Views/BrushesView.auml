@@ -375,6 +375,78 @@
                 </StackPanel>
             </StackPanel>
 
+            <!-- DrawingBrush stand: the SAME four mechanisms as the ImageBrush above, on content that has no pixels at
+                 all. Worth poking in this order - viewport sizes the tile, viewbox picks what a tile shows, stretch
+                 fits the content in it and alignment says where, tile mode repeats it. Stretch and alignment stay
+                 meaningful while tiling: a Uniform fit letterboxes EVERY copy, not the lot. -->
+            <TextBlock Text="DrawingBrush — live (a drawing as a fill: viewbox, viewport, stretch, tiling)" FontSize="18" Margin="0,20,0,10"/>
+            <StackPanel Orientation="Horizontal">
+                <Border Width="360" Height="240" Margin="10" Background="#101418">
+                    <Grid Width="{Binding DrawingWidth}"
+                          Height="{Binding DrawingHeight}"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center">
+                        <Rectangle Width="{Binding DrawingWidth}"
+                                   Height="{Binding DrawingHeight}"
+                                   Fill="{Binding LiveDrawing}"
+                                   CornerRadius="{Binding DrawingRadius, Converter={conv:DoubleToCornerRadiusConverter}}"
+                                   Visibility="{Binding DrawingShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Rectangle}"/>
+                        <Ellipse Width="{Binding DrawingWidth}"
+                                 Height="{Binding DrawingHeight}"
+                                 Fill="{Binding LiveDrawing}"
+                                 Visibility="{Binding DrawingShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Ellipse}"/>
+                        <Polygon Points="{Binding DrawingTriangle}"
+                                 Fill="{Binding LiveDrawing}"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center"
+                                 Visibility="{Binding DrawingShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Triangle}"/>
+                        <Polygon Points="{Binding DrawingStar}"
+                                 Fill="{Binding LiveDrawing}"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center"
+                                 Visibility="{Binding DrawingShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Star}"/>
+                    </Grid>
+                </Border>
+                <StackPanel Orientation="Vertical" Width="300" MarginLeft="16">
+                    <TextBlock Text="Paint it on" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <DropDown ItemsSource="{Binding PreviewShapes}" SelectedItem="{Binding DrawingShape, Mode=TwoWay}" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Tile mode" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <DropDown ItemsSource="{Binding TileModes}" SelectedItem="{Binding DrawingTileMode, Mode=TwoWay}" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Stretch — fits the content inside ONE tile" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <DropDown ItemsSource="{Binding Stretches}" SelectedItem="{Binding DrawingStretch, Mode=TwoWay}" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Alignment X (only while the fit leaves room)" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <DropDown ItemsSource="{Binding AlignmentsX}" SelectedItem="{Binding DrawingAlignmentX, Mode=TwoWay}" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Alignment Y" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <DropDown ItemsSource="{Binding AlignmentsY}" SelectedItem="{Binding DrawingAlignmentY, Mode=TwoWay}" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Viewport units — px, or a fraction of the shape" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <DropDown ItemsSource="{Binding MappingModes}" SelectedItem="{Binding DrawingViewportUnits, Mode=TwoWay}" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Viewport size — one tile (sizes the SINGLE copy too, so None puts it in a corner)" Foreground="{ResourceReference TextFillColorSecondary}" TextWrapping="WrapByWords" MarginBottom="2"/>
+                    <Slider Value="{Binding DrawingViewportSize, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="16" Maximum="200" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Viewport origin X — shifts the whole grid" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding DrawingViewportOriginX, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="-100" Maximum="100" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Viewport origin Y" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding DrawingViewportOriginY, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="-100" Maximum="100" Width="280" MarginBottom="10"/>
+                </StackPanel>
+                <StackPanel Orientation="Vertical" Width="300" MarginLeft="16">
+                    <TextBlock Text="Viewbox X — which part of the drawing a tile shows" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding DrawingViewboxX, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Viewbox Y" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding DrawingViewboxY, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Viewbox size — 1 is the whole drawing" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding DrawingViewboxSize, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0.1" Maximum="1" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Width" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding DrawingWidth, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="40" Maximum="340" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Height" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding DrawingHeight, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="40" Maximum="220" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Corner radius" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding DrawingRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="100" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Opacity" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding DrawingOpacity, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Tint" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding DrawingTint, Mode=TwoWay}"/>
+                </StackPanel>
+            </StackPanel>
+
             <TextBlock Text="Mesh gradient — live (four corners, pick each)" FontSize="18" Margin="0,20,0,10"/>
             <StackPanel Orientation="Horizontal">
                 <Grid Width="300" Height="200" Margin="10">

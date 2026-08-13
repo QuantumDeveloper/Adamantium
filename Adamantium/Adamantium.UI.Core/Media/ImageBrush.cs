@@ -31,15 +31,7 @@ public sealed class ImageBrush : TileBrush
         }
     }
 
-    /// <summary>A picture's own size is its PIXELS - <see cref="ImageSource.Width"/> is already scaled by its DPI, and
-    /// fitting against that stretches a high-DPI image. A vector source has no pixels, so there its Width/Height (the
-    /// drawing's own bounds) IS the natural size.</summary>
-    public override Size ContentSize => Source switch
-    {
-        BitmapSource bitmap => new Size(bitmap.PixelWidth, bitmap.PixelHeight),
-        null => default,
-        var source => new Size(source.Width, source.Height)
-    };
+    public override ImageSource ContentSource => Source;
 
     private static void OnSourceChanged(AdamantiumComponent sender, AdamantiumPropertyChangedEventArgs e)
     {

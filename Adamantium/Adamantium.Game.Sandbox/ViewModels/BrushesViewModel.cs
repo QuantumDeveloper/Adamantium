@@ -1,8 +1,10 @@
 using System;
 using Adamantium.Mathematics;
+using Adamantium.ProceduralGeometry;
 using Adamantium.MVVM;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Collections;
+using Adamantium.UI.Core.Media.Drawings;
 using Adamantium.UI.Core.Media.Imaging;
 using Adamantium.UI.Core.Media;
 
@@ -17,8 +19,12 @@ public partial class BrushesViewModel : TabPageViewModel
     public BrushesViewModel() : base("Brushes")
     {
         LiveImage.TileMode = _imageTileMode;
-        LiveImage.ViewportUnits = BrushMappingMode.Absolute;
-        LiveImage.Viewport = new Rect(0, 0, _imageTile, _imageTile);
+        PushImageViewport();
+
+        LiveDrawing.TileMode = _drawingTileMode;
+        LiveDrawing.Stretch = _drawingStretch;
+        LiveDrawing.ViewportUnits = _drawingViewportUnits;
+        PushViewport();
 
         // Built here rather than in an initializer: the brush's first skin comes from the list below, and one source of
         // truth for "which skin is on" beats repeating the path.
@@ -76,12 +82,26 @@ public partial class BrushesViewModel : TabPageViewModel
     [Bindable] private double _imageRadius;
     [Bindable] private Color _imageTint = Colors.White;
 
-    partial void OnImageTileModeChanged(TileMode value) => LiveImage.TileMode = value;
+    partial void OnImageTileModeChanged(TileMode value)
+    {
+        LiveImage.TileMode = value;
+        PushImageViewport();
+    }
+
     partial void OnImageStretchChanged(Stretch value) => LiveImage.Stretch = value;
     partial void OnImageTintChanged(Color value) => LiveImage.Tint = value;
 
+    partial void OnImageTileChanged(double value) => PushImageViewport();
+
     // One number for both axes: a square tile is what a texture is normally drawn as, and two sliders would be noise.
-    partial void OnImageTileChanged(double value) => LiveImage.Viewport = new Rect(0, 0, value, value);
+    // A single copy takes the WHOLE shape - that is what makes Stretch mean anything, and it is the pairing this stand
+    // states above the sliders. Left at the tile size it would instead sit in a small corner of the shape.
+    private void PushImageViewport()
+    {
+        var single = _imageTileMode == TileMode.None;
+        LiveImage.ViewportUnits = single ? BrushMappingMode.RelativeToBoundingBox : BrushMappingMode.Absolute;
+        LiveImage.Viewport = single ? new Rect(0, 0, 1, 1) : new Rect(0, 0, _imageTile, _imageTile);
+    }
     partial void OnImageWidthChanged(double value)
     {
         ImageTriangle = Triangle(value, _imageHeight);
@@ -93,6 +113,112 @@ public partial class BrushesViewModel : TabPageViewModel
         ImageTriangle = Triangle(_imageWidth, value);
         ImageStar = Star(_imageWidth, value);
     }
+
+    /// <summary>The brush the "live drawing" rectangle fills with: a DRAWING rather than a picture, so the content has
+    /// no pixels at all and every tile is replayed at the size it is drawn. Deliberately asymmetric, and authored in a
+    /// 0..24 box with the shapes NOT filling it - so a viewbox that cuts a corner out of it is visibly a different
+    /// picture, not just a crop of the same one.</summary>
+    public DrawingBrush LiveDrawing { get; } = new DrawingBrush(new DrawingGroup
+    {
+        Children =
+        {
+            // SQUARE corners: a rounded backdrop leaves a notch at every tile joint, so the seam reads as a rendering
+            // fault rather than as the tiling it is.
+            new GeometryDrawing
+            {
+                Geometry = new RectangleGeometry { Rect = new Rect(0, 0, 24, 24) },
+                Brush = new SolidColorBrush(new Color(30, 41, 59, 255))
+            },
+            new GeometryDrawing
+            {
+                Geometry = new EllipseGeometry { Center = new Vector2(8, 8), RadiusX = 5, RadiusY = 5 },
+                Brush = new SolidColorBrush(new Color(56, 189, 248, 255))
+            },
+            new GeometryDrawing
+            {
+                Geometry = new RectangleGeometry { Rect = new Rect(14, 14, 8, 8) },
+                Brush = new SolidColorBrush(new Color(244, 114, 182, 255))
+            }
+        }
+    });
+
+    public BrushMappingMode[] MappingModes { get; } = Enum.GetValues<BrushMappingMode>();
+
+    public AlignmentX[] AlignmentsX { get; } = Enum.GetValues<AlignmentX>();
+
+    public AlignmentY[] AlignmentsY { get; } = Enum.GetValues<AlignmentY>();
+
+    [Bindable] private PreviewShape _drawingShape = PreviewShape.Rectangle;
+    [Bindable] private TileMode _drawingTileMode = TileMode.Tile;
+    [Bindable] private Stretch _drawingStretch = Stretch.Uniform;
+    [Bindable] private AlignmentX _drawingAlignmentX = AlignmentX.Center;
+    [Bindable] private AlignmentY _drawingAlignmentY = AlignmentY.Center;
+    [Bindable] private BrushMappingMode _drawingViewportUnits = BrushMappingMode.Absolute;
+    [Bindable] private double _drawingViewportSize = 72;
+    [Bindable] private double _drawingViewportOriginX;
+    [Bindable] private double _drawingViewportOriginY;
+    [Bindable] private double _drawingViewboxX;
+    [Bindable] private double _drawingViewboxY;
+    [Bindable] private double _drawingViewboxSize = 1;
+    [Bindable] private double _drawingWidth = 320;
+    [Bindable] private double _drawingHeight = 200;
+    [Bindable] private double _drawingRadius = 12;
+    [Bindable] private double _drawingOpacity = 1;
+    [Bindable] private Color _drawingTint = Colors.White;
+
+    partial void OnDrawingTileModeChanged(TileMode value) => LiveDrawing.TileMode = value;
+    partial void OnDrawingStretchChanged(Stretch value) => LiveDrawing.Stretch = value;
+    partial void OnDrawingAlignmentXChanged(AlignmentX value) => LiveDrawing.AlignmentX = value;
+    partial void OnDrawingAlignmentYChanged(AlignmentY value) => LiveDrawing.AlignmentY = value;
+    partial void OnDrawingTintChanged(Color value) => LiveDrawing.Tint = value;
+    partial void OnDrawingOpacityChanged(double value) => LiveDrawing.Opacity = value;
+
+    partial void OnDrawingViewportUnitsChanged(BrushMappingMode value)
+    {
+        LiveDrawing.ViewportUnits = value;
+        // The two units mean different NUMBERS, so the slider is re-read into whichever is now in force rather than
+        // carrying 72 (px) straight over into a relative viewport, which would be 72 shapes wide.
+        PushViewport();
+    }
+
+    partial void OnDrawingViewportSizeChanged(double value) => PushViewport();
+    partial void OnDrawingViewportOriginXChanged(double value) => PushViewport();
+    partial void OnDrawingViewportOriginYChanged(double value) => PushViewport();
+
+    partial void OnDrawingViewboxXChanged(double value) => PushViewbox();
+    partial void OnDrawingViewboxYChanged(double value) => PushViewbox();
+    partial void OnDrawingViewboxSizeChanged(double value) => PushViewbox();
+
+    partial void OnDrawingWidthChanged(double value)
+    {
+        DrawingTriangle = Triangle(value, _drawingHeight);
+        DrawingStar = Star(value, _drawingHeight);
+    }
+
+    partial void OnDrawingHeightChanged(double value)
+    {
+        DrawingTriangle = Triangle(_drawingWidth, value);
+        DrawingStar = Star(_drawingWidth, value);
+    }
+
+    // One slider for a SQUARE tile: two would be noise, and the point of the stand is which mechanism does what.
+    // The ORIGIN converts with the size: the sliders are read in px, and handing a px origin to a RELATIVE viewport
+    // means that many SHAPES across - the tile lands far outside and the fill simply disappears.
+    private void PushViewport()
+    {
+        var scale = _drawingViewportUnits == BrushMappingMode.Absolute ? 1.0 : 1.0 / 200.0;
+        LiveDrawing.Viewport = new Rect(
+            _drawingViewportOriginX * scale,
+            _drawingViewportOriginY * scale,
+            _drawingViewportSize * scale,
+            _drawingViewportSize * scale);
+    }
+
+    private void PushViewbox() =>
+        LiveDrawing.Viewbox = new Rect(_drawingViewboxX, _drawingViewboxY, _drawingViewboxSize, _drawingViewboxSize);
+
+    [Bindable] private PointsCollection _drawingTriangle = Triangle(320, 200);
+    [Bindable] private PointsCollection _drawingStar = Star(320, 200);
 
     /// <summary>The brush the "live mesh" rectangle fills with: four corner colours blended bilinearly, driven by four
     /// pickers. No axis and no stops - which is what makes it a different animal from the linear/radial family.</summary>
