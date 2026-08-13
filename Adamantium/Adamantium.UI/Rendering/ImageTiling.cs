@@ -78,10 +78,10 @@ internal static class ImageTiling
             return box;
         }
 
-        // TILED: one copy is a TILE, so that is the unit to bake - each copy then carries its own resolution.
-        var tile = brush.TileMode != TileMode.None
-            ? TileSize(brush, box)
-            : box;
+        // The unit to bake is one TILE, tiled or not: a single copy is still laid out in the viewport, so measuring it
+        // against the whole shape baked it at the wrong size - and, since the size is the cache key, at a size nothing
+        // ever asked for again.
+        var tile = TileSize(brush, box);
 
         return brush.Stretch switch
         {

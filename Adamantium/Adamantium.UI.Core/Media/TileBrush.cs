@@ -185,10 +185,20 @@ public abstract class TileBrush : Brush
         }
     }
 
-    /// <summary>The content's own size, in its own units - a picture's pixels, a drawing's bounds. What
-    /// <see cref="Stretch"/> and an absolute <see cref="Viewbox"/> are measured against; zero when there is no content
-    /// yet (still decoding), which every consumer must read as "nothing to draw".</summary>
-    public abstract Size ContentSize { get; }
+    /// <summary>What this brush paints with, as the render path wants it. Every tile brush has content and the paths
+    /// that sample it care only THAT there is some - so they ask here rather than testing for each brush in turn, which
+    /// is how a new one would silently draw nothing.</summary>
+    public abstract Imaging.ImageSource ContentSource { get; }
+
+    /// <summary>The content's own size, in its own units. A picture's is its PIXELS - <c>ImageSource.Width</c> is
+    /// already scaled by its DPI, and fitting against that stretches a high-DPI image; a vector's own bounds ARE its
+    /// natural size. Zero when there is no content yet, which every consumer must read as "nothing to draw".</summary>
+    public virtual Size ContentSize => ContentSource switch
+    {
+        Imaging.BitmapSource bitmap => new Size(bitmap.PixelWidth, bitmap.PixelHeight),
+        null => default,
+        var source => new Size(source.Width, source.Height)
+    };
 
     /// <summary>Copy this brush's tiling onto <paramref name="clone"/>. Subclasses call it from their own clone so the
     /// eight properties above are never half-copied - the frozen snapshot is what the render path reads, and a missing

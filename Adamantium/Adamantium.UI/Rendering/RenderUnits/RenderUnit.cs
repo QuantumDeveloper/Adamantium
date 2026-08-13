@@ -402,11 +402,11 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
 
     /// <summary>This geometry's fill as one TEXTURED instance: the shared mesh, its local box, and the texture to bind.
     /// False for anything but an ImageBrush, or while its source is still decoding (the next re-render picks it up).</summary>
-    public bool TryGetInstancedTexturedFill(out GeometryKey key, out object mesh, out ImageBrush brush,
+    public bool TryGetInstancedTexturedFill(out GeometryKey key, out object mesh, out TileBrush brush,
         out Rect localBounds, out double opacity, out ITexture texture)
     {
         key = default; mesh = null; brush = null; localBounds = default; opacity = 1.0; texture = null;
-        if (Payload.Brush is not ImageBrush image) return false;
+        if (Payload.Brush is not TileBrush image) return false;
         if (_frozenMesh is not { HasPoints: true } fm) return false;
         // Baked at the SAME box the shader maps its UVs from (localBounds below) - the geometry's own bounds are a
         // different box, and the picture then sampled at a shifted scale and spilled past the shape.

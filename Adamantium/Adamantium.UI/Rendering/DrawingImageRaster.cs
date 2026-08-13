@@ -46,7 +46,48 @@ internal static class DrawingImageRaster
             return null;
         }
 
-        return _baked.TryGetValue(key, out var baked) ? baked : null;
+        if (_baked.TryGetValue(key, out var baked))
+        {
+            return baked;
+        }
+
+        // MISS, but this drawing may already be baked at another size. Drawing nothing until the new one lands is what
+        // made a fill flicker - and vanish - while a size slider moved: every frame asked for a size that was not there
+        // yet. Any bake of the SAME SHAPE shows the same picture (the uv is normalised), so it stands in meanwhile and
+        // is simply replaced when the exact one arrives. A different aspect would distort, so only the shape matches.
+        return NearestOfSameShape(image, key);
+    }
+
+    // The closest already-baked size for this drawing whose aspect matches - closest, so the stand-in is as near the
+    // asked-for resolution as anything available.
+    private static BitmapSource NearestOfSameShape(DrawingImage image, (DrawingImage Image, int Width, int Height) key)
+    {
+        BitmapSource best = null;
+        var bestDistance = double.MaxValue;
+        var wanted = (double)key.Width / key.Height;
+
+        foreach (var pair in _baked)
+        {
+            if (!ReferenceEquals(pair.Key.Image, image) || pair.Key.Height <= 0)
+            {
+                continue;
+            }
+
+            var aspect = (double)pair.Key.Width / pair.Key.Height;
+            if (System.Math.Abs(aspect - wanted) > 0.01)
+            {
+                continue;
+            }
+
+            var distance = System.Math.Abs(pair.Key.Width - key.Width);
+            if (distance < bestDistance)
+            {
+                bestDistance = distance;
+                best = pair.Value;
+            }
+        }
+
+        return best;
     }
 
     /// <summary>Queue a bake for a size that has none yet, and repaint whoever asked once it exists. Cheap to call every
@@ -66,7 +107,9 @@ internal static class DrawingImageRaster
             return;
         }
 
-        dispatcher.Post(() => Bake(key, size, owner));
+        // At the KEY's size, not the asked-for one: the key is snapped, and a bitmap that does not match the key it is
+        // filed under is handed to every later ask for that key.
+        dispatcher.Post(() => Bake(key, new Size(key.Width, key.Height), owner));
     }
 
     /// <summary>Throw away everything baked from this drawing - its picture changed, so every size of it is now wrong.</summary>
@@ -90,8 +133,52 @@ internal static class DrawingImageRaster
         }
     }
 
-    private static (DrawingImage Image, int Width, int Height) KeyOf(DrawingImage image, Size size) =>
-        (image, (int)System.Math.Round(size.Width), (int)System.Math.Round(size.Height));
+    // How many sizes of ONE drawing are kept. A drag still walks through keys, and each is a GPU texture, so the set is
+    // bounded: the ones furthest from the size in use now go first, since that is the one being asked for.
+    private const int KeptSizesPerDrawing = 6;
+
+    private static void Evict((DrawingImage Image, int Width, int Height) newest)
+    {
+        List<(DrawingImage Image, int Width, int Height)> mine = [];
+        foreach (var key in _baked.Keys)
+        {
+            if (ReferenceEquals(key.Image, newest.Image))
+            {
+                mine.Add(key);
+            }
+        }
+
+        if (mine.Count <= KeptSizesPerDrawing)
+        {
+            return;
+        }
+
+        mine.Sort((a, b) => System.Math.Abs(b.Width - newest.Width).CompareTo(System.Math.Abs(a.Width - newest.Width)));
+        for (var i = 0; i < mine.Count - KeptSizesPerDrawing; i++)
+        {
+            if (_baked.TryRemove(mine[i], out var stale))
+            {
+                stale?.Dispose();
+            }
+        }
+    }
+
+    // A bake per PIXEL of size is what a drag produces, and each one is a render target: the size is snapped UP to a
+    // step so a slider crosses a handful of keys instead of one per frame. Both axes are scaled by the SAME factor -
+    // the bake's aspect has to stay the content's, or the picture is sampled into a rect it was not drawn for.
+    private const double SizeStep = 32.0;
+
+    private static (DrawingImage Image, int Width, int Height) KeyOf(DrawingImage image, Size size)
+    {
+        var longest = System.Math.Max(size.Width, size.Height);
+        if (longest <= 0)
+        {
+            return (image, 0, 0);
+        }
+
+        var scale = System.Math.Ceiling(longest / SizeStep) * SizeStep / longest;
+        return (image, (int)System.Math.Round(size.Width * scale), (int)System.Math.Round(size.Height * scale));
+    }
 
     // LOOP thread. Baked THROUGH the vector path - an Image showing the drawing draws exactly what the on-screen one
     // does - and QUEUED, never rendered here: the GPU half shares one device with the render thread, so submitting it
@@ -136,6 +223,7 @@ internal static class DrawingImageRaster
         }
 
         _baked[key] = baked;
+        Evict(key);
         // RE-RECORD, not a paint re-bake: the texture is asked for while the unit is being routed into a batch, and a
         // paint invalidation only re-bakes what was already recorded - it never asks again, so the bake would sit in the
         // cache unused and the fill stay empty for ever.
