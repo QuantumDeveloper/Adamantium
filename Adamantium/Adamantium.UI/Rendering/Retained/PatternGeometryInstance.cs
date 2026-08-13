@@ -39,4 +39,8 @@ public struct PatternGeometryInstance
     /// <summary>Noise params (noise types only): x octaves (sign = animate flag), y seed, z lacunarity, w gain
     /// (or, for combustible, the fire-palette flag).</summary>
     public Vector4F Noise;
+
+    /// <summary>.x = the offset subtracted from the live clock while animating (the brush's own phase); .y = the phase to hold
+    /// while NOT animating. .zw spare.</summary>
+    public Vector4F Anim;
 }

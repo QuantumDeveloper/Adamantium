@@ -33,8 +33,18 @@ internal readonly struct PatternBrushRecord
     /// palette flag in .w.</summary>
     public readonly Vector4F Noise;
 
-    private PatternBrushRecord(int type, Color color1, Color color2, Color midColor, double cell, double opacity, Vector4F noise)
+    /// <summary>The phase a PAUSED noise flows at - the brush's own phase captured when Animate went off, so a pause holds the
+    /// frame it stopped on instead of snapping back to the start.</summary>
+    public readonly double FrozenPhase;
+
+    /// <summary>Subtracted from the live clock while ANIMATING, so the brush flows on its own phase rather than the shared
+    /// one. It only changes when animation is switched on, so an animated instance still replays without a re-bake.</summary>
+    public readonly double PhaseOffset;
+
+    private PatternBrushRecord(int type, Color color1, Color color2, Color midColor, double cell, double opacity, Vector4F noise, double frozenPhase, double phaseOffset)
     {
+        FrozenPhase = frozenPhase;
+        PhaseOffset = phaseOffset;
         Type = type;
         Color1 = color1;
         Color2 = color2;
@@ -53,7 +63,7 @@ internal readonly struct PatternBrushRecord
             // Bake the hatch line normal (cos/sin) here so the shader needs NO trig (its pattern PS is at the NVVM limit).
             var ha = pat.HatchAngle * Math.PI / 180.0;
             record = new PatternBrushRecord((int)pat.Pattern, pat.Color1, pat.Color2, new Color(0, 0, 0, 0),
-                pat.CellSize, pat.Opacity, new Vector4F((float)Math.Cos(ha), (float)Math.Sin(ha), 0, 0));
+                pat.CellSize, pat.Opacity, new Vector4F((float)Math.Cos(ha), (float)Math.Sin(ha), 0, 0), 0.0, 0.0);
             return true;
         }
 
@@ -69,7 +79,7 @@ internal readonly struct PatternBrushRecord
             }
 
             record = new PatternBrushRecord(n.NoiseType == NoiseType.Simplex ? 4 : 6 + (int)n.NoiseType,
-                n.Color1, n.Color2, n.MidColor, n.Scale, n.Opacity, noise);
+                n.Color1, n.Color2, n.MidColor, n.Scale, n.Opacity, noise, n.FrozenPhase, n.PhaseOffset);
             return true;
         }
 

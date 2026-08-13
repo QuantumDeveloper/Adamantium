@@ -41,4 +41,9 @@ public struct PatternRectItem
     /// <summary>Optional MID colour for a 3-colour gradient-map ramp of the noise (Color1 -> Color3 -> Color2); straight
     /// RGBA, opacity folded. .w == 0 = disabled (plain two-colour duotone).</summary>
     public Vector4F Color3;
+
+    /// <summary>.x = the offset subtracted from the shared clock while ANIMATING, so the brush flows on its own phase; .y =
+    /// the phase HELD while paused, so stopping keeps the frame it stopped at instead of snapping back to phase 0. Both only
+    /// change when animation is toggled, which is what keeps an animated instance replayable without a re-bake. .zw spare.</summary>
+    public Vector4F Anim;
 }
