@@ -664,11 +664,6 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
         if (metadata.AffectsRender)
         {
-            // Keep this element subscribed to the CURRENT brush of a brush-valued render property, so a later mutation OF
-            // the brush itself (an animated gradient stop, a recoloured fill) re-renders it - not only replacing the whole
-            // brush. One place covers any AffectsRender brush property on any element. old != new is guaranteed above.
-            if (oldEffectiveValue is Media.Brush oldBrush) oldBrush.Changed -= OnAffectsRenderBrushChanged;
-            if (newEffectiveValue is Media.Brush newBrush) newBrush.Changed += OnAffectsRenderBrushChanged;
             element?.InvalidateRender(false);
         }
         // Paint-only: same shape, same draw commands, a different colour. Re-bake what is already recorded instead of
@@ -708,7 +703,7 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     // NOTE the asymmetry with an ordinary SET of a brush property (handled in the AffectsRender path above): assigning a
     // DIFFERENT brush object leaves the recorded command pointing at the OLD one, so that genuinely needs a re-record until
     // payloads reference brushes by identity rather than by object.
-    private void OnAffectsRenderBrushChanged(object sender, EventArgs e)
+    internal void OnRenderValueChanged(object sender, EventArgs e)
     {
         if (this is not IUIComponent { Visibility: Visibility.Visible } element) return;
         element.InvalidatePaint();

@@ -28,6 +28,7 @@ public class TexturedShapeRenderTests
 
     private static OffscreenTestRenderer _renderer;
     private static BitmapSource _source;
+    private static BitmapSource _tall;
 
     [OneTimeSetUp]
     public void CreateRenderer()
@@ -38,6 +39,7 @@ public class TexturedShapeRenderTests
             ClearColor = Colors.Black
         };
         _source = FlatRed();
+        _tall = TwoHalves();
     }
 
     [OneTimeTearDown]
@@ -47,6 +49,8 @@ public class TexturedShapeRenderTests
         _renderer = null;
         _source?.Dispose();
         _source = null;
+        _tall?.Dispose();
+        _tall = null;
     }
 
     // One flat colour: the test is about WHERE the texture lands, not what it holds, and a flat source makes any sampled
@@ -63,6 +67,25 @@ public class TexturedShapeRenderTests
             pixels[i + 3] = 255;
         }
         return new BitmapSource(src, src, 1, 1, SurfaceFormat.B8G8R8A8.UNorm, pixels);
+    }
+
+    // TALL (1:2) and two-coloured: Uniform fits it to HALF the square shape's width, and a wrapped edge then shows up
+    // as the wrong half rather than as "some red".
+    private static BitmapSource TwoHalves()
+    {
+        const int width = 16;
+        const int height = 32;
+        var pixels = new byte[width * height * 4];
+        for (var y = 0; y < height; y++)
+        for (var x = 0; x < width; x++)
+        {
+            var i = (y * width + x) * 4;
+            var left = x < width / 2;
+            pixels[i + 0] = (byte)(left ? 255 : 0);   // B
+            pixels[i + 1] = (byte)(left ? 0 : 255);   // G
+            pixels[i + 3] = 255;
+        }
+        return new BitmapSource(width, height, 1, 1, SurfaceFormat.B8G8R8A8.UNorm, pixels);
     }
 
     private static byte[] Draw(Brush brush, bool ellipse)
@@ -196,6 +219,52 @@ public class TexturedShapeRenderTests
         Assert.That(middle.R, Is.GreaterThan(200), $"the star's body is not painted: {middle}");
         Assert.That(notch.R + notch.G + notch.B, Is.LessThan(40),
             $"the notch at ({notchX},{notchY}) is painted, so the fill bridged a reflex corner: {notch}");
+    }
+
+    // --- Stretch.Uniform: the PICTURE is fitted, the SHAPE is not ------------------------------------------------
+    // The fitted rect used to be baked as the instance's bounds, which resized the SDF itself - so a circle came out
+    // an oval and the picture's own edge, now inside the shape, wrapped a column of the opposite edge onto itself.
+    private const int DrawnLeft = 30;    // a 1:2 source fitted into the square shape: x 30..90, shape-local
+    private const int DrawnRight = 90;
+
+    [Test]
+    public void UniformFitsThePictureAndLeavesTheRestOfTheShapeClear()
+    {
+        var pixels = Draw(new ImageBrush { Source = _tall, Stretch = Stretch.Uniform }, ellipse: false);
+
+        var left = At_(pixels, At + DrawnLeft + 15, At + Size / 2);
+        var right = At_(pixels, At + DrawnRight - 15, At + Size / 2);
+        var outside = At_(pixels, At + DrawnLeft / 2, At + Size / 2);
+
+        Assert.That(left.B, Is.GreaterThan(200), $"the picture's left half is not where the fit puts it: {left}");
+        Assert.That(right.G, Is.GreaterThan(200), $"the picture's right half is not where the fit puts it: {right}");
+        Assert.That(outside.R + outside.G + outside.B, Is.LessThan(40),
+            $"the shape is painted outside the fitted picture, so Uniform stretched it after all: {outside}");
+    }
+
+    [Test]
+    public void TheFittedPicturesFarEdgeDoesNotWrapToItsNearOne()
+    {
+        var pixels = Draw(new ImageBrush { Source = _tall, Stretch = Stretch.Uniform }, ellipse: false);
+
+        for (var x = DrawnRight - 3; x <= DrawnRight + 3; x++)
+        {
+            var p = At_(pixels, At + x, At + Size / 2);
+            Assert.That(p.B, Is.LessThan(120), $"column {x} shows the picture's LEFT edge, so the far edge wrapped: {p}");
+        }
+    }
+
+    // Inside the circle, but outside an ellipse squeezed into the fitted rect - so it is painted only while the fit
+    // leaves the shape alone.
+    [Test]
+    public void UniformDoesNotSqueezeTheShapeItself()
+    {
+        var pixels = Draw(new ImageBrush { Source = _tall, Stretch = Stretch.Uniform }, ellipse: true);
+
+        var offAxis = At_(pixels, At + 85, At + 20);
+
+        Assert.That(offAxis.G, Is.GreaterThan(200),
+            $"the ellipse was cut to the fitted rect instead of staying a circle: {offAxis}");
     }
 
     // The rectangle it always could do - here to prove the shared pass did not lose it when the ellipse branch went in.

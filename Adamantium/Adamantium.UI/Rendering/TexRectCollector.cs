@@ -81,13 +81,18 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
 
         // A VECTOR source has no pixels to sample, so this is where the raster fallback earns its keep: hand over the
         // bake if there is one, and otherwise queue it and draw nothing this frame - the same "not ready yet" answer a
-        // picture still being decoded gives. Size comes from the fill, so each fill gets a bake at its own size.
+        // picture still being decoded gives. Baked at the rect it is DRAWN in, not at the fill box, so it carries the
+        // aspect Stretch asked for (see ImageTiling.BakeSize). A nine-slice always fills its box.
         if (source is DrawingImage vector)
         {
-            var baked = DrawingImageRaster.Get(vector, size);
-            if (baked != null) return baked.GetOrCreateTexture(factory);
+            var bakeSize = brush is ImageBrush imageBrush ? ImageTiling.BakeSize(imageBrush, size) : size;
+            var baked = DrawingImageRaster.Get(vector, bakeSize);
+            if (baked != null)
+            {
+                return baked.GetOrCreateTexture(factory);
+            }
 
-            DrawingImageRaster.Request(vector, size, owner);
+            DrawingImageRaster.Request(vector, bakeSize, owner);
         }
 
         return null;
@@ -198,10 +203,20 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
 
         var (drawn, uvRect, uvRepeat) = ImageTiling.Layout(brush, bounds, scaleX, scaleY);
 
+        // The SHAPE stays the shape; only the picture inside it is fitted. Handing `drawn` over as the bounds shrank
+        // the SDF itself, so a Uniform fill turned a circle into an oval.
+        var w = System.Math.Max(bounds.Width, 1e-6);
+        var h = System.Math.Max(bounds.Height, 1e-6);
+
         return new TexRectItem
         {
-            Bounds = new Vector4F((float)drawn.X, (float)drawn.Y, (float)drawn.Width, (float)drawn.Height),
-            Params = new Vector4F(radius, transformSlot, 0, 0),
+            Bounds = new Vector4F((float)bounds.X, (float)bounds.Y, (float)bounds.Width, (float)bounds.Height),
+            Params = new Vector4F(radius, transformSlot, brush.TileMode == TileMode.None ? 1f : 0f, 0),
+            Drawn = new Vector4F(
+                (float)((drawn.X - bounds.X) / w),
+                (float)((drawn.Y - bounds.Y) / h),
+                (float)(drawn.Width / w),
+                (float)(drawn.Height / h)),
             UvRect = uvRect,
             UvRepeat = uvRepeat,
             Tint = tint

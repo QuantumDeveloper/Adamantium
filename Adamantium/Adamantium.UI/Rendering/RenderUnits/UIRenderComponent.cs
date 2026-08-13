@@ -85,6 +85,10 @@ public abstract class UIRenderComponent : DeferredDisposableObject
         _indexBuffer?.Invalidate();
     }
 
+    /// <summary>The element this draw belongs to. Needed where a fill has to be PRODUCED rather than read: a vector
+    /// source is baked at the size this unit draws it, and the bake needs the owner's data and a way to notify it.</summary>
+    public IUIComponent Owner { get; set; }
+
     public void Update(Matrix4x4F transform, Matrix4x4F projectionMatrix)
     {
         RenderData.TransformMatrix = transform;
@@ -223,12 +227,6 @@ public class GeometryRenderComponent : UIRenderComponent
     // has no texture yet: draw nothing this frame and let the re-render pick it up.
     private void RenderTextured(ImageBrush image)
     {
-        var texture = TexRectCollector.BrushTexture(image, _resourceFactory);
-        if (texture == null)
-        {
-            return;
-        }
-
         var world = RenderData.TransformMatrix;
         var bounds = Mesh.Bounds;
         var box = new Rect(
@@ -237,6 +235,13 @@ public class GeometryRenderComponent : UIRenderComponent
             bounds.Size.X,
             bounds.Size.Y);
         if (box.Width <= 0 || box.Height <= 0)
+        {
+            return;
+        }
+
+        // The box first: it is what a vector source must be baked at, since this path maps the picture across it.
+        var texture = TexRectCollector.BrushTexture(image, _resourceFactory, box.Size, Owner);
+        if (texture == null)
         {
             return;
         }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Adamantium.Core.TypeParsing;
 using Adamantium.UI.Core.Media.Animation;
 using Adamantium.UI.Core.TypeParsers;
@@ -6,8 +6,36 @@ using Adamantium.UI.Core.TypeParsers;
 namespace Adamantium.UI.Core.Media;
 
 [TypeParser(typeof(BrushParser))]
-public abstract class Brush: AdamantiumComponent
+public abstract class Brush: AdamantiumComponent, IRenderAttachable
 {
+   // Set by RaiseChanged (a genuine property change), consumed by the compositor's per-frame RefreshBases. Lets a paint
+   // animation re-capture its base ONLY when the brush actually changed (a theme recolour) instead of every loop frame -
+   // so the render thread's dedup (see Compositor's paint tag) is not defeated by a base that is "re-captured" unchanged.
+   // Loop-thread only (RaiseChanged and RefreshBases both run there); never touched by the render thread's PublishSnapshot.
+   private bool _baseChanged = true;
+
+   private bool _anchorConsidered;
+
+   // How many render properties of each owner currently hold this brush. A Border whose Background AND BorderBrush both
+   // point at one theme brush attaches TWICE; counting is what keeps attach and detach symmetric - notify once per
+   // owner, and drop the subscription only when its LAST property lets go.
+   //
+   // Counted rather than scanned: "-= then +=" walks the whole invocation list, and a theme brush has thousands of
+   // subscribers. Allocated lazily - most brushes have exactly one owner.
+   private Dictionary<AdamantiumComponent, int> _owners;
+
+   // The immutable appearance the render path reads - see Snapshot.
+   private volatile Brush _snapshot;
+
+   private bool _isFrozen;
+
+   // PAINT: a brush's own opacity changes only the colour the units are baked with - never a shape, never a layout. Every
+   // element painting with this brush re-bakes (via Changed -> InvalidatePaint); the flag STATES that, so an animation of
+   // it can also be recognised as composited (run on the render thread) without the renderer keeping a hardcoded list of
+   // "known" brush properties. The loading-skeleton pulse animates exactly this.
+   public static readonly AdamantiumProperty OpacityProperty = AdamantiumProperty.Register(nameof(Opacity),
+      typeof (Double), typeof (Brush), new PropertyMetadata(1.0, PropertyMetadataOptions.AffectsPaint));
+
    protected Brush()
    {
       // Any property change on the brush itself (Opacity here; Color on a SolidColorBrush; StartPoint/EndPoint on a
@@ -21,6 +49,32 @@ public abstract class Brush: AdamantiumComponent
    /// an ANIMATED brush (e.g. a looping shimmer sweeping a gradient) repaint without the element polling.</summary>
    public event EventHandler Changed;
 
+   public Double Opacity
+   {
+      get => GetValue<Double>(OpacityProperty);
+      set
+      {
+         if (IsFrozen)
+         {
+            return;
+         }
+
+         SetValue(OpacityProperty, value);
+      }
+   }
+
+   public bool IsFrozen => _isFrozen;
+
+   /// <summary>The immutable snapshot of this brush's CURRENT appearance - what the bake/draw path reads. A frozen brush is
+   /// its own snapshot. Null until the brush has been prepared for rendering, which every payload does in its constructor
+   /// (see <see cref="ForRendering"/>), so a brush that can be drawn always has one.</summary>
+   public Brush Snapshot => _isFrozen ? this : _snapshot;
+
+   /// <summary>How many handlers are listening to <see cref="Changed"/>. This is what the owner counting exists to keep
+   /// at one per owner, so it is what the test has to read - the hold count alone is satisfied by a broken attach that
+   /// subscribes every time.</summary>
+   internal int SubscriberCount => Changed?.GetInvocationList().Length ?? 0;
+
    protected void RaiseChanged()
    {
       // Re-PUBLISH the snapshot the render path reads (see Snapshot). Eagerly, here, on the thread that owns the brush -
@@ -32,11 +86,82 @@ public abstract class Brush: AdamantiumComponent
       Changed?.Invoke(this, EventArgs.Empty);
    }
 
-   // Set by RaiseChanged (a genuine property change), consumed by the compositor's per-frame RefreshBases. Lets a paint
-   // animation re-capture its base ONLY when the brush actually changed (a theme recolour) instead of every loop frame -
-   // so the render thread's dedup (see Compositor's paint tag) is not defeated by a base that is "re-captured" unchanged.
-   // Loop-thread only (RaiseChanged and RefreshBases both run there); never touched by the render thread's PublishSnapshot.
-   private bool _baseChanged = true;
+   void IRenderAttachable.AttachTo(AdamantiumComponent owner)
+   {
+      _owners ??= new Dictionary<AdamantiumComponent, int>();
+
+      if (_owners.TryGetValue(owner, out var held))
+      {
+         _owners[owner] = held + 1;   // already subscribed for this owner; another of its properties took the brush
+      }
+      else
+      {
+         _owners[owner] = 1;
+         // Keep the owner subscribed to THIS brush, so a later mutation OF the brush - an animated gradient stop, a
+         // recoloured fill - repaints it, and not only replacing the whole brush does.
+         Changed += owner.OnRenderValueChanged;
+      }
+
+      Anchor(owner);
+   }
+
+   void IRenderAttachable.DetachFrom(AdamantiumComponent owner)
+   {
+      if (_owners == null || !_owners.TryGetValue(owner, out var held))
+      {
+         return;
+      }
+
+      if (held > 1)
+      {
+         _owners[owner] = held - 1;   // its other properties still draw with this brush
+         return;
+      }
+
+      _owners.Remove(owner);
+      Changed -= owner.OnRenderValueChanged;
+   }
+
+   /// <summary>How many of <paramref name="owner"/>'s render properties currently hold this brush.</summary>
+   internal int OwnerHoldCount(AdamantiumComponent owner) =>
+      _owners != null && _owners.TryGetValue(owner, out var held) ? held : 0;
+
+   /// <summary>Hang this brush on the element that draws with it, so expressions written ON THE BRUSH -
+   /// <c>{Binding Colour}</c>, <c>{ResourceReference Key}</c> - have a tree to resolve against. On its own a brush is
+   /// not in the tree, so the lookup walks up from it, finds no element and yields null SILENTLY.
+   /// <para>The FIRST owner wins, and only a brush that is actually WAITING on something is anchored: an anchor pins
+   /// that element for as long as the brush lives, and a theme brush shared by thousands of recycled rows would
+   /// otherwise hold whichever one used it first. Every later assignment costs one bool.</para></summary>
+   private void Anchor(AdamantiumComponent owner)
+   {
+      if (_anchorConsidered)
+      {
+         return;
+      }
+
+      _anchorConsidered = true;
+
+      // TWO places to look: an EXPRESSION on one of the brush's properties, and a RESOURCE only a tree-scoped lookup can
+      // answer. Asking about the first alone is how {ResourceReference} on a brush kept resolving to nothing.
+      var hasExpressions = Data.BindingEngine.GetBindings(this).Count > 0;
+      var hasResources = Resources.ResourceResolver.HasPending(this);
+      if (!hasExpressions && !hasResources)
+      {
+         return;
+      }
+
+      InheritanceParent = owner;
+
+      if (hasExpressions)
+      {
+         Data.BindingEngine.RefreshBindings(this);
+      }
+
+      if (hasResources)
+      {
+         Resources.ResourceResolver.Resolve(this, owner as IUIComponent);
+      }
+   }
 
    /// <summary>Returns whether the brush's own values changed since the last call, and clears the flag. Loop thread.</summary>
    public bool ConsumeBaseChange()
@@ -44,19 +169,6 @@ public abstract class Brush: AdamantiumComponent
       var changed = _baseChanged;
       _baseChanged = false;
       return changed;
-   }
-
-   // PAINT: a brush's own opacity changes only the colour the units are baked with - never a shape, never a layout. Every
-   // element painting with this brush re-bakes (via Changed -> InvalidatePaint); the flag STATES that, so an animation of
-   // it can also be recognised as composited (run on the render thread) without the renderer keeping a hardcoded list of
-   // "known" brush properties. The loading-skeleton pulse animates exactly this.
-   public static readonly AdamantiumProperty OpacityProperty = AdamantiumProperty.Register(nameof(Opacity),
-      typeof (Double), typeof (Brush), new PropertyMetadata(1.0, PropertyMetadataOptions.AffectsPaint));
-
-   public Double Opacity
-   {
-      get => GetValue<Double>(OpacityProperty);
-      set { if (IsFrozen) return; SetValue(OpacityProperty, value); }
    }
 
    // --- Frozen snapshot (render/compositor-thread safety) -------------------------------------------------------------
@@ -74,15 +186,6 @@ public abstract class Brush: AdamantiumComponent
    // a snapshot from minutes ago. One clone per CHANGE, not per user: a theme brush shared by thousands of elements
    // publishes ONE. And an unchanged brush keeps handing out the SAME instance, so the render cache's reference-equality
    // change detection stays stable (no spurious re-bake / text re-raster on a re-record).
-   private volatile Brush _snapshot;
-   private bool _isFrozen;
-
-   public bool IsFrozen => _isFrozen;
-
-   /// <summary>The immutable snapshot of this brush's CURRENT appearance - what the bake/draw path reads. A frozen brush is
-   /// its own snapshot. Null until the brush has been prepared for rendering, which every payload does in its constructor
-   /// (see <see cref="ForRendering"/>), so a brush that can be drawn always has one.</summary>
-   public Brush Snapshot => _isFrozen ? this : _snapshot;
 
    /// <summary>Prepare this brush to be drawn: publish a snapshot for the render thread, and hand back the LIVE brush -
    /// which is what a payload stores, so later changes stay visible through <see cref="Snapshot"/>. Called on the thread

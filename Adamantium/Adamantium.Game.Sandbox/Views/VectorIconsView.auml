@@ -236,57 +236,15 @@
                            CornerRadius="12"
                            MarginRight="18">
                     <Rectangle.Fill>
-                        <ImageBrush>
-                            <ImageBrush.Source>
-                                <DrawingImage>
-                                    <DrawingGroup>
-                                        <GeometryDrawing Brush="#0F172A">
-                                            <GeometryDrawing.Geometry>
-                                                <RectangleGeometry Rect="0,0,24,24" CornerRadius="2"/>
-                                            </GeometryDrawing.Geometry>
-                                        </GeometryDrawing>
-                                        <GeometryDrawing Brush="#38BDF8">
-                                            <GeometryDrawing.Geometry>
-                                                <EllipseGeometry Center="12,9" RadiusX="5" RadiusY="5"/>
-                                            </GeometryDrawing.Geometry>
-                                        </GeometryDrawing>
-                                        <GeometryDrawing Brush="#E2E8F0">
-                                            <GeometryDrawing.Geometry>
-                                                <RectangleGeometry Rect="4,17,16,3" CornerRadius="1.5"/>
-                                            </GeometryDrawing.Geometry>
-                                        </GeometryDrawing>
-                                    </DrawingGroup>
-                                </DrawingImage>
-                            </ImageBrush.Source>
-                        </ImageBrush>
+                        <ImageBrush Source="{ResourceReference FolderIcon}"
+                                    Stretch="Uniform"/>
                     </Rectangle.Fill>
                 </Rectangle>
                 <Ellipse Width="140"
                          Height="140">
                     <Ellipse.Fill>
-                        <ImageBrush>
-                            <ImageBrush.Source>
-                                <DrawingImage>
-                                    <DrawingGroup>
-                                        <GeometryDrawing Brush="#0F172A">
-                                            <GeometryDrawing.Geometry>
-                                                <RectangleGeometry Rect="0,0,24,24" CornerRadius="2"/>
-                                            </GeometryDrawing.Geometry>
-                                        </GeometryDrawing>
-                                        <GeometryDrawing Brush="#38BDF8">
-                                            <GeometryDrawing.Geometry>
-                                                <EllipseGeometry Center="12,9" RadiusX="5" RadiusY="5"/>
-                                            </GeometryDrawing.Geometry>
-                                        </GeometryDrawing>
-                                        <GeometryDrawing Brush="#E2E8F0">
-                                            <GeometryDrawing.Geometry>
-                                                <RectangleGeometry Rect="4,17,16,3" CornerRadius="1.5"/>
-                                            </GeometryDrawing.Geometry>
-                                        </GeometryDrawing>
-                                    </DrawingGroup>
-                                </DrawingImage>
-                            </ImageBrush.Source>
-                        </ImageBrush>
+                        <ImageBrush Source="{ResourceReference FolderIcon}"
+                                    Stretch="Uniform"/>
                     </Ellipse.Fill>
                 </Ellipse>
             </StackPanel>
