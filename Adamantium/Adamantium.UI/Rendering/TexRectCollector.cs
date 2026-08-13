@@ -201,24 +201,17 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
         var tint = brush.Tint.ToVector4();
         tint.W *= (float)(opacity * brush.Opacity);
 
-        var (drawn, uvRect, uvRepeat) = ImageTiling.Layout(brush, bounds, scaleX, scaleY);
+        var layout = ImageTiling.Layout(brush, bounds, scaleX, scaleY);
 
-        // The SHAPE stays the shape; only the picture inside it is fitted. Handing `drawn` over as the bounds shrank
-        // the SDF itself, so a Uniform fill turned a circle into an oval.
-        var w = System.Math.Max(bounds.Width, 1e-6);
-        var h = System.Math.Max(bounds.Height, 1e-6);
-
+        // The SHAPE stays the shape; only the content inside each tile is fitted. Handing the fitted rect over as the
+        // bounds shrank the SDF itself, so a Uniform fill turned a circle into an oval.
         return new TexRectItem
         {
             Bounds = new Vector4F((float)bounds.X, (float)bounds.Y, (float)bounds.Width, (float)bounds.Height),
-            Params = new Vector4F(radius, transformSlot, brush.TileMode == TileMode.None ? 1f : 0f, 0),
-            Drawn = new Vector4F(
-                (float)((drawn.X - bounds.X) / w),
-                (float)((drawn.Y - bounds.Y) / h),
-                (float)(drawn.Width / w),
-                (float)(drawn.Height / h)),
-            UvRect = uvRect,
-            UvRepeat = uvRepeat,
+            Params = new Vector4F(radius, transformSlot, layout.Repeats ? 1f : 0f, layout.Mirror),
+            Tile = layout.Tile,
+            Drawn = layout.Drawn,
+            UvRect = layout.UvRect,
             Tint = tint
         };
     }

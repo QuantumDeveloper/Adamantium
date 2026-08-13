@@ -114,7 +114,7 @@ public class NineSliceTests
     {
         var items = Bake(Brush(), new Rect(0, 0, 300, 300));
 
-        Assert.That(items.All(i => i.UvRepeat.X == 1f && i.UvRepeat.Y == 1f), Is.True);
+        Assert.That(items.All(i => i.Tile.X == 1f && i.Tile.Y == 1f), Is.True);
     }
 
     // Repeat tiles the strip as many times as it fits - and ONLY along the axis the strip runs.
@@ -127,12 +127,12 @@ public class NineSliceTests
         var items = Bake(brush, new Rect(0, 0, 300, 300));
 
         var top = items[1];      // the top EDGE: 250px of shape over a 50px strip of source
-        Assert.That(top.UvRepeat.X, Is.EqualTo(5f).Within(1e-4));
-        Assert.That(top.UvRepeat.Y, Is.EqualTo(1f), "a top edge does not repeat downwards");
+        Assert.That(top.Tile.X, Is.EqualTo(5f).Within(1e-4));
+        Assert.That(top.Tile.Y, Is.EqualTo(1f), "a top edge does not repeat downwards");
 
         var corner = items[0];
-        Assert.That(corner.UvRepeat.X, Is.EqualTo(1f), "a corner never repeats - that is what makes it a corner");
-        Assert.That(corner.UvRepeat.Y, Is.EqualTo(1f));
+        Assert.That(corner.Tile.X, Is.EqualTo(1f), "a corner never repeats - that is what makes it a corner");
+        Assert.That(corner.Tile.Y, Is.EqualTo(1f));
     }
 
     // A shape too small for its own frame: the corners must not overlap and draw each other's pixels. Shrink the border
@@ -148,8 +148,8 @@ public class NineSliceTests
         var items = Bake(brush, new Rect(0, 0, 300, 300));
 
         var top = items[1];
-        Assert.That(top.UvRepeat.X, Is.EqualTo(Math.Round(top.UvRepeat.X)).Within(1e-5), "a whole number of tiles");
-        Assert.That(top.UvRepeat.X, Is.GreaterThanOrEqualTo(1f));
+        Assert.That(top.Tile.X, Is.EqualTo(Math.Round(top.Tile.X)).Within(1e-5), "a whole number of tiles");
+        Assert.That(top.Tile.X, Is.GreaterThanOrEqualTo(1f));
     }
 
     [Test]
@@ -161,7 +161,7 @@ public class NineSliceTests
         var items = Bake(brush, new Rect(0, 0, 310, 300));
 
         var top = items[1];
-        Assert.That(top.UvRepeat.X, Is.Not.EqualTo(Math.Round(top.UvRepeat.X)).Within(1e-5));
+        Assert.That(top.Tile.X, Is.Not.EqualTo(Math.Round(top.Tile.X)).Within(1e-5));
     }
 
     // The MIDDLE is not an edge: tiled at the edges' pitch it becomes a grid, denser the smaller the slice. It only
@@ -175,8 +175,8 @@ public class NineSliceTests
         var items = Bake(brush, new Rect(0, 0, 300, 300));
 
         var centre = items[4];
-        Assert.That(centre.UvRepeat.X, Is.EqualTo(1f), "the centre is stretched, not tiled");
-        Assert.That(centre.UvRepeat.Y, Is.EqualTo(1f));
+        Assert.That(centre.Tile.X, Is.EqualTo(1f), "the centre is stretched, not tiled");
+        Assert.That(centre.Tile.Y, Is.EqualTo(1f));
     }
 
     [Test]
@@ -188,7 +188,7 @@ public class NineSliceTests
 
         var items = Bake(brush, new Rect(0, 0, 300, 300));
 
-        Assert.That(items[4].UvRepeat.X, Is.GreaterThan(1f));
+        Assert.That(items[4].Tile.X, Is.GreaterThan(1f));
     }
 
     [Test]

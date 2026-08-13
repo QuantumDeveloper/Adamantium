@@ -1468,10 +1468,10 @@ float4 PatternFillColor(PatternRectData it, float2 pTopLeft, float2 centerRel, f
 struct TexRectData
 {
     float4 Bounds;     // NODE-local x, y, w, h - the SHAPE, which never shrinks with the picture
-    float4 Params;     // .x corner radius, .y transform slot, .z clip flag (1 = one copy, keep its outside clear)
-    float4 Drawn;      // the rect the picture is drawn in: offsetXY, scaleXY, both in 0..1 of Bounds
+    float4 Params;     // .x corner radius, .y transform slot, .z repeat flag, .w mirror flags (1 = X, 2 = Y, 3 = both)
+    float4 Tile;       // tile grid over the bounds: tiles per axis (.xy), grid origin in tiles (.zw)
+    float4 Drawn;      // the content's rect inside ONE tile: offsetXY, scaleXY, both in 0..1 of the tile
     float4 UvRect;     // sub-rectangle of the source: x, y, w, h (normalised)
-    float4 UvRepeat;   // how many times UvRect repeats across the bounds, per axis (1 = stretch)
     float4 Tint;       // multiplied into the sample, straight RGBA
 };
 
@@ -1522,22 +1522,24 @@ float4 TexRectPS(TexPSInput input) : SV_Target
                    SdEllipse(input.Local, input.Half),
                    isEllipse);
 
-    // 0..1 across the shape, then across the DRAWN rect inside it, then into the source's sub-rectangle. The REPEAT is
-    // done here with frac() rather than by a wrapping sampler: the sampler would wrap the WHOLE texture, and a slice
-    // needs its own strip wrapped.
+    // 0..1 across the shape -> TILE space -> the content's rect inside one tile -> the source's sub-rectangle. The
+    // REPEAT is done here with frac() rather than by a wrapping sampler: the sampler would wrap the WHOLE texture, and
+    // a slice of it needs its own strip wrapped.
     float2 t = input.Local / max(input.Half * 2.0, float2(1e-4, 1e-4)) + 0.5;
-    float2 inDrawn = (t - it.Drawn.xy) / max(it.Drawn.zw, float2(1e-4, 1e-4));
-    float2 n = inDrawn * it.UvRepeat.xy;
-    // A SINGLE copy never wraps: frac() sends its far edge (n = 1) back to 0, drawing one column of the opposite edge.
-    float clip = it.Params.z;
-    float2 wrapped = lerp(frac(n), saturate(n), clip);
+    float2 n = t * it.Tile.xy - it.Tile.zw;
+    // A SINGLE copy never wraps: frac() would send its far edge (n = 1) back to 0, drawing one column of the opposite
+    // edge. Past that edge there is nothing at all - which is what the coverage test below states.
+    float2 tileLocal = lerp(n, frac(n), it.Params.z);
     // MIRRORED repeat: every other copy runs backwards, so a picture that was never drawn to tile still meets its own
-    // reflection at the seam. A triangle wave, not a branch - UvRepeat.z carries the two axis flags (1 = X, 2 = Y).
+    // reflection at the seam. A triangle wave, not a branch.
     float2 mirrored = abs(frac(n * 0.5) * 2.0 - 1.0);
     // Branch-free (a ?: in this family has device-lost form): flag 1 = mirror X, 2 = mirror Y, 3 = both.
-    float flags = it.UvRepeat.z;
+    float flags = it.Params.w;
     float2 pick = float2(step(0.5, fmod(flags, 2.0)), step(0.5, floor(flags * 0.5)));
-    float2 uv = it.UvRect.xy + lerp(wrapped, mirrored, pick) * it.UvRect.zw;
+    float2 inTile = lerp(tileLocal, mirrored, pick);
+    // Where the content sits inside its tile - Stretch and the alignment, already folded into one rect per tile.
+    float2 inContent = (inTile - it.Drawn.xy) / max(it.Drawn.zw, float2(1e-4, 1e-4));
+    float2 uv = it.UvRect.xy + saturate(inContent) * it.UvRect.zw;
 
     // SampleLevel, not Sample: frac() above makes uv DISCONTINUOUS at every tile seam, so the hardware's derivative -
     // which is what Sample picks a mip level by - spikes there and that one column of pixels is drawn from the smallest
@@ -1552,9 +1554,10 @@ float4 TexRectPS(TexPSInput input) : SV_Target
     float ramp = saturate(0.5 - d / aa);
     float crisp = step(d, 0.0);
     fill.a *= lerp(crisp, ramp, max(step(0.001, r), isEllipse));   // an ellipse is ALL curve, so it always earns the ramp
-    // ONE copy that does not fill the shape (Uniform / None): outside its drawn rect there is nothing to paint.
-    float inside = step(0.0, inDrawn.x) * step(inDrawn.x, 1.0) * step(0.0, inDrawn.y) * step(inDrawn.y, 1.0);
-    fill.a *= lerp(1.0, inside, clip);
+    // Outside the content's rect there is nothing to paint - the gap a Uniform fit leaves around EVERY tile, and the
+    // whole of the shape a single copy does not reach.
+    float inside = step(0.0, inContent.x) * step(inContent.x, 1.0) * step(0.0, inContent.y) * step(inContent.y, 1.0);
+    fill.a *= inside;
     return fill;
 }
 
@@ -1942,11 +1945,11 @@ float4 HaloLivingPS(HaloPSInput input) : SV_Target
 struct TexGeomData
 {
     float4x4 Local;      // element local -> SLOT space (the slot's matrix is applied on top, from the transform table)
-    float4 Params;       // .x = clip flag (1 = ONE copy that must not spill outside its drawn rect); .w = transform slot
+    float4 Params;       // .x repeat flag, .y mirror flags (1 = X, 2 = Y, 3 = both), .w transform slot
     float4 LocalBounds;  // shape local bounds: minXY, sizeXY - the box the picture is mapped across
-    float4 Drawn;        // the drawn rect inside that box: offsetXY, scaleXY, both in 0..1 of the box
+    float4 Tile;         // tile grid over that box: tiles per axis (.xy), grid origin in tiles (.zw)
+    float4 Drawn;        // the content's rect inside ONE tile: offsetXY, scaleXY, both in 0..1 of the tile
     float4 UvRect;       // the sub-rectangle of the source one copy samples
-    float4 UvRepeat;     // .xy copies per axis, .z mirror flags (1 = X, 2 = Y)
     float4 Tint;
 };
 
@@ -1978,23 +1981,24 @@ float4 TexFillPS(TexFillPSInput input) : SV_Target
     TexGeomData* items = (TexGeomData*)InstancesAddress;
     TexGeomData it = items[input.InstId];
 
-    // 0..1 across the shape's box -> the drawn rect's own space -> the source's sub-rectangle, repeated.
+    // 0..1 across the shape's box -> TILE space -> the content's rect inside one tile -> the source's sub-rectangle.
     float2 t = (input.Local - it.LocalBounds.xy) / max(it.LocalBounds.zw, float2(1e-4, 1e-4));
-    float2 n = (t - it.Drawn.xy) / max(it.Drawn.zw, float2(1e-4, 1e-4));
-    float2 nn = n * it.UvRepeat.xy;
+    float2 nn = t * it.Tile.xy - it.Tile.zw;
     // A SINGLE copy never wraps - frac() would send its far edge back to the opposite one (see TexRectPS).
-    float2 wrapped = lerp(frac(nn), saturate(nn), it.Params.x);
+    float2 tileLocal = lerp(nn, frac(nn), it.Params.x);
     float2 mirrored = abs(frac(nn * 0.5) * 2.0 - 1.0);
-    float2 pick = float2(step(0.5, fmod(it.UvRepeat.z, 2.0)), step(0.5, floor(it.UvRepeat.z * 0.5)));
-    float2 uv = it.UvRect.xy + lerp(wrapped, mirrored, pick) * it.UvRect.zw;
+    float2 pick = float2(step(0.5, fmod(it.Params.y, 2.0)), step(0.5, floor(it.Params.y * 0.5)));
+    float2 inTile = lerp(tileLocal, mirrored, pick);
+    float2 n = (inTile - it.Drawn.xy) / max(it.Drawn.zw, float2(1e-4, 1e-4));
+    float2 uv = it.UvRect.xy + saturate(n) * it.UvRect.zw;
 
     // SampleLevel, not Sample: frac() makes uv discontinuous at every tile seam, and the derivative Sample picks its mip
     // by spikes there - one column of pixels from the smallest mip, i.e. a thin line down each seam.
     float4 color = SourceTexture.SampleLevel(SourceSampler, uv, 0.0) * it.Tint;
 
-    // ONE copy that does not fill the shape (Uniform / None): outside its drawn rect there is nothing to paint.
+    // Outside the content's rect inside its tile there is nothing to paint - the gap a Uniform fit leaves.
     float inside = step(0.0, n.x) * step(n.x, 1.0) * step(0.0, n.y) * step(n.y, 1.0);
-    color.a *= lerp(1.0, inside, it.Params.x);
+    color.a *= inside;
 
     return color;
 }
@@ -2037,16 +2041,17 @@ float4 TexFringePS(TexFringePSInput input) : SV_Target
     // The ring is expanded a pixel OUTWARD, so its outer edge lies just outside the shape's box: clamp before mapping,
     // or the band would sample past the picture (and the single-copy clip below would erase the fringe entirely).
     float2 t = saturate((input.Local - it.LocalBounds.xy) / max(it.LocalBounds.zw, float2(1e-4, 1e-4)));
-    float2 n = (t - it.Drawn.xy) / max(it.Drawn.zw, float2(1e-4, 1e-4));
-    float2 nn = n * it.UvRepeat.xy;
-    float2 wrapped = lerp(frac(nn), saturate(nn), it.Params.x);
+    float2 nn = t * it.Tile.xy - it.Tile.zw;
+    float2 tileLocal = lerp(nn, frac(nn), it.Params.x);
     float2 mirrored = abs(frac(nn * 0.5) * 2.0 - 1.0);
-    float2 pick = float2(step(0.5, fmod(it.UvRepeat.z, 2.0)), step(0.5, floor(it.UvRepeat.z * 0.5)));
-    float2 uv = it.UvRect.xy + lerp(wrapped, mirrored, pick) * it.UvRect.zw;
+    float2 pick = float2(step(0.5, fmod(it.Params.y, 2.0)), step(0.5, floor(it.Params.y * 0.5)));
+    float2 inTile = lerp(tileLocal, mirrored, pick);
+    float2 n = (inTile - it.Drawn.xy) / max(it.Drawn.zw, float2(1e-4, 1e-4));
+    float2 uv = it.UvRect.xy + saturate(n) * it.UvRect.zw;
 
     float4 color = SourceTexture.SampleLevel(SourceSampler, uv, 0.0) * it.Tint;
     float inside = step(0.0, n.x) * step(n.x, 1.0) * step(0.0, n.y) * step(n.y, 1.0);
-    color.a *= lerp(1.0, inside, it.Params.x) * input.Coverage;
+    color.a *= inside * input.Coverage;
 
     return color;
 }

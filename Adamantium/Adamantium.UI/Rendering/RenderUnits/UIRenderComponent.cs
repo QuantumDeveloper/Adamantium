@@ -248,7 +248,7 @@ public class GeometryRenderComponent : UIRenderComponent
 
         // The mesh is in LOCAL units and the world scale is applied by the vertex shader, so a tile is sized against the
         // scale here - otherwise the picture would tile by local units and change density with the element's scale.
-        var (drawn, uvRect, uvRepeat) = ImageTiling.Layout(image, box, world.M11, world.M22);
+        var layout = ImageTiling.Layout(image, box, world.M11, world.M22);
         var tint = image.Tint.ToVector4();
         tint.W *= (float)image.Opacity;
 
@@ -256,16 +256,12 @@ public class GeometryRenderComponent : UIRenderComponent
         UIBasicEffect.World.SetValue(world);
         UIBasicEffect.Opacity.SetValue(RenderData.Opacity);
         UIBasicEffect.FillBounds.SetValue(new Vector4F((float)box.X, (float)box.Y, (float)box.Width, (float)box.Height));
-        UIBasicEffect.TexDrawn.SetValue(new Vector4F(
-            (float)((drawn.X - box.X) / box.Width),
-            (float)((drawn.Y - box.Y) / box.Height),
-            (float)(drawn.Width / box.Width),
-            (float)(drawn.Height / box.Height)));
-        UIBasicEffect.TexUvRect.SetValue(uvRect);
-        UIBasicEffect.TexUvRepeat.SetValue(uvRepeat);
+        UIBasicEffect.TexTile.SetValue(layout.Tile);
+        UIBasicEffect.TexDrawn.SetValue(layout.Drawn);
+        UIBasicEffect.TexUvRect.SetValue(layout.UvRect);
         UIBasicEffect.TexTint.SetValue(tint);
-        // Only a single copy that does NOT fill the shape has an outside to keep clear; a tiled one covers everything.
-        UIBasicEffect.TexClip.SetValue(image.TileMode == TileMode.None ? 1f : 0f);
+        UIBasicEffect.TexRepeat.SetValue(layout.Repeats ? 1f : 0f);
+        UIBasicEffect.TexMirror.SetValue(layout.Mirror);
         UIBasicEffect.ShaderTexture.SetResource(texture);
         UIBasicEffect.SampleType.SetResource(((GraphicsDevice)GraphicsDevice).SamplerStates.LinearClampToEdge);
         UIBasicEffect.BasicTexturedFillPass.Apply();

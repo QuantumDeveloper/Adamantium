@@ -24,11 +24,12 @@ float opacity = 1;
 // mapping - so the picture is mapped across the shape's own LOCAL bounding box here instead. Same tiling arithmetic as
 // the batch (ImageTiling): WHICH part of the source one copy takes and HOW MANY copies fit.
 float4 fillBounds;    // the shape's local box (x, y, w, h) the picture is mapped across
-float4 texDrawn;      // the drawn rect INSIDE that box, as (offsetX, offsetY, scaleX, scaleY) in 0..1 of it
+float4 texTile;       // tile grid over that box: tiles per axis (.xy), grid origin in tiles (.zw)
+float4 texDrawn;      // the content's rect inside ONE tile, as (offsetX, offsetY, scaleX, scaleY) in 0..1 of it
 float4 texUvRect;     // the sub-rectangle of the source one copy samples
-float4 texUvRepeat;   // .xy copies per axis, .z mirror flags (1 = X, 2 = Y)
 float4 texTint = float4(1, 1, 1, 1);
-float texClip;        // 1 = ONE copy that must not spill outside its drawn rect (Uniform / None)
+float texRepeat;      // 1 = the tile repeats; 0 = a single copy, which must never wrap
+float texMirror;      // mirror flags: 1 = X, 2 = Y, 3 = both
 
 VERTEX_OUTPUT UIVertexShader(UI_VERTEX input)
 {
@@ -74,22 +75,24 @@ VERTEX_OUTPUT TexturedFillVS(UI_VERTEX input)
 
 float4 TexturedFill_PS(VERTEX_OUTPUT input) : SV_TARGET
 {
-    // 0..1 across the shape's box -> the drawn rect's own space -> the source's sub-rectangle, repeated.
-    float2 n = (input.uv0 - texDrawn.xy) / max(texDrawn.zw, float2(1e-4, 1e-4));
-    float2 nn = n * texUvRepeat.xy;
-    float2 wrapped = frac(nn);
+    // 0..1 across the shape's box -> TILE space -> the content's rect inside one tile -> the source's sub-rectangle.
+    float2 nn = input.uv0 * texTile.xy - texTile.zw;
+    // A SINGLE copy never wraps: frac() would send its far edge back to the opposite one.
+    float2 tileLocal = lerp(nn, frac(nn), texRepeat);
     // MIRRORED repeat: every other copy runs backwards, so a picture never drawn to tile still meets its own reflection.
     float2 mirrored = abs(frac(nn * 0.5) * 2.0 - 1.0);
-    float2 pick = float2(step(0.5, fmod(texUvRepeat.z, 2.0)), step(0.5, floor(texUvRepeat.z * 0.5)));
-    float2 uv = texUvRect.xy + lerp(wrapped, mirrored, pick) * texUvRect.zw;
+    float2 pick = float2(step(0.5, fmod(texMirror, 2.0)), step(0.5, floor(texMirror * 0.5)));
+    float2 inTile = lerp(tileLocal, mirrored, pick);
+    float2 n = (inTile - texDrawn.xy) / max(texDrawn.zw, float2(1e-4, 1e-4));
+    float2 uv = texUvRect.xy + saturate(n) * texUvRect.zw;
 
     // SampleLevel, not Sample: frac() makes uv discontinuous at every tile seam, and the derivative Sample picks its mip
     // by spikes there - one column of pixels drawn from the smallest mip, i.e. a thin line down each seam.
     float4 color = shaderTexture.SampleLevel(sampleType, uv, 0.0) * texTint;
 
-    // ONE copy that does not fill the shape (Uniform / None): outside its drawn rect there is nothing to paint.
+    // Outside the content's rect inside its tile there is nothing to paint - the gap a Uniform fit leaves.
     float inside = step(0.0, n.x) * step(n.x, 1.0) * step(0.0, n.y) * step(n.y, 1.0);
-    color.a *= lerp(1.0, inside, texClip);
+    color.a *= inside;
     color.a *= opacity;
 
     return color;

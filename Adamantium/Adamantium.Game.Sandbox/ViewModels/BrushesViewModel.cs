@@ -1,6 +1,7 @@
 using System;
 using Adamantium.Mathematics;
 using Adamantium.MVVM;
+using Adamantium.UI.Core;
 using Adamantium.UI.Core.Collections;
 using Adamantium.UI.Core.Media.Imaging;
 using Adamantium.UI.Core.Media;
@@ -16,7 +17,8 @@ public partial class BrushesViewModel : TabPageViewModel
     public BrushesViewModel() : base("Brushes")
     {
         LiveImage.TileMode = _imageTileMode;
-        LiveImage.TileSize = new Size(_imageTile, _imageTile);
+        LiveImage.ViewportUnits = BrushMappingMode.Absolute;
+        LiveImage.Viewport = new Rect(0, 0, _imageTile, _imageTile);
 
         // Built here rather than in an initializer: the brush's first skin comes from the list below, and one source of
         // truth for "which skin is on" beats repeating the path.
@@ -79,7 +81,7 @@ public partial class BrushesViewModel : TabPageViewModel
     partial void OnImageTintChanged(Color value) => LiveImage.Tint = value;
 
     // One number for both axes: a square tile is what a texture is normally drawn as, and two sliders would be noise.
-    partial void OnImageTileChanged(double value) => LiveImage.TileSize = new Size(value, value);
+    partial void OnImageTileChanged(double value) => LiveImage.Viewport = new Rect(0, 0, value, value);
     partial void OnImageWidthChanged(double value)
     {
         ImageTriangle = Triangle(value, _imageHeight);

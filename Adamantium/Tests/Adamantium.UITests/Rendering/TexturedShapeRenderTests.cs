@@ -267,6 +267,30 @@ public class TexturedShapeRenderTests
             $"the ellipse was cut to the fitted rect instead of staying a circle: {offAxis}");
     }
 
+    // A VIEWPORT smaller than the shape is what makes a tile a tile: two tiles across means the source's left half
+    // appears twice, at the shape's left edge and again at its middle.
+    [Test]
+    public void AnAbsoluteViewportTilesTheSourceAcrossTheShape()
+    {
+        var brush = new ImageBrush
+        {
+            Source = _tall,
+            TileMode = TileMode.Tile,
+            ViewportUnits = BrushMappingMode.Absolute,
+            Viewport = new Rect(0, 0, Size / 2.0, Size)
+        };
+
+        var pixels = Draw(brush, ellipse: false);
+
+        var firstLeft = At_(pixels, At + 10, At + Size / 2);
+        var firstRight = At_(pixels, At + Size / 2 - 10, At + Size / 2);
+        var secondLeft = At_(pixels, At + Size / 2 + 10, At + Size / 2);
+
+        Assert.That(firstLeft.B, Is.GreaterThan(200), $"tile 1 starts with the source's left half: {firstLeft}");
+        Assert.That(firstRight.G, Is.GreaterThan(200), $"and ends with its right half: {firstRight}");
+        Assert.That(secondLeft.B, Is.GreaterThan(200), $"tile 2 starts over rather than continuing: {secondLeft}");
+    }
+
     // The rectangle it always could do - here to prove the shared pass did not lose it when the ellipse branch went in.
     [Test]
     public void TheRectangleStillPaintsItsCorners()
