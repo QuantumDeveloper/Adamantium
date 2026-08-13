@@ -1,12 +1,19 @@
 ﻿using System;
+using Adamantium.Mathematics;
 using Adamantium.ProceduralGeometry;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Media;
 
 namespace Adamantium.UI.Rendering.Payloads;
 
-public class GeometryPayload(Brush brush, Geometry geometry, Pen pen = null) : IEquatable<GeometryPayload>, IRenderCachePolicy
+public class GeometryPayload(Brush brush, Geometry geometry, Pen pen = null, Matrix4x4F? localTransform = null) : IEquatable<GeometryPayload>, IRenderCachePolicy
 {
+    /// <summary>Where this draw places the geometry, ON TOP of the element's own world transform - how a
+    /// <see cref="Adamantium.UI.Core.Media.Drawings.Drawing"/> puts many shapes at their own positions and scales while
+    /// they all belong to one element. Identity for every ordinary draw. It rides the INSTANCE, never the mesh, so a
+    /// shape drawn at five sizes is still one mesh and five instances.</summary>
+    public Matrix4x4F LocalTransform { get; } = localTransform ?? Matrix4x4F.Identity;
+
     // The LIVE brush, read through its immutable snapshot - see RectanglePayload.
     private readonly Brush _brush = brush?.ForRendering();
 
@@ -46,7 +53,8 @@ public class GeometryPayload(Brush brush, Geometry geometry, Pen pen = null) : I
         if (other is null) return false;
         if (ReferenceEquals(this, other)) return true;
         return Equals(Brush, other.Brush) && Geometry.Equals(other.Geometry)
-               && GeometryVersion == other.GeometryVersion && Equals(Pen, other.Pen);
+               && GeometryVersion == other.GeometryVersion && Equals(Pen, other.Pen)
+               && LocalTransform == other.LocalTransform;
     }
 
     public override bool Equals(object obj)
@@ -59,7 +67,7 @@ public class GeometryPayload(Brush brush, Geometry geometry, Pen pen = null) : I
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(Brush, Geometry, GeometryVersion, Pen);
+        return HashCode.Combine(Brush, Geometry, GeometryVersion, Pen, LocalTransform);
     }
 
     public bool RequiresBufferRebuild(IRenderCachePolicy newState)

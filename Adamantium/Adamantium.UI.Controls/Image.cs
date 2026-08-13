@@ -140,10 +140,39 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
    
    private static void OnSourceChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
    {
-      if (a is Image img)
+      if (a is not Image img) return;
+
+      img.WatchDrawing(e.OldValue, e.NewValue);
+      img.ProcessImageSource();
+   }
+
+   // A DRAWING source only. It is MUTABLE and nobody else is watching it: the property system re-renders when a
+   // BRUSH-valued property changes, but Source is an ImageSource, so recolouring a shape three levels down inside the
+   // drawing would otherwise never reach this element. Every other source kind is immutable and needs none of this.
+   private void WatchDrawing(object oldSource, object newSource)
+   {
+      if (oldSource is DrawingImage previous)
       {
-         img.ProcessImageSource();
+         previous.Changed -= OnDrawingChanged;
       }
+
+      if (newSource is DrawingImage current)
+      {
+         current.Changed += OnDrawingChanged;
+      }
+   }
+
+   // A drawing changing is a SHAPE change, not a recolour of the same commands - the replay emits different geometry -
+   // so this re-records rather than re-baking the paint.
+   private void OnDrawingChanged(object sender, EventArgs e) => InvalidateRender(false);
+
+   // A drawing lives in a RESOURCE, outside the tree, so its bindings have nothing to resolve against until it is hung
+   // on an element that does. Done at the point of use rather than on attach: when this element attaches, the ancestor
+   // chain above it is not finished yet, and an inherited DataContext arriving later notifies nobody. Cheap - it is a
+   // no-op once the owner and its data stop changing.
+   private void EnsureDrawingAttached()
+   {
+      if (Source is DrawingImage drawing) drawing.Attach(this);
    }
    
    public UInt32 MipLevel
@@ -223,7 +252,9 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
 
    public ImageSource Source
    {
-      get => GetValue<BitmapSource>(SourceProperty);
+      // ImageSource, not BitmapSource: every source used to be a bitmap, so the narrower read never showed -
+      // DrawingImage is the first that is not one, and reading it as a BitmapSource yields nothing at all.
+      get => GetValue<ImageSource>(SourceProperty);
       set => SetValue(SourceProperty, value);
    }
 
@@ -433,6 +464,9 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
 
    protected override Size MeasureOverride(Size availableSize)
    {
+      // Before the size is read: a drawing source's extent can itself come from bindings inside the drawing.
+      EnsureDrawingAttached();
+
       if (Source != null)
       {
          var source = Source;
@@ -489,6 +523,16 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
       var destination = new Rect((Bounds.Width - width) / 2, (Bounds.Height - height) / 2, width, height);
 
       var session = context.ForControl(this);
+
+      // A DRAWING source draws itself: its shapes are replayed into this session through the viewbox-to-destination
+      // mapping, so it stays sharp at any size and nothing is rasterised. The cropping the raster paths do below has
+      // nothing to crop here - the fitted rect already carries the Stretch decision.
+      if (image is DrawingImage drawing)
+      {
+         EnsureDrawingAttached();
+         drawing.Render(session, destination);
+         return;
+      }
 
       // An animation draws from ONE texture whose layers are its frames: the frame is a number handed to the shader, so
       // advancing it costs no upload and no allocation. (Before this, every frame became its own texture - a 200-frame

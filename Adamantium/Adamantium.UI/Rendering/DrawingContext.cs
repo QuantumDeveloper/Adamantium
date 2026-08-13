@@ -26,9 +26,9 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
    protected void CreateCommand(object payload)
    {
       var command = new DrawCommand(
-         _currentComponent, 
-         _currentComponent.RenderId, 
-         payload, 
+         _currentComponent,
+         _currentComponent.RenderId,
+         payload,
          GetRenderDataFromComponent());
       drawCommands.Add(command);
    }
@@ -117,6 +117,13 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
       return this;
    }
 
+   IDrawingSession IDrawingSession.DrawGeometry(Brush brush, Geometry geometry, Pen pen, Matrix4x4F transform)
+   {
+      if (!brush.IsVisible() && pen == null) return this;
+      CreateCommand(new GeometryPayload(brush, geometry, pen, transform));
+      return this;
+   }
+
    IDrawingSession IDrawingSession.DrawImage(ImageSource image, Brush filter, Rect destinationRect, CornerRadius corners)
    {
       var payload = new ImagePayload(filter, image, destinationRect, corners);
@@ -152,6 +159,15 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
          CreateCommand(new RectanglePayload(background, new Rect(desiredSize), CornerRadius.Empty, null));
       var payload = new TextPayload(renderingParameters, desiredSize, textLayout, foreground, background, stroke);
       CreateCommand(payload);
+      return this;
+   }
+
+   IDrawingSession IDrawingSession.DrawText(TextRenderingParameters renderingParameters, Size desiredSize, TextLayout textLayout, Brush foreground, Brush background, Brush stroke, Matrix4x4F transform)
+   {
+      if (background.IsVisible())
+         CreateCommand(new RectanglePayload(background, new Rect(desiredSize), CornerRadius.Empty, null));
+      
+      CreateCommand(new TextPayload(renderingParameters, desiredSize, textLayout, foreground, background, stroke, transform));
       return this;
    }
 

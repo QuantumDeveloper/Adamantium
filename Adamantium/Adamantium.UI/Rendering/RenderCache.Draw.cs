@@ -563,7 +563,10 @@ public partial class RenderCache
                 // Node-aware, same as the rect batch: glyphs pack NODE-LOCAL with the node's transform-table slot, so a block
                 // under a motion node (a scroll list) rides the O(1) slot-write fast path. ResolveBake returns the
                 // node-relative transform + slot (world + slot 0 off any node).
-                var textBake = ResolveBake(device, unit.Component, wt, out var slot4Text);
+                // The unit's own placement on top of the bake - a Drawing's text run sits at its own spot inside the
+                // element. Folded here because this batch takes the COMPONENT, which cannot reach the payload; the
+                // per-unit path composes the same value through Update.
+                var textBake = tru.Place(ResolveBake(device, unit.Component, wt, out var slot4Text));
                 if (_textBatch.TryAdd(tc, textBake, slot4Text, scissor, atlas, LogicalBounds(unit.Component, wt)))
                 {
                     if (_recording) group.PatchableRectOnly = false;   // text is a separate collector, not rect-splice-patchable
@@ -581,6 +584,16 @@ public partial class RenderCache
                 // natural z-layer (paint order), not all-at-once.
                 if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
+                // A flush lays every pending FILL down and only then every FRINGE on top (fill-under-fringe). So a shape
+                // added next to one it OVERLAPS gets the earlier shape's semi-transparent AA edge painted over its own
+                // fill - a visible band wherever two shapes cross, which is what the arms of a drawn cross show. Close
+                // the group first when they really do overlap, so each fringe can only land on its own fill. Costs a
+                // flush per crossing, not per shape - shapes that do not overlap still batch together.
+                if (gru.HasInstancedFringe &&
+                    _instancedFill.OverlapsPending(gru.Payload.Geometry.Bounds.TransformToAABB(gru.Place(wt))))
+                {
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                }
                 var fillBake = ResolveBake(device, unit.Component, wt, out var slot4Fill);
                 if (_instancedFill.TryAdd(gru, fillBake, scissor, LogicalBounds(unit.Component, wt), slot4Fill))
                 {
