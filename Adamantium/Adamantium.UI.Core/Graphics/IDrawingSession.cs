@@ -14,6 +14,12 @@ public interface IDrawingSession
     IDrawingSession DrawRectangle(Brush brush, Rect destinationRect, CornerRadius corners, Pen pen = null);
     IDrawingSession DrawEllipse(Rect destinationRect, Brush brush, Double startAngle, Double sweepAngle, EllipseType ellipseType, Pen pen = null);
     IDrawingSession DrawGeometry(Brush brush, Geometry geometry, Pen pen = null);
+
+    /// <summary>Draws the geometry placed by <paramref name="transform"/>, WITHOUT touching the geometry itself. A
+    /// <see cref="Media.Drawings.Drawing"/> replays this way: the same shape appears at several sizes and positions in
+    /// one frame, and each placement must stay a separate instance of ONE shared mesh. Baking the placement into the
+    /// geometry instead would give every size its own tessellation and defeat the instancing outright.</summary>
+    IDrawingSession DrawGeometry(Brush brush, Geometry geometry, Pen pen, Matrix4x4F transform);
     IDrawingSession DrawImage(ImageSource image, Brush filter, Rect destinationRect, CornerRadius corners);
 
     /// <summary>Draws a normalised (0..1) SUB-RECT of the image into <paramref name="destinationRect"/> - a mosaic tile
@@ -29,5 +35,16 @@ public interface IDrawingSession
         Brush foreground, 
         Brush background,
         Brush stroke);
+    /// <summary>Draws the text run placed by <paramref name="transform"/>. Needed for the same reason DrawGeometry has
+    /// one: a <see cref="Media.Drawings.Drawing"/> puts several runs at their own spots inside a single element, and the
+    /// text area cannot say where - it aligns the run WITHIN the layout, while the quad itself is placed by the unit.</summary>
+    IDrawingSession DrawText(TextRenderingParameters renderingParameters,
+        Size desiredSize,
+        TextLayout textLayout,
+        Brush foreground,
+        Brush background,
+        Brush stroke,
+        Matrix4x4F transform);
+
     IDrawingSession PushImage(ImageSource image);
 }

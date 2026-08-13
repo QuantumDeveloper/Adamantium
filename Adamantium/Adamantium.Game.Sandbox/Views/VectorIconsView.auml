@@ -1,0 +1,315 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions">
+    <!-- DataContext is the VectorIconsViewModel. One DrawingImage resource, shown at five sizes at once: the whole
+         claim of the vector path is that the 320px one and the 16px one are the same drawing, replayed - not a bitmap
+         stretched. Zoom in on the big one and the edges must stay clean. -->
+    <ResourceContext.Resources>
+        <!-- A folder icon: body, tab and a stroked outline, authored in a 0..24 box. The brushes bind to the view
+             model, so the colour knobs recolour every size at once. -->
+        <DrawingImage x:Key="FolderIcon">
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Brush>
+                        <SolidColorBrush Color="{Binding Body}"/>
+                    </GeometryDrawing.Brush>
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="2,7,20,14"
+                                           CornerRadius="2"/>
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Brush>
+                        <SolidColorBrush Color="{Binding Accent}"/>
+                    </GeometryDrawing.Brush>
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="2,4,9,4"
+                                           CornerRadius="1"/>
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GeometryDrawing>
+                    <GeometryDrawing.Brush>
+                        <SolidColorBrush Color="{Binding Accent}"/>
+                    </GeometryDrawing.Brush>
+                    <GeometryDrawing.Geometry>
+                        <EllipseGeometry Center="12,14"
+                                         RadiusX="3.5"
+                                         RadiusY="3.5"/>
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+            </DrawingGroup>
+        </DrawingImage>
+
+        <!-- A group TRANSFORM, driven live: the children keep their own geometry, only the placement changes. -->
+        <DrawingImage x:Key="RotatingBadge">
+            <DrawingGroup>
+                <GeometryDrawing Brush="#1E293B">
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="0,0,24,24"
+                                           CornerRadius="4"/>
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <DrawingGroup>
+                    <DrawingGroup.Transform>
+                        <Transform RotationAngle="{Binding Rotation}"
+                                   RotationCenterX="12"
+                                   RotationCenterY="12"/>
+                    </DrawingGroup.Transform>
+                    <GeometryDrawing>
+                    <GeometryDrawing.Brush>
+                        <SolidColorBrush Color="{Binding Accent}"/>
+                    </GeometryDrawing.Brush>
+                        <GeometryDrawing.Geometry>
+                            <RectangleGeometry Rect="10.5,3,3,18"
+                                               CornerRadius="1.5"/>
+                        </GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                    <GeometryDrawing>
+                    <GeometryDrawing.Brush>
+                        <SolidColorBrush Color="{Binding Body}"/>
+                    </GeometryDrawing.Brush>
+                        <GeometryDrawing.Geometry>
+                            <RectangleGeometry Rect="3,10.5,18,3"
+                                               CornerRadius="1.5"/>
+                        </GeometryDrawing.Geometry>
+                    </GeometryDrawing>
+                </DrawingGroup>
+            </DrawingGroup>
+        </DrawingImage>
+
+        <!-- Text INSIDE a drawing: re-shaped at the size it is drawn at, never a scaled picture of glyphs. -->
+        <DrawingImage x:Key="LetteredTile">
+            <DrawingGroup>
+                <GeometryDrawing>
+                    <GeometryDrawing.Brush>
+                        <SolidColorBrush Color="{Binding Accent}"/>
+                    </GeometryDrawing.Brush>
+                    <GeometryDrawing.Geometry>
+                        <RectangleGeometry Rect="0,0,48,24"
+                                           CornerRadius="4"/>
+                    </GeometryDrawing.Geometry>
+                </GeometryDrawing>
+                <GlyphRunDrawing Text="{Binding Caption}"
+                                 FontSize="9"
+                                 Box="0,0,48,24">
+                    <GlyphRunDrawing.Foreground>
+                        <SolidColorBrush Color="{Binding CaptionColor}"/>
+                    </GlyphRunDrawing.Foreground>
+                </GlyphRunDrawing>
+            </DrawingGroup>
+        </DrawingImage>
+    </ResourceContext.Resources>
+
+    <ScrollViewer Margin="24"
+                  HorizontalScrollBarVisibility="Disabled"
+                  VerticalScrollBarVisibility="Auto">
+        <StackPanel Orientation="Vertical">
+
+            <TextBlock Text="One drawing, every size"
+                       FontSize="18"
+                       Margin="0,0,0,4"/>
+            <TextBlock Text="All six below are the SAME DrawingImage resource. Nothing is rasterised: each is replayed through its own placement, so the edges stay clean at any size and a DPI change costs nothing."
+                       Foreground="{ResourceReference TextFillColorSecondary}"
+                       TextWrapping="WrapByWords"
+                       MarginBottom="14"/>
+
+            <StackPanel Orientation="Horizontal"
+                        VerticalAlignment="Bottom">
+                <Image Source="{ResourceReference FolderIcon}"
+                       Width="{Binding ShowcaseSize}"
+                       Height="{Binding ShowcaseSize}"
+                       MarginRight="20"/>
+                <Image Source="{ResourceReference FolderIcon}"
+                       Width="96"
+                       Height="96"
+                       MarginRight="16"/>
+                <Image Source="{ResourceReference FolderIcon}"
+                       Width="48"
+                       Height="48"
+                       MarginRight="12"/>
+                <Image Source="{ResourceReference FolderIcon}"
+                       Width="32"
+                       Height="32"
+                       MarginRight="10"/>
+                <Image Source="{ResourceReference FolderIcon}"
+                       Width="20"
+                       Height="20"
+                       MarginRight="10"/>
+                <Image Source="{ResourceReference FolderIcon}"
+                       Width="16"
+                       Height="16"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal"
+                        Margin="0,18,0,0">
+                <StackPanel Orientation="Vertical"
+                            MarginRight="28">
+                    <TextBlock Text="Showcase size"
+                               Foreground="{ResourceReference TextFillColorSecondary}"
+                               MarginBottom="2"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Slider Width="230"
+                                Minimum="24"
+                                Maximum="360"
+                                IsMoveToPointEnabled="true"
+                                Value="{Binding ShowcaseSize, Mode=TwoWay}"
+                                VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding ShowcaseSize}"
+                                   Width="52"
+                                   MarginLeft="8"
+                                   VerticalAlignment="Center"
+                                   Foreground="{ResourceReference TextFillColorSecondary}"/>
+                    </StackPanel>
+
+                    <TextBlock Text="Group rotation (badge)"
+                               Foreground="{ResourceReference TextFillColorSecondary}"
+                               Margin="0,12,0,2"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Slider Width="230"
+                                Minimum="0"
+                                Maximum="360"
+                                IsMoveToPointEnabled="true"
+                                Value="{Binding Rotation, Mode=TwoWay}"
+                                VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding Rotation}"
+                                   Width="52"
+                                   MarginLeft="8"
+                                   VerticalAlignment="Center"
+                                   Foreground="{ResourceReference TextFillColorSecondary}"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Orientation="Vertical"
+                            VerticalAlignment="Top">
+                    <TextBlock Text="Colours — one edit, every size"
+                               Foreground="{ResourceReference TextFillColorSecondary}"
+                               MarginBottom="8"/>
+                    <TextBlock Text="Accent"
+                               Foreground="{ResourceReference TextFillColorSecondary}"
+                               MarginBottom="2"/>
+                    <ColorPickerButton SelectedColor="{Binding Accent, Mode=TwoWay}"
+                                       Width="200"
+                                       Height="30"
+                                       MarginBottom="12"/>
+                    <TextBlock Text="Body"
+                               Foreground="{ResourceReference TextFillColorSecondary}"
+                               MarginBottom="2"/>
+                    <ColorPickerButton SelectedColor="{Binding Body, Mode=TwoWay}"
+                                       Width="200"
+                                       Height="30"/>
+                    <TextBlock Text="Caption"
+                               Foreground="{ResourceReference TextFillColorSecondary}"
+                               Margin="0,12,0,2"/>
+                    <ColorPickerButton SelectedColor="{Binding CaptionColor, Mode=TwoWay}"
+                                       Width="200"
+                                       Height="30"/>
+                </StackPanel>
+            </StackPanel>
+
+            <TextBlock Text="A transform inside the drawing"
+                       FontSize="18"
+                       Margin="0,24,0,4"/>
+            <TextBlock Text="The cross belongs to a nested DrawingGroup with its own Transform. Its geometry never changes — only where the group puts it — so the two sizes below stay one shared mesh while they turn."
+                       Foreground="{ResourceReference TextFillColorSecondary}"
+                       TextWrapping="WrapByWords"
+                       MarginBottom="12"/>
+            <StackPanel Orientation="Horizontal"
+                        VerticalAlignment="Bottom">
+                <Image Source="{ResourceReference RotatingBadge}"
+                       Width="160"
+                       Height="160"
+                       MarginRight="18"/>
+                <Image Source="{ResourceReference RotatingBadge}"
+                       Width="56"
+                       Height="56"/>
+            </StackPanel>
+
+            <TextBlock Text="Raster fallback: a drawing as a texture"
+                       FontSize="18"
+                       Margin="0,24,0,4"/>
+            <TextBlock Text="An ImageBrush samples a TEXTURE, so it cannot replay a drawing. The drawing is baked once at the size the fill needs and sampled from there; the vector path stays the default, this is the fallback."
+                       Foreground="{ResourceReference TextFillColorSecondary}"
+                       TextWrapping="WrapByWords"
+                       MarginBottom="12"/>
+            <StackPanel Orientation="Horizontal">
+                <Rectangle Width="220"
+                           Height="140"
+                           CornerRadius="12"
+                           MarginRight="18">
+                    <Rectangle.Fill>
+                        <ImageBrush>
+                            <ImageBrush.Source>
+                                <DrawingImage>
+                                    <DrawingGroup>
+                                        <GeometryDrawing Brush="#0F172A">
+                                            <GeometryDrawing.Geometry>
+                                                <RectangleGeometry Rect="0,0,24,24" CornerRadius="2"/>
+                                            </GeometryDrawing.Geometry>
+                                        </GeometryDrawing>
+                                        <GeometryDrawing Brush="#38BDF8">
+                                            <GeometryDrawing.Geometry>
+                                                <EllipseGeometry Center="12,9" RadiusX="5" RadiusY="5"/>
+                                            </GeometryDrawing.Geometry>
+                                        </GeometryDrawing>
+                                        <GeometryDrawing Brush="#E2E8F0">
+                                            <GeometryDrawing.Geometry>
+                                                <RectangleGeometry Rect="4,17,16,3" CornerRadius="1.5"/>
+                                            </GeometryDrawing.Geometry>
+                                        </GeometryDrawing>
+                                    </DrawingGroup>
+                                </DrawingImage>
+                            </ImageBrush.Source>
+                        </ImageBrush>
+                    </Rectangle.Fill>
+                </Rectangle>
+                <Ellipse Width="140"
+                         Height="140">
+                    <Ellipse.Fill>
+                        <ImageBrush>
+                            <ImageBrush.Source>
+                                <DrawingImage>
+                                    <DrawingGroup>
+                                        <GeometryDrawing Brush="#0F172A">
+                                            <GeometryDrawing.Geometry>
+                                                <RectangleGeometry Rect="0,0,24,24" CornerRadius="2"/>
+                                            </GeometryDrawing.Geometry>
+                                        </GeometryDrawing>
+                                        <GeometryDrawing Brush="#38BDF8">
+                                            <GeometryDrawing.Geometry>
+                                                <EllipseGeometry Center="12,9" RadiusX="5" RadiusY="5"/>
+                                            </GeometryDrawing.Geometry>
+                                        </GeometryDrawing>
+                                        <GeometryDrawing Brush="#E2E8F0">
+                                            <GeometryDrawing.Geometry>
+                                                <RectangleGeometry Rect="4,17,16,3" CornerRadius="1.5"/>
+                                            </GeometryDrawing.Geometry>
+                                        </GeometryDrawing>
+                                    </DrawingGroup>
+                                </DrawingImage>
+                            </ImageBrush.Source>
+                        </ImageBrush>
+                    </Ellipse.Fill>
+                </Ellipse>
+            </StackPanel>
+
+            <TextBlock Text="Text inside a drawing"
+                       FontSize="18"
+                       Margin="0,24,0,4"/>
+            <TextBlock Text="A GlyphRunDrawing is re-shaped at the size it is drawn at, so the big tile gets glyphs shaped for the big tile rather than stretched ones."
+                       Foreground="{ResourceReference TextFillColorSecondary}"
+                       TextWrapping="WrapByWords"
+                       MarginBottom="12"/>
+            <StackPanel Orientation="Horizontal"
+                        VerticalAlignment="Bottom"
+                        MarginBottom="24">
+                <Image Source="{ResourceReference LetteredTile}"
+                       Width="260"
+                       Height="130"
+                       MarginRight="18"/>
+                <Image Source="{ResourceReference LetteredTile}"
+                       Width="96"
+                       Height="48"/>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</View>

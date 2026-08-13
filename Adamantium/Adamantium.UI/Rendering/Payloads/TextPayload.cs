@@ -12,8 +12,14 @@ public class TextPayload(
     TextLayout textLayout,
     Brush foreground,
     Brush background,
-    Brush stroke) : IEquatable<TextPayload>, IRenderCachePolicy
+    Brush stroke,
+    Matrix4x4F? localTransform = null) : IEquatable<TextPayload>, IRenderCachePolicy
 {
+    /// <summary>Where this run sits ON TOP of the element's world transform. The text quad is anchored at its own CENTRE
+    /// in mesh-local space and placed by the unit's transform - the text AREA only aligns the run inside the layout - so
+    /// a drawing putting several runs at their own spots inside one element has nowhere else to say where they go.</summary>
+    public Matrix4x4F LocalTransform { get; } = localTransform ?? Matrix4x4F.Identity;
+
     public TextRenderingParameters TextRenderingParameters { get; } = renderingParameters;
     public Size DesiredSize { get; } = desiredSize;
     public TextLayout TextLayout { get; } = textLayout;
@@ -35,7 +41,7 @@ public class TextPayload(
 
     public override int GetHashCode()
     {
-        return HashCode.Combine(TextRenderingParameters, DesiredSize, TextLayout, Foreground, Background, Stroke);
+        return HashCode.Combine(TextRenderingParameters, DesiredSize, TextLayout, Foreground, Background, Stroke, LocalTransform);
     }
 
     public bool RequiresBufferRebuild(IRenderCachePolicy newState)
@@ -53,7 +59,7 @@ public class TextPayload(
         return Equals(TextRenderingParameters, other.TextRenderingParameters) &&
                DesiredSize.Equals(other.DesiredSize) && Equals(TextLayout, other.TextLayout) &&
                Equals(Foreground, other.Foreground) && Equals(Background, other.Background) &&
-               Equals(Stroke, other.Stroke);
+               Equals(Stroke, other.Stroke) && LocalTransform == other.LocalTransform;
     }
 
     public override bool Equals(object obj)

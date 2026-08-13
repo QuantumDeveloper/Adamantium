@@ -32,6 +32,7 @@ public partial class GalleryViewModel
         new TextViewModel(),
         new SlidePanelViewModel(),
         new ImageViewModel(),
+        new VectorIconsViewModel(),
         new LayoutViewModel(),
         new ViewboxViewModel(),
         new ZoomBoxViewModel(),

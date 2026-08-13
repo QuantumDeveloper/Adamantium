@@ -68,7 +68,7 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
     /// <summary>The GPU texture a brush samples, or null - either it is not a textured brush, or its source is still
     /// decoding (in which case the next re-render picks it up, the way ImageRenderUnit does). ONE statement of "which
     /// brushes carry a texture", asked by every render unit that can route here rather than restated per shape.</summary>
-    internal static ITexture BrushTexture(Brush brush, IResourceFactory factory)
+    internal static ITexture BrushTexture(Brush brush, IResourceFactory factory, Size size = default, IUIComponent owner = null)
     {
         var source = brush switch
         {
@@ -77,7 +77,20 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
             _ => null
         };
 
-        return source is BitmapSource bitmap ? bitmap.GetOrCreateTexture(factory) : null;
+        if (source is BitmapSource bitmap) return bitmap.GetOrCreateTexture(factory);
+
+        // A VECTOR source has no pixels to sample, so this is where the raster fallback earns its keep: hand over the
+        // bake if there is one, and otherwise queue it and draw nothing this frame - the same "not ready yet" answer a
+        // picture still being decoded gives. Size comes from the fill, so each fill gets a bake at its own size.
+        if (source is DrawingImage vector)
+        {
+            var baked = DrawingImageRaster.Get(vector, size);
+            if (baked != null) return baked.GetOrCreateTexture(factory);
+
+            DrawingImageRaster.Request(vector, size, owner);
+        }
+
+        return null;
     }
 
     /// <summary>Whether this fill belongs to the textured batch at all. STATIC because it is asked before the collector

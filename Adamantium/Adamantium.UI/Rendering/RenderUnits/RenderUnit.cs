@@ -270,10 +270,19 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
             if (FillFringeRenderer != null) FillFringeRenderer.RenderData = renderData;
             if (StrokeRenderer != null) StrokeRenderer.RenderData = renderData;
         }
-        GeometryRenderer?.Update(transform, projection);
-        FillFringeRenderer?.Update(transform, projection);
-        StrokeRenderer?.Update(transform, projection);
+        // Place() FIRST, then hand the result to every renderer: a draw carrying its own placement must move its body,
+        // its AA fringe and its stroke together, and this is the only spot all three pass through. RenderData cannot
+        // hold the composed matrix instead - Update overwrites TransformMatrix from the visual walk on every draw, so
+        // anything folded in at record time is gone by the first frame.
+        var placed = Place(transform);
+        GeometryRenderer?.Update(placed, projection);
+        FillFringeRenderer?.Update(placed, projection);
+        StrokeRenderer?.Update(placed, projection);
     }
+
+    /// <summary>Where this unit's draw sits ON TOP of the element's world transform. Identity for every ordinary unit;
+    /// a geometry drawn by a <see cref="Adamantium.UI.Core.Media.Drawings.Drawing"/> carries its own placement.</summary>
+    public virtual Matrix4x4F Place(Matrix4x4F world) => world;
 
     public virtual void PreRender()
     {
@@ -321,6 +330,8 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
         ProcessStrokeData(Payload.Pen, Payload.Geometry);
     }
 
+    public override Matrix4x4F Place(Matrix4x4F world) => Payload.LocalTransform * world;
+
     // Solid arbitrary geometry is instanceable: N identical Paths share one mesh + one instanced draw. A gradient/image
     // fill (or a mesh with no vertices) falls back to the per-unit body. The instanced applier reads the FROZEN mesh
     // snapshot (captured at record after ProcessGeometry), never the live Geometry.Mesh - so it is render-thread safe.
@@ -329,7 +340,11 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
     // A fill the instanced path draws BODY AND FRINGE for builds no per-unit fringe at all: every brush that has an
     // instanced fringe pass, on a mesh that has a ring. What is left per-unit is a mesh with no closed boundary, or a
     // fill kind with no instanced pass at all (an image fill).
-    protected override bool FringeInstanced =>
+    protected override bool FringeInstanced => HasInstancedFringe;
+
+    /// <summary>This unit's AA edge rides the instanced flush, where it is drawn AFTER every pending fill - so it is the
+    /// one that can land on a later shape's fill (see the overlap flush in the draw loop).</summary>
+    public bool HasInstancedFringe =>
         InstancedFillCollector.Enabled && _frozenMesh is { Ring.Length: > 0 } &&
         Payload.Brush is SolidColorBrush or GradientBrush or PatternBrush or NoiseBrush;
 
@@ -392,7 +407,7 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
         key = default; mesh = null; brush = null; localBounds = default; opacity = 1.0; texture = null;
         if (Payload.Brush is not ImageBrush image) return false;
         if (_frozenMesh is not { HasPoints: true } fm) return false;
-        texture = TexRectCollector.BrushTexture(image, ResourceFactory);
+        texture = TexRectCollector.BrushTexture(image, ResourceFactory, Payload.Geometry.Bounds.Size, DrawCommand.Component);
         if (texture == null) return false;
 
         key = fm.Key;
@@ -510,7 +525,8 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
     /// source is still decoding (in which case the next re-render picks it up, the way ImageRenderUnit does).
     /// <para>Lives here because the resource factory does: the textured batch needs the texture but has no business
     /// holding a factory.</para></summary>
-    internal ITexture BrushTexture() => TexRectCollector.BrushTexture(Payload.Brush, ResourceFactory);
+    internal ITexture BrushTexture() => TexRectCollector.BrushTexture(Payload.Brush, ResourceFactory,
+        Payload.DestinationRect.Size, DrawCommand.Component);
 
     // Whether a batch will draw this rect - ASKED OF THE BATCH, never re-stated here. "The batch draws it" means this
     // unit builds ZERO machinery: no tessellation, no geometry/fringe/stroke, no GPU buffers, which is what makes a big
@@ -630,7 +646,8 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
     public double FillOpacity => DrawCommand?.RenderData?.Opacity ?? 1.0;
 
     /// <summary>The GPU texture this ellipse's brush samples, or null - see the rect's twin; both defer to the batch.</summary>
-    internal ITexture BrushTexture() => TexRectCollector.BrushTexture(Payload.Brush, ResourceFactory);
+    internal ITexture BrushTexture() => TexRectCollector.BrushTexture(Payload.Brush, ResourceFactory,
+        Payload.DestinationRect.Size, DrawCommand.Component);
 
     // An ellipse the SDF batch will draw (solid fill, no pen, FULL ellipse): the batch shader reconstructs it from an
     // implicit field and self-anti-aliases, so this unit needs NO tessellated body and NO AA fringe. Building them per
@@ -868,6 +885,8 @@ public class TextRenderUnit : RenderUnit<TextPayload>
     // The text batch aggregator (RenderCache) reaches the block's TextLayout / params / foreground / FontRenderer
     // through this. Null only transiently before the component is built. See docs/TEXT_GLYPH_BATCH_PLAN.md §9.
     public TextRenderComponent TextComponent => GeometryRenderer as TextRenderComponent;
+
+    public override Matrix4x4F Place(Matrix4x4F world) => Payload.LocalTransform * world;
 
     public TextRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {

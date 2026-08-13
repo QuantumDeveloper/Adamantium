@@ -296,6 +296,10 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     public bool TryAdd(GeometryRenderUnit unit, Matrix4x4F local, Rect2D scissor, Rect logicalBounds, int transformSlot)
     {
         if (!unit.TryGetInstancedFill(out var key, out var meshObj, out var color)) return false;
+        // The unit's OWN placement on top of the caller's bake (a Drawing's shape sitting at its own spot and scale
+        // inside one element). Folded HERE rather than at the four call sites so this path and the per-unit one compose
+        // it exactly once and the same way.
+        local = unit.Place(local);
         if (meshObj is not FrozenMesh mesh) return false;
         var seg = GetOrCreate(key, mesh);
         if (seg == null) return false;
@@ -344,6 +348,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     public bool TryAddGradient(GeometryRenderUnit unit, Matrix4x4F local, Rect2D scissor, Rect logicalBounds, int transformSlot)
     {
         if (!unit.TryGetInstancedGradientFill(out var key, out var meshObj, out var brush, out var localBounds, out var opacity)) return false;
+        local = unit.Place(local);
         if (meshObj is not FrozenMesh mesh) return false;
         var seg = GetOrCreate(key, mesh);
         if (seg == null) return false;
@@ -412,6 +417,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     public bool TryAddTextured(GeometryRenderUnit unit, Matrix4x4F local, Rect2D scissor, Rect logicalBounds, int transformSlot)
     {
         if (!unit.TryGetInstancedTexturedFill(out var key, out var meshObj, out var brush, out var localBounds, out var opacity, out var texture)) return false;
+        local = unit.Place(local);
         if (meshObj is not FrozenMesh mesh) return false;
         var seg = GetOrCreate(key, mesh);
         if (seg == null) return false;
@@ -489,6 +495,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     public bool TryAddPattern(GeometryRenderUnit unit, Matrix4x4F local, Rect2D scissor, Rect logicalBounds, int transformSlot)
     {
         if (!unit.TryGetInstancedPatternFill(out var key, out var meshObj, out var brush, out var localBounds, out var opacity)) return false;
+        local = unit.Place(local);
         if (meshObj is not FrozenMesh mesh) return false;
         var seg = GetOrCreate(key, mesh);
         if (seg == null) return false;
