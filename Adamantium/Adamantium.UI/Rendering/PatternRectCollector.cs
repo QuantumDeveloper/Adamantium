@@ -157,7 +157,8 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
             Stroke0 = stroke0,
             Stroke1 = stroke1,
             Noise = noise,
-            Color3 = c3
+            Color3 = c3,
+            Anim = new Vector4F((float)brushRecord.PhaseOffset, (float)brushRecord.FrozenPhase, 0, 0)
         };
         return true;
     }

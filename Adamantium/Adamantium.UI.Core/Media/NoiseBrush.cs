@@ -159,11 +159,14 @@ public sealed class NoiseBrush : Brush
         }
     }
 
-    /// <summary>The phase to bake when NOT animating: the shared clock value captured the moment Animate turned off, so the
-    /// field HOLDS that exact frame instead of snapping back to phase 0. The render side reads this via the pattern record.
-    /// While animating it's ignored (the shader uses the live clock, which - once the ticker holds on release - resumes from
-    /// here, so re-enabling continues seamlessly).</summary>
+    /// <summary>The phase to flow at when NOT animating: this brush's own phase captured the moment Animate turned off, so the
+    /// field HOLDS that exact frame instead of snapping back to phase 0. The render side reads this via the pattern record.</summary>
     public double FrozenPhase { get; private set; }
+
+    /// <summary>Subtracted from the shared clock while animating, so this brush flows on its OWN phase. The clock is shared and
+    /// never stops while ANY brush animates, so without the offset a pause here would still let the phase run and re-enabling
+    /// would jump the field forward by the whole length of the pause.</summary>
+    public double PhaseOffset { get; private set; }
 
     /// <summary>When true, the noise flows over time (Worley feature points orbit -> cells flow in place; other types drift).
     /// Ref-counts the shared <see cref="NoiseClock"/> so the render loop keeps presenting while it's on.</summary>
@@ -174,10 +177,21 @@ public sealed class NoiseBrush : Brush
         {
             if (IsFrozen) return;
             var was = GetValue<bool>(AnimateProperty);
-            // Capture the frozen frame BEFORE SetValue fires the paint change (which triggers the re-bake that reads it).
-            if (!_suppressClock && was && !value)
+            // Capture BEFORE SetValue fires the paint change (which triggers the re-bake that reads these).
+            if (!_suppressClock && was != value)
             {
-                FrozenPhase = NoiseClock.Time;
+                if (!value)
+                {
+                    // Pausing: remember the phase THIS brush was at - the shared clock minus its own offset.
+                    FrozenPhase = NoiseClock.Time - PhaseOffset;
+                }
+                else
+                {
+                    // Resuming: the shared clock has kept running all this time (other animating brushes hold it alive),
+                    // so continuing to read it raw would jump the field forward by the whole length of the pause. Take
+                    // the offset that puts this brush back exactly where it stopped.
+                    PhaseOffset = NoiseClock.Time - FrozenPhase;
+                }
             }
             SetValue(AnimateProperty, value);
             if (_suppressClock || value == was) return;
@@ -234,6 +248,7 @@ public sealed class NoiseBrush : Brush
             Animate = Animate,
             FlowSpeed = FlowSpeed,
             FrozenPhase = FrozenPhase,
+            PhaseOffset = PhaseOffset,
             UseFirePalette = UseFirePalette,
             Opacity = Opacity
         };

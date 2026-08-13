@@ -999,6 +999,7 @@ struct PatternRectData
     float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
     float4 Noise;        // FBM noise (type 4 only): x octaves, y seed, z lacunarity, w gain
     float4 Color3;       // optional MID colour for a 3-colour noise gradient-map (Color1->Color3->Color2); .w==0 = off
+    float4 Anim;         // .x = offset subtracted from the clock while animating, .y = the phase held while paused
 };
 
 struct PatternPSInput
@@ -1261,7 +1262,16 @@ float fbmFold(float2 p, int oct, float lacunarity, float gain, int mode, float p
 // Pattern mix factor at fragment `p` (device px from the rect's top-left): 0 = Color1, 1 = Color2. Anti-aliased by the
 // fragment's pixel footprint (fwidth) - the checkerboard analytically (iq's filtered checker), the others via a ~1px
 // smoothstep on a signed field - so edges stay crisp without a tiled texture. Type 4 is FBM noise (continuous 0..1).
-float PatternMix(int type, float2 p, float cell, float4 noise)
+// The phase this instance flows at. The clock is SHARED and keeps running while any brush animates, so an animating
+// instance rides it minus its own offset (anim.x), and a paused one holds the phase it stopped at (anim.y). Reading the
+// raw clock instead makes a pause leak: the field would still advance while stopped, and resuming would jump it forward
+// by the whole length of the pause. Branch-free: a ?: in this pass has device-lost form on this driver.
+float NoisePhase(float octavesSigned, float2 anim)
+{
+    return lerp(anim.y, Time - anim.x, step(octavesSigned, -0.0001));
+}
+
+float PatternMix(int type, float2 p, float cell, float4 noise, float2 anim)
 {
     cell = max(cell, 1.0);
     float2 g = p / cell;
@@ -1292,8 +1302,7 @@ float PatternMix(int type, float2 p, float cell, float4 noise)
         int basis = type - 6;                                            // 7->1 perlin, 8->2 value, 9->3 worley
         if (type == 4) basis = 0;                                        // 4 -> simplex
         int oct = int(abs(noise.x));                                     // octaves is sign-encoded: negative = animate
-        float phase = 0.0;
-        if (noise.x < 0.0) phase = Time;                                 // only an animating instance advances by Time
+        float phase = NoisePhase(noise.x, anim);
         float2 np = g + noise.y;                                         // base noise domain + seed offset
         float n = fbm(np, oct, max(noise.z, 1.0), noise.w, basis, phase);   // Color1 (low) -> Color2 (high); phase drives flow
         return saturate(n * 0.5 + 0.5);
@@ -1303,8 +1312,7 @@ float PatternMix(int type, float2 p, float cell, float4 noise)
         int mode = 0;                              // turbulence
         if (type == 10) mode = 1;                  // ridged
         int oct = int(abs(noise.x));
-        float phase = 0.0;
-        if (noise.x < 0.0) phase = Time;
+        float phase = NoisePhase(noise.x, anim);
         float2 np = g + noise.y;
         float n = fbmFold(np, oct, max(noise.z, 1.0), noise.w, mode, phase);
         if (type == 11) n = n * 1.6;               // turbulence is dimmer (averaged |noise|) - lift it for contrast
@@ -1312,8 +1320,7 @@ float PatternMix(int type, float2 p, float cell, float4 noise)
     }
     if (type == 12)   // Voronoi BORDER network (iq Xd23Dh): thin bright cell walls, morphing under Animate
     {
-        float ph = 0.0;
-        if (noise.x < 0.0) ph = Time;              // octaves-sign = animate flag
+        float ph = NoisePhase(noise.x, anim);
         float dd = voronoiEdge(g + noise.y, ph);
         float aa = fwidth(dd) + 1e-4;
         return 1.0 - smoothstep(0.0, 0.06 + aa, dd);   // Color2 on the borders, Color1 inside the cells
@@ -1419,8 +1426,7 @@ float4 PatternFillColor(PatternRectData it, float2 pTopLeft, float2 centerRel, f
     float4 fill;
     if (ptype == 13)   // Combustible Voronoi: its own 3D-ray + fire-palette colour path (ignores Color1/Color2 as a lerp)
     {
-        float time = 0.0;
-        if (it.Noise.x < 0.0) time = Time;   // octaves-sign = animate flag; a fire really wants Animate on
+        float time = NoisePhase(it.Noise.x, it.Anim.xy);
         float2 uv = centerRel / max(halfY, 1.0);   // centred, normalised by half height
         float cs = cos(time * 0.25);
         float si = sin(time * 0.25);
@@ -1443,7 +1449,7 @@ float4 PatternFillColor(PatternRectData it, float2 pTopLeft, float2 centerRel, f
     }
     else
     {
-        float k = PatternMix(ptype, pTopLeft, it.Params.z, it.Noise);
+        float k = PatternMix(ptype, pTopLeft, it.Params.z, it.Noise, it.Anim.xy);
         // TRITONE gradient-map (Color1 -> Color3 mid -> Color2), BRANCH-FREE (step, no vector ternary - the NVVM device-lost
         // on a nested ternary here). Color3.w==0 (no mid colour) blends back to the plain two-colour duotone.
         float4 duo = lerp(it.Color1, it.Color2, k);
@@ -1594,6 +1600,7 @@ struct PatGeomData
     float4 Color2;
     float4 Color3;
     float4 Noise;        // x octaves (sign=animate), y seed, z lacunarity, w gain (or combustible fire-palette flag)
+    float4 Anim;         // .x = offset subtracted from the clock while animating, .y = the phase held while paused
 };
 
 struct PatFillPSInput
@@ -1656,6 +1663,7 @@ float4 PatternFillPS(PatFillPSInput input) : SV_Target
     pd.Stroke1 = float4(0.0, 0.0, 0.0, 0.0);
     pd.Noise = it.Noise;
     pd.Color3 = it.Color3;
+    pd.Anim = it.Anim;
 
     float2 pTopLeft = input.Local - it.LocalBounds.xy;                                   // fragment from the shape top-left
     float2 centerRel = input.Local - (it.LocalBounds.xy + it.LocalBounds.zw * 0.5);      // fragment from the shape centre

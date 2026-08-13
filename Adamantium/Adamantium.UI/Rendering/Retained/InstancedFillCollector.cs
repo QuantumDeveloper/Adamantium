@@ -546,6 +546,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         inst.Color2 = c2;
         inst.Color3 = c3;
         inst.Noise = noise;
+        inst.Anim = new Vector4F((float)record.PhaseOffset, (float)record.FrozenPhase, 0, 0);
         return inst;
     }
 
