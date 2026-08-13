@@ -290,6 +290,103 @@ public class HaloRenderTests
         Assert.That(beyond.R, Is.LessThan(30), $"the band plateaus past its range: {beyond}");
     }
 
+    // A LIVING aura: the reach WANDERS along the outline instead of standing at one distance everywhere. That is the
+    // whole difference from a still band, and it is measurable - walk the ring around the shape and the band's edge is
+    // no longer at the same place on every side.
+    [Test]
+    public void ALivingAuraIsUneven()
+    {
+        var still = Draw(new Aura { Radius = 26, Color = Colors.Red, Opacity = 1.0 }, null);
+        var alive = Draw(new Aura { Radius = 26, Turbulence = 1.2, Flow = 0, Detail = 4, Color = Colors.Red, Opacity = 1.0 }, null);
+
+        Assert.That(Spread(alive), Is.GreaterThan(Spread(still) + 20),
+            $"the living band is as even as the still one: {Spread(alive)} against {Spread(still)}");
+    }
+
+    // A living aura with a PALETTE travels its colours rather than painting one - so more than one hue reaches the band.
+    [Test]
+    public void ALivingAuraTravelsItsPalette()
+    {
+        var aura = new Aura
+        {
+            Radius = 26, Turbulence = 1.2, Flow = 0, Detail = 4, Opacity = 1.0, Color = Colors.Red,
+            Palette =
+            [
+                new GradientStop(Colors.Red, 0.0),
+                new GradientStop(Colors.Lime, 1.0)
+            ]
+        };
+
+        var pixels = Draw(aura, null);
+
+        var reds = 0;
+        var greens = 0;
+        for (var y = At - 24; y < At + Size + 24; y += 2)
+        {
+            for (var x = At - 24; x < At + Size + 24; x += 2)
+            {
+                var p = At_(pixels, x, y);
+                if (p.R > 90 && p.G < 50) reds++;
+                if (p.G > 90 && p.R < 50) greens++;
+            }
+        }
+
+        Assert.That(reds, Is.GreaterThan(10), "the palette's first colour never reached the band");
+        Assert.That(greens, Is.GreaterThan(10), "the palette's second colour never reached the band");
+    }
+
+    // How far apart the band's outer edge sits on different sides of the shape - a still band is the same everywhere, a
+    // living one is not.
+    private static int Spread(byte[] pixels)
+    {
+        var min = int.MaxValue;
+        var max = 0;
+        for (var y = At; y < At + Size; y += 4)
+        {
+            var reach = 0;
+            for (var d = 1; d < 60; d++)
+            {
+                if (At_(pixels, At - d, y).R > 40) reach = d;
+            }
+            if (reach < min) min = reach;
+            if (reach > max) max = reach;
+        }
+        return max - min;
+    }
+
+    // Switched off, a band keeps its settings and simply is not drawn. Zeroing the radius or the opacity would only fake
+    // that, and leave the author somewhere to put the real values while it is off.
+    [Test]
+    public void ASwitchedOffAuraDrawsNothing()
+    {
+        var pixels = Draw(new Aura { Radius = 26, Color = Colors.Red, Opacity = 1.0, IsEnabled = false }, null);
+
+        var beside = At_(pixels, At + Size / 2, At - 5);
+        Assert.That(beside.R, Is.LessThan(12), $"a switched-off aura still painted: {beside}");
+    }
+
+    [Test]
+    public void ASwitchedOffShadowDrawsNothing()
+    {
+        var pixels = Draw(null, new Shadow { OffsetY = 14, BlurRadius = 14, Color = Colors.Red, Opacity = 1.0, IsEnabled = false });
+
+        var below = At_(pixels, At + Size / 2, At + Size + 8);
+        Assert.That(below.R, Is.LessThan(12), $"a switched-off shadow still painted: {below}");
+    }
+
+    // ...and a LIVING one goes quiet too - it is a different pass, so it needs its own answer rather than inheriting one.
+    [Test]
+    public void ASwitchedOffLivingAuraDrawsNothing()
+    {
+        var pixels = Draw(new Aura
+        {
+            Radius = 26, Turbulence = 1.2, Flow = 0, Detail = 4, Color = Colors.Red, Opacity = 1.0, IsEnabled = false
+        }, null);
+
+        var beside = At_(pixels, At + Size / 2, At - 5);
+        Assert.That(beside.R, Is.LessThan(12), $"a switched-off living aura still painted: {beside}");
+    }
+
     // Aura AND shadow at once - the case that made them two properties rather than one.
     [Test]
     public void AnAuraAndAShadowBothDraw()

@@ -30,6 +30,10 @@ public class RenderData
     /// overwhelmingly common case, so nothing is allocated for it.</summary>
     public Media.HaloBand[] Halo { get; set; }
 
+    /// <summary>The LIVING aura, if this element wears one - drawn by its own pass, so it is kept apart from the plain
+    /// bands above rather than folded in with them.</summary>
+    public Media.LivingBand? LivingHalo { get; set; }
+
     // Viewport zoom multiplier (designer renders ClientSize x RenderScale; the projection stays logical). 1 = on-screen
     // 1:1. Analytic AA reads it so the fringe stays ~1 DEVICE px under zoom (TransformMatrix carries only the logical
     // local->world scale; the zoom lives in the viewport, not the projection - see WindowRendererBase.RenderScale).

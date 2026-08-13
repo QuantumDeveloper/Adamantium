@@ -14,6 +14,9 @@ namespace Adamantium.UI.Core.Media;
 /// </summary>
 public sealed class Shadow : AdamantiumComponent
 {
+    public static readonly AdamantiumProperty IsEnabledProperty = AdamantiumProperty.Register(nameof(IsEnabled),
+        typeof(bool), typeof(Shadow), new PropertyMetadata(true, OnChanged));
+
     public static readonly AdamantiumProperty OffsetXProperty = AdamantiumProperty.Register(nameof(OffsetX),
         typeof(double), typeof(Shadow), new PropertyMetadata(0.0, OnChanged));
 
@@ -34,6 +37,14 @@ public sealed class Shadow : AdamantiumComponent
 
     public static readonly AdamantiumProperty InnerProperty = AdamantiumProperty.Register(nameof(Inner),
         typeof(bool), typeof(Shadow), new PropertyMetadata(false, OnChanged));
+
+    /// <summary>Switch the shadow off without losing its settings - what a trigger or a binding wants (an element that
+    /// lifts only while dragged), and what zeroing the blur or the opacity would only fake.</summary>
+    public bool IsEnabled
+    {
+        get => GetValue<bool>(IsEnabledProperty);
+        set => SetValue(IsEnabledProperty, value);
+    }
 
     /// <summary>How far the shadow is thrown sideways, in pixels - i.e. where the light is.</summary>
     public double OffsetX

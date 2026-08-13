@@ -191,12 +191,22 @@ public partial class BrushesViewModel : TabPageViewModel
         Opacity = 0.55
     };
 
+    [Bindable] private bool _auraOn = true;
     [Bindable] private double _auraRadius = 28;
     [Bindable] private double _auraSpread;
     [Bindable] private Color _auraColor = new Color(56, 189, 248, 255);
     [Bindable] private double _auraOpacity = 0.9;
     [Bindable] private bool _auraInner;
+    [Bindable] private double _auraTurbulence;
+    [Bindable] private double _auraFlow = 0.5;
+    [Bindable] private double _auraDetail = 3;
+    [Bindable] private bool _auraPalette;
+    [Bindable] private Color _auraColor1 = new Color(56, 189, 248, 255);
+    [Bindable] private Color _auraColor2 = new Color(167, 139, 250, 255);
+    [Bindable] private Color _auraColor3 = new Color(244, 114, 182, 255);
+    [Bindable] private Color _auraColor4 = new Color(74, 222, 128, 255);
 
+    [Bindable] private bool _shadowOn = true;
     [Bindable] private double _shadowOffsetX;
     [Bindable] private double _shadowOffsetY = 10;
     [Bindable] private double _shadowBlur = 18;
@@ -223,11 +233,41 @@ public partial class BrushesViewModel : TabPageViewModel
     [Bindable] private double _haloRadius = 16;
     [Bindable] private PreviewShape _haloShape = PreviewShape.Rectangle;
 
+    partial void OnAuraOnChanged(bool value) => LiveAura.IsEnabled = value;
+    partial void OnShadowOnChanged(bool value) => LiveShadow.IsEnabled = value;
     partial void OnAuraRadiusChanged(double value) => LiveAura.Radius = value;
     partial void OnAuraSpreadChanged(double value) => LiveAura.Spread = value;
     partial void OnAuraColorChanged(Color value) => LiveAura.Color = value;
     partial void OnAuraOpacityChanged(double value) => LiveAura.Opacity = value;
     partial void OnAuraInnerChanged(bool value) => LiveAura.Inner = value;
+
+    // Living: at Turbulence 0 this is exactly the cheap still band and the living pass is never reached. The palette is
+    // authored as gradient stops so it goes through the SAME packer every gradient uses - a second way to pack a ramp is
+    // how the hatch angle once went missing from one of two copies of the pattern record.
+    partial void OnAuraTurbulenceChanged(double value) => LiveAura.Turbulence = value;
+    partial void OnAuraFlowChanged(double value) => LiveAura.Flow = value;
+    partial void OnAuraDetailChanged(double value) => LiveAura.Detail = value;
+
+    partial void OnAuraPaletteChanged(bool value) => RebuildPalette();
+    partial void OnAuraColor1Changed(Color value) => RebuildPalette();
+    partial void OnAuraColor2Changed(Color value) => RebuildPalette();
+    partial void OnAuraColor3Changed(Color value) => RebuildPalette();
+    partial void OnAuraColor4Changed(Color value) => RebuildPalette();
+
+    // A FRESH collection each time rather than editing the one the aura holds: the aura re-records on its own property
+    // change, and mutating the collection in place would slip past that.
+    private void RebuildPalette()
+    {
+        LiveAura.Palette = _auraPalette
+            ? new GradientStopCollection
+            {
+                new GradientStop(_auraColor1, 0.0),
+                new GradientStop(_auraColor2, 0.34),
+                new GradientStop(_auraColor3, 0.67),
+                new GradientStop(_auraColor4, 1.0)
+            }
+            : null;
+    }
 
     partial void OnShadowOffsetXChanged(double value) => LiveShadow.OffsetX = value;
     partial void OnShadowOffsetYChanged(double value) => LiveShadow.OffsetY = value;

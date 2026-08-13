@@ -68,7 +68,7 @@
                                TextWrapping="WrapByWords" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <Slider Value="{Binding HaloMargin, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="70" Width="280" MarginBottom="14"/>
 
-                    <TextBlock Text="AURA — no direction" FontSize="14" MarginBottom="6"/>
+                    <CheckBox Content="AURA — no direction" IsChecked="{Binding AuraOn, Mode=TwoWay}" FontSize="14" MarginBottom="6"/>
                     <TextBlock Text="Radius — how far it reaches" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <Slider Value="{Binding AuraRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="60" Width="280" MarginBottom="10"/>
                     <TextBlock Text="Spread — solid rim before the fade" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
@@ -77,12 +77,33 @@
                     <Slider Value="{Binding AuraOpacity, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="280" MarginBottom="10"/>
                     <CheckBox Content="Inner (glow inward — needs no margin at all)" IsChecked="{Binding AuraInner, Mode=TwoWay}" MarginBottom="6"/>
                     <TextBlock Text="Colour" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding AuraColor, Mode=TwoWay}"/>
+                    <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding AuraColor, Mode=TwoWay}" MarginBottom="14"/>
+
+                    <!-- LIVING: at Turbulence 0 this is the still band above and the living pass is never reached, so a
+                         plain glow pays nothing for the noise. -->
+                    <TextBlock Text="ALIVE — the reach breathes" FontSize="14" MarginBottom="6"/>
+                    <TextBlock Text="Turbulence — how far the reach wanders (0 = still)"
+                               TextWrapping="WrapByWords" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding AuraTurbulence, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="2" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Flow — how fast it drifts" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding AuraFlow, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="3" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Detail — how many tongues run around it" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding AuraDetail, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0.5" Maximum="12" Width="280" MarginBottom="10"/>
+                    <CheckBox Content="Palette — travel four colours instead of one" IsChecked="{Binding AuraPalette, Mode=TwoWay}" MarginBottom="6"/>
+                    <StackPanel Orientation="Vertical" Visibility="{Binding AuraPalette, Converter={conv:BoolToVisibilityConverter}}">
+                        <TextBlock Text="The four it travels through" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <StackPanel Orientation="Horizontal">
+                            <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding AuraColor1, Mode=TwoWay}" MarginRight="8"/>
+                            <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding AuraColor2, Mode=TwoWay}" MarginRight="8"/>
+                            <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding AuraColor3, Mode=TwoWay}" MarginRight="8"/>
+                            <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding AuraColor4, Mode=TwoWay}"/>
+                        </StackPanel>
+                    </StackPanel>
                 </StackPanel>
                 <!-- The shadow's own column: the two sets are independent, and stacking them made one tall strip nobody
                      could take in at a glance. -->
                 <StackPanel Orientation="Vertical" Width="300" MarginLeft="24" VerticalAlignment="Center">
-                    <TextBlock Text="SHADOW — thrown where the light is not" FontSize="14" MarginBottom="6"/>
+                    <CheckBox Content="SHADOW — thrown where the light is not" IsChecked="{Binding ShadowOn, Mode=TwoWay}" FontSize="14" MarginBottom="6"/>
                     <TextBlock Text="Offset X / Y" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <Slider Value="{Binding ShadowOffsetX, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="-40" Maximum="40" Width="280" MarginBottom="6"/>
                     <Slider Value="{Binding ShadowOffsetY, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="-40" Maximum="40" Width="280" MarginBottom="10"/>

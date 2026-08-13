@@ -52,6 +52,8 @@ public partial class RenderCache
                         case 7: _texRectBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
                         case 8: _haloUnder.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
                         case 9: _haloOver.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
+                        case 10: _haloLivingUnder.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
+                        case 11: _haloLivingOver.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
                         default: _textBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
                     }
                     break;
@@ -62,6 +64,69 @@ public partial class RenderCache
         }
     }
 
+    // WHERE a band gets its distance from - asked once and answered here, so the still band and the living one can never
+    // disagree about what shape they are wrapping. A unit with no answer simply wears no band rather than a wrong one.
+    private static bool TryHaloShape(IRenderUnit unit, out Rect shape, out double radius, out HaloShape kind,
+        out ITexture field, out double fieldRange)
+    {
+        shape = default;
+        radius = 0;
+        kind = HaloShape.RoundedRect;
+        field = null;
+        fieldRange = 0;
+
+        switch (unit)
+        {
+            case RectangleRenderUnit rect:
+                shape = rect.RectPayload.DestinationRect;
+                radius = rect.RectPayload.CornerRadius.TopLeft;
+                kind = HaloShape.RoundedRect;
+                return true;
+            case EllipseRenderUnit ell when ell.EllipsePayload.StartAngle <= 0.0 && ell.EllipsePayload.SweepAngle >= 360.0:
+                shape = ell.EllipsePayload.DestinationRect;
+                kind = HaloShape.Ellipse;
+                return true;
+            // Arbitrary geometry: no closed-form distance, so the band reads one baked per shape. The box comes from the
+            // MESH, not the element - a Polygon's element box and its outline's box are not the same thing.
+            case GeometryRenderUnit geom:
+                field = geom.HaloField(out shape, out fieldRange);
+                kind = HaloShape.Field;
+                return field != null;
+            default:
+                return false;
+        }
+    }
+
+    // Collect this unit's LIVING aura - the band whose reach wanders. Its own collector and its own pass: a still band
+    // must not pay for the noise, so the two are never mixed into one draw.
+    private bool CollectLivingHalo(IGraphicsDevice device, IRenderUnit unit, Matrix4x4F wt, Rect2D scissor, bool inner)
+    {
+        if (unit.RenderData.LivingHalo is not { } band || band.Inner != inner) return false;
+        if (!TryHaloShape(unit, out var shape, out var radius, out var kind, out var field, out var fieldRange)) return false;
+
+        ref var batch = ref inner ? ref _haloLivingOver : ref _haloLivingUnder;
+        if (batch == null)
+        {
+            batch = new HaloLivingCollector { TransformsAddress = _transformTable?.DeviceAddress ?? 0 };
+            batch.BeginFrame(device);
+        }
+
+        if (!batch.SameField(field)) return false;
+
+        var bounds = LogicalBounds(unit.Component, wt);
+        var bakeWorld = ResolveBake(device, unit.Component, wt, out var slot);
+        if (!batch.TryAdd(band, shape, radius, kind, bakeWorld, unit.RenderData.Opacity, scissor, bounds,
+                band.Color, slot, field, fieldRange))
+        {
+            return false;
+        }
+
+        if (inner) _haloOverOwner = unit.Component;
+        _batchScissor = scissor;
+        _batchOpen = true;
+        return true;
+    }
+
     // Collect this unit's soft bands (aura / shadow) into the halo batch. The SHAPE comes from the payload - only a rect
     // or a full ellipse has a signed distance to read, and arbitrary geometry is a separate story (a distance field baked
     // per mesh key). A shape that has none simply wears no band rather than getting a wrong one.
@@ -70,34 +135,9 @@ public partial class RenderCache
         var bands = unit.RenderData.Halo;
         if (!HaloRectCollector.HasSide(bands, inner)) return false;
 
-        Rect shape;
-        double radius;
-        HaloShape kind;
-        ITexture field = null;
-        double fieldRange = 0;
-        switch (unit)
+        if (!TryHaloShape(unit, out var shape, out var radius, out var kind, out var field, out var fieldRange))
         {
-            case RectangleRenderUnit rect:
-                shape = rect.RectPayload.DestinationRect;
-                radius = rect.RectPayload.CornerRadius.TopLeft;
-                kind = HaloShape.RoundedRect;
-                break;
-            case EllipseRenderUnit ell when ell.EllipsePayload.StartAngle <= 0.0 && ell.EllipsePayload.SweepAngle >= 360.0:
-                shape = ell.EllipsePayload.DestinationRect;
-                radius = 0;
-                kind = HaloShape.Ellipse;
-                break;
-            // Arbitrary geometry: no closed-form distance, so the band reads one baked per shape. The quad still covers
-            // the mesh's own box - the field is sampled across it - which is why the bounds come from the mesh, not the
-            // element (a Polygon's element box and its outline's box are not the same thing).
-            case GeometryRenderUnit geom:
-                field = geom.HaloField(out shape, out fieldRange);
-                if (field == null) return false;
-                radius = 0;
-                kind = HaloShape.Field;
-                break;
-            default:
-                return false;
+            return false;
         }
 
         // Created on FIRST use: the GPU ring is dead weight in the windows that never draw a halo, which is most of them.
@@ -143,6 +183,7 @@ public partial class RenderCache
         // FIRST, before every fill in this clip group: that is what puts an OUTER aura / shadow under the shapes it
         // belongs to. Its INNER twin is flushed after the fills instead - see below.
         if (_haloUnder != null) RecordSegment(8, _haloUnder.Flush(device, fullScissor, _projectionMatrix));
+        if (_haloLivingUnder != null) RecordSegment(10, _haloLivingUnder.Flush(device, fullScissor, _projectionMatrix));
         RecordSegment(0, _rectBatch.Flush(device, fullScissor, _projectionMatrix));
         RecordSegment(1, _ellipseBatch.Flush(device, fullScissor, _projectionMatrix));
         RecordSegment(3, _gradientRectBatch.Flush(device, fullScissor, _projectionMatrix));
@@ -168,6 +209,10 @@ public partial class RenderCache
         {
             RecordSegment(9, _haloOver.Flush(device, fullScissor, _projectionMatrix));
             _haloOverOwner = null;
+        }
+        if (_haloLivingOver != null)
+        {
+            RecordSegment(11, _haloLivingOver.Flush(device, fullScissor, _projectionMatrix));
         }
 
         RecordSegment(2, _textBatch.Flush(device, fullScissor, _projectionMatrix));

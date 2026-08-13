@@ -25,7 +25,24 @@ internal static class GradientBake
             return 4;
         }
 
-        var stops = new List<GradientStop>(g.GradientStops);
+        return PackStops(g.GradientStops, alpha, colors, offsets);
+    }
+
+    /// <summary>The array form the halo bake asks for - it lives with the public types and must not grow a packer of its
+    /// own. Same rule, same code, handed over as a delegate.</summary>
+    public static int PackPalette(GradientStopCollection stops, float alpha, out Vector4F[] colors, out float[] offsets)
+    {
+        colors = new Vector4F[MaxStops];
+        offsets = new float[MaxStops];
+        return PackStops(stops, alpha, colors, offsets);
+    }
+
+    /// <summary>The same packing from a bare stop list - what a ramp that belongs to no gradient BRUSH needs (an aura's
+    /// palette is sampled by a noise value, not by a position along an axis). One statement of how a ramp is packed:
+    /// stating it twice is how the hatch angle went missing from one of two copies of the pattern record.</summary>
+    public static int PackStops(IEnumerable<GradientStop> gradientStops, float alpha, Span<Vector4F> colors, Span<float> offsets)
+    {
+        var stops = new List<GradientStop>(gradientStops);
         stops.Sort((a, b) => a.Offset.CompareTo(b.Offset));
         var count = Math.Min(stops.Count, MaxStops);
         for (var i = 0; i < count; i++)
