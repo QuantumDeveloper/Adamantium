@@ -1793,6 +1793,131 @@ float4 HaloRectPS(HaloPSInput input) : SV_Target
     return color;
 }
 
+// ---- Living halo: an aura whose REACH wanders along the outline and drifts over time, travelling a palette. A biofield
+// rather than a rim of colour. Its own pass on purpose: the noise below is real ALU, and a plain shadow - which is most
+// of what this family draws - must neither pay for it nor risk a heavier shader on a driver with this one's history.
+//
+// The wander is sampled in the coordinates that BELONG to an outline: ANGLE around the shape (along it) and DISTANCE
+// from it (away). Sampling in screen space instead would shimmer independently of the shape, which reads as noise laid
+// over a glow rather than as a glow that is alive.
+struct HaloLivingData
+{
+    float4 Bounds;
+    float4 Params;    // .x radius, .y slot, .z shape (0 rect, 1 ellipse, 2 field), .w inner
+    float4 Band;      // .z spread, .w softness - slot units
+    float4 Field;     // .x field range, .y turbulence, .z flow, .w detail
+    float4 Color;     // used when the palette is empty
+    float4 Ramp;      // .x = valid palette stops
+    float4 Stop0; float4 Stop1; float4 Stop2; float4 Stop3;
+    float4 Stop4; float4 Stop5; float4 Stop6; float4 Stop7;
+    float4 Offsets0; float4 Offsets1;
+};
+
+[shader("vertex")]
+HaloPSInput HaloLivingVS(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
+{
+    HaloLivingData* items = (HaloLivingData*)InstancesAddress;
+    HaloLivingData it = items[instanceId];
+
+    HaloPSInput o;
+    float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
+    float4x4* transforms = (float4x4*)TransformsAddress;
+    float4x4 nodeWorld = transforms[(uint)it.Params.y];
+    float2 px = SlotPixelScale(nodeWorld);
+    float iso = min(px.x, px.y);
+
+    // The wander ADDS to the reach, so the quad has to hold more than a still band of the same radius would.
+    float reach = it.Band.z + it.Band.w * (1.0 + it.Field.y);
+    float outsetPx = lerp(max(reach, 0.0) * iso, 0.0, step(0.5, it.Params.w)) + 1.0;
+
+    float2 localPos = it.Bounds.xy + corner * it.Bounds.zw + (corner * 2.0 - 1.0) * (outsetPx / px);
+    float4 worldPos = mul(float4(localPos, 0.0, 1.0), nodeWorld);
+    o.Position = mul(worldPos, Projection);
+    o.Half   = it.Bounds.zw * 0.5 * px;
+    o.Local  = (corner - 0.5) * it.Bounds.zw * px + (corner * 2.0 - 1.0) * outsetPx;
+    o.Radius = it.Params.x * iso;
+    o.Scale  = iso;
+    o.InstId = instanceId;
+    return o;
+}
+
+// The palette, sampled by the WANDER rather than by any direction - which is what makes it read as alive instead of as
+// a gradient laid over the glow. Same stop layout every gradient in this file uses.
+float4 LivingPalette(HaloLivingData it, float t)
+{
+    float count = it.Ramp.x;
+    float4 colours[8] = { it.Stop0, it.Stop1, it.Stop2, it.Stop3, it.Stop4, it.Stop5, it.Stop6, it.Stop7 };
+    float offsets[8] = { it.Offsets0.x, it.Offsets0.y, it.Offsets0.z, it.Offsets0.w,
+                         it.Offsets1.x, it.Offsets1.y, it.Offsets1.z, it.Offsets1.w };
+
+    float4 c = colours[0];
+    for (int i = 1; i < 8; i++)
+    {
+        float active = step((float)i + 0.5, count);                  // this stop exists
+        float span = max(offsets[i] - offsets[i - 1], 1e-4);
+        float k = saturate((t - offsets[i - 1]) / span);
+        c = lerp(c, lerp(colours[i - 1], colours[i], k), active * step(offsets[i - 1], t));
+    }
+    return c;
+}
+
+[shader("fragment")]
+float4 HaloLivingPS(HaloPSInput input) : SV_Target
+{
+    HaloLivingData* items = (HaloLivingData*)InstancesAddress;
+    HaloLivingData it = items[input.InstId];
+
+    float isEllipse = it.Params.z;
+    float inner = it.Params.w;
+    float sc = input.Scale;
+    float softness = max(it.Band.w * sc, 0.5);
+    float spread = lerp(it.Band.z, -it.Band.z, step(0.5, inner)) * sc;
+
+    float sampled = step(1.5, isEllipse);
+    float analyticShape = saturate(isEllipse);
+    float rangePx = it.Field.x * sc;
+
+    float bandFade, shapeFade;
+    float dBand = lerp(HaloShapeDistance(input.Local, input.Half, input.Radius, spread, analyticShape),
+                       HaloFieldDistance(input.Local, input.Half, rangePx, spread, bandFade), sampled);
+    float dShape = lerp(HaloShapeDistance(input.Local, input.Half, input.Radius, 0.0, analyticShape),
+                        HaloFieldDistance(input.Local, input.Half, rangePx, 0.0, shapeFade), sampled);
+
+    // ALONG the outline and AWAY from it. The angle wraps, so the noise is sampled on a CIRCLE in its own space - a
+    // straight atan2 fed to a plane would tear where it wraps from +pi to -pi, and the tear would sit still while
+    // everything else drifted.
+    float ang = atan2(input.Local.y, max(length(input.Half), 1.0) * 0.0 + input.Local.x);
+    float detail = it.Field.w;
+    float2 ring = float2(cos(ang), sin(ang)) * detail;
+    float away = dBand / max(softness, 1.0);
+    float t = Time * it.Field.z;
+
+    float n = snoise(ring + float2(t, -t * 0.7));
+    float n2 = snoise(ring * 1.9 + float2(-t * 0.6, t * 0.4) + float2(away * 1.5, 0.0));
+    float wander = (n * 0.65 + n2 * 0.35);            // ~[-1,1]
+
+    // The reach breathes: the band's own distance is pulled in and pushed out along the outline.
+    float dLive = dBand - wander * it.Field.y * softness;
+
+    float tOuter = saturate(dLive / softness);
+    float tInner = saturate(-dLive / softness);
+    float aOuter = (1.0 - tOuter) * (1.0 - tOuter);
+    float aInner = (1.0 - tInner) * (1.0 - tInner);
+    float a = lerp(aOuter, aInner, step(0.5, inner));
+
+    float aa = max(fwidth(dShape), 1e-4);
+    a *= lerp(saturate(dShape / aa + 0.5), saturate(-dShape / aa + 0.5), step(0.5, inner));
+    a *= lerp(1.0, bandFade, sampled);
+
+    // The hue rides its OWN sample, not the wander. Colouring by the wander ties each end of the palette to a fixed
+    // brightness - the far end always lands where the band has already faded - so one colour is never really seen.
+    // Decorrelated, the hues travel across the band independently of how far it happens to be reaching.
+    float hue = snoise(ring * 0.8 + float2(-t * 0.35, t * 0.9)) * 0.5 + 0.5;
+    float4 colour = lerp(it.Color, LivingPalette(it, saturate(hue)), step(1.5, it.Ramp.x));
+    colour.a *= saturate(a);
+    return colour;
+}
+
 // ---- TexFill: general instanced geometry (a shared tessellated mesh drawn N times) whose FILL is SAMPLED from a
 // texture - the textured sibling of GradientFill/PatternFill, so an ImageBrush works on ANY geometry (Path/Polygon) and
 // N such shapes cost ONE draw instead of N. A tessellated mesh carries neither an SDF nor a usable uv0, so the picture
@@ -2257,6 +2382,15 @@ technique Batch
         Profile = 5.1;
         VertexShader = HaloRectInstancedVS;
         PixelShader = HaloRectPS;
+    }
+
+    // An aura that BREATHES: its reach wanders along the outline and drifts over time, travelling a palette. Kept out of
+    // the plain Halo pass so a still band pays nothing for the noise.
+    pass HaloLiving
+    {
+        Profile = 5.1;
+        VertexShader = HaloLivingVS;
+        PixelShader = HaloLivingPS;
     }
 
     // Instanced TEXTURED fill on arbitrary geometry: the shared mesh drawn N times, each instance sampling the bound

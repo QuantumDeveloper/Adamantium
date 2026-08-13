@@ -32,6 +32,9 @@ public partial class RenderCache
     // them - drawn under, it would simply be covered by the shape's own fill. Both lazy: most windows have neither.
     private HaloRectCollector _haloUnder;
     private HaloRectCollector _haloOver;
+    // The LIVING aura rides its own pass, so it has its own pair - flushed right beside their still twins.
+    private HaloLivingCollector _haloLivingUnder;
+    private HaloLivingCollector _haloLivingOver;
     // Whose inner band is pending. Its OWN fill must not flush it - the fill is added right after the band and the two
     // belong together; anyone ELSE overlapping it still forces a flush, or a later sibling would be painted over.
     private IUIComponent _haloOverOwner;
@@ -119,6 +122,8 @@ public partial class RenderCache
         if (_texRectBatch != null) _texRectBatch.TransformsAddress = address;
         if (_haloUnder != null) _haloUnder.TransformsAddress = address;
         if (_haloOver != null) _haloOver.TransformsAddress = address;
+        if (_haloLivingUnder != null) _haloLivingUnder.TransformsAddress = address;
+        if (_haloLivingOver != null) _haloLivingOver.TransformsAddress = address;
         if (_textBatch != null) _textBatch.TransformsAddress = address;   // glyph VS fetches the block's node matrix by slot
         if (_instancedFill != null) _instancedFill.TransformsAddress = address;
     }
@@ -221,6 +226,8 @@ public partial class RenderCache
             _texRectBatch?.BeginFrame(device);
             _haloUnder?.BeginFrame(device);
             _haloOver?.BeginFrame(device);
+            _haloLivingUnder?.BeginFrame(device);
+            _haloLivingOver?.BeginFrame(device);
             _haloOverOwner = null;
             // Transform table: this frame's copy, and its address on the collectors that were just (re)created above.
             BeginTransformFrame(device);
@@ -281,12 +288,14 @@ public partial class RenderCache
 
             // The unit's soft bands (aura / shadow), if it wears any. NOT an alternative to its fill - an addition, so it
             // is collected before the routing chain and drawn first at the flush, which is what puts it UNDER the fills.
-            if (device != null && HaloRectCollector.WantsBatch(unit.RenderData))
+            if (device != null && (HaloRectCollector.WantsBatch(unit.RenderData) || HaloLivingCollector.WantsBatch(unit.RenderData)))
             {
                 // The band reaches PAST the element, so the overlap test uses the grown box: what it must not be drawn
-                // under is whatever the band itself covers, not just what the element covers.
-                var bandBounds = LogicalBounds(unit.Component, wt)
-                    .Inflate(HaloRectCollector.MaxReach(unit.RenderData.Halo));
+                // under is whatever the band itself covers, not just what the element covers. A LIVING band wanders
+                // further than its radius, so it answers for its own reach.
+                var reach = System.Math.Max(HaloRectCollector.MaxReach(unit.RenderData.Halo),
+                    HaloLivingCollector.MaxReach(unit.RenderData.LivingHalo));
+                var bandBounds = LogicalBounds(unit.Component, wt).Inflate(reach);
                 if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(-1, bandBounds))
                 {
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
@@ -295,6 +304,8 @@ public partial class RenderCache
                 // what decides paint order. Collecting the inner one later would mean finding this unit again.
                 var under = CollectHalo(device, unit, wt, scissor, inner: false);
                 var over = CollectHalo(device, unit, wt, scissor, inner: true);
+                under |= CollectLivingHalo(device, unit, wt, scissor, inner: false);
+                over |= CollectLivingHalo(device, unit, wt, scissor, inner: true);
                 if ((under || over) && _recording)
                 {
                     group.PatchableRectOnly = false;   // a band is not a rect slot; the fast-path patch can't reproduce it
@@ -734,7 +745,9 @@ public partial class RenderCache
 
         // The INNER band sits above every fill, so anything below text that overlaps a pending one has to flush first -
         // otherwise a later element's fill would be drawn over a glow that belongs to the element before it.
-        if (layer < 8 && _haloOver != null && !ReferenceEquals(owner, _haloOverOwner) && _haloOver.OverlapsPending(lb))
+        if (layer < 8 && !ReferenceEquals(owner, _haloOverOwner)
+            && ((_haloOver != null && _haloOver.OverlapsPending(lb))
+                || (_haloLivingOver != null && _haloLivingOver.OverlapsPending(lb))))
         {
             return true;
         }

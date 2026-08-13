@@ -14,6 +14,9 @@ using Adamantium.UI.Core.RoutedEvents;
 /// </summary>
 public sealed class Aura : AdamantiumComponent
 {
+    public static readonly AdamantiumProperty IsEnabledProperty = AdamantiumProperty.Register(nameof(IsEnabled),
+        typeof(bool), typeof(Aura), new PropertyMetadata(true, OnChanged));
+
     public static readonly AdamantiumProperty RadiusProperty = AdamantiumProperty.Register(nameof(Radius),
         typeof(double), typeof(Aura), new PropertyMetadata(8.0, OnChanged));
 
@@ -28,6 +31,20 @@ public sealed class Aura : AdamantiumComponent
 
     public static readonly AdamantiumProperty InnerProperty = AdamantiumProperty.Register(nameof(Inner),
         typeof(bool), typeof(Aura), new PropertyMetadata(false, OnChanged));
+
+    /// <summary>Switch the glow off without losing its settings - what a trigger or a binding wants (a focus ring that
+    /// comes and goes) and what zeroing the radius or the opacity would only fake, at the cost of somewhere to keep the
+    /// real values while it is off.</summary>
+    public bool IsEnabled
+    {
+        get => GetValue<bool>(IsEnabledProperty);
+        set
+        {
+            var wasLiving = IsLiving;
+            SetValue(IsEnabledProperty, value);
+            UpdateClock(wasLiving);
+        }
+    }
 
     /// <summary>How far the glow REACHES past the outline, in pixels, before it has faded to nothing.</summary>
     public double Radius
@@ -63,6 +80,71 @@ public sealed class Aura : AdamantiumComponent
         get => GetValue<bool>(InnerProperty);
         set => SetValue(InnerProperty, value);
     }
+
+    // --- Living aura -------------------------------------------------------------------------------------------------
+    // A still glow is a rim of colour; a LIVING one breathes - the reach wanders along the outline and drifts over time,
+    // and the colour travels a palette. Opt-in by setting Turbulence (and usually Flow): at zero this is exactly the
+    // cheap band above, drawn by the plain pass, paying nothing for a feature it is not using.
+
+    public static readonly AdamantiumProperty TurbulenceProperty = AdamantiumProperty.Register(nameof(Turbulence),
+        typeof(double), typeof(Aura), new PropertyMetadata(0.0, OnChanged));
+
+    public static readonly AdamantiumProperty FlowProperty = AdamantiumProperty.Register(nameof(Flow),
+        typeof(double), typeof(Aura), new PropertyMetadata(0.5, OnChanged));
+
+    public static readonly AdamantiumProperty DetailProperty = AdamantiumProperty.Register(nameof(Detail),
+        typeof(double), typeof(Aura), new PropertyMetadata(3.0, OnChanged));
+
+    public static readonly AdamantiumProperty PaletteProperty = AdamantiumProperty.Register(nameof(Palette),
+        typeof(GradientStopCollection), typeof(Aura), new PropertyMetadata(null, OnChanged));
+
+    /// <summary>How far the reach WANDERS, as a fraction of <see cref="Radius"/>. 0 = a still, even band (and the cheap
+    /// pass); 1 = tongues that reach out and fall back. This is the switch: everything else here only matters above 0.</summary>
+    public double Turbulence
+    {
+        get => GetValue<double>(TurbulenceProperty);
+        set
+        {
+            var wasLiving = IsLiving;
+            SetValue(TurbulenceProperty, value);
+            UpdateClock(wasLiving);
+        }
+    }
+
+    // HOLD the shared flow clock while alive. It is reference-counted and only ticks for whoever asked - so without this
+    // the aura would read a phase that never advances unless an animated noise brush happened to be on screen, and it
+    // would breathe only by coincidence. Switched off it lets the clock go, rather than keeping a ticker for nothing.
+    private void UpdateClock(bool wasLiving)
+    {
+        if (IsLiving == wasLiving) return;
+        if (IsLiving) NoiseClock.Acquire();
+        else NoiseClock.Release();
+    }
+
+    /// <summary>How fast it drifts. 0 holds the wander still - the same uneven glow, frozen.</summary>
+    public double Flow
+    {
+        get => GetValue<double>(FlowProperty);
+        set => SetValue(FlowProperty, value);
+    }
+
+    /// <summary>How many tongues run around the outline: a few broad ones, or many fine ones.</summary>
+    public double Detail
+    {
+        get => GetValue<double>(DetailProperty);
+        set => SetValue(DetailProperty, value);
+    }
+
+    /// <summary>The colours it travels through, sampled by the wander rather than by any direction - which is what makes
+    /// it read as ALIVE rather than as a gradient. Empty (the default) means the single <see cref="Color"/>.</summary>
+    public GradientStopCollection Palette
+    {
+        get => GetValue<GradientStopCollection>(PaletteProperty);
+        set => SetValue(PaletteProperty, value);
+    }
+
+    /// <summary>Whether this aura needs the living pass at all - i.e. whether the reach wanders.</summary>
+    public bool IsLiving => IsEnabled && Turbulence > 0.0;
 
     /// <summary>Raised when any value changes, so the element wearing it can re-record.</summary>
     public event EventHandler Changed;
