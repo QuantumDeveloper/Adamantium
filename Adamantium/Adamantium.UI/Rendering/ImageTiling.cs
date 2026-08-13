@@ -28,7 +28,7 @@ internal static class ImageTiling
         if (viewport.Width <= 0 || viewport.Height <= 0 || bounds.Width <= 0 || bounds.Height <= 0)
         {
             // Nothing to lay out - one tile over the whole shape, whole source. The honest "as if nothing was said".
-            return new TileLayout(WholeTile, new Vector4F(1, 1, 0, 0), WholeTile, 0f, false);
+            return new TileLayout(WholeTile, new Vector4F(1, 1, 0, 0), WholeTile, NoRotation, 0f, false);
         }
 
         var tile = new Vector4F(
@@ -36,6 +36,8 @@ internal static class ImageTiling
             (float)(bounds.Height / viewport.Height),
             (float)((viewport.X - bounds.X) / viewport.Width),
             (float)((viewport.Y - bounds.Y) / viewport.Height));
+
+        var rotation = Rotation(brush, bounds, viewport, ref tile);
 
         var uv = Viewbox(brush, content);
         var drawn = WholeTile;
@@ -64,7 +66,51 @@ internal static class ImageTiling
             }
         }
 
-        return new TileLayout(uv, tile, drawn, Mirror(brush.TileMode), repeats);
+        return new TileLayout(uv, tile, drawn, rotation, Mirror(brush.TileMode), repeats);
+    }
+
+    private static readonly Vector4F NoRotation = new(1, 0, 0, 1);
+
+    // The whole turn, resolved to ONE 2x2 the shader multiplies a fragment by. Three things are folded in here rather
+    // than in the pixel shader, which this driver's compiler is measurably sensitive to the size of:
+    //   * the INVERSE (a fragment is mapped back into the grid), which for a rotation is the transpose;
+    //   * the shape's ASPECT - turning normalised coordinates of a non-square shape shears it, so the matrix is
+    //     conjugated by the size;
+    //   * the CENTRE, which becomes a shift of the grid's origin: turning about c and then scaling by the grid is the
+    //     same as turning about zero and starting the grid somewhere else.
+    private static Vector4F Rotation(TileBrush brush, Rect bounds, Rect viewport, ref Vector4F tile)
+    {
+        var radians = brush.RotationAngle * Math.PI / 180.0;
+        if (Math.Abs(radians) < 1e-9)
+        {
+            return NoRotation;
+        }
+
+        var cos = Math.Cos(radians);
+        var sin = Math.Sin(radians);
+
+        // A(-1) * R(-angle) * A, with A = diag(width, height): the turn happens in PIXELS, so it is conjugated by the
+        // shape's size on the way in and out of normalised space. Swap the two aspect factors and it shears instead.
+        var aspect = bounds.Height / bounds.Width;
+
+        var m00 = cos;
+        var m01 = sin * aspect;
+        var m10 = -sin / aspect;
+        var m11 = cos;
+
+        // The stated centre is a fraction of the TILE; the matrix works in fractions of the SHAPE, so it is placed
+        // through the viewport first.
+        var stated = brush.RotationCenter;
+        var centreX = (viewport.X - bounds.X + stated.X * viewport.Width) / bounds.Width;
+        var centreY = (viewport.Y - bounds.Y + stated.Y * viewport.Height) / bounds.Height;
+
+        tile = new Vector4F(
+            tile.X,
+            tile.Y,
+            (float)(tile.Z - (centreX - (m00 * centreX + m01 * centreY)) * tile.X),
+            (float)(tile.W - (centreY - (m10 * centreX + m11 * centreY)) * tile.Y));
+
+        return new Vector4F((float)m00, (float)m01, (float)m10, (float)m11);
     }
 
     /// <summary>The size a VECTOR source is baked at: the rectangle its picture is actually DRAWN in. A drawing maps

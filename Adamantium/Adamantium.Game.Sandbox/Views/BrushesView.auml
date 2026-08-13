@@ -370,6 +370,8 @@
                     <Slider Value="{Binding ImageHeight, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="40" Maximum="220" Width="280" MarginBottom="10"/>
                     <TextBlock Text="Corner radius" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <Slider Value="{Binding ImageRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="100" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Grid rotation — turns the TILING" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding ImageRotation, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="360" Width="280" MarginBottom="10"/>
                     <TextBlock Text="Tint" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding ImageTint, Mode=TwoWay}"/>
                 </StackPanel>
@@ -440,6 +442,8 @@
                     <Slider Value="{Binding DrawingHeight, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="40" Maximum="220" Width="280" MarginBottom="10"/>
                     <TextBlock Text="Corner radius" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <Slider Value="{Binding DrawingRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="100" Width="280" MarginBottom="10"/>
+                    <TextBlock Text="Grid rotation — turns the TILING, not the content" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding DrawingRotation, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="360" Width="280" MarginBottom="10"/>
                     <TextBlock Text="Opacity" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <Slider Value="{Binding DrawingOpacity, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="280" MarginBottom="10"/>
                     <TextBlock Text="Tint" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>

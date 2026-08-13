@@ -20,6 +20,12 @@ internal readonly struct TileLayout
     /// leaves a gap around EVERY copy, not one around the lot.</summary>
     public readonly Vector4F Drawn;
 
+    /// <summary>The 2x2 that maps a fragment (0..1 of the shape) back into the UNTURNED grid, row-major. It is the
+    /// inverse rotation with the shape's aspect folded in - rotating normalised coordinates of a non-square shape would
+    /// shear it - and the turn's centre is folded into <see cref="Tile"/>'s origin. All of that is done here so the
+    /// pixel shader is one 2x2 multiply and nothing else: this driver's compiler AVs as a pass grows.</summary>
+    public readonly Vector4F Rotation;
+
     /// <summary>Mirror flags: 1 = X, 2 = Y, 3 = both. Packed as a number the shader reads branch-free.</summary>
     public readonly float Mirror;
 
@@ -27,11 +33,12 @@ internal readonly struct TileLayout
     /// picture's opposite side.</summary>
     public readonly bool Repeats;
 
-    public TileLayout(Vector4F uvRect, Vector4F tile, Vector4F drawn, float mirror, bool repeats)
+    public TileLayout(Vector4F uvRect, Vector4F tile, Vector4F drawn, Vector4F rotation, float mirror, bool repeats)
     {
         UvRect = uvRect;
         Tile = tile;
         Drawn = drawn;
+        Rotation = rotation;
         Mirror = mirror;
         Repeats = repeats;
     }

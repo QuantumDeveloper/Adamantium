@@ -28,6 +28,10 @@ public struct TexRectItem
     /// tiled surface must do.</summary>
     public Vector4F Tile;
 
+    /// <summary>The tile grid's rotation: 2x2 that maps a fragment back into the unturned grid, row-major.
+    /// The inverse, the shape's aspect and the turn's centre are folded in by ImageTiling.</summary>
+    public Vector4F Rotation;
+
     /// <summary>The rectangle the content occupies inside ONE tile: offset x, y and scale w, h, in 0..1 of the tile.
     /// A field of its own because the SHAPE must not shrink with the picture - baked as the bounds, a Uniform fill
     /// turned a circle into an oval.</summary>

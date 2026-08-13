@@ -477,6 +477,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             Params = new Vector4F(layout.Repeats ? 1f : 0f, layout.Mirror, 0, transformSlot),
             LocalBounds = new Vector4F((float)box.X, (float)box.Y, (float)box.Width, (float)box.Height),
             Tile = layout.Tile,
+            Rotation = layout.Rotation,
             Drawn = layout.Drawn,
             UvRect = layout.UvRect,
             Tint = tint

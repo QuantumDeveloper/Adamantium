@@ -25,6 +25,7 @@ float opacity = 1;
 // the batch (ImageTiling): WHICH part of the source one copy takes and HOW MANY copies fit.
 float4 fillBounds;    // the shape's local box (x, y, w, h) the picture is mapped across
 float4 texTile;       // tile grid over that box: tiles per axis (.xy), grid origin in tiles (.zw)
+float4 texRotation;   // 2x2 mapping a fragment back into the unturned grid, row-major (identity = 1,0,0,1)
 float4 texDrawn;      // the content's rect inside ONE tile, as (offsetX, offsetY, scaleX, scaleY) in 0..1 of it
 float4 texUvRect;     // the sub-rectangle of the source one copy samples
 float4 texTint = float4(1, 1, 1, 1);
@@ -76,7 +77,10 @@ VERTEX_OUTPUT TexturedFillVS(UI_VERTEX input)
 float4 TexturedFill_PS(VERTEX_OUTPUT input) : SV_TARGET
 {
     // 0..1 across the shape's box -> TILE space -> the content's rect inside one tile -> the source's sub-rectangle.
-    float2 nn = input.uv0 * texTile.xy - texTile.zw;
+    // Back into the UNTURNED grid: one 2x2, with the inverse, the aspect and the turn centre already folded in.
+    float2 g = float2(input.uv0.x * texRotation.x + input.uv0.y * texRotation.y,
+                      input.uv0.x * texRotation.z + input.uv0.y * texRotation.w);
+    float2 nn = g * texTile.xy - texTile.zw;
     // A SINGLE copy never wraps: frac() would send its far edge back to the opposite one.
     float2 tileLocal = lerp(nn, frac(nn), texRepeat);
     // MIRRORED repeat: every other copy runs backwards, so a picture never drawn to tile still meets its own reflection.

@@ -80,6 +80,7 @@ public partial class BrushesViewModel : TabPageViewModel
     [Bindable] private double _imageWidth = 320;
     [Bindable] private double _imageHeight = 200;
     [Bindable] private double _imageRadius;
+    [Bindable] private double _imageRotation;
     [Bindable] private Color _imageTint = Colors.White;
 
     partial void OnImageTileModeChanged(TileMode value)
@@ -89,6 +90,7 @@ public partial class BrushesViewModel : TabPageViewModel
     }
 
     partial void OnImageStretchChanged(Stretch value) => LiveImage.Stretch = value;
+    partial void OnImageRotationChanged(double value) => LiveImage.RotationAngle = value;
     partial void OnImageTintChanged(Color value) => LiveImage.Tint = value;
 
     partial void OnImageTileChanged(double value) => PushImageViewport();
@@ -163,6 +165,7 @@ public partial class BrushesViewModel : TabPageViewModel
     [Bindable] private double _drawingWidth = 320;
     [Bindable] private double _drawingHeight = 200;
     [Bindable] private double _drawingRadius = 12;
+    [Bindable] private double _drawingRotation;
     [Bindable] private double _drawingOpacity = 1;
     [Bindable] private Color _drawingTint = Colors.White;
 
@@ -171,6 +174,7 @@ public partial class BrushesViewModel : TabPageViewModel
     partial void OnDrawingAlignmentXChanged(AlignmentX value) => LiveDrawing.AlignmentX = value;
     partial void OnDrawingAlignmentYChanged(AlignmentY value) => LiveDrawing.AlignmentY = value;
     partial void OnDrawingTintChanged(Color value) => LiveDrawing.Tint = value;
+    partial void OnDrawingRotationChanged(double value) => LiveDrawing.RotationAngle = value;
     partial void OnDrawingOpacityChanged(double value) => LiveDrawing.Opacity = value;
 
     partial void OnDrawingViewportUnitsChanged(BrushMappingMode value)

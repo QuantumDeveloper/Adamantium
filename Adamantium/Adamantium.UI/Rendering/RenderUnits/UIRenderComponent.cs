@@ -257,6 +257,7 @@ public class GeometryRenderComponent : UIRenderComponent
         UIBasicEffect.Opacity.SetValue(RenderData.Opacity);
         UIBasicEffect.FillBounds.SetValue(new Vector4F((float)box.X, (float)box.Y, (float)box.Width, (float)box.Height));
         UIBasicEffect.TexTile.SetValue(layout.Tile);
+        UIBasicEffect.TexRotation.SetValue(layout.Rotation);
         UIBasicEffect.TexDrawn.SetValue(layout.Drawn);
         UIBasicEffect.TexUvRect.SetValue(layout.UvRect);
         UIBasicEffect.TexTint.SetValue(tint);
