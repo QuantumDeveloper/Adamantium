@@ -210,6 +210,7 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
             Bounds = new Vector4F((float)bounds.X, (float)bounds.Y, (float)bounds.Width, (float)bounds.Height),
             Params = new Vector4F(radius, transformSlot, layout.Repeats ? 1f : 0f, layout.Mirror),
             Tile = layout.Tile,
+            Rotation = layout.Rotation,
             Drawn = layout.Drawn,
             UvRect = layout.UvRect,
             Tint = tint

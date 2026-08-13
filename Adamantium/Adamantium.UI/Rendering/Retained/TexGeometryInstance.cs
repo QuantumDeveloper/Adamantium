@@ -27,6 +27,9 @@ public struct TexGeometryInstance
     /// <summary>The tile grid over that box: tiles per axis (.xy), grid origin in tiles (.zw).</summary>
     public Vector4F Tile;
 
+    /// <summary>The grid rotation: cosine and sine (.xy) and the point it turns about, in 0..1 of the box (.zw).</summary>
+    public Vector4F Rotation;
+
     /// <summary>The content's rect inside ONE tile: (offsetX, offsetY, scaleX, scaleY), each in 0..1 of the tile. Only
     /// Uniform and None shrink it; everything else fills its tile.</summary>
     public Vector4F Drawn;

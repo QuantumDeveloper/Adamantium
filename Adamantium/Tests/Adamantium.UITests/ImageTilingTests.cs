@@ -245,6 +245,73 @@ public class ImageTilingTests
         Assert.That(layout.Repeats, Is.EqualTo(repeats));
     }
 
+    // --- Grid rotation ------------------------------------------------------------------------------------------------
+
+    [Test]
+    public void NoAngleLeavesTheGridExactlyWhereItWas()
+    {
+        var brush = Brush();
+        brush.TileMode = TileMode.Tile;
+        brush.ViewportUnits = BrushMappingMode.Absolute;
+        brush.Viewport = new Rect(0, 0, 64, 32);
+
+        var layout = Layout(brush, new Rect(0, 0, 320, 128));
+
+        Assert.That(layout.Rotation, Is.EqualTo(new Vector4F(1, 0, 0, 1)), "identity, so a fragment maps to itself");
+        Assert.That(layout.Tile.Z, Is.EqualTo(0f), "and the grid's origin is untouched");
+        Assert.That(layout.Tile.W, Is.EqualTo(0f));
+    }
+
+    // A QUARTER turn swaps the axes and NOTHING else. On a non-square shape that is the whole difficulty: the turn
+    // happens in pixels, so the matrix is conjugated by the shape's size - and getting those two factors the wrong way
+    // round (which is what shipped first) shears the grid instead of turning it, the more so the less square the shape.
+    [Test]
+    public void AQuarterTurnSwapsTheAxesWithoutScalingThem()
+    {
+        var brush = Brush();
+        brush.TileMode = TileMode.Tile;
+        brush.RotationAngle = 90;
+        brush.ViewportUnits = BrushMappingMode.Absolute;
+        brush.Viewport = new Rect(0, 0, 40, 40);
+
+        var shape = new Rect(0, 0, 400, 100);   // 4:1, so a swapped aspect factor is off by sixteen
+        var layout = Layout(brush, shape);
+
+        // The matrix maps a fragment (0..1 of the shape) back into the grid. Applied to a step of one PIXEL along x,
+        // it must give a step of one pixel along y - a pure turn changes direction, never length.
+        var stepX = new Vector2(1.0 / shape.Width, 0);
+        var mapped = new Vector2(
+            stepX.X * layout.Rotation.X + stepX.Y * layout.Rotation.Y,
+            stepX.X * layout.Rotation.Z + stepX.Y * layout.Rotation.W);
+
+        Assert.That(mapped.X * shape.Width, Is.EqualTo(0.0).Within(1e-6), "nothing is left along the original axis");
+        Assert.That(System.Math.Abs(mapped.Y * shape.Height), Is.EqualTo(1.0).Within(1e-6),
+            "one pixel across becomes one pixel down - not sixteen, which a swapped aspect gives");
+    }
+
+    // The centre is a fraction of the TILE, so a single copy turns where it lies instead of swinging around the shape.
+    // Its whole effect is on the grid's ORIGIN - the matrix cannot carry a translation.
+    [Test]
+    public void TheTurnCentreMovesTheGridOriginAndNothingElse()
+    {
+        var brush = Brush();
+        brush.RotationAngle = 90;
+        brush.ViewportUnits = BrushMappingMode.Absolute;
+        brush.Viewport = new Rect(0, 0, 100, 100);
+
+        var middle = Layout(brush, new Rect(0, 0, 200, 200));
+
+        brush.RotationCenter = new Vector2(0, 0);
+        var corner = Layout(brush, new Rect(0, 0, 200, 200));
+
+        Assert.That(corner.Rotation, Is.EqualTo(middle.Rotation), "the same turn, so the same matrix");
+        Assert.That(corner.Tile.X, Is.EqualTo(middle.Tile.X), "and the same tile count");
+        // Which COMPONENT of the origin carries the shift depends on the angle - at a quarter turn it is all on y - so
+        // the pair is what is compared, not a hand-picked axis.
+        var moved = System.Math.Abs(corner.Tile.Z - middle.Tile.Z) + System.Math.Abs(corner.Tile.W - middle.Tile.W);
+        Assert.That(moved, Is.GreaterThan(1e-3), "only where the grid starts moves");
+    }
+
     [Test]
     public void ABrushWithNoSourceStillLaysOutTheWholeShape()
     {

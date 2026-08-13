@@ -54,10 +54,51 @@ public abstract class TileBrush : Brush
         typeof(BrushMappingMode), typeof(TileBrush),
         new PropertyMetadata(BrushMappingMode.RelativeToBoundingBox, PropertyMetadataOptions.AffectsPaint));
 
+    /// <summary>Turns the whole TILE GRID, in degrees. Distinct from a rotation written inside the content: that one
+    /// turns what a tile shows and leaves the grid square, this one lays the tiles on the diagonal - which is what
+    /// makes a straight hatch out of a straight stripe.</summary>
+    public static readonly AdamantiumProperty RotationAngleProperty = AdamantiumProperty.Register(nameof(RotationAngle),
+        typeof(double), typeof(TileBrush), new PropertyMetadata(0.0, PropertyMetadataOptions.AffectsPaint));
+
+    /// <summary>What <see cref="RotationAngle"/> turns about, as a fraction of ONE TILE - so the default is the tile's
+    /// own middle. A tile's own centre rather than the shape's because that is the one that shows: an endless grid
+    /// looks the same turned about any point, but a SINGLE copy turned about the shape's centre swings away across it
+    /// instead of spinning where it lies.</summary>
+    public static readonly AdamantiumProperty RotationCenterProperty = AdamantiumProperty.Register(nameof(RotationCenter),
+        typeof(Vector2), typeof(TileBrush), new PropertyMetadata(new Vector2(0.5, 0.5), PropertyMetadataOptions.AffectsPaint));
+
     /// <summary>Multiplied into every sampled pixel. White (the default) draws the content as it is; a colour tints it,
     /// which is how one greyscale skin serves several themes.</summary>
     public static readonly AdamantiumProperty TintProperty = AdamantiumProperty.Register(nameof(Tint),
         typeof(Color), typeof(TileBrush), new PropertyMetadata(Colors.White, PropertyMetadataOptions.AffectsPaint));
+
+    public double RotationAngle
+    {
+        get => GetValue<double>(RotationAngleProperty);
+        set
+        {
+            if (IsFrozen)
+            {
+                return;
+            }
+
+            SetValue(RotationAngleProperty, value);
+        }
+    }
+
+    public Vector2 RotationCenter
+    {
+        get => GetValue<Vector2>(RotationCenterProperty);
+        set
+        {
+            if (IsFrozen)
+            {
+                return;
+            }
+
+            SetValue(RotationCenterProperty, value);
+        }
+    }
 
     public TileMode TileMode
     {
@@ -213,6 +254,8 @@ public abstract class TileBrush : Brush
         clone.ViewportUnits = ViewportUnits;
         clone.Viewbox = Viewbox;
         clone.ViewboxUnits = ViewboxUnits;
+        clone.RotationAngle = RotationAngle;
+        clone.RotationCenter = RotationCenter;
         clone.Tint = Tint;
         clone.Opacity = Opacity;
     }

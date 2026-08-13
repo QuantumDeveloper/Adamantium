@@ -1470,6 +1470,7 @@ struct TexRectData
     float4 Bounds;     // NODE-local x, y, w, h - the SHAPE, which never shrinks with the picture
     float4 Params;     // .x corner radius, .y transform slot, .z repeat flag, .w mirror flags (1 = X, 2 = Y, 3 = both)
     float4 Tile;       // tile grid over the bounds: tiles per axis (.xy), grid origin in tiles (.zw)
+    float4 Rotation;   // 2x2 mapping a fragment back into the unturned grid, row-major (identity = 1,0,0,1)
     float4 Drawn;      // the content's rect inside ONE tile: offsetXY, scaleXY, both in 0..1 of the tile
     float4 UvRect;     // sub-rectangle of the source: x, y, w, h (normalised)
     float4 Tint;       // multiplied into the sample, straight RGBA
@@ -1526,7 +1527,9 @@ float4 TexRectPS(TexPSInput input) : SV_Target
     // REPEAT is done here with frac() rather than by a wrapping sampler: the sampler would wrap the WHOLE texture, and
     // a slice of it needs its own strip wrapped.
     float2 t = input.Local / max(input.Half * 2.0, float2(1e-4, 1e-4)) + 0.5;
-    float2 n = t * it.Tile.xy - it.Tile.zw;
+    // Back into the UNTURNED grid: one 2x2, with the inverse, the aspect and the turn centre already folded in.
+    float2 g = float2(t.x * it.Rotation.x + t.y * it.Rotation.y, t.x * it.Rotation.z + t.y * it.Rotation.w);
+    float2 n = g * it.Tile.xy - it.Tile.zw;
     // A SINGLE copy never wraps: frac() would send its far edge (n = 1) back to 0, drawing one column of the opposite
     // edge. Past that edge there is nothing at all - which is what the coverage test below states.
     float2 tileLocal = lerp(n, frac(n), it.Params.z);
@@ -1948,6 +1951,7 @@ struct TexGeomData
     float4 Params;       // .x repeat flag, .y mirror flags (1 = X, 2 = Y, 3 = both), .w transform slot
     float4 LocalBounds;  // shape local bounds: minXY, sizeXY - the box the picture is mapped across
     float4 Tile;         // tile grid over that box: tiles per axis (.xy), grid origin in tiles (.zw)
+    float4 Rotation;     // 2x2 mapping a fragment back into the unturned grid, row-major (identity = 1,0,0,1)
     float4 Drawn;        // the content's rect inside ONE tile: offsetXY, scaleXY, both in 0..1 of the tile
     float4 UvRect;       // the sub-rectangle of the source one copy samples
     float4 Tint;
@@ -1983,7 +1987,8 @@ float4 TexFillPS(TexFillPSInput input) : SV_Target
 
     // 0..1 across the shape's box -> TILE space -> the content's rect inside one tile -> the source's sub-rectangle.
     float2 t = (input.Local - it.LocalBounds.xy) / max(it.LocalBounds.zw, float2(1e-4, 1e-4));
-    float2 nn = t * it.Tile.xy - it.Tile.zw;
+    float2 g = float2(t.x * it.Rotation.x + t.y * it.Rotation.y, t.x * it.Rotation.z + t.y * it.Rotation.w);
+    float2 nn = g * it.Tile.xy - it.Tile.zw;
     // A SINGLE copy never wraps - frac() would send its far edge back to the opposite one (see TexRectPS).
     float2 tileLocal = lerp(nn, frac(nn), it.Params.x);
     float2 mirrored = abs(frac(nn * 0.5) * 2.0 - 1.0);
@@ -2041,7 +2046,8 @@ float4 TexFringePS(TexFringePSInput input) : SV_Target
     // The ring is expanded a pixel OUTWARD, so its outer edge lies just outside the shape's box: clamp before mapping,
     // or the band would sample past the picture (and the single-copy clip below would erase the fringe entirely).
     float2 t = saturate((input.Local - it.LocalBounds.xy) / max(it.LocalBounds.zw, float2(1e-4, 1e-4)));
-    float2 nn = t * it.Tile.xy - it.Tile.zw;
+    float2 g = float2(t.x * it.Rotation.x + t.y * it.Rotation.y, t.x * it.Rotation.z + t.y * it.Rotation.w);
+    float2 nn = g * it.Tile.xy - it.Tile.zw;
     float2 tileLocal = lerp(nn, frac(nn), it.Params.x);
     float2 mirrored = abs(frac(nn * 0.5) * 2.0 - 1.0);
     float2 pick = float2(step(0.5, fmod(it.Params.y, 2.0)), step(0.5, floor(it.Params.y * 0.5)));

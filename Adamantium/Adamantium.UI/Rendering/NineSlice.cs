@@ -111,6 +111,7 @@ internal static class NineSlice
                     // simply one tile across its quad, so the same path serves both without a second branch.
                     Params = new Vector4F(0, transformSlot, 1, 0),
                     Tile = new Vector4F((float)Math.Max(1e-3, repeatX), (float)Math.Max(1e-3, repeatY), 0, 0),
+                    Rotation = new Vector4F(1, 0, 0, 1),   // a slice is never turned - its quad IS the layout
                     Drawn = new Vector4F(0, 0, 1, 1),   // each slice fills its own quad exactly - nothing to fit
                     UvRect = new Vector4F((float)uv.Start, (float)vv.Start, (float)uv.Length, (float)vv.Length),
                     Tint = tint
