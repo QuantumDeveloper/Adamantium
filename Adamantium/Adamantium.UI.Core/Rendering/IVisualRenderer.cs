@@ -43,6 +43,14 @@ public interface IVisualRenderer
     /// </summary>
     void RequestSnapshot(IUIComponent visual, Action<ImageSource> onReady);
 
+    /// <summary>
+    /// Renders a DETACHED visual off-screen through the same two-stage split: recorded on the loop thread, drawn on the
+    /// render thread, delivered to <paramref name="onReady"/> on the UI thread. Prefer this to the synchronous
+    /// <see cref="Render(IUIComponent, Size, double, Color?)"/> anywhere a window is on screen - that one submits and
+    /// waits on the shared GPU device from the caller's thread, which races the window's own frame.
+    /// </summary>
+    void RequestRender(IUIComponent visual, Size size, double scale, Color? clearColor, Action<ImageSource> onReady);
+
     /// <summary>App-loop plumbing, LOOP thread: stage 1 of a live snapshot - read the queued live subtrees and build their
     /// caches (device-free). Called every frame at a quiescent boundary; a no-op when nothing is queued. Not for general use.</summary>
     void RecordPendingSnapshots();

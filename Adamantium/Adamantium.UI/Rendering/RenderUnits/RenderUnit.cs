@@ -326,6 +326,7 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
         _frozenMesh = FrozenMesh.From(Payload.Geometry.Mesh, Payload.Geometry.Bounds);   // freeze the tessellated mesh for the instanced path
         GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, Payload.Geometry.Mesh, Payload.LiveBrush, BufferManager, ResourceFactory);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
+        GeometryRenderer.Owner = DrawCommand.Component;
         ProcessFillFringe(Payload.Geometry, Payload.Brush);
         ProcessStrokeData(Payload.Pen, Payload.Geometry);
     }
@@ -407,7 +408,9 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
         key = default; mesh = null; brush = null; localBounds = default; opacity = 1.0; texture = null;
         if (Payload.Brush is not ImageBrush image) return false;
         if (_frozenMesh is not { HasPoints: true } fm) return false;
-        texture = TexRectCollector.BrushTexture(image, ResourceFactory, Payload.Geometry.Bounds.Size, DrawCommand.Component);
+        // Baked at the SAME box the shader maps its UVs from (localBounds below) - the geometry's own bounds are a
+        // different box, and the picture then sampled at a shifted scale and spilled past the shape.
+        texture = TexRectCollector.BrushTexture(image, ResourceFactory, fm.Bounds.Size, DrawCommand.Component);
         if (texture == null) return false;
 
         key = fm.Key;
@@ -457,6 +460,7 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
         if (GeometryRenderer != null)
         {
             GeometryRenderer.RenderData = DrawCommand.RenderData;
+            GeometryRenderer.Owner = DrawCommand.Component;
         }
 
         // Analytic-AA fringe follows the fill: cheap brush/colour change repoints it, a geometry change rebuilds it.
@@ -559,6 +563,7 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
         g.ProcessGeometry(GeometryType.Both);
         GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, payload.Brush, BufferManager, ResourceFactory);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
+        GeometryRenderer.Owner = DrawCommand.Component;
         ProcessFillFringe(g, payload.Brush);
         ProcessStrokeData(payload.Pen, g);
     }
@@ -576,6 +581,7 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
         g.ProcessGeometry(GeometryType.Both);
         GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, Payload.Brush, BufferManager, ResourceFactory);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
+        GeometryRenderer.Owner = DrawCommand.Component;
     }
 
     public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
@@ -608,6 +614,7 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
         DrawCommand = drawCommand;
         Payload = inputPayload;
         GeometryRenderer.RenderData = DrawCommand.RenderData;
+        GeometryRenderer.Owner = DrawCommand.Component;
 
         // Fringe: skip for a batchable rect (the batch self-AAs, and a per-tile fringe rebuilt on resize is the OOM);
         // drop a stale one. Otherwise follow the fill.
@@ -684,6 +691,7 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
         g.ProcessGeometry(GeometryType.Both);
         GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, payload.Brush, BufferManager, ResourceFactory);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
+        GeometryRenderer.Owner = DrawCommand.Component;
         ProcessFillFringe(g, payload.Brush);
         ProcessStrokeData(payload.Pen, g);
     }
@@ -697,6 +705,7 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
         g.ProcessGeometry(GeometryType.Both);
         GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, Payload.Brush, BufferManager, ResourceFactory);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
+        GeometryRenderer.Owner = DrawCommand.Component;
     }
 
     public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
@@ -909,6 +918,7 @@ public class TextRenderUnit : RenderUnit<TextPayload>
             Payload.Stroke,
             BufferManager);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
+        GeometryRenderer.Owner = DrawCommand.Component;
         TextComponent.GlyphRun = Payload.TextLayout.SnapshotGlyphs();   // freeze the shaped glyphs for the render-thread batch bake
     }
 

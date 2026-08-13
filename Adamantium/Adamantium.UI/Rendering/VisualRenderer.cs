@@ -66,6 +66,14 @@ public sealed class VisualRenderer : IVisualRenderer
     /// </summary>
     public ImageSource Render(IUIComponent visual, Size size, double scale = 1.0, Color? clearColor = null)
     {
+        var built = BuildDetachedCache(visual, size, scale);
+        return DrawToBitmap(built.Cache, built.Width, built.Height, clearColor ?? Colors.Transparent);
+    }
+
+    // The DEVICE-FREE half of a detached render: host the visual, lay it out and record it into a parallel cache. Split
+    // out so the queued path (RequestRender) can run it on the loop thread and leave only the GPU half to the render one.
+    private (RenderCache Cache, uint Width, uint Height) BuildDetachedCache(IUIComponent visual, Size size, double scale)
+    {
         EnsureDevice();
         var root = new VisualRoot(visual, size.Width, size.Height);
         var layoutSize = new Size(size.Width, size.Height);
@@ -76,9 +84,7 @@ public sealed class VisualRenderer : IVisualRenderer
         cache.BuildFromVisualTree(root);
         cache.ProcessCommands(root.GetProjectionMatrix(), scale);
 
-        var width = (uint)Math.Max(1, size.Width * scale);
-        var height = (uint)Math.Max(1, size.Height * scale);
-        return DrawToBitmap(cache, width, height, clearColor ?? Colors.Transparent);
+        return (cache, (uint)Math.Max(1, size.Width * scale), (uint)Math.Max(1, size.Height * scale));
     }
 
     /// <summary>Parses AUML markup into a fresh visual and renders it (UWP <c>XamlReader.Load</c> + RenderTargetBitmap).</summary>
@@ -123,6 +129,7 @@ public sealed class VisualRenderer : IVisualRenderer
     // render thread), so a no-op drain on an empty queue is the idle cost - a single TryDequeue miss, no device touched.
     // ------------------------------------------------------------------------------------------------------------------
     private readonly ConcurrentQueue<(IUIComponent visual, Action<ImageSource> onReady)> _recordQueue = new();
+    private readonly ConcurrentQueue<(IUIComponent visual, Size size, double scale, Color clear, Action<ImageSource> onReady)> _detachedQueue = new();
     private readonly ConcurrentQueue<(RenderCache cache, uint width, uint height, Color clear, Action<ImageSource> onReady)> _drawQueue = new();
 
     /// <summary>UI-thread API: request a snapshot of a LIVE on-screen element. It is recorded on the loop thread and drawn on
@@ -135,11 +142,32 @@ public sealed class VisualRenderer : IVisualRenderer
         LoopSignal.Request();
     }
 
+    /// <summary>Queue a DETACHED visual, split the same way <see cref="RequestSnapshot"/> is. Rendering it synchronously
+    /// instead submits and waits on the SHARED VkDevice from whatever thread asked, racing the window's own frame - and
+    /// the picture that came back was intermittently wrong.</summary>
+    public void RequestRender(IUIComponent visual, Size size, double scale, Color? clearColor, Action<ImageSource> onReady)
+    {
+        if (visual == null || onReady == null)
+        {
+            return;
+        }
+
+        _detachedQueue.Enqueue((visual, size, scale, clearColor ?? Colors.Transparent, onReady));
+        LoopSignal.Request();
+    }
+
     /// <summary>LOOP-thread stage 1: read each queued live subtree and build its render cache (device-free), then hand the
     /// built cache to the render thread's draw queue. Called by the app loop every frame at a quiescent boundary; a no-op
     /// when nothing is queued.</summary>
     public void RecordPendingSnapshots()
     {
+        while (_detachedQueue.TryDequeue(out var detached))
+        {
+            var built = BuildDetachedCache(detached.visual, detached.size, detached.scale);
+            _drawQueue.Enqueue((built.Cache, built.Width, built.Height, detached.clear, detached.onReady));
+            LoopSignal.Request();
+        }
+
         while (_recordQueue.TryDequeue(out var request))
         {
             EnsureDevice();

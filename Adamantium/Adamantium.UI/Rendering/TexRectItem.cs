@@ -19,8 +19,13 @@ public struct TexRectItem
     public Vector4F Bounds;
 
     /// <summary>.x = corner radius (device px; NEGATIVE = draw the ellipse SDF instead); .y = transform-table slot;
-    /// .z, .w = reserved.</summary>
+    /// .z = clip flag (1 = ONE copy that must not spill outside <see cref="Drawn"/>); .w = reserved.</summary>
     public Vector4F Params;
+
+    /// <summary>The rectangle the picture is DRAWN in, inside <see cref="Bounds"/>: offset x, y and scale w, h, in 0..1
+    /// of the bounds. A field of its own because the SHAPE must not shrink with the picture - baked as the bounds, a
+    /// Uniform fill turned a circle into an oval.</summary>
+    public Vector4F Drawn;
 
     /// <summary>The sub-rectangle of the source to sample, normalised: x, y, w, h. A whole image is (0,0,1,1); one
     /// slice of a nine-slice is its own ninth.</summary>

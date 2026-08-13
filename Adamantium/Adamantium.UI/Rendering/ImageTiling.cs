@@ -11,6 +11,9 @@ namespace Adamantium.UI.Rendering;
 /// collector so it can be tested without a device - the same reason <see cref="NineSlice"/> is.</summary>
 internal static class ImageTiling
 {
+    private static readonly Vector4F Whole = new(0, 0, 1, 1);
+    private static readonly Vector4F One = new(1, 1, 0, 0);
+    
     /// <summary>The sub-rectangle of the source one copy samples, how many times it repeats across the bounds, and the
     /// rectangle it is drawn in (which only <see cref="Stretch.Uniform"/> and <see cref="Stretch.None"/> shrink).</summary>
     public static (Rect Bounds, Vector4F UvRect, Vector4F UvRepeat) Layout(ImageBrush brush, Rect bounds, double scaleX, double scaleY)
@@ -43,8 +46,34 @@ internal static class ImageTiling
         };
     }
 
-    private static readonly Vector4F Whole = new(0, 0, 1, 1);
-    private static readonly Vector4F One = new(1, 1, 0, 0);
+    /// <summary>The size a VECTOR source is baked at: the rectangle its picture is actually DRAWN in. A drawing maps
+    /// its viewbox onto whatever box the bake is given, so baking at the fill box and fitting afterwards squashes it
+    /// twice - which is why Stretch did nothing at all on a drawing.</summary>
+    public static Size BakeSize(ImageBrush brush, Size box)
+    {
+        var (naturalWidth, naturalHeight) = PixelSize(brush.Source);
+        if (naturalWidth <= 0 || naturalHeight <= 0 || box.Width <= 0 || box.Height <= 0)
+        {
+            return box;
+        }
+
+        // TILED: one copy is a TILE, so that is the unit to bake - each copy then carries its own resolution.
+        if (brush.TileMode != TileMode.None)
+        {
+            var tile = brush.TileSize;
+            return new Size(tile.Width > 0 ? tile.Width : naturalWidth, tile.Height > 0 ? tile.Height : naturalHeight);
+        }
+
+        return brush.Stretch switch
+        {
+            Stretch.Uniform => Scaled(naturalWidth, naturalHeight, Math.Min(box.Width / naturalWidth, box.Height / naturalHeight)),
+            Stretch.UniformToFill => Scaled(naturalWidth, naturalHeight, Math.Max(box.Width / naturalWidth, box.Height / naturalHeight)),
+            Stretch.None => new Size(naturalWidth, naturalHeight),
+            _ => box
+        };
+    }
+
+    private static Size Scaled(double width, double height, double scale) => new(width * scale, height * scale);
 
     // The mirror flag the shader reads out of UvRepeat.z: bit 0 = mirror X, bit 1 = mirror Y. Packed rather than given a
     // field of its own because the record is read per fragment and two spare components were already there.

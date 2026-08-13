@@ -66,7 +66,18 @@ public class DrawingImage : ImageSource
         // the drawing, the tree IS built. Re-attaching only when the owner or its data actually changed keeps that
         // cheap: after the first successful bind every later call returns immediately.
         var dataContext = (owner as IUIComponent)?.DataContext;
-        if (ReferenceEquals(_owner, owner) && ReferenceEquals(_dataContext, dataContext)) return;
+
+        // One inheritance parent, so the FIRST owner that can answer keeps it - a later one would move where every
+        // binding inside the drawing resolves.
+        if (_owner != null && _dataContext != null && !ReferenceEquals(_owner, owner))
+        {
+            return;
+        }
+
+        if (ReferenceEquals(_owner, owner) && ReferenceEquals(_dataContext, dataContext))
+        {
+            return;
+        }
 
         _owner = owner;
         _dataContext = dataContext;

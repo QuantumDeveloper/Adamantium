@@ -108,6 +108,7 @@ internal static class NineSlice
                 {
                     Bounds = new Vector4F((float)xs[column], (float)ys[row], (float)w, (float)h),
                     Params = new Vector4F(0, transformSlot, 0, 0),   // no corner radius: the picture carries its own shape
+                    Drawn = new Vector4F(0, 0, 1, 1),   // each slice fills its own quad exactly - nothing to fit
                     UvRect = new Vector4F((float)uv.Start, (float)vv.Start, (float)uv.Length, (float)vv.Length),
                     UvRepeat = new Vector4F((float)Math.Max(1e-3, repeatX), (float)Math.Max(1e-3, repeatY), 0, 0),
                     Tint = tint
