@@ -7,8 +7,8 @@ using NUnit.Framework;
 
 namespace Adamantium.UITests;
 
-// Where one copy of a picture lands and how many copies fit. Pure rectangle arithmetic, so it is tested without a
-// device - the same reason the nine-slice cutter is.
+// The four mechanisms of a TileBrush, as rectangle arithmetic: viewbox picks the slice of the source, viewport places
+// and sizes one tile, stretch + alignment fit the content in it, tile mode repeats it. Tested without a device.
 [TestFixture]
 public class ImageTilingTests
 {
@@ -20,116 +20,238 @@ public class ImageTilingTests
 
     private static ImageBrush Brush() => new(new Source());
 
-    private static (Rect Bounds, Vector4F UvRect, Vector4F UvRepeat) Layout(ImageBrush brush, Rect bounds)
-        => ImageTiling.Layout(brush, bounds, 1.0, 1.0);
+    private static TileLayout Layout(ImageBrush brush, Rect bounds) => ImageTiling.Layout(brush, bounds, 1.0, 1.0);
 
     [Test]
     public void FillTakesTheWholeShapeAndTheWholeSource()
     {
-        var shape = new Rect(0, 0, 300, 200);
+        var layout = Layout(Brush(), new Rect(0, 0, 300, 200));
 
-        var (bounds, uv, repeat) = Layout(Brush(), shape);
-
-        Assert.That(bounds, Is.EqualTo(shape));
-        Assert.That(uv, Is.EqualTo(new Vector4F(0, 0, 1, 1)));
-        Assert.That(repeat.X, Is.EqualTo(1f));
-        Assert.That(repeat.Y, Is.EqualTo(1f));
+        Assert.That(layout.UvRect, Is.EqualTo(new Vector4F(0, 0, 1, 1)));
+        Assert.That(layout.Drawn, Is.EqualTo(new Vector4F(0, 0, 1, 1)), "the content fills its tile");
+        Assert.That(layout.Tile.X, Is.EqualTo(1f), "one tile across");
+        Assert.That(layout.Tile.Y, Is.EqualTo(1f));
+        Assert.That(layout.Repeats, Is.False);
     }
 
-    // Tiling counts how many TILES fit - fractional, so the last one is cut by the shape's edge, as a tiled surface must.
+    // --- Viewport: where one tile sits, and therefore how big it is -------------------------------------------------
+
+    // An ABSOLUTE viewport states the tile in logical px, so the count is however many fit - fractional, so the last
+    // one is cut by the shape's edge, as a tiled surface must be.
     [Test]
-    public void TilingRepeatsTheSourceAtItsOwnPixelSize()
+    public void AnAbsoluteViewportSizesTheTileInPixels()
     {
         var brush = Brush();
         brush.TileMode = TileMode.Tile;
+        brush.ViewportUnits = BrushMappingMode.Absolute;
+        brush.Viewport = new Rect(0, 0, 32, 32);
 
-        var (bounds, uv, repeat) = Layout(brush, new Rect(0, 0, 320, 128));
+        var layout = Layout(brush, new Rect(0, 0, 320, 128));
 
-        Assert.That(bounds.Width, Is.EqualTo(320));
-        Assert.That(uv, Is.EqualTo(new Vector4F(0, 0, 1, 1)), "each tile samples the whole picture");
-        Assert.That(repeat.X, Is.EqualTo(5f).Within(1e-4), "320 / 64");
-        Assert.That(repeat.Y, Is.EqualTo(4f).Within(1e-4), "128 / 32");
+        Assert.That(layout.Tile.X, Is.EqualTo(10f).Within(1e-4), "320 / 32");
+        Assert.That(layout.Tile.Y, Is.EqualTo(4f).Within(1e-4), "128 / 32");
+        Assert.That(layout.Repeats, Is.True);
     }
 
+    // A RELATIVE viewport is a fraction of the shape, so the tile COUNT is fixed however the shape resizes - the
+    // difference from absolute that makes a brush reusable.
     [Test]
-    public void AStatedTileSizeWins()
+    public void ARelativeViewportKeepsTheTileCountAcrossSizes()
     {
         var brush = Brush();
         brush.TileMode = TileMode.Tile;
-        brush.TileSize = new Size(32, 32);
+        brush.Viewport = new Rect(0, 0, 0.25, 0.5);
 
-        var (_, _, repeat) = Layout(brush, new Rect(0, 0, 320, 128));
+        var small = Layout(brush, new Rect(0, 0, 100, 100));
+        var large = Layout(brush, new Rect(0, 0, 900, 400));
 
-        Assert.That(repeat.X, Is.EqualTo(10f).Within(1e-4));
-        Assert.That(repeat.Y, Is.EqualTo(4f).Within(1e-4));
+        Assert.That(small.Tile.X, Is.EqualTo(4f).Within(1e-4));
+        Assert.That(small.Tile.Y, Is.EqualTo(2f).Within(1e-4));
+        Assert.That(large.Tile.X, Is.EqualTo(4f).Within(1e-4), "a resize must not change the count");
+        Assert.That(large.Tile.Y, Is.EqualTo(2f).Within(1e-4));
     }
 
-    // The mirror flags ride UvRepeat.z: 1 = X, 2 = Y, 3 = both. The shader reads them branch-free.
-    [TestCase(TileMode.Tile, 0f)]
-    [TestCase(TileMode.FlipX, 1f)]
-    [TestCase(TileMode.FlipY, 2f)]
-    [TestCase(TileMode.FlipXY, 3f)]
-    public void TheMirrorFlagsAreCarriedOnTheRepeat(TileMode mode, float expected)
+    // The viewport's ORIGIN shifts the whole grid, in tiles - what lets a tiled brush be offset without moving the shape.
+    [Test]
+    public void TheViewportOriginShiftsTheTileGrid()
     {
         var brush = Brush();
-        brush.TileMode = mode;
+        brush.TileMode = TileMode.Tile;
+        brush.ViewportUnits = BrushMappingMode.Absolute;
+        brush.Viewport = new Rect(16, 8, 32, 32);
 
-        var (_, _, repeat) = Layout(brush, new Rect(0, 0, 320, 128));
+        var layout = Layout(brush, new Rect(0, 0, 320, 128));
 
-        Assert.That(repeat.Z, Is.EqualTo(expected));
+        Assert.That(layout.Tile.Z, Is.EqualTo(0.5f).Within(1e-4), "16px into a 32px tile");
+        Assert.That(layout.Tile.W, Is.EqualTo(0.25f).Within(1e-4), "8px into a 32px tile");
     }
 
-    // UniformToFill covers the shape and CROPS: the drawn rect is the whole shape, the sampled rect shrinks.
+    // --- Viewbox: which part of the source a tile shows -------------------------------------------------------------
+
     [Test]
-    public void UniformToFillCropsTheSourceRatherThanTheShape()
+    public void ARelativeViewboxIsTheSampledRectAsItStands()
     {
         var brush = Brush();
-        brush.Stretch = Stretch.UniformToFill;
+        brush.Viewbox = new Rect(0.25, 0, 0.5, 1);
 
-        var (bounds, uv, _) = Layout(brush, new Rect(0, 0, 200, 200));   // square shape, 2:1 source
+        var layout = Layout(brush, new Rect(0, 0, 200, 100));
 
-        Assert.That(bounds, Is.EqualTo(new Rect(0, 0, 200, 200)), "the shape is filled edge to edge");
-        Assert.That(uv.Z, Is.EqualTo(0.5f).Within(1e-4), "half the source's width is sampled");
-        Assert.That(uv.X, Is.EqualTo(0.25f).Within(1e-4), "and it is the CENTRED half");
-        Assert.That(uv.W, Is.EqualTo(1f), "its full height");
+        Assert.That(layout.UvRect, Is.EqualTo(new Vector4F(0.25f, 0f, 0.5f, 1f)));
     }
 
-    // Uniform does the opposite: the picture keeps its shape, so what is DRAWN shrinks and centres.
+    // An ABSOLUTE viewbox is stated in the source's own units - texels for a picture - so a sprite is cut out by the
+    // coordinates the artist reads off the sheet, and the shader still only ever sees 0..1.
     [Test]
-    public void UniformFitsTheDrawnRectAndKeepsTheWholeSource()
+    public void AnAbsoluteViewboxIsStatedInTheSourcesOwnUnits()
+    {
+        var brush = Brush();
+        brush.ViewboxUnits = BrushMappingMode.Absolute;
+        brush.Viewbox = new Rect(16, 8, 32, 16);   // the source is 64x32
+
+        var layout = Layout(brush, new Rect(0, 0, 200, 100));
+
+        Assert.That(layout.UvRect.X, Is.EqualTo(0.25f).Within(1e-4));
+        Assert.That(layout.UvRect.Y, Is.EqualTo(0.25f).Within(1e-4));
+        Assert.That(layout.UvRect.Z, Is.EqualTo(0.5f).Within(1e-4));
+        Assert.That(layout.UvRect.W, Is.EqualTo(0.5f).Within(1e-4));
+    }
+
+    // --- Stretch, measured against the TILE (not the shape) ---------------------------------------------------------
+
+    // Uniform keeps the aspect, so the content occupies part of its tile and the rest stays clear.
+    [Test]
+    public void UniformFitsTheContentInsideItsTile()
     {
         var brush = Brush();
         brush.Stretch = Stretch.Uniform;
 
-        var (bounds, uv, _) = Layout(brush, new Rect(0, 0, 200, 200));
+        var layout = Layout(brush, new Rect(0, 0, 200, 200));   // square shape, 2:1 source
 
-        Assert.That(uv, Is.EqualTo(new Vector4F(0, 0, 1, 1)), "nothing is cropped");
-        Assert.That(bounds.Width, Is.EqualTo(200).Within(1e-4), "the wide axis fills");
-        Assert.That(bounds.Height, Is.EqualTo(100).Within(1e-4), "the other keeps the 2:1 ratio");
-        Assert.That(bounds.Y, Is.EqualTo(50).Within(1e-4), "centred in what is left");
+        Assert.That(layout.UvRect, Is.EqualTo(new Vector4F(0, 0, 1, 1)), "nothing is cropped");
+        Assert.That(layout.Drawn.Z, Is.EqualTo(1f).Within(1e-4), "the wide axis fills the tile");
+        Assert.That(layout.Drawn.W, Is.EqualTo(0.5f).Within(1e-4), "the other keeps the 2:1 ratio");
+        Assert.That(layout.Drawn.Y, Is.EqualTo(0.25f).Within(1e-4), "centred in what is left");
     }
 
-    // None draws it at its own pixel size - and a picture bigger than its shape is cropped BY the shape, not scaled.
+    // A TILED Uniform brush letterboxes EVERY copy, not the lot: the fit is measured against one tile.
+    [Test]
+    public void UniformLetterboxesEveryTileNotTheWholeShape()
+    {
+        var brush = Brush();
+        brush.Stretch = Stretch.Uniform;
+        brush.TileMode = TileMode.Tile;
+        brush.ViewportUnits = BrushMappingMode.Absolute;
+        brush.Viewport = new Rect(0, 0, 100, 100);
+
+        var layout = Layout(brush, new Rect(0, 0, 400, 400));
+
+        Assert.That(layout.Tile.X, Is.EqualTo(4f).Within(1e-4));
+        Assert.That(layout.Drawn.W, Is.EqualTo(0.5f).Within(1e-4), "each 100x100 tile holds the 2:1 source at half height");
+        Assert.That(layout.Drawn.Y, Is.EqualTo(0.25f).Within(1e-4));
+    }
+
+    // UniformToFill does the opposite: the tile is filled edge to edge and the SOURCE is cropped.
+    [Test]
+    public void UniformToFillCropsTheSourceRatherThanTheTile()
+    {
+        var brush = Brush();
+        brush.Stretch = Stretch.UniformToFill;
+
+        var layout = Layout(brush, new Rect(0, 0, 200, 200));
+
+        Assert.That(layout.Drawn, Is.EqualTo(new Vector4F(0, 0, 1, 1)), "the tile is filled edge to edge");
+        Assert.That(layout.UvRect.Z, Is.EqualTo(0.5f).Within(1e-4), "half the source's width is sampled");
+        Assert.That(layout.UvRect.X, Is.EqualTo(0.25f).Within(1e-4), "and it is the CENTRED half");
+        Assert.That(layout.UvRect.W, Is.EqualTo(1f), "its full height");
+    }
+
     [Test]
     public void NoneDrawsTheSourceAtItsOwnSize()
     {
         var brush = Brush();
         brush.Stretch = Stretch.None;
 
-        var (bounds, _, _) = Layout(brush, new Rect(0, 0, 200, 200));
+        var layout = Layout(brush, new Rect(0, 0, 200, 200));
 
-        Assert.That(bounds.Width, Is.EqualTo(64).Within(1e-4));
-        Assert.That(bounds.Height, Is.EqualTo(32).Within(1e-4));
-        Assert.That(bounds.X, Is.EqualTo(68).Within(1e-4), "centred");
+        Assert.That(layout.Drawn.Z, Is.EqualTo(0.32f).Within(1e-4), "64 of 200");
+        Assert.That(layout.Drawn.W, Is.EqualTo(0.16f).Within(1e-4), "32 of 200");
+        Assert.That(layout.Drawn.X, Is.EqualTo(0.34f).Within(1e-4), "centred");
+    }
+
+    // --- Alignment: which part survives when Stretch leaves room -----------------------------------------------------
+
+    [TestCase(AlignmentX.Left, 0f)]
+    [TestCase(AlignmentX.Center, 0.25f)]
+    [TestCase(AlignmentX.Right, 0.5f)]
+    public void AlignmentPlacesAUniformFitInsideItsTile(AlignmentX alignment, float expected)
+    {
+        var brush = Brush();
+        brush.Stretch = Stretch.Uniform;
+        brush.AlignmentX = alignment;
+
+        // A 2:1 source in a 4:1 tile fits by HEIGHT, so it fills half the width and the rest is room to move in.
+        var layout = Layout(brush, new Rect(0, 0, 400, 100));
+
+        Assert.That(layout.Drawn.Z, Is.EqualTo(0.5f).Within(1e-4));
+        Assert.That(layout.Drawn.X, Is.EqualTo(expected).Within(1e-4));
+    }
+
+    [TestCase(AlignmentX.Left, 0f)]
+    [TestCase(AlignmentX.Center, 0.375f)]
+    [TestCase(AlignmentX.Right, 0.75f)]
+    public void AlignmentPicksWhichPartUniformToFillCrops(AlignmentX alignment, float expected)
+    {
+        var brush = Brush();
+        brush.Stretch = Stretch.UniformToFill;
+        brush.AlignmentX = alignment;
+
+        // A 2:1 source covering a 1:2 tile overflows HORIZONTALLY, so the crop runs across the source's width.
+        var layout = Layout(brush, new Rect(0, 0, 100, 200));
+
+        Assert.That(layout.UvRect.Z, Is.EqualTo(0.25f).Within(1e-4));
+        Assert.That(layout.UvRect.X, Is.EqualTo(expected).Within(1e-4));
+    }
+
+    // --- Tile mode ----------------------------------------------------------------------------------------------------
+
+    [Test]
+    public void TilingRepeatsTheSourceAtItsOwnPixelSize()
+    {
+        var brush = Brush();
+        brush.TileMode = TileMode.Tile;
+        brush.ViewportUnits = BrushMappingMode.Absolute;
+        brush.Viewport = new Rect(0, 0, 64, 32);
+
+        var layout = Layout(brush, new Rect(0, 0, 320, 128));
+
+        Assert.That(layout.UvRect, Is.EqualTo(new Vector4F(0, 0, 1, 1)), "each tile samples the whole picture");
+        Assert.That(layout.Tile.X, Is.EqualTo(5f).Within(1e-4), "320 / 64");
+        Assert.That(layout.Tile.Y, Is.EqualTo(4f).Within(1e-4), "128 / 32");
+    }
+
+    [TestCase(TileMode.None, 0f, false)]
+    [TestCase(TileMode.Tile, 0f, true)]
+    [TestCase(TileMode.FlipX, 1f, true)]
+    [TestCase(TileMode.FlipY, 2f, true)]
+    [TestCase(TileMode.FlipXY, 3f, true)]
+    public void TheTileModeStatesMirroringAndWhetherItRepeats(TileMode mode, float mirror, bool repeats)
+    {
+        var brush = Brush();
+        brush.TileMode = mode;
+
+        var layout = Layout(brush, new Rect(0, 0, 320, 128));
+
+        Assert.That(layout.Mirror, Is.EqualTo(mirror));
+        Assert.That(layout.Repeats, Is.EqualTo(repeats));
     }
 
     [Test]
     public void ABrushWithNoSourceStillLaysOutTheWholeShape()
     {
-        var (bounds, uv, repeat) = Layout(new ImageBrush(), new Rect(0, 0, 100, 50));
+        var layout = Layout(new ImageBrush(), new Rect(0, 0, 100, 50));
 
-        Assert.That(bounds, Is.EqualTo(new Rect(0, 0, 100, 50)));
-        Assert.That(uv, Is.EqualTo(new Vector4F(0, 0, 1, 1)));
-        Assert.That(repeat.X, Is.EqualTo(1f));
+        Assert.That(layout.UvRect, Is.EqualTo(new Vector4F(0, 0, 1, 1)));
+        Assert.That(layout.Drawn, Is.EqualTo(new Vector4F(0, 0, 1, 1)));
+        Assert.That(layout.Tile.X, Is.EqualTo(1f));
     }
 }

@@ -466,7 +466,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         double opacity, int transformSlot)
     {
         var box = localBounds.Width > 0 && localBounds.Height > 0 ? localBounds : new Rect(0, 0, 1, 1);
-        var (drawn, uvRect, uvRepeat) = ImageTiling.Layout(brush, box, local.M11, local.M22);
+        var layout = ImageTiling.Layout(brush, box, local.M11, local.M22);
 
         var tint = brush.Tint.ToVector4();
         tint.W *= (float)(opacity * brush.Opacity);
@@ -474,16 +474,11 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         return new TexGeometryInstance
         {
             Local = local,
-            // Only a single copy that does NOT fill the shape has an outside to keep clear; a tiled one covers everything.
-            Params = new Vector4F(brush.TileMode == TileMode.None ? 1f : 0f, 0, 0, transformSlot),
+            Params = new Vector4F(layout.Repeats ? 1f : 0f, layout.Mirror, 0, transformSlot),
             LocalBounds = new Vector4F((float)box.X, (float)box.Y, (float)box.Width, (float)box.Height),
-            Drawn = new Vector4F(
-                (float)((drawn.X - box.X) / box.Width),
-                (float)((drawn.Y - box.Y) / box.Height),
-                (float)(drawn.Width / box.Width),
-                (float)(drawn.Height / box.Height)),
-            UvRect = uvRect,
-            UvRepeat = uvRepeat,
+            Tile = layout.Tile,
+            Drawn = layout.Drawn,
+            UvRect = layout.UvRect,
             Tint = tint
         };
     }
