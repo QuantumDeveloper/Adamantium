@@ -96,7 +96,7 @@ public class ResourceManager : IResourceManager
         {
             var local = _localResources.FindResourceForOwner(node, name);
             if (local != null)
-                return local;
+                return Materialize(local);
         }
 
         var themeResource = FindResourceInScope(name, ResourceScope.Theme);
@@ -133,9 +133,14 @@ public class ResourceManager : IResourceManager
                 value = _themeResources.FindResource(name);
                 break;
         }
-        
-        return value;
+
+        return Materialize(value);
     }
+
+    // An entry declared x:Shared="False" is STORED as a factory, so every ask gets its own object - what a ContextMenu, a
+    // Popup or a Transform needs, each belonging to the element it sits on. Unwrapped HERE, the one place a stored
+    // resource leaves the dictionary, so no consumer has to know a factory was ever involved.
+    private static object Materialize(object stored) => stored is PerTargetValue perTarget ? perTarget.Create() : stored;
 
     public void AddSource(IAdamantiumComponent owner, Type source, ResourceScope scope = ResourceScope.Local)
     {
