@@ -173,16 +173,24 @@
                 <ControlTemplate TargetType="ContextMenu">
                     <Grid>
                         <Popup x:Name="PART_Popup" Placement="Bottom" FlipToFit="True" VerticalOffset="4">
-                            <Border x:Name="PART_MenuRoot"
-                                    Background="{ResourceReference CardBackgroundFillColorDefault}"
-                                    BorderBrush="{ResourceReference ControlStrokeColorDefault}"
-                                    BorderThickness="1" CornerRadius="6" Padding="4" MinWidth="160">
-                                <!-- Menu taller than the window: capped to the window (MaxHeight set in code) and scrolled by
-                                     the ▲/▼ hover-arrows the MenuScrollViewer grows - no scrollbar. A short menu is content-sized. -->
-                                <MenuScrollViewer x:Name="PART_MenuScroll">
-                                    <ItemsPresenter x:Name="PART_ItemsPresenter"/>
-                                </MenuScrollViewer>
-                            </Border>
+                            <!-- The card builds on FIRST OPEN (ChildTemplate), not with the menu. This is the one that pays
+                                 across the whole application rather than in one control: ANY element may carry a context
+                                 menu, and a right-click menu is by nature something most of them never show. Its parts are
+                                 taken from the built content in code (Popup.ContentBuilt). -->
+                            <Popup.ChildTemplate>
+                                <ControlTemplate TargetType="Popup">
+                                    <Border x:Name="PART_MenuRoot"
+                                            Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                            BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                            BorderThickness="1" CornerRadius="6" Padding="4" MinWidth="160">
+                                        <!-- Menu taller than the window: capped to the window (MaxHeight set in code) and scrolled by
+                                             the ▲/▼ hover-arrows the MenuScrollViewer grows - no scrollbar. A short menu is content-sized. -->
+                                        <MenuScrollViewer x:Name="PART_MenuScroll">
+                                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                        </MenuScrollViewer>
+                                    </Border>
+                                </ControlTemplate>
+                            </Popup.ChildTemplate>
                         </Popup>
                     </Grid>
                 </ControlTemplate>

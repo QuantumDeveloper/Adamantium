@@ -30,6 +30,11 @@ public class ContextMenu : ItemsControl
     private IInputComponent _clickRoot;   // the items presenter; leaf-row clicks bubble to it (it IS an input element)
     private ScrollViewer _scroll;         // wraps the items; capped to the window height so a long menu scrolls
 
+    /// <summary>Nothing of this control is shown where it stands - the rows live in the popup overlay - so a menu nobody
+    /// right-clicked builds nothing at all, not even its own portal. Every element may carry one of these, and most are
+    /// never opened.</summary>
+    protected override bool DeferTemplate => !IsOpen;
+
     /// <summary>Whether the menu is shown. Set true (with a PlacementTarget) to open; cleared on pick / outside click.</summary>
     public bool IsOpen
     {
@@ -129,15 +134,12 @@ public class ContextMenu : ItemsControl
         base.OnApplyTemplate();
         DetachParts();   // a template swap re-runs this; drop the old wiring first
 
+        // The card is built on first open, so neither the scroller nor the items presenter is in this template's
+        // namescope - both arrive with the content.
         _popup = GetTemplateChild("PART_Popup") as Popup;
-        _clickRoot = GetTemplateChild("PART_ItemsPresenter") as IInputComponent;
-        _scroll = GetTemplateChild("PART_MenuScroll") as ScrollViewer;
-        // Scrolling the list = browsing it, not navigating a submenu: close any open submenu so it doesn't ride along with
-        // the scrolled row it's anchored to. A NAMED handler, not a lambda: a lambda cannot be taken off again, and this
-        // one has to come off when the template goes.
-        if (_scroll != null) _scroll.ScrollChanged += OnMenuScrolled;
         if (_popup != null)
         {
+            _popup.ContentBuilt += OnPopupContentBuilt;
             _popup.PlacementTarget = PlacementTarget ?? this;
             _popup.Placement = Placement;
             _popup.HorizontalOffset = HorizontalOffset;
@@ -149,6 +151,25 @@ public class ContextMenu : ItemsControl
             _popup.Closed += OnPopupClosed;
             _popup.IsOpen = IsOpen;
         }
+    }
+
+    // The card only exists once the popup has built its deferred content - take its parts then.
+    private void OnPopupContentBuilt(object sender, EventArgs e)
+    {
+        var popup = (Popup)sender;
+
+        _clickRoot = popup.FindContentChild("PART_ItemsPresenter") as IInputComponent;
+        _scroll = popup.FindContentChild("PART_MenuScroll") as ScrollViewer;
+
+        // base.OnApplyTemplate connected the items host while it was still in this control's namescope; now it isn't, so
+        // the connection is made here instead - an unconnected host has no owner and never grows an items panel.
+        if (_clickRoot is ItemsPresenter presenter) ConnectPresenter(presenter);
+
+        // Scrolling the list = browsing it, not navigating a submenu: close any open submenu so it doesn't ride along with
+        // the scrolled row it's anchored to. A NAMED handler, not a lambda: a lambda cannot be taken off again, and this
+        // one has to come off when the template goes.
+        if (_scroll != null) _scroll.ScrollChanged += OnMenuScrolled;
+
         // Any leaf row's Click bubbles up to the items presenter - close the menu after the command has run.
         // The handler INSTANCE is kept: RemoveHandler matches on the delegate, so a freshly-made one would not take off
         // the one that was added.
@@ -167,7 +188,12 @@ public class ContextMenu : ItemsControl
     {
         if (_scroll != null) _scroll.ScrollChanged -= OnMenuScrolled;
         if (_clickRoot != null && _itemClicked != null) _clickRoot.RemoveHandler(MenuItem.ClickEvent, _itemClicked);
-        if (_popup != null) _popup.Closed -= OnPopupClosed;
+        if (_popup != null)
+        {
+            _popup.Closed -= OnPopupClosed;
+            _popup.ContentBuilt -= OnPopupContentBuilt;
+        }
+
         _scroll = null;
         _clickRoot = null;
         _popup = null;
@@ -185,6 +211,10 @@ public class ContextMenu : ItemsControl
     private static void OnIsOpenChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
         var menu = (ContextMenu)a;
+        // First open: build the template now. Placement is stated on the menu BEFORE IsOpen (see Open), so the popup
+        // OnApplyTemplate hands it is already positioned; what follows just re-states it for every later open.
+        if ((bool)e.NewValue) menu.EnsureTemplate();
+
         if (menu._popup != null)
         {
             menu._popup.PlacementTarget = menu.PlacementTarget ?? menu;

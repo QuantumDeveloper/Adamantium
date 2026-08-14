@@ -61,7 +61,7 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent, ITe
 
         if (appliedTemplate != null) RemoveTemplate();
         appliedTemplate = effective;
-        if (effective != null) ApplyTemplate();
+        if (effective != null && !DeferTemplate) ApplyTemplate();
 
         // Template parts just changed: re-point any style/element triggers that target named parts at the new tree
         // (and tear down what they held on the old, now-discarded parts) so a runtime template swap stays leak-free.
@@ -79,6 +79,17 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent, ITe
         if (Template == null || templateResult?.RootComponent == null) return null;
 
         return templateResult.GetComponentByName(name);
+    }
+
+    /// <summary>Hold the template back instead of building it as soon as it is themed. A control that is shown nowhere
+    /// inline - a <c>ContextMenu</c>, whose rows live in the popup overlay and which exists only to be right-clicked open -
+    /// answers true until it is asked for, and calls <see cref="EnsureTemplate"/> then.</summary>
+    protected virtual bool DeferTemplate => false;
+
+    /// <summary>Builds the template that <see cref="DeferTemplate"/> held back. Does nothing if it is already built.</summary>
+    protected void EnsureTemplate()
+    {
+        if (templateResult == null && appliedTemplate != null) ApplyTemplate();
     }
 
     private void ApplyTemplate()

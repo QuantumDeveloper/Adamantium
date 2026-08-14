@@ -217,16 +217,46 @@ public class RibbonGallery : Selector
             // WE own the close - the chevron's own press must not light-dismiss first, or the press would close and
             // re-open and read as doing nothing.
             _popup.IgnoreTargetPress = true;
-            _popup.Closed += (_, _) => SetCurrentValue(IsDropDownOpenProperty, false);
+            // Named handlers, not lambdas: a part outlives neither its template nor a theme swap, and what is subscribed
+            // here has to be given back in OnRemoveTemplate - which a lambda makes impossible.
+            _popup.Closed -= OnDropDownClosed;
+            _popup.Closed += OnDropDownClosed;
+
+            // The card is built on first open, so the panel is not in this template's namescope - it arrives with the
+            // content, and the cells are filled in then.
+            _popup.ContentBuilt -= OnDropDownContentBuilt;
+            _popup.ContentBuilt += OnDropDownContentBuilt;
             _popup.IsOpen = IsDropDownOpen;
         }
 
-        _dropDownPanel = GetTemplateChild("PART_DropDownPanel") as RibbonGalleryPanel;
+        _dropDownPanel = null;
 
         if (GetTemplateChild("PART_ScrollUp") is Primitives.ButtonBase up) up.Click += (_, _) => ScrollUp();
         if (GetTemplateChild("PART_ScrollDown") is Primitives.ButtonBase down) down.Click += (_, _) => ScrollDown();
         if (GetTemplateChild("PART_More") is Primitives.ButtonBase more) more.Click += (_, _) => IsDropDownOpen = !IsDropDownOpen;
 
+        RefreshDropDown();
+    }
+
+    /// <summary>Let the template's parts go when the template does - see ScrollBar.OnRemoveTemplate.</summary>
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        if (_popup != null)
+        {
+            _popup.Closed -= OnDropDownClosed;
+            _popup.ContentBuilt -= OnDropDownContentBuilt;
+        }
+
+        _popup = null;
+        _dropDownPanel = null;
+    }
+
+    private void OnDropDownClosed(object sender, EventArgs e) => SetCurrentValue(IsDropDownOpenProperty, false);
+
+    private void OnDropDownContentBuilt(object sender, EventArgs e)
+    {
+        _dropDownPanel = ((Popup)sender).FindContentChild("PART_DropDownPanel") as RibbonGalleryPanel;
         RefreshDropDown();
     }
 

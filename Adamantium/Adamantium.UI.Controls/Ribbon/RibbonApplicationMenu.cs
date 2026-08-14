@@ -250,19 +250,18 @@ public class RibbonApplicationMenu : Selector
             _button.Click += OnButtonClick;
         }
 
+        // The page itself - back button, rail, items host - is built on first open, so none of it is in this template's
+        // namescope: it arrives with the content.
         if (_backButton != null)
         {
             _backButton.Click -= OnBackClick;
         }
-        _backButton = GetTemplateChild("PART_BackButton") as Primitives.ButtonBase;
-        if (_backButton != null)
-        {
-            _backButton.Click += OnBackClick;
-        }
+        _backButton = null;
 
         if (_popup != null)
         {
             _popup.Closed -= OnPopupClosed;
+            _popup.ContentBuilt -= OnPopupContentBuilt;
         }
         _popup = GetTemplateChild("PART_Popup") as Popup;
         if (_popup != null)
@@ -271,9 +270,44 @@ public class RibbonApplicationMenu : Selector
             // outside press or not - belongs to whichever template is in use, and is stated there.
             _popup.PlacementTarget = this;
             _popup.Closed += OnPopupClosed;
+            _popup.ContentBuilt += OnPopupContentBuilt;
         }
 
         ReflectOpenState();
+    }
+
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        if (_button != null) _button.Click -= OnButtonClick;
+        if (_backButton != null) _backButton.Click -= OnBackClick;
+        if (_popup != null)
+        {
+            _popup.Closed -= OnPopupClosed;
+            _popup.ContentBuilt -= OnPopupContentBuilt;
+            _popup.LayerPass -= OnLayerPass;
+        }
+
+        _button = null;
+        _backButton = null;
+        _popup = null;
+    }
+
+    // The page only exists once the popup has built its deferred content - take its parts then.
+    private void OnPopupContentBuilt(object sender, EventArgs e)
+    {
+        var popup = (Popup)sender;
+
+        _backButton = popup.FindContentChild("PART_BackButton") as Primitives.ButtonBase;
+        if (_backButton != null)
+        {
+            _backButton.Click += OnBackClick;
+        }
+
+        if (popup.FindContentChild("PART_ItemsPresenter") is ItemsPresenter presenter)
+        {
+            ConnectPresenter(presenter);
+        }
     }
 
     private void OnButtonClick(object sender, RoutedEventArgs e) => IsOpen = _button?.IsChecked == true;

@@ -1071,7 +1071,12 @@ public class TabControl : Selector
     public override void OnRemoveTemplate()
     {
         base.OnRemoveTemplate();
+        DetachTabStripAffordances();
         ItemContainerGenerator.Clear();
+        _tabStrip = null;
+        _overflow = null;
+        _overflowPopup = null;
+        _overflowList = null;
         _tabsHost = null;
         _pinnedHost = null;
         _rowIndicator = null;
@@ -1374,14 +1379,15 @@ public class TabControl : Selector
     // Find the overflow parts (a custom template may omit them), (re)subscribe, and set the initial state.
     private void WireTabStripAffordances()
     {
-        if (_tabStrip != null) _tabStrip.ScrollStateChanged -= OnTabStripScrollStateChanged;
-        if (_overflow != null) { _overflow.Checked -= OnOverflowToggled; _overflow.Unchecked -= OnOverflowToggled; }
-        if (_overflowPopup != null) _overflowPopup.Closed -= OnOverflowClosed;
+        DetachTabStripAffordances();
 
         _tabStrip = GetTemplateChild("PART_TabStrip") as TabStripScroller;
         _overflow = GetTemplateChild("PART_TabOverflow") as ToggleButton;
         _overflowPopup = GetTemplateChild("PART_TabOverflowPopup") as Popup;
-        _overflowList = GetTemplateChild("PART_TabOverflowList") as ListBox;
+
+        // The flyout's card is built on first open, so the list is not in this template's namescope - it arrives with the
+        // content and is taken then.
+        _overflowList = null;
 
         // The ▾ visibility tracks the strip's overflow state; the scroller flips CanScroll* during its own arrange and now,
         // with Visibility marked AffectsParentMeasure, a mid-arrange show/hide correctly reflows the strip Grid (no deferral).
@@ -1393,17 +1399,36 @@ public class TabControl : Selector
             _overflowPopup.KeepOpen = false;             // click-outside-to-close, owned by Popup now (no per-control hook)
             _overflowPopup.IgnoreTargetPress = true;     // a ▾ press is the toggle - it handles the close, don't dismiss+reopen
             _overflowPopup.Closed += OnOverflowClosed;   // un-press the ▾ when the flyout light-dismisses
-        }
-        if (_overflowList != null)
-        {
-            // The flyout mirrors the tabs BY PROJECTION, not by sharing the item list - see BuildOverflowRows. Selection
-            // is therefore mapped by position: picking a row (even one whose tab is scrolled out of sight) selects that
-            // tab, and TabControl's own SelectionChanged then scrolls it into view. The rows' LOOK is the theme's
-            // (ListBox.TabOverflowList), so nothing is assigned here that would outrank it.
-            _overflowList.SelectionChanged -= OnOverflowRowPicked;
-            _overflowList.SelectionChanged += OnOverflowRowPicked;
+            _overflowPopup.ContentBuilt += OnOverflowContentBuilt;
         }
         RefreshTabStripAffordances();
+    }
+
+    // Give back everything WireTabStripAffordances took, so a template (or theme) swap leaves nothing subscribed.
+    private void DetachTabStripAffordances()
+    {
+        if (_tabStrip != null) _tabStrip.ScrollStateChanged -= OnTabStripScrollStateChanged;
+        if (_overflow != null) { _overflow.Checked -= OnOverflowToggled; _overflow.Unchecked -= OnOverflowToggled; }
+        if (_overflowPopup != null)
+        {
+            _overflowPopup.Closed -= OnOverflowClosed;
+            _overflowPopup.ContentBuilt -= OnOverflowContentBuilt;
+        }
+
+        if (_overflowList != null) _overflowList.SelectionChanged -= OnOverflowRowPicked;
+    }
+
+    // The flyout's list only exists once the popup has built its deferred content.
+    private void OnOverflowContentBuilt(object sender, EventArgs e)
+    {
+        _overflowList = ((Popup)sender).FindContentChild("PART_TabOverflowList") as ListBox;
+        if (_overflowList == null) return;
+
+        // The flyout mirrors the tabs BY PROJECTION, not by sharing the item list - see BuildOverflowRows. Selection
+        // is therefore mapped by position: picking a row (even one whose tab is scrolled out of sight) selects that
+        // tab, and TabControl's own SelectionChanged then scrolls it into view. The rows' LOOK is the theme's
+        // (ListBox.TabOverflowList), so nothing is assigned here that would outrank it.
+        _overflowList.SelectionChanged += OnOverflowRowPicked;
     }
 
     // Open/close the flyout with the ▾. The list's own template (a pixel-scrolling ScrollViewer capped by MaxHeight) handles
@@ -1411,9 +1436,9 @@ public class TabControl : Selector
     private void OnOverflowToggled(object sender, RoutedEventArgs e)
     {
         var opening = _overflow?.IsChecked == true;
-        if (opening) FillOverflowList();   // built fresh on each open, so it needs no subscription and cannot go stale
-        if (_overflowPopup != null) 
-            _overflowPopup.IsOpen = opening;
+        if (_overflowPopup != null)
+            _overflowPopup.IsOpen = opening;   // opening BUILDS the list on first use, so the rows go in after this
+        if (opening) FillOverflowList();       // built fresh on each open, so it needs no subscription and cannot go stale
     }
 
     /// <summary>
