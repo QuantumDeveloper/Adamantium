@@ -69,8 +69,7 @@ public unsafe class BitmapSource : ImageSource
    /// the next <c>BeginDraw</c> once that frame's fence has been waited on. A picture is replaced on the UI thread while
    /// frames that sample it are still in flight, and freeing the image out from under them is an invalid read on the
    /// GPU: the whole device goes, not one wrong pixel.
-   /// <para>Deferred against the RENDER device, not the texture's own: these are made by the resource loader, which
-   /// draws no frames, so its queue would never be drained.</para></summary>
+   /// </summary>
    protected override void ReleaseUnmanagedResources()
    {
       var texture = Texture;
@@ -80,10 +79,9 @@ public unsafe class BitmapSource : ImageSource
          return;
       }
 
-      var device = texture.GraphicsDevice?.MainDevice?.DrawingDevice;
-      if (device != null && texture is IDisposable deferred)
+      if (texture.GraphicsDevice != null && texture is IDisposable deferred)
       {
-         device.AddToDeferDisposeQueue(deferred);
+         texture.GraphicsDevice.AddToDeferDisposeQueue(deferred);
          return;
       }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Buffer = Adamantium.Graphics.Buffer;
@@ -20,12 +21,22 @@ public sealed class ReusableBuffer : IDisposable
     private readonly GpuBufferManager _manager;
     private readonly BufferUsageFlags _usage;
     private readonly MemoryPropertyFlags _memory;
+    // RENDER-THREAD state. Everything below is written only inside Acquire, which is the draw path - so the buffers are
+    // allocated and read by one thread. The record thread used to allocate here too (Reserve/Invalidate->Promote), and
+    // since none of it is ordered against the reader, the render thread could see `_promoted` already true while the ring
+    // slots it then indexes were still null: Acquire handed back nothing and the address fetch faulted the process. It
+    // took a fast render loop to catch that window at all, which is why it hid for as long as it did.
     private readonly Buffer[] _ring;       // [0] only while single; all slots once promoted to a ring
     private readonly int[] _slotVersion;   // data version last written to each slot; -1 = stale (must rewrite)
     private ulong _capacity;               // bytes; high-water-mark, only grows
-    private int _version;                  // current data version; bumped by Invalidate
     private bool _promoted;                // false = single buffer (static), true = per-frame ring (animating)
     private bool _drawnOnce;               // a frame has read slot 0 -> a later change must promote, not rewrite in place
+    private int _seenVersion;              // the data version this side has already acted on
+
+    // The RECORD thread's half: two plain numbers, published atomically and read by the draw path. It says WHAT is
+    // wanted; the draw path decides when to allocate it.
+    private int _version;                  // current data version; bumped by Invalidate
+    private long _requestedBytes;          // largest size asked for by Reserve (high-water)
 
     public ReusableBuffer(GpuBufferManager manager, BufferUsageFlags usage, MemoryPropertyFlags memory)
     {
@@ -37,61 +48,94 @@ public sealed class ReusableBuffer : IDisposable
         Array.Fill(_slotVersion, -1);
     }
 
-    public ulong Capacity => _capacity;
-
-    // Pre-allocate the backing buffer for geometry of this size (call when the geometry is set, so the allocation
-    // happens up front rather than on the first draw). Grows, never shrinks.
-    public void Reserve(ulong requiredBytes) => EnsureCapacity(requiredBytes);
-
-    // The data changed: bump the version so every slot rewrites lazily. Once the buffer has been drawn, a change also
-    // promotes it to a ring - the single buffer may be in flight, so it can't be safely rewritten in place.
-    public void Invalidate()
+    /// <summary>RECORD thread: geometry of this size is coming. Only remembered - the allocation itself belongs to the
+    /// draw path, which is the only thread allowed to touch the buffers.</summary>
+    public void Reserve(ulong requiredBytes)
     {
-        _version++;
-        if (_drawnOnce && !_promoted) Promote();
+        var wanted = (long)RoundUpToBucket(Math.Max(requiredBytes, MinCapacityBytes));
+        long seen;
+        do
+        {
+            seen = Interlocked.Read(ref _requestedBytes);
+            if (wanted <= seen)
+            {
+                return;
+            }
+        }
+        while (Interlocked.CompareExchange(ref _requestedBytes, wanted, seen) != seen);
     }
+
+    /// <summary>RECORD thread: the data changed, so every slot must rewrite lazily. A bumped number and nothing else -
+    /// whether that also means promoting to a ring is the draw path's call, because promoting ALLOCATES.</summary>
+    public void Invalidate() => Interlocked.Increment(ref _version);
 
     // Ensure the current slot holds at least requiredBytes (grow, never shrink) and return it. needsWrite is true when
     // that slot doesn't yet hold the current data version (freshly grown/promoted, or invalidated) - the caller then
     // uploads/re-dispatches into the returned buffer; otherwise it's already current (zero work).
     public Buffer Acquire(ulong requiredBytes, out bool needsWrite)
     {
-        EnsureCapacity(requiredBytes);
+        var version = Volatile.Read(ref _version);
+
+        // A change AFTER the single buffer has been drawn is what promotes it: that buffer may be read by an in-flight
+        // frame, so the rewrite has to go to a slot of its own rather than over it.
+        if (_drawnOnce && !_promoted && version != _seenVersion)
+        {
+            Promote();
+        }
+
+        _seenVersion = version;
+        EnsureCapacity(Math.Max(requiredBytes, (ulong)Interlocked.Read(ref _requestedBytes)));
+
         var slot = _promoted ? _manager.CurrentFrame : 0u;
-        needsWrite = _slotVersion[slot] != _version;
-        if (needsWrite) _slotVersion[slot] = _version;
+        needsWrite = _slotVersion[slot] != version;
+        if (needsWrite)
+        {
+            _slotVersion[slot] = version;
+        }
+
         _drawnOnce = true;
         return _ring[slot];
     }
 
+    // Every ACTIVE slot ends up allocated and at least this big - slot 0 while single, the whole ring once promoted.
+    // Checking only slot 0 was half the crash: after promotion Acquire indexes by frame, so a slot the check never
+    // looked at could still be empty. An existing buffer may be read by an in-flight frame, so it is handed to the
+    // deferred queue rather than freed. Growth is rare (high-water-mark) - about once, at the peak size.
     private void EnsureCapacity(ulong requiredBytes)
     {
         var needed = RoundUpToBucket(Math.Max(requiredBytes, MinCapacityBytes));
-        if (needed <= _capacity && _ring[0] != null) return;   // already allocated and big enough
-
-        // Allocate (or grow) the active slots: just slot 0 while single, the whole ring once promoted. An existing
-        // buffer may still be read by an in-flight frame, so defer its disposal to after its fence. Growth is rare
-        // (high-water-mark) - about once, at the peak size.
+        var size = Math.Max(needed, _capacity);
         var slots = _promoted ? _ring.Length : 1;
         for (var i = 0; i < slots; i++)
         {
-            if (_ring[i] != null) _manager.Device.AddToDeferDisposeQueue(_ring[i]);
-            _ring[i] = Buffer.New(_manager.Device, needed, _usage, _memory);
+            if (_ring[i] != null && needed <= _capacity)
+            {
+                continue;
+            }
+
+            if (_ring[i] != null)
+            {
+                _manager.Device.AddToDeferDisposeQueue(_ring[i]);
+            }
+
+            _ring[i] = Buffer.New(_manager.Device, size, _usage, _memory);
+            _slotVersion[i] = -1;
         }
-        _capacity = Math.Max(_capacity, needed);
-        Array.Fill(_slotVersion, -1, 0, slots);
+
+        _capacity = size;
     }
 
+    // Hands the single buffer over and leaves the ring EMPTY: EnsureCapacity, which runs right after, allocates every
+    // slot at the current capacity. One place that allocates, rather than two that must agree.
     private void Promote()
     {
         _promoted = true;
-        // Give every ring slot a FRESH buffer so the per-frame rewrites that follow never touch a buffer a previous
-        // frame still reads; defer the old single buffer to after its fence.
-        for (var i = 0; i < _ring.Length; i++)
+        if (_ring[0] != null)
         {
-            if (_ring[i] != null) _manager.Device.AddToDeferDisposeQueue(_ring[i]);
-            _ring[i] = _capacity > 0 ? Buffer.New(_manager.Device, _capacity, _usage, _memory) : null;
+            _manager.Device.AddToDeferDisposeQueue(_ring[0]);
+            _ring[0] = null;
         }
+
         Array.Fill(_slotVersion, -1);
     }
 

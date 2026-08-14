@@ -32,11 +32,11 @@ internal static class VisualBrushRaster
     private static readonly HashSet<IUIComponent> _pending = new();
 
     // The last TWO pictures handed out for a source. Owned HERE because every brush of that source shares the one
-    // instance, so whoever replaces it is the only one that may free the old one - but not yet: a picture is still
-    // referenced by the batches until the fills have been re-ROUTED onto its successor, which is a whole bake later.
-    // Freeing at the moment of replacement recycled its memory under an in-flight frame and lost the device (the
-    // crash-diagnostic layer called it: an invalid read inside a just-created image). So one generation is kept back,
-    // and only THEN handed to the device's retire queue, which adds the frames-in-flight delay on top.
+    // instance, so whoever replaces it is the only one that may free the old one.
+    // The extra generation is a margin, not the guarantee: a picture is referenced by the batches until the fills have
+    // been re-ROUTED onto its successor, and holding one back means that has certainly happened. What actually makes it
+    // safe is the deferred queue it is then handed to, which waits for every drawing device to retire the frames it had
+    // in flight (9 runs and a 1040-bake stress are clean WITHOUT this hold). Kept because it costs one picture.
     private static readonly ConditionalWeakTable<IUIComponent, BitmapSource> _current = new();
     private static readonly ConditionalWeakTable<IUIComponent, BitmapSource> _previous = new();
 
