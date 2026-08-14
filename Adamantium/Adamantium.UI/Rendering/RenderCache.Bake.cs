@@ -161,6 +161,17 @@ public partial class RenderCache
 
     private RenderPacket RentPacket() => _spare.TryTake(out var packet) ? packet : new RenderPacket();
 
+    /// <summary>Test hook: snapshot entries actually handed to the applier. It is the number a retained frame lives or
+    /// dies by - the applier reads ANY entry as "the layout moved under the recorded stream" and refuses to replay it,
+    /// so an idle frame publishing entries costs the whole scene its retained path (measured: 28 fps against ~320).</summary>
+    internal static long SnapshotEntriesPublished { get; private set; }
+
+    private void PublishSnapshot(IUIComponent component, LayoutSnapshot snapshot)
+    {
+        SnapshotEntriesPublished++;
+        _packet.SnapDelta.Add(new KeyValuePair<IUIComponent, LayoutSnapshot>(component, snapshot));
+    }
+
     // Record one component's frozen layout into the recorder's map AND this frame's delta (the applier's replica is built
     // from nothing else). Memoised: an unchanged component is captured once and never re-sent.
     private LayoutSnapshot Snap(IUIComponent c)
@@ -168,7 +179,7 @@ public partial class RenderCache
         if (_snap.TryGetValue(c, out var s)) return s;
         s = new LayoutSnapshot(c.LocalTransform, c.RenderSize, c.ClipToBounds, c.IsRenderMotionNode, c.RenderParent, (float)c.Opacity, (float)c.SelfOpacity);
         _snap[c] = s;
-        _packet.SnapDelta.Add(new KeyValuePair<IUIComponent, LayoutSnapshot>(c, s));
+        PublishSnapshot(c, s);
         return s;
     }
 
@@ -263,7 +274,7 @@ public partial class RenderCache
         if (!_snap.TryGetValue(component, out var previous) || !previous.Equals(snapshot))
         {
             _snap[component] = snapshot;
-            _packet.SnapDelta.Add(new KeyValuePair<IUIComponent, LayoutSnapshot>(component, snapshot));
+            PublishSnapshot(component, snapshot);
         }
 
         for (var c = component.RenderParent; c != null && !_snap.ContainsKey(c); c = c.RenderParent)

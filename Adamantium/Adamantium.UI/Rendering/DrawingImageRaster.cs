@@ -27,8 +27,8 @@ internal static class DrawingImageRaster
     // needs two bakes, and handing the small one to the large fill is precisely the blur the vector path exists to avoid.
     // TWO THREADS touch these: Get/Request are asked on the RENDER thread while batches are filled, Bake runs on the
     // LOOP thread. Plain collections lost and duplicated entries at random, silently.
-    private static readonly ConcurrentDictionary<(DrawingImage Image, int Width, int Height), BitmapSource> _baked = new();
-    private static readonly ConcurrentDictionary<(DrawingImage Image, int Width, int Height), byte> _pending = new();
+    private static readonly ConcurrentDictionary<(DrawingImage Image, int Width, int Height, int Scale), BitmapSource> _baked = new();
+    private static readonly ConcurrentDictionary<(DrawingImage Image, int Width, int Height, int Scale), byte> _pending = new();
 
     private static readonly HashSet<DrawingImage> _watched = [];
 
@@ -38,9 +38,9 @@ internal static class DrawingImageRaster
 
     /// <summary>The bake for this drawing at this size, or null while there is none. Render-thread safe: it only reads.
     /// A miss queues the bake (see <see cref="Request"/>) - it never blocks the frame waiting for one.</summary>
-    public static BitmapSource Get(DrawingImage image, Size size)
+    public static BitmapSource Get(DrawingImage image, Size size, IUIComponent owner)
     {
-        var key = KeyOf(image, size);
+        var key = KeyOf(image, size, DeviceScaleOf(owner));
         if (key.Width <= 0 || key.Height <= 0)
         {
             return null;
@@ -60,7 +60,7 @@ internal static class DrawingImageRaster
 
     // The closest already-baked size for this drawing whose aspect matches - closest, so the stand-in is as near the
     // asked-for resolution as anything available.
-    private static BitmapSource NearestOfSameShape(DrawingImage image, (DrawingImage Image, int Width, int Height) key)
+    private static BitmapSource NearestOfSameShape(DrawingImage image, (DrawingImage Image, int Width, int Height, int Scale) key)
     {
         BitmapSource best = null;
         var bestDistance = double.MaxValue;
@@ -94,7 +94,7 @@ internal static class DrawingImageRaster
     /// frame: a size already baked or already queued does nothing.</summary>
     public static void Request(DrawingImage image, Size size, IUIComponent owner)
     {
-        var key = KeyOf(image, size);
+        var key = KeyOf(image, size, DeviceScaleOf(owner));
         if (key.Width <= 0 || key.Height <= 0 || _baked.ContainsKey(key) || !_pending.TryAdd(key, 0))
         {
             return;
@@ -115,7 +115,7 @@ internal static class DrawingImageRaster
     /// <summary>Throw away everything baked from this drawing - its picture changed, so every size of it is now wrong.</summary>
     public static void Invalidate(DrawingImage image)
     {
-        List<(DrawingImage Image, int Width, int Height)> stale = [];
+        List<(DrawingImage Image, int Width, int Height, int Scale)> stale = [];
         foreach (var key in _baked.Keys)
         {
             if (ReferenceEquals(key.Image, image))
@@ -137,9 +137,9 @@ internal static class DrawingImageRaster
     // bounded: the ones furthest from the size in use now go first, since that is the one being asked for.
     private const int KeptSizesPerDrawing = 6;
 
-    private static void Evict((DrawingImage Image, int Width, int Height) newest)
+    private static void Evict((DrawingImage Image, int Width, int Height, int Scale) newest)
     {
-        List<(DrawingImage Image, int Width, int Height)> mine = [];
+        List<(DrawingImage Image, int Width, int Height, int Scale)> mine = [];
         foreach (var key in _baked.Keys)
         {
             if (ReferenceEquals(key.Image, newest.Image))
@@ -168,22 +168,44 @@ internal static class DrawingImageRaster
     // the bake's aspect has to stay the content's, or the picture is sampled into a rect it was not drawn for.
     private const double SizeStep = 32.0;
 
-    private static (DrawingImage Image, int Width, int Height) KeyOf(DrawingImage image, Size size)
+    // The device scale is PART of the key: the same drawing at the same logical size needs a different number of pixels
+    // on a 150% display than on a 100% one, and one standing in for the other is exactly the blur this was meant to
+    // avoid. Quantised to a hundredth so a scale that arrives as 1.4999999 does not key a second bake.
+    private static (DrawingImage Image, int Width, int Height, int Scale) KeyOf(DrawingImage image, Size size, double deviceScale)
     {
         var longest = System.Math.Max(size.Width, size.Height);
         if (longest <= 0)
         {
-            return (image, 0, 0);
+            return (image, 0, 0, 0);
         }
 
         var scale = System.Math.Ceiling(longest / SizeStep) * SizeStep / longest;
-        return (image, (int)System.Math.Round(size.Width * scale), (int)System.Math.Round(size.Height * scale));
+        return (image,
+            (int)System.Math.Round(size.Width * scale),
+            (int)System.Math.Round(size.Height * scale),
+            (int)System.Math.Round(System.Math.Max(0.01, deviceScale) * 100));
+    }
+
+    /// <summary>Device pixels per logical unit for whatever window shows <paramref name="owner"/> - the scale the bake has
+    /// to be drawn at to be as sharp as everything around it. 1.0 when there is no window to ask (a detached host, a
+    /// headless render).</summary>
+    private static double DeviceScaleOf(IUIComponent owner)
+    {
+        for (var node = owner; node != null; node = node.VisualParent)
+        {
+            if (node is IWindow { Renderer: { } renderer })
+            {
+                return renderer.RenderScale <= 0 ? 1.0 : renderer.RenderScale;
+            }
+        }
+
+        return 1.0;
     }
 
     // LOOP thread. Baked THROUGH the vector path - an Image showing the drawing draws exactly what the on-screen one
     // does - and QUEUED, never rendered here: the GPU half shares one device with the render thread, so submitting it
     // from this thread interleaved with a live frame and the bake came back with one shape wearing another's colour.
-    private static void Bake((DrawingImage Image, int Width, int Height) key, Size size, IUIComponent owner)
+    private static void Bake((DrawingImage Image, int Width, int Height, int Scale) key, Size size, IUIComponent owner)
     {
         var renderer = Renderer;
         if (renderer == null)
@@ -203,11 +225,14 @@ internal static class DrawingImageRaster
             DataContext = owner?.DataContext
         };
 
-        renderer.RequestRender(host, size, 1.0, Colors.Transparent, image => Store(key, image, owner));
+        // The LOGICAL size lays the host out; the device scale decides how many PIXELS come back. Baking at 1.0 on a
+        // 150% display handed the fill a texture two thirds of the resolution it is drawn at - the whole reason a vector
+        // source exists is that it does not have to blur.
+        renderer.RequestRender(host, size, key.Scale / 100.0, Colors.Transparent, image => Store(key, image, owner));
     }
 
     // UI thread, once the render thread has drawn and read the bake back.
-    private static void Store((DrawingImage Image, int Width, int Height) key, ImageSource rendered, IUIComponent owner)
+    private static void Store((DrawingImage Image, int Width, int Height, int Scale) key, ImageSource rendered, IUIComponent owner)
     {
         _pending.TryRemove(key, out _);
         if (rendered is not BitmapSource baked)

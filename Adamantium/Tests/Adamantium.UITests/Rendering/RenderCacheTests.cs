@@ -815,4 +815,41 @@ public class RenderCacheTests
         Assert.That(_cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Partial), "a count change is spliced into that one group - no tree walk");
         Assert.That(_factory.Created.Count, Is.EqualTo(2), "the control's new second unit was created");
     }
+
+    // -------- the retained frame's life-support --------
+    // The applier reads ANY snapshot entry as "the layout moved under the recorded stream" and refuses to replay that
+    // stream - for the WHOLE scene, not just the component that moved. So a frame that re-freezes components without
+    // anything having changed silently costs the retained path: measured on the 60k grid, ~15 identical entries a frame,
+    // two thirds of frames falling back to the full walk, 35 ms a frame where the replay takes 0.6. It went unnoticed for
+    // a week because nothing was wrong on screen - it was just slow. These two pin the rule from both sides.
+
+    [Test]
+    public void AnIdleFramePublishesNoSnapshotEntries()
+    {
+        var c = AddControl(); DrawsRectangle(c);
+        RenderFrame();
+        RenderFrame();
+
+        var before = RenderCache.SnapshotEntriesPublished;
+        RenderFrame();
+
+        Assert.That(RenderCache.SnapshotEntriesPublished, Is.EqualTo(before),
+            "nothing changed, so the applier must hear nothing - an entry here refuses the retained replay for the whole scene");
+    }
+
+    // ...and the other half: a REAL move must still be published, or the applier composes from the previous transform and
+    // the element draws where it no longer is.
+    [Test]
+    public void AMoveIsStillPublished()
+    {
+        var c = AddControl(); DrawsRectangle(c);
+        RenderFrame();
+        RenderFrame();
+
+        var before = RenderCache.SnapshotEntriesPublished;
+        c.Bounds = new Rect(5, 5, 10, 10);
+        RenderFrame();
+
+        Assert.That(RenderCache.SnapshotEntriesPublished, Is.GreaterThan(before));
+    }
 }
