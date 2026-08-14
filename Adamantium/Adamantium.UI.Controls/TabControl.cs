@@ -1407,22 +1407,37 @@ public class TabControl : Selector
     // Give back everything WireTabStripAffordances took, so a template (or theme) swap leaves nothing subscribed.
     private void DetachTabStripAffordances()
     {
-        if (_tabStrip != null) _tabStrip.ScrollStateChanged -= OnTabStripScrollStateChanged;
-        if (_overflow != null) { _overflow.Checked -= OnOverflowToggled; _overflow.Unchecked -= OnOverflowToggled; }
+        if (_tabStrip != null)
+        {
+            _tabStrip.ScrollStateChanged -= OnTabStripScrollStateChanged;
+        }
+
+        if (_overflow != null)
+        {
+            _overflow.Checked -= OnOverflowToggled;
+            _overflow.Unchecked -= OnOverflowToggled;
+        }
+
         if (_overflowPopup != null)
         {
             _overflowPopup.Closed -= OnOverflowClosed;
             _overflowPopup.ContentBuilt -= OnOverflowContentBuilt;
         }
 
-        if (_overflowList != null) _overflowList.SelectionChanged -= OnOverflowRowPicked;
+        if (_overflowList != null)
+        {
+            _overflowList.SelectionChanged -= OnOverflowRowPicked;
+        }
     }
 
     // The flyout's list only exists once the popup has built its deferred content.
     private void OnOverflowContentBuilt(object sender, EventArgs e)
     {
         _overflowList = ((Popup)sender).FindContentChild("PART_TabOverflowList") as ListBox;
-        if (_overflowList == null) return;
+        if (_overflowList == null)
+        {
+            return;
+        }
 
         // The flyout mirrors the tabs BY PROJECTION, not by sharing the item list - see BuildOverflowRows. Selection
         // is therefore mapped by position: picking a row (even one whose tab is scrolled out of sight) selects that
@@ -1436,9 +1451,18 @@ public class TabControl : Selector
     private void OnOverflowToggled(object sender, RoutedEventArgs e)
     {
         var opening = _overflow?.IsChecked == true;
+
+        // Opening BUILDS the list on first use, so the rows go in after this - and they are built fresh on each open,
+        // which is why the list needs no subscription and cannot go stale.
         if (_overflowPopup != null)
-            _overflowPopup.IsOpen = opening;   // opening BUILDS the list on first use, so the rows go in after this
-        if (opening) FillOverflowList();       // built fresh on each open, so it needs no subscription and cannot go stale
+        {
+            _overflowPopup.IsOpen = opening;
+        }
+
+        if (opening)
+        {
+            FillOverflowList();
+        }
     }
 
     /// <summary>

@@ -205,7 +205,8 @@ public class RibbonGroup : ItemsControl, IHeaderedItemsControl
             _popup.ContentBuilt -= OnFlyoutContentBuilt;
         }
 
-        if (_collapsedButton != null) _collapsedButton.Click -= OnCollapsedButtonClick;
+        if (_collapsedButton != null)
+            _collapsedButton.Click -= OnCollapsedButtonClick;
 
         _popup = null;
         _collapsedButton = null;
