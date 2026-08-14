@@ -382,16 +382,14 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
 
             if (old != null)
             {
-                var e = new LogicalTreeAttachmentEventArgs(LogicalParent);
-                OnDetachedFromLogicalTree(e);
+                RaiseDetachedFromLogicalTree(new LogicalTreeAttachmentEventArgs(LogicalParent));
             }
 
             if (parent != null)
             {
                 ApplyCurrentTheme();
 
-                var e = new LogicalTreeAttachmentEventArgs(parent);
-                OnAttachedToLogicalTree(e);
+                RaiseAttachedToLogicalTree(new LogicalTreeAttachmentEventArgs(parent));
             }
         }
     }
@@ -469,6 +467,29 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
             {
                 (child as FundamentalUIComponent)?.InvalidateStylesCore(visited);
             }
+        }
+    }
+
+    // A graft moves a whole SUBTREE into the tree, not just the node whose parent was set: what an element deep inside it
+    // can see ABOVE itself changes too, and only the root is told. The visual side already carries its attach down the
+    // subtree (UIComponent.AttachedToVisualTree); the logical side has to as well, or anything that resolves against its
+    // logical ancestry from inside a subtree built detached - an {Ancestor Logical=True} in a popup's ChildTemplate, say -
+    // is established while the subtree is still rootless and is never told to look again.
+    private void RaiseAttachedToLogicalTree(LogicalTreeAttachmentEventArgs e)
+    {
+        OnAttachedToLogicalTree(e);
+        foreach (var child in LogicalChildrenCollection)
+        {
+            (child as FundamentalUIComponent)?.RaiseAttachedToLogicalTree(e);
+        }
+    }
+
+    private void RaiseDetachedFromLogicalTree(LogicalTreeAttachmentEventArgs e)
+    {
+        OnDetachedFromLogicalTree(e);
+        foreach (var child in LogicalChildrenCollection)
+        {
+            (child as FundamentalUIComponent)?.RaiseDetachedFromLogicalTree(e);
         }
     }
 

@@ -466,11 +466,19 @@
                             <!-- NOT clipped: our ClipToBounds is rectangular and this card is rounded (open debt in
                                  TECH_DEBT.md). Its content is PART_Content, moved here by the group. -->
                             <Popup x:Name="PART_Popup" Placement="Bottom" FlipToFit="True">
-                                <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
-                                        BorderBrush="{ResourceReference ControlStrokeColorDefault}"
-                                        BorderThickness="1" CornerRadius="6" Padding="6">
-                                    <Border x:Name="PART_PopupHost"/>
-                                </Border>
+                                <!-- The card builds on FIRST OPEN, not with the group's template: a band carries a
+                                     couple of dozen groups and hardly any of them are ever collapsed, let alone opened.
+                                     The group hosts its content here through PART_PopupHost when the content arrives
+                                     (Popup.ContentBuilt), which is why nothing here binds to the group directly. -->
+                                <Popup.ChildTemplate>
+                                    <ControlTemplate TargetType="Popup">
+                                        <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                                BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                                BorderThickness="1" CornerRadius="6" Padding="6">
+                                            <Border x:Name="PART_PopupHost"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Popup.ChildTemplate>
                             </Popup>
                         </Grid>
 
@@ -572,13 +580,20 @@
                                FlipToFit="True"
                                VerticalOffset="2"
                                DismissOnEscape="True">
-                            <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
-                                    BorderBrush="{ResourceReference ControlStrokeColorDefault}"
-                                    BorderThickness="1"
-                                    CornerRadius="4"
-                                    Padding="4">
-                                <RibbonGalleryPanel x:Name="PART_DropDownPanel"/>
-                            </Border>
+                            <!-- Built on first drop-down, like the cells inside it: a gallery that is never dropped down
+                                 is a card and a panel nobody looks at. The gallery fills the panel when it arrives
+                                 (Popup.ContentBuilt), which is the same moment it would have filled it anyway. -->
+                            <Popup.ChildTemplate>
+                                <ControlTemplate TargetType="Popup">
+                                    <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                            BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                            BorderThickness="1"
+                                            CornerRadius="4"
+                                            Padding="4">
+                                        <RibbonGalleryPanel x:Name="PART_DropDownPanel"/>
+                                    </Border>
+                                </ControlTemplate>
+                            </Popup.ChildTemplate>
                         </Popup>
                     </Grid>
                 </ControlTemplate>
@@ -874,34 +889,44 @@
                         <!-- FillWindow: the backstage takes the window over. KeepOpen because there IS no outside to
                              press - Escape and the back arrow are the ways out. -->
                         <Popup x:Name="PART_Popup" FillWindow="True" KeepOpen="True">
-                          <Grid RowDefinitions="Auto,*">
-                            <!-- The caption keeps its own strip: the window buttons stay reachable, and this spacer is
-                                 see-through AND untouchable so presses land on the title bar underneath. -->
-                            <Border Grid.Row="0" Height="{TemplateBinding CaptionInset}"
-                                    Background="Transparent" IsHitTestVisible="False"/>
+                            <!-- The whole backstage builds on FIRST OPEN (ChildTemplate), not with the ribbon's template:
+                                 it is a window-sized page plus a row per command, and an application that is never asked
+                                 for its File page pays for none of it. {Ancestor} rather than {TemplateBinding}, because a
+                                 ChildTemplate is built against the POPUP; and rather than a DataContext on the popup,
+                                 because the rows' PAGES bind to the view model and a DataContext here would take it from
+                                 them. The back button and the items host arrive with the content (Popup.ContentBuilt). -->
+                            <Popup.ChildTemplate>
+                                <ControlTemplate TargetType="Popup">
+                                  <Grid RowDefinitions="Auto,*">
+                                    <!-- The caption keeps its own strip: the window buttons stay reachable, and this spacer is
+                                         see-through AND untouchable so presses land on the title bar underneath. -->
+                                    <Border Grid.Row="0" Height="{Ancestor RibbonApplicationMenu, CaptionInset, Logical=True}"
+                                            Background="Transparent" IsHitTestVisible="False"/>
 
-                            <Grid Grid.Row="1" ColumnDefinitions="Auto,*"
-                                    Background="{ResourceReference SolidBackgroundFillColorBase}">
-                                <Grid Grid.Column="0" RowDefinitions="Auto,*,Auto"
-                                        Width="{TemplateBinding RailWidth}"
-                                        Background="{ThemeResource AccentFillColorDefault}">
-                                    <Button x:Name="PART_BackButton" Grid.Row="0"
-                                            Classes="RibbonBackstageBack"
-                                            ToolTip="Back"/>
+                                    <Grid Grid.Row="1" ColumnDefinitions="Auto,*"
+                                            Background="{ResourceReference SolidBackgroundFillColorBase}">
+                                        <Grid Grid.Column="0" RowDefinitions="Auto,*,Auto"
+                                                Width="{Ancestor RibbonApplicationMenu, RailWidth, Logical=True}"
+                                                Background="{ThemeResource AccentFillColorDefault}">
+                                            <Button x:Name="PART_BackButton" Grid.Row="0"
+                                                    Classes="RibbonBackstageBack"
+                                                    ToolTip="Back"/>
 
-                                    <ItemsPresenter x:Name="PART_ItemsPresenter" Grid.Row="1"/>
+                                            <ItemsPresenter x:Name="PART_ItemsPresenter" Grid.Row="1"/>
 
-                                    <ContentPresenter Grid.Row="2"
-                                            Content="{TemplateBinding FooterPaneContent}"
-                                            ContentTemplate="{TemplateBinding FooterPaneContentTemplate}"/>
-                                </Grid>
+                                            <ContentPresenter Grid.Row="2"
+                                                    Content="{Ancestor RibbonApplicationMenu, FooterPaneContent, Logical=True}"
+                                                    ContentTemplate="{Ancestor RibbonApplicationMenu, FooterPaneContentTemplate, Logical=True}"/>
+                                        </Grid>
 
-                                <ContentPresenter Grid.Column="1" Margin="40 28"
-                                        Content="{TemplateBinding SelectedPage}"
-                                        ContentTemplate="{TemplateBinding SelectedPageTemplate}"
-                                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
-                            </Grid>
-                          </Grid>
+                                        <ContentPresenter Grid.Column="1" Margin="40 28"
+                                                Content="{Ancestor RibbonApplicationMenu, SelectedPage, Logical=True}"
+                                                ContentTemplate="{Ancestor RibbonApplicationMenu, SelectedPageTemplate, Logical=True}"
+                                                HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                                    </Grid>
+                                  </Grid>
+                                </ControlTemplate>
+                            </Popup.ChildTemplate>
                         </Popup>
                     </Grid>
                 </ControlTemplate>
@@ -926,31 +951,37 @@
                                  IgnoreTargetPress so the press that OPENS it is not also the press that dismisses it. -->
                             <Popup x:Name="PART_Popup" Placement="Bottom" FlipToFit="True"
                                     KeepOpen="False" IgnoreTargetPress="True">
-                                <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
-                                        BorderBrush="{ResourceReference ControlStrokeColorDefault}"
-                                        BorderThickness="1" CornerRadius="6">
-                                    <!-- ONE card: the rail runs the full height with the footer at its foot, and the
-                                         pane is a lighter field beside it. Two stacked halves read as two panels. -->
-                                    <Grid ColumnDefinitions="Auto,*">
-                                        <Grid Grid.Column="0" RowDefinitions="*,Auto"
-                                                Width="{TemplateBinding RailWidth}"
-                                                Background="{ThemeResource AccentFillColorDefault}">
-                                            <ItemsPresenter x:Name="PART_ItemsPresenter" Grid.Row="0"
-                                                    VerticalAlignment="Top"/>
-                                            <ContentPresenter Grid.Row="1"
-                                                    Content="{TemplateBinding FooterPaneContent}"
-                                                    ContentTemplate="{TemplateBinding FooterPaneContentTemplate}"/>
-                                        </Grid>
+                                <!-- Deferred to first open, and bound through {Ancestor}, for the same reasons as the
+                                     backstage above. -->
+                                <Popup.ChildTemplate>
+                                    <ControlTemplate TargetType="Popup">
+                                        <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                                BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                                BorderThickness="1" CornerRadius="6">
+                                            <!-- ONE card: the rail runs the full height with the footer at its foot, and the
+                                                 pane is a lighter field beside it. Two stacked halves read as two panels. -->
+                                            <Grid ColumnDefinitions="Auto,*">
+                                                <Grid Grid.Column="0" RowDefinitions="*,Auto"
+                                                        Width="{Ancestor RibbonApplicationMenu, RailWidth, Logical=True}"
+                                                        Background="{ThemeResource AccentFillColorDefault}">
+                                                    <ItemsPresenter x:Name="PART_ItemsPresenter" Grid.Row="0"
+                                                            VerticalAlignment="Top"/>
+                                                    <ContentPresenter Grid.Row="1"
+                                                            Content="{Ancestor RibbonApplicationMenu, FooterPaneContent, Logical=True}"
+                                                            ContentTemplate="{Ancestor RibbonApplicationMenu, FooterPaneContentTemplate, Logical=True}"/>
+                                                </Grid>
 
-                                        <Border Grid.Column="1" MinWidth="300" MinHeight="260"
-                                                Background="{ResourceReference SolidBackgroundFillColorBase}">
-                                            <ContentPresenter Margin="24 20"
-                                                    Content="{TemplateBinding SelectedPage}"
-                                                    ContentTemplate="{TemplateBinding SelectedPageTemplate}"
-                                                    HorizontalAlignment="Stretch" VerticalAlignment="Top"/>
+                                                <Border Grid.Column="1" MinWidth="300" MinHeight="260"
+                                                        Background="{ResourceReference SolidBackgroundFillColorBase}">
+                                                    <ContentPresenter Margin="24 20"
+                                                            Content="{Ancestor RibbonApplicationMenu, SelectedPage, Logical=True}"
+                                                            ContentTemplate="{Ancestor RibbonApplicationMenu, SelectedPageTemplate, Logical=True}"
+                                                            HorizontalAlignment="Stretch" VerticalAlignment="Top"/>
+                                                </Border>
+                                            </Grid>
                                         </Border>
-                                    </Grid>
-                                </Border>
+                                    </ControlTemplate>
+                                </Popup.ChildTemplate>
                             </Popup>
                         </Grid>
                     </ControlTemplate>

@@ -165,9 +165,13 @@ public class RibbonGroup : ItemsControl, IHeaderedItemsControl
         base.OnApplyTemplate();
 
         _inlineHost = GetTemplateChild("PART_InlineHost") as Decorators.Decorator;
-        _popupHost = GetTemplateChild("PART_PopupHost") as Decorators.Decorator;
         _content = GetTemplateChild("PART_Content") as IMeasurableComponent;
         _popup = GetTemplateChild("PART_Popup") as Popup;
+
+        // The flyout's card is built on first open, so PART_PopupHost is not in the template's namescope - it arrives
+        // with the content. Until then the group's content simply waits in the inline host, which a collapsed group
+        // hides anyway.
+        _popupHost = null;
 
         if (_popup != null)
         {
@@ -179,6 +183,8 @@ public class RibbonGroup : ItemsControl, IHeaderedItemsControl
             _popup.IgnoreTargetPress = true;
             _popup.Closed -= OnFlyoutClosed;
             _popup.Closed += OnFlyoutClosed;
+            _popup.ContentBuilt -= OnFlyoutContentBuilt;
+            _popup.ContentBuilt += OnFlyoutContentBuilt;
         }
 
         if (_collapsedButton != null) _collapsedButton.Click -= OnCollapsedButtonClick;
@@ -187,6 +193,32 @@ public class RibbonGroup : ItemsControl, IHeaderedItemsControl
 
         // A new template starts at the roomiest sizes, so the choice already made has to be re-stated.
         if (_current > 0) Packing?.Apply(Math.Min(_current, Variants.Count - 1));
+        HostContent();
+    }
+
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        if (_popup != null)
+        {
+            _popup.Closed -= OnFlyoutClosed;
+            _popup.ContentBuilt -= OnFlyoutContentBuilt;
+        }
+
+        if (_collapsedButton != null) _collapsedButton.Click -= OnCollapsedButtonClick;
+
+        _popup = null;
+        _collapsedButton = null;
+        _popupHost = null;
+        _inlineHost = null;
+        _content = null;
+    }
+
+    // The flyout's card only exists once the popup has built its deferred content - take the host then and move the
+    // content into it, which is what the collapsed group is waiting for.
+    private void OnFlyoutContentBuilt(object sender, EventArgs e)
+    {
+        _popupHost = ((Popup)sender).FindContentChild("PART_PopupHost") as Decorators.Decorator;
         HostContent();
     }
 
