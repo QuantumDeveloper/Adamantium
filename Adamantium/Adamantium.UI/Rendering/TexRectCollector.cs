@@ -94,7 +94,7 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
         if (source is DrawingImage vector)
         {
             var bakeSize = brush is TileBrush tileBrush ? ImageTiling.BakeSize(tileBrush, size) : size;
-            var baked = DrawingImageRaster.Get(vector, bakeSize);
+            var baked = DrawingImageRaster.Get(vector, bakeSize, owner);
             if (baked != null)
             {
                 return baked.GetOrCreateTexture(factory);
