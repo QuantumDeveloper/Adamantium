@@ -18,6 +18,7 @@ public class DefaultTypeContainer
         UiTemplate = typeResolver.ResolveByShortName("UiTemplate");
         TemplateBindingExpression = typeResolver.ResolveByShortName("TemplateBindingExpression");
         TemplateResult = typeResolver.ResolveByShortName("TemplateResult");
+        PerTargetValue = typeResolver.ResolveByShortName("PerTargetValue");
     }
     
     public IResolvedType TypeParser { get; }
@@ -42,6 +43,8 @@ public class DefaultTypeContainer
 
     public IResolvedType TemplateBindingExpression { get; }
     public IResolvedType TemplateResult { get; }
+
+    public IResolvedType PerTargetValue { get; }
 
     public static DefaultTypeContainer ResolveFrom(ITypeResolver typeResolver)
     {

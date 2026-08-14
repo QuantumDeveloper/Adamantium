@@ -170,6 +170,16 @@ public class CodeGenerationContext
             }
         }
 
+        // x:Shared="False" on a KEYED entry: the dictionary stores a FACTORY, not the object, so each ask builds its own.
+        // Emitted here, before the element is constructed - once its statements are out there is nothing to wrap.
+        if (isResource && !string.IsNullOrEmpty(key) && IsPerTarget(element))
+        {
+            var factoryName = GenerateNextElementName("shared");
+            TextGenerator.WriteLine($"var {factoryName} = {EmitPerTargetValue(element, false, diagnostics)};");
+            TextGenerator.WriteLine($@"Add(""{key}"", {factoryName});");
+            return factoryName;
+        }
+
         PushTypeContext(typeInfo);
 
         void ProcessProperties(IEnumerable<AumlAstPropertyNode> propertyNodes)
@@ -700,6 +710,14 @@ public class CodeGenerationContext
                             }
                             continue;
                         }
+                        // x:Shared="False" on the value: hand the setter a FACTORY instead of an instance, so every target
+                        // gets its own. Emitted before the generic path, which would build the one shared object.
+                        if (IsPerTarget(propertyValue))
+                        {
+                            TextGenerator.WriteLine($"{symbolName} = {EmitPerTargetValue(propertyValue, isResource, diagnostics)};");
+                            continue;
+                        }
+
                         string nestedName = ProcessNestedValue(propertyValue, diagnostics, isResource);
                         // Same rule as the text-node branch above: a PART's property set inside a ControlTemplate lands at
                         // TEMPLATE priority, not the CLR setter's LOCAL - so a theme trigger/style can override it. Nested
@@ -792,6 +810,46 @@ public class CodeGenerationContext
     // when a template is a PROPERTY value (ItemTemplate/Template/...) AND when it's a KEYED RESOURCE entry - a
     // DataTemplate stored in a ResourceDictionary must build its builder too, else it resolves to an empty template that
     // renders nothing (a bare `new DataTemplate()` with an orphaned child).
+    /// <summary>Whether this value is marked <c>x:Shared="False"</c> - build it per target, do not share one instance.</summary>
+    private static bool IsPerTarget(IAumlAstValueNode value)
+    {
+        if (value is not AumlAstObjectNode obj)
+        {
+            return false;
+        }
+
+        foreach (var child in obj.Children)
+        {
+            if (child is AumlAstDirective { Name: AumlDirectives.Shared } directive
+                && directive.Value is AumlAstTextNode text
+                && string.Equals(text.Text?.Trim(), "False", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Emits a builder for a per-target value and returns the expression that wraps it. Same shape as a
+    /// template's builder (see <see cref="EmitTemplateBuilder"/>): a local function that constructs the tree, handed to
+    /// the value object so the setter can call it once per element it matches.</summary>
+    private string EmitPerTargetValue(IAumlAstValueNode value, bool isResource, IDiagnosticSink diagnostics)
+    {
+        var builder = $"Build_{GenerateNextElementName("shared")}";
+        var expression = $"new {Metadata.DefaultTypeContainer.PerTargetValue.FullName}({builder})";
+
+        TextGenerator.NewLine();
+        TextGenerator.WriteLine($"object {builder}()");
+        TextGenerator.WriteOpenBraceAndIndent();
+        var built = ProcessNestedValue(value, diagnostics, isResource);
+        TextGenerator.WriteLine($"return {built};");
+        TextGenerator.UnindentAndWriteCloseBrace();
+        TextGenerator.NewLine();
+
+        return expression;
+    }
+
     private void EmitTemplateBuilder(string targetVar, string templateTypeName, IAumlAstNode templateNode,
         bool isResource, IDiagnosticSink diagnostics)
     {
