@@ -65,10 +65,29 @@ public unsafe class BitmapSource : ImageSource
       Texture.Save(filePath.IsAbsoluteUri ? filePath.AbsolutePath : filePath.LocalPath, fileType);
    }
    
+   /// <summary>Defers the GPU texture instead of destroying it here - the same queue every GPU buffer uses, drained at
+   /// the next <c>BeginDraw</c> once that frame's fence has been waited on. A picture is replaced on the UI thread while
+   /// frames that sample it are still in flight, and freeing the image out from under them is an invalid read on the
+   /// GPU: the whole device goes, not one wrong pixel.
+   /// <para>Deferred against the RENDER device, not the texture's own: these are made by the resource loader, which
+   /// draws no frames, so its queue would never be drained.</para></summary>
    protected override void ReleaseUnmanagedResources()
    {
-      Texture?.Dispose();
+      var texture = Texture;
       Texture = null;
+      if (texture == null)
+      {
+         return;
+      }
+
+      var device = texture.GraphicsDevice?.MainDevice?.DrawingDevice;
+      if (device != null && texture is IDisposable deferred)
+      {
+         device.AddToDeferDisposeQueue(deferred);
+         return;
+      }
+
+      texture.Dispose();
    }
 
    protected void SetPixels(byte[] pixels)

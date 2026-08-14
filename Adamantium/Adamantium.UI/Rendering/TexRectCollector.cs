@@ -77,6 +77,14 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
             _ => null
         };
 
+        // A LIVE source has to be DRAWN before it can be sampled. Asked every frame and cheap: a picture that is still
+        // current does nothing (see VisualBrushRaster).
+        if (brush is VisualBrush live)
+        {
+            VisualBrushRaster.Ensure(live, owner);
+            source = live.ContentSource;
+        }
+
         if (source is BitmapSource bitmap) return bitmap.GetOrCreateTexture(factory);
 
         // A VECTOR source has no pixels to sample, so this is where the raster fallback earns its keep: hand over the

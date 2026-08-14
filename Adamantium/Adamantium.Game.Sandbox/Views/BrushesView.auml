@@ -1,10 +1,12 @@
 <View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
       xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters">
     <!-- DataContext is the BrushesViewModel. Every gradient below is authored in AUML (element syntax:
          <Shape.Fill><LinearGradientBrush><GradientStop/>...) - proving gradients are fully markup-authorable, on any
          element, and batched by the SDF gradient batches. -->
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Orientation="Vertical" Margin="24">
+
 
             <!-- Aura and Shadow: the soft band around a shape. Two properties rather than one with the offset zeroed -
                  a shadow has a DIRECTION and an aura does not. Both are the shape's own signed distance read further out,
@@ -451,6 +453,130 @@
                 </StackPanel>
             </StackPanel>
 
+            <!-- VisualBrush stand: the one brush whose content is a LIVE element rather than a recording. The panel on
+                 the left is ordinary, interactive UI; the three shapes beside it are FILLED with it. Drag the slider
+                 inside the source and the fills follow - the picture is re-taken when the element says it changed. -->
+            <TextBlock Text="VisualBrush — live (a real element as the fill)" FontSize="18" Margin="0,20,0,10"/>
+            <StackPanel Orientation="Horizontal">
+                <!-- THE SOURCE. Ordinary, interactive UI - drag ITS slider and every fill below follows, which is the
+                     one thing that separates this brush from a picture taken once. -->
+                <StackPanel Orientation="Vertical" Margin="10">
+                    <TextBlock Text="The source (drag me)" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Border x:Name="ReflectionSource" Width="240" Height="150" Background="#101418" CornerRadius="8">
+                        <StackPanel Orientation="Vertical" Margin="14">
+                            <TextBlock Text="I am a live element" MarginBottom="8"/>
+                            <Slider Value="{Binding VisualSourceValue, Mode=TwoWay}" Minimum="10" Maximum="180" Width="200" MarginBottom="10"/>
+                            <!-- 44 = two whole rows of the pattern's 22px cell. At 34 the second row landed on the
+                                 element's own edge and came out sliced in half, which reads as a rendering fault. -->
+                            <Border Height="44" Width="{Binding VisualSourceValue}" CornerRadius="4" HorizontalAlignment="Left"
+                                    Background="{Binding LivePattern}"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- PAINTED WITH IT. The box is the sliders, not what the figure happens to measure - same reason as the
+                     ImageBrush stand: a figure that keeps its proportions would otherwise slide along the box's edge. -->
+                <!-- GREY, not the near-black the others use: the source's own background is near-black too, so on a dark
+                     box the figure's outline vanished into it and only the tinted content showed where the fill was. -->
+                <Border Width="300" Height="230" Margin="10" Background="#3A4048">
+                    <Grid Width="{Binding VisualWidth}"
+                          Height="{Binding VisualHeight}"
+                          HorizontalAlignment="Center"
+                          VerticalAlignment="Center">
+                        <Rectangle Width="{Binding VisualWidth}"
+                                   Height="{Binding VisualHeight}"
+                                   CornerRadius="{Binding VisualRadius, Converter={conv:DoubleToCornerRadiusConverter}}"
+                                   Visibility="{Binding VisualShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Rectangle}">
+                            <Rectangle.Fill>
+                                <VisualBrush Visual="{Binding ElementName=ReflectionSource}"
+                                             TileMode="{Binding VisualTileMode}"
+                                             Stretch="{Binding VisualStretch}"
+                                             AlignmentX="{Binding VisualAlignmentX}"
+                                             AlignmentY="{Binding VisualAlignmentY}"
+                                             ViewportUnits="Absolute"
+                                             Viewport="{Binding VisualViewportSize, Converter={conv:DoubleToSquareViewportConverter}}"
+                                             RotationAngle="{Binding VisualRotation}"
+                                             Opacity="{Binding VisualOpacity}"
+                                             Tint="{Binding VisualTint}"/>
+                            </Rectangle.Fill>
+                        </Rectangle>
+                        <Ellipse Width="{Binding VisualWidth}"
+                                 Height="{Binding VisualHeight}"
+                                 Visibility="{Binding VisualShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Ellipse}">
+                            <Ellipse.Fill>
+                                <VisualBrush Visual="{Binding ElementName=ReflectionSource}"
+                                             TileMode="{Binding VisualTileMode}"
+                                             Stretch="{Binding VisualStretch}"
+                                             AlignmentX="{Binding VisualAlignmentX}"
+                                             AlignmentY="{Binding VisualAlignmentY}"
+                                             ViewportUnits="Absolute"
+                                             Viewport="{Binding VisualViewportSize, Converter={conv:DoubleToSquareViewportConverter}}"
+                                             RotationAngle="{Binding VisualRotation}"
+                                             Opacity="{Binding VisualOpacity}"
+                                             Tint="{Binding VisualTint}"/>
+                            </Ellipse.Fill>
+                        </Ellipse>
+                        <Polygon Points="{Binding VisualTriangle}"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center"
+                                 Visibility="{Binding VisualShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Triangle}">
+                            <Polygon.Fill>
+                                <VisualBrush Visual="{Binding ElementName=ReflectionSource}"
+                                             TileMode="{Binding VisualTileMode}"
+                                             Stretch="{Binding VisualStretch}"
+                                             ViewportUnits="Absolute"
+                                             Viewport="{Binding VisualViewportSize, Converter={conv:DoubleToSquareViewportConverter}}"
+                                             RotationAngle="{Binding VisualRotation}"
+                                             Tint="{Binding VisualTint}"/>
+                            </Polygon.Fill>
+                        </Polygon>
+                        <Polygon Points="{Binding VisualStar}"
+                                 HorizontalAlignment="Center"
+                                 VerticalAlignment="Center"
+                                 Visibility="{Binding VisualShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Star}">
+                            <Polygon.Fill>
+                                <VisualBrush Visual="{Binding ElementName=ReflectionSource}"
+                                             TileMode="{Binding VisualTileMode}"
+                                             Stretch="{Binding VisualStretch}"
+                                             ViewportUnits="Absolute"
+                                             Viewport="{Binding VisualViewportSize, Converter={conv:DoubleToSquareViewportConverter}}"
+                                             RotationAngle="{Binding VisualRotation}"
+                                             Tint="{Binding VisualTint}"/>
+                            </Polygon.Fill>
+                        </Polygon>
+                    </Grid>
+                </Border>
+
+                <StackPanel Orientation="Vertical" Width="290" MarginLeft="16">
+                    <TextBlock Text="Paint it on" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <DropDown ItemsSource="{Binding PreviewShapes}" SelectedItem="{Binding VisualShape, Mode=TwoWay}" Width="270" MarginBottom="10"/>
+                    <TextBlock Text="Tile mode" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <DropDown ItemsSource="{Binding TileModes}" SelectedItem="{Binding VisualTileMode, Mode=TwoWay}" Width="270" MarginBottom="10"/>
+                    <TextBlock Text="Stretch — fits the source inside ONE tile" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <DropDown ItemsSource="{Binding Stretches}" SelectedItem="{Binding VisualStretch, Mode=TwoWay}" Width="270" MarginBottom="10"/>
+                    <TextBlock Text="Alignment X" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <DropDown ItemsSource="{Binding AlignmentsX}" SelectedItem="{Binding VisualAlignmentX, Mode=TwoWay}" Width="270" MarginBottom="10"/>
+                    <TextBlock Text="Alignment Y" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <DropDown ItemsSource="{Binding AlignmentsY}" SelectedItem="{Binding VisualAlignmentY, Mode=TwoWay}" Width="270" MarginBottom="10"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Vertical" Width="290" MarginLeft="16">
+                    <TextBlock Text="Tile size (px) — smaller than the shape starts tiling" Foreground="{ResourceReference TextFillColorSecondary}" TextWrapping="WrapByWords" MarginBottom="2"/>
+                    <Slider Value="{Binding VisualViewportSize, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="30" Maximum="300" Width="270" MarginBottom="10"/>
+                    <TextBlock Text="Grid rotation" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding VisualRotation, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="360" Width="270" MarginBottom="10"/>
+                    <TextBlock Text="Width" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding VisualWidth, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="60" Maximum="290" Width="270" MarginBottom="10"/>
+                    <TextBlock Text="Height" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding VisualHeight, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="60" Maximum="220" Width="270" MarginBottom="10"/>
+                    <TextBlock Text="Corner radius" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding VisualRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="100" Width="270" MarginBottom="10"/>
+                    <TextBlock Text="Opacity" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <Slider Value="{Binding VisualOpacity, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="270" MarginBottom="10"/>
+                    <TextBlock Text="Tint" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding VisualTint, Mode=TwoWay}"/>
+                </StackPanel>
+            </StackPanel>
             <TextBlock Text="Mesh gradient — live (four corners, pick each)" FontSize="18" Margin="0,20,0,10"/>
             <StackPanel Orientation="Horizontal">
                 <Grid Width="300" Height="200" Margin="10">

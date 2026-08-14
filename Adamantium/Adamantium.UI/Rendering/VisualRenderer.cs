@@ -11,6 +11,7 @@ using Adamantium.UI.Core.Media;
 using Adamantium.UI.Core.Media.Imaging;
 using Adamantium.UI.Core.Rendering;
 using Adamantium.Vulkan.Core;
+using Serilog;
 
 namespace Adamantium.UI.Rendering;
 
@@ -32,6 +33,9 @@ public sealed class VisualRenderer : IVisualRenderer
     private readonly object _deviceLock = new();
     private IGraphicsDevice _device;
     private IRenderUnitFactory _renderUnitFactory;
+    private GraphicsPresenter _target;
+    private RenderCache _cache;
+    private readonly object _cacheLock = new();
 
     // DI singleton. Its render device has its own queue / command pool / fences, but SHARES the one VkDevice with the window
     // loop's device - so an off-screen draw must not run device-wide barriers (DeviceWaitIdle) or submit concurrently with
@@ -66,8 +70,20 @@ public sealed class VisualRenderer : IVisualRenderer
     /// </summary>
     public ImageSource Render(IUIComponent visual, Size size, double scale = 1.0, Color? clearColor = null)
     {
-        var built = BuildDetachedCache(visual, size, scale);
-        return DrawToBitmap(built.Cache, built.Width, built.Height, clearColor ?? Colors.Transparent);
+        lock (_cacheLock)
+        {
+            var built = BuildDetachedCache(visual, size, scale);
+            return DrawToBitmap(built.Cache, built.Width, built.Height, clearColor ?? Colors.Transparent);
+        }
+    }
+
+    /// <summary>The ONE cache every bake records into. A cache per bake looked harmless - its units are freed after the
+    /// draw - but a cache also owns the batch collectors' GPU RINGS, and those were left behind: a source that changes
+    /// every frame exhausted host-visible memory in seconds, and the failed bake then never answered its caller. Reused
+    /// exactly as a window reuses its own cache, which is also why a bake no longer re-allocates anything.</summary>
+    private RenderCache SharedCache()
+    {
+        return _cache ??= new RenderCache(new DrawingContext(), _renderUnitFactory);
     }
 
     // The DEVICE-FREE half of a detached render: host the visual, lay it out and record it into a parallel cache. Split
@@ -80,7 +96,7 @@ public sealed class VisualRenderer : IVisualRenderer
         ((IMeasurableComponent)root).Measure(layoutSize);
         ((IMeasurableComponent)root).Arrange(new Rect(layoutSize));
 
-        var cache = new RenderCache(new DrawingContext(), _renderUnitFactory);
+        var cache = SharedCache();
         cache.BuildFromVisualTree(root);
         cache.ProcessCommands(root.GetProjectionMatrix(), scale);
 
@@ -161,25 +177,61 @@ public sealed class VisualRenderer : IVisualRenderer
     /// when nothing is queued.</summary>
     public void RecordPendingSnapshots()
     {
-        while (_detachedQueue.TryDequeue(out var detached))
+        // ONE request per call, and none at all while a recorded one still awaits its draw: record and draw share the one
+        // cache, so recording ahead would overwrite what the render thread is about to draw. A frame apiece is no limit
+        // worth having - a bake takes far longer than a frame anyway.
+        if (!_drawQueue.IsEmpty)
         {
-            var built = BuildDetachedCache(detached.visual, detached.size, detached.scale);
-            _drawQueue.Enqueue((built.Cache, built.Width, built.Height, detached.clear, detached.onReady));
-            LoopSignal.Request();
+            return;
         }
 
-        while (_recordQueue.TryDequeue(out var request))
+        lock (_cacheLock)
+        {
+            if (_detachedQueue.TryDequeue(out var detached))
+            {
+                Record(detached.onReady, () =>
+                {
+                    var built = BuildDetachedCache(detached.visual, detached.size, detached.scale);
+                    return (built.Cache, built.Width, built.Height, detached.clear);
+                });
+                return;
+            }
+
+            if (_recordQueue.TryDequeue(out var request))
+            {
+                Record(request.onReady, () =>
+                {
+                    var built = BuildLiveCache(request.visual);
+                    return built == null
+                        ? default((RenderCache, uint, uint, Color)?)
+                        : (built.Value.cache, built.Value.width, built.Value.height, Colors.Transparent);
+                });
+            }
+        }
+    }
+
+    // Builds one queued request and hands it to the draw queue. Whatever happens, the caller gets an ANSWER: a request
+    // that never comes back is not one lost picture - the caller counts it as still in flight and refuses every later
+    // one, so a live brush freezes at its last good picture for good.
+    private void Record(Action<ImageSource> onReady, Func<(RenderCache Cache, uint Width, uint Height, Color Clear)?> build)
+    {
+        try
         {
             EnsureDevice();
-            var built = BuildLiveCache(request.visual);
+            var built = build();
             if (built == null)
             {
-                var cb = request.onReady;
-                UIAppContext.Current?.Dispatcher.Post(() => cb(null));
-                continue;
+                UIAppContext.Current?.Dispatcher.Post(() => onReady(null));
+                return;
             }
-            _drawQueue.Enqueue((built.Value.cache, built.Value.width, built.Value.height, Colors.Transparent, request.onReady));
+
+            _drawQueue.Enqueue((built.Value.Cache, built.Value.Width, built.Value.Height, built.Value.Clear, onReady));
             LoopSignal.Request();   // ensure a frame runs so the render thread drains the draw queue
+        }
+        catch (Exception ex)
+        {
+            Log.Logger.Error($"Off-screen snapshot record failed: {ex}");
+            UIAppContext.Current?.Dispatcher.Post(() => onReady(null));
         }
     }
 
@@ -189,8 +241,22 @@ public sealed class VisualRenderer : IVisualRenderer
     {
         while (_drawQueue.TryDequeue(out var request))
         {
-            var image = DrawToBitmap(request.cache, request.width, request.height, request.clear);
             var callback = request.onReady;
+            ImageSource image = null;
+            lock (_cacheLock)
+            {
+                try
+                {
+                    image = DrawToBitmap(request.cache, request.width, request.height, request.clear);
+                }
+                catch (Exception ex)
+                {
+                    // Same reason as the record half: the answer is what releases the caller, so a failed draw must
+                    // still produce one.
+                    Log.Logger.Error($"Off-screen snapshot draw failed: {ex}");
+                }
+            }
+
             UIAppContext.Current?.Dispatcher.Post(() => callback(image));
         }
     }
@@ -238,7 +304,7 @@ public sealed class VisualRenderer : IVisualRenderer
         // window's loop is never woken into a concurrent render. The subtree is already valid, so ordinary Render() would
         // no-op - this replays OnRender read-only into the parallel cache. BuildFromComponents + ProcessCommands are both
         // device-free (units hold CPU geometry until DrawToBitmap uploads them), so this whole method is safe off-device.
-        var cache = new RenderCache(new DrawingContext(), _renderUnitFactory);
+        var cache = SharedCache();
         cache.BuildFromComponents(list, projection, readOnly: true);
         cache.RebaseToOrigin(element);
         cache.ProcessCommands(projection, scale);
@@ -260,9 +326,7 @@ public sealed class VisualRenderer : IVisualRenderer
     private ImageSource DrawToBitmap(RenderCache cache, uint width, uint height, Color clear)
     {
         EnsureDevice();
-        var presenter = GraphicsPresenter.Create(_device,
-            new PresentationParameters(PresenterType.RenderTarget, width, height, IntPtr.Zero, MSAALevel.None),
-            "VisualRenderer_presenter");
+        var presenter = TargetFor(width, height);
 
         _device.ClearColor = clear;
         _device.SetRenderTargets(presenter.RenderTarget);
@@ -276,7 +340,6 @@ public sealed class VisualRenderer : IVisualRenderer
         if (!_device.BeginDraw(beforeRenderPass: _ => cache.PreRender()))
         {
             cache.DisposeUnits();
-            presenter.Dispose();
             return null;
         }
 
@@ -294,9 +357,28 @@ public sealed class VisualRenderer : IVisualRenderer
         var pixels = new byte[(int)hostImage.TotalSizeInBytes];
         System.Runtime.InteropServices.Marshal.Copy(hostImage.DataPointer, pixels, 0, pixels.Length);
 
+        // The units go here, on the render thread and behind the wait above - the tree they were built from is gone by the
+        // next bake anyway, and freeing them from the RECORD thread instead races the window's own frames. The cache
+        // itself is kept: what leaked was never the units, it was the batch rings it owns.
         cache.DisposeUnits();
-        presenter.Dispose();
 
         return new BitmapSource(width, height, 1, 1, format, pixels);
+    }
+
+    /// <summary>The off-screen target, KEPT between bakes and re-made only when the size changes. A fresh render target
+    /// (plus its depth buffer) per bake exhausted device memory within a couple of seconds of a source that changes every
+    /// frame - and an allocation failure took the bake down mid-flight, which the caller reads as "no answer".</summary>
+    private GraphicsPresenter TargetFor(uint width, uint height)
+    {
+        if (_target != null && _target.Width == width && _target.Height == height)
+        {
+            return _target;
+        }
+
+        _target?.Dispose();
+        _target = GraphicsPresenter.Create(_device,
+            new PresentationParameters(PresenterType.RenderTarget, width, height, IntPtr.Zero, MSAALevel.None),
+            "VisualRenderer_presenter");
+        return _target;
     }
 }

@@ -38,6 +38,13 @@ namespace Adamantium.Graphics.Core
         // whole lifetime, so the main device creates and owns them itself (see ctor) — callers only read the getters.
         public IGraphicsDevice ResourceLoaderDevice { get; private set; }
 
+        /// <summary>A live device that DRAWS frames, or null before the first one exists. Resources the loader creates
+        /// but a window SAMPLES (textures above all) are deferred against one of these: every defer queue is drained in
+        /// its own device's <c>BeginDraw</c>, and the loader draws no frames, so its queue would never be drained at all.
+        /// <para>Resolved on the spot, never stored: this list holds only LIVE render devices (a closed window's device
+        /// is removed from it), and a remembered one would go on collecting resources after its window was gone.</para></summary>
+        public IGraphicsDevice DrawingDevice => graphicsDevices.Count > 0 ? graphicsDevices[0] : null;
+
         // One shared heap per logical device, used by every render-device wrapper (they share one VkDevice).
         public IDescriptorHeapManager DescriptorHeapManager { get; private set; }
 
