@@ -61,7 +61,10 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent, ITe
 
         if (appliedTemplate != null) RemoveTemplate();
         appliedTemplate = effective;
-        if (effective != null && !DeferTemplate) ApplyTemplate();
+        if (effective != null && !DeferTemplate)
+        {
+            ApplyTemplate();
+        }
 
         // Template parts just changed: re-point any style/element triggers that target named parts at the new tree
         // (and tear down what they held on the old, now-discarded parts) so a runtime template swap stays leak-free.
@@ -89,7 +92,10 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent, ITe
     /// <summary>Builds the template that <see cref="DeferTemplate"/> held back. Does nothing if it is already built.</summary>
     protected void EnsureTemplate()
     {
-        if (templateResult == null && appliedTemplate != null) ApplyTemplate();
+        if (templateResult == null && appliedTemplate != null)
+        {
+            ApplyTemplate();
+        }
     }
 
     private void ApplyTemplate()

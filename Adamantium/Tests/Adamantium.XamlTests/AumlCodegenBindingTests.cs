@@ -1,124 +1,23 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
-using System.Threading;
-using Adamantium.UI.Generators;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.Diagnostics;
-using Microsoft.CodeAnalysis.Text;
 using NUnit.Framework;
 
 namespace Adamantium.XamlTests;
 
-/// <summary>
-/// Harness for the AUML compile-time code generator: it drives the real <see cref="AumlCodeBehindGenerator"/>
-/// (parser -> RoslynTypeResolver -> transformer -> AumlSourceGenerator) over an in-memory .auml file and inspects the
-/// emitted C#. This is the only way to verify codegen in-process, since there was no existing harness for it.
-/// </summary>
+/// <summary>What the AUML code generator emits for bindings, view models, transitions and trigger animations - driven
+/// through <see cref="AumlCodegenHarness"/>.</summary>
 [TestFixture]
 public class AumlCodegenBindingTests
 {
-    // Force the UI assemblies to load so AppDomain.GetAssemblies() (our reference set) includes them.
-    private static readonly Type[] _seed =
-    [
-        typeof(Adamantium.UI.Controls.Window),
-        typeof(Adamantium.UI.Controls.Text.TextBlock),
-        typeof(Adamantium.UI.Core.Data.Binding),
-        typeof(Adamantium.UI.Core.Data.MultiBinding),
-        typeof(Adamantium.Core.TypeParsing.TypeParser),   // force-load Adamantium.Core so codegen resolves OUR TypeParser
-    ];
+    private static string Generate(string auml, out IReadOnlyList<Diagnostic> errors) => AumlCodegenHarness.Generate(auml, out errors);
 
-    private sealed class InMemoryAdditionalText(string path, string content) : AdditionalText
-    {
-        private readonly SourceText _text = SourceText.From(content);
-        public override string Path { get; } = path;
-        public override SourceText GetText(CancellationToken cancellationToken = default) => _text;
-    }
+    private static IReadOnlyList<Diagnostic> Compile(string auml) => AumlCodegenHarness.Compile(auml);
 
-    private sealed class DictOptions(Dictionary<string, string> values) : AnalyzerConfigOptions
-    {
-        public override bool TryGetValue(string key, out string? value) => values.TryGetValue(key, out value);
-    }
+    private const string WindowHeader = AumlCodegenHarness.WindowHeader;
 
-    private sealed class DictOptionsProvider : AnalyzerConfigOptionsProvider
-    {
-        private readonly AnalyzerConfigOptions _global;
-        public DictOptionsProvider(Dictionary<string, string> values) => _global = new DictOptions(values);
-        public override AnalyzerConfigOptions GlobalOptions => _global;
-        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => _global;
-        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => _global;
-    }
-
-    private static string Generate(string auml, out IReadOnlyList<Diagnostic> errors)
-    {
-        _ = _seed.Length;   // touch the seed so the assemblies are loaded
-
-        var references = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location))
-            .Select(a => (MetadataReference)MetadataReference.CreateFromFile(a.Location))
-            .ToList();
-
-        var compilation = CSharpCompilation.Create("AumlCodegenProbe",
-            syntaxTrees: null,
-            references: references,
-            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-        var optionsProvider = new DictOptionsProvider(new Dictionary<string, string>
-        {
-            ["build_property.RootNamespace"] = "Test.App",
-            ["build_property.projectdir"] = @"C:\Test\",
-        });
-
-        var driver = CSharpGeneratorDriver.Create(
-            generators: [new AumlCodeBehindGenerator().AsSourceGenerator()],
-            additionalTexts: [new InMemoryAdditionalText(@"C:\Test\MainWindow.auml", auml)],
-            parseOptions: null,
-            optionsProvider: optionsProvider);
-
-        var result = driver.RunGenerators(compilation).GetRunResult();
-        errors = result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
-        return string.Join("\n\n", result.GeneratedTrees.Select(t => t.GetText().ToString()));
-    }
-
-    // Generates and then COMPILES the output, returning compile errors — proves the emitted binding code (SetBinding,
-    // PropertyPath, MultiBinding.Bindings.Add, ...) actually matches the real API, not just the expected text.
-    private static IReadOnlyList<Diagnostic> Compile(string auml)
-    {
-        var references = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(a => !a.IsDynamic && !string.IsNullOrEmpty(a.Location))
-            .Select(a => (MetadataReference)MetadataReference.CreateFromFile(a.Location))
-            .ToList();
-
-        var compilation = CSharpCompilation.Create("AumlCodegenCompile",
-            syntaxTrees: null,
-            references: references,
-            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-
-        var optionsProvider = new DictOptionsProvider(new Dictionary<string, string>
-        {
-            ["build_property.RootNamespace"] = "Test.App",
-            ["build_property.projectdir"] = @"C:\Test\",
-        });
-
-        var driver = CSharpGeneratorDriver.Create(
-            generators: [new AumlCodeBehindGenerator().AsSourceGenerator()],
-            additionalTexts: [new InMemoryAdditionalText(@"C:\Test\MainWindow.auml", auml)],
-            parseOptions: null,
-            optionsProvider: optionsProvider);
-
-        driver.RunGeneratorsAndUpdateCompilation(compilation, out var output, out _);
-        return output.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error).ToArray();
-    }
-
-    private const string WindowHeader =
-        "<Window x:Namespace=\"Test.App\" " +
-        "xmlns=\"http://adamantium/ui\" " +
-        "xmlns:x=\"http://adamantium/ui/xaml/extensions\" ";
-
-    private static string Errors(IReadOnlyList<Diagnostic> errors) =>
-        "generator reported errors: " + string.Join(" | ", errors.Select(e => e.GetMessage()));
+    private static string Errors(IReadOnlyList<Diagnostic> errors) => AumlCodegenHarness.Errors(errors);
 
     [Test]
     public void Harness_GeneratesControl_WithoutErrors()

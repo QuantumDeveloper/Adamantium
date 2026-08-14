@@ -340,13 +340,29 @@ internal sealed class AumlInstantiator
 
     // Resolves a markup value node to a runtime object: a markup extension (incl. a converter authored AS a markup
     // extension, or {ResourceReference}), an inline element (<...><local:MyConverter/></...>), or a text literal.
+    // The transformer runs before this (see AumlLoader), so a directive in value position arrives already turned into
+    // the node it means: {x:Null} -> AumlAstNullValueNode, {x:Type ...} -> AumlAstTypeReferenceValueNode. Without a case
+    // for the latter it fell through to null, and the preview silently showed a tree the build does not produce.
     private object ResolveValue(IAumlAstValueNode value, Type targetType) => value switch
     {
+        AumlAstNullValueNode => null,
+        AumlAstTypeReferenceValueNode typeNode => ResolveTypeValue(typeNode),
         AumlAstMarkupExtensionNode me => ResolveMarkupExtension(me, targetType),
         AumlAstObjectNode obj => Instantiate(obj),
         AumlAstTextNode text => TryConvert(text.Text, targetType, out var r) ? r : null,
         _ => null,
     };
+
+    private Type ResolveTypeValue(AumlAstTypeReferenceValueNode node)
+    {
+        var resolved = ResolveClrType(node.TypeReference);
+        if (resolved == null)
+        {
+            _diagnostics.Add($"x:Type '{node.TypeReference?.GetFullTypeName()}' could not be resolved");
+        }
+
+        return resolved;
+    }
 
     private object ResolveMarkupExtension(AumlAstMarkupExtensionNode markup, Type targetType)
     {

@@ -114,6 +114,14 @@ namespace Adamantium.UI.Generators
                             continue;
                         }
 
+                        // A fragment root (no Window/View/Page/Theme/StyleSet/ResourceDictionary) has no class to emit.
+                        // The transformer still walks and judges it - the runtime loader previews exactly such markup -
+                        // so the decision NOT to generate is stated here, where generation is decided.
+                        if (aumlMetadataContainer.RootEntityType == EntityType.Unknown)
+                        {
+                            continue;
+                        }
+
                         codeGenerator.GenerateSourceCode(aumlMetadataContainer, new RoslynOutputSink(spc), diagnostics);
 
                         if (aumlMetadataContainer.RootEntityType == EntityType.ResourceDictionary)

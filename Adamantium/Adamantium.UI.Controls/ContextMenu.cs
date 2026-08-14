@@ -163,12 +163,18 @@ public class ContextMenu : ItemsControl
 
         // base.OnApplyTemplate connected the items host while it was still in this control's namescope; now it isn't, so
         // the connection is made here instead - an unconnected host has no owner and never grows an items panel.
-        if (_clickRoot is ItemsPresenter presenter) ConnectPresenter(presenter);
+        if (_clickRoot is ItemsPresenter presenter)
+        {
+            ConnectPresenter(presenter);
+        }
 
         // Scrolling the list = browsing it, not navigating a submenu: close any open submenu so it doesn't ride along with
         // the scrolled row it's anchored to. A NAMED handler, not a lambda: a lambda cannot be taken off again, and this
         // one has to come off when the template goes.
-        if (_scroll != null) _scroll.ScrollChanged += OnMenuScrolled;
+        if (_scroll != null)
+        {
+            _scroll.ScrollChanged += OnMenuScrolled;
+        }
 
         // Any leaf row's Click bubbles up to the items presenter - close the menu after the command has run.
         // The handler INSTANCE is kept: RemoveHandler matches on the delegate, so a freshly-made one would not take off
@@ -213,7 +219,10 @@ public class ContextMenu : ItemsControl
         var menu = (ContextMenu)a;
         // First open: build the template now. Placement is stated on the menu BEFORE IsOpen (see Open), so the popup
         // OnApplyTemplate hands it is already positioned; what follows just re-states it for every later open.
-        if ((bool)e.NewValue) menu.EnsureTemplate();
+        if ((bool)e.NewValue)
+        {
+            menu.EnsureTemplate();
+        }
 
         if (menu._popup != null)
         {

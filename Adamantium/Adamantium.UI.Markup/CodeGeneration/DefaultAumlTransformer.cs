@@ -356,21 +356,20 @@ public class DefaultAumlTransformer : IAumlTransformer
             );
         }
         
-        // --- НОВЫЙ МЕТОД ДЛЯ ОБРАБОТКИ ВСЕХ ТИПОВ ЗНАЧЕНИЙ ---
         IAumlAstValueNode ProcessValueNode(IAumlAstValueNode valueNode)
         {
             switch (valueNode)
             {
-                // Если значение - это директива (например, из {x:Type ...})
+                // A directive standing in value position, e.g. {x:Type ...}
                 case AumlAstDirective directive:
                     return ProcessDirectiveValue(directive);
-                
-                // Если значение - обычное расширение разметки (не директива)
+
+                // An ordinary markup extension (not a directive)
                 case AumlAstMarkupExtensionNode markupExtension:
                     ProcessMarkupExtension(markupExtension);
                     return markupExtension;
 
-                // Если это текстовое значение или любой другой узел, оставляем как есть
+                // Text, or anything else - left as it stands
                 default:
                     return valueNode;
             }
@@ -383,27 +382,47 @@ public class DefaultAumlTransformer : IAumlTransformer
             switch (directive.Name)
             {
                 // The one directive that carries no value: saying nothing IS its value.
-                case "Null":
+                case AumlDirectives.Null:
                     return new AumlAstNullValueNode(directive.GetLineInfo());
 
-                case "Type":
+                case AumlDirectives.Type:
                     if (MissingValue(directive, directiveBody)) return directive;
 
-                    // Используем тот же механизм, что и в парсере, чтобы распознать имя типа
+                    // Read the type name with the very mechanism the parser uses
                     var typeRef = MarkupExtensionParser.ParseTypeName(new ParserContext(null), directiveBody, directive.GetLineInfo(), document.NamespaceMappings.ToList());
 
-                    // Резолвим его в конкретный IResolvedType
+                    // Resolve it to a concrete IResolvedType
                     var resolvedTypeRef = ProcessTypeReference(typeRef, directive.GetLineInfo());
 
-                    // Возвращаем наш новый узел, который несет в себе информацию о типе
+                    // Hand back a node that carries the resolved type
                     return new AumlAstTypeReferenceValueNode(directive.GetLineInfo(), resolvedTypeRef);
                
                 default:
                     if (MissingValue(directive, directiveBody)) return directive;
 
-                    diagnostics.ReportError(document.FileName, $"Unknown directive 'x:{directive.Name}'. {directive.GetLineInfo()}");
+                    // A name the registry knows is not "unknown" - it is written in the wrong place, and saying so is
+                    // the difference between "you invented this" and "this one goes on the element".
+                    diagnostics.ReportError(document.FileName, AumlDirectives.Find(directive.Name) != null
+                        ? $"Directive 'x:{directive.Name}' is written on the element, not in a value. {directive.GetLineInfo()}"
+                        : $"Unknown directive 'x:{directive.Name}'. {directive.GetLineInfo()}");
                     return directive;
             }
+        }
+
+        // Every x: name is judged against the registry, so a directive nobody implemented - or one written in the wrong
+        // place - says so at build time instead of being silently dropped. The registry is what tooling completes from,
+        // so this is also what keeps the two from drifting apart.
+        void ReportIfNotAnAttributeDirective(AumlAstDirective directive)
+        {
+            var known = AumlDirectives.Find(directive.Name);
+            if (known is { Usage: AumlDirectiveUsage.Attribute })
+            {
+                return;
+            }
+
+            diagnostics.ReportError(document.FileName, known != null
+                ? $"Directive 'x:{directive.Name}' belongs in a value, not on the element. {directive.GetLineInfo()}"
+                : $"Unknown directive 'x:{directive.Name}'. {directive.GetLineInfo()}");
         }
 
         bool MissingValue(AumlAstDirective directive, string body)
@@ -480,15 +499,15 @@ public class DefaultAumlTransformer : IAumlTransformer
             return container;
         }
                 
+        // A root that is not a Window/View/Page/Theme/StyleSet/ResourceDictionary is a FRAGMENT - markup with no class to
+        // generate. That is a statement about CODE GENERATION, not about the tree, and the two used to be one: the walk
+        // below was skipped for such a root, so nothing in a fragment was type-resolved or judged at all. The runtime
+        // loader shares this transformer and previews exactly those fragments, which made the preview quieter than the
+        // build - a typo'd directive passed here and failed on compile. The tree is walked for every root now; whether a
+        // class comes out of it is decided by the generator, off RootEntityType.
         entityType = rootType.EntityType;
-
-        if (entityType == EntityType.Unknown)
-        {
-            return container;
-        }
-        
         container.RootEntityType = entityType;
-        
+
         var queue = new Queue<IAumlAstNode>();
         queue.Enqueue(document.Root);
             
@@ -517,6 +536,13 @@ public class DefaultAumlTransformer : IAumlTransformer
                     
                     break;
                 case AumlAstDirective directive:
+                    // A directive written in VALUE position carries no parent (see MarkupExtensionParser) and has already
+                    // been answered for by ProcessDirectiveValue; only the attribute form is judged here.
+                    if (directive.ParentNode != null)
+                    {
+                        ReportIfNotAnAttributeDirective(directive);
+                    }
+
                     if (directive.Name == AumlDirectives.Name)
                     {
                         if (directive.Value is AumlAstTextNode textNode)

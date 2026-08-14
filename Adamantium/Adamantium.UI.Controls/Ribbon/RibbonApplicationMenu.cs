@@ -279,8 +279,12 @@ public class RibbonApplicationMenu : Selector
     public override void OnRemoveTemplate()
     {
         base.OnRemoveTemplate();
-        if (_button != null) _button.Click -= OnButtonClick;
-        if (_backButton != null) _backButton.Click -= OnBackClick;
+        if (_button != null)
+            _button.Click -= OnButtonClick;
+
+        if (_backButton != null)
+            _backButton.Click -= OnBackClick;
+
         if (_popup != null)
         {
             _popup.Closed -= OnPopupClosed;
