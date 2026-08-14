@@ -291,6 +291,22 @@ public class TexturedShapeRenderTests
         Assert.That(secondLeft.B, Is.GreaterThan(200), $"tile 2 starts over rather than continuing: {secondLeft}");
     }
 
+    // A picture is replaced on the UI thread (a VisualBrush re-bakes, an animated source hands over a new frame) while
+    // frames that sample it are still IN FLIGHT on the GPU. Destroying its image there and then is an invalid read on the
+    // device - the whole device goes, not one wrong pixel - so the texture must go through the deferred queue instead.
+    [Test]
+    public void ReplacingAPictureDoesNotDestroyItsTextureUnderTheGpu()
+    {
+        var device = GpuTestDevice.Device;
+        var picture = FlatRed();
+        var texture = picture.GetOrCreateTexture(new DeviceResourceFactory(device));
+
+        picture.Dispose();
+
+        Assert.That(texture, Is.Not.Null);
+        Assert.That(texture.IsDisposed, Is.False, "the image was destroyed while submitted frames could still sample it");
+    }
+
     // The rectangle it always could do - here to prove the shared pass did not lose it when the ellipse branch went in.
     [Test]
     public void TheRectangleStillPaintsItsCorners()

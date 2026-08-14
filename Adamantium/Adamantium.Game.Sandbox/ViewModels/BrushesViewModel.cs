@@ -144,6 +144,40 @@ public partial class BrushesViewModel : TabPageViewModel
         }
     });
 
+    // Drives a control INSIDE the VisualBrush's source, so dragging it changes the source and the fill has to follow -
+    // which is the whole claim of the brush: it paints with a live element, not a picture of one taken once.
+    [Bindable] private double _visualSourceValue = 60;
+
+    // The brush itself is declared in MARKUP (its source is named there with ElementName - a view-model never holds a
+    // UI element), so these drive it through bindings on the brush rather than by mutating an object here.
+    [Bindable] private PreviewShape _visualShape = PreviewShape.Rectangle;
+    [Bindable] private TileMode _visualTileMode = TileMode.None;
+    [Bindable] private Stretch _visualStretch = Stretch.Uniform;
+    [Bindable] private AlignmentX _visualAlignmentX = AlignmentX.Center;
+    [Bindable] private AlignmentY _visualAlignmentY = AlignmentY.Center;
+    [Bindable] private double _visualViewportSize = 120;
+    [Bindable] private double _visualRotation;
+    [Bindable] private double _visualOpacity = 1;
+    [Bindable] private double _visualWidth = 260;
+    [Bindable] private double _visualHeight = 170;
+    [Bindable] private double _visualRadius = 12;
+    [Bindable] private Color _visualTint = Colors.White;
+
+    [Bindable] private PointsCollection _visualTriangle = Triangle(260, 170);
+    [Bindable] private PointsCollection _visualStar = Star(260, 170);
+
+    partial void OnVisualWidthChanged(double value)
+    {
+        VisualTriangle = Triangle(value, _visualHeight);
+        VisualStar = Star(value, _visualHeight);
+    }
+
+    partial void OnVisualHeightChanged(double value)
+    {
+        VisualTriangle = Triangle(_visualWidth, value);
+        VisualStar = Star(_visualWidth, value);
+    }
+
     public BrushMappingMode[] MappingModes { get; } = Enum.GetValues<BrushMappingMode>();
 
     public AlignmentX[] AlignmentsX { get; } = Enum.GetValues<AlignmentX>();

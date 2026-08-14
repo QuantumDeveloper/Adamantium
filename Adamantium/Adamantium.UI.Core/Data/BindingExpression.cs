@@ -202,7 +202,15 @@ public class BindingExpression : BindingExpressionBase
    // (attach), so a forward-referenced element resolves once the whole tree exists. Null until then.
    private object ResolveElementName()
    {
-      if (string.IsNullOrEmpty(Binding.ElementName) || Target is not IUIComponent target) return null;
+      if (string.IsNullOrEmpty(Binding.ElementName)) return null;
+
+      // A NON-VISUAL target - a brush, a pen, a gradient stop - has no place in the tree to search FROM, so it borrows
+      // the element that holds it (the same InheritanceParent a resource lookup uses; see Brush.Anchor). Without this
+      // an ElementName written on a brush resolved to nothing, silently - and a VisualBrush cannot name its source at
+      // all in markup, which is the only way to write one.
+      var target = AnchorElement(Target);
+      if (target == null) 
+         return null;
 
       // The TEMPLATE first, when this binding was written inside one. A template is its own namescope - its names belong
       // to the control that applied it, not to the window - so they are not on the visual tree under Name and the walk
@@ -214,6 +222,17 @@ public class BindingExpression : BindingExpressionBase
       var root = target;
       while (root.VisualParent is { } parent) root = parent;
       return FindByName(root, Binding.ElementName);
+   }
+
+   // The element a search starts from: the target itself when it is one, otherwise the nearest one holding it.
+   private static IUIComponent AnchorElement(object target)
+   {
+      for (var node = target as IAdamantiumComponent; node != null; node = node.InheritanceParent)
+      {
+         if (node is IUIComponent element) return element;
+      }
+
+      return null;
    }
 
    private static IUIComponent FindByName(IUIComponent node, string name)

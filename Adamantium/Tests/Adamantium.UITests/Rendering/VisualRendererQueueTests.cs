@@ -31,6 +31,18 @@ public class VisualRendererQueueTests
         Assert.That(delivered, Is.Null);
     }
 
+    // A bake can fail for reasons the caller cannot see - the device refused an allocation, the tree changed under the
+    // record. The failure must stay inside the drain: it used to escape into the app loop, which left the request counted
+    // as still in flight, so the brush that asked refused every later bake and its fill froze at the last good picture.
+    [Test]
+    public void ARecordThatFailsDoesNotEscapeTheDrain()
+    {
+        var renderer = new VisualRenderer(null, null);   // no device service: the record cannot get past EnsureDevice
+        renderer.RequestSnapshot(new Border(), _ => { });
+
+        Assert.DoesNotThrow(() => renderer.RecordPendingSnapshots());
+    }
+
     [Test]
     public void RequestRender_IgnoresAnAskItCouldNeverAnswer()
     {

@@ -155,6 +155,21 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
       if (hasExpressions)
       {
          Data.BindingEngine.RefreshBindings(this);
+
+         // The refresh above searches from an element that markup has not added to its parent yet, so nothing that has
+         // to be looked UP can be found. Two later moments each answer half of it, and BOTH are needed:
+         //   * ATTACH - the element now has ancestors, so {Binding ElementName=...} can find its target;
+         //   * the owner's DATACONTEXT arriving - an INHERITED DataContext is pushed down without announcing itself per
+         //     descendant, and it lands AFTER attach, so a plain {Binding Path} still had nothing to read at attach.
+         if (owner is IUIComponent visual)
+         {
+            visual.AttachedToVisualTreeEvent += (_, _) => Data.BindingEngine.RefreshBindings(this);
+         }
+
+         owner.PropertyChanged += (_, e) =>
+         {
+            if (e.Property == FundamentalUIComponent.DataContextProperty) Data.BindingEngine.RefreshBindings(this);
+         };
       }
 
       if (hasResources)
