@@ -380,6 +380,7 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
     private readonly List<int> _recycleBuf = new();                          // scratch: active slots to recycle this frame
     private readonly HashSet<int> _pendingSet = new();                       // scratch: this frame's pending, for O(1) lookup
     private readonly List<(UIComponent card, Rect rect)> _skelArrangeBuf = new();   // scratch: (card, rect) for the parallel arrange pass
+    private readonly List<UIComponent> _vacatedBuf = new();                  // scratch: cards freed this pass, offered to slots that need one
     private int _pendingFrames;
     private const int SkeletonDelayFrames = 6;   // ~100 ms at 60 fps before cards appear - no flash on a fill that clears fast
     private const int SkeletonParallelThreshold = 64;   // fan the card arrange across cores only above this many (matches the real-tile arrange)
@@ -406,13 +407,23 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         var template = Owner?.ItemSkeletonTemplate;
         if (template == null) return;   // unthemed ItemsControl - no skeletons
 
-        // Recycle cards whose slot is no longer pending (it bound, or scrolled out of the window).
+        // Cards whose slot is no longer pending (it bound, or scrolled out) are VACATED, not recycled: they are held aside
+        // and handed straight to the slots that need one below. Collapsing them here and un-collapsing them a few lines
+        // later is what made scrolling expensive - Visibility carries AffectsMeasure, so each flip invalidates that card's
+        // measure AND arrange and lands it in the layout queue as a dirty root of its own. On a scrolling 60k grid that
+        // was ~16k flips per half second, for cards that never left the screen. Only the surplus is collapsed, at the end.
         _pendingSet.Clear();
         for (var i = 0; i < pending.Count; i++) _pendingSet.Add(pending[i]);
         _recycleBuf.Clear();
         foreach (var slot in _activeSkeletons.Keys)
             if (!_pendingSet.Contains(slot)) _recycleBuf.Add(slot);
-        for (var i = 0; i < _recycleBuf.Count; i++) RecycleSkeleton(_recycleBuf[i]);
+
+        _vacatedBuf.Clear();
+        for (var i = 0; i < _recycleBuf.Count; i++)
+        {
+            if (_activeSkeletons.Remove(_recycleBuf[i], out var vacated)) 
+                _vacatedBuf.Add(vacated);
+        }
 
         // Inset each cell rect by the REAL tile's margin (read from a realized item, never hardcoded) so a card sits
         // exactly where its item's visual would - same footprint, same inter-tile gaps.
@@ -427,8 +438,14 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
             var slot = pending[i];
             if (!_activeSkeletons.TryGetValue(slot, out var card))
             {
-                card = RentSkeleton(template);
-                if (card == null) return;   // template has no root
+                // A card just vacated by another slot first - it is already on screen and already the right size, so it
+                // simply moves. Only when none is left does this fall back to the pool (or to building one).
+                card = TakeVacated() ?? RentSkeleton(template);
+                if (card == null)
+                {
+                    ParkVacated();   // nothing to show; whatever was held aside goes back to the pool, not nowhere
+                    return;          // template has no root
+                }
                 _activeSkeletons[slot] = card;
             }
             if (card.Visibility != Visibility.Visible) card.Visibility = Visibility.Visible;
@@ -438,6 +455,10 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
                 Math.Max(0, rc.Width - inset.Left - inset.Right),
                 Math.Max(0, rc.Height - inset.Top - inset.Bottom))));
         }
+
+        // Whatever nobody claimed really has left the screen: hide it and pool it. In a steady scroll this is usually
+        // empty - the slots that appear and the slots that leave balance out, and the cards just move between them.
+        ParkVacated();
 
         SyncLoadingState();
 
@@ -554,6 +575,32 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         measurable.Arrange(rect);
     }
 
+    // A card freed by one slot this pass, for a slot that needs one in the same pass. Never touches Visibility - it was
+    // on screen and stays on screen, only its rect changes.
+    private UIComponent TakeVacated()
+    {
+        if (_vacatedBuf.Count == 0)
+        {
+            return null;
+        }
+
+        var card = _vacatedBuf[^1];
+        _vacatedBuf.RemoveAt(_vacatedBuf.Count - 1);
+        return card;
+    }
+
+    private void ParkVacated()
+    {
+        for (var i = 0; i < _vacatedBuf.Count; i++)
+        {
+            var card = _vacatedBuf[i];
+            card.Visibility = Visibility.Collapsed;
+            _skeletonPool.Push(card);
+        }
+
+        _vacatedBuf.Clear();
+    }
+
     private UIComponent RentSkeleton(DataTemplate template)
     {
         if (_skeletonPool.Count > 0)
@@ -567,13 +614,6 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         _skeletonSet.Add(card);
         AddVisualChild(card);
         return card;
-    }
-
-    private void RecycleSkeleton(int slot)
-    {
-        if (!_activeSkeletons.Remove(slot, out var card)) return;
-        card.Visibility = Visibility.Collapsed;
-        _skeletonPool.Push(card);
     }
 
     private void RecycleAllSkeletons()
