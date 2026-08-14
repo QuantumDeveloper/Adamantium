@@ -251,11 +251,21 @@ public partial class RenderCache
         if (component == null) return;
         var snapshot = new LayoutSnapshot(component.LocalTransform, component.RenderSize, component.ClipToBounds,
             component.IsRenderMotionNode, component.RenderParent, (float)component.Opacity, (float)component.SelfOpacity);
-        _snap[component] = snapshot;
+
         // ...AND publish it: the delta is the ONLY source of the applier's replica, so updating the recorder's map alone
         // leaves the applier composing from the PREVIOUS transform (a tilting tile never moves). Snap() below publishes on
         // its own only for a NEW entry, so this force-refresh (overwriting an existing one) must publish explicitly.
-        _packet.SnapDelta.Add(new KeyValuePair<IUIComponent, LayoutSnapshot>(component, snapshot));
+        // But ONLY when it really changed. A dirty mark says "look at me", not "I moved": a component can be re-frozen
+        // with the same transform, size and clip it already had, and republishing that is not free - the applier reads
+        // ANY delta entry as "the layout moved under the recorded stream" and refuses the clean-frame replay for the whole
+        // scene. Measured on the 60k view: ~15 unchanged entries per frame, two thirds of frames falling back to the full
+        // walk, 35 ms a frame instead of a replay - 28 fps where the retained path gives hundreds.
+        if (!_snap.TryGetValue(component, out var previous) || !previous.Equals(snapshot))
+        {
+            _snap[component] = snapshot;
+            _packet.SnapDelta.Add(new KeyValuePair<IUIComponent, LayoutSnapshot>(component, snapshot));
+        }
+
         for (var c = component.RenderParent; c != null && !_snap.ContainsKey(c); c = c.RenderParent)
             Snap(c);
     }

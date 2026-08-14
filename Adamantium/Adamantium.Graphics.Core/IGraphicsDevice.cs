@@ -122,7 +122,11 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
     Guid DeviceId { get; }
     
     uint MaxFramesInFlight { get; }
-    
+
+    /// <summary>Frames this device has BEGUN, counted after each one's fence wait. Deferred disposal reads it to know
+    /// when whatever was in flight at hand-over time has certainly retired. Zero on a device that never draws.</summary>
+    ulong FrameTicket { get; }
+
     void AddResource(GraphicsResource resource);
 
     /// <summary>Unregisters a resource (called from its Dispose) so it stops being rooted by the device.</summary>

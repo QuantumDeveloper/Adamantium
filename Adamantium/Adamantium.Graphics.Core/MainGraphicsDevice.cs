@@ -38,12 +38,82 @@ namespace Adamantium.Graphics.Core
         // whole lifetime, so the main device creates and owns them itself (see ctor) — callers only read the getters.
         public IGraphicsDevice ResourceLoaderDevice { get; private set; }
 
-        /// <summary>A live device that DRAWS frames, or null before the first one exists. Resources the loader creates
-        /// but a window SAMPLES (textures above all) are deferred against one of these: every defer queue is drained in
-        /// its own device's <c>BeginDraw</c>, and the loader draws no frames, so its queue would never be drained at all.
-        /// <para>Resolved on the spot, never stored: this list holds only LIVE render devices (a closed window's device
-        /// is removed from it), and a remembered one would go on collecting resources after its window was gone.</para></summary>
-        public IGraphicsDevice DrawingDevice => graphicsDevices.Count > 0 ? graphicsDevices[0] : null;
+        // Deferred disposal, for EVERY GPU resource of this logical device. It lives here rather than per device wrapper
+        // because the wrappers share one VkDevice and freely share resources: a texture is made by the resource loader,
+        // which draws no frames at all, and sampled by any window that paints with it. A per-wrapper queue can only
+        // promise that ITS OWN frames finished, and freeing an image a moment too early is not a wrong pixel - the GPU
+        // reads a recycled address and the device is lost.
+        // So a resource is held until EVERY drawing wrapper has begun enough frames to have retired whatever was in
+        // flight when it was handed over. A window that stops drawing (minimised) simply delays that - it is alive and
+        // will paint again, so its resources must stay. Only DESTROYING a wrapper drops its vote.
+        private readonly List<(IDisposable Resource, IGraphicsDevice[] Devices, ulong[] Due)> _retired = [];
+        private readonly object _retireSync = new();
+
+        /// <summary>Hand a GPU resource over for disposal once no submitted work can still reference it.</summary>
+        public void RetireResource(IDisposable resource)
+        {
+            if (resource == null)
+            {
+                return;
+            }
+
+            lock (_retireSync)
+            {
+                var devices = graphicsDevices.ToArray();
+                var due = new ulong[devices.Length];
+                for (var i = 0; i < devices.Length; i++)
+                {
+                    // Its frame in flight NOW is retired once this many more frames have begun - each begin waits on the
+                    // fence of the frame MaxFramesInFlight back.
+                    due[i] = devices[i].FrameTicket + devices[i].MaxFramesInFlight + 1;
+                }
+
+                _retired.Add((resource, devices, due));
+            }
+        }
+
+        /// <summary>Called by a drawing wrapper as it begins a frame, once its own fence wait has returned.</summary>
+        public void OnFrameStarted()
+        {
+            List<IDisposable> due = null;
+            lock (_retireSync)
+            {
+                for (var i = _retired.Count - 1; i >= 0; i--)
+                {
+                    if (!IsDue(_retired[i].Devices, _retired[i].Due))
+                    {
+                        continue;
+                    }
+
+                    (due ??= []).Add(_retired[i].Resource);
+                    _retired.RemoveAt(i);
+                }
+            }
+
+            if (due == null)
+            {
+                return;
+            }
+
+            foreach (var resource in due)
+            {
+                resource.Dispose();
+            }
+        }
+
+        // A wrapper that is gone cannot be executing anything, so its vote is dropped rather than waited on for ever.
+        private bool IsDue(IGraphicsDevice[] devices, ulong[] due)
+        {
+            for (var i = 0; i < devices.Length; i++)
+            {
+                if (graphicsDevices.Contains(devices[i]) && devices[i].FrameTicket < due[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
 
         // One shared heap per logical device, used by every render-device wrapper (they share one VkDevice).
         public IDescriptorHeapManager DescriptorHeapManager { get; private set; }

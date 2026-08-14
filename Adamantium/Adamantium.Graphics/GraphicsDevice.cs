@@ -38,8 +38,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     private PrimitiveTopology primitiveTopology;
     private IEffectPass currentEffectPass;
 
-    private Queue<IDisposable>[] _deferedDisposeQueue;
-        
     // -- Drawing States
         
     private TrackingCollection<Viewport> viewports;
@@ -143,7 +141,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         InitializeSyncObject();
         DeviceId = Guid.NewGuid();
         MaxFramesInFlight = 1;
-        InitializeDeferQueue();
         InitializeResourceLoadingDevice();
         Log.Logger.Debug($"Resource loader device created. Id: {DeviceId}");
     }
@@ -160,8 +157,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         EffectPools = new List<EffectPool>();
         DefaultEffectPool = EffectPool.New(this);
         MaxFramesInFlight = mainDevice.BuffersCount;
-        InitializeDeferQueue();
-            
         InitializeRenderDevice();
         InitializePipeline();
         // One global descriptor heap per logical device, owned by the main device and shared by every render-device
@@ -179,15 +174,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         Log.Logger.Debug($"Primary render device created. Id: {DeviceId}");
 
         SampleMask = [0xF];
-    }
-
-    private void InitializeDeferQueue()
-    {
-        _deferedDisposeQueue = new Queue<IDisposable>[MaxFramesInFlight];
-        for (int i = 0; i < MaxFramesInFlight; i++)
-        {
-            _deferedDisposeQueue[i] = new Queue<IDisposable>();
-        }
     }
 
     private void InitializePipeline()
@@ -224,6 +210,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     public EffectPass.DynamicBufferPool CurrentBufferPool => _dynamicBufferPools[CurrentFrame];
 
     public uint MaxFramesInFlight { get; private set; }
+
+    public ulong FrameTicket { get; private set; }
 
     public List<EffectPool> EffectPools { get; private set; }
 
@@ -444,9 +432,12 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     /// <summary>Number of live (registered) graphics resources. Used by leak regression tests.</summary>
     public int RegisteredResourceCount => _graphicsResources.Count;
 
+    /// <summary>Hand a GPU resource over for disposal. Held by the LOGICAL device (see
+    /// <see cref="MainGraphicsDevice.RetireResource"/>) until every drawing wrapper has retired the frames it had in
+    /// flight - the wrappers share one VkDevice and share resources, so this device's own fences prove too little.</summary>
     public void AddToDeferDisposeQueue(IDisposable obj)
     {
-        _deferedDisposeQueue[CurrentFrame].Enqueue(obj);
+        MainDevice.RetireResource(obj);
     }
 
     public IEffectResourceLinker CreateEffectResourceLinker()
@@ -813,16 +804,6 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         commandBuffer.PipelineBarrier2(dependencyInfo);
     }
     
-    private void DisposeDeferredObjects(uint currentFrame)
-    {
-        var queue = _deferedDisposeQueue[currentFrame];
-        foreach (var obj in queue)
-        {
-            obj?.Dispose();
-        }
-        queue.Clear();
-    }
-
     /// <summary>Why the last <see cref="BeginDraw"/> returned false (a Vulkan device/surface error). Surfaced so a
     /// caller that only sees the bool (e.g. the designer's headless render) can report the real reason, not "render failed".</summary>
     public string LastFrameError { get; private set; }
@@ -878,7 +859,8 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         var renderFence = InFlightFences[CurrentFrame];
         var result = LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
 
-        DisposeDeferredObjects(CurrentFrame);
+        FrameTicket++;
+        MainDevice.OnFrameStarted();
 
         if (result != Result.Success && result != Result.Timeout)
         {
