@@ -347,11 +347,39 @@ internal sealed class AumlInstantiator
     {
         AumlAstNullValueNode => null,
         AumlAstTypeReferenceValueNode typeNode => ResolveTypeValue(typeNode),
+        AumlAstStaticMemberValueNode staticMember => ResolveStaticMember(staticMember),
         AumlAstMarkupExtensionNode me => ResolveMarkupExtension(me, targetType),
         AumlAstObjectNode obj => Instantiate(obj),
         AumlAstTextNode text => TryConvert(text.Text, targetType, out var r) ? r : null,
         _ => null,
     };
+
+    // {x:Static Type.Member} in the preview. The transformer has already proved the member exists, so a miss here means
+    // the preview resolved a different type than the build would - worth saying, not swallowing.
+    private object ResolveStaticMember(AumlAstStaticMemberValueNode node)
+    {
+        var owner = ResolveClrType(node.TypeReference);
+        if (owner == null)
+        {
+            _diagnostics.Add($"x:Static type '{node.TypeReference?.GetFullTypeName()}' could not be resolved");
+            return null;
+        }
+
+        var field = owner.GetField(node.MemberName, BindingFlags.Public | BindingFlags.Static);
+        if (field != null)
+        {
+            return field.GetValue(null);
+        }
+
+        var property = owner.GetProperty(node.MemberName, BindingFlags.Public | BindingFlags.Static);
+        if (property != null)
+        {
+            return property.GetValue(null);
+        }
+
+        _diagnostics.Add($"x:Static: '{owner.FullName}' has no static member '{node.MemberName}'");
+        return null;
+    }
 
     private Type ResolveTypeValue(AumlAstTypeReferenceValueNode node)
     {

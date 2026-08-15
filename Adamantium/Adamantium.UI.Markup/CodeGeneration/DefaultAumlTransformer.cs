@@ -396,6 +396,11 @@ public class DefaultAumlTransformer : IAumlTransformer
 
                     // Hand back a node that carries the resolved type
                     return new AumlAstTypeReferenceValueNode(directive.GetLineInfo(), resolvedTypeRef);
+
+                case AumlDirectives.Static:
+                    if (MissingValue(directive, directiveBody)) return directive;
+
+                    return ResolveStaticMember(directive, directiveBody);
                
                 default:
                     if (MissingValue(directive, directiveBody)) return directive;
@@ -407,6 +412,56 @@ public class DefaultAumlTransformer : IAumlTransformer
                         : $"Unknown directive 'x:{directive.Name}'. {directive.GetLineInfo()}");
                     return directive;
             }
+        }
+
+        // A type-valued directive accepts both the plain reference (local:Vm) and the markup-extension form
+        // ({x:Type local:Vm}) - the parser turns the latter into a Type directive whose value is the inner text.
+        string UnwrapTypeText(string text)
+        {
+            var trimmed = text.Trim();
+            if (!trimmed.StartsWith("{")) return trimmed;
+
+            var parsed = MarkupExtensionParser.Parse(new ParserContext(null), trimmed, document.Root.GetLineInfo(),
+                document.NamespaceMappings.ToList());
+            return parsed is AumlAstDirective { Name: AumlDirectives.Type, Value: AumlAstTextNode inner }
+                ? inner.Text.Trim()
+                : trimmed;
+        }
+
+        // {x:Static prefix:Type.Member}: the type is named the way x:Type names one, the member is the last segment. The
+        // member is checked HERE - a name that does not exist is a build error, not a silently empty property.
+        IAumlAstValueNode ResolveStaticMember(AumlAstDirective directive, string body)
+        {
+            var lastDot = body.LastIndexOf('.');
+            if (lastDot <= 0 || lastDot == body.Length - 1)
+            {
+                diagnostics.ReportError(document.FileName,
+                    $"x:Static expects 'Type.Member', got '{body}'. {directive.GetLineInfo()}");
+                return directive;
+            }
+
+            var typeText = body.Substring(0, lastDot);
+            var memberName = body.Substring(lastDot + 1);
+
+            var typeRef = MarkupExtensionParser.ParseTypeName(new ParserContext(null), typeText, directive.GetLineInfo(),
+                document.NamespaceMappings.ToList());
+            var resolvedRef = ProcessTypeReference(typeRef, directive.GetLineInfo());
+            if (resolvedRef is not { IsResolved: true })
+            {
+                diagnostics.ReportError(document.FileName,
+                    $"x:Static type '{typeText}' could not be resolved. {directive.GetLineInfo()}");
+                return directive;
+            }
+
+            var owner = typeResolver.Resolve(resolvedRef.GetFullTypeName());
+            if (owner?.GetMemberByName(memberName) == null)
+            {
+                diagnostics.ReportError(document.FileName,
+                    $"x:Static: '{resolvedRef.GetFullTypeName()}' has no member '{memberName}'. {directive.GetLineInfo()}");
+                return directive;
+            }
+
+            return new AumlAstStaticMemberValueNode(directive.GetLineInfo(), resolvedRef, memberName);
         }
 
         // Every x: name is judged against the registry, so a directive nobody implemented - or one written in the wrong
@@ -548,6 +603,22 @@ public class DefaultAumlTransformer : IAumlTransformer
                         if (directive.Value is AumlAstTextNode textNode)
                         {
                             container.NamedElements.Add(new NamedElement(textNode.Text, directive.ParentNode));
+                        }
+                    }
+                    else if (directive.Name == AumlDirectives.DataType)
+                    {
+                        // Declared, not inferred: the type is what tooling resolves {Binding} paths against inside the
+                        // template. Nothing is generated from it - what IS checked here is that the name resolves, so a
+                        // renamed model does not leave a template silently pointing at nothing.
+                        if (directive.Value is AumlAstTextNode dataTypeNode && !string.IsNullOrWhiteSpace(dataTypeNode.Text))
+                        {
+                            var dataTypeRef = MarkupExtensionParser.ParseTypeName(new ParserContext(null),
+                                UnwrapTypeText(dataTypeNode.Text), directive.GetLineInfo(), document.NamespaceMappings.ToList());
+                            if (ProcessTypeReference(dataTypeRef, directive.GetLineInfo()) is not { IsResolved: true })
+                            {
+                                diagnostics.ReportError(document.FileName,
+                                    $"x:DataType '{dataTypeNode.Text}' could not be resolved. {directive.GetLineInfo()}");
+                            }
                         }
                     }
                     else if (directive.Name == AumlDirectives.ViewModel && directive.ParentNode == document.Root)

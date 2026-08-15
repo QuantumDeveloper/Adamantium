@@ -1,0 +1,130 @@
+<View xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:local="clr-namespace:Adamantium.Game.Sandbox">
+    <!-- The AUML vocabulary, demonstrated rather than described. Every section that HAS a wrong answer shows it beside
+         the right one - a claim with no control arm proves nothing. -->
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel Orientation="Vertical" Margin="24">
+
+            <!-- ============ x:Shared="False" ============ -->
+            <TextBlock Text="x:Shared=&quot;False&quot; — a value built per target, not shared" FontSize="18" Margin="0,0,0,4"/>
+            <TextBlock Opacity="0.7" MarginBottom="12"
+                       Text="A setter writes the SAME object into every element it matches. Right-click both buttons in each pair."/>
+
+            <!-- ItemContainerStyle, not an inline <X.Styles>: a Styles collection applies the style to THAT element and
+                 nothing below it, while a container style is applied to every container the list makes - which is what
+                 "one setter, several targets" needs in order to mean anything. -->
+            <StackPanel Orientation="Horizontal">
+
+                <!-- The WRONG half, kept on purpose: one ContextMenu handed to both rows. A menu points at ONE placement
+                     target, so the two rows fight over it - and the second right-click says so. -->
+                <StackPanel Orientation="Vertical" Margin="0,0,32,0">
+                    <TextBlock Text="Shared (the default)" MarginBottom="6"/>
+                    <ItemsControl ItemsSource="{Binding SharedRows}" Width="220">
+                        <ItemsControl.ItemContainerStyle>
+                            <Style Selector="ContentPresenter">
+                                <Setter Property="ContextMenu">
+                                    <Setter.Value>
+                                        <ContextMenu>
+                                            <MenuItem Header="One menu, shared by both"/>
+                                        </ContextMenu>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ItemsControl.ItemContainerStyle>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Height="34" MarginBottom="6" CornerRadius="4"
+                                        Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                        BorderBrush="{ResourceReference ControlStrokeColorDefault}" BorderThickness="1">
+                                    <TextBlock Text="{Binding}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <!-- The SAME markup plus one directive: each row is handed its own menu. -->
+                <StackPanel Orientation="Vertical">
+                    <TextBlock Text="x:Shared=&quot;False&quot;" MarginBottom="6"/>
+                    <ItemsControl ItemsSource="{Binding OwnRows}" Width="220">
+                        <ItemsControl.ItemContainerStyle>
+                            <Style Selector="ContentPresenter">
+                                <Setter Property="ContextMenu">
+                                    <Setter.Value>
+                                        <ContextMenu x:Shared="False">
+                                            <MenuItem Header="This row's own menu"/>
+                                        </ContextMenu>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ItemsControl.ItemContainerStyle>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Height="34" MarginBottom="6" CornerRadius="4"
+                                        Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                        BorderBrush="{ResourceReference ControlStrokeColorDefault}" BorderThickness="1">
+                                    <TextBlock Text="{Binding}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </StackPanel>
+
+            <TextBlock Opacity="0.7" Margin="0,10,0,0"
+                       Text="Neither menu exists until it is asked for: the card, and the menu's own template, are built on the first right-click."/>
+
+            <!-- ============ {x:Static} ============ -->
+            <TextBlock Text="x:Static — a value read straight out of C#" FontSize="18" Margin="0,32,0,4"/>
+            <TextBlock Opacity="0.7" MarginBottom="12"
+                       Text="The size and the caption below are not stated in markup and not restated as resources - they are read from DemoMetrics."/>
+
+            <Border Width="{x:Static local:DemoMetrics.SwatchWidth}"
+                    Height="{x:Static local:DemoMetrics.SwatchHeight}"
+                    CornerRadius="6"
+                    Background="{ResourceReference CardBackgroundFillColorDefault}"
+                    BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                    BorderThickness="1">
+                <TextBlock Text="{x:Static local:DemoMetrics.Caption}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+
+            <!-- ============ {x:Null} ============ -->
+            <TextBlock Text="x:Null — an explicit nothing" FontSize="18" Margin="0,32,0,4"/>
+            <TextBlock Opacity="0.7" MarginBottom="12"
+                       Text="The theme gives every Border its outline (BorderBrush). Neither box states one: the left keeps what the theme gave, the right says an explicit nothing and loses it."/>
+
+            <StackPanel Orientation="Horizontal">
+                <Border Width="200" Height="56" CornerRadius="6" Margin="0,0,32,0" BorderThickness="2"
+                        Background="{ResourceReference CardBackgroundFillColorDefault}">
+                    <TextBlock Text="outline from the theme" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <Border Width="200" Height="56" CornerRadius="6" BorderThickness="2"
+                        BorderBrush="{x:Null}"
+                        Background="{ResourceReference CardBackgroundFillColorDefault}">
+                    <TextBlock Text="BorderBrush turned off" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+            </StackPanel>
+
+            <!-- ============ x:DataType ============ -->
+            <TextBlock Text="x:DataType — the type a template is written against" FontSize="18" Margin="0,32,0,4"/>
+            <TextBlock Opacity="0.7" MarginBottom="12"
+                       Text="Declared, not inferred. Nothing is generated from it: tooling resolves the bindings inside the template against it, and a name that does not resolve fails the build."/>
+
+            <ItemsControl ItemsSource="{Binding Rows}" Width="{x:Static local:DemoMetrics.RowWidth}"
+                          HorizontalAlignment="Left">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="local:ViewModels.MarkupRow">
+                        <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                BorderThickness="1" CornerRadius="4" Padding="8" MarginBottom="4">
+                            <TextBlock Text="{Binding Title}"/>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+        </StackPanel>
+    </ScrollViewer>
+</View>

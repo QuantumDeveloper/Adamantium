@@ -23,6 +23,7 @@ public partial class GalleryViewModel
         new RangesViewModel(),
         new KeyboardViewModel(),
         new ResourcesViewModel(),
+        new MarkupViewModel(),
         new ScrollBarViewModel(),
         new ListsViewModel(),
         new ShapesViewModel(),
