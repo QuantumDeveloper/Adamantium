@@ -1,4 +1,6 @@
-<View xmlns="http://adamantium/ui"
+<View x:KeepAlive="Required"
+      xmlns="http://adamantium/ui"
+      xmlns:x="http://adamantium/ui/xaml/extensions"
       xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters">
     <!-- DataContext is the InstancingViewModel. A big virtualized grid of star polygons (arbitrary tessellated fill = NOT
          an SDF batch, unlike the Layout tab's rounded rectangles). Every star is authored with the SAME local Points at

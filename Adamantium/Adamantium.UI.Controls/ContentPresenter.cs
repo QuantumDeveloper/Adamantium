@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Adamantium.Graphics.Fonts;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Text;
@@ -19,6 +20,12 @@ public class ContentPresenter : InputUIComponent
     private IUIComponent _currentRoot;
     private TemplateResult _currentTemplateResult;
     private DataTemplate _currentTemplate;   // the template that built _currentRoot, so a recycled container can reuse it
+    // What the current visual was built for: the KEY it waits under in ParkedVisuals while it is away.
+    private object _builtFor;
+
+    // Set when the outgoing visual is one to keep: it still slides out, but is parked instead of destroyed at the end.
+    private object _outgoingParkedKey;
+
     private IUIComponent _outgoingRoot;
     private TemplateResult _outgoingTemplateResult;
     private bool _isContentChanged;
@@ -145,20 +152,28 @@ public class ContentPresenter : InputUIComponent
         var animate = ContentTransition != ContentTransition.None && newContent != null
                       && !Design.IsDesignMode;
 
+        // A view that asked to be kept is PARKED instead of destroyed - it goes on waiting by reference, holding what was
+        // built for it (see ParkedSubtree). Which one it is has to be decided here, while the content it was built for is
+        // still known.
+        var parkedKey = _currentRoot != null && ParkedVisuals.ShouldKeep(_currentRoot) ? _builtFor : null;
+
         if (animate)
         {
             // Keep the current content (if any) as outgoing; it slides out and is removed when its animation completes.
             _outgoingRoot = _currentRoot;
             _outgoingTemplateResult = _currentTemplateResult;
+            _outgoingParkedKey = parkedKey;
         }
         else if (_currentRoot != null)
         {
-            Release(_currentRoot, _currentTemplateResult);
+            if (parkedKey != null) ParkCurrent(parkedKey, _currentRoot, _currentTemplateResult, _currentTemplate);
+            else Release(_currentRoot, _currentTemplateResult);
         }
 
         _currentRoot = null;
         _currentTemplateResult = null;
         _currentTemplate = null;
+        _builtFor = null;
 
         if (newContent != null)
             BuildCurrent(newContent);
@@ -174,6 +189,30 @@ public class ContentPresenter : InputUIComponent
 
     private void BuildCurrent(object newContent)
     {
+        // Coming back to a view that was parked: put it back as it was. Not building it again IS the point - the rebuild
+        // is the pause x:KeepAlive exists to avoid.
+        if (ParkedVisuals.TryTake(newContent, this, out var parkedRoot, out var parkedBuilt, out var parkedTemplate, out var parkedHostSize))
+        {
+            // Came home to a different window or after a theme swap: drop the mark first, so the attach below revalidates
+            // every node the ordinary way. Same world - the mark stays and the attach skips what it would recompute.
+            if (!ParkedVisuals.IsUnchanged) ParkedSubtree.Revalidate(parkedRoot);
+            _currentRoot = parkedRoot;
+            _currentTemplateResult = parkedBuilt;
+            _currentTemplate = parkedTemplate;
+            _builtFor = newContent;
+
+            AddVisualChild(_currentRoot);
+            AddLogicalChild(_currentRoot);
+            // Measure it again only if it comes back into a DIFFERENT sized host than it left. Same size means the layout
+            // it kept is still the right one, and re-measuring a page of a thousand rows to arrive at what it already has
+            // is the whole remaining cost of a return.
+            ParkedSubtree.Unpark(_currentRoot, remeasure: parkedHostSize != _lastArrangeSize);
+            SetContentContext(newContent);
+            return;
+        }
+
+        _builtFor = newContent;
+
         if (newContent is IUIComponent iuiComponent)
         {
             // Host the content element itself (the SAME instance the author built and bound), not a template result,
@@ -213,6 +252,7 @@ public class ContentPresenter : InputUIComponent
             AddLogicalChild(_currentRoot);
             SetContentContext(newContent);
         }
+
     }
 
     private void RemoveOutgoing()
@@ -220,9 +260,21 @@ public class ContentPresenter : InputUIComponent
         if (_outgoingRoot == null)
             return;
 
-        Release(_outgoingRoot, _outgoingTemplateResult);
+        if (_outgoingParkedKey != null) ParkCurrent(_outgoingParkedKey, _outgoingRoot, _outgoingTemplateResult, template: null);
+        else Release(_outgoingRoot, _outgoingTemplateResult);
+
         _outgoingRoot = null;
         _outgoingTemplateResult = null;
+        _outgoingParkedKey = null;
+    }
+
+    /// <summary>Puts a visual aside instead of destroying it. The store parks it (so the renderer keeps what it built);
+    /// taking it out of the tree is this presenter's job, because only it knows what removal means here.</summary>
+    private void ParkCurrent(object key, IUIComponent root, TemplateResult built, DataTemplate template)
+    {
+        ParkedVisuals.Keep(key, root, built, template, _lastArrangeSize);
+        RemoveVisualChild(root);
+        RemoveLogicalChild(root);
     }
 
     /// <summary>
@@ -367,7 +419,11 @@ public class ContentPresenter : InputUIComponent
     {
         // Mirror the measure skip: a data-only reuse at the same arranged size leaves the subtree positioned as-is, so
         // don't re-walk it. A rebuilt/resized child was re-measured (arrange-invalid) and is handled by base below.
-        if (!_lastContentRebuilt && _currentRoot is IMeasurableComponent { IsArrangeValid: true } && finalSize == _lastArrangeSize)
+        // A PENDING TRANSITION is not "nothing changed", though: a kept view comes back arrange-VALID at the same size
+        // (it kept the arrange it had when it was parked), so this skip swallowed its entrance - and it stayed wherever
+        // the slide-out had left it, off screen. That is what made a kept view come back to an empty page.
+        if (!_transitionPending && !_lastContentRebuilt
+            && _currentRoot is IMeasurableComponent { IsArrangeValid: true } && finalSize == _lastArrangeSize)
             return finalSize;
 
         _lastArrangeSize = finalSize;

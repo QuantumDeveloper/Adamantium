@@ -293,8 +293,10 @@ public partial class RenderCache
             var known = HoldsUnits(c) || HasRank(c);
             if (known && _removedSet.Add(c))
             {
-                if (c.IsAttachedToVisualTree) _undrawnList.Add(c);   // hidden: keep the units
-                else _removedList.Add(c);                            // detached: free them
+                // Hidden keeps its units; so does PARKED - out of the tree on purpose and coming back, which is the whole
+                // point of the mark. Only an unmarked detach means gone.
+                if (c.IsAttachedToVisualTree || c.IsParked) _undrawnList.Add(c);
+                else _removedList.Add(c);
             }
 
             // Descend regardless of the child's own visibility: the whole subtree stops being drawn with its root.

@@ -21,6 +21,7 @@ public static class AumlDirectives
     public const string Shared = "Shared";
     public const string Static = "Static";
     public const string DataType = "DataType";
+    public const string KeepAlive = "KeepAlive";
 
     /// <summary>Every directive with the description tooling shows in completion and hover.</summary>
     public static readonly IReadOnlyList<AumlDirectiveInfo> All =
@@ -32,7 +33,8 @@ public static class AumlDirectives
         new AumlDirectiveInfo(ViewModel, "View-model type for this view (prefix:Type). At runtime the framework resolves an instance from the DI container and assigns it as DataContext; design-time tooling resolves {Binding} paths against this type.", isTypeReference: true),
         new AumlDirectiveInfo(CreateInDesignTime, "Design-time only: \"True\" makes the preview instantiate x:ViewModel (parameterless ctor) so {Binding}s show real sample data. Off by default - the WPF d:IsDesignTimeCreatable behaviour."),
         new AumlDirectiveInfo(Null, "An explicit null value: Background=\"{x:Null}\".", usage: AumlDirectiveUsage.Value),
-        new AumlDirectiveInfo(DataType, "The type of the item a DataTemplate is written against (prefix:Type). Declared, not inferred: tooling resolves {Binding} paths inside the template against it, the way x:ViewModel does for a view. The type must exist - a name that does not resolve fails the build.", isTypeReference: true),
+        new AumlDirectiveInfo(KeepAlive, "What this view asks of whoever navigates away from it: Disabled (default - rebuilt on every visit), Enabled (kept, but evictable) or Required (kept, never evicted). Metadata only - the view parks nothing itself."),
+        new AumlDirectiveInfo(DataType,"The type of the item a DataTemplate is written against (prefix:Type). Declared, not inferred: tooling resolves {Binding} paths inside the template against it, the way x:ViewModel does for a view. The type must exist - a name that does not resolve fails the build.", isTypeReference: true),
         new AumlDirectiveInfo(Static,"The value of a static field or property: Width=\"{x:Static local:Metrics.RailWidth}\". Read at the point of use, so the declaration stays in one place instead of being restated as a resource.", isTypeReference: true, usage: AumlDirectiveUsage.Value),
         new AumlDirectiveInfo(Shared,"\"False\" builds this value PER TARGET instead of sharing one instance between every element the setter matches - what a ContextMenu, a Popup or a Transform needs, since each belongs to the element it sits on."),
     ];

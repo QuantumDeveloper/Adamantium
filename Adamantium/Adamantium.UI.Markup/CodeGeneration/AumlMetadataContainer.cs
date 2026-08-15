@@ -22,6 +22,9 @@ public class AumlMetadataContainer
     /// generated InitializeComponent resolves it from the DI container and assigns it to DataContext.</summary>
     public string RootViewModelTypeName { get; set; }
 
+    /// <summary>The <c>x:KeepAlive</c> value declared on the root, as the enum member name; null when unstated.</summary>
+    public string RootKeepAlive { get; set; }
+
     public List<string> Usings { get; }
 
     public Dictionary<IAumlAstNode, string> NamedElementsMap { get; set; }

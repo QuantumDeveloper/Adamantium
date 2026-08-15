@@ -347,10 +347,11 @@ public partial class RenderCache
         }
 
         // Mirror the applier's ReconcileDetachedControls: it frees the units of controls no longer in the tree, so the
-        // recorder's own "who holds units" view must drop them too (this walk never visits them).
+        // recorder's own "who holds units" view must drop them too (this walk never visits them). Parked controls are
+        // kept for the same reason the applier keeps them - they are coming back.
         _staleUnitIds.Clear();
         foreach (var (id, entry) in _recordedUnits)
-            if (!entry.Component.IsAttachedToVisualTree) _staleUnitIds.Add(id);
+            if (!entry.Component.IsAttachedToVisualTree && !entry.Component.IsParked) _staleUnitIds.Add(id);
         foreach (var id in _staleUnitIds) _recordedUnits.Remove(id);
 
     }
@@ -496,7 +497,10 @@ public partial class RenderCache
     /// <summary>Frees the cached units of any control no longer attached to the visual tree. Must run during the build
     /// (EndDraw): disposal is deferred and drained M frames later, so calling it earlier (from the detach event during
     /// Update) would dispose a unit still in flight. Attachment, not visibility, is the keep signal - hidden-but-attached
-    /// controls retain their resources.</summary>
+    /// controls retain their resources.
+    /// <para>A PARKED control is the third case: out of the tree, but coming back. Freeing its units would throw away
+    /// exactly what parking exists to keep - rebuilding them is the pause a kept-alive view is meant to avoid - so the
+    /// keep signal is "attached OR parked".</para></summary>
     private void ReconcileDetachedControls()
     {
         List<Guid> detached = null;
@@ -504,7 +508,8 @@ public partial class RenderCache
         {
             var units = pair.Value.Units;
             if (units.Count == 0
-                || units[0].Component.IsAttachedToVisualTree) continue;
+                || units[0].Component.IsAttachedToVisualTree
+                || units[0].Component.IsParked) continue;
             (detached ??= new List<Guid>()).Add(pair.Key);
         }
 

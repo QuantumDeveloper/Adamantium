@@ -223,6 +223,15 @@ public class AumlSourceGenerator : IAumlSourceGenerator
             textGenerator.NewLine();
         }
 
+        if (!string.IsNullOrEmpty(container.RootKeepAlive))
+        {
+            // x:KeepAlive: what the view asks of whoever navigates away from it. Metadata only - the view parks nothing
+            // itself.
+            textGenerator.WriteLine("public override global::Adamantium.UI.Core.NavigationCacheMode KeepAlive => " +
+                $"global::Adamantium.UI.Core.NavigationCacheMode.{container.RootKeepAlive};");
+            textGenerator.NewLine();
+        }
+
         textGenerator.WriteLine($"protected override void InitializeComponent()");
         textGenerator.WriteOpenBraceAndIndent();
 

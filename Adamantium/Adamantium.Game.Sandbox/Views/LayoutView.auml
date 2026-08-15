@@ -1,4 +1,5 @@
-<View xmlns="http://adamantium/ui"
+<View x:KeepAlive="Required"
+      xmlns="http://adamantium/ui"
       xmlns:x="http://adamantium/ui/xaml/extensions"
       xmlns:conv="clr-namespace:Adamantium.Game.Sandbox.Converters"
       xmlns:app="clr-namespace:Adamantium.Game.Sandbox">

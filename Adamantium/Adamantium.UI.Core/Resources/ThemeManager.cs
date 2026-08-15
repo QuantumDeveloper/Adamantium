@@ -43,10 +43,15 @@ public class ThemeManager : IThemeManager
     private bool _cascadeSettled;  // has every swapping window's layout drained?
     private ITheme _pendingOld;    // outgoing theme whose palette a deferred swap must still deactivate
 
+    /// <summary>Bumped on every theme swap. A cheap way to ask "did the theme change while I was away?" - a parked view
+    /// that comes back at the same version needs none of the revalidation a returning view otherwise does.</summary>
+    public static int Version { get; private set; }
+
     public void SetTheme(ITheme theme)
     {
         if (CurrentTheme == theme) return;
 
+        Version++;
         var oldTheme = CurrentTheme;
         CurrentTheme = theme;
 

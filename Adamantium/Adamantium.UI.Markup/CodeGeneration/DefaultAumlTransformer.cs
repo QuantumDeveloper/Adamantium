@@ -605,6 +605,21 @@ public class DefaultAumlTransformer : IAumlTransformer
                             container.NamedElements.Add(new NamedElement(textNode.Text, directive.ParentNode));
                         }
                     }
+                    else if (directive.Name == AumlDirectives.KeepAlive && directive.ParentNode == document.Root)
+                    {
+                        // Only one of three answers means anything, so a fourth is a build error rather than a value
+                        // silently read as the default.
+                        var mode = (directive.Value as AumlAstTextNode)?.Text?.Trim();
+                        if (mode is "Disabled" or "Enabled" or "Required")
+                        {
+                            container.RootKeepAlive = mode;
+                        }
+                        else
+                        {
+                            diagnostics.ReportError(document.FileName,
+                                $"x:KeepAlive expects Disabled, Enabled or Required, got '{mode}'. {directive.GetLineInfo()}");
+                        }
+                    }
                     else if (directive.Name == AumlDirectives.DataType)
                     {
                         // Declared, not inferred: the type is what tooling resolves {Binding} paths against inside the

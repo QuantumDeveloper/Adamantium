@@ -6,6 +6,10 @@ namespace Adamantium.UI.Core;
 
 public interface IFundamentalUIComponent : IAdamantiumComponent, IDispatcherComponent, IName
 {
+    /// <summary>What this view asked of whoever navigates away from it (<c>x:KeepAlive</c>). Metadata: the view states
+    /// what it wants, the navigator decides.</summary>
+    public NavigationCacheMode KeepAlive { get; }
+
     public String Id { get; set; }
     public Classes ClassNames { get; }
     public StylesCollection Styles { get; }

@@ -70,6 +70,10 @@ public interface IUIComponent : IFundamentalUIComponent
 
     bool IsAttachedToVisualTree { get; }
 
+    /// <summary>True while this subtree is PARKED: deliberately out of the tree, but kept - so what the renderer cached
+    /// for it must survive. Detachment alone means "gone"; parking is what tells the difference.</summary>
+    bool IsParked { get; }
+
     /// <summary>A render MOTION NODE: this element's subtree translates as a unit (a transform-only-scrolled panel).
     /// The render cache bakes its descendants' batched instances in THIS node's space and gives them its transform-table
     /// slot, so moving the node costs one matrix write instead of re-baking the subtree (the O(1)-scroll path). Set by
