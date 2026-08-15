@@ -198,8 +198,7 @@ public partial class RenderCache
             var fi = _instancedFill.Flush(fullScissor, _projectionMatrix);
             if (_recording && fi >= 0)
             {
-                _ops.Add(new RenderOp { Kind = RenderOpKind.InstancedFlush, SegIndex = fi });
-                _opsHaveInstancedFlush = true;
+                _ops.Add(new RenderOp { Kind = RenderOpKind.InstancedFlush, SegIndex = fi, Order = _recordOrder });
             }
         }
 
@@ -225,7 +224,7 @@ public partial class RenderCache
     private void RecordSegment(byte batch, int segIndex)
     {
         if (_recording && segIndex >= 0)
-            _ops.Add(new RenderOp { Kind = RenderOpKind.Segment, Batch = batch, SegIndex = segIndex });
+            _ops.Add(new RenderOp { Kind = RenderOpKind.Segment, Batch = batch, SegIndex = segIndex, Order = _recordOrder });
     }
 
     private static bool ScissorEquals(Rect2D a, Rect2D b)

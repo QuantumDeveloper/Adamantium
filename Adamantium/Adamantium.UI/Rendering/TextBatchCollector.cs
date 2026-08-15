@@ -74,15 +74,42 @@ internal sealed class TextBatchCollector : BatchCollector<GlyphItem>
     // buffer overflow this frame -> the caller renders that block via the per-block direct draw. Mirrors RectBatchCollector.
     public bool TryAdd(TextRenderComponent tc, Matrix4x4F relWorld, int transformSlot, Rect2D scissor, FontAtlas atlas, Rect logicalBounds)
     {
-        var run = tc.GlyphRun;                        // FROZEN snapshot - the applier never reads the live TextLayout here
-        var n = run.Count;
+        var n = tc.GlyphRun.Count;
 
         EnsureCpuCapacity(Count + n);
         if (Count + n > GpuCapacity) return false;   // won't fit this frame's GPU buffer -> direct
+        if (!Pack(tc, relWorld, transformSlot, Count)) return false;
 
+        Count += n;
+        _atlas = atlas;
+        _fontRenderer = tc.FontRenderer;
+        MarkPending(scissor, logicalBounds);
+        return true;
+    }
+
+    /// <summary>Re-bake an already-flushed block into the run of slots it ALREADY occupies - <see cref="UpdateSlot"/> for
+    /// a unit that owns several slots. The recorded segment still spans this run, so the frame can be replayed instead of
+    /// re-walked: a counter whose glyph count holds steady costs one range upload, not a walk of the scene. The caller
+    /// checks the count and atlas still match (RenderCache.IsSlotPatchable); false here means the block no longer packs
+    /// at all (a rotated relative transform) and the walk must take it.</summary>
+    public bool UpdateRun(IGraphicsDevice device, int first, TextRenderComponent tc, Matrix4x4F relWorld, int transformSlot)
+    {
+        PrepareRetainedWrite(device);
+        if (!Pack(tc, relWorld, transformSlot, first)) return false;
+        UploadRange(first, tc.GlyphRun.Count);
+        return true;
+    }
+
+    // Write one block's glyphs at [at, at+run.Count): each glyph's LOCAL rect folded by the node-RELATIVE scale/translate
+    // (the axis-aligned rect can hold that), its transform SLOT, its atlas UV, and the block's foreground as a per-instance
+    // colour. NO world matrix is applied here - the glyph VS applies the node matrix (from the transform table at the slot)
+    // on the GPU. False (no write) for a rotated/sheared RELATIVE transform. Mirrors RectBatchCollector's bake.
+    private bool Pack(TextRenderComponent tc, Matrix4x4F relWorld, int transformSlot, int at)
+    {
         const float eps = 1e-4f;
-        if (Math.Abs(relWorld.M12) > eps || Math.Abs(relWorld.M21) > eps) return false;   // rotated relative xform -> direct
+        if (Math.Abs(relWorld.M12) > eps || Math.Abs(relWorld.M21) > eps) return false;
 
+        var run = tc.GlyphRun;                        // FROZEN snapshot - the applier never reads the live TextLayout here
         var area = tc.RenderingParameters.TextArea;
         var color = ((SolidColorBrush)tc.Foreground).Color.ToVector4();
         color.W *= (float)tc.RenderData.Opacity;      // fold the element's opacity into the glyph alpha
@@ -90,10 +117,10 @@ internal sealed class TextBatchCollector : BatchCollector<GlyphItem>
         float sx = relWorld.M11, sy = relWorld.M22, tx = relWorld.M41, ty = relWorld.M42;
         float ax = (float)area.X, ay = (float)area.Y;
         var glyphs = run.Glyphs;
-        for (var i = 0; i < n; i++)
+        for (var i = 0; i < run.Count; i++)
         {
             var d = glyphs[i].ArrangeRect;   // local x, y, w, h
-            Items[Count++] = new GlyphItem
+            Items[at + i] = new GlyphItem
             {
                 LocalRect = new Vector4F((d.X + ax) * sx + tx, (d.Y + ay) * sy + ty, d.Z * sx, d.W * sy),
                 Source = glyphs[i].Source,
@@ -102,9 +129,6 @@ internal sealed class TextBatchCollector : BatchCollector<GlyphItem>
             };
         }
 
-        _atlas = atlas;
-        _fontRenderer = tc.FontRenderer;
-        MarkPending(scissor, logicalBounds);
         return true;
     }
 

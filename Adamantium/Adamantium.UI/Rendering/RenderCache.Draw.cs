@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
@@ -84,8 +85,15 @@ public partial class RenderCache
         public IRenderUnit Unit;  // Unit
         public byte Batch;        // Segment: which collector (0 rect, 1 ellipse, 2 text, 3 gradient-rect, 4 gradient-ellipse, 5 pattern, 6 fractal, 7 textured)
         public int SegIndex;      // Segment: index into that collector's recorded segment list; InstancedFlush: flush index
+
+        // Paint rank of the group being recorded when this op was emitted. The stream is written in rank order, so a
+        // control that starts drawing later knows exactly where its op belongs - by its OWN rank, not by guessing from
+        // whatever happens to sit next to it. Guessing is what made an unrelated diagnostics label in the corner decide
+        // whether hovering a tile cost 0.9 ms or a full walk.
+        public long Order;
     }
     private readonly List<RenderOp> _ops = new();
+    private long _recordOrder;   // paint rank of the group currently being recorded - stamped onto every op it emits
 
     // The transform-table version the op stream was recorded against, and whether it still holds. A recorded stream bakes
     // THREE things against the transforms of its own frame: each Scissor op (a world-space rect), each per-unit draw (its
@@ -105,9 +113,6 @@ public partial class RenderCache
     private bool _recording;       // this frame runs the walk and is appending ops
     private bool _opsRecorded;     // _ops holds a complete frame from a prior walk
     private bool _opsReplayable;   // the recorded stream faithfully reproduces the frame (currently always true - see above)
-    private bool _opsHaveInstancedFlush;   // the recorded stream contains an instanced-fill flush op - a splice that INSERTS a
-                                           // rect segment must yield to the full walk (it can't place the segment relative to
-                                           // that flush, so an appended highlight could draw OVER instanced geometry)
 
     private readonly List<Compositor.Entry> _compositedBuf = new();   // this thread's view of the composited set (reused)
     private readonly Dictionary<IUIComponent, (LayoutSnapshot Snap, Matrix4x4F ParentWorld)> _compositedFallback = new();   // keep animating across a settling swap's snapshot re-capture
@@ -115,6 +120,8 @@ public partial class RenderCache
 
     private const int MaxRetainedOps = 256;   // op stream past this -> a splice yields to a full walk that recompacts
     private readonly List<GroupPatch> _patchBuf = new();   // TrySplicedPatch: staged per-group patches (validated before mutation)
+    private readonly List<int> _patchLayers = new();     // the LAYERS those patches land in - each re-issued once, whole
+    private readonly List<RectItem> _rebakeBuf = new();
 
     // Picks the transform-table copy this frame writes and draws from, and hands its address to every collector that
     // exists. Called at the very top of Render AND again once the walk has (re)created the collectors, because the
@@ -181,7 +188,7 @@ public partial class RenderCache
     {
         // TEMP trace: one array write per frame, dumped from memory by the overlay.
         var traceStart = Core.Diagnostics.FrameTrace.Enabled ? System.Diagnostics.Stopwatch.GetTimestamp() : 0L;
-        _traceReplayed = false;
+        LastFrameReplayed = false;
         _traceWhy = 0;
         try
         {
@@ -199,13 +206,29 @@ public partial class RenderCache
 
                 Core.Diagnostics.FrameTrace.Add(
                     System.Diagnostics.Stopwatch.GetElapsedTime(traceStart).TotalMilliseconds,
-                    (byte)LastBuildKind, _traceReplayed, clones, _traceWhy);
+                    (byte)LastBuildKind, LastFrameReplayed, clones, _traceWhy, _traceCacheId, _traceComposited);
             }
         }
     }
 
-    private bool _traceReplayed;
+    /// <summary>Did the last frame REPLAY the recorded op stream (patching only what changed) instead of walking the tree?
+    /// A walk is O(scene) and a replay is O(dirty). Tests assert it, so a regression to "one dirty element re-draws
+    /// everything" is caught as a failure rather than as a slower frame nobody notices.</summary>
+    public bool LastFrameReplayed { get; private set; }
+
+    /// <summary>Why the last frame WALKED instead of patching: 0 none, 1 nothing recorded, 2 stream unusable, 3 transform
+    /// dirty, 4 layout changed since the record, 5 the splice refused, 6 the slot patch refused. A walk is O(scene) where a
+    /// patch is O(changed), so every non-zero answer here is a frame that cost the whole scene - and the reason has to be
+    /// askable from a test, not only from a live trace.</summary>
+    public byte LastWalkReason => _traceWhy;
+
     private byte _traceWhy;
+
+    // TEMP trace: several caches (one per window, plus each window's adorner layer) write into one ring, so a frame has to
+    // say whose it is - otherwise a quiet cache's cheap frames and a busy one's expensive frames read as one bimodal blur.
+    private static int _traceNextCacheId;
+    private readonly int _traceCacheId = System.Threading.Interlocked.Increment(ref _traceNextCacheId);
+    private int _traceComposited;
 
     private void RenderCore(IGraphicsDevice device, Rect2D fullScissor)
     {
@@ -222,7 +245,7 @@ public partial class RenderCache
         // still hold its bytes). Only a fully-Clean build qualifies; a Partial/Full re-walks and re-records.
         if (device != null && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Clean && OpsMatchTransforms)
         {
-            _traceReplayed = true;
+            LastFrameReplayed = true;
             ExecuteOps(device, fullScissor);
             return;
         }
@@ -233,7 +256,7 @@ public partial class RenderCache
         // while per-unit draws follow the new transform (the "outline runs ahead of its fill" tear) -> fall through to the walk.
         if (device != null && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Partial
             && !LastBuildTransformDirty && OpsMatchTransforms && !_partialSpliced && _rectBatch != null && TryPartialReplay(device, fullScissor))
-        { _traceReplayed = true; return; }
+        { LastFrameReplayed = true; return; }
 
         // SPLICED partial patch: a dirty control's unit COUNT changed (hover background 0<->1, a live chart re-recording a
         // different number of segments). Its group re-rendered in place; here the retained BATCH is patched by segment
@@ -241,7 +264,7 @@ public partial class RenderCache
         // paint position) then replayed. O(dirty groups). Falls back to the full walk on anything not yet patchable.
         if (device != null && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Partial
             && !LastBuildTransformDirty && OpsMatchTransforms && _partialSpliced && _rectBatch != null && TrySplicedPatch(device, fullScissor))
-        { _traceReplayed = true; return; }
+        { LastFrameReplayed = true; return; }
 
         // TEMP trace: WHY this frame is walking instead of patching - the walk is O(scene) and the patch is O(dirty), so
         // every one of these is a 43 ms frame among 0.12 ms ones.
@@ -262,9 +285,9 @@ public partial class RenderCache
         {
             _ops.Clear(); 
             _opsReplayable = true; 
-            _opsHaveInstancedFlush = false; 
-            _rectSlotByUnit.Clear(); 
-            _sdfSlotByUnit.Clear(); 
+            _rectSlotByUnit.Clear();
+            _sdfSlotByUnit.Clear();
+            _textRunByUnit.Clear();
             _unitsByBrush.Clear(); 
             _walkGroup = null; 
             _walkVersion++;
@@ -357,6 +380,7 @@ public partial class RenderCache
             if (_recording && !ReferenceEquals(group, _walkGroup))
             {
                 _walkGroup = group;
+                _recordOrder = group.Order;
                 group.RectRuns.Clear();
                 group.PatchableRectOnly = true;
                 group.WalkVersion = _walkVersion;
@@ -674,9 +698,15 @@ public partial class RenderCache
                 // element. Folded here because this batch takes the COMPONENT, which cannot reach the payload; the
                 // per-unit path composes the same value through Update.
                 var textBake = tru.Place(ResolveBake(device, unit.Component, wt, out var slot4Text));
+                var textFirst = _textBatch.RetainedCount;
                 if (_textBatch.TryAdd(tc, textBake, slot4Text, scissor, atlas, LogicalBounds(unit.Component, wt)))
                 {
-                    if (_recording) group.PatchableRectOnly = false;   // text is a separate collector, not rect-splice-patchable
+                    if (_recording)
+                    {
+                        group.PatchableRectOnly = false;   // text is a separate collector, not rect-splice-patchable...
+                        // ...but SLOT-patchable: remember the run so a later re-render of the same glyph count patches it.
+                        _textRunByUnit[unit] = (textFirst, _textBatch.RetainedCount - textFirst, atlas);
+                    }
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;   // baked into the batch - drawn at the next flush (node-aware: no MarkNodeNotAware)
@@ -831,7 +861,7 @@ public partial class RenderCache
 
             if (_recording) { group.PatchableRectOnly = false; MarkNodeNotAware(unit.Component); }   // per-unit draw: world-baked RenderData
             unit.Render();
-            if (_recording) _ops.Add(new RenderOp { Kind = RenderOpKind.Unit, Unit = unit });
+            if (_recording) _ops.Add(new RenderOp { Kind = RenderOpKind.Unit, Unit = unit, Order = _recordOrder });
             }
 
             // End of a clone run's subtree: rewind to its first group under the next matrix, or leave the run.
@@ -939,12 +969,15 @@ public partial class RenderCache
     // (see Compositor). Recompose ALL entries (Tick), then apply each by its channel.
     private void ApplyCompositedAnimations(IGraphicsDevice device)
     {
+        _traceComposited = 0;
         if (device == null || _transformTable == null) return;
         if (!Compositor.Tick(_compositedBuf))   // recomposes matrices AND republishes paint snapshots
         {
             if (_compositedOwners.Count > 0) _compositedOwners.Clear();
             return;
         }
+
+        _traceComposited = _compositedBuf.Count;
 
         _compositedOwners.Clear();
         foreach (var entry in _compositedBuf)
@@ -1012,7 +1045,7 @@ public partial class RenderCache
 
     private void RecordScissor(Rect2D scissor)
     {
-        if (_recording) _ops.Add(new RenderOp { Kind = RenderOpKind.Scissor, Scissor = scissor });
+        if (_recording) _ops.Add(new RenderOp { Kind = RenderOpKind.Scissor, Scissor = scissor, Order = _recordOrder });
     }
 
 
@@ -1054,9 +1087,16 @@ public partial class RenderCache
                     return false;   // became non-bakeable (rotated); the full walk re-bakes everything anyway
             }
         }
+        AcceptPatchedTransforms();
         ExecuteOps(device, fullScissor);
         return true;
     }
+
+    // A patch WRITES node matrices - that is how a scrolled or re-baked element moves without re-recording. The op stream
+    // is checked against the table version to catch transforms that changed UNDER it, but the patch just validated the ones
+    // it wrote (RefreshMovedNodes proves the moved subtrees are node-aware), so those must not count as a mismatch. Left
+    // counting, the first patch made every following frame walk - one hover cost every other frame the whole scene.
+    private void AcceptPatchedTransforms() => _opsMatrixVersion = _transformTable?.MatrixVersion ?? 0;
 
     // Does this unit's GPU data live in ONE retained SDF-batch slot we can rewrite in place? The whole precondition for
     // repainting without re-walking. Anything else (text, per-unit geometry, an instanced fill) keeps its bytes elsewhere.
@@ -1069,6 +1109,15 @@ public partial class RenderCache
                 return _gradientRectBatch.CanBatch(rru.RectPayload);
             return false;
         }
+
+        // A text block holds a RUN of glyph slots. Patchable only while the run still DESCRIBES it: the same number of
+        // glyphs (the run is a fixed span of the retained buffer) and the same atlas (the recorded segment binds one).
+        // A counter ticking 600 -> 598 qualifies; text that grew or shrank does not, and takes the walk.
+        if (u is TextRenderUnit tru && _textRunByUnit.TryGetValue(u, out var run))
+            return tru.TextComponent is { } tc
+                && _textBatch.CanBatch(tc, out var atlas)
+                && atlas == run.Atlas
+                && tc.GlyphRun.Count == run.Count;
 
         if (u is EllipseRenderUnit eru && _sdfSlotByUnit.TryGetValue(u, out var e))
             return e.Kind == SdfSlotKind.Ellipse
@@ -1095,6 +1144,12 @@ public partial class RenderCache
             return true;
         }
 
+        if (u is TextRenderUnit tru)
+        {
+            // The block's own placement rides on top of the bake, exactly as the recording walk composed it.
+            return _textBatch.UpdateRun(device, _textRunByUnit[u].First, tru.TextComponent, tru.Place(bakeWorld), transformSlot);
+        }
+
         var eru = (EllipseRenderUnit)u;
         var entry = _sdfSlotByUnit[u];
         if (entry.Kind == SdfSlotKind.Ellipse)
@@ -1116,22 +1171,24 @@ public partial class RenderCache
         public RectItem[] Items;      // re-baked instances of the group's (non-culled) units, in unit order
         public Rect2D Scissor;        // the group's clip (all units of one component share it)
         public bool InPlace;          // count-stable recolor -> per-slot UpdateSlot, no surgery
+        public int Layer;             // the layer this group's items belong to, resolved ONCE before anything is mutated
     }
 
-    // Draw a SPLICED partial by per-group batch-segment surgery + op-stream splice, then replay - the O(dirty-control) path
-    // for unit-count changes (hover 0<->1 backgrounds, a live chart). Requirements per dirty group (else return false
-    // BEFORE mutating anything -> full walk): every unit rect-batchable NOW; a group with retained runs must have been
-    // rect-only on the last recording walk (its old draws are then fully described by RectRuns). A splice APPENDS the
-    // re-baked group at the arena's end and INSERTS segment ops, neither reclaimed until a full walk resets Count/_ops -
-    // so a sustained burst grows the arena + op stream unbounded (measured ops 30 -> 1300+), slow and increasingly fragile.
-    // Cap the op stream: past MaxRetainedOps the splice yields to a full walk (its fallback), which recompacts.
+    // Draw a partial whose dirty controls changed their unit COUNT (a hover backdrop appearing, a live chart) by editing
+    // the LAYER each belongs to, then replaying - O(dirty layer) instead of O(scene). A layer is one recorded batch run
+    // drawn by one op; the edit happens inside it and the op is left where it stands, so paint order relative to text,
+    // per-unit draws and instanced geometry holds by construction. A control that has no run of its own gets its own
+    // layer, placed by its paint RANK - never by what happens to sit next to it (see PlaceNewSegment).
+    // Requirements per dirty group (checked BEFORE anything is mutated -> full walk): every unit rect-batchable NOW; a
+    // group described by the last walk must have been rect-only; its clip must be the layer's. Re-baked runs are appended
+    // and not reclaimed until a full walk resets Count, so a sustained burst still yields to the walk on a full arena.
     private bool TrySplicedPatch(IGraphicsDevice device, Rect2D fullScissor)
     {
         // Moved motion nodes first (same as TryPartialReplay): rewrite their matrices, bail on non-aware content.
-        if (!RefreshMovedNodes(device)) return false;
+        if (!RefreshMovedNodes(device)) return SpliceRefused("movedNode");
 
         // Op stream grown too long from accumulated splices -> recompact with a full walk before it mis-replays.
-        if (_ops.Count > MaxRetainedOps) return false;
+        if (_ops.Count > MaxRetainedOps) return SpliceRefused("opsTooLong");
 
         _opacityChain.Clear();   // recompose from the (possibly re-frozen) snapshot, as in TryPartialReplay
 
@@ -1153,14 +1210,14 @@ public partial class RenderCache
             foreach (var r in group.RectRuns) runTotal += r.Count;
             // A group DESCRIBED by the last walk must have been rect-only - else it also drew per-unit/text/instanced content
             // whose recorded ops we can't excise (stale Unit ops would even replay disposed units).
-            if (walked && !group.PatchableRectOnly) return false;
+            if (walked && !group.PatchableRectOnly) return SpliceRefused("notRectOnly");
 
             var items = new List<RectItem>(group.Units.Count);
             var scissor = fullScissor;
             var haveScissor = false;
             foreach (var u in group.Units)
             {
-                if (u is not RectangleRenderUnit rru || !_rectBatch.CanBatch(rru.RectPayload)) return false;
+                if (u is not RectangleRenderUnit rru || !_rectBatch.CanBatch(rru.RectPayload)) return SpliceRefused("notARect");
                 u.SetEffectiveOpacity(EffectiveOpacity(u.Component));   // a splice may ride an opacity cascade too
                 var wt = World(u.Component);
                 if (!haveScissor)
@@ -1170,7 +1227,7 @@ public partial class RenderCache
                     if (cull) break;   // whole component off-clip: it contributes no items (units share the component)
                 }
                 var bakeWorld = ResolveBake(device, u.Component, wt, out var slot);
-                if (!RectBatchCollector.BakeItem(rru.RectPayload, bakeWorld, rru.FillOpacity, slot, out var item)) return false;
+                if (!RectBatchCollector.BakeItem(rru.RectPayload, bakeWorld, rru.FillOpacity, slot, out var item)) return SpliceRefused("notBakeable");
                 items.Add(item);
             }
 
@@ -1180,86 +1237,61 @@ public partial class RenderCache
             _patchBuf.Add(new GroupPatch { Group = group, Items = items.ToArray(), Scissor = scissor, InPlace = inPlace });
         }
 
-        if (appendTotal > _rectBatch.PatchCapacityLeft) 
-            return false;   // arena full - full walk compacts it
-
-        // A splice that INSERTS rect segments (a 0->N appear: a selection/hover highlight materializing) anchors them only by
-        // neighboring groups' rect runs - it has no handle on where the instanced-fill flush sits in the op stream, so the
-        // appended segment can land AFTER it and the highlight would draw OVER the instanced geometry (a selection accent on
-        // top of an instanced star instead of behind it), flipping z as splices and full walks alternate. When the frame has
-        // an instanced flush, yield any INSERTING splice to the full walk (it emits rects before the instanced flush = correct
-        // z). Excise-only (a highlight vanishing) and in-place recolors don't insert, so they stay on the fast path.
-        if (_opsHaveInstancedFlush && appendTotal > 0) 
-            return false;
-
-        // Every surgery group must have a findable segment for each retained run, and an op referencing it.
-        foreach (var p in _patchBuf)
+        // ---- Phase 1b: which LAYER does each surgery group belong to (no mutation) ----
+        // The unit of repair is the SEGMENT, not the item. A group whose unit count changed is put right by re-baking the
+        // whole segment it lives in, with its new items in their paint position inside it, and pointing the SAME recorded
+        // op at the result. Nothing is excised, nothing is inserted into the op stream, so paint order relative to text,
+        // per-unit draws and instanced flushes is unchanged BY CONSTRUCTION - which is why there is no instanced-flush
+        // question here at all. Cost is O(items in that segment) instead of O(scene).
+        _patchLayers.Clear();
+        for (var n = 0; n < _patchBuf.Count; n++)
         {
+            var p = _patchBuf[n];
             if (p.InPlace) continue;
-            foreach (var run in p.Group.RectRuns)
+
+            // Nothing recorded for this control yet: it gets its own segment, placed by its own paint rank.
+            if (p.Group.RectRuns.Count == 0)
             {
-                var seg = _rectBatch.FindSegmentContaining(run.First);
-                if (seg < 0 || FindSegmentOp(seg) < 0) return false;
+                p.Layer = -1;
+                _patchBuf[n] = p;
+                continue;
             }
+
+            var layer = TargetLayer(p.Group);
+            if (layer < 0) return false;   // TargetLayer already named which of its three answers it gave
+            if (FindSegmentOp(layer) < 0) return SpliceRefused("noLayerOp");
+            // One segment draws under ONE clip; a group that now sits under a different one cannot join it.
+            if (p.Items.Length > 0 && !ScissorEquals(_rectBatch.GetSegmentScissor(layer), p.Scissor)) return SpliceRefused("otherClip");
+            p.Layer = layer;
+            _patchBuf[n] = p;
+            if (!_patchLayers.Contains(layer)) _patchLayers.Add(layer);
         }
 
         // ---- Phase 2: mutate (can no longer fail) ----
         foreach (var p in _patchBuf)
         {
-            var group = p.Group;
-            if (p.InPlace)
-            {
-                var i = 0;
-                foreach (var u in group.Units)
-                    _rectBatch.UpdateSlot(device, _rectSlotByUnit[u], p.Items[i++]);
-                continue;
-            }
-
-            // Excise the old runs: each segment shrinks to its 'before' part and the 'after' remainder becomes a new
-            // segment whose op is inserted right after the original - [before][after] keeps every other item's order. The
-            // FIRST run's position is the insertion anchor so the group's new items draw at the same paint position.
-            var anchorOp = -1;
-            foreach (var run in group.RectRuns)
-            {
-                var seg = _rectBatch.FindSegmentContaining(run.First);
-                var opIdx = FindSegmentOp(seg);
-                var after = _rectBatch.ExcludeRun(seg, run.First, run.Count);
-                if (after >= 0)
-                    _ops.Insert(opIdx + 1, new RenderOp { Kind = RenderOpKind.Segment, Batch = 0, SegIndex = after });
-                if (anchorOp < 0) anchorOp = opIdx;
-            }
-
-            if (anchorOp < 0 && p.Items.Length > 0)
-            {
-                // 0 -> N (first units this control ever batched): anchor at the paint position of the nearest FOLLOWING
-                // group with a retained rect run (split its run's segment at the run start so our op sits exactly at our
-                // paint rank), else fall back to the nearest PRECEDING group's run. A mid-phase-2 bail here is SAFE: every
-                // already-patched group is self-consistent, and the caller's full walk re-records the whole frame anyway.
-                if (!TryAnchorByNeighbour(group, out anchorOp)) return false;
-            }
-
-            if (p.Items.Length > 0)
-            {
-                var newSeg = _rectBatch.AppendPatchSegment(device, p.Items, p.Scissor);
-                var newFirst = _rectBatch.RetainedCount - p.Items.Length;
-                _ops.Insert(anchorOp + 1, new RenderOp { Kind = RenderOpKind.Segment, Batch = 0, SegIndex = newSeg });
-
-                group.RectRuns.Clear();
-                group.RectRuns.Add((newFirst, p.Items.Length));
-                group.PatchableRectOnly = true;
-                group.WalkVersion = _walkVersion;   // its runs now describe THIS arena - not stale on the next splice
-                var i = 0;
-                foreach (var u in group.Units) _rectSlotByUnit[u] = newFirst + i++;
-            }
-            else
-            {
-                group.RectRuns.Clear();   // re-rendered to nothing (a hover background vanishing) - exclusion was enough
-                foreach (var u in group.Units) _rectSlotByUnit.Remove(u);
-            }
+            if (!p.InPlace) continue;   // count-stable recolour: the slots are already the right ones
+            var i = 0;
+            foreach (var u in p.Group.Units) _rectBatch.UpdateSlot(device, _rectSlotByUnit[u], p.Items[i++]);
         }
 
+        foreach (var p in _patchBuf)
+        {
+            if (p.InPlace) continue;
+            if (!ReissueLayer(device, p)) return SpliceRefused("arenaFull");
+        }
+
+        AcceptPatchedTransforms();
         ExecuteOps(device, fullScissor);
         return true;
+    }
+
+    // TEMP: name WHICH of the splice's preconditions sent the frame to the full walk - there are nine and they are fixed
+    // by nine different means.
+    private static bool SpliceRefused(string reason)
+    {
+        if (Core.Diagnostics.FrameTrace.Enabled) Core.Diagnostics.FrameTrace.Refuser = reason;
+        return false;
     }
 
     private bool AllUnitsHaveSlots(ControlGroup group)
@@ -1277,45 +1309,141 @@ public partial class RenderCache
         return -1;
     }
 
-    // Anchor a 0->N group's new segment by its paint rank relative to neighbouring groups' retained rect runs.
-    private bool TryAnchorByNeighbour(ControlGroup group, out int anchorOp)
+    // A LAYER is one recorded batch run drawn by one op - the backdrops of a list.s rows, say. A group that already draws
+    // in one is repaired inside it; a group that does not gets its own (see PlaceNewSegment), so this only ever answers
+    // for the former. It used to hunt for a neighbour.s layer to join, which is how the placement came to depend on what
+    // else the frame happened to contain.
+    private int TargetLayer(ControlGroup group)
     {
-        anchorOp = -1;
-        var idx = _groups.IndexOf(group);
-        if (idx < 0) return false;
-
-        // Following group with a run: split its run's segment AT the run start; our op goes after the 'before' piece (the
-        // successor's items keep drawing after us via the split-off remainder).
-        for (var g = idx + 1; g < _groups.Count; g++)
-        {
-            var runs = _groups[g].RectRuns;
-            if (runs.Count == 0) continue;
-            var seg = _rectBatch.FindSegmentContaining(runs[0].First);
-            if (seg < 0) return false;
-            var opIdx = FindSegmentOp(seg);
-            if (opIdx < 0) return false;
-            var after = _rectBatch.ExcludeRun(seg, runs[0].First, 0);   // pure split - nothing excluded
-            if (after >= 0)
-                _ops.Insert(opIdx + 1, new RenderOp { Kind = RenderOpKind.Segment, Batch = 0, SegIndex = after });
-            anchorOp = opIdx;
-            return true;
-        }
-
-        // No successor: insert after the nearest preceding group's run segment op.
-        for (var g = idx - 1; g >= 0; g--)
-        {
-            var runs = _groups[g].RectRuns;
-            if (runs.Count == 0) continue;
-            var lastRun = runs[^1];
-            var seg = _rectBatch.FindSegmentContaining(lastRun.First);
-            if (seg < 0) return false;
-            var opIdx = FindSegmentOp(seg);
-            if (opIdx < 0) return false;
-            anchorOp = opIdx;
-            return true;
-        }
-        return false;
+        var own = _rectBatch.FindSegmentContaining(group.RectRuns[0].First);
+        if (own < 0 && Core.Diagnostics.FrameTrace.Enabled) Core.Diagnostics.FrameTrace.Refuser = "runOutsideAnyLayer";
+        return own;
     }
 
-}
+    // Re-issue ONE layer with one group's items replaced. The layer's content comes from the RETAINED RANGE, copied as
+    // bytes, never rebuilt from the groups: group bookkeeping does not describe every slot in a layer (a culled unit, a
+    // group the last walk did not visit), and whatever it fails to account for would be dropped. The range describes itself.
+    private bool ReissueLayer(IGraphicsDevice device, GroupPatch patch)
+    {
+        if (patch.Layer < 0) return PlaceNewSegment(device, patch);
 
+        var layer = patch.Layer;
+        var (first, count) = _rectBatch.SegmentRange(layer);
+        var scissor = _rectBatch.GetSegmentScissor(layer);
+        var group = patch.Group;
+
+        // WHERE inside the layer this group's items sit: its own run, which is the only reason it is in this layer at all.
+        var at = group.RectRuns[0].First - first;
+        var replaced = 0;
+        foreach (var run in group.RectRuns) replaced += run.Count;
+
+        if (at < 0 || at + replaced > count) return true;   // its run is not in this layer after all - leave the frame be
+
+        // The cheap path: edit inside the room the layer already owns, moving only what follows the edit. Only when the
+        // layer has outgrown its room does it relocate, and then it does have to be carried across whole.
+        if (!_rectBatch.ReplaceInSegment(device, layer, at, replaced, patch.Items))
+        {
+            _rebakeBuf.Clear();
+            _rectBatch.CopyRetained(first, at, _rebakeBuf);
+            _rebakeBuf.AddRange(patch.Items);
+            _rectBatch.CopyRetained(first + at + replaced, count - at - replaced, _rebakeBuf);
+            if (!_rectBatch.RepointSegment(device, layer, CollectionsMarshal.AsSpan(_rebakeBuf), scissor)) return false;
+        }
+
+        // The layer may have moved, and everything after the edit shifted by the size difference. Re-index every group
+        // that draws in it - runs and unit slots both, or a later patch would address freed space.
+        var (newFirst, _) = _rectBatch.SegmentRange(layer);
+        var delta = patch.Items.Length - replaced;
+        var editEnd = first + at + replaced;
+        foreach (var g in _groups)
+        {
+            if (g.WalkVersion != _walkVersion || ReferenceEquals(g, group)) continue;
+            var touched = false;
+            for (var r = 0; r < g.RectRuns.Count; r++)
+            {
+                var run = g.RectRuns[r];
+                if (run.First < first || run.First >= first + count) continue;
+                g.RectRuns[r] = (run.First - first + newFirst + (run.First >= editEnd ? delta : 0), run.Count);
+                touched = true;
+            }
+
+            if (touched) ReslotUnits(g);
+        }
+
+        group.RectRuns.Clear();
+        group.WalkVersion = _walkVersion;
+        if (patch.Items.Length > 0)
+        {
+            group.RectRuns.Add((newFirst + at, patch.Items.Length));
+            group.PatchableRectOnly = true;
+        }
+
+        ReslotUnits(group);
+        return true;
+    }
+
+    // A control that drew nothing until now: give it its own segment and put its op where its RANK says, not where its
+    // neighbours happen to be. Nothing already recorded moves, so this cannot disturb anyone's order - and it is provable
+    // without looking at what else the frame contains.
+    private bool PlaceNewSegment(IGraphicsDevice device, GroupPatch patch)
+    {
+        var group = patch.Group;
+        if (patch.Items.Length == 0)
+        {
+            group.WalkVersion = _walkVersion;
+            ReslotUnits(group);
+            return true;   // drew nothing, still draws nothing
+        }
+
+        var seg = _rectBatch.AllocateSegment(device, patch.Items, patch.Scissor);
+        if (seg < 0) return false;
+
+        _ops.Insert(OpIndexForRank(group.Order), new RenderOp
+        {
+            Kind = RenderOpKind.Segment, Batch = 0, SegIndex = seg, Order = group.Order
+        });
+
+        var (first, _) = _rectBatch.SegmentRange(seg);
+        group.RectRuns.Clear();
+        group.RectRuns.Add((first, patch.Items.Length));
+        group.PatchableRectOnly = true;
+        group.WalkVersion = _walkVersion;
+        ReslotUnits(group);
+        return true;
+    }
+
+    // Where an op of this rank belongs in the stream: before the first op recorded for a LATER rank. Never immediately
+    // after a Scissor op - that op sets a clip for the draw that follows it, and a segment slipped in between would
+    // restore the full clip and leave that draw unclipped.
+    private int OpIndexForRank(long order)
+    {
+        var at = _ops.Count;
+        for (var i = 0; i < _ops.Count; i++)
+        {
+            if (_ops[i].Order <= order) continue;
+            at = i;
+            break;
+        }
+
+        while (at > 0 && _ops[at - 1].Kind == RenderOpKind.Scissor) at--;
+        return at;
+    }
+
+    // A group's units map onto its run one-for-one only when the run accounts for all of them; a partly-culled group gives
+    // its entries up rather than keep a guess, and the next walk restores them.
+    private void ReslotUnits(ControlGroup group)
+    {
+        var total = 0;
+        foreach (var run in group.RectRuns) total += run.Count;
+        if (total != group.Units.Count || group.RectRuns.Count != 1)
+        {
+            foreach (var u in group.Units) _rectSlotByUnit.Remove(u);
+            return;
+        }
+
+        var i = group.RectRuns[0].First;
+        foreach (var u in group.Units) _rectSlotByUnit[u] = i++;
+    }
+
+
+}

@@ -97,6 +97,7 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
         {
             _traceWindows = 0;
             System.IO.File.WriteAllText(@"C:\AdamantiumEngine\frames.log", FrameTrace.Dump());
+            System.IO.File.WriteAllText(@"C:\AdamantiumEngine\incidents.log", FrameTrace.DumpIncidents());
         }
 
         _lastMeasure = measure; _lastArrange = arrange; _lastBindings = bindings;

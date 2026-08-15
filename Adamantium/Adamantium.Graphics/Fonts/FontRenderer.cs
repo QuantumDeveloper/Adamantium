@@ -265,47 +265,13 @@ public class FontRenderer : GraphicsResource
         GraphicsDevice.Draw(4, count);   // 4 strip verts x glyph instances
     }
 
-    // Aggregated text batch (docs/TEXT_GLYPH_BATCH_PLAN.md §9 Stage 2): draws MANY blocks' glyphs - already baked to
-    // world space, one shared atlas - in a SINGLE instanced draw straight into the main pass = the FPS win. The VS
-    // applies ONLY the static Projection (positions are pre-transformed on the CPU during aggregation, the one
-    // driver-safe form). The batch pixel shader takes the foreground from the per-instance vertex colour (baked per
-    // glyph), so blocks of different colours share one draw. State/depth/blend match DrawLayoutDirect (main pass).
-    public void DrawBatch(SamplerState samplerState, FontAtlas atlas, Buffer<FontItem> glyphs, uint glyphCount, Matrix4x4F projection, uint firstInstance = 0)
-    {
-        if (glyphCount == 0) return;
-
-        GraphicsDevice.ColorBlendEnabled = true;
-        GraphicsDevice.ColorBlendEquation = ColorBlendEquations.Premultiplied;
-        GraphicsDevice.PrimitiveRestartEnable = true;
-        GraphicsDevice.DepthTestEnabled = true;
-        GraphicsDevice.DepthWriteEnable = true;
-        GraphicsDevice.DepthCompareFunction = CompareOp.Always;
-
-        effectSampler.SetResource(samplerState);
-        effectTexture.SetResource(atlas.Atlas);
-        effectMatrixTransform.SetValue(projection);
-        effectUVCornerCoords.SetValue(UVCornerCoords);
-        effectFontWeight.SetValue(FontWeight);
-        effectPixelRange.SetValue(atlas.PixelRange);
-        effectAtlasSize.SetValue(new Vector2F(atlas.Atlas.Width, atlas.Atlas.Height));
-        effectSdfBlendLo.SetValue(SdfBlendLo);
-        effectSdfBlendHi.SetValue(SdfBlendHi);
-        GraphicsDevice.VertexType = vertexType;
-        GraphicsDevice.SetVertexBuffer(glyphs);
-        GraphicsDevice.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
-        // Batch pass: per-instance foreground (input.Color), so many colours in one draw. Canonical MSDF only for
-        // now; outline/stroked/gradient-AA text stays on the per-block direct path (RenderCache routes it there).
-        fontEffect.FontBatchRenderMsdfBatchPass.Apply();
-        // firstInstance offsets the per-instance FontItem fetch to THIS segment's slice of the shared buffer (its data
-        // was uploaded at the matching byte offset), so several segments share one buffer without overwriting.
-        GraphicsDevice.Draw(4, glyphCount, 0, firstInstance);   // 4 strip verts x glyphCount glyph instances
-    }
-
-    // STORAGE-INSTANCED text batch: per-instance GlyphItem read from a BDA storage buffer by SV_InstanceID, and each
-    // glyph's NODE-LOCAL rect transformed to world on the GPU via the transform table at its slot (slot 0 = identity).
-    // Mirrors the SDF rect/ellipse fills (SdfBatchCollector) - no per-instance vertex buffer, no CPU per-glyph world bake,
-    // and a scrolling block moves by one table matrix write instead of re-baking N glyphs. instancesAddress is pre-offset
-    // to THIS segment's slice (drawn at base instance 0). State/depth/blend match the vertex-buffer DrawBatch above.
+    // Aggregated text batch (docs/TEXT_GLYPH_BATCH_PLAN.md §9 Stage 2): draws MANY blocks' glyphs sharing one atlas in a
+    // SINGLE instanced draw straight into the main pass = the FPS win. Per-instance GlyphItem read from a BDA storage
+    // buffer by SV_InstanceID, and each glyph's NODE-LOCAL rect transformed to world on the GPU via the transform table
+    // at its slot (slot 0 = identity). Mirrors the SDF rect/ellipse fills (SdfBatchCollector) - no per-instance vertex
+    // buffer, no CPU per-glyph world bake, and a scrolling block moves by one table matrix write instead of re-baking N
+    // glyphs. Foreground is per-instance, so blocks of different colours share one draw. instancesAddress is pre-offset
+    // to THIS segment's slice (drawn at base instance 0). State/depth/blend match DrawLayoutDirect (main pass).
     public void DrawBatch(SamplerState samplerState, FontAtlas atlas, ulong instancesAddress, ulong transformsAddress,
         uint glyphCount, Matrix4x4F projection)
     {

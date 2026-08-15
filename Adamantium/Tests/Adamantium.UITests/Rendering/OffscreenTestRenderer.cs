@@ -48,6 +48,10 @@ internal sealed class OffscreenTestRenderer : IDisposable
 
     public GraphicsPresenter Presenter => _presenter;
 
+    /// <summary>The content cache this harness drives - for asserting HOW a frame was drawn (replayed vs walked), not
+    /// just what it looks like.</summary>
+    public RenderCache Cache => _renderCache;
+
     /// <summary>The rendered frame - read this back or <see cref="Save"/> it.</summary>
     public IRenderTarget RenderTarget => _presenter.RenderTarget;
 
