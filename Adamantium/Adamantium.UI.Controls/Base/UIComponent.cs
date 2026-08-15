@@ -773,6 +773,10 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     /// (same rule as Visibility). Set through <see cref="ParkedSubtree"/>, which is what parks and unparks a subtree.</summary>
     public bool IsParked { get; internal set; }
 
+    /// <summary>Draw this subtree once per matrix instead of once at its own place - see <see cref="IUIComponent.RenderClones"/>.
+    /// A plain field, deliberately not a registered property: the draw walk reads it per group, per frame.</summary>
+    public IReadOnlyList<Matrix4x4F> RenderClones { get; set; }
+
     /// <summary>Quiet everything this element drives while it waits out of the tree. Removal already suspends what
     /// TRIGGERS run (DetachedFromVisualTree -> SuspendTriggerActions); animations are the half detachment does NOT stop,
     /// so a parked view would otherwise keep costing a frame forever - see animation-lifecycle-detach-leak.</summary>

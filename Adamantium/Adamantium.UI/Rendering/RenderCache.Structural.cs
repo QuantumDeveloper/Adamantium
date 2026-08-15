@@ -321,7 +321,7 @@ public partial class RenderCache
         _drawingContextInternal.Clear();
         component.Render(_drawingContext);
         var commands = CopyCommands(_drawingContextInternal.GetDrawCommands());
-        packet.Draws.Add(new ComponentDraw(component, commands, wasGeometryValid, rank));
+        packet.Draws.Add(new ComponentDraw(component, commands, wasGeometryValid, rank, component.RenderClones));
         MirrorUnits(component, commands.Count, wasGeometryValid);
     }
 

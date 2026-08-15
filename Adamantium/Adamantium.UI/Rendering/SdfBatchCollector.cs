@@ -1,4 +1,4 @@
-using Adamantium.Graphics;
+﻿using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.EffectsFramework;
 using Adamantium.Mathematics;
@@ -21,6 +21,9 @@ internal abstract class SdfBatchCollector<TItem> : BatchCollector<TItem> where T
     /// instance's world matrix from it by the instance's slot index. Set by RenderCache every frame BEFORE any draw
     /// (the shader always reads it; slot 0 is identity, so legacy world-baked instances render unchanged).</summary>
     public ulong TransformsAddress { get; set; }
+
+    /// <summary>Device address of the alpha table, indexed by the same slot as the matrix. 0 = none bound.</summary>
+
 
     protected SdfBatchCollector(int initialCapacity) : base(initialCapacity) { }
 
@@ -53,6 +56,7 @@ internal abstract class SdfBatchCollector<TItem> : BatchCollector<TItem> where T
         var stride = (ulong)System.Runtime.InteropServices.Marshal.SizeOf<TItem>();
         Effect.InstancesAddress.SetValue(buffer.GetDeviceAddress() + firstInstance * stride);
         Effect.TransformsAddress.SetValue(TransformsAddress);
+
         DrawPass.Apply();
         device.Draw(4, count, 0, 0);
     }

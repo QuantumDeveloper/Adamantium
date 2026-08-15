@@ -100,7 +100,7 @@ public partial class RenderCache
                     component.RenderReadOnly(_drawingContext); 
                 else 
                     component.Render(_drawingContext);
-                ProcessRenderCommands(component, _drawingContextInternal.GetDrawCommands(), projectionMatrix, !readOnly && wasGeometryValid, order);
+                ProcessRenderCommands(component, _drawingContextInternal.GetDrawCommands(), projectionMatrix, !readOnly && wasGeometryValid, order, component.RenderClones);
                 order += OrderGap;   // the flat list IS the paint order
             }
         }
@@ -356,7 +356,19 @@ public partial class RenderCache
 
     // A unit's bake transform + transform-table slot: node-local + the node's slot when under a motion node (matrix
     // refreshed once per walk), else its OWN slot holding the world. NOTHING is baked into an instance any more.
+    /// <summary>Where a unit's geometry is baked, and which transform-table slot carries the rest.
+    /// <para>A CLONE (§4o) folds its offset into the BAKE, never into the slot. Its own slot holding an absolute world
+    /// was the first attempt, and it broke the scroll: content moves by rewriting ONE node matrix without re-walking, so
+    /// clone slots kept the world they were baked with and drifted a frame or two behind the tiles - the band along the
+    /// realize frontier, wider the faster the scroll. In the bake the offset is per-INSTANCE (each clone has its own
+    /// bounds anyway), so clones ride the node's slot exactly as the tiles do and one matrix write moves both.</para></summary>
     private Matrix4x4F ResolveBake(IGraphicsDevice device, IUIComponent component, Matrix4x4F world, out int slot)
+    {
+        var bake = ResolveBakeCore(device, component, world, out slot);
+        return _cloneMatrix.HasValue ? bake * _cloneMatrix.Value : bake;
+    }
+
+    private Matrix4x4F ResolveBakeCore(IGraphicsDevice device, IUIComponent component, Matrix4x4F world, out int slot)
     {
         var node = NodeOf(component);
         if (node == null)

@@ -30,13 +30,28 @@ internal sealed class TransformTable
 {
     private const int InitialCapacity = 256;
 
-    private Matrix4x4F[] _cpu = new Matrix4x4F[InitialCapacity];
+    /// <summary>One entry: the node's world matrix and its ALPHA, in ONE record so both travel on ONE device address.
+    /// A second table would need a second address, and adding one more <c>uint64_t</c> parameter to the batch effect
+    /// stopped shader creation outright (measured: the declaration alone, used by nothing, killed startup 3 of 3 while
+    /// the same build without it started 3 of 3 - the parameter block is at its limit). They belong together anyway:
+    /// same node, same slot, same lifetime, same catch-up.</summary>
+    [StructLayout(LayoutKind.Sequential, Size = SlotStride)]
+    internal struct NodeSlot
+    {
+        public Matrix4x4F World;
+        public Vector4F Params;   // X = alpha (1 = opaque); YZW reserved. Pads the record to 16-byte alignment.
+    }
+
+    private const int SlotStride = 80;
+
+    private NodeSlot[] _cpu = NewSlots(InitialCapacity);
+
     private int[] _version = new int[InitialCapacity];   // content version of each slot, bumped on every real change
     private int[][] _uploaded;                           // per copy: the version each slot was last sent with
     // One BUFFER per copy, not one buffer holding all copies at different offsets. Same guarantee either way, but a
     // separate allocation is what makes "is this buffer being rewritten before the pipeline drained?" answerable per
     // copy - with a shared allocation every writer looks like it is rewriting the same buffer every frame.
-    private Buffer<Matrix4x4F>[] _gpu;
+    private Buffer<NodeSlot>[] _gpu;
     private int _gpuCapacity;                            // slots per copy
     private int _copies;                                 // = MaxFramesInFlight
     private int _current;                                // copy this frame writes and draws from
@@ -57,6 +72,25 @@ internal sealed class TransformTable
     public int SlotCount => _count;
     public int GpuCapacity => _gpuCapacity;
 
+    /// <summary>Makes room for <paramref name="extraSlots"/> more slots BEFORE <see cref="EnsureResources"/> decides the
+    /// buffer size. Growth is otherwise discovered while baking, and a slot past the current GPU capacity is never
+    /// uploaded that frame (see <see cref="SetMatrix"/>) - the shader still indexes by it and reads past the buffer.
+    /// That is harmless when one node appears and the next frame catches up, and ruinous when a clone run asks for
+    /// thousands at once: tiles vanished and jumped about as the set changed, differently every frame.</summary>
+    public void Reserve(int extraSlots)
+    {
+        var needed = _count + extraSlots;
+        if (needed <= _cpu.Length) return;
+
+        var length = _cpu.Length;
+        while (length < needed) length *= 2;
+
+        var was = _cpu.Length;
+        Array.Resize(ref _cpu, length);
+        Array.Resize(ref _version, length);
+        for (var slot = was; slot < length; slot++) _cpu[slot].Params.X = 1f;   // new slots are opaque
+    }
+
     /// <summary>Picks this frame's copy, (re)creates the buffer when capacity outgrew it and catches that copy up with
     /// the changes it missed. Call at a fence-safe point (BeginFrame), before any slot is written or drawn.</summary>
     public void EnsureResources(IGraphicsDevice device)
@@ -74,12 +108,12 @@ internal sealed class TransformTable
                 }
             }
             _copies = copies;
-            _gpu = new Buffer<Matrix4x4F>[_copies];
+            _gpu = new Buffer<NodeSlot>[_copies];
             _gpuCapacity = _cpu.Length;
             _uploaded = new int[_copies][];
             for (var i = 0; i < _copies; i++)
             {
-                _gpu[i] = Adamantium.Graphics.Buffer.New<Matrix4x4F>(device, (uint)_gpuCapacity,
+                _gpu[i] = Adamantium.Graphics.Buffer.New<NodeSlot>(device, (uint)_gpuCapacity,
                     BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
                     MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal);
                 _uploaded[i] = new int[_gpuCapacity];
@@ -106,8 +140,36 @@ internal sealed class TransformTable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void Upload(int slot)
     {
-        _gpu[_current].SetData(_cpu.AsSpan(slot, 1), (uint)(slot * 64));
+        // Matrix and alpha travel together - one record, one write, one address.
+        _gpu[_current].SetData(_cpu.AsSpan(slot, 1), (uint)(slot * SlotStride));
         _uploaded[_current][slot] = _version[slot];
+    }
+
+    private void GrowAlpha()
+    {
+        for (var slot = _count; slot < _cpu.Length; slot++) _cpu[slot].Params.X = 1f;   // new slots are opaque
+    }
+
+    /// <summary>Sets the alpha this slot multiplies its instances by. Fading a whole node - or one CLONE of a prototype -
+    /// is then ONE float write instead of re-baking every instance's colour.</summary>
+    public void SetAlpha(IGraphicsDevice device, int slot, float alpha)
+    {
+        if (_cpu[slot].Params.X != alpha)
+        {
+            _cpu[slot].Params.X = alpha;
+            _version[slot]++;
+            MatrixVersion++;
+        }
+
+        if (_gpu == null || slot >= _gpuCapacity) return;
+        if (_uploaded[_current][slot] != _version[slot]) Upload(slot);
+    }
+
+    private static NodeSlot[] NewSlots(int length)
+    {
+        var slots = new NodeSlot[length];
+        for (var i = 0; i < length; i++) slots[i].Params.X = 1f;   // a slot nobody fades is opaque
+        return slots;
     }
 
     /// <summary>The slot for <paramref name="nodeId"/>, allocating one if needed (from the free-list, else grown).</summary>
@@ -128,6 +190,22 @@ internal sealed class TransformTable
         return slot;
     }
 
+
+    private int AcquireFreeSlot()
+    {
+        if (_free.Count > 0) return _free.Pop();
+
+        var slot = _count++;
+        if (_count > _cpu.Length)
+        {
+            Array.Resize(ref _cpu, _cpu.Length * 2);   // GPU grows at next EnsureResources
+            Array.Resize(ref _version, _cpu.Length);
+            GrowAlpha();
+        }
+
+        return slot;
+    }
+
     /// <summary>Releases a promoted node's slot back to the pool (its instances re-point to an ancestor slot first).</summary>
     public void ReleaseSlot(Guid nodeId)
     {
@@ -145,13 +223,13 @@ internal sealed class TransformTable
     /// moved pays.</para></summary>
     public void SetMatrix(IGraphicsDevice device, int slot, in Matrix4x4F world)
     {
-        if (!SameBytes(_cpu[slot], world))
+        if (!SameBytes(_cpu[slot].World, world))
         {
             // Record the value FIRST, always. A slot allocated past the current buffer (the table grew mid-frame; the GPU
             // side follows at the next EnsureResources) still has to keep its matrix and bump its version, or the catch-up
             // that runs after the reallocation sees "already up to date" and the node draws with a stale matrix - which is
             // every node past slot 256 the first time a long tab strip pushes the table over its initial capacity.
-            _cpu[slot] = world;
+            _cpu[slot].World = world;
             _version[slot]++;
             MatrixVersion++;
         }
@@ -184,5 +262,6 @@ internal sealed class TransformTable
         _count = 0;
         _free.Clear();
         _slotByNode.Clear();
+
     }
 }

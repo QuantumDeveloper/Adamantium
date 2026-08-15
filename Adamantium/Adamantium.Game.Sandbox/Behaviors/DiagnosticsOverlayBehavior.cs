@@ -33,6 +33,7 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
     private int _windowFrames;
     private bool _windowDeferred;
     private bool _running;
+    private int _traceWindows;   // TEMP
 
     protected override void OnAttached(TextBlock target)
     {
@@ -40,6 +41,7 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
         _lastArrange = MeasurableUIComponent.TotalArrangeCalls;
         _lastBindings = RuntimeStats.BindingUpdatesApplied;
         _running = true;
+        FrameTrace.Enabled = true;   // TEMP
         AnimationManager.AddTicker(dt => Advance(target, dt));
     }
 
@@ -89,6 +91,13 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
             $"processors {avgProcs,4:F1}    other {other,4:F1} ms\n" +
             $"measure/arrange  {measure - _lastMeasure} / {arrange - _lastArrange}\n" +
             $"bindings {bindings - _lastBindings}    anim {AnimationManager.ActiveCount}";
+
+        // TEMP: dump the in-memory frame ring once a second (four refresh windows) - one file write, not one per frame.
+        if (++_traceWindows >= 4)
+        {
+            _traceWindows = 0;
+            System.IO.File.WriteAllText(@"C:\AdamantiumEngine\frames.log", FrameTrace.Dump());
+        }
 
         _lastMeasure = measure; _lastArrange = arrange; _lastBindings = bindings;
         _windowElapsed = 0; _windowFrames = 0; _windowMaxLayoutMs = 0; _windowDeferred = false;

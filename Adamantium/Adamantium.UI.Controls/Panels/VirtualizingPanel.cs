@@ -370,25 +370,25 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
     // skeleton brush, whose Opacity a single PulseAnimation drives while this list reports IsLoadingItems (see
     // SyncLoadingState) - a screenful of cards costs one animation, not one per card. Skipped when the ItemsControl has
     // no ItemSkeletonTemplate.
-    private readonly Stack<UIComponent> _skeletonPool = new();               // idle cards, ready to reuse
-    private readonly Dictionary<int, UIComponent> _activeSkeletons = new();  // slot index -> the card showing there now
+    // ONE card, drawn once per pending slot through RenderClones (§4o) - not one card per slot. Building a full template
+    // instance per slot is what this replaces: measured on a tile-size drag, 3469 template builds in a 0.25 s window
+    // against 147 realized containers, and every property write of every build marked layout dirty (measure=15952,
+    // arrange=44949, frame down to 30 fps). The clones live only in the instance buffer: no layout, no hit-test, no state.
+    private UIComponent _skeletonPrototype;
+    private Size _prototypeSize;
+    private List<Matrix4x4F> _skeletonClones;   // fresh list per change - the draw walk may read it off the render thread
 
-    /// <summary>How many skeleton cards are on screen right now (one is reconciled per PENDING slot, every
-    /// frame - a cost that scales with the un-filled window, not with what the frame admits).</summary>
-    protected int ActiveSkeletonCount => _activeSkeletons.Count;
-    private readonly HashSet<IUIComponent> _skeletonSet = new();             // every card built (skip in HideUnmappedContainers)
-    private readonly List<int> _recycleBuf = new();                          // scratch: active slots to recycle this frame
-    private readonly HashSet<int> _pendingSet = new();                       // scratch: this frame's pending, for O(1) lookup
-    private readonly List<(UIComponent card, Rect rect)> _skelArrangeBuf = new();   // scratch: (card, rect) for the parallel arrange pass
-    private readonly List<UIComponent> _vacatedBuf = new();                  // scratch: cards freed this pass, offered to slots that need one
+    /// <summary>How many skeleton cards are on screen right now - clones of the one prototype.</summary>
+    protected int ActiveSkeletonCount => _skeletonClones?.Count ?? 0;
+    private readonly HashSet<IUIComponent> _skeletonSet = new();             // panel-owned visuals (skip in HideUnmappedContainers)
     private int _pendingFrames;
     private const int SkeletonDelayFrames = 6;   // ~100 ms at 60 fps before cards appear - no flash on a fill that clears fast
-    private const int SkeletonParallelThreshold = 64;   // fan the card arrange across cores only above this many (matches the real-tile arrange)
 
-    /// <summary>Reconciles the pooled per-slot loading cards to the generator's budget-deferred slots: each pending slot
-    /// shows a themed <c>ItemSkeletonTemplate</c> card positioned at its grid rect; a slot that binds (or scrolls out)
-    /// hands its card back to the pool. <paramref name="slotRect"/> maps a slot index to its absolute grid rect - the
-    /// subclass owns that geometry and calls this from ArrangeVirtualized. O(pending): a screenful of pooled instanced cards.</summary>
+    /// <summary>Shows a loading placeholder at each of the generator's budget-deferred slots. ONE themed
+    /// <c>ItemSkeletonTemplate</c> card is built, measured and arranged - every slot is a CLONE of it
+    /// (<see cref="IUIComponent.RenderClones"/>), which exists only in the instance buffer. <paramref name="slotRect"/>
+    /// maps a slot index to its absolute grid rect; the subclass owns that geometry and calls this from
+    /// ArrangeVirtualized. O(pending) matrix writes, and not one element per slot.</summary>
     protected void ReconcileSkeletons(Func<int, Rect> slotRect)
     {
         var pending = Owner.ItemContainerGenerator.PendingIndices;
@@ -396,81 +396,117 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         if (pending.Count == 0)
         {
             _pendingFrames = 0;
-            if (_activeSkeletons.Count > 0) RecycleAllSkeletons();
+            HideSkeletons();
             return;
         }
 
         _pendingFrames++;
         // Don't flash cards on a fill that clears within a few frames (small list / warm cache).
-        if (_activeSkeletons.Count == 0 && _pendingFrames < SkeletonDelayFrames) return;
+        if (ActiveSkeletonCount == 0 && _pendingFrames < SkeletonDelayFrames) return;
 
         var template = Owner?.ItemSkeletonTemplate;
         if (template == null) return;   // unthemed ItemsControl - no skeletons
 
-        // Cards whose slot is no longer pending (it bound, or scrolled out) are VACATED, not recycled: they are held aside
-        // and handed straight to the slots that need one below. Collapsing them here and un-collapsing them a few lines
-        // later is what made scrolling expensive - Visibility carries AffectsMeasure, so each flip invalidates that card's
-        // measure AND arrange and lands it in the layout queue as a dirty root of its own. On a scrolling 60k grid that
-        // was ~16k flips per half second, for cards that never left the screen. Only the surplus is collapsed, at the end.
-        _pendingSet.Clear();
-        for (var i = 0; i < pending.Count; i++) _pendingSet.Add(pending[i]);
-        _recycleBuf.Clear();
-        foreach (var slot in _activeSkeletons.Keys)
-            if (!_pendingSet.Contains(slot)) _recycleBuf.Add(slot);
-
-        _vacatedBuf.Clear();
-        for (var i = 0; i < _recycleBuf.Count; i++)
-        {
-            if (_activeSkeletons.Remove(_recycleBuf[i], out var vacated)) 
-                _vacatedBuf.Add(vacated);
-        }
+        var prototype = EnsureSkeletonPrototype(template);
+        if (prototype == null) return;   // template has no root
 
         // Inset each cell rect by the REAL tile's margin (read from a realized item, never hardcoded) so a card sits
         // exactly where its item's visual would - same footprint, same inter-tile gaps.
         var inset = ItemMargin();
+        var firstRect = slotRect(pending[0]);
+        var size = new Size(
+            Math.Max(0, firstRect.Width - inset.Left - inset.Right),
+            Math.Max(0, firstRect.Height - inset.Top - inset.Bottom));
 
-        // Pass 1 (this thread): ensure a card at each pending slot and SHOW it. Renting mutates the pool/active/set + the
-        // visual tree, and SyncLoadingState below fires the list's pulse trigger (which mutates the shared
-        // AnimationManager) - none of that is thread-safe, so it stays here. Collect (card, rect) for a parallel arrange.
-        _skelArrangeBuf.Clear();
-        for (var i = 0; i < pending.Count; i++)
+        // Arranged ONCE, at the ORIGIN: the clones carry the positions. Slots of a virtualizing grid are the same size
+        // by construction, so one arranged card fits them all - which is exactly why a translation is enough and no
+        // clone needs a scale (a scale would stretch the card's border thickness with it).
+        if (prototype.Visibility != Visibility.Visible) prototype.Visibility = Visibility.Visible;
+        if (_prototypeSize != size)
         {
-            var slot = pending[i];
-            if (!_activeSkeletons.TryGetValue(slot, out var card))
-            {
-                // A card just vacated by another slot first - it is already on screen and already the right size, so it
-                // simply moves. Only when none is left does this fall back to the pool (or to building one).
-                card = TakeVacated() ?? RentSkeleton(template);
-                if (card == null)
-                {
-                    ParkVacated();   // nothing to show; whatever was held aside goes back to the pool, not nowhere
-                    return;          // template has no root
-                }
-                _activeSkeletons[slot] = card;
-            }
-            if (card.Visibility != Visibility.Visible) card.Visibility = Visibility.Visible;
-            var rc = slotRect(slot);
-            _skelArrangeBuf.Add((card, new Rect(
-                rc.X + inset.Left, rc.Y + inset.Top,
-                Math.Max(0, rc.Width - inset.Left - inset.Right),
-                Math.Max(0, rc.Height - inset.Top - inset.Bottom))));
+            var measurable = (IMeasurableComponent)prototype;
+            measurable.Measure(size);
+            measurable.Arrange(new Rect(0, 0, size.Width, size.Height));
+            _prototypeSize = size;
         }
 
-        // Whatever nobody claimed really has left the screen: hide it and pool it. In a steady scroll this is usually
-        // empty - the slots that appear and the slots that leave balance out, and the cards just move between them.
-        ParkVacated();
+        // A FRESH list each time: the draw walk reads RenderClones on the render thread, so refilling the live one in
+        // place would move clones under the frame drawing them.
+        var clones = new List<Matrix4x4F>(pending.Count);
+        for (var i = 0; i < pending.Count; i++) AddClone(clones, slotRect(pending[i]), inset);
+
+        // A slot leaves PendingIndices the moment it gets a CONTAINER - which is one or more passes before that container
+        // is arranged and drawn. Dropping its card then opens a hole with neither tile nor skeleton, and a streaming fill
+        // shows it as a band along the realize frontier. (The old per-slot cards hid this by accident: they were dismissed
+        // with Visibility=Collapsed, which only takes effect on a later pass, so a card lingered exactly long enough.)
+        // The honest rule is not a delay but a condition: a skeleton stands until its slot is actually LAID OUT.
+        foreach (var index in Owner.ItemContainerGenerator.RealizedIndices)
+        {
+            if (Owner.ItemContainerGenerator.ContainerFromIndex(index) is IMeasurableComponent { IsArrangeValid: true }) continue;
+            AddClone(clones, slotRect(SlotOf(index)), inset);
+        }
+
+        // Only when the set actually MOVED. The prototype's re-record is what carries the new set to the render side, and
+        // a component re-recorded every pass keeps its window off the clean-frame fast path for as long as skeletons are
+        // up - measured at 600 fps -> 180 when this was unconditional. A steady screenful of pending slots produces the
+        // same matrices frame after frame, so the common case is no mark at all.
+        if (!SameClones(_skeletonClones, clones))
+        {
+            _skeletonClones = clones;
+            prototype.RenderClones = clones;
+
+            // The recorder walks the geometry-dirty QUEUE, not the IsGeometryValid flag: InvalidateRender only clears the
+            // flag, so without the mark the prototype was recorded once at birth (clones still null) and never again -
+            // the group kept an empty set for good and the card drew once at the origin.
+            prototype.InvalidateRender(false);
+            RenderDirty.MarkGeometry(prototype);
+        }
 
         SyncLoadingState();
+    }
 
-        // Pass 2: measure + arrange the cards. Each card is an independent leaf (its own geometry; the only shared write
-        // is the locked MarkGeometry), so fan them across cores when there are enough to amortise the thread overhead -
-        // same as the real-tile arrange above. Small windows stay sequential.
-        if (_skelArrangeBuf.Count >= SkeletonParallelThreshold)
-            System.Threading.Tasks.Parallel.ForEach(
-                System.Collections.Concurrent.Partitioner.Create(0, _skelArrangeBuf.Count),
-                range => { for (var i = range.Item1; i < range.Item2; i++) ArrangeSkeleton(_skelArrangeBuf[i]); });
-        else
-            for (var i = 0; i < _skelArrangeBuf.Count; i++) ArrangeSkeleton(_skelArrangeBuf[i]);
+    private static bool SameClones(List<Matrix4x4F> a, List<Matrix4x4F> b)
+    {
+        if (ReferenceEquals(a, b)) return true;
+        if (a == null || b == null || a.Count != b.Count) return false;
+
+        for (var i = 0; i < a.Count; i++)
+        {
+            if (a[i] != b[i]) return false;
+        }
+
+        return true;
+    }
+
+    private static void AddClone(List<Matrix4x4F> clones, Rect slot, Thickness inset) =>
+        clones.Add(Matrix4x4F.Translation((float)(slot.X + inset.Left), (float)(slot.Y + inset.Top), 0f));
+
+    // The one card every slot is a clone of. Built from the theme's template; the panel owns no skeleton visual or
+    // animation of its own - the whole look and breathe live in the template.
+    private UIComponent EnsureSkeletonPrototype(DataTemplate template)
+    {
+        if (_skeletonPrototype != null) return _skeletonPrototype;
+
+        _skeletonPrototype = template.Build(this).RootComponent as UIComponent;
+        if (_skeletonPrototype == null) return null;
+
+        _skeletonSet.Add(_skeletonPrototype);   // panel-owned, not a generator container
+        AddVisualChild(_skeletonPrototype);
+        return _skeletonPrototype;
+    }
+
+    private void HideSkeletons()
+    {
+        if (_skeletonClones == null && _skeletonPrototype == null) return;
+
+        _skeletonClones = null;
+        if (_skeletonPrototype != null)
+        {
+            _skeletonPrototype.RenderClones = null;
+            _skeletonPrototype.Visibility = Visibility.Collapsed;
+        }
+
+        SyncLoadingState();
     }
 
     // The LIST-level loading state (ItemsControl.IsLoadingItems): true exactly while cards are on screen. The theme keys
@@ -479,10 +515,10 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
     // fan-out per card per frame). The panel owns the STATE, the theme owns the look.
     private void SyncLoadingState()
     {
-        if (Owner is { } owner) owner.IsLoadingItems = _activeSkeletons.Count > 0;
+        if (Owner is { } owner) owner.IsLoadingItems = ActiveSkeletonCount > 0;
     }
 
-    private static void ArrangeSkeleton((UIComponent card, Rect rect) slot)
+    private static void ArrangeSkeletonUnused((UIComponent card, Rect rect) slot)
     {
         var m = (IMeasurableComponent)slot.card;
         m.Measure(new Size(slot.rect.Width, slot.rect.Height));
@@ -564,7 +600,7 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         {
             _gapCard = template.Build(this).RootComponent as UIComponent;
             if (_gapCard == null) return;
-            _skeletonSet.Add(_gapCard);   // same "not a container" exemption the skeleton cards get
+            _skeletonSet.Add(_gapCard);   // same "not a container" exemption the skeleton prototype gets
             AddVisualChild(_gapCard);
         }
 
@@ -575,69 +611,17 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         measurable.Arrange(rect);
     }
 
-    // A card freed by one slot this pass, for a slot that needs one in the same pass. Never touches Visibility - it was
-    // on screen and stays on screen, only its rect changes.
-    private UIComponent TakeVacated()
-    {
-        if (_vacatedBuf.Count == 0)
-        {
-            return null;
-        }
-
-        var card = _vacatedBuf[^1];
-        _vacatedBuf.RemoveAt(_vacatedBuf.Count - 1);
-        return card;
-    }
-
-    private void ParkVacated()
-    {
-        for (var i = 0; i < _vacatedBuf.Count; i++)
-        {
-            var card = _vacatedBuf[i];
-            card.Visibility = Visibility.Collapsed;
-            _skeletonPool.Push(card);
-        }
-
-        _vacatedBuf.Clear();
-    }
-
-    private UIComponent RentSkeleton(DataTemplate template)
-    {
-        if (_skeletonPool.Count > 0)
-        {
-            var reused = _skeletonPool.Pop();
-            reused.Visibility = Visibility.Visible;
-            return reused;
-        }
-        var card = template.Build(this).RootComponent as UIComponent;
-        if (card == null) return null;
-        _skeletonSet.Add(card);
-        AddVisualChild(card);
-        return card;
-    }
-
-    private void RecycleAllSkeletons()
-    {
-        foreach (var card in _activeSkeletons.Values)
-        {
-            card.Visibility = Visibility.Collapsed;
-            _skeletonPool.Push(card);
-        }
-        _activeSkeletons.Clear();
-        SyncLoadingState();   // no cards on screen -> the list is no longer loading -> the theme stops the shared pulse
-    }
-
-    // Drop all skeleton state - called from Revirtualize, which detaches every visual child (the cards among them), so
-    // the pool/active/set would otherwise hand back cards that are no longer in the tree. Also forgets the item margin
-    // (the ItemTemplate may have changed).
+    // Drop all skeleton state - called from Revirtualize, which detaches every visual child (the prototype among them),
+    // so a stale reference would otherwise point at a card no longer in the tree. Also forgets the item margin (the
+    // ItemTemplate may have changed).
     private void ResetSkeletons()
     {
-        // Clear the ACTIVE cards FIRST: that is what drops IsLoadingItems (SyncLoadingState) and so fires the theme's
-        // ExitAction, which stops the shared pulse in the static AnimationManager. Dropping the references below without
-        // it would leave the list reporting "loading" forever and the pulse ticking with no card on screen.
-        RecycleAllSkeletons();
-        _skeletonPool.Clear();
-        _activeSkeletons.Clear();
+        // Hide FIRST: that is what drops IsLoadingItems (SyncLoadingState) and so fires the theme's ExitAction, which
+        // stops the shared pulse in the static AnimationManager. Dropping the reference below without it would leave the
+        // list reporting "loading" forever and the pulse ticking with no card on screen.
+        HideSkeletons();
+        _skeletonPrototype = null;
+        _prototypeSize = default;
         _skeletonSet.Clear();
         _pendingFrames = 0;
         _itemMarginKnown = false;
@@ -646,12 +630,11 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
     // A tab switch (or any subtree removal) detaches the panel while loading skeletons are still on screen. Detach alone
     // changes nothing about the list's loading state, so the theme's ExitAction would never fire and the shared pulse
     // would keep ticking in the static AnimationManager for a list nobody sees (the "switch tabs mid-load -> FPS never
-    // recovers" report). Recycle the actives now to fire the stop; a re-attach + re-fill re-shows them and the pulse
-    // restarts via the EnterAction.
+    // recovers" report). Hide now to fire the stop; a re-attach + re-fill re-shows them and the pulse restarts.
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
-        if (_activeSkeletons.Count > 0) RecycleAllSkeletons();
+        HideSkeletons();
     }
 
     // The margin a real item's template leaves around each tile - read ONCE from a realized item so a skeleton card

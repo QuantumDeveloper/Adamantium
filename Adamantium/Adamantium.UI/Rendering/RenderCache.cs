@@ -26,6 +26,14 @@ public partial class RenderCache
     {
         public Guid ControlId;
 
+        // The control this group draws. Needed BEFORE its units are walked (a clone host may hold no units of its own
+        // while its children do), so it cannot be read off Units[0].
+        public IUIComponent Component;
+
+        // The clone set as it was RECORDED with this group's contribution (§4o) - never read live off the component at
+        // draw time, which is layout's to write while the render thread draws.
+        public IReadOnlyList<Matrix4x4F> Clones;
+
         // Paint rank - _groups is kept sorted by it. Carried on the group (not a shared map) so the applier can place a
         // spliced group by comparison.
         public long Order;

@@ -339,7 +339,7 @@ public partial class RenderCache
             _drawingContextInternal.Clear();
             component.Render(_drawingContext);
             var commands = CopyCommands(_drawingContextInternal.GetDrawCommands());
-            packet.Draws.Add(new ComponentDraw(component, commands, wasGeometryValid, order));
+            packet.Draws.Add(new ComponentDraw(component, commands, wasGeometryValid, order, component.RenderClones));
             MirrorUnits(component, commands.Count, wasGeometryValid);
             order += OrderGap;
 
@@ -362,7 +362,7 @@ public partial class RenderCache
     {
         ClearOrder();   // the walk re-derives the whole order; whoever it does not visit is simply not in it any more
         foreach (var draw in packet.Draws)
-            ProcessRenderCommands(draw.Component, draw.Commands, packet.ProjectionMatrix, draw.WasGeometryValid, draw.Order);
+            ProcessRenderCommands(draw.Component, draw.Commands, packet.ProjectionMatrix, draw.WasGeometryValid, draw.Order, draw.Clones);
         ReconcileDetachedControls();
     }
 
@@ -427,7 +427,7 @@ public partial class RenderCache
     {
         if (!_groupById.TryGetValue(component.RenderId, out var group))
         {
-            group = new ControlGroup { ControlId = component.RenderId };
+            group = new ControlGroup { ControlId = component.RenderId, Component = component };
             _groupById[component.RenderId] = group;
         }
 
@@ -465,11 +465,25 @@ public partial class RenderCache
         return group;
     }
 
-    private void ProcessRenderCommands(IUIComponent component, IReadOnlyList<IDrawCommand> drawCommands, Matrix4x4F projectionMatrix, bool wasGeometryValid, long order)
+    private void ProcessRenderCommands(IUIComponent component, IReadOnlyList<IDrawCommand> drawCommands, Matrix4x4F projectionMatrix, bool wasGeometryValid, long order, IReadOnlyList<Matrix4x4F> clones = null)
     {
+        // A CLONE HOST takes its place in the paint order even when it draws nothing of its own (§4o): the clone run
+        // starts at its group and covers the subtree that follows. A prototype that is a bare container - the visual
+        // carried by its children - would otherwise never be seen by the draw walk, and its subtree would draw once.
+        if (drawCommands.Count == 0 && clones is { Count: > 0 })
+        {
+            var hostGroup = BuildUnitsFor(component, drawCommands, projectionMatrix);
+            hostGroup.Clones = clones;
+            hostGroup.Order = order;
+            _groups.Add(hostGroup);
+            hostGroup.InOrder = true;
+            return;
+        }
+
         if (drawCommands.Count > 0)
         {
             var group = BuildUnitsFor(component, drawCommands, projectionMatrix);
+            group.Clones = clones;
             group.Order = order;   // _groups stays sorted by rank - a later structural splice merges into it
             _groups.Add(group);
             group.InOrder = true;
