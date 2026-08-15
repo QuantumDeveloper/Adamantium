@@ -145,7 +145,11 @@ public sealed class CompletionEngine
 
         // PropertyPath value (e.g. Binding.Path) -> view-model bindable path completion.
         if (propType.Name == "PropertyPath")
-            return CompleteBindingPath(partial, FindNearestAttributeType(text, offset, "ViewModel", namespaces));
+            // The nearest declared data type wins: inside a DataTemplate that states x:DataType the paths belong to the
+            // ITEM, not to the view's x:ViewModel - and "nearest" is what tells the two apart.
+            return CompleteBindingPath(partial,
+                FindNearestAttributeType(text, offset, "DataType", namespaces)
+                ?? FindNearestAttributeType(text, offset, "ViewModel", namespaces));
 
         // A System.Type-valued property -> type names.
         if (propType.Name == "Type")

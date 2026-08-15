@@ -981,7 +981,7 @@ public class CodeGenerationContext
         switch (member.SpecialType)
         {
             case ResolvedSpecialType.System_String:
-                return $"\"{valueText}\"";
+                return Quote(valueText);
             case ResolvedSpecialType.System_Double:
             case ResolvedSpecialType.System_Single:
             case ResolvedSpecialType.System_Decimal:
@@ -997,7 +997,7 @@ public class CodeGenerationContext
             case ResolvedSpecialType.System_Boolean:
                 return valueText.ToLowerInvariant();
             case ResolvedSpecialType.System_Object:
-                return $"\"{valueText}\"";
+                return Quote(valueText);
             default:
                 return $"{Metadata.DefaultTypeContainer.TypeParser.FullName}.Parse<{member.FullName}>({Quote(valueText)})";
         }
@@ -1024,13 +1024,36 @@ public class CodeGenerationContext
         return null;
     }
 
-    private string Quote(string str) => $"\"{str}\"";
+    // A C# string literal, not just text between quotes: markup carries quotes (&quot;), backslashes and line breaks, and
+    // any of them written straight through produce code that does not compile - which is how this was found, from a
+    // caption that quoted an attribute value.
+    private string Quote(string str)
+    {
+        if (str == null)
+        {
+            return "null";
+        }
+
+        var escaped = str
+            .Replace("\\", "\\\\")
+            .Replace("\"", "\\\"")
+            .Replace("\r", "\\r")
+            .Replace("\n", "\\n");
+
+        return $"\"{escaped}\"";
+    }
     
     private string ProcessNestedValue(IAumlAstNode value, IDiagnosticSink diagnostics, bool isResource)
     {
         if (value is AumlAstObjectNode objNode)
         {
             return ProcessControlElements(objNode, diagnostics, isResource);
+        }
+
+        // {x:Static Type.Member} - the member is read where the value is used, so it needs no variable of its own.
+        if (value is AumlAstStaticMemberValueNode staticMember)
+        {
+            return $"{staticMember.TypeReference.GetFullTypeName()}.{staticMember.MemberName}";
         }
 
         if (value is AumlAstMarkupExtensionLiteral literal)
@@ -1058,7 +1081,8 @@ public class CodeGenerationContext
                     var fullTypeName = typeValueNode.TypeReference.GetFullTypeName();
                     TextGenerator.WriteLine($"{target} = typeof({fullTypeName});");
                 }
-                else if (arg.Value is IAumlAstMarkupExtensionLiteral or IAumlAstMarkupExtensionNode || arg.Value is AumlAstObjectNode)
+                else if (arg.Value is IAumlAstMarkupExtensionLiteral or IAumlAstMarkupExtensionNode
+                         || arg.Value is AumlAstObjectNode or AumlAstStaticMemberValueNode)
                 {
                     var nested = ProcessNestedValue(arg.Value, diagnostics, isResource);
                     TextGenerator.WriteLine($"{target} = {nested};");
@@ -1205,7 +1229,7 @@ public class CodeGenerationContext
         {
             case "Path":
                 if ((value as AumlAstTextNode)?.Text?.Trim() is { Length: > 0 } path)
-                    TextGenerator.WriteLine($"{bindingVar}.Path = new {PropertyPathFqn}(\"{path}\");");
+                    TextGenerator.WriteLine($"{bindingVar}.Path = new {PropertyPathFqn}({Quote(path)});");
                 break;
             case "Mode":
                 if ((value as AumlAstTextNode)?.Text is { Length: > 0 } mode)
@@ -1221,7 +1245,7 @@ public class CodeGenerationContext
                 break;
             case "StringFormat":
                 if ((value as AumlAstTextNode)?.Text is { } format)
-                    TextGenerator.WriteLine($"{bindingVar}.StringFormat = \"{format}\";");
+                    TextGenerator.WriteLine($"{bindingVar}.StringFormat = {Quote(format)};");
                 break;
             case "Source":
                 var source = EmitValueExpression(value, "object", diagnostics, isResource);
