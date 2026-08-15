@@ -210,6 +210,20 @@ public class AumlSourceGenerator : IAumlSourceGenerator
         {
             typeContainer = container.TypeResolver.GetResolvedAssembly(item.Element.TypeReference.Assembly);
             var typeInfo = typeContainer.Types.FirstOrDefault(x => x.Name == item.Element.TypeReference.Name);
+            // A NAMED element held back by x:Load has no field to hold it - it does not exist yet. What the name means
+            // instead is "give it to me", and asking builds it: in UWP the field is simply null until something loads
+            // the element, and everyone trips over that.
+            if (CodeGenerationContext.GetLoadDirective(item.Element) != null)
+            {
+                // PUBLIC, unlike the plain name fields: this one exists to be CALLED FROM OUTSIDE. A view has no code
+                // behind it - it is extended through behaviors - so a private accessor would leave x:Load="False" with
+                // no way to be asked for at all.
+                var slotField = CodeGenerationContext.LoadSlotField(item.Name);
+                textGenerator.WriteLine($"global::Adamantium.UI.Controls.LoadSlot {slotField};");
+                textGenerator.WriteLine($"public {typeInfo.FullName} {item.Name} => ({typeInfo.FullName}){slotField}.Element;");
+                continue;
+            }
+
             textGenerator.WriteLine($"{typeInfo.FullName} {item.Name};");
         }
 

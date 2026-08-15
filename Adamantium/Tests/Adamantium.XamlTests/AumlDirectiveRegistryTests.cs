@@ -16,15 +16,27 @@ public class AumlDirectiveRegistryTests
     private static string Attribute(string directive, string value = "Whatever") =>
         AumlCodegenHarness.WindowHeader + $"x:{directive}=\"{value}\"><Grid /></Window>";
 
+    // What this test asks is "is the directive ACCEPTED", so it has to hand over a value the directive would accept:
+    // one that NAMES A TYPE needs a type that resolves, and one with a fixed set of answers needs one of them -
+    // otherwise the failure is about the value and says nothing about the directive being implemented.
+    private static string LegalValueFor(AumlDirectiveInfo directive)
+    {
+        if (directive.IsTypeReference) return "TextBlock";
+
+        return directive.Name switch
+        {
+            AumlDirectives.Load => "False",
+            AumlDirectives.KeepAlive => "Enabled",
+            _ => "Whatever"
+        };
+    }
+
     [Test]
     public void EveryListedAttributeDirectiveIsAccepted()
     {
         foreach (var directive in AumlDirectives.All.Where(d => d.Usage == AumlDirectiveUsage.Attribute))
         {
-            // A directive whose value NAMES A TYPE has to be given one that resolves, or the failure is about the type
-            // rather than about the directive being accepted.
-            var value = directive.IsTypeReference ? "TextBlock" : "Whatever";
-            AumlCodegenHarness.Generate(Attribute(directive.Name, value), out var errors);
+            AumlCodegenHarness.Generate(Attribute(directive.Name, LegalValueFor(directive)), out var errors);
 
             Assert.That(errors.Select(e => e.GetMessage()), Has.None.Contains($"x:{directive.Name}"),
                 $"x:{directive.Name} is listed for tooling but the transformer does not accept it");

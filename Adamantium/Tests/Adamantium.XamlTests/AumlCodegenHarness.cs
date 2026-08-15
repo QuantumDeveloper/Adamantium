@@ -56,6 +56,16 @@ internal static class AumlCodegenHarness
     public static string Errors(IReadOnlyList<Diagnostic> errors) =>
         "generator reported errors: " + string.Join(" | ", errors.Select(e => e.GetMessage()));
 
+    /// <summary>The generator's WARNINGS - what it accepted but thinks you did not mean.</summary>
+    public static IReadOnlyList<string> Warnings(string auml)
+    {
+        var result = Driver(auml).RunGenerators(Compilation()).GetRunResult();
+        return result.Diagnostics
+            .Where(d => d.Severity == DiagnosticSeverity.Warning)
+            .Select(d => d.GetMessage())
+            .ToArray();
+    }
+
     public static string Generate(string auml, out IReadOnlyList<Diagnostic> errors)
     {
         var result = Driver(auml).RunGenerators(Compilation()).GetRunResult();

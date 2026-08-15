@@ -113,14 +113,18 @@ public class CodeGenerationContext
         if (!isRoot)
         {
             var isNamed = Metadata.NamedElementsMap.TryGetValue(element, out var named);
-            elementName = isNamed
+            var isHeldBack = GetLoadDirective(element) != null;
+            elementName = isNamed && !isHeldBack
                 ? named
                 : GenerateNextElementName();
             // A named element in a control file has a backing field (declared in GenerateControlFile) — assign to
             // the field, otherwise a local var would shadow it (the field would stay null). Inside a ControlTemplate and in
             // theme/resource files there is no field → local var (+ RegisterName for the template below).
+            // A held-back element's name is a PROPERTY reading through its slot, not a field - so its build assigns a
+            // local, or it would be writing to something with no setter.
             var hasBackingField = isNamed
                 && CurrentTemplate == null
+                && !isHeldBack
                 && EntityType is not (EntityType.ResourceDictionary or EntityType.StyleSet or EntityType.Theme);
             var declaration = hasBackingField ? elementName : $"var {elementName}";
 
@@ -315,7 +319,8 @@ public class CodeGenerationContext
                     }
                     else
                     {
-                        TextGenerator.WriteLine($"{CurrentParent}.{propRef.Name} = {templateName};");
+                        var target = isRoot ? "this" : CurrentParent;
+                        TextGenerator.WriteLine($"{target}.{propRef.Name} = {templateName};");
                     }
                     continue;
                 }
@@ -738,8 +743,18 @@ public class CodeGenerationContext
 
         void ProcessLogicalChildren(params AumlAstObjectNode[] childNodes)
         {
-            foreach (var child in childNodes)
+            for (var childIndex = 0; childIndex < childNodes.Length; childIndex++)
             {
+                var child = childNodes[childIndex];
+
+                // x:Load: the child is not built here at all. What goes in its place is a slot holding the factory that
+                // would build it, and the condition that says when - see EmitLoadSlot.
+                if (GetLoadDirective(child) is { } load)
+                {
+                    EmitLoadSlot(child, load, childIndex, elementName, typeInfo, diagnostics, isResource);
+                    continue;
+                }
+
                 var childName = ProcessControlElements(child, diagnostics, isResource);
 
                 if (element.TypeReference.Name == "Style")
@@ -802,6 +817,80 @@ public class CodeGenerationContext
         PopTypeContext();
 
         return elementName;
+    }
+
+    /// <summary>The <c>x:Load</c> directive on this element, or null. Its value has already been judged by the
+    /// transformer - text here is only ever True or False, anything else is a binding node.</summary>
+    internal static AumlAstDirective GetLoadDirective(AumlAstObjectNode node) =>
+        node.Children.OfType<AumlAstDirective>().FirstOrDefault(d => d.Name == AumlDirectives.Load);
+
+    /// <summary>The field holding the slot of a NAMED held-back element. The name is exposed as a property that reads
+    /// through it, so asking for the element by name builds it - see the generated accessor.</summary>
+    internal static string LoadSlotField(string elementName) => $"_load_{elementName}";
+
+    // An element held back by x:Load is not constructed here: what is emitted in its place is a LoadSlot holding a local
+    // factory function (the element's whole build, moved wholesale into it) and the condition. The slot is a LOGICAL
+    // child of the container, never a visual one - layout and rendering never see it - and it has to be in the tree at
+    // all because a condition may be a BINDING, which resolves against the DataContext in force at the element's place.
+    private void EmitLoadSlot(AumlAstObjectNode child, AumlAstDirective load, int index, string containerVar,
+        IResolvedType containerType, IDiagnosticSink diagnostics, bool isResource)
+    {
+        // Putting it back where it was written is the container's own incremental child editing (IContainer) - the same
+        // contract the live designer reconciles markup edits through. A container without it has no way to take the
+        // element back at its place, and saying so beats generating something that silently appends or never removes.
+        // A template is applied to MANY controls, and the slot would be one field on the generated class - every
+        // application overwriting the last, so the name would answer with whichever control was templated most
+        // recently. Template parts also live in the template's own namescope rather than as fields, so the accessor
+        // has nowhere right to be. Refuse it instead of generating something that is wrong per control.
+        if (CurrentTemplate != null)
+        {
+            diagnostics.ReportError(Metadata.ClassName,
+                $"x:Load is not supported inside a template: a template is applied to many controls, and the element " +
+                $"would be held by one slot shared between all of them. {load.GetLineInfo()}");
+            return;
+        }
+
+        if (!containerType.ImplementsInterface("IContainer") || !containerType.ImplementsInterface("IFundamentalUIComponent"))
+        {
+            diagnostics.ReportError(Metadata.ClassName,
+                $"x:Load is not supported inside {containerType.Name}: it must be an IContainer (so the element can go " +
+                $"back at its place) and an IFundamentalUIComponent (so the condition has a DataContext). {load.GetLineInfo()}");
+            return;
+        }
+
+        // A named element's slot goes into the FIELD its name reads through, so asking for it by name reaches the same
+        // slot and builds it. An unnamed one is only ever driven by its condition, so a local is enough.
+        var isNamed = Metadata.NamedElementsMap.TryGetValue(child, out var childName_);
+        var slotVar = isNamed ? LoadSlotField(childName_) : GenerateNextElementName("load");
+        var slotDeclaration = isNamed ? slotVar : $"var {slotVar}";
+        var builder = $"Build_{GenerateNextElementName("load")}";
+
+        TextGenerator.NewLine();
+        TextGenerator.WriteLine($"{UIComponentFqn} {builder}()");
+        TextGenerator.WriteOpenBraceAndIndent();
+        var childName = ProcessControlElements(child, diagnostics, isResource);
+        TextGenerator.WriteLine($"return {childName};");
+        TextGenerator.UnindentAndWriteCloseBrace();
+
+        TextGenerator.WriteLine(
+            $"{slotDeclaration} = new {LoadSlotFqn}({builder}, ({ContainerFqn}){containerVar}, {index});");
+        TextGenerator.WriteLine($"(({FundamentalComponentFqn}){containerVar}).AddLogicalChild({slotVar});");
+
+        switch (load.Value)
+        {
+            case AumlAstTextNode { Text: var text } when text.Trim() == "True":
+                TextGenerator.WriteLine($"{slotVar}.Condition = true;");
+                break;
+            case AumlAstTextNode:
+                // "False" - nothing is built until something asks for it by name.
+                break;
+            default:
+                TextGenerator.WriteLine(
+                    $"{slotVar}.SetBinding({LoadSlotFqn}.ConditionProperty, {EmitBinding(load.Value, diagnostics, isResource)});");
+                break;
+        }
+
+        TextGenerator.NewLine();
     }
 
     // Emits `{targetVar} = new {templateType}(Build_xxx);` plus the local builder function that constructs the template's
@@ -1114,6 +1203,10 @@ public class CodeGenerationContext
         return $"{bindingTarget}.SetBinding(\"{propRef.Name}\", {bindingVar});";
     }
 
+    private const string LoadSlotFqn = "global::Adamantium.UI.Controls.LoadSlot";
+    private const string ContainerFqn = "global::Adamantium.UI.Core.IContainer";
+    private const string FundamentalComponentFqn = "global::Adamantium.UI.Core.IFundamentalUIComponent";
+    private const string UIComponentFqn = "global::Adamantium.UI.Core.IUIComponent";
     private const string BindingFqn = "global::Adamantium.UI.Core.Data.Binding";
     private const string MultiBindingFqn = "global::Adamantium.UI.Core.Data.MultiBinding";
     private const string PropertyPathFqn = "global::Adamantium.UI.Core.PropertyPath";
