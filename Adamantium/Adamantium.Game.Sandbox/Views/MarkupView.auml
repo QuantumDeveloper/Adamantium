@@ -125,6 +125,64 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
+            <!-- ============ x:Load ============ -->
+            <TextBlock Text="x:Load — an element that is not there yet" FontSize="18" Margin="0,32,0,4"/>
+            <TextBlock Opacity="0.7" MarginBottom="12"
+                       Text="Not hidden — ABSENT. While the condition is false the panel below is not constructed at all, and the counter says so. Turn it on and off again: it is parked, not rebuilt, so the counter never passes 1."/>
+
+            <CheckBox Content="Build the panel — x:Load={Binding HeavyShown}"
+                      IsChecked="{Binding HeavyShown, Mode=TwoWay}" MarginBottom="6"/>
+            <TextBlock Text="{Binding HeavyBuilds, StringFormat='times constructed: {0}'}" MarginBottom="12"/>
+
+            <Border BorderThickness="1" CornerRadius="6" Padding="12" MinHeight="80"
+                    BorderBrush="{ResourceReference ControlStrokeColorDefault}">
+                <StackPanel Orientation="Vertical">
+                    <local:DemoBuildProbe x:Name="Heavy" x:Load="{Binding HeavyShown}"
+                                          CornerRadius="4" Padding="10"
+                                          Background="{ResourceReference CardBackgroundFillColorDefault}">
+                        <StackPanel Orientation="Vertical">
+                            <TextBlock Text="built on demand" MarginBottom="6"/>
+                            <TextBlock Opacity="0.7"
+                                       Text="Everything in here - this panel, both captions, the rows below - exists only after the box above is ticked."/>
+                            <ItemsControl ItemsSource="{Binding Rows}" MarginTop="8">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="local:ViewModels.MarkupRow">
+                                        <TextBlock Text="{Binding Title}" Opacity="0.7" MarginBottom="2"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </local:DemoBuildProbe>
+                </StackPanel>
+            </Border>
+
+            <!-- The other form: nothing watches a condition, so the element waits to be ASKED for. With no code behind
+                 a view, the asker is a behavior - and reading the generated name IS the asking. -->
+            <TextBlock Text="x:Load=&quot;False&quot; — waits to be asked for" FontSize="18" Margin="0,32,0,4"/>
+            <TextBlock Opacity="0.7" MarginBottom="12"
+                       Text="No condition to answer, so nothing will ever build it on its own. The button's behavior reads the element's name, and reading it builds it. A one-way trip: there is no condition to put it back."/>
+
+            <StackPanel Orientation="Horizontal" MarginBottom="6">
+                <Button Content="Ask for it" MarginRight="12">
+                    <Button.Behaviors>
+                        <local:Behaviors.RevealHeldBackBehavior/>
+                    </Button.Behaviors>
+                </Button>
+                <TextBlock Text="{Binding ManualBuilds, StringFormat='times constructed: {0}'}"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <Border BorderThickness="1" CornerRadius="6" Padding="12" MinHeight="60"
+                    BorderBrush="{ResourceReference ControlStrokeColorDefault}">
+                <StackPanel Orientation="Vertical">
+                    <local:DemoManualProbe x:Name="Manual" x:Load="False"
+                                           CornerRadius="4" Padding="10"
+                                           Background="{ResourceReference CardBackgroundFillColorDefault}">
+                        <TextBlock Text="asked for by name, built on the spot"/>
+                    </local:DemoManualProbe>
+                </StackPanel>
+            </Border>
+
         </StackPanel>
     </ScrollViewer>
 </View>

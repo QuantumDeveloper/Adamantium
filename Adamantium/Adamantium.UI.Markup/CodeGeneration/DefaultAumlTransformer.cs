@@ -620,6 +620,42 @@ public class DefaultAumlTransformer : IAumlTransformer
                                 $"x:KeepAlive expects Disabled, Enabled or Required, got '{mode}'. {directive.GetLineInfo()}");
                         }
                     }
+                    else if (directive.Name == AumlDirectives.Load)
+                    {
+                        // The condition may be a BINDING, so the value is not judged as text. A "{...}" body is parsed
+                        // as a markup extension and walked like any other value, so its type reference resolves and the
+                        // generator emits it through the ordinary binding path - there is no second way to write one.
+                        var condition = (directive.Value as AumlAstTextNode)?.Text?.Trim();
+                        if (condition != null && condition.StartsWith("{"))
+                        {
+                            var parsed = MarkupExtensionParser.Parse(new ParserContext(null), condition,
+                                directive.GetLineInfo(), document.NamespaceMappings.ToList());
+                            if (parsed is AumlAstMarkupExtensionNode { TypeReference.Name: "Binding" or "MultiBinding" })
+                            {
+                                directive.Value = ProcessValueNode(parsed);
+                                queue.Enqueue(directive.Value);
+                            }
+                            else
+                            {
+                                diagnostics.ReportError(document.FileName,
+                                    $"x:Load takes True, False or a binding, got '{condition}'. {directive.GetLineInfo()}");
+                            }
+                        }
+                        else if (condition == "True")
+                        {
+                            // Legal, and does nothing: the element is built either way. Worth saying, because a
+                            // directive that reads as "I arranged something here" and arranges nothing is exactly what
+                            // nobody notices - and it still costs a slot and turns the name into an accessor.
+                            diagnostics.ReportWarning(document.FileName,
+                                $"x:Load=\"True\" holds nothing back - the element is built anyway. Remove it, or give " +
+                                $"it a condition to answer. {directive.GetLineInfo()}");
+                        }
+                        else if (condition != "False")
+                        {
+                            diagnostics.ReportError(document.FileName,
+                                $"x:Load takes True, False or a binding, got '{condition}'. {directive.GetLineInfo()}");
+                        }
+                    }
                     else if (directive.Name == AumlDirectives.DataType)
                     {
                         // Declared, not inferred: the type is what tooling resolves {Binding} paths against inside the
@@ -687,6 +723,8 @@ public class DefaultAumlTransformer : IAumlTransformer
             }
         }
 
+        ReportTargetsIntoHeldBackElements(document, diagnostics);
+
         foreach (var kvp in usings)
         {
             container.Usings.Add(kvp.Key);
@@ -701,6 +739,60 @@ public class DefaultAumlTransformer : IAumlTransformer
         container.HasSemanticErrors = diagnostics.HasErrors;
 
         return container;
+    }
+
+    // A trigger reaches a template part by NAME, and a name resolves through the names the template registered - which a
+    // held-back element does only once it is built. So a trigger aimed into an unloaded chunk does not fail, it simply
+    // never arrives, and the part keeps whatever it was given last. Say it at build time; the runtime cannot.
+    private static void ReportTargetsIntoHeldBackElements(AumlDocument document, IDiagnosticSink diagnostics)
+    {
+        var heldBack = new HashSet<string>();
+        var targets = new List<AumlAstTextNode>();
+        Collect(document.Root);
+
+        foreach (var target in targets)
+        {
+            if (heldBack.Contains(target.Text.Trim()))
+            {
+                diagnostics.ReportError(document.FileName,
+                    $"TargetName='{target.Text}' points at an element held back by x:Load. It would resolve to nothing " +
+                    $"until that element is built, and silently do nothing until then. {target.GetLineInfo()}");
+            }
+        }
+
+        void Collect(IAumlAstNode node)
+        {
+            switch (node)
+            {
+                case AumlAstObjectNode obj:
+                    var directives = obj.Children.OfType<AumlAstDirective>().ToList();
+                    if (directives.Any(d => d.Name == AumlDirectives.Load)
+                        && directives.FirstOrDefault(d => d.Name == AumlDirectives.Name)?.Value is AumlAstTextNode name)
+                    {
+                        heldBack.Add(name.Text.Trim());
+                    }
+
+                    foreach (var child in obj.Children)
+                    {
+                        Collect(child);
+                    }
+
+                    break;
+
+                case AumlAstPropertyNode property:
+                    if ((property.Property as AumlAstPropertyReference)?.Name == "TargetName")
+                    {
+                        targets.AddRange(property.Values.OfType<AumlAstTextNode>());
+                    }
+
+                    foreach (var value in property.Values)
+                    {
+                        Collect(value);
+                    }
+
+                    break;
+            }
+        }
     }
 
     /// <summary>
