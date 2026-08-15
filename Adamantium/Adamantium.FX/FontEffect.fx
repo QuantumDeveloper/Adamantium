@@ -70,6 +70,15 @@ float SdfBlendHi;
 uint64_t GlyphInstancesAddress;
 uint64_t TransformsAddress;
 
+// One entry of the transform table (see Adamantium.UI/Rendering/TransformTable.cs). It carries the node's ALPHA beside
+// its matrix - both are one node's state, and this shader must know the layout even though it only reads the matrix,
+// or it would stride through the buffer wrong.
+struct NodeSlot
+{
+    float4x4 World;
+    float4   Params;   // .x = alpha (1 = opaque); .yzw reserved
+};
+
 // Per-glyph quad expansion, now in the VERTEX stage (corner from SV_VertexID), so the geometry shader is gone:
 // plain instanced rendering (4-vertex triangle strip x N glyphs), portable to Metal/MoltenVK and free of the
 // NVIDIA Turing GS NVVM bug.
@@ -294,8 +303,8 @@ PSInput FontBatchInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_I
     float2 corner = TextureCornerCoords[vertexId];
     float2 localPos = g.LocalRect.xy + corner * g.LocalRect.zw;
     // Node-local -> world via the instance's transform-table matrix (slot 0 = identity for legacy world bakes).
-    float4x4* transforms = (float4x4*)TransformsAddress;
-    float4x4 nodeWorld = transforms[(uint)g.Params.x];
+    NodeSlot* nodes = (NodeSlot*)TransformsAddress;
+    float4x4 nodeWorld = nodes[(uint)g.Params.x].World;
     float4 worldPos = mul(float4(localPos, g.Params.z, 1.0), nodeWorld);
     o.Position = mul(worldPos, MatrixTransform);   // MatrixTransform = the (transposed-on-upload) projection
     o.UV = g.Source.xy + corner * g.Source.zw;     // SpriteEffect == 0 for batched glyphs

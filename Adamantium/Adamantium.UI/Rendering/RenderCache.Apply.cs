@@ -115,7 +115,7 @@ public partial class RenderCache
             {
                 // APPLY pass (GPU): realize the recorded draws - update the units in place / splice a count change.
                 foreach (var draw in packet.Draws)
-                    ApplyReRender(draw.Component, draw.Commands, draw.Order);
+                    ApplyReRender(draw.Component, draw.Commands, draw.Order, draw.Clones);
 
                 if (LastBuildKind != RenderBuildKind.Full) LastBuildKind = RenderBuildKind.Partial;
                 LastBuildTransformDirty |= packet.IsTransformDirty;
@@ -205,7 +205,7 @@ public partial class RenderCache
         _drawingContextInternal.Clear();
         component.Render(_drawingContext);   // NB: consumes the dirty flag (Render sets IsGeometryValid back to true)
         var commands = CopyCommands(_drawingContextInternal.GetDrawCommands());
-        packet.Draws.Add(new ComponentDraw(component, commands, false, rank));
+        packet.Draws.Add(new ComponentDraw(component, commands, false, rank, component.RenderClones));
         MirrorUnits(component, commands.Count, false);   // it WAS dirty: no commands now means "draws nothing" -> units freed
         return PartialRecord.Recorded;
     }
@@ -213,9 +213,14 @@ public partial class RenderCache
     // APPLY half (GPU): realize ONE recorded partial draw - update the group's units in place (same count+type) or splice
     // in the count/type change. `order` (the paint rank) rides WITH the draw, so a group appearing for the first time is
     // placed without the applier ever reading the recorder's rank map.
-    private void ApplyReRender(IUIComponent component, IReadOnlyList<IDrawCommand> drawCommands, long order)
+    private void ApplyReRender(IUIComponent component, IReadOnlyList<IDrawCommand> drawCommands, long order,
+        IReadOnlyList<Adamantium.Mathematics.Matrix4x4F> clones = null)
     {
         _groupById.TryGetValue(component.RenderId, out var group);
+
+        // The clone set travels with the contribution on EVERY path, this one included: a partial re-render that left it
+        // untouched went on drawing the previous frame's set (caught by DroppingTheClones_ReturnsToASingleDraw).
+        if (group != null) group.Clones = clones;
         var oldCount = group?.Units.Count ?? 0;
 
         // Fast path: same command count and every unit still matches -> update in place; nothing structural changed. Gate
@@ -315,6 +320,7 @@ public partial class RenderCache
             var replace = existing == null || !existing.InOrder || existing.Order != draw.Order;
 
             var group = BuildUnitsFor(draw.Component, draw.Commands, packet.ProjectionMatrix);
+            group.Clones = draw.Clones;   // the THIRD apply path - a clone set has to arrive on all of them, not two
             group.Order = draw.Order;
 
             if (replace) QueueInsert(group);

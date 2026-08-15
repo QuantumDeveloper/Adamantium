@@ -23,6 +23,30 @@ public partial class RenderCache
     // SDF vertex shaders fetch each instance's matrix by slot, so moving a node costs ONE matrix write instead of re-baking
     // its instances - and rotated/3D instances stay batched. Owned per cache; initialised in the Render device block.
     private TransformTable _transformTable;
+
+    // Set only while a clone run is being drawn (§4o); null on every ordinary group, which is what keeps the hot loop
+    // paying one null check instead of a matrix multiply.
+    private Matrix4x4F? _cloneMatrix;
+
+    /// <summary>Index just past the prototype's subtree in <see cref="_groups"/>. Paint rank is DFS order, so a subtree
+    /// is a CONTIGUOUS run: scan forward while each group's control is a visual descendant of the prototype.</summary>
+    private int CloneSubtreeEnd(int start)
+    {
+        var prototype = _groups[start].Component;
+        var end = start + 1;
+        while (end < _groups.Count && IsVisualDescendantOf(_groups[end].Component, prototype)) end++;
+        return end;
+    }
+
+    private static bool IsVisualDescendantOf(IUIComponent node, IUIComponent ancestor)
+    {
+        for (var p = node?.VisualParent; p != null; p = p.VisualParent)
+        {
+            if (ReferenceEquals(p, ancestor)) return true;
+        }
+
+        return false;
+    }
     private GradientRectCollector _gradientRectBatch;   // SDF family: rounded rects with a linear/radial GRADIENT fill
     private GradientEllipseCollector _gradientEllipseBatch;   // SDF family: ellipses with a linear/radial GRADIENT fill
     private PatternRectCollector _patternBatch;   // SDF family: rounded rects with a PROCEDURAL pattern fill (checker/stripes/dots/grid)
@@ -107,10 +131,19 @@ public partial class RenderCache
             _transformTable.EnsureResources(device);
             _transformTable.SetMatrix(device, _transformTable.AcquireSlot(Guid.Empty), Matrix4x4F.Identity);
         }
-        else
+
+        // Every clone takes a slot of its own, and a clone run asks for its whole set in ONE frame. The buffer is sized
+        // here and nowhere else, so the count has to be known BEFORE it is made - discovering it while baking leaves the
+        // overflow unuploaded and the shader reading past the buffer (tiles vanishing and jumping, differently each
+        // frame). Cheap: this scans groups, and only a clone host contributes.
+        var reserve = 0;
+        foreach (var group in _groups)
         {
-            _transformTable.EnsureResources(device);
+            if (group.Clones is { Count: > 0 } clones) reserve += clones.Count;
         }
+
+        _transformTable.Reserve(reserve);
+        _transformTable.EnsureResources(device);
 
         var address = _transformTable.DeviceAddress;
         if (_rectBatch != null) _rectBatch.TransformsAddress = address;
@@ -146,6 +179,36 @@ public partial class RenderCache
     /// units.</summary>
     public void Render(IGraphicsDevice device, Rect2D fullScissor)
     {
+        // TEMP trace: one array write per frame, dumped from memory by the overlay.
+        var traceStart = Core.Diagnostics.FrameTrace.Enabled ? System.Diagnostics.Stopwatch.GetTimestamp() : 0L;
+        _traceReplayed = false;
+        _traceWhy = 0;
+        try
+        {
+            RenderCore(device, fullScissor);
+        }
+        finally
+        {
+            if (Core.Diagnostics.FrameTrace.Enabled)
+            {
+                var clones = 0;
+                foreach (var g in _groups)
+                {
+                    if (g.Clones is { Count: > 0 } c) clones += c.Count;
+                }
+
+                Core.Diagnostics.FrameTrace.Add(
+                    System.Diagnostics.Stopwatch.GetElapsedTime(traceStart).TotalMilliseconds,
+                    (byte)LastBuildKind, _traceReplayed, clones, _traceWhy);
+            }
+        }
+    }
+
+    private bool _traceReplayed;
+    private byte _traceWhy;
+
+    private void RenderCore(IGraphicsDevice device, Rect2D fullScissor)
+    {
         // This frame's transform-table copy, picked BEFORE anything writes a matrix or draws - the composited animations
         // below write matrices, and the replay paths below draw without ever reaching the walk's setup block.
         BeginTransformFrame(device);
@@ -159,6 +222,7 @@ public partial class RenderCache
         // still hold its bytes). Only a fully-Clean build qualifies; a Partial/Full re-walks and re-records.
         if (device != null && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Clean && OpsMatchTransforms)
         {
+            _traceReplayed = true;
             ExecuteOps(device, fullScissor);
             return;
         }
@@ -169,7 +233,7 @@ public partial class RenderCache
         // while per-unit draws follow the new transform (the "outline runs ahead of its fill" tear) -> fall through to the walk.
         if (device != null && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Partial
             && !LastBuildTransformDirty && OpsMatchTransforms && !_partialSpliced && _rectBatch != null && TryPartialReplay(device, fullScissor))
-            return;
+        { _traceReplayed = true; return; }
 
         // SPLICED partial patch: a dirty control's unit COUNT changed (hover background 0<->1, a live chart re-recording a
         // different number of segments). Its group re-rendered in place; here the retained BATCH is patched by segment
@@ -177,7 +241,19 @@ public partial class RenderCache
         // paint position) then replayed. O(dirty groups). Falls back to the full walk on anything not yet patchable.
         if (device != null && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Partial
             && !LastBuildTransformDirty && OpsMatchTransforms && _partialSpliced && _rectBatch != null && TrySplicedPatch(device, fullScissor))
-            return;
+        { _traceReplayed = true; return; }
+
+        // TEMP trace: WHY this frame is walking instead of patching - the walk is O(scene) and the patch is O(dirty), so
+        // every one of these is a 43 ms frame among 0.12 ms ones.
+        if (Core.Diagnostics.FrameTrace.Enabled && LastBuildKind == RenderBuildKind.Partial)
+        {
+            _traceWhy = !_opsRecorded ? (byte)1
+                : !_opsReplayable ? (byte)2
+                : LastBuildTransformDirty ? (byte)3
+                : !OpsMatchTransforms ? (byte)4
+                : _partialSpliced ? (byte)5
+                : (byte)6;   // the patch itself refused
+        }
 
         var scissorNarrowed = false;   // whether the active scissor is currently narrower than fullScissor
 
@@ -245,9 +321,37 @@ public partial class RenderCache
             _batchOpen = false;
         }
 
-        foreach (var group in _groups)
-        foreach (var unit in group.Units)
+        // CLONES (§4o): a prototype's subtree is drawn once per matrix instead of once at its own place. The subtree is a
+        // CONTIGUOUS run of groups (paint rank is DFS order), so a clone run is "replay groups [start, end) under another
+        // matrix" - the per-unit body below is untouched except for the one line that composes the clone into the world.
+        IReadOnlyList<Matrix4x4F> cloneRun = null;
+        var cloneStart = 0;
+        var cloneEnd = 0;
+        var cloneIndex = 0;
+        var recordingBeforeClones = _recording;
+
+        for (var groupIndex = 0; groupIndex < _groups.Count; groupIndex++)
         {
+            var group = _groups[groupIndex];
+
+            if (cloneRun == null && group.Clones is { Count: > 0 } clones)
+            {
+                cloneRun = clones;
+                cloneStart = groupIndex;
+                cloneEnd = CloneSubtreeEnd(groupIndex);
+                cloneIndex = 0;
+                _cloneMatrix = clones[0];
+                // A clone run IS recorded - the stream has to describe the whole frame, clones included, or a replay
+                // re-issues everything except them. What it must NOT do is offer this group to the per-unit patch paths:
+                // they key a batch slot by UNIT, one to one, and a cloned unit owns N of them. Marking the group
+                // unpatchable says exactly that, and costs nothing else.
+                // (Refusing to replay instead was the first attempt, and it cost the whole window its fast path for as
+                // long as any skeleton was on screen: 600 fps -> 180.)
+                group.PatchableRectOnly = false;
+            }
+
+            foreach (var unit in group.Units)
+            {
             // Group boundary (recording walks): reset this group's spliced-patch records once per group (re-derived by the
             // draw decisions below). Boundary detection instead of an outer block keeps the hot loop flat.
             if (_recording && !ReferenceEquals(group, _walkGroup))
@@ -260,7 +364,10 @@ public partial class RenderCache
 
             // World transform read ONCE (frame-memoized): the bounds-cull below and the GPU re-bake use the SAME value, so
             // the cull can't approve "inside" while the GPU draws the element elsewhere (the spill).
+            // A clone COMPOSES onto it (never replaces it): the subtree keeps its own internal layout and the clone only
+            // says where this copy goes. Substituting would collapse the whole subtree onto the clone's origin.
             var wt = World(unit.Component);
+            if (_cloneMatrix.HasValue) wt = wt * _cloneMatrix.Value;
 
             var scissor = fullScissor;
             var clipped = false;
@@ -725,7 +832,27 @@ public partial class RenderCache
             if (_recording) { group.PatchableRectOnly = false; MarkNodeNotAware(unit.Component); }   // per-unit draw: world-baked RenderData
             unit.Render();
             if (_recording) _ops.Add(new RenderOp { Kind = RenderOpKind.Unit, Unit = unit });
+            }
+
+            // End of a clone run's subtree: rewind to its first group under the next matrix, or leave the run.
+            if (cloneRun != null && groupIndex == cloneEnd - 1)
+            {
+                if (++cloneIndex < cloneRun.Count)
+                {
+                    _cloneMatrix = cloneRun[cloneIndex];
+                    groupIndex = cloneStart - 1;
+                }
+                else
+                {
+                    cloneRun = null;
+                    _cloneMatrix = null;
+                    _recording = recordingBeforeClones;
+                }
+            }
         }
+
+        _cloneMatrix = null;   // a run that ended on the last group leaves it set otherwise
+        _recording = recordingBeforeClones;
 
         // Drain the tail batches (rects under fills under text), then leave the device on the full scissor for next pass.
         if (device != null) FlushBatches(device, fullScissor, ref scissorNarrowed);
@@ -908,7 +1035,11 @@ public partial class RenderCache
             if (!_groupById.TryGetValue(comp.RenderId, out var g)) continue;
             foreach (var u in g.Units)
                 if (!IsSlotPatchable(u))
+                {
+                    // TEMP: name the type that costs the frame its patch.
+                    if (Core.Diagnostics.FrameTrace.Enabled) Core.Diagnostics.FrameTrace.Refuser = u.GetType().Name;
                     return false;   // a per-unit / text / instanced / no-longer-batchable dirty unit -> full walk
+                }
         }
         // Nothing moved on a geometry-only partial, so the cached world is still valid; re-bake each dirty tile from its
         // (just-updated) payload into its retained slot. (No-units components patched nothing above.)

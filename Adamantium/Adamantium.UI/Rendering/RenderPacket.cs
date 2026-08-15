@@ -94,11 +94,17 @@ internal sealed class RenderPacket
 /// <see cref="WasGeometryValid"/>, exactly as the fused walk did) + its PAINT RANK, which is how the applier places the
 /// group without ever reading the recorder's rank map across the seam.</summary>
 internal readonly struct ComponentDraw(IUIComponent component, IReadOnlyList<IDrawCommand> commands, bool wasGeometryValid,
-    long order)
+    long order, IReadOnlyList<Matrix4x4F> clones = null)
 {
     public IUIComponent Component { get; } = component;
     public IReadOnlyList<IDrawCommand> Commands { get; } = commands;
     public bool WasGeometryValid { get; } = wasGeometryValid;
+
+    /// <summary>The component's clone set (§4o), SNAPSHOT with the rest of its contribution. Read live off the component
+    /// at draw time instead, it is written by layout on the loop thread while the render thread is drawing: the frame
+    /// then paints a set that no longer matches the tiles recorded beside it, which showed up as skeletons trailing the
+    /// scroll by a frame or two (measured: 154 frames of 357 emitted a different count than was declared).</summary>
+    public IReadOnlyList<Matrix4x4F> Clones { get; } = clones;
 
     /// <summary>The component's paint rank (_groups is sorted by it).</summary>
     public long Order { get; } = order;

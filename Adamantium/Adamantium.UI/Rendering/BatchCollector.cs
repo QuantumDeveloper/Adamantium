@@ -10,7 +10,9 @@ using Adamantium.Vulkan.Core;
 namespace Adamantium.UI.Rendering;
 
 // Shared machinery for the CPU-baked instanced UI batches (text glyphs, item-background rects; see
-// docs/TEXT_GLYPH_BATCH_PLAN.md §9). Holds a growable CPU array + one growable GPU vertex buffer, filled APPEND-ONLY
+// docs/TEXT_GLYPH_BATCH_PLAN.md §9). Holds a growable CPU array + one growable GPU buffer - a BDA STORAGE buffer read
+// in the vertex shader by SV_InstanceID (the quad comes from SV_VertexID), except for the glyph/text batch, which still
+// binds its instances as a per-instance VERTEX buffer (see UsesStorageBuffer). Filled APPEND-ONLY
 // within a frame and drawn as SEGMENTS - a segment is a run of items sharing one clip (scissor), drawn with a
 // firstInstance offset so a mid-frame flush never overwrites an earlier segment's still-recorded draw. The GPU buffer
 // only grows at BeginFrame (a safe point: the render runs after the frame fence, so last frame's reads are done). The

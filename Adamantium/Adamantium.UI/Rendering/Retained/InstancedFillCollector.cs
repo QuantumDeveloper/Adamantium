@@ -816,10 +816,12 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     /// it. Set by the caller each frame (the table may have been reallocated), same as for the SDF batches.</summary>
     public ulong TransformsAddress { get; set; }
 
+
     private void SetupInstancedState(Matrix4x4F projection)
     {
         _effect.Projection.SetValue(projection);
         _effect.TransformsAddress.SetValue(TransformsAddress);
+
         _device.VertexType = typeof(UIVertex);
         _device.PolygonMode = PolygonMode.Fill;
         _device.RasterizerDiscardEnabled = false;   // a prior compute pass (fringe/stroke expander) may have left discard ON

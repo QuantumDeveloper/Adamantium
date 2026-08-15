@@ -74,6 +74,16 @@ public interface IUIComponent : IFundamentalUIComponent
     /// for it must survive. Detachment alone means "gone"; parking is what tells the difference.</summary>
     bool IsParked { get; }
 
+    /// <summary>Draw this element's SUBTREE once per matrix here, instead of once at its own place - the element becomes
+    /// a PROTOTYPE and each matrix a clone. Null or empty (the normal case) means the ordinary single draw.
+    /// <para>What this buys: N copies of a visual cost ONE real element. The clones exist only in the instance buffer -
+    /// they are in no tree, take no layout, take no hit-test and hold no state. A virtualizing panel's loading skeletons
+    /// are the first user: it built a full template instance per empty slot (measured: 3469 template builds in a 0.25 s
+    /// window against 147 realized containers), and every property write of every build marked layout dirty.</para>
+    /// <para>The matrix is COMPOSED, not substituted: a unit is drawn at <c>clone * itsWorld</c>, so the subtree keeps
+    /// its internal layout and the clone only says where the copy goes.</para></summary>
+    IReadOnlyList<Matrix4x4F> RenderClones { get; }
+
     /// <summary>A render MOTION NODE: this element's subtree translates as a unit (a transform-only-scrolled panel).
     /// The render cache bakes its descendants' batched instances in THIS node's space and gives them its transform-table
     /// slot, so moving the node costs one matrix write instead of re-baking the subtree (the O(1)-scroll path). Set by

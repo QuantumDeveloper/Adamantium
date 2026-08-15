@@ -33,6 +33,18 @@ SamplerState SourceSampler : register(s2);
 // instances inside the batch (the old axis-aligned world bake had to reject them to per-unit draws).
 uint64_t TransformsAddress;
 
+// One entry of that table. Alpha lives HERE, beside the matrix, rather than in a second table with a second address:
+// adding one more global uint64_t to this effect stopped shader creation outright (measured - a declaration alone, used
+// by nothing, killed startup 3 times out of 3, while the same build without it started 3 of 3). The parameter block is
+// evidently at its limit, and one slot's matrix and alpha are one node's state anyway, so they belong together.
+// Params.x = alpha (1 = opaque); .yzw reserved. Padded to 16 bytes so the struct stays 16-byte aligned.
+struct NodeSlot
+{
+    float4x4 World;
+    float4   Params;
+};
+
+
 // GPU-resident FRACTAL REFERENCE ORBITS (perturbation deep-zoom): a flat float2[] holding every deep-zoom fractal
 // instance's reference orbit Z_n concatenated. Each FractalRectData.Ref.x is this instance's START INDEX into it and
 // .y the length. Zero (address 0) when no deep-zoom fractal is live - the shader only dereferences it on the deep path.
@@ -408,8 +420,8 @@ FillPSInput InstancedFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
     GeometryInstance inst = instances[instanceId];
     // local -> slot space -> world. The slot matrix lives in the transform table, so a node move rewrites 64 bytes there
     // and every instance under it follows without this buffer being touched (same scheme as the SDF batches).
-    float4x4* transforms = (float4x4*)TransformsAddress;
-    float4 world = mul(mul(float4(v.position.xyz, 1.0), inst.Local), transforms[(uint)inst.Params.x]);
+    NodeSlot* nodes = (NodeSlot*)TransformsAddress;
+    float4 world = mul(mul(float4(v.position.xyz, 1.0), inst.Local), nodes[(uint)inst.Params.x].World);
     FillPSInput o;
     o.Position = mul(world, Projection);
     o.Color = inst.Color;
@@ -478,8 +490,8 @@ FringePSInput InstancedFringeVS(FringeVertex v, uint instanceId : SV_InstanceID)
 {
     GeometryInstance* instances = (GeometryInstance*)InstancesAddress;
     GeometryInstance inst = instances[instanceId];
-    float4x4* transforms = (float4x4*)TransformsAddress;
-    float4x4 m = mul(mul(inst.Local, transforms[(uint)inst.Params.x]), Projection);
+    NodeSlot* nodes = (NodeSlot*)TransformsAddress;
+    float4x4 m = mul(mul(inst.Local, nodes[(uint)inst.Params.x].World), Projection);
 
     FringePSInput o;
     float coverage;
@@ -524,8 +536,8 @@ PSInput RectBatchInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_I
     // The SDF inputs (Local/Half) keep the RECT's own ORIENTATION, so rounded corners + strokes are correct under
     // rotation, but are measured in DEVICE PIXELS (SlotPixelScale) so one AA width fits both axes even when the slot
     // scales them differently. A slot with no scale gives (1,1) and this is the identity of the old code.
-    float4x4* transforms = (float4x4*)TransformsAddress;
-    float4x4 nodeWorld = transforms[(uint)item.Params.y];
+    NodeSlot* nodes = (NodeSlot*)TransformsAddress;
+    float4x4 nodeWorld = nodes[(uint)item.Params.y].World;
     float2 px = SlotPixelScale(nodeWorld);
     float iso = min(px.x, px.y);   // stroke width / radius / dashes are one number: an anisotropic slot has no exact answer
 
@@ -537,8 +549,11 @@ PSInput RectBatchInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_I
     o.Half   = item.Bounds.zw * 0.5 * px;
     o.Local  = (corner - 0.5) * item.Bounds.zw * px + (corner * 2.0 - 1.0) * outsetPx;
     o.Radius = item.Params.x * iso;
-    o.Color  = item.Color;
-    o.StrokeColor = item.StrokeColor;
+    // The slot's alpha multiplies BOTH fill and stroke: fading a node fades what it draws, its outline included. Read
+    // from the SAME record the matrix came from - no second buffer, no second address.
+    float slotAlpha = nodes[(uint)item.Params.y].Params.x;
+    o.Color  = float4(item.Color.rgb, item.Color.a * slotAlpha);
+    o.StrokeColor = float4(item.StrokeColor.rgb, item.StrokeColor.a * slotAlpha);
     o.Stroke0 = float4(widthPx, item.Stroke0.y, item.Stroke0.z * iso, item.Stroke0.w * iso);
     o.Stroke1 = float4(item.Stroke1.x * iso, item.Stroke1.y, item.Stroke1.z, item.Stroke1.w);
     o.Crisp = item.Params.z;
@@ -613,8 +628,8 @@ EllipsePSInput EllipseBatchInstancedVS(uint vertexId : SV_VertexID, uint instanc
     float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
     // Node-local -> world via the transform table (slot 0 = identity), and the SDF inputs in DEVICE PIXELS - same
     // scheme, and same reason, as RectBatchInstancedVS (see SlotPixelScale).
-    float4x4* transforms = (float4x4*)TransformsAddress;
-    float4x4 nodeWorld = transforms[(uint)item.Params.x];
+    NodeSlot* nodes = (NodeSlot*)TransformsAddress;
+    float4x4 nodeWorld = nodes[(uint)item.Params.x].World;
     float2 px = SlotPixelScale(nodeWorld);
     float iso = min(px.x, px.y);
 
@@ -810,8 +825,8 @@ GradPSInput GradientRectInstancedVS(uint vertexId : SV_VertexID, uint instanceId
     // Node-local -> world via the transform table (slot in Geom1.w - Geom1.z is the shape flag; slot 0 = identity),
     // and the SDF inputs in DEVICE PIXELS, same as RectBatchInstancedVS. The gradient uv is Local/Half - a RATIO - so
     // the change of unit leaves the gradient itself untouched; the STROKE record is not a ratio, hence Scale.
-    float4x4* transforms = (float4x4*)TransformsAddress;
-    float4x4 nodeWorld = transforms[(uint)it.Geom1.w];
+    NodeSlot* nodes = (NodeSlot*)TransformsAddress;
+    float4x4 nodeWorld = nodes[(uint)it.Geom1.w].World;
     float2 px = SlotPixelScale(nodeWorld);
     float iso = min(px.x, px.y);
 
@@ -905,8 +920,8 @@ GradFillPSInput GradientFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
     GradGeomData it = items[instanceId];
     // local -> slot space -> world, as InstancedFillVS: the slot matrix lives in the transform table, so a node move
     // rewrites 64 bytes there and every instance under it follows without this buffer being touched.
-    float4x4* transforms = (float4x4*)TransformsAddress;
-    float4 world = mul(mul(float4(v.position.xyz, 1.0), it.Local), transforms[(uint)it.Geom1.w]);
+    NodeSlot* nodes = (NodeSlot*)TransformsAddress;
+    float4 world = mul(mul(float4(v.position.xyz, 1.0), it.Local), nodes[(uint)it.Geom1.w].World);
 
     GradFillPSInput o;
     o.Position = mul(world, Projection);
@@ -963,8 +978,8 @@ GradFringePSInput InstancedGradientFringeVS(FringeVertex v, uint instanceId : SV
 {
     GradGeomData* items = (GradGeomData*)InstancesAddress;
     GradGeomData it = items[instanceId];
-    float4x4* transforms = (float4x4*)TransformsAddress;
-    float4x4 m = mul(mul(it.Local, transforms[(uint)it.Geom1.w]), Projection);
+    NodeSlot* nodes = (NodeSlot*)TransformsAddress;
+    float4x4 m = mul(mul(it.Local, nodes[(uint)it.Geom1.w].World), Projection);
 
     GradFringePSInput o;
     float coverage;
@@ -1023,8 +1038,8 @@ PatternPSInput PatternRectInstancedVS(uint vertexId : SV_VertexID, uint instance
     PatternPSInput o;
     float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
     // SDF inputs in DEVICE PIXELS, same scheme as RectBatchInstancedVS (see SlotPixelScale).
-    float4x4* transforms = (float4x4*)TransformsAddress;
-    float4x4 nodeWorld = transforms[(uint)it.Params.w];
+    NodeSlot* nodes = (NodeSlot*)TransformsAddress;
+    float4x4 nodeWorld = nodes[(uint)it.Params.w].World;
     float2 px = SlotPixelScale(nodeWorld);
     float iso = min(px.x, px.y);
 
@@ -1493,8 +1508,8 @@ TexPSInput TexRectInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_
 
     TexPSInput o;
     float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
-    float4x4* transforms = (float4x4*)TransformsAddress;
-    float4x4 nodeWorld = transforms[(uint)it.Params.y];
+    NodeSlot* nodes = (NodeSlot*)TransformsAddress;
+    float4x4 nodeWorld = nodes[(uint)it.Params.y].World;
     float2 px = SlotPixelScale(nodeWorld);
     float iso = min(px.x, px.y);
 
@@ -1630,8 +1645,8 @@ PatFillPSInput PatternFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
     PatGeomData* items = (PatGeomData*)InstancesAddress;
     PatGeomData it = items[instanceId];
     // local -> slot space -> world, as InstancedFillVS / GradientFillVS.
-    float4x4* transforms = (float4x4*)TransformsAddress;
-    float4 world = mul(mul(float4(v.position.xyz, 1.0), it.Local), transforms[(uint)it.Params.w]);
+    NodeSlot* nodes = (NodeSlot*)TransformsAddress;
+    float4 world = mul(mul(float4(v.position.xyz, 1.0), it.Local), nodes[(uint)it.Params.w].World);
 
     PatFillPSInput o;
     o.Position = mul(world, Projection);
@@ -1649,8 +1664,8 @@ FringePSInput InstancedPatternFringeVS(FringeVertex v, uint instanceId : SV_Inst
 {
     PatGeomData* items = (PatGeomData*)InstancesAddress;
     PatGeomData it = items[instanceId];
-    float4x4* transforms = (float4x4*)TransformsAddress;
-    float4x4 m = mul(mul(it.Local, transforms[(uint)it.Params.w]), Projection);
+    NodeSlot* nodes = (NodeSlot*)TransformsAddress;
+    float4x4 m = mul(mul(it.Local, nodes[(uint)it.Params.w].World), Projection);
 
     FringePSInput o;
     float coverage;
@@ -1714,8 +1729,8 @@ HaloPSInput HaloRectInstancedVS(uint vertexId : SV_VertexID, uint instanceId : S
 
     HaloPSInput o;
     float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
-    float4x4* transforms = (float4x4*)TransformsAddress;
-    float4x4 nodeWorld = transforms[(uint)it.Params.y];
+    NodeSlot* nodes = (NodeSlot*)TransformsAddress;
+    float4x4 nodeWorld = nodes[(uint)it.Params.y].World;
     float2 px = SlotPixelScale(nodeWorld);
     float iso = min(px.x, px.y);
 
@@ -1843,8 +1858,8 @@ HaloPSInput HaloLivingVS(uint vertexId : SV_VertexID, uint instanceId : SV_Insta
 
     HaloPSInput o;
     float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
-    float4x4* transforms = (float4x4*)TransformsAddress;
-    float4x4 nodeWorld = transforms[(uint)it.Params.y];
+    NodeSlot* nodes = (NodeSlot*)TransformsAddress;
+    float4x4 nodeWorld = nodes[(uint)it.Params.y].World;
     float2 px = SlotPixelScale(nodeWorld);
     float iso = min(px.x, px.y);
 
@@ -1969,8 +1984,8 @@ TexFillPSInput TexFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
 {
     TexGeomData* items = (TexGeomData*)InstancesAddress;
     TexGeomData it = items[instanceId];
-    float4x4* transforms = (float4x4*)TransformsAddress;
-    float4 world = mul(mul(float4(v.position.xyz, 1.0), it.Local), transforms[(uint)it.Params.w]);
+    NodeSlot* nodes = (NodeSlot*)TransformsAddress;
+    float4 world = mul(mul(float4(v.position.xyz, 1.0), it.Local), nodes[(uint)it.Params.w].World);
 
     TexFillPSInput o;
     o.Position = mul(world, Projection);
@@ -2025,8 +2040,8 @@ TexFringePSInput InstancedTexFringeVS(FringeVertex v, uint instanceId : SV_Insta
 {
     TexGeomData* items = (TexGeomData*)InstancesAddress;
     TexGeomData it = items[instanceId];
-    float4x4* transforms = (float4x4*)TransformsAddress;
-    float4x4 m = mul(mul(it.Local, transforms[(uint)it.Params.w]), Projection);
+    NodeSlot* nodes = (NodeSlot*)TransformsAddress;
+    float4x4 m = mul(mul(it.Local, nodes[(uint)it.Params.w].World), Projection);
 
     TexFringePSInput o;
     float coverage;
@@ -2100,8 +2115,8 @@ FractalPSInput FractalRectInstancedVS(uint vertexId : SV_VertexID, uint instance
     float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
     // SDF inputs in DEVICE PIXELS, same scheme as RectBatchInstancedVS. The fractal plane is Local/Half - a RATIO - so
     // the change of unit leaves the image itself untouched; only the stroke record needs Scale.
-    float4x4* transforms = (float4x4*)TransformsAddress;
-    float4x4 nodeWorld = transforms[(uint)it.Params.z];
+    NodeSlot* nodes = (NodeSlot*)TransformsAddress;
+    float4x4 nodeWorld = nodes[(uint)it.Params.z].World;
     float2 px = SlotPixelScale(nodeWorld);
     float iso = min(px.x, px.y);
 
