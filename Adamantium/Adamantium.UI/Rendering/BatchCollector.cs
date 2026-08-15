@@ -11,8 +11,7 @@ namespace Adamantium.UI.Rendering;
 
 // Shared machinery for the CPU-baked instanced UI batches (text glyphs, item-background rects; see
 // docs/TEXT_GLYPH_BATCH_PLAN.md §9). Holds a growable CPU array + one growable GPU buffer - a BDA STORAGE buffer read
-// in the vertex shader by SV_InstanceID (the quad comes from SV_VertexID), except for the glyph/text batch, which still
-// binds its instances as a per-instance VERTEX buffer (see UsesStorageBuffer). Filled APPEND-ONLY
+// in the vertex shader by SV_InstanceID (the quad comes from SV_VertexID) - the glyph batch included. Filled APPEND-ONLY
 // within a frame and drawn as SEGMENTS - a segment is a run of items sharing one clip (scissor), drawn with a
 // firstInstance offset so a mid-frame flush never overwrites an earlier segment's still-recorded draw. The GPU buffer
 // only grows at BeginFrame (a safe point: the render runs after the frame fence, so last frame's reads are done). The
@@ -52,8 +51,13 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     // records an ordered op stream during the walk; on a fully-unchanged (Clean) frame it skips the walk entirely and
     // replays each segment via DrawRecordedSegment - no re-bake, no upload (the GPU buffer still holds these exact
     // bytes). Cleared at BeginFrame; a segment's index is stable within the frame that recorded it.
-    protected struct Segment { public Rect2D Scissor; public uint Count; public uint First; }
+    // Capacity is the ROOM a range owns, Count what it currently draws - so a layer re-issued one item larger fits where
+    // it already is instead of moving, and blocks freed by one edit are the right size for the next.
+    protected struct Segment { public Rect2D Scissor; public uint Count; public uint First; public uint Capacity; }
     private readonly List<Segment> _segments = new();
+
+    // Ranges vacated by a re-issued layer, handed back so the next re-issue reuses them instead of growing the arena.
+    private readonly List<(int First, int Count)> _freeBlocks = new();
 
     protected BatchCollector(int initialCapacity) => Items = new TItem[initialCapacity];
 
@@ -67,20 +71,21 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     /// <summary>GPU-buffer element capacity for THIS frame - derived TryAdd guards against overflowing it.</summary>
     protected int GpuCapacity => _gpuCapacity;
 
-    /// <summary>The batch buffer is a BDA STORAGE buffer by default (per-instance data read in the vertex shader by
-    /// SV_InstanceID, quad from SV_VertexID - no per-instance vertex buffer). Override to <c>false</c> only for a batch
-    /// that still binds its instances as a per-instance VERTEX buffer (the glyph/text batch).</summary>
-    protected virtual bool UsesStorageBuffer => true;
-
-    /// <summary>The batch buffer (its device address feeds the instanced shader when <see cref="UsesStorageBuffer"/>).</summary>
+    /// <summary>The batch buffer - a BDA STORAGE buffer whose device address feeds the instanced shader.</summary>
     protected Buffer<TItem> GpuBuffer => _ring?[_current];
 
     public void BeginFrame(IGraphicsDevice device)
     {
+        // HEADROOM for patches. Capacity can only change here (the GPU buffer must not be reallocated under frames in
+        // flight), so a walk that fits the scene exactly would leave a later patch nowhere to put a layer that GREW by one
+        // item, and every such frame would fall back to the walk - which resets capacity to exactly the scene again.
+        EnsureCpuCapacity(Count + Math.Max(64, Count / 8));
+
         Count = 0;
         _segmentStart = 0;
         _hasUnion = false;
         _segments.Clear();
+        _freeBlocks.Clear();
         EnsureRing(device);
         SelectSlot(device);
         OnBeginFrame(device);
@@ -111,11 +116,9 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         _mirrorCount = new int[copies];
         for (var i = 0; i < copies; i++)
         {
-            _ring[i] = UsesStorageBuffer
-                ? Adamantium.Graphics.Buffer.New<TItem>(device, (uint)Items.Length,
-                    BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
-                    MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal)
-                : Adamantium.Graphics.Buffer.Vertex.New<TItem>(device, (uint)Items.Length, BufferMemoryUsage.UploadFromCpuToGpu);
+            _ring[i] = Adamantium.Graphics.Buffer.New<TItem>(device, (uint)Items.Length,
+                BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
+                MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal);
             _mirror[i] = new TItem[Items.Length];
             _mirrorCount[i] = 0;   // a fresh buffer holds nothing -> everything differs -> first write sends it all
         }
@@ -139,7 +142,7 @@ internal abstract class BatchCollector<TItem> where TItem : struct
 
     // A write that does NOT come from a walk (a partial patch replaying last frame's ops) still has to land in THIS
     // frame's copy, and that copy is a lap behind - bring it up to the retained data first, by diff, then patch it.
-    private void PrepareRetainedWrite(IGraphicsDevice device)
+    protected void PrepareRetainedWrite(IGraphicsDevice device)
     {
         if (_ring == null || device.CurrentFrame == _writeFrame) return;
         SelectSlot(device);
@@ -147,7 +150,7 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     }
 
     // Sends [first, first+count) to the current copy, but only the one contiguous span that copy is actually missing.
-    private void UploadRange(int first, int count)
+    protected void UploadRange(int first, int count)
     {
         if (count <= 0) return;
         var mirror = _mirror[_current];
@@ -195,7 +198,7 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         // replays this exact segment via DrawRecordedSegment (same code path, no upload) - so the immediate draw here
         // and the replayed draw are byte-for-byte the same.
         var index = _segments.Count;
-        _segments.Add(new Segment { Scissor = _scissor, Count = (uint)count, First = (uint)segStart });
+        _segments.Add(new Segment { Scissor = _scissor, Count = (uint)count, First = (uint)segStart, Capacity = (uint)count });
         OnSegmentRecorded(index);
 
         _segmentStart = Count;
@@ -211,7 +214,7 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     public void DrawRecordedSegment(IGraphicsDevice device, int index, Rect2D fullScissor, Matrix4x4F projection)
     {
         var s = _segments[index];
-        if (s.Count == 0) return;   // fully excluded by a spliced patch (see ExcludeRun) - nothing left to draw
+        if (s.Count == 0) return;   // re-issued to nothing - nothing left to draw
         device.SetScissors(s.Scissor);
         BindSegment(index);
         DrawSegment(device, _ring[_current], s.Count, s.First, projection);
@@ -251,44 +254,128 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         return $"first={s.First} count={s.Count} clip={x},{y} {w}x{h}";
     }
 
-    /// <summary>Shrinks segment <paramref name="segmentIndex"/> to end BEFORE <paramref name="first"/> and registers the
-    /// remainder AFTER [first, first+count) as a NEW segment (same scissor), returning its index (-1 when nothing
-    /// remains after). With count = 0 this is a pure SPLIT at <paramref name="first"/> (an op-order insertion point).
-    /// NOTE: only for collectors with no per-segment state (the SDF family) - the split does not re-run
-    /// OnSegmentRecorded, so a stashing collector (the text batch's atlas) must not be patched this way.</summary>
-    public int ExcludeRun(int segmentIndex, int first, int count)
-    {
-        var s = _segments[segmentIndex];
-        var before = first - (int)s.First;
-        var afterCount = (int)s.Count - before - count;
-        _segments[segmentIndex] = new Segment { Scissor = s.Scissor, Count = (uint)Math.Max(0, before), First = s.First };
-        if (afterCount <= 0) return -1;
-        var idx = _segments.Count;
-        _segments.Add(new Segment { Scissor = s.Scissor, Count = (uint)afterCount, First = (uint)(first + count) });
-        return idx;
-    }
-
     /// <summary>Free retained capacity for patch appends this frame (capacity only grows at the next BeginFrame).</summary>
     public int PatchCapacityLeft => _gpuCapacity - Count;
 
     /// <summary>Retained slot count (the next patch append starts here).</summary>
     public int RetainedCount => Count;
 
-    /// <summary>Appends a spliced control's re-baked items into the RETAINED frame data (no BeginFrame ran): writes them
-    /// after the last used slot, uploads exactly those bytes, mirrors them for the next incremental-upload diff, and
-    /// registers a new segment over the range. The caller pre-checks <see cref="PatchCapacityLeft"/>. Returns the new
-    /// segment's index.</summary>
-    public int AppendPatchSegment(IGraphicsDevice device, ReadOnlySpan<TItem> items, Rect2D scissor)
+    /// <summary>The retained range [first, first+count) a recorded segment currently draws.</summary>
+    public (int First, int Count) SegmentRange(int index) => ((int)_segments[index].First, (int)_segments[index].Count);
+
+    /// <summary>Copy retained items out, for a caller re-issuing a segment: the instances of the groups that did NOT
+    /// change are carried over as bytes rather than re-baked, so re-issuing a layer costs a copy, not a re-computation.</summary>
+    public void CopyRetained(int first, int count, List<TItem> into)
+    {
+        for (var i = 0; i < count; i++) into.Add(Items[first + i]);
+    }
+
+    /// <summary>Re-issue a WHOLE segment over a freshly baked run: the items are appended at the retained frame's end and
+    /// the SAME segment index is pointed at them. The recorded op stream is not touched at all - the op that drew this
+    /// segment still stands in its place, so paint order relative to everything else (text, per-unit draws, an instanced
+    /// flush) is unchanged by construction. That is the point: a control whose unit count changed is repaired by re-baking
+    /// the LAYER it belongs to, instead of tearing the layer's segment in two to weave one item into the middle of it.
+    /// False when the arena has no room; the caller falls back to a full walk, which compacts it.</summary>
+    /// <summary>Replace [at, at+replaced) INSIDE a segment with <paramref name="items"/>, shifting only what follows - the
+    /// cheap shape of a layer edit, a hover backdrop being one item among a screenful. The head never moves and the upload
+    /// covers the edit plus the tail it pushed.
+    /// False when the result no longer fits the room this segment owns; the caller then relocates it whole.</summary>
+    public bool ReplaceInSegment(IGraphicsDevice device, int index, int at, int replaced, ReadOnlySpan<TItem> items)
+    {
+        var s = _segments[index];
+        var newCount = (int)s.Count - replaced + items.Length;
+        if (newCount > (int)s.Capacity) return false;
+
+        PrepareRetainedWrite(device);
+
+        var first = (int)s.First;
+        var delta = items.Length - replaced;
+        var tailAt = first + at + replaced;
+        var tailLen = (int)s.Count - at - replaced;
+        if (delta != 0 && tailLen > 0) Array.Copy(Items, tailAt, Items, tailAt + delta, tailLen);
+        items.CopyTo(Items.AsSpan(first + at));
+
+        var touched = items.Length + (delta != 0 ? tailLen + Math.Max(0, -delta) : 0);
+        UploadRange(first + at, touched);
+        _segments[index] = new Segment { Scissor = s.Scissor, Count = (uint)newCount, First = s.First, Capacity = s.Capacity };
+        return true;
+    }
+
+    /// <summary>Register a NEW segment over freshly written items - for a control that starts drawing where nothing of its
+    /// own was recorded. It gets its own range (reused from a vacated one where possible) and its own op, placed by paint
+    /// rank; nothing already recorded moves. Returns the segment index, or -1 when the arena has no room.</summary>
+    public int AllocateSegment(IGraphicsDevice device, ReadOnlySpan<TItem> items, Rect2D scissor)
     {
         PrepareRetainedWrite(device);
-        var first = Count;
-        EnsureCpuCapacity(first + items.Length);
+
+        var want = items.Length + Math.Max(16, items.Length / 8);
+        var first = -1;
+        for (var i = 0; i < _freeBlocks.Count; i++)
+        {
+            if (_freeBlocks[i].Count < want) continue;
+            first = _freeBlocks[i].First;
+            want = _freeBlocks[i].Count;
+            _freeBlocks.RemoveAt(i);
+            break;
+        }
+
+        if (first < 0)
+        {
+            if (want > PatchCapacityLeft) return -1;
+            first = Count;
+            EnsureCpuCapacity(first + want);
+            Count = first + want;
+        }
+
         items.CopyTo(Items.AsSpan(first));
-        Count = first + items.Length;
         UploadRange(first, items.Length);
-        var idx = _segments.Count;
-        _segments.Add(new Segment { Scissor = scissor, Count = (uint)items.Length, First = (uint)first });
-        return idx;
+        _segments.Add(new Segment { Scissor = scissor, Count = (uint)items.Length, First = (uint)first, Capacity = (uint)want });
+        return _segments.Count - 1;
+    }
+
+    public bool RepointSegment(IGraphicsDevice device, int index, ReadOnlySpan<TItem> items, Rect2D scissor)
+    {
+        PrepareRetainedWrite(device);
+
+        var s = _segments[index];
+        var need = items.Length;
+
+        // Inside its own room: the normal case once a layer has been re-issued once, and the only one a hover ever needs.
+        if (need <= (int)s.Capacity)
+        {
+            items.CopyTo(Items.AsSpan((int)s.First));
+            UploadRange((int)s.First, need);
+            _segments[index] = new Segment { Scissor = scissor, Count = (uint)need, First = s.First, Capacity = s.Capacity };
+            return true;
+        }
+
+        // Outgrew it: take a bigger block, WITH room to grow again. Handing out exactly what is asked for means the block
+        // freed here (N) never fits the next request (N+1), and the arena fills with near-misses.
+        var want = need + Math.Max(16, need / 8);
+        var first = -1;
+        for (var i = 0; i < _freeBlocks.Count; i++)
+        {
+            if (_freeBlocks[i].Count < want) continue;
+            first = _freeBlocks[i].First;
+            want = _freeBlocks[i].Count;   // take the block whole; splitting it leaves shards nothing fits in
+            _freeBlocks.RemoveAt(i);
+            break;
+        }
+
+        if (first < 0)
+        {
+            if (want > PatchCapacityLeft) return false;
+            first = Count;
+            EnsureCpuCapacity(first + want);
+            Count = first + want;
+        }
+
+        if (s.Capacity > 0) _freeBlocks.Add(((int)s.First, (int)s.Capacity));
+
+        items.CopyTo(Items.AsSpan(first));
+        UploadRange(first, need);
+        _segments[index] = new Segment { Scissor = scissor, Count = (uint)need, First = (uint)first, Capacity = (uint)want };
+        return true;
     }
 
     /// <summary>

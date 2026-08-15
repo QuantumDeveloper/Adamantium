@@ -69,6 +69,15 @@ public partial class RenderCache
         foreach (var atlas in _warmAtlases) atlas.Warm(text);
     }
 
+    // What the recorded op stream actually baked out of a snapshot: where the element is, how big it is, what clips it.
+    // Opacity is NOT among them - it is re-composed per unit on every patch - so a fade must not cost a re-record.
+    private static bool SameGeometry(LayoutSnapshot a, LayoutSnapshot b) =>
+        a.LocalTransform == b.LocalTransform
+        && a.RenderSize == b.RenderSize
+        && a.ClipToBounds == b.ClipToBounds
+        && a.IsMotionNode == b.IsMotionNode
+        && ReferenceEquals(a.RenderParent, b.RenderParent);
+
     // Realize ONE packet. The per-frame results the draw pass reads are MERGED across the packets drained this frame: a
     // Full supersedes everything before it; two Partials union their dirty sets.
     private void ApplyPacket(RenderPacket packet)
@@ -102,9 +111,17 @@ public partial class RenderCache
         // re-pointed at replay (see ExecuteOps), but a recorded SCISSOR is a world-space rect baked at record time and
         // nothing re-derives it - so a move still has to force a rebuild. A packet that changes nothing about layout
         // (a recolour) leaves the stream perfectly valid and keeps its replay.
-        if (packet.SnapDelta.Count > 0 || packet.MovedNodes.Count > 0) _layoutChangedSinceRecord = true;
+        // ...but a snapshot ENTRY is not a layout change: it is re-published whenever a component re-renders, and a hover
+        // re-publishes an entry whose transform, size and clip are word for word the ones the stream already baked. So
+        // compare what the stream actually baked, instead of taking the entry's presence as proof of movement.
+        if (packet.MovedNodes.Count > 0) _layoutChangedSinceRecord = true;
 
-        foreach (var entry in packet.SnapDelta) _applySnap[entry.Key] = entry.Value;
+        foreach (var entry in packet.SnapDelta)
+        {
+            if (!_applySnap.TryGetValue(entry.Key, out var previous) || !SameGeometry(previous, entry.Value))
+                _layoutChangedSinceRecord = true;
+            _applySnap[entry.Key] = entry.Value;
+        }
 
         switch (packet.Kind)
         {

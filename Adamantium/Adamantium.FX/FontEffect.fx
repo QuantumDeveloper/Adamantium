@@ -330,14 +330,6 @@ technique FontBatch
         PixelShader = FontPixelShaderMsdf;
     }
 
-    pass RenderMsdfBatch
-    {
-        EffectName = "FontEffectMsdfBatch";
-        Profile = 5.1;
-        VertexShader = FontVertexShader;
-        PixelShader = FontPixelShaderMsdfBatch;
-    }
-
     pass RenderMsdfBatchInstanced
     {
         EffectName = "FontEffectMsdfBatchInstanced";

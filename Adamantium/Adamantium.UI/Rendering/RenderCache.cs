@@ -110,6 +110,11 @@ public partial class RenderCache
     private enum SdfSlotKind { Ellipse, GradientRect, GradientEllipse }
     private readonly Dictionary<IRenderUnit, (SdfSlotKind Kind, int Slot)> _sdfSlotByUnit = new();
 
+    // A text block owns a RUN of glyph slots, not one - the same map widened to a range, plus the atlas its recorded
+    // segment binds. Lets a block whose glyph COUNT and atlas are unchanged (a counter ticking over, an FPS readout) be
+    // re-baked in place. Without it ANY dirty text refused the frame's patch and cost a full walk of the scene.
+    private readonly Dictionary<IRenderUnit, (int First, int Count, Graphics.Fonts.FontAtlas Atlas)> _textRunByUnit = new();
+
     // The units each LIVE brush paints, built on the recording walk; the render thread re-bakes them all when a
     // composited PAINT animation changes the brush snapshot. Keyed by live brush by REFERENCE; one brush is shared by
     // hundreds of elements (the skeleton pulse) - the reason paint fans out where transform does not.
