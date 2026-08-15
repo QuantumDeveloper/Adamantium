@@ -151,6 +151,39 @@ public static class AnimationManager
         Compositor.Release(target);
     }
 
+    /// <summary>Stops everything running anywhere under <paramref name="root"/> - what parking a whole page needs. ONE
+    /// pass over what is actually running, asking each animation whether its target sits in that subtree: a page has a
+    /// thousand realized rows and hardly any of them animate, so asking every ROW instead cost a scan of the running list
+    /// per row and dwarfed the work it was meant to save.</summary>
+    public static void CancelSubtree(IUIComponent root)
+    {
+        if (root == null) return;
+
+        var released = new List<AdamantiumComponent>();
+        RemoveWhere(a =>
+        {
+            if (a.DirtyTarget is not { } target || !IsWithin(target, root)) return false;
+
+            released.Add(target as AdamantiumComponent);
+            return true;
+        });
+
+        foreach (var target in released)
+        {
+            if (target != null) Compositor.Release(target);
+        }
+    }
+
+    private static bool IsWithin(IUIComponent node, IUIComponent root)
+    {
+        for (var current = node; current != null; current = current.VisualParent)
+        {
+            if (ReferenceEquals(current, root)) return true;
+        }
+
+        return false;
+    }
+
     // --- Shared-target ownership -------------------------------------------------------------------------------------
     // An animation TARGET can be shared by many trigger hosts: the loading-skeleton pulse runs on ONE theme brush
     // ({ResourceReference SkeletonPulseFill}) that EVERY loading list animates, so a naive Stop from the first list to

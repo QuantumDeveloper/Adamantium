@@ -1013,7 +1013,10 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
          base.OnAttachedToVisualTree(e);
-         IsInitialized = true;
+
+         // A one-way latch - nothing ever puts it back. Writing it on every later attach cost a full trip through the
+         // property system per node to set the value that was already there.
+         if (!IsInitialized) IsInitialized = true;
     }
 
     public IWindow GetWindow()

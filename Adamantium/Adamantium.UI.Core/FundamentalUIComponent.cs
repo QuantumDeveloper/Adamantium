@@ -177,6 +177,11 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
     /// </summary>
     public virtual Type ViewModelType => null;
 
+    /// <summary>What <c>x:KeepAlive</c> declared in markup, generated code-behind overriding it the way it overrides
+    /// <see cref="ViewModelType"/>. Pure metadata again: the view states what it wants, and whoever navigates away from
+    /// it - not the view itself - decides to park it instead of dropping it.</summary>
+    public virtual NavigationCacheMode KeepAlive => NavigationCacheMode.Disabled;
+
     /// <summary>
     /// Resolves the <see cref="ViewModelType"/> (if any) from the application's dependency resolver and assigns it as
     /// the DataContext - but only the first time, and only if the DataContext wasn't set explicitly (so x:ViewModel is

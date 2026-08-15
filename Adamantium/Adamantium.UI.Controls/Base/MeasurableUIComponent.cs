@@ -869,6 +869,10 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         // there was none - so the parent kept a size computed from the size we USED to have. Re-registering ourselves does
         // not repair that: we re-measure to the same answer, nothing changed, and nothing propagates. The parent has to be
         // told once, here, where re-attachment is known.
+        // A parked subtree is the exception: it comes back whole, carrying the layout it left, and ParkedSubtree.Unpark
+        // decides whether that layout still holds. Every node telling its parent to re-measure would undo that decision.
+        if (IsParked) return;
+
         // Measured: a folded tab's label row reported the turned 17x55 while the tab above it kept the 78x29 it had when
         // the label lay flat - through every later pass, because the row's size never changed AGAIN.
         (VisualParent as IMeasurableComponent)?.InvalidateMeasure();

@@ -155,6 +155,48 @@ public class RenderCacheTests
         Assert.That(unit.DeferDisposeCount, Is.EqualTo(1));
     }
 
+    // A PARKED control is detached on purpose and coming back (x:KeepAlive, an x:Load slot). Freeing its units would
+    // throw away exactly what parking exists to keep - rebuilding them IS the pause a kept view avoids - so the keep
+    // signal is "attached OR parked", and only an unmarked detach means gone.
+    [Test]
+    public void Parked_Control_KeepsItsUnits_WhileOutOfTheTree()
+    {
+        var c = AddControl(); DrawsRectangle(c);
+        RenderFrame();
+        var unit = _factory.Created.Single();
+
+        ParkedSubtree.Park(c);
+        _root.Remove(c);
+        RenderFrame();
+
+        Assert.That(unit.DeferDisposeCount, Is.EqualTo(0),
+            "a parked control is coming back - what was built for it must survive the detach");
+    }
+
+    // ...and that is worth something only if the return REUSES them: rebuilding the units is the pause parking exists to
+    // avoid, so a view that comes back must not cost a new set.
+    [Test]
+    public void AParkedControlThatComesBack_ReusesItsUnits()
+    {
+        var c = AddControl(); DrawsRectangle(c);
+        RenderFrame();
+        var unit = _factory.Created.Single();
+
+        ParkedSubtree.Park(c);
+        _root.Remove(c);
+        RenderFrame();
+
+        _root.Add(c);
+        ParkedSubtree.Unpark(c);
+        RenderFrame();
+
+        Assert.That(_factory.Created, Has.Count.EqualTo(1), "the return must reuse what parking kept, not build again");
+        Assert.That(unit.DeferDisposeCount, Is.EqualTo(0));
+        // Keeping the units is worth nothing if the group does not go back into the paint order: the view returns BLANK,
+        // which is exactly what the live stand showed.
+        Assert.That(_cache.PaintOrder, Does.Contain(c.RenderId), "a returned view has to be drawn again, not just kept");
+    }
+
     [Test]
     public void Hidden_Control_RetainsResources_AndIsNotRecreatedOnShow()
     {

@@ -768,6 +768,22 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     /// </summary>
     public bool IsAttachedToVisualTree => RootVisual != null;
 
+    /// <summary>Parked: out of the tree on purpose and coming back, so nothing cached for it may be thrown away. A plain
+    /// field, not a registered property - the render cache reads it while deciding what to free, and that is a hot path
+    /// (same rule as Visibility). Set through <see cref="ParkedSubtree"/>, which is what parks and unparks a subtree.</summary>
+    public bool IsParked { get; internal set; }
+
+    /// <summary>Quiet everything this element drives while it waits out of the tree. Removal already suspends what
+    /// TRIGGERS run (DetachedFromVisualTree -> SuspendTriggerActions); animations are the half detachment does NOT stop,
+    /// so a parked view would otherwise keep costing a frame forever - see animation-lifecycle-detach-leak.</summary>
+    internal void SuspendForPark()
+    {
+        // ONE pass over what is actually running, not a Cancel per node: a parked page has a thousand realized rows and
+        // almost none of them animate, so asking each one cost O(rows x running) for nothing. Measured on the Layout tab
+        // at the smallest tile - it ate the whole gain of keeping the view.
+        Core.Media.Animation.AnimationManager.CancelSubtree(this);
+    }
+
     protected void SetVisualParent(IUIComponent parent)
     {
         if (VisualParent == parent)
@@ -814,7 +830,12 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         // it is still geometry-valid, so its Render() would record nothing and it would draw blank (e.g. a TabItem body
         // shown, hidden by switching tabs, then shown again). Invalidate so the next render pass rebuilds its units; the
         // recursion below carries this to the whole re-attached subtree.
-        InvalidateRender(false);
+        //
+        // A PARKED subtree is the exception, and the reason parking exists: its units were kept, so asking the renderer to
+        // record them again throws away precisely what was saved. Measured on the Layout tab at the smallest tile - a
+        // return marked 5997 components dirty and cost 25 ms, all of it this line. The mark is cleared only for a subtree
+        // that comes home to the SAME window and theme (ParkedVisuals.IsUnchanged); anything else takes the full path above.
+        if (!IsParked) InvalidateRender(false);
 
         // Back on screen: whatever its triggers had running before it left starts again, at the phase it stopped on.
         ResumeTriggerActions();

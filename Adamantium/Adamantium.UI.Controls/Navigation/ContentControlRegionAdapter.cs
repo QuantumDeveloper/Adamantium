@@ -10,6 +10,10 @@ public sealed class ContentControlRegionAdapter : IRegionAdapter
 {
     private readonly IViewLocator _viewLocator;
 
+    // What is currently shown, so leaving it can park it. Read off the ContentControl instead and a transition that has
+    // not finished swapping would hand back the wrong one.
+    private object _currentViewModel;
+
     public ContentControlRegionAdapter(IViewLocator viewLocator)
     {
         _viewLocator = viewLocator;
@@ -29,6 +33,32 @@ public sealed class ContentControlRegionAdapter : IRegionAdapter
     private void Render(IRegion region, ContentControl content)
     {
         var viewModel = region.CurrentViewModel;
-        content.Content = viewModel != null ? _viewLocator.ResolveView(viewModel) : null;
+        if (ReferenceEquals(viewModel, _currentViewModel)) return;
+
+        // Leaving: a view that asked to be kept is handed to the framework's store, which parks it - so the detach that
+        // follows reads as "coming back" and the renderer keeps what it built. Anything else is dropped, as before. The
+        // view here is the CONTENT itself (a resolved view element), so the presenter cannot keep it for us - whoever
+        // supplied it has to.
+        if (_currentViewModel != null && content.Content is IUIComponent leaving && ParkedVisuals.ShouldKeep(leaving))
+        {
+            ParkedVisuals.Keep(_currentViewModel, leaving);
+        }
+
+        _currentViewModel = viewModel;
+        if (viewModel == null)
+        {
+            content.Content = null;
+            return;
+        }
+
+        // Returning: the parked view goes back in as it was - the rebuild it avoids is the pause this exists for.
+        if (ParkedVisuals.TryTake(viewModel, content, out var parked, out _, out _, out _))
+        {
+            content.Content = parked;
+            ParkedSubtree.Unpark(parked);
+            return;
+        }
+
+        content.Content = _viewLocator.ResolveView(viewModel);
     }
 }
