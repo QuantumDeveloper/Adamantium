@@ -101,6 +101,31 @@ namespace Adamantium.Graphics.Core
             }
         }
 
+        /// <summary>Dispose everything retired, WITHOUT waiting for frames to retire it. The caller must have waited the
+        /// device idle first - idle proves no submitted work can reference any of it, which is a stronger guarantee than
+        /// the frame tickets give. For teardown and for anything that stops drawing: the ordinary path frees a resource
+        /// only when a wrapper BEGINS another frame, so whatever is retired after the last frame is never freed at all.
+        /// A test run pays for that directly - each fixture's targets accumulate until the device runs out of memory.</summary>
+        public void FlushRetiredAfterIdle()
+        {
+            List<IDisposable> due;
+            lock (_retireSync)
+            {
+                if (_retired.Count == 0)
+                {
+                    return;
+                }
+
+                due = _retired.Select(r => r.Resource).ToList();
+                _retired.Clear();
+            }
+
+            foreach (var resource in due)
+            {
+                resource.Dispose();
+            }
+        }
+
         // A wrapper that is gone cannot be executing anything, so its vote is dropped rather than waited on for ever.
         private bool IsDue(IGraphicsDevice[] devices, ulong[] due)
         {

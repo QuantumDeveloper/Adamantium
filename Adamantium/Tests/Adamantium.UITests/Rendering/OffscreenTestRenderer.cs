@@ -157,6 +157,12 @@ internal sealed class OffscreenTestRenderer : IDisposable
     {
         _renderCache.DisposeUnits();
         _adornerCache.DisposeUnits();
+        _renderCache.DisposeDeviceResources();
+        _adornerCache.DisposeDeviceResources();
         _presenter?.Dispose();
+
+        // Everything above only RETIRES its GPU resources; they are freed when a wrapper begins another frame, and this
+        // harness has just stopped drawing. Reclaim here, or each test's target lives until the process ends.
+        GpuTestDevice.Reclaim();
     }
 }

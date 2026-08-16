@@ -19,6 +19,19 @@ public class GpuTestDevice
     /// <summary>The shared render device. Valid for the whole run of this namespace's fixtures.</summary>
     public static IGraphicsDevice Device { get; private set; }
 
+    /// <summary>Wait the device idle and free everything the finished work retired. The engine frees a retired resource
+    /// when a wrapper BEGINS another frame, which never happens once a test stops drawing - so without this every
+    /// fixture's render targets stay alive for the whole run and the device eventually refuses to allocate
+    /// (ErrorOutOfDeviceMemory, taking the fixtures that happen to run last down with it). Call it when a harness is
+    /// done with its resources.</summary>
+    public static void Reclaim()
+    {
+        if (Device == null) return;
+
+        Device.DeviceWaitIdle();
+        _main.FlushRetiredAfterIdle();
+    }
+
     [OneTimeSetUp]
     public void Create()
     {

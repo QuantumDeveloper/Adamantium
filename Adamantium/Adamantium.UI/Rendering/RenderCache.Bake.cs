@@ -127,6 +127,45 @@ public partial class RenderCache
     /// <summary>Disposes every cached unit and empties the cache (caller ensures the GPU is idle first). For the off-screen
     /// designer, which builds a new tree per render: those controls never detach (each owns its root window), so
     /// attachment-based reconciliation can't reclaim them - the designer resets between renders instead.</summary>
+    /// <summary>Release every GPU resource this cache owns - the batch rings and the transform table - for a window that
+    /// is going away. Separate from <see cref="DisposeUnits"/> on purpose: that one drops the units and is called on
+    /// every designer re-render, where the collectors should stay.</summary>
+    public void DisposeDeviceResources()
+    {
+        var device = _renderUnitFactory?.GraphicsDevice;
+        if (device == null) return;
+
+        _rectBatch?.DisposeGpuResources(device);
+        _ellipseBatch?.DisposeGpuResources(device);
+        _textBatch?.DisposeGpuResources(device);
+        _gradientRectBatch?.DisposeGpuResources(device);
+        _gradientEllipseBatch?.DisposeGpuResources(device);
+        _patternBatch?.DisposeGpuResources(device);
+        _fractalBatch?.DisposeGpuResources(device);
+        _texRectBatch?.DisposeGpuResources(device);
+        _haloUnder?.DisposeGpuResources(device);
+        _haloOver?.DisposeGpuResources(device);
+        _haloLivingUnder?.DisposeGpuResources(device);
+        _haloLivingOver?.DisposeGpuResources(device);
+        _instancedFill?.Dispose();
+        _transformTable?.Dispose();
+
+        _rectBatch = null;
+        _ellipseBatch = null;
+        _textBatch = null;
+        _gradientRectBatch = null;
+        _gradientEllipseBatch = null;
+        _patternBatch = null;
+        _fractalBatch = null;
+        _texRectBatch = null;
+        _haloUnder = null;
+        _haloOver = null;
+        _haloLivingUnder = null;
+        _haloLivingOver = null;
+        _instancedFill = null;
+        _transformTable = null;
+    }
+
     public void DisposeUnits()
     {
         foreach (var group in _groupById.Values)
