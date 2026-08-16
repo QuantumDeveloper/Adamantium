@@ -435,8 +435,10 @@ public partial class RenderCache
         {
             var command = drawCommands[i];
             command.RenderData.ProjectionMatrix = projectionMatrix;
+            Core.Diagnostics.RuntimeStats.CommandsApplied++;
             if (i >= units.Count)
             {
+                Core.Diagnostics.RuntimeStats.UnitsCreated++;
                 units.Add(_renderUnitFactory.CreateRenderUnitFromCommand(command));
             }
             else
@@ -444,10 +446,12 @@ public partial class RenderCache
                 var unit = units[i];
                 if (unit.Match(command))
                 {
+                    Core.Diagnostics.RuntimeStats.UnitsUpdated++;
                     unit.UpdateWithDrawCommand(command);
                 }
                 else
                 {
+                    Core.Diagnostics.RuntimeStats.UnitsCreated++;
                     unit.DeferDispose();
                     units[i] = _renderUnitFactory.CreateRenderUnitFromCommand(command);
                 }

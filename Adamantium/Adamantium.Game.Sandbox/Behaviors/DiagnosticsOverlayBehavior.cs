@@ -34,6 +34,10 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
     private bool _windowDeferred;
     private bool _running;
     private int _traceWindows;   // TEMP
+    private int _peakLayout;     // TEMP: busiest layout-invalidation second seen so far
+    private long _peakUnits, _lastCreated, _lastUpdated, _lastCommands;   // TEMP: busiest build second
+    private int _second;   // TEMP: index in the appended history
+    private double _windowMaxRecord, _windowMaxApply;
 
     protected override void OnAttached(TextBlock target)
     {
@@ -41,7 +45,8 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
         _lastArrange = MeasurableUIComponent.TotalArrangeCalls;
         _lastBindings = RuntimeStats.BindingUpdatesApplied;
         _running = true;
-        FrameTrace.Enabled = true;   // TEMP
+        FrameTrace.Enabled = true;      // TEMP
+        LayoutTrace.Counting = true;   // TEMP
         AnimationManager.AddTicker(dt => Advance(target, dt));
     }
 
@@ -61,6 +66,8 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
         _sumProc   += RuntimeStats.LastRenderProcMs;
         _sumDraw   += RuntimeStats.LastRenderDrawMs;
         _sumProcs  += RuntimeStats.LastProcessorsMs;
+        if (RuntimeStats.LastRecordMs > _windowMaxRecord) _windowMaxRecord = RuntimeStats.LastRecordMs;
+        if (RuntimeStats.LastApplyMs > _windowMaxApply) _windowMaxApply = RuntimeStats.LastApplyMs;
         if (_windowElapsed < RefreshSeconds) return false;
 
         var measure = MeasurableUIComponent.TotalMeasureCalls;
@@ -98,10 +105,57 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
             _traceWindows = 0;
             System.IO.File.WriteAllText(@"C:\AdamantiumEngine\frames.log", FrameTrace.Dump());
             System.IO.File.WriteAllText(@"C:\AdamantiumEngine\incidents.log", FrameTrace.DumpIncidents());
+
+            // WHO marked layout dirty over the last second, biggest first. Reset per dump, so a drag reads as "this is
+            // what one second of dragging costs" rather than as a total that only ever grows - and the BUSIEST second so
+            // far is kept beside it, because the second worth reading is never the one that happens to be current when
+            // somebody looks.
+            var layout = LayoutTrace.DumpCounts();
+            var total = LayoutTrace.TotalCount();
+            System.IO.File.WriteAllText(@"C:\AdamantiumEngine\layout.log", layout);
+            if (total > _peakLayout)
+            {
+                _peakLayout = total;
+                System.IO.File.WriteAllText(@"C:\AdamantiumEngine\layout-peak.log", layout);
+            }
+
+            LayoutTrace.ResetCounts();
+
+            // ...and what the BUILD spent itself on over the same second: which half, and whether the apply was building
+            // units from scratch or updating the ones it had. Peak-kept for the same reason.
+            var created = RuntimeStats.UnitsCreated - _lastCreated;
+            var updated = RuntimeStats.UnitsUpdated - _lastUpdated;
+            var commands = RuntimeStats.CommandsApplied - _lastCommands;
+            _lastCreated = RuntimeStats.UnitsCreated;
+            _lastUpdated = RuntimeStats.UnitsUpdated;
+            _lastCommands = RuntimeStats.CommandsApplied;
+
+            // MAXIMA over the window, not the value that happened to be current at the dump - a spike lasts one frame and
+            // the dump reads a quiet one.
+            var build = $"record max {_windowMaxRecord:F2} ms   apply max {_windowMaxApply:F2} ms\n" +
+                        $"units created {created}   updated {updated}   commands {commands}\n" +
+                        $"measure {measure - _lastMeasure}   arrange {arrange - _lastArrange}   maxLayout {_windowMaxLayoutMs:F1} ms\n";
+            System.IO.File.WriteAllText(@"C:\AdamantiumEngine\build.log", build);
+            if (created + updated > _peakUnits)
+            {
+                _peakUnits = created + updated;
+                System.IO.File.WriteAllText(@"C:\AdamantiumEngine\build-peak.log", build);
+            }
+
+            // EVERY second, appended. A "peak" file picks one second by one criterion and throws the rest away - and the
+            // criterion picked the initial fill, which measures more than any drag ever will, so the file froze on the
+            // startup second and the thing being hunted was never written at all. A history cannot lose the event.
+            _second++;
+            if (measure - _lastMeasure > 50 || created + updated > 500)
+            {
+                System.IO.File.AppendAllText(@"C:\AdamantiumEngine\layout-history.log",
+                    $"---- second {_second} ----\n{build}{layout}\n");
+            }
         }
 
         _lastMeasure = measure; _lastArrange = arrange; _lastBindings = bindings;
         _windowElapsed = 0; _windowFrames = 0; _windowMaxLayoutMs = 0; _windowDeferred = false;
+        _windowMaxRecord = 0; _windowMaxApply = 0;
         _sumLayout = _sumBuild = _sumProc = _sumDraw = _sumProcs = 0;
         return false;   // keep ticking
     }

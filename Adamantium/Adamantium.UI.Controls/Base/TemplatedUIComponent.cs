@@ -102,6 +102,7 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent, ITe
     {
         if (Template == null) return;
 
+        Core.Diagnostics.LayoutTrace.Count(GetType(), "*template-build*");
         templateResult = Template.Build(this);
         if (templateResult != null)
         {

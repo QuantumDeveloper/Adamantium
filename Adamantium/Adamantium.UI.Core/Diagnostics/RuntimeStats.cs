@@ -22,6 +22,18 @@ public static class RuntimeStats
     /// <summary>RenderCache.BuildFromVisualTree - the per-frame walk that re-records every component's draw commands.</summary>
     public static double LastRenderBuildMs;
     /// <summary>RenderCache.ProcessCommands - re-bake every cached unit's world transform.</summary>
+    /// <summary>The two halves of the render BUILD, so a spike says WHICH: the device-free record (walk + component.Render
+    /// into the packet) or the apply that realizes it into units.</summary>
+    public static double LastRecordMs;
+    public static double LastApplyMs;
+
+    /// <summary>What the apply actually did this frame: units built from scratch, units updated in place, and the draw
+    /// commands it consumed. A structural frame that CREATES its units costs a different thing from one that updates them,
+    /// and the totals alone cannot tell the two apart.</summary>
+    public static long UnitsCreated;
+    public static long UnitsUpdated;
+    public static long CommandsApplied;
+
     public static double LastRenderProcMs;
     /// <summary>RenderCache.Render - the content draw pass (batch + command recording).</summary>
     public static double LastRenderDrawMs;
