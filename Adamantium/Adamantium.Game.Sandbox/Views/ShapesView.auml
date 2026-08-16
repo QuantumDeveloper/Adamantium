@@ -251,40 +251,51 @@
              of coverage TWICE shows up as a darker patch. The swatch is the reference tone: a crossing that matches it
              is correct, a crossing darker than it is double-blended. -->
         <TextBlock Text="Translucent overlap — a crossing must not be darker than the swatch:" Margin="0,20,0,6"/>
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+            <TextBlock Text="Alpha" Width="80" VerticalAlignment="Center"/>
+            <Slider Width="130" Minimum="0" Maximum="1" Value="{Binding Stroke.OverlapAlpha, Mode=TwoWay}"/>
+            <TextBlock Text="{Binding Stroke.OverlapAlpha}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+        </StackPanel>
         <WrapPanel Orientation="Horizontal">
             <!-- Reference: one flat piece of the same colour, drawn once. -->
             <StackPanel Orientation="Vertical" Margin="10">
-                <Border Width="150" Height="60" Background="#8022D3EE"/>
+                <Border Width="150" Height="60" Background="#22D3EE" Opacity="{Binding Stroke.OverlapAlpha}"/>
                 <TextBlock Text="reference tone" Margin="0,4,0,0"/>
             </StackPanel>
 
             <!-- One stroke that crosses ITSELF: the crossing is one object's own coverage, so it must stay flat. -->
             <StackPanel Orientation="Vertical" Margin="10">
                 <Polyline Width="180" Height="120" Points="10,10 170,110 10,110 170,10"
-                          Stroke="#8022D3EE" StrokeThickness="18" StrokeLineJoin="Round"/>
+                          Stroke="#22D3EE" StrokeThickness="18" StrokeLineJoin="Round"
+                          Opacity="{Binding Stroke.OverlapAlpha}"/>
                 <TextBlock Text="self-crossing stroke" Margin="0,4,0,0"/>
             </StackPanel>
 
             <!-- A closed self-intersecting outline: joins AND crossings in one shape. -->
             <StackPanel Orientation="Vertical" Margin="10">
                 <Path Width="180" Height="150" Data="F0 M90,10 L145,140 L10,58 L170,58 L35,140 Z"
-                      Stroke="#8022D3EE" StrokeThickness="14" StrokeLineJoin="Round"/>
+                      Stroke="#22D3EE" StrokeThickness="14" StrokeLineJoin="Round"
+                      Opacity="{Binding Stroke.OverlapAlpha}"/>
                 <TextBlock Text="self-intersecting outline" Margin="0,4,0,0"/>
             </StackPanel>
 
             <!-- Its own translucent fill under its own translucent stroke. -->
             <StackPanel Orientation="Vertical" Margin="10">
                 <Path Width="180" Height="150" Data="F0 M90,10 L145,140 L10,58 L170,58 L35,140 Z"
-                      Fill="#8022D3EE" Stroke="#8022D3EE" StrokeThickness="14" StrokeLineJoin="Round"/>
+                      Fill="#22D3EE" Stroke="#22D3EE" StrokeThickness="14" StrokeLineJoin="Round"
+                      Opacity="{Binding Stroke.OverlapAlpha}"/>
                 <TextBlock Text="fill + stroke, same alpha" Margin="0,4,0,0"/>
             </StackPanel>
 
             <!-- CONTROL: two SEPARATE shapes. Here the crossing is genuinely two objects, so it SHOULD be darker -
-                 if this one looks flat, the fix has gone too far and is eating real compositing. -->
+                 if this one looks flat, the fix has gone too far and is eating real compositing. The alpha sits on each
+                 LINE, not on the Grid: a group opacity would composite the pair as one and hide exactly that. -->
             <StackPanel Orientation="Vertical" Margin="10">
                 <Grid Width="180" Height="120">
-                    <Line X1="10" Y1="10" X2="170" Y2="110" Stroke="#8022D3EE" StrokeThickness="18"/>
-                    <Line X1="10" Y1="110" X2="170" Y2="10" Stroke="#8022D3EE" StrokeThickness="18"/>
+                    <Line X1="10" Y1="10" X2="170" Y2="110" Stroke="#22D3EE" StrokeThickness="18"
+                          Opacity="{Binding Stroke.OverlapAlpha}"/>
+                    <Line X1="10" Y1="110" X2="170" Y2="10" Stroke="#22D3EE" StrokeThickness="18"
+                          Opacity="{Binding Stroke.OverlapAlpha}"/>
                 </Grid>
                 <TextBlock Text="two strokes — MUST be darker" Margin="0,4,0,0"/>
             </StackPanel>
@@ -292,8 +303,9 @@
             <!-- Dashes at the same alpha: every dash boundary is a cap, i.e. more edges to double-blend. -->
             <StackPanel Orientation="Vertical" Margin="10">
                 <Polyline Width="180" Height="120" Points="10,10 170,110 10,110 170,10"
-                          Stroke="#8022D3EE" StrokeThickness="18" StrokeDashArray="30 18"
-                          StrokeDashStartCap="ConvexRound" StrokeDashEndCap="ConvexRound" StrokeLineJoin="Round"/>
+                          Stroke="#22D3EE" StrokeThickness="18" StrokeDashArray="30 18"
+                          StrokeDashStartCap="ConvexRound" StrokeDashEndCap="ConvexRound" StrokeLineJoin="Round"
+                          Opacity="{Binding Stroke.OverlapAlpha}"/>
                 <TextBlock Text="dashed, self-crossing" Margin="0,4,0,0"/>
             </StackPanel>
         </WrapPanel>

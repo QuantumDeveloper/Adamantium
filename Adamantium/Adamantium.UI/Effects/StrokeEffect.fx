@@ -49,6 +49,13 @@ float TrimEnd;            // 0..1
 float4x4 Projection;
 float4 StrokeColor;
 
+// --- union coverage (translucent strokes only) ---
+// A translucent ribbon that crosses itself blends twice and leaves dark veins. The fix is to blend ONCE with the
+// coverage of the UNION, and the union's coverage is the MAXIMUM over the pieces that meet on a pixel. Depth carries
+// that maximum: the ribbon is drawn once writing 1 - coverage under a Less test (so the deepest = the most covered
+// wins), then again testing Equal, which lets exactly the winner through. The caller clears depth over the stroke's
+// own bounds first, so the range is known to start at 1.0 and nothing else in the frame has to change.
+
 // The two ends of the piece being emitted: where each one is, which way the contour runs there (dA points INTO the
 // piece, dB OUT of it) and which cap each wears - capStart + 8*capEnd, with 6 meaning "this end is not an end"
 // (an interior join, a closed loop), which leaves that cap's mask inert.
@@ -202,11 +209,11 @@ void PointAtArc(float target, out float2 pos, out float2 dir)
 //     edge of a thin star spike, a tight U) ribbon that is 20px away along the path lands "behind" the cap and gets
 //     shaved into a hair.
 // All ten are affine in the position along a segment, so they interpolate exactly across a triangle.
-void WriteVert(float* o, uint vi, float2 p, float perp, float arcA, float arcB, PieceFrame f)
+void WriteVert(float* o, uint vi, float2 p, float perp, float arcA, float arcB, PieceFrame f, float pieceId)
 {
     float2 rA = p - f.A;
     float2 rB = p - f.B;
-    uint b = vi * 10u;
+    uint b = vi * 11u;
     o[b + 0u] = p.x;
     o[b + 1u] = p.y;
     o[b + 2u] = perp;
@@ -217,27 +224,28 @@ void WriteVert(float* o, uint vi, float2 p, float perp, float arcA, float arcB, 
     o[b + 7u] = -dot(rB, f.dB);
     o[b + 8u] = dot(rB, float2(-f.dB.y, f.dB.x));
     o[b + 9u] = arcB;
+    o[b + 10u] = pieceId;   // ties between overlapping pieces, see StrokeVertex.PieceId
 }
 
 // Writes a quad (two triangles, 6 verts) from four corners into outVerts at vertex offset o.
 // hw = widened half-extent (HalfThickness + Fringe/2): the P corners sit at +hw perpendicular, the M corners at -hw, and
 // the signed distance v=+/-hw is interpolated across the quad so StrokePS feathers both long edges.
 void EmitQuad(float* outVerts, uint o, float2 aP, float2 aM, float2 bP, float2 bM, float hw,
-              float aArcA, float aArcB, float bArcA, float bArcB, PieceFrame f)
+              float aArcA, float aArcB, float bArcA, float bArcB, PieceFrame f, float pieceId)
 {
-    WriteVert(outVerts, o + 0u, aP,  hw, aArcA, aArcB, f);
-    WriteVert(outVerts, o + 1u, aM, -hw, aArcA, aArcB, f);
-    WriteVert(outVerts, o + 2u, bP,  hw, bArcA, bArcB, f);
-    WriteVert(outVerts, o + 3u, bP,  hw, bArcA, bArcB, f);
-    WriteVert(outVerts, o + 4u, aM, -hw, aArcA, aArcB, f);
-    WriteVert(outVerts, o + 5u, bM, -hw, bArcA, bArcB, f);
+    WriteVert(outVerts, o + 0u, aP,  hw, aArcA, aArcB, f, pieceId);
+    WriteVert(outVerts, o + 1u, aM, -hw, aArcA, aArcB, f, pieceId);
+    WriteVert(outVerts, o + 2u, bP,  hw, bArcA, bArcB, f, pieceId);
+    WriteVert(outVerts, o + 3u, bP,  hw, bArcA, bArcB, f, pieceId);
+    WriteVert(outVerts, o + 4u, aM, -hw, aArcA, aArcB, f, pieceId);
+    WriteVert(outVerts, o + 5u, bM, -hw, bArcA, bArcB, f, pieceId);
 }
 
 // Writes a degenerate (zero-area) quad at o - used for slots a thread doesn't fill, so the fixed layout stays uniform.
 void EmitDegenerateQuad(float* outVerts, uint o, float2 p)
 {
     PieceFrame none = NoCaps();
-    for (uint q = 0u; q < 6u; ++q) WriteVert(outVerts, o + q, p, 0.0, 1e6, 1e6, none);
+    for (uint q = 0u; q < 6u; ++q) WriteVert(outVerts, o + q, p, 0.0, 1e6, 1e6, none, 0.0);
 }
 
 // Round-join disc at V (radius half, an OPAQUE over-approximation of the corner wedge). Writes triangles at `base`, at
@@ -247,7 +255,7 @@ void EmitDegenerateQuad(float* outVerts, uint o, float2 p)
 // corner's own arc puts it wholly inside or wholly outside a cap's reach: park the corner just past that reach and the
 // half of the disc that lies inside the carved notch is left unmasked, and bulges out of the dash end.
 uint EmitDisc(float* outVerts, uint base, uint maxTris, float2 V, float arcA, float arcB,
-              float2 dIn, float2 dOut, PieceFrame f)
+              float2 dIn, float2 dOut, PieceFrame f, float pieceId)
 {
     float hw = HalfThickness + Fringe * 0.5;   // widened radius; perp = radial distance so the rim feathers
     uint n = 0u;
@@ -257,9 +265,9 @@ uint EmitDisc(float* outVerts, uint base, uint maxTris, float2 V, float arcA, fl
         float a1 = 6.28318530717958647692 * float(k + 1u) / float(RoundSegments);
         float2 r0 = hw * float2(cos(a0), sin(a0));
         float2 r1 = hw * float2(cos(a1), sin(a1));
-        WriteVert(outVerts, base + n * 3u + 0u, V, 0.0, arcA, arcB, f);
-        WriteVert(outVerts, base + n * 3u + 1u, V + r0, hw, arcA + dot(r0, dIn), arcB - dot(r0, dOut), f);
-        WriteVert(outVerts, base + n * 3u + 2u, V + r1, hw, arcA + dot(r1, dIn), arcB - dot(r1, dOut), f);
+        WriteVert(outVerts, base + n * 3u + 0u, V, 0.0, arcA, arcB, f, pieceId);
+        WriteVert(outVerts, base + n * 3u + 1u, V + r0, hw, arcA + dot(r0, dIn), arcB - dot(r0, dOut), f, pieceId);
+        WriteVert(outVerts, base + n * 3u + 2u, V + r1, hw, arcA + dot(r1, dIn), arcB - dot(r1, dOut), f, pieceId);
         ++n;
     }
     return n;
@@ -333,7 +341,7 @@ void StrokeExpandCS(uint3 tid : SV_DispatchThreadID)
             OffsetPair(i, aP, aM);
             OffsetPair(ni, bP, bM);
             EmitQuad(outVerts, baseV, aP, aM, bP, bM, HalfThickness + Fringe * 0.5,
-                     back, fwd, nBack, nFwd, frame);
+                     back, fwd, nBack, nFwd, frame, float(i * 2u));
         }
         else
         {
@@ -350,7 +358,8 @@ void StrokeExpandCS(uint3 tid : SV_DispatchThreadID)
                 if (i == 0u) a -= dir * EndExtend(i);              // room for the start cap's mask
                 if (ni + 1u == PointCount) b += dir * EndExtend(ni);
             }
-            EmitQuad(outVerts, baseV, a + nrm, a - nrm, b + nrm, b - nrm, hw, back, fwd, nBack, nFwd, frame);
+            EmitQuad(outVerts, baseV, a + nrm, a - nrm, b + nrm, b - nrm, hw, back, fwd, nBack, nFwd, frame,
+                     float(i * 2u));
         }
     }
     else
@@ -371,9 +380,11 @@ void StrokeExpandCS(uint3 tid : SV_DispatchThreadID)
 
     float2 dIn = normalize(p - points[prev]);
     float2 dOut = normalize(points[next] - p);
+    // The fan is a SEPARATE piece from the segment quad above (it lies on top of it), so it takes its own serial.
+    float fanId = float(i * 2u + 1u);
     if (JoinType == 2u && !isStart && !isEnd && JoinIsVisible(dIn, dOut))
     {
-        nTris = EmitDisc(outVerts, discBase, RoundSegments, p, back, fwd, dIn, dOut, frame);
+        nTris = EmitDisc(outVerts, discBase, RoundSegments, p, back, fwd, dIn, dOut, frame, fanId);
     }
     else if (JoinType == 1u && hasSegment && !isStart)
     {
@@ -382,12 +393,12 @@ void StrokeExpandCS(uint3 tid : SV_DispatchThreadID)
         float hw = HalfThickness + Fringe * 0.5;
         float2 nIn = SegmentNormal(points[prev], p) * hw;
         float2 nOut = SegmentNormal(p, points[next]) * hw;
-        WriteVert(outVerts, discBase + 0u, p + nIn, hw, back, fwd, frame);
-        WriteVert(outVerts, discBase + 1u, p + nOut, hw, back, fwd, frame);
-        WriteVert(outVerts, discBase + 2u, p, 0.0, back, fwd, frame);
-        WriteVert(outVerts, discBase + 3u, p - nIn, -hw, back, fwd, frame);
-        WriteVert(outVerts, discBase + 4u, p - nOut, -hw, back, fwd, frame);
-        WriteVert(outVerts, discBase + 5u, p, 0.0, back, fwd, frame);
+        WriteVert(outVerts, discBase + 0u, p + nIn, hw, back, fwd, frame, fanId);
+        WriteVert(outVerts, discBase + 1u, p + nOut, hw, back, fwd, frame, fanId);
+        WriteVert(outVerts, discBase + 2u, p, 0.0, back, fwd, frame, fanId);
+        WriteVert(outVerts, discBase + 3u, p - nIn, -hw, back, fwd, frame, fanId);
+        WriteVert(outVerts, discBase + 4u, p - nOut, -hw, back, fwd, frame, fanId);
+        WriteVert(outVerts, discBase + 5u, p, 0.0, back, fwd, frame, fanId);
         nTris = 2u;
     }
 
@@ -396,9 +407,9 @@ void StrokeExpandCS(uint3 tid : SV_DispatchThreadID)
     for (uint k = nTris; k < RoundSegments; ++k)
     {
         uint o = discBase + k * 3u;
-        WriteVert(outVerts, o + 0u, p, 0.0, 1e6, 1e6, none);
-        WriteVert(outVerts, o + 1u, p, 0.0, 1e6, 1e6, none);
-        WriteVert(outVerts, o + 2u, p, 0.0, 1e6, 1e6, none);
+        WriteVert(outVerts, o + 0u, p, 0.0, 1e6, 1e6, none, 0.0);
+        WriteVert(outVerts, o + 1u, p, 0.0, 1e6, 1e6, none, 0.0);
+        WriteVert(outVerts, o + 2u, p, 0.0, 1e6, 1e6, none, 0.0);
     }
 }
 
@@ -409,14 +420,14 @@ void StrokeExpandCS(uint3 tid : SV_DispatchThreadID)
 // The join belongs to the dash PIECE that crosses it and carries that piece's frame, so a corner falling inside a
 // concave cap's bite is carved by the same curve as the ribbon instead of poking out of the notch.
 uint EmitJoin(float* outVerts, uint vCount, uint maxV, float2 V, float2 dIn, float2 dOut,
-              float arcA, float arcB, PieceFrame f)
+              float arcA, float arcB, PieceFrame f, float pieceId)
 {
     float h = HalfThickness + Fringe * 0.5;   // widened; the outer corner verts carry perp=+/-h, the centre V carries 0
     float2 nInU = float2(-dIn.y, dIn.x);
     float2 nOutU = float2(-dOut.y, dOut.x);
     if (JoinType == 2u)   // round join: a disc of radius half
     {
-        uint tris = EmitDisc(outVerts, vCount, (maxV - vCount) / 3u, V, arcA, arcB, dIn, dOut, f);
+        uint tris = EmitDisc(outVerts, vCount, (maxV - vCount) / 3u, V, arcA, arcB, dIn, dOut, f, pieceId);
         return vCount + tris * 3u;
     }
 
@@ -425,12 +436,12 @@ uint EmitJoin(float* outVerts, uint vCount, uint maxV, float2 V, float2 dIn, flo
     // ever having to pick - and mis-pick - the outer side. MITER is not routed here (its quad ends already meet).
     if (vCount + 6u <= maxV)
     {
-        WriteVert(outVerts, vCount + 0u, V + nInU * h, h, arcA, arcB, f);
-        WriteVert(outVerts, vCount + 1u, V + nOutU * h, h, arcA, arcB, f);
-        WriteVert(outVerts, vCount + 2u, V, 0.0, arcA, arcB, f);
-        WriteVert(outVerts, vCount + 3u, V - nInU * h, -h, arcA, arcB, f);
-        WriteVert(outVerts, vCount + 4u, V - nOutU * h, -h, arcA, arcB, f);
-        WriteVert(outVerts, vCount + 5u, V, 0.0, arcA, arcB, f);
+        WriteVert(outVerts, vCount + 0u, V + nInU * h, h, arcA, arcB, f, pieceId);
+        WriteVert(outVerts, vCount + 1u, V + nOutU * h, h, arcA, arcB, f, pieceId);
+        WriteVert(outVerts, vCount + 2u, V, 0.0, arcA, arcB, f, pieceId);
+        WriteVert(outVerts, vCount + 3u, V - nInU * h, -h, arcA, arcB, f, pieceId);
+        WriteVert(outVerts, vCount + 4u, V - nOutU * h, -h, arcA, arcB, f, pieceId);
+        WriteVert(outVerts, vCount + 5u, V, 0.0, arcA, arcB, f, pieceId);
         vCount += 6u;
     }
     return vCount;
@@ -509,6 +520,7 @@ void StrokeDashCutCS(uint3 tid : SV_DispatchThreadID)
     frame.caps = PieceCaps(pieceStart, pieceEnd, tStart, tEnd);
 
     uint vCount = 0u;
+    uint pieceSerial = 0u;   // every quad and every join the walk emits is its own piece (see StrokeVertex.PieceId)
     float arc = 0.0;
     bool contInto = (IsClosed != 0u) && on;   // does a live dash cross the vertex ENTERING the current segment (miter start)
     for (uint s = 0u; s < segCount; ++s)
@@ -573,7 +585,8 @@ void StrokeDashCutCS(uint3 tid : SV_DispatchThreadID)
                 float2 eBot = endCont ? mEm : e1 - nrm;
                 if (vCount + 6u <= MaxVertices)
                 {
-                    EmitQuad(outVerts, vCount, sTop, sBot, eTop, eBot, hw, aArcA, aArcB, bArcA, bArcB, frame);
+                    EmitQuad(outVerts, vCount, sTop, sBot, eTop, eBot, hw, aArcA, aArcB, bArcA, bArcB, frame,
+                             float(pieceSerial++));
                     vCount += 6u;
                 }
             }
@@ -613,7 +626,7 @@ void StrokeDashCutCS(uint3 tid : SV_DispatchThreadID)
             if (JoinIsVisible(dir, dOut))
             {
                 vCount = EmitJoin(outVerts, vCount, MaxVertices, points[cv], dir, dOut,
-                                  arc - pieceStart, pieceEnd - arc, frame);
+                                  arc - pieceStart, pieceEnd - arc, frame, float(pieceSerial++));
             }
         }
         contInto = joinHere;
@@ -630,6 +643,7 @@ struct VSInput
     float2 Position : POSITION;
     float4 Cap0 : TEXCOORD0;   // perp, uA, vA, arcA
     float4 Cap1 : TEXCOORD1;   // caps, uB, vB, arcB
+    float PieceId : TEXCOORD2;
 };
 
 struct PSInput
@@ -637,6 +651,7 @@ struct PSInput
     float4 Position : SV_Position;
     float4 Cap0 : TEXCOORD0;
     float4 Cap1 : TEXCOORD1;
+    float PieceId : TEXCOORD2;
 };
 
 [shader("vertex")]
@@ -646,6 +661,7 @@ PSInput StrokeVS(VSInput input)
     o.Position = mul(float4(input.Position, 0.0, 1.0), Projection);   // row-vector convention (matches engine effects)
     o.Cap0 = input.Cap0;
     o.Cap1 = input.Cap1;
+    o.PieceId = input.PieceId;
     return o;
 }
 
@@ -673,23 +689,73 @@ float CapSd(uint cap, float u, float v, float arc, float h, float hBite)
     return u;                                                     // flat
 }
 
-[shader("fragment")]
-float4 StrokePS(PSInput input) : SV_Target
+// Analytic AA: coverage from the signed distance to the nearest boundary - the ribbon's two long edges (|v| vs
+// HalfThickness) and the piece's two caps. 1 in the core, 0.5 on the nominal boundary, 0 a feather past it.
+// Fringe == 0 (analytic AA off) => a hard edge, the mask still shapes the caps.
+// A concave cap may not eat past the middle of its own piece - hBite is that limit.
+// ONE function for all three passes: the union passes compare their depths for EQUALITY, so both must reach the same
+// value down to the bit, which only a shared body guarantees.
+float StrokeCoverage(PSInput input)
 {
-    // Analytic AA: coverage from the signed distance to the nearest boundary - the ribbon's two long edges (|v| vs
-    // HalfThickness) and the piece's two caps. 1 in the core, 0.5 on the nominal boundary, 0 a feather past it.
-    // Fringe == 0 (analytic AA off) => a hard edge, the mask still shapes the caps.
-    // A concave cap may not eat past the middle of its own piece - hBite is that limit.
     uint caps = uint(round(input.Cap1.x));
     float hBite = min(HalfThickness, 0.5 * (input.Cap0.w + input.Cap1.w));
     float sd = HalfThickness - abs(input.Cap0.x);
     sd = min(sd, CapSd(caps % 8u, input.Cap0.y, input.Cap0.z, input.Cap0.w, HalfThickness, hBite));
     sd = min(sd, CapSd(caps / 8u, input.Cap1.y, input.Cap1.z, input.Cap1.w, HalfThickness, hBite));
 
-    float coverage = Fringe > 0.0 ? saturate(sd / Fringe + 0.5) : (sd >= 0.0 ? 1.0 : 0.0);
+    return Fringe > 0.0 ? saturate(sd / Fringe + 0.5) : (sd >= 0.0 ? 1.0 : 0.0);
+}
+
+// The depth a fragment claims: coverage in the high 8 bits (more coverage = deeper, so a Less test over a 1.0-cleared
+// range settles on the MAXIMUM), the piece serial in the low 16. The whole thing is an integer below 2^24 scaled by a
+// power of two, so a 32-bit float holds it EXACTLY and both passes reach the same bits - which is what an Equal test
+// needs. The serial is what makes it injective: without it two pieces covering a pixel equally (a crossing covers both
+// fully) would both match, and blend twice - the very thing being fixed.
+float CoverageDepth(float coverage, float pieceId)
+{
+    float covered = round(saturate(1.0 - coverage) * 255.0);
+    float serial = clamp(round(pieceId), 0.0, 65535.0);
+    return (covered * 65536.0 + serial) / 16777216.0;
+}
+
+[shader("fragment")]
+float4 StrokePS(PSInput input) : SV_Target
+{
     float4 c = StrokeColor;
-    c.a *= coverage;
+    c.a *= StrokeCoverage(input);
     return c;
+}
+
+// Union pass 1: depth only, under Less over bounds the caller cleared to 1.0. Afterwards each pixel holds the depth of
+// the single fragment with the greatest coverage over it - the coverage of the UNION.
+[shader("fragment")]
+float StrokeUnionDepthPS(PSInput input) : SV_Depth
+{
+    return CoverageDepth(StrokeCoverage(input), input.PieceId);
+}
+
+struct UnionOutput
+{
+    float4 Color : SV_Target;
+    float Depth : SV_Depth;
+};
+
+// Union pass 2: Equal, no depth write. Exactly the fragment pass 1 settled on gets through, so the union blends ONCE -
+// which is the whole point. Drawing it under Less in a single pass instead looks nearly right and is not: the order two
+// pieces reach a pixel is fixed along their whole shared edge, so wherever the weaker one lands first it paints a
+// second time down the entire length, and that reads as a hard line through the stroke.
+[shader("fragment")]
+UnionOutput StrokeUnionDrawPS(PSInput input)
+{
+    // No discard for zero coverage: it would pull in DemoteToHelperInvocation, and it buys nothing - such a fragment
+    // paints an alpha of zero anyway.
+    float coverage = StrokeCoverage(input);
+
+    UnionOutput o;
+    o.Color = StrokeColor;
+    o.Color.a *= coverage;
+    o.Depth = CoverageDepth(coverage, input.PieceId);
+    return o;
 }
 
 technique Stroke
@@ -718,5 +784,22 @@ technique Stroke
         Profile = 6.6;
         VertexShader = StrokeVS;
         PixelShader = StrokePS;
+    }
+
+    // UnionDepth / UnionDraw (graphics): the two passes a TRANSLUCENT stroke takes so its self-overlaps blend once.
+    pass UnionDepth
+    {
+        EffectName = "StrokeEffect";
+        Profile = 6.6;
+        VertexShader = StrokeVS;
+        PixelShader = StrokeUnionDepthPS;
+    }
+
+    pass UnionDraw
+    {
+        EffectName = "StrokeEffect";
+        Profile = 6.6;
+        VertexShader = StrokeVS;
+        PixelShader = StrokeUnionDrawPS;
     }
 }

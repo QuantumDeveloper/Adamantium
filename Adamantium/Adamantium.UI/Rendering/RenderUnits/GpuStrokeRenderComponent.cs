@@ -28,6 +28,13 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
     // Disc-fan subdivision for round joins (a smooth-enough circle); 0 when the contour has no round geometry.
     private const uint RoundSegmentsCount = 16;
     private const int MaxDashVertices = 8192 * 6;   // safety cap on the dash output buffer (per contour)
+
+    private const ColorComponentFlagBits AllColorComponents = ColorComponentFlagBits.RBit |
+                                                              ColorComponentFlagBits.GBit |
+                                                              ColorComponentFlagBits.BBit |
+                                                              ColorComponentFlagBits.ABit;
+
+
     private const MemoryPropertyFlags StrokeMemory = MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal;
 
     private readonly GraphicsDevice _device;
@@ -60,7 +67,7 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
         public Buffer IndirectBuffer;    // dash only (VkDrawIndirectCommand)
         public float DashScale = 1f;     // what FitDashesToContour stretched the pattern by (1 = untouched)
         public ulong PointsBytes => (ulong)(PointsData.Length * sizeof(float));
-        public ulong VertexBytes => (ulong)(VertexCount * 10 * sizeof(float));   // see StrokeVertex (pos + one float4 per piece end)
+        public ulong VertexBytes => (ulong)(VertexCount * 11 * sizeof(float));   // see StrokeVertex (pos, a float4 per piece end, the piece serial)
     }
 
     public GpuStrokeRenderComponent(IGraphicsDevice device, UIBasicEffect uiBasicEffect, StrokeEffect effect,
@@ -405,11 +412,104 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
         _device.PolygonMode = PolygonMode.Fill;
         _device.PrimitiveTopology = PrimitiveTopology.TriangleList;
         _device.ColorBlendEquation = ColorBlendEquations.AlphaBlend;
-        _device.DepthCompareFunction = CompareOp.Always;
         _device.DepthTestEnabled = true;
-        _device.DepthWriteEnable = true;
-        _effect.StrokeDrawPass.Apply();
 
+        // An OPAQUE stroke cannot see its own overlaps, and a fully transparent one has nothing to show; both keep the
+        // single cheap pass. A translucent one blends every self-crossing twice and comes out veined, so it goes
+        // through the union path below instead.
+        if (color.W >= 1.0f || color.W <= 0.0f || !_device.HasDepthAttachment || !TryDeviceBounds(out var bounds))
+        {
+            _device.DepthCompareFunction = CompareOp.Always;
+            _device.DepthWriteEnable = true;
+            _effect.StrokeDrawPass.Apply();
+            DrawContours();
+            return;
+        }
+
+        // Depth is SCRATCH here, and it is shared with everything else in the frame, so this stroke starts by putting
+        // its own bounds back to 1.0 rather than assuming what is there. Depth only - the stencil in that rectangle
+        // carries the instanced fills' coverage marks and must survive.
+        _device.ClearDepthInRect(bounds);
+
+        // Pass 1: settle the union's coverage into that depth, no colour. Pass 2: the one fragment that survived blends.
+        // Both passes must be draws of the SAME ribbon so their depths agree bit for bit.
+        _device.ColorComponentFlags = 0;
+        _device.DepthCompareFunction = CompareOp.Less;
+        _device.DepthWriteEnable = true;
+        _effect.StrokeUnionDepthPass.Apply();
+        DrawContours();
+
+        _device.ColorComponentFlags = AllColorComponents;
+        _device.DepthCompareFunction = CompareOp.Equal;
+        _device.DepthWriteEnable = false;
+        _effect.StrokeUnionDrawPass.Apply();
+        DrawContours();
+
+        _device.DepthCompareFunction = CompareOp.Always;
+        _device.DepthWriteEnable = true;
+    }
+
+    // This stroke's footprint in DEVICE pixels - the rectangle whose depth it may use as scratch. Built from the raw
+    // contour points padded by the widest thing the expander can put around them (half a thickness, the miter clamp's
+    // 4x reach on a sharp corner, the AA feather), then transformed and clamped to the viewport.
+    private bool TryDeviceBounds(out Rect2D bounds)
+    {
+        bounds = default;
+        var viewports = _device.CurrentViewports;
+        if (viewports is not { Length: > 0 }) return false;
+
+        var pad = (float)(_pen.Thickness * 2.0) + ComputeFringe() + 1.0f;
+        float minX = float.MaxValue, minY = float.MaxValue, maxX = float.MinValue, maxY = float.MinValue;
+        foreach (var c in _contours)
+        {
+            for (var i = 0; i + 1 < c.PointsData.Length; i += 2)
+            {
+                if (c.PointsData[i] < minX) minX = c.PointsData[i];
+                if (c.PointsData[i] > maxX) maxX = c.PointsData[i];
+                if (c.PointsData[i + 1] < minY) minY = c.PointsData[i + 1];
+                if (c.PointsData[i + 1] > maxY) maxY = c.PointsData[i + 1];
+            }
+        }
+        if (minX > maxX) return false;
+
+        minX -= pad; minY -= pad; maxX += pad; maxY += pad;
+
+        // Local -> clip, row-vector convention (the same product StrokeVS uses). A rotation or a flip can send any
+        // corner anywhere, so all four are transformed and the extent taken from the result.
+        var m = RenderData.TransformMatrix * RenderData.ProjectionMatrix;
+        float clipMinX = float.MaxValue, clipMinY = float.MaxValue, clipMaxX = float.MinValue, clipMaxY = float.MinValue;
+        foreach (var (x, y) in new[] { (minX, minY), (maxX, minY), (minX, maxY), (maxX, maxY) })
+        {
+            var cx = x * m.M11 + y * m.M21 + m.M41;
+            var cy = x * m.M12 + y * m.M22 + m.M42;
+            if (cx < clipMinX) clipMinX = cx;
+            if (cx > clipMaxX) clipMaxX = cx;
+            if (cy < clipMinY) clipMinY = cy;
+            if (cy > clipMaxY) clipMaxY = cy;
+        }
+
+        var vp = viewports[0];
+        var left = (int)Math.Floor((clipMinX * 0.5f + 0.5f) * vp.Width + vp.X);
+        var top = (int)Math.Floor((clipMinY * 0.5f + 0.5f) * vp.Height + vp.Y);
+        var right = (int)Math.Ceiling((clipMaxX * 0.5f + 0.5f) * vp.Width + vp.X);
+        var bottom = (int)Math.Ceiling((clipMaxY * 0.5f + 0.5f) * vp.Height + vp.Y);
+
+        left = Math.Clamp(left, (int)vp.X, (int)(vp.X + vp.Width));
+        top = Math.Clamp(top, (int)vp.Y, (int)(vp.Y + vp.Height));
+        right = Math.Clamp(right, left, (int)(vp.X + vp.Width));
+        bottom = Math.Clamp(bottom, top, (int)(vp.Y + vp.Height));
+        if (right == left || bottom == top) return false;
+
+        bounds = new Rect2D
+        {
+            Offset = new Offset2D { X = left, Y = top },
+            Extent = new Extent2D { Width = (uint)(right - left), Height = (uint)(bottom - top) }
+        };
+        return true;
+    }
+
+    private void DrawContours()
+    {
         foreach (var c in _contours)
         {
             var vertices = c.VertexBuffer.Acquire(c.VertexBytes, out _);   // the slot PreRender expanded this frame
