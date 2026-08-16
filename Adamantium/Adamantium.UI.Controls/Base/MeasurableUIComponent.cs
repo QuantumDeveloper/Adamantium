@@ -361,6 +361,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     public void Measure(Size availableSize, bool force = false)
     {
         TotalMeasureCalls++;
+        if (Core.Diagnostics.LayoutTrace.Counting) Core.Diagnostics.LayoutTrace.Count(GetType(), "*measure-call*");
         if (Double.IsNaN(availableSize.Width) || Double.IsNaN(availableSize.Height))
         {
             throw new InvalidOperationException("Cannot call Measure using a size with NaN values.");
@@ -443,6 +444,11 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     public void Arrange(Rect rect, bool force = false)
     {
         TotalArrangeCalls++;
+        if (Core.Diagnostics.LayoutTrace.Counting)
+        {
+            Core.Diagnostics.LayoutTrace.Count(GetType(), "*arrange-call*");
+            Core.Diagnostics.LayoutTrace.CountCaller(GetType(), "arrange", 1);
+        }
         if (IsInvalidRect(rect))
         {
             throw new InvalidOperationException("Invalid Arrange rectangle.");
@@ -774,6 +780,8 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
 
     public virtual void InvalidateMeasure()
     {
+        if (Core.Diagnostics.LayoutTrace.Counting) Core.Diagnostics.LayoutTrace.Count(GetType(), "*any-measure*");
+
         // NO early return for an already-invalid node. The flag and the QUEUE are two different things: a node marked
         // invalid at a moment when it could not be enqueued - detached (the dirty queue belongs to the visual root), or
         // mid-pass - stays flagged forever, and returning here on the strength of that flag means the request to measure
@@ -810,8 +818,12 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
 
     public virtual void InvalidateArrange()
     {
-        if (!IsArrangeValid) return;
+        if (Core.Diagnostics.LayoutTrace.Counting) Core.Diagnostics.LayoutTrace.Count(GetType(), "*any-arrange*");
 
+        // NO early return for an already-invalid node - the same reason spelled out in InvalidateMeasure: the flag and the
+        // QUEUE are two different things. A node marked invalid at a moment when it could not be enqueued (collapsed, or
+        // detached) would otherwise keep the flag forever and never be arranged again, because every later request sees
+        // "already invalid" and drops itself. Re-stating the request is cheap - the manager's queue is a set.
         IsArrangeValid = false;
         IsGeometryValid = false;
         // _previousArrange is KEPT (the last correct slot) - see InvalidateMeasure. IsArrangeValid=false forces re-arrange.

@@ -635,11 +635,13 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             // TODO: think how to improve this code and get rid of type casting
             if (metadata.AffectsMeasure)
             {
+                if (Diagnostics.LayoutTrace.Counting) Diagnostics.LayoutTrace.Count(GetType(), property.Name);
                 measurable.InvalidateMeasure();
                 measurable.InvalidateArrange();
             }
             else if (metadata.AffectsArrange)
             {
+                if (Diagnostics.LayoutTrace.Counting) Diagnostics.LayoutTrace.Count(GetType(), property.Name);
                 measurable.InvalidateArrange();
             }
 
@@ -652,11 +654,13 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             {
                 if (metadata.AffectsParentMeasure)
                 {
+                    if (Diagnostics.LayoutTrace.Counting) Diagnostics.LayoutTrace.Count(GetType(), property.Name + " (parent)");
                     parent.InvalidateMeasure();
                     parent.InvalidateArrange();
                 }
                 else if (metadata.AffectsParentArrange)
                 {
+                    if (Diagnostics.LayoutTrace.Counting) Diagnostics.LayoutTrace.Count(GetType(), property.Name + " (parent)");
                     parent.InvalidateArrange();
                 }
             }

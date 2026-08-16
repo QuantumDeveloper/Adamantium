@@ -112,6 +112,7 @@ public class ForwardWindowRenderer : WindowRendererBase
         var t0 = Stopwatch.GetTimestamp();
         _renderCache.RecordFrame(Window);
         _lastRecordMs = Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
+        RuntimeStats.LastRecordMs = _lastRecordMs;
     }
 
     // GPU apply half (Phase 3.2): realize the recorded packet into units + the per-unit transform re-bake. Runs inside
@@ -122,7 +123,8 @@ public class ForwardWindowRenderer : WindowRendererBase
 
         var t0 = Stopwatch.GetTimestamp();
         _renderCache.ApplyFrame();
-        RuntimeStats.LastRenderBuildMs = _lastRecordMs + Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
+        RuntimeStats.LastApplyMs = Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
+        RuntimeStats.LastRenderBuildMs = _lastRecordMs + RuntimeStats.LastApplyMs;
 
         // Skip the per-unit transform re-bake (proc) when nothing MOVED: a Clean frame (nothing changed at all) or a
         // GEOMETRY-ONLY partial (a hover re-recorded some draw contents, but no transform changed). Proc walks EVERY unit

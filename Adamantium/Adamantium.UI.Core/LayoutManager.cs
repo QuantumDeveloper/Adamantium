@@ -203,6 +203,7 @@ public sealed class LayoutManager
         }
 
         RuntimeStats.LastLayoutPassMs = _passStopwatch.Elapsed.TotalMilliseconds;
+        if (didWork) Diagnostics.LayoutTrace.Count(typeof(LayoutManager), "*pass*");
         RuntimeStats.LastPassBudgetDeferred = !settled;
 
         // LayoutUpdated = "layout settled this frame" - only when everything drained.
@@ -234,6 +235,11 @@ public sealed class LayoutManager
     {
         var control = (IMeasurableComponent)node;
         if (control.IsMeasureValid) return;   // already measured this pass via an ancestor's cascade
+
+        // COLLAPSED: takes no space, so its desired size is nobody's business until it comes back - and coming back writes
+        // Visibility, which invalidates and re-queues it. Same reasoning as the arrange drain. Measured on a tile-size
+        // drag: nearly every measure in a step was one of the containers the window had just parked.
+        if (node.Visibility == Visibility.Collapsed) return;
 
         if (LayoutTrace.Enabled)
         {
@@ -274,6 +280,13 @@ public sealed class LayoutManager
     {
         var control = (IMeasurableComponent)node;
         if (control.IsArrangeValid) return;
+
+        // A COLLAPSED node takes no space and draws nothing, so arranging it produces nothing anyone can see. Dropping it
+        // here (invalid, un-queued) is safe because becoming visible writes Visibility, which invalidates and re-queues it
+        // - and that request is now honoured whatever the flag already said. Measured on a tile-size drag: every container
+        // the window shed was parked AND then arranged, one whole extra arrange per shed container per step.
+        if (node.Visibility == Visibility.Collapsed) return;
+
         if (!control.IsMeasureValid)
         {
             // Its measure was re-dirtied after this arrange was queued; defer to a later iteration (re-enqueue, don't drop)

@@ -80,6 +80,7 @@ public class ItemContainerGenerator
         Action<IUIComponent> onBound = null)
     {
         var budgetStart = System.Diagnostics.Stopwatch.GetTimestamp();
+        Core.Diagnostics.LayoutTrace.Count(typeof(ItemContainerGenerator), "*setwindow*");
         // 1. Unmap every realized index now outside the window; its generated container becomes a reusable donor (kept
         //    fully intact - same visual, same DataContext - until step 2 rebinds it). Item-is-own-container isn't reused.
         // Reused buffers + a plain loop (no LINQ closure/ToList): SetWindow runs every scroll frame, so the old per-call
@@ -91,6 +92,7 @@ public class ItemContainerGenerator
             if (idx < first || idx > last) _outKeysBuf.Add(idx);   // snapshot: can't remove from _byIndex mid-enumeration
         foreach (var idx in _outKeysBuf)
         {
+            Core.Diagnostics.LayoutTrace.Count(typeof(ItemContainerGenerator), "*unmapped*");
             var container = _byIndex[idx];
             _byIndex.Remove(idx);
             _indexByContainer.Remove(container);
@@ -165,11 +167,13 @@ public class ItemContainerGenerator
                 // (creating containers from empty, or after a DPI/resize regime change) stops after budgetMs instead of
                 // running a whole stale count and freezing the frame; a CHEAP burst (scroll rebinds) fits many in the
                 // same budget.
+                Core.Diagnostics.LayoutTrace.Count(typeof(ItemContainerGenerator), "*deferred*");
                 _pendingBuf.Add(i);
                 continue;
             }
             else if (next < donors.Count)
             {
+                Core.Diagnostics.LayoutTrace.Count(typeof(ItemContainerGenerator), "*rebound*");
                 container = donors[next++];
                 rebinds++;
                 _owner.PrepareContainer(container, item);   // rebind: DataContext/content -> the new item
