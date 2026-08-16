@@ -15,4 +15,11 @@ internal struct StrokeVertex
     [VertexInputElement("POSITION")] public Vector2F Position;
     [VertexInputElement("TEXCOORD0")] public Vector4F Cap0;
     [VertexInputElement("TEXCOORD1")] public Vector4F Cap1;
+
+    // Serial number of the PIECE of ribbon this vertex belongs to - one segment quad, one join fan, one dash. A
+    // translucent stroke resolves its self-overlaps by keeping the MAXIMUM coverage per pixel, and this is what breaks
+    // the tie between two pieces that cover a pixel equally (a crossing covers both fully). It rides in its own
+    // attribute rather than packed into Cap1: interpolating a large value across a triangle costs more than half a
+    // unit of error, and rounding it back would then land on the wrong piece.
+    [VertexInputElement("TEXCOORD2")] public float PieceId;
 }

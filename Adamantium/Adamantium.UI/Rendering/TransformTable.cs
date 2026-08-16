@@ -145,11 +145,6 @@ internal sealed class TransformTable
         _uploaded[_current][slot] = _version[slot];
     }
 
-    private void GrowAlpha()
-    {
-        for (var slot = _count; slot < _cpu.Length; slot++) _cpu[slot].Params.X = 1f;   // new slots are opaque
-    }
-
     /// <summary>Sets the alpha this slot multiplies its instances by. Fading a whole node - or one CLONE of a prototype -
     /// is then ONE float write instead of re-baking every instance's colour.</summary>
     public void SetAlpha(IGraphicsDevice device, int slot, float alpha)
@@ -180,11 +175,7 @@ internal sealed class TransformTable
         else
         {
             slot = _count++;
-            if (_count > _cpu.Length)
-            {
-                Array.Resize(ref _cpu, _cpu.Length * 2);   // GPU grows at next EnsureResources
-                Array.Resize(ref _version, _cpu.Length);
-            }
+            if (_count > _cpu.Length) Grow();
         }
         _slotByNode[nodeId] = slot;
         return slot;
@@ -196,14 +187,21 @@ internal sealed class TransformTable
         if (_free.Count > 0) return _free.Pop();
 
         var slot = _count++;
-        if (_count > _cpu.Length)
-        {
-            Array.Resize(ref _cpu, _cpu.Length * 2);   // GPU grows at next EnsureResources
-            Array.Resize(ref _version, _cpu.Length);
-            GrowAlpha();
-        }
+        if (_count > _cpu.Length) Grow();
 
         return slot;
+    }
+
+    // Doubles the table. Growth lived in TWO places, and only one of them made the new slots OPAQUE - so every slot past
+    // the initial capacity came out of the other one with alpha 0 and drew its element fully transparent, while the
+    // element still answered the mouse. The fill starts at the OLD length, not at _count: the slot being handed out right
+    // now IS the first of the new range, and starting a step later left exactly it invisible.
+    private void Grow()
+    {
+        var was = _cpu.Length;
+        Array.Resize(ref _cpu, was * 2);   // the GPU side follows at the next EnsureResources
+        Array.Resize(ref _version, _cpu.Length);
+        for (var slot = was; slot < _cpu.Length; slot++) _cpu[slot].Params.X = 1f;
     }
 
     /// <summary>Releases a promoted node's slot back to the pool (its instances re-point to an ancestor slot first).</summary>

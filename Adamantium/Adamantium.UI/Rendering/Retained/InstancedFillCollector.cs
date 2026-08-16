@@ -146,12 +146,14 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     private readonly List<FlushRecord> _flushRecords = new();
     private int _flushCount;   // records used this frame (pooled objects reused up to this count)
 
+    private const uint CoverageMarkBits = 0xFF;
+
     // Marks are 8 bits and the buffer is cleared per frame, so a frame has 255 of them; past that the caller falls back
     // to closing the group on overlap.
     private uint _groupRef;
 
     /// <summary>True once this frame has used up the 255 distinct coverage marks.</summary>
-    public bool CoverageMarksExhausted => _groupRef >= 255;
+    public bool CoverageMarksExhausted => _groupRef >= CoverageMarkBits;
 
     /// <summary>Set by the caller each frame: true when the scene is provably unchanged (RenderBuildKind.Clean) so the
     /// per-key instance upload is skipped (the retained buffer already holds these exact bytes).</summary>
@@ -626,7 +628,9 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         _flushCount++;
         rec.Reset();
         rec.Scissor = _scissor;
-        rec.StencilRef = ++_groupRef;
+        // Clamped to the field, NOT left to wrap: a mark past it writes back as 0 through the write mask, and a fringe
+        // testing Greater against 0 draws nowhere. Past exhaustion the caller has already stopped relying on marks.
+        rec.StencilRef = Math.Min(++_groupRef, CoverageMarkBits);
 
         foreach (var seg in _pendingKeys)
         {

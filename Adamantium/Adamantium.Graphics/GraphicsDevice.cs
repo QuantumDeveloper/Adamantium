@@ -377,6 +377,26 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     public uint StencilWriteMask { get; set; } = 0xFF;
 
+    /// <summary>Is there a depth attachment to borrow at all? Without one the caller draws the plain single-pass way.</summary>
+    public bool HasDepthAttachment => depthBuffer != null;
+
+    /// <summary>Resets DEPTH ONLY (the stencil, which carries the instanced fills' coverage marks, is untouched) inside
+    /// one rectangle of the attachment, mid-pass. A draw that borrows depth as scratch - the strokes' union coverage -
+    /// uses this to start from a known 1.0 over its own bounds, instead of assuming what the rest of the frame left
+    /// there. That assumption is what made the first version of this a frame-wide change.</summary>
+    public void ClearDepthInRect(Rect2D rect)
+    {
+        if (depthBuffer == null || rect.Extent.Width == 0 || rect.Extent.Height == 0) return;
+
+        var attachment = new ClearAttachment
+        {
+            AspectMask = ImageAspectFlagBits.DepthBit,
+            ClearValue = new ClearValue { DepthStencil = new ClearDepthStencilValue { Depth = 1.0f, Stencil = 0 } }
+        };
+        var clearRect = new ClearRect { Rect = rect, BaseArrayLayer = 0, LayerCount = 1 };
+        CurrentCommandBuffer.ClearAttachments(1, new[] { attachment }, 1, new[] { clearRect });
+    }
+
     public bool LogicOperationsEnabled { get; set; } = false;
         
     public LogicOp LogicOperation { get; set; }
@@ -982,7 +1002,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         };
         
         var loadOperation = continueRendering ? AttachmentLoadOp.Load : AttachmentLoadOp.Clear;
-        
+
         if (EnableDynamicRendering)
         {
             var colorAttachments = new RenderingAttachmentInfo[renderTargets.Length];

@@ -14,6 +14,11 @@ public sealed class StrokeSettings : PropertyChangedBase
     private double _strokeWidth = 8;
     public double StrokeWidth { get => _strokeWidth; set => SetProperty(ref _strokeWidth, value); }
 
+    // Alpha of the translucent-overlap stand. Worth dragging: at 1 the strokes take the plain single-pass path, and
+    // anywhere below it they take the union path, so the two can be compared on the same shapes.
+    private double _overlapAlpha = 0.5;
+    public double OverlapAlpha { get => _overlapAlpha; set => SetProperty(ref _overlapAlpha, value); }
+
     // Curve tessellation density: number of points each Bézier/NURBS/B-spline is sampled into (evenly by arc length).
     // 0 = automatic (~3px spacing). The curves bind their Samples to this so the panel drives them all.
     private double _samples = 32;   // demo slider START only; the real default lives on CurveBase.Samples (32)

@@ -38,6 +38,13 @@ internal abstract class SdfBatchCollector<TItem> : BatchCollector<TItem> where T
     // base (whether it includes firstInstance is translation-defined).
     protected override void DrawSegment(IGraphicsDevice device, Buffer<TItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
     {
+        var dev = (GraphicsDevice)device;
+
+        // Set what this draw DEPENDS on, don't inherit it. The colour mask is device state like any other, and a pass
+        // that borrows it (the strokes' union coverage masks colour off for its depth pass) would otherwise leave these
+        // instances writing nothing at all.
+        dev.ColorComponentFlags = ColorComponentFlagBits.RBit | ColorComponentFlagBits.GBit |
+                                  ColorComponentFlagBits.BBit | ColorComponentFlagBits.ABit;
         device.ColorBlendEnabled = true;
         device.ColorBlendEquation = ColorBlendEquations.AlphaBlend;
         device.PrimitiveRestartEnable = true;
