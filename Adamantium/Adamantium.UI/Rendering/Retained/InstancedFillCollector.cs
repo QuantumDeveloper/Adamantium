@@ -135,10 +135,23 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         public readonly List<(KeySegment Seg, uint First, uint Count, ITexture Texture)> TexKeys = new();
         public readonly List<IRenderUnit> Units = new();
         public Rect2D Scissor;
+
+        // This group's COVERAGE mark. Fills stamp it; the fringes then draw only where the stencil is LOWER, i.e. over
+        // earlier groups (which belong underneath) but never over a fill of their own group. Replayed frames reuse the
+        // recorded value, so a replay marks the buffer exactly as the recording did.
+        public uint StencilRef;
+
         public void Reset() { Keys.Clear(); GradKeys.Clear(); PatKeys.Clear(); TexKeys.Clear(); Units.Clear(); }
     }
     private readonly List<FlushRecord> _flushRecords = new();
     private int _flushCount;   // records used this frame (pooled objects reused up to this count)
+
+    // Marks are 8 bits and the buffer is cleared per frame, so a frame has 255 of them; past that the caller falls back
+    // to closing the group on overlap.
+    private uint _groupRef;
+
+    /// <summary>True once this frame has used up the 255 distinct coverage marks.</summary>
+    public bool CoverageMarksExhausted => _groupRef >= 255;
 
     /// <summary>Set by the caller each frame: true when the scene is provably unchanged (RenderBuildKind.Clean) so the
     /// per-key instance upload is skipped (the retained buffer already holds these exact bytes).</summary>
@@ -273,7 +286,9 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         _pendingKeys.Clear();
         _pendingUnits.Clear();
         _hasUnion = false;
+        _hasFringeUnion = false;
         _flushCount = 0;   // pooled flush records reused from index 0 this frame
+        _groupRef = 0;     // the stencil is cleared with the frame, so coverage marks start over with it
     }
 
     private int _writeCursor;   // which ring copy the next walk writes (see BeginFrame)
@@ -328,6 +343,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         _scissor = scissor;
         if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
         AddPendingUnit(unit);
+        NoteFringed(unit, logicalBounds);
         if (!_hasUnion) { _uL = logicalBounds.X; _uT = logicalBounds.Y; _uR = logicalBounds.Right; _uB = logicalBounds.Bottom; _hasUnion = true; }
         else
         {
@@ -375,6 +391,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         _scissor = scissor;
         if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
         AddPendingUnit(unit);
+        NoteFringed(unit, logicalBounds);
         if (!_hasUnion) { _uL = logicalBounds.X; _uT = logicalBounds.Y; _uR = logicalBounds.Right; _uB = logicalBounds.Bottom; _hasUnion = true; }
         else
         {
@@ -448,6 +465,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         _scissor = scissor;
         if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
         AddPendingUnit(unit);
+        NoteFringed(unit, logicalBounds);
         if (!_hasUnion) { _uL = logicalBounds.X; _uT = logicalBounds.Y; _uR = logicalBounds.Right; _uB = logicalBounds.Bottom; _hasUnion = true; }
         else
         {
@@ -518,6 +536,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         _scissor = scissor;
         if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
         AddPendingUnit(unit);
+        NoteFringed(unit, logicalBounds);
         if (!_hasUnion) { _uL = logicalBounds.X; _uT = logicalBounds.Y; _uR = logicalBounds.Right; _uB = logicalBounds.Bottom; _hasUnion = true; }
         else
         {
@@ -567,6 +586,32 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     public bool OverlapsPending(Rect r)
         => _hasUnion && r.X < _uR && _uL < r.Right && r.Y < _uB && _uT < r.Bottom;
 
+    // Union of pending shapes that WEAR a fringe, kept apart from the union of all of them: only a fringed pending shape
+    // can band a later fill.
+    private double _fL, _fT, _fR, _fB;
+    private bool _hasFringeUnion;
+
+    /// <summary>Does this shape overlap a pending shape whose fringe would be drawn after it?</summary>
+    public bool OverlapsPendingFringe(Rect r)
+        => _hasFringeUnion && r.X < _fR && _fL < r.Right && r.Y < _fB && _fT < r.Bottom;
+
+    private void NoteFringed(GeometryRenderUnit unit, Rect logicalBounds)
+    {
+        if (!unit.HasInstancedFringe && !unit.HasPerUnitOverlay) return;
+
+        if (!_hasFringeUnion)
+        {
+            _fL = logicalBounds.X; _fT = logicalBounds.Y; _fR = logicalBounds.Right; _fB = logicalBounds.Bottom;
+            _hasFringeUnion = true;
+            return;
+        }
+
+        if (logicalBounds.X < _fL) _fL = logicalBounds.X;
+        if (logicalBounds.Y < _fT) _fT = logicalBounds.Y;
+        if (logicalBounds.Right > _fR) _fR = logicalBounds.Right;
+        if (logicalBounds.Bottom > _fB) _fB = logicalBounds.Bottom;
+    }
+
     /// <summary>Draw the pending clip group: each key's new instances as one instanced call (fills), then the collected
     /// units' fringe/stroke ON TOP (fill-under-fringe). Records the group into a pooled <see cref="FlushRecord"/> and
     /// draws THROUGH it (so the immediate draw and a later clean-frame replay share one path). Returns the record index
@@ -581,6 +626,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         _flushCount++;
         rec.Reset();
         rec.Scissor = _scissor;
+        rec.StencilRef = ++_groupRef;
 
         foreach (var seg in _pendingKeys)
         {
@@ -626,6 +672,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         _pendingKeys.Clear();
         _pendingUnits.Clear();
         _hasUnion = false;
+        _hasFringeUnion = false;
 
         DrawFlushRecord(rec, fullScissor, projection);
         return _flushCount - 1;
@@ -643,6 +690,15 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         if (rec.Keys.Count > 0)
         {
             SetupInstancedState(projection);
+
+            // Stamp this group's coverage mark wherever a fill lands, so the fringes below can tell "my group's fill"
+            // from "an earlier group's, which I belong on top of".
+            _device.StencilTestEnabled = true;
+            _device.StencilCompareOp = CompareOp.Always;
+            _device.StencilPassOp = StencilOp.Replace;
+            _device.StencilWriteMask = 0xFF;
+            _device.StencilReference = rec.StencilRef;
+
             _device.SetScissors(rec.Scissor);
             foreach (var (seg, first, count) in rec.Keys)
             {
@@ -656,6 +712,8 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
                     _device.Draw(seg.VertexCount, count);
             }
             _device.SetScissors(fullScissor);
+
+            _device.StencilTestEnabled = false;
         }
 
         // The analytic-AA fringe of those same instances: the shared ring per key, drawn with the SAME instance buffer
@@ -664,6 +722,17 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         if (rec.Keys.Count > 0 && AnalyticAa.Enabled)
         {
             SetupFringeState(projection);
+
+            // The ring feathers OUTSIDE its own shape, so it has no business anywhere a fill of this group already
+            // covers. Masking it there is what makes the group's [all fills][all fringes] order indistinguishable from
+            // true paint order - and with that, two overlapping shapes no longer have to be split into separate groups.
+            // Earlier groups carry a LOWER mark and lie underneath, so the fringe still draws over them.
+            _device.StencilTestEnabled = true;
+            _device.StencilCompareOp = CompareOp.Greater;   // draw where THIS group's mark is greater than what is there
+            _device.StencilPassOp = StencilOp.Keep;
+            _device.StencilWriteMask = 0;
+            _device.StencilReference = rec.StencilRef;
+
             _device.SetScissors(rec.Scissor);
             foreach (var (seg, first, count) in rec.Keys)
             {
@@ -674,6 +743,9 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
                 _device.Draw(seg.RingVertexCount, count);
             }
             _device.SetScissors(fullScissor);
+
+            _device.StencilTestEnabled = false;
+            _device.StencilWriteMask = 0xFF;
         }
 
         // Gradient instanced fills for this group (same shared meshes, gradient pass + per-instance gradient buffer),

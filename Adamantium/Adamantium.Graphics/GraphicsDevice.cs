@@ -64,6 +64,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     private bool _cDepthBounds;
     private bool _cDepthBias;
     private bool _cDepthClamp;
+    private const StencilFaceFlagBits BothStencilFaces = StencilFaceFlagBits.FrontAndBack;
     private bool _cStencilTest;
     private bool _cLogicOp;
         
@@ -365,7 +366,17 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     public bool DepthClampEnable { get; set; } = false;
         
     public bool StencilTestEnabled { get; set; } = false;
-        
+
+    /// <summary>Stencil comparison, reference, and what a passing fragment writes back - for marking COVERAGE: one pass
+    /// stamps where it drew, a later pass tests against it.</summary>
+    public CompareOp StencilCompareOp { get; set; } = CompareOp.Always;
+
+    public StencilOp StencilPassOp { get; set; } = StencilOp.Keep;
+
+    public uint StencilReference { get; set; }
+
+    public uint StencilWriteMask { get; set; } = 0xFF;
+
     public bool LogicOperationsEnabled { get; set; } = false;
         
     public LogicOp LogicOperation { get; set; }
@@ -1385,6 +1396,13 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         { commandBuffer.SetDepthClampEnableEXT(DepthClampEnable); _cDepthClamp = DepthClampEnable; }
         if (!_stateInitialized || _cStencilTest != StencilTestEnabled)
         { commandBuffer.SetStencilTestEnable(StencilTestEnabled); _cStencilTest = StencilTestEnabled; }
+        if (StencilTestEnabled)
+        {
+            commandBuffer.SetStencilOp(BothStencilFaces, StencilOp.Keep, StencilPassOp, StencilOp.Keep, StencilCompareOp);
+            commandBuffer.SetStencilCompareMask(BothStencilFaces, 0xFF);
+            commandBuffer.SetStencilWriteMask(BothStencilFaces, StencilWriteMask);
+            commandBuffer.SetStencilReference(BothStencilFaces, StencilReference);
+        }
         if (!_stateInitialized || _cLogicOp != LogicOperationsEnabled)
         { commandBuffer.SetLogicOpEnableEXT(LogicOperationsEnabled); _cLogicOp = LogicOperationsEnabled; }
 
