@@ -87,7 +87,19 @@ public interface IDynamicStateDevice
     bool DepthBiasEnabled { get; set; }
         
     bool StencilTestEnabled { get; set; }
-        
+
+    /// <summary>Stencil comparison, the value compared against, and what a passing fragment writes back - for marking
+    /// COVERAGE: one pass writes its reference where it drew, a later pass draws only where the mark is absent.</summary>
+    CompareOp StencilCompareOp { get; set; }
+
+    StencilOp StencilPassOp { get; set; }
+
+    uint StencilReference { get; set; }
+
+    uint StencilWriteMask { get; set; }
+
+
+
     bool LogicOperationsEnabled { get; set; }
         
     LogicOp LogicOperation { get; set; }

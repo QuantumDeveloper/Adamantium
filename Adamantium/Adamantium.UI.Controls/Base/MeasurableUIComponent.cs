@@ -292,7 +292,17 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
 
     public bool IsArrangeValid { get; private set; }
 
-    public Size DesiredSize { get; private set; }
+    /// <summary>Zero while COLLAPSED - it asks its parent for no space, which is what collapsing means, and matches what
+    /// <see cref="UIComponent.RenderSize"/> already reports. Keeping the last measured size instead let a hidden element
+    /// go on occupying its parent's layout, and let a SKIPPED measure hand out a size from a constraint that no longer
+    /// applies (a hidden tab's stale width raised a scrollbar on the visible one).</summary>
+    public Size DesiredSize
+    {
+        get => Visibility == Visibility.Collapsed ? Size.Zero : _desiredSize;
+        private set => _desiredSize = value;
+    }
+
+    private Size _desiredSize;
 
     /// <summary>The rect this element was last arranged with (its last correct slot), preserved across invalidation so
     /// the layout manager can re-arrange the element into it. Null until the first arrange.</summary>

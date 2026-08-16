@@ -204,9 +204,16 @@ public partial class RenderCache
                     if (g.Clones is { Count: > 0 } c) clones += c.Count;
                 }
 
+                var unitOps = 0;
+                foreach (var op in _ops)
+                {
+                    if (op.Kind == RenderOpKind.Unit) unitOps++;
+                }
+
                 Core.Diagnostics.FrameTrace.Add(
                     System.Diagnostics.Stopwatch.GetElapsedTime(traceStart).TotalMilliseconds,
-                    (byte)LastBuildKind, LastFrameReplayed, clones, _traceWhy, _traceCacheId, _traceComposited);
+                    (byte)LastBuildKind, LastFrameReplayed, clones, _traceWhy, _traceCacheId, _traceComposited,
+                    _ops.Count, unitOps);
             }
         }
     }
@@ -721,13 +728,11 @@ public partial class RenderCache
                 // natural z-layer (paint order), not all-at-once.
                 if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
-                // A flush lays every pending FILL down and only then every FRINGE on top (fill-under-fringe). So a shape
-                // added next to one it OVERLAPS gets the earlier shape's semi-transparent AA edge painted over its own
-                // fill - a visible band wherever two shapes cross, which is what the arms of a drawn cross show. Close
-                // the group first when they really do overlap, so each fringe can only land on its own fill. Costs a
-                // flush per crossing, not per shape - shapes that do not overlap still batch together.
-                if (gru.HasInstancedFringe &&
-                    _instancedFill.OverlapsPending(gru.Payload.Geometry.Bounds.TransformToAABB(gru.Place(wt))))
+                // A group draws every fill and only then every fringe, so an already-pending FRINGED shape could band this
+                // one. Masking the fringes to the group's own coverage settles it - except once a frame has spent all
+                // 255 marks, where closing the group stands in.
+                if (_instancedFill.CoverageMarksExhausted
+                    && _instancedFill.OverlapsPendingFringe(gru.Payload.Geometry.Bounds.TransformToAABB(gru.Place(wt))))
                 {
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }

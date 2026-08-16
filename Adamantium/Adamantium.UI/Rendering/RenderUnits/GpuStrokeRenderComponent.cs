@@ -38,10 +38,11 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
     private readonly uint _joinType;        // 0 miter, 1 bevel, 2 round
     private readonly List<Contour> _contours = [];
 
-    // Continuous strokes expand to geometry-LOCAL ribbons (only the fringe width depends on scale), so the expanded ring
-    // slot is reused every frame until the scale (or, via TryRepoint, the pen's expand uniforms) change. The dash/cut
-    // path re-cuts every frame (DashOffset/trim animate).
+    // Expanded ring slots are reused until something they were expanded FROM changes: the scale (fringe) for a continuous
+    // stroke, and additionally the cut parameters (offset/phase/trim/thickness) for a dashed one.
     private float _expandedFringe = float.NaN;
+    private (double Offset, double Phase, double TrimStart, double TrimEnd, double Thickness) _expandedCut;
+    private bool _cutDirty = true;
 
     // Per-contour GPU state. The expander runs once per contour (its own points + output buffers), so combined/group
     // geometry strokes every contour instead of falling back to the CPU path.
@@ -306,14 +307,19 @@ public sealed class GpuStrokeRenderComponent : UIRenderComponent
         var fringeChanged = fringe != _expandedFringe;
         _expandedFringe = fringe;
 
+        // What the CUT is made of. Re-cutting unconditionally cost a dashed stroke a compute dispatch every frame even
+        // when it stood still - the difference between 600 and 200 fps on a page of dashed shapes.
+        var cut = (_pen.DashOffset, _pen.DashPhase, _pen.TrimStart, _pen.TrimEnd, _pen.Thickness);
+        var cutChanged = _cutDirty || cut != _expandedCut;
+        _expandedCut = cut;
+        _cutDirty = false;
+
         foreach (var c in _contours)
         {
             var points = c.PointsBuffer.Acquire(c.PointsBytes, out var writePoints);
             if (writePoints) points.SetData(c.PointsData, 0, (uint)c.PointsData.Length);
 
-            // The dash/cut path re-cuts every frame (offset/trim animate). Continuous re-expands only on a scale change.
-            if (_useCut) c.VertexBuffer.Invalidate();
-            else if (fringeChanged) c.VertexBuffer.Invalidate();
+            if (_useCut ? cutChanged || fringeChanged : fringeChanged) c.VertexBuffer.Invalidate();
 
             var vertices = c.VertexBuffer.Acquire(c.VertexBytes, out var writeVertices);
             if (!writeVertices) continue;   // continuous static: this slot already holds the expanded ribbon

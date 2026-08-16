@@ -236,11 +236,6 @@ public sealed class LayoutManager
         var control = (IMeasurableComponent)node;
         if (control.IsMeasureValid) return;   // already measured this pass via an ancestor's cascade
 
-        // COLLAPSED: takes no space, so its desired size is nobody's business until it comes back - and coming back writes
-        // Visibility, which invalidates and re-queues it. Same reasoning as the arrange drain. Measured on a tile-size
-        // drag: nearly every measure in a step was one of the containers the window had just parked.
-        if (node.Visibility == Visibility.Collapsed) return;
-
         if (LayoutTrace.Enabled)
         {
             var name = string.IsNullOrEmpty(node.Name) ? node.GetType().Name : node.Name;
@@ -281,10 +276,6 @@ public sealed class LayoutManager
         var control = (IMeasurableComponent)node;
         if (control.IsArrangeValid) return;
 
-        // A COLLAPSED node takes no space and draws nothing, so arranging it produces nothing anyone can see. Dropping it
-        // here (invalid, un-queued) is safe because becoming visible writes Visibility, which invalidates and re-queues it
-        // - and that request is now honoured whatever the flag already said. Measured on a tile-size drag: every container
-        // the window shed was parked AND then arranged, one whole extra arrange per shed container per step.
         if (node.Visibility == Visibility.Collapsed) return;
 
         if (!control.IsMeasureValid)

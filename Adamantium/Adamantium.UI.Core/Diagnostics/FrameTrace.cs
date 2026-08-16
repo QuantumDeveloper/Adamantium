@@ -20,6 +20,8 @@ public static class FrameTrace
         public double LayoutMs; // the LAYOUT pass and the RECORD pass of the same frame - so a spike can be attributed
         public double BuildMs;
         public int Composited;  // compositor entries applied on this frame (an animation the render thread plays itself)
+        public int Ops;         // recorded draw operations replayed
+        public int UnitOps;     // ...of which per-unit draws (each its own pipeline + uniforms)
     }
 
     // Several caches share the ring, so 512 entries was under a second of real time - short enough that a hand-made event
@@ -34,7 +36,8 @@ public static class FrameTrace
     /// <summary>TEMP: the unit type that last cost a frame its patch.</summary>
     public static string Refuser;
 
-    public static void Add(double drawMs, byte kind, bool replayed, int clones, byte why, int cache, int composited)
+    public static void Add(double drawMs, byte kind, bool replayed, int clones, byte why, int cache, int composited,
+        int ops, int unitOps)
     {
         if (!Enabled) return;
 
@@ -49,7 +52,7 @@ public static class FrameTrace
                 _incidents.Add(new Entry
                 {
                     DrawMs = drawMs, Kind = kind, Replayed = replayed, Clones = clones, Why = why,
-                    By = why is 5 or 6 ? Refuser : null, Cache = cache, Composited = composited,
+                    By = why is 5 or 6 ? Refuser : null, Cache = cache, Composited = composited, Ops = ops, UnitOps = unitOps,
                     LayoutMs = RuntimeStats.LastLayoutPassMs, BuildMs = RuntimeStats.LastRenderBuildMs
                 });
             }
@@ -64,6 +67,8 @@ public static class FrameTrace
         _ring[i].By = why is 5 or 6 ? Refuser : null;
         _ring[i].Cache = cache;
         _ring[i].Composited = composited;
+        _ring[i].Ops = ops;
+        _ring[i].UnitOps = unitOps;
     }
 
     private const int IncidentLimit = 4096;
@@ -104,6 +109,7 @@ public static class FrameTrace
             .Append(" clones=").Append(e.Clones).Append(" why=").Append(e.Why)
             .Append(" by=").Append(e.By ?? "-")
             .Append(" cache=").Append(e.Cache).Append(" comp=").Append(e.Composited)
+            .Append(" ops=").Append(e.Ops).Append(" unitOps=").Append(e.UnitOps)
             .Append(" layout=").Append(e.LayoutMs.ToString("F2"))
             .Append(" build=").Append(e.BuildMs.ToString("F2")).Append('\n');
     }
