@@ -74,6 +74,27 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     /// <summary>The batch buffer - a BDA STORAGE buffer whose device address feeds the instanced shader.</summary>
     protected Buffer<TItem> GpuBuffer => _ring?[_current];
 
+    /// <summary>Hand every GPU buffer this collector owns back to the device. Nothing else does: DisposeUnits frees the
+    /// render UNITS, and a collector's ring - one host-visible buffer per frame in flight, per collector, and there are a
+    /// dozen collectors per cache - stayed alive for the process. A closed window leaked all of it.</summary>
+    public void DisposeGpuResources(IGraphicsDevice device)
+    {
+        if (_ring == null) return;
+
+        foreach (var buffer in _ring)
+        {
+            if (buffer != null) device.AddToDeferDisposeQueue(buffer);
+        }
+
+        _ring = null;
+        _mirror = null;
+        _mirrorCount = null;
+        _gpuCapacity = 0;
+        _segments.Clear();
+        _freeBlocks.Clear();
+        Count = 0;
+    }
+
     public void BeginFrame(IGraphicsDevice device)
     {
         // HEADROOM for patches. Capacity can only change here (the GPU buffer must not be reallocated under frames in

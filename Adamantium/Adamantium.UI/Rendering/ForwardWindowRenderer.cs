@@ -161,6 +161,7 @@ public class ForwardWindowRenderer : WindowRendererBase
     public override void Dispose()
     {
         _renderCache.DisposeUnits();
+        _renderCache.DisposeDeviceResources();   // the batch rings + transform table: nothing else owns them
         base.Dispose();
     }
 
