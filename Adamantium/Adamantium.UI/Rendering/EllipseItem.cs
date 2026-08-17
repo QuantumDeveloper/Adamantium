@@ -32,4 +32,8 @@ public struct EllipseItem
     /// <summary>Stroke arc-length features: x = dash offset (device px), y = trim start (0..1),
     /// z = trim end (0..1), w = flags (join/cap codes, packed).</summary>
     public Vector4F Stroke1;
+
+    /// <summary>Dash runs 2..5 in device px - runs 0 and 1 ride in <see cref="Stroke0"/>.zw and the RUN COUNT is
+    /// packed into <see cref="Stroke1"/>.w. A pattern longer than one ON/GAP period lives here.</summary>
+    public Vector4F Dash;
 }

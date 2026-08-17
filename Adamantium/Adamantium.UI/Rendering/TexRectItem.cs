@@ -23,6 +23,9 @@ public struct TexRectItem
     /// (1 = X, 2 = Y, 3 = both).</summary>
     public Vector4F Params;
 
+    /// <summary>The four corner radii: x = top-left, y = top-right, z = bottom-right, w = bottom-left.</summary>
+    public Vector4F Radii;
+
     /// <summary>The tile GRID over <see cref="Bounds"/>: tiles per axis (.xy) and where the grid starts, in tiles (.zw).
     /// Fractional counts are allowed - a tiled edge rarely divides evenly, and cutting the last tile short is what a
     /// tiled surface must do.</summary>

@@ -20,8 +20,11 @@ public struct GradientRectItem
     /// <summary>World-space bounds: x, y, w, h.</summary>
     public Vector4F Bounds;
 
-    /// <summary>.x = corner radius (uniform); .y = type (1 linear, 2 radial, 3 conic); .z = stop count; .w = spread (0 pad, 1 reflect, 2 repeat).</summary>
+    /// <summary>.x = the LARGEST corner radius; .y = type (1 linear, 2 radial, 3 conic); .z = stop count; .w = spread (0 pad, 1 reflect, 2 repeat).</summary>
     public Vector4F Params;
+
+    /// <summary>The four corner radii: x = top-left, y = top-right, z = bottom-right, w = bottom-left.</summary>
+    public Vector4F Radii;
 
     /// <summary>LOCAL (0..1) gradient geometry. Linear: (startX, startY, endX, endY). Radial: (centerX, centerY, radiusX, radiusY).
     /// Conic: (centerX, centerY, startAngleTurns, _).</summary>
@@ -38,6 +41,10 @@ public struct GradientRectItem
 
     /// <summary>Stroke arc-length: x = dash offset, y = trim start, z = trim end, w = flags (join/cap codes).</summary>
     public Vector4F Stroke1;
+
+    /// <summary>Dash runs 2..5 in device px - runs 0 and 1 ride in <see cref="Stroke0"/>.zw and the RUN COUNT is
+    /// packed into <see cref="Stroke1"/>.w. A pattern longer than one ON/GAP period lives here.</summary>
+    public Vector4F Dash;
 
     /// <summary>Straight (non-premultiplied) stop colours, opacity folded into .w. Only the first .z (stop count) are valid.</summary>
     public Vector4F Stop0, Stop1, Stop2, Stop3, Stop4, Stop5, Stop6, Stop7;

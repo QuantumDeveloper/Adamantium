@@ -124,7 +124,7 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
         {
             return false;
         }
-        if (!Bake(p.Brush, p.DestinationRect, p.CornerRadius.TopLeft, world, opacity, transformSlot, out var baked))
+        if (!Bake(p.Brush, p.DestinationRect, p.CornerRadius, false, world, opacity, transformSlot, out var baked))
         {
             return false;
         }
@@ -160,7 +160,7 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
         {
             return false;
         }
-        if (!Bake(p.Brush, p.DestinationRect, -1.0, world, opacity, transformSlot, out var baked))
+        if (!Bake(p.Brush, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, true, world, opacity, transformSlot, out var baked))
         {
             return false;
         }
@@ -172,9 +172,9 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
     }
 
     // Bake a textured fill into 1 or 9 instance records. Position -> world; false on a rotated/sheared world (the
-    // axis-aligned instance cannot hold it) so the caller falls back to the per-unit path. A NEGATIVE cornerRadius is
-    // the ELLIPSE shape flag and is passed through unscaled; a rect's radius scales with the world like everything else.
-    private static bool Bake(Brush brush, Rect destinationRect, double cornerRadius, Matrix4x4F world, double opacity,
+    // axis-aligned instance cannot hold it) so the caller falls back to the per-unit path. The four corner radii ride in
+    // Radii, scaled with the world; Params.x carries the LARGEST of them, or -1 as the ELLIPSE shape flag.
+    private static bool Bake(Brush brush, Rect destinationRect, ProceduralGeometry.CornerRadius corners, bool ellipse, Matrix4x4F world, double opacity,
         int transformSlot, out TexRectItem[] items)
     {
         items = null;
@@ -190,12 +190,13 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
         var ty = world.M42;
         var r = destinationRect;
         var bounds = new Rect(r.X * sx + tx, r.Y * sy + ty, r.Width * sx, r.Height * sy);
-        var radius = cornerRadius < 0 ? -1f : (float)(cornerRadius * sx);
+        var radii = ellipse ? Vector4F.Zero : RectBatchCollector.BakeRadii(corners, r, sx);
+        var radius = ellipse ? -1f : RectBatchCollector.MaxOf(radii);
 
         items = brush switch
         {
             NineSliceBrush nine => NineSlice.Bake(nine, bounds, opacity, transformSlot, sx, sy),
-            TileBrush tile => [Single(tile, bounds, radius, opacity, transformSlot, sx, sy)],
+            TileBrush tile => [Single(tile, bounds, radius, radii, opacity, transformSlot, sx, sy)],
             _ => null
         };
         return items != null;
@@ -203,7 +204,7 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
 
     // One record for the plain textured fill. WHERE it is drawn and WHAT it samples come from the brush's tiling and
     // stretch (see ImageTiling) - stretched across the shape, fitted inside it, or repeated.
-    private static TexRectItem Single(TileBrush brush, Rect bounds, float radius, double opacity, int transformSlot,
+    private static TexRectItem Single(TileBrush brush, Rect bounds, float radius, Vector4F radii, double opacity, int transformSlot,
         double scaleX, double scaleY)
     {
         var tint = brush.Tint.ToVector4();
@@ -217,6 +218,7 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
         {
             Bounds = new Vector4F((float)bounds.X, (float)bounds.Y, (float)bounds.Width, (float)bounds.Height),
             Params = new Vector4F(radius, transformSlot, layout.Repeats ? 1f : 0f, layout.Mirror),
+            Radii = radii,
             Tile = layout.Tile,
             Rotation = layout.Rotation,
             Drawn = layout.Drawn,

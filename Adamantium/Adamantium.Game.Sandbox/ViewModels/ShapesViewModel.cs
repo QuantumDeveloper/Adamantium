@@ -11,4 +11,7 @@ public partial class ShapesViewModel : TabPageViewModel
     public ShapesViewModel() : base("Shapes") { }
 
     public StrokeSettings Stroke { get; } = new();
+
+    /// <summary>The border stand's eight sliders: a thickness per side and a radius per corner.</summary>
+    public BorderSettings Border { get; } = new();
 }

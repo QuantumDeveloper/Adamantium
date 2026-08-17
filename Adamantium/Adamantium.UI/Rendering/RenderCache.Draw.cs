@@ -91,9 +91,21 @@ public partial class RenderCache
         // whatever happens to sit next to it. Guessing is what made an unrelated diagnostics label in the corner decide
         // whether hovering a tile cost 0.9 ms or a full walk.
         public long Order;
+
+        // A SEGMENT is not one rank - it glues the rects of EVERY control that fell between two flushes, so it covers the
+        // SPAN [OrderFirst, Order]. Insertion needs both ends: a newcomer whose rank lands strictly inside the span cannot
+        // be placed before or after that op at all (either way it jumps over somebody), and the frame has to say so
+        // instead of drawing it in the wrong layer. Recorded as Order until proven otherwise, so a non-segment op's span
+        // is just its own rank.
+        public long OrderFirst;
     }
     private readonly List<RenderOp> _ops = new();
     private long _recordOrder;   // paint rank of the group currently being recorded - stamped onto every op it emits
+
+    // Where the rect batch's PENDING segment's paint span begins: the rank of the first group that put something in it.
+    // Noted while the segment is still empty, because afterwards there is nothing left to read it from - and a splice that
+    // places a newcomer needs the span's START, not just where it ended (see PlaceNewSegment).
+    private long _rectSegStart;
 
     // The transform-table version the op stream was recorded against, and whether it still holds. A recorded stream bakes
     // THREE things against the transforms of its own frame: each Scissor op (a world-space rect), each per-unit draw (its
@@ -388,6 +400,9 @@ public partial class RenderCache
             {
                 _walkGroup = group;
                 _recordOrder = group.Order;
+                // An EMPTY rect segment will begin with whatever group first puts a rect in it, and that is this one or a
+                // later one - so keep moving the mark until something lands.
+                if (_rectBatch == null || !_rectBatch.HasPending) _rectSegStart = group.Order;
                 group.RectRuns.Clear();
                 group.PatchableRectOnly = true;
                 group.WalkVersion = _walkVersion;
@@ -1107,6 +1122,13 @@ public partial class RenderCache
     // repainting without re-walking. Anything else (text, per-unit geometry, an instanced fill) keeps its bytes elsewhere.
     private bool IsSlotPatchable(IRenderUnit u)
     {
+        // A CLONED unit fills one slot PER CLONE, and the maps below hold ONE slot per unit - the last the walk wrote.
+        // Patching through it repaints a single card, and once the clone set shrinks (a list finishing its fill) the
+        // walk renumbers the arena behind that run, so the remembered slot belongs to whatever moved into its place:
+        // the pulse was recolouring the first star in step with the last skeleton. A cloned unit is repainted by the
+        // next walk, in full, rather than by one slot write that may not even be its own.
+        if (u.Component?.RenderClones is { Count: > 0 }) return false;
+
         if (u is RectangleRenderUnit rru)
         {
             if (_rectSlotByUnit.ContainsKey(u)) return _rectBatch.CanBatch(rru.RectPayload);
@@ -1420,6 +1442,13 @@ public partial class RenderCache
     // Where an op of this rank belongs in the stream: before the first op recorded for a LATER rank. Never immediately
     // after a Scissor op - that op sets a clip for the draw that follows it, and a segment slipped in between would
     // restore the full clip and leave that draw unclipped.
+    //
+    // KNOWN LIMIT, reproduced by BorderPatchRenderTests.ANeighbourAppearing_DoesNotCostABorderItsRing: a SEGMENT covers
+    // the whole paint SPAN between two flushes (its OrderFirst..Order), and a newcomer whose rank lands inside that span
+    // has no correct place in a flat stream - before the op it paints under controls it must cover, after it over controls
+    // it must not. Comparing against the span's START instead only moves which half is wrong (it was tried: the backdrop
+    // tests, which need the other half, fail immediately). The fix is to SPLIT the segment at the newcomer's rank, which
+    // is why the span is recorded at all.
     private int OpIndexForRank(long order)
     {
         var at = _ops.Count;
