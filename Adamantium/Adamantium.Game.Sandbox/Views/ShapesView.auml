@@ -109,88 +109,6 @@
           </StackPanel>
         </WrapPanel>
 
-        <!-- BORDER stand. A border is not a stroke: each SIDE has its own thickness and each CORNER its own radius, and
-             both now ride in the SDF instance - so every combination these eight sliders reach is drawn by the same
-             instanced pass that draws a plain fill, with no tessellated ring and no seam where the fill meets it.
-             The middle keeps the fill's colour, the ring the border's, which is what makes a wrong side or a swapped
-             corner visible at a glance. -->
-        <TextBlock Text="Border — a thickness per side, a radius per corner, all drawn by one SDF instance:" Margin="0,20,0,6"/>
-        <StackPanel Orientation="Horizontal">
-            <!-- The border sits over a two-tone backdrop so a TRANSLUCENT ring shows what is behind the element - which is
-                 what the alpha slider is for. The flat swatch below the stand is the reference: same colour, same alpha,
-                 no ring arithmetic. Drag alpha down and the border's CORNER must keep matching that swatch; a ring drawn
-                 as its own shape darkens there (two edges meet, the pixel is blended twice), and this one may not. -->
-            <StackPanel Orientation="Vertical" Margin="0,0,24,0">
-                <Grid Width="220" Height="140">
-                    <StackPanel Orientation="Horizontal">
-                        <Rectangle Width="110" Height="140" Fill="#0EA5E9"/>
-                        <Rectangle Width="110" Height="140" Fill="#F1F5F9"/>
-                    </StackPanel>
-                    <Border Background="#1E3A8A"
-                            BorderBrush="{Binding Border.BorderBrush}"
-                            BorderThickness="{Binding Border.Thickness}"
-                            CornerRadius="{Binding Border.Corners}"/>
-                </Grid>
-                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <TextBlock Text="Flat swatch:" VerticalAlignment="Center" Width="80"/>
-                    <Rectangle Width="130" Height="18" Fill="{Binding Border.SwatchBrush}"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
-                    <TextBlock Text="Alpha" Width="80" VerticalAlignment="Center"/>
-                    <Slider Width="130" Minimum="0" Maximum="1"
-                            Value="{Binding Border.Alpha, Mode=TwoWay}" VerticalAlignment="Center"/>
-                </StackPanel>
-            </StackPanel>
-
-            <StackPanel Orientation="Vertical" Margin="0,0,24,0">
-                <TextBlock Text="Sides" MarginBottom="4"/>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                    <TextBlock Text="Left" Width="70" VerticalAlignment="Center"/>
-                    <Slider Width="130" Minimum="0" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="true"
-                            Value="{Binding Border.Left, Mode=TwoWay}" VerticalAlignment="Center"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                    <TextBlock Text="Top" Width="70" VerticalAlignment="Center"/>
-                    <Slider Width="130" Minimum="0" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="true"
-                            Value="{Binding Border.Top, Mode=TwoWay}" VerticalAlignment="Center"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                    <TextBlock Text="Right" Width="70" VerticalAlignment="Center"/>
-                    <Slider Width="130" Minimum="0" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="true"
-                            Value="{Binding Border.Right, Mode=TwoWay}" VerticalAlignment="Center"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Bottom" Width="70" VerticalAlignment="Center"/>
-                    <Slider Width="130" Minimum="0" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="true"
-                            Value="{Binding Border.Bottom, Mode=TwoWay}" VerticalAlignment="Center"/>
-                </StackPanel>
-            </StackPanel>
-
-            <StackPanel Orientation="Vertical">
-                <TextBlock Text="Corners" MarginBottom="4"/>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                    <TextBlock Text="Top left" Width="86" VerticalAlignment="Center"/>
-                    <Slider Width="130" Minimum="0" Maximum="70" TickFrequency="1" IsSnapToTickEnabled="true"
-                            Value="{Binding Border.TopLeft, Mode=TwoWay}" VerticalAlignment="Center"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                    <TextBlock Text="Top right" Width="86" VerticalAlignment="Center"/>
-                    <Slider Width="130" Minimum="0" Maximum="70" TickFrequency="1" IsSnapToTickEnabled="true"
-                            Value="{Binding Border.TopRight, Mode=TwoWay}" VerticalAlignment="Center"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                    <TextBlock Text="Bottom right" Width="86" VerticalAlignment="Center"/>
-                    <Slider Width="130" Minimum="0" Maximum="70" TickFrequency="1" IsSnapToTickEnabled="true"
-                            Value="{Binding Border.BottomRight, Mode=TwoWay}" VerticalAlignment="Center"/>
-                </StackPanel>
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="Bottom left" Width="86" VerticalAlignment="Center"/>
-                    <Slider Width="130" Minimum="0" Maximum="70" TickFrequency="1" IsSnapToTickEnabled="true"
-                            Value="{Binding Border.BottomLeft, Mode=TwoWay}" VerticalAlignment="Center"/>
-                </StackPanel>
-            </StackPanel>
-        </StackPanel>
-
         <!-- The pen playground. Thickness/dash/trim/corner are sliders; Cap and Join are enum DropDowns; Colour is a
              ColorPicker (compact button that opens the full HSV picker). Everything mutates the one Stroke object above. -->
         <TextBlock Text="Stroke / Pen parameters:" Margin="0,20,0,6"/>
@@ -328,6 +246,155 @@
             <Border Width="120" Height="80" Margin="8" Background="#30FFFFFF" BorderBrush="#C03B82F6" BorderThickness="1,2,1,2" CornerRadius="10"/>
             <Border Width="120" Height="80" Margin="8" Background="#30FFFFFF" BorderBrush="#C0EF4444" BorderThickness="1,1,2,1" CornerRadius="0"/>
         </WrapPanel>
+
+        <!-- SECTOR stand. A partial ellipse is not a shape of its own: the batch draws the same ellipse and intersects it
+             with a straight boundary, so everything these sliders reach is one instanced pass - a wedge, a chord, a ring
+             gauge. The two closings are shown side by side because they differ in two ways worth seeing at once: a SECTOR
+             closes through the centre and strokes both radii; EDGE-TO-EDGE closes by the chord, and stroked it is an OPEN
+             arc - two ends, nothing drawn across it. Turn Fill off to see exactly that. -->
+        <TextBlock Text="Sectors — the same ellipse cut by a straight boundary:" Margin="0,20,0,6"/>
+        <StackPanel Orientation="Horizontal">
+            <StackPanel Orientation="Vertical" Margin="0,0,24,0">
+                <TextBlock Text="Live" MarginBottom="4" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <Ellipse Width="180" Height="180"
+                         Fill="{Binding Arc.Fill}"
+                         Stroke="#F59E0B"
+                         StrokeThickness="{Binding Arc.StrokeWidth}"
+                         StartAngle="{Binding Arc.StartAngle}"
+                         StopAngle="{Binding Arc.SweepAngle}"
+                         EllipseType="{Binding Arc.Kind}"
+                         RingThickness="{Binding Arc.RingThickness}"/>
+            </StackPanel>
+
+            <!-- The same numbers in the OTHER closing, so the pair can be compared without touching a slider. -->
+            <StackPanel Orientation="Vertical" Margin="0,0,24,0">
+                <TextBlock Text="Squashed — the cut follows the ellipse's own angle" MarginBottom="4"
+                           Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <Ellipse Width="220" Height="120"
+                         Fill="{Binding Arc.Fill}"
+                         Stroke="#22C55E"
+                         StrokeThickness="{Binding Arc.StrokeWidth}"
+                         StartAngle="{Binding Arc.StartAngle}"
+                         StopAngle="{Binding Arc.SweepAngle}"
+                         EllipseType="{Binding Arc.Kind}"
+                         RingThickness="{Binding Arc.RingThickness}"/>
+            </StackPanel>
+
+            <StackPanel Orientation="Vertical">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Start" Width="80" VerticalAlignment="Center"/>
+                    <Slider Width="160" Minimum="0" Maximum="360" TickFrequency="1" IsSnapToTickEnabled="true"
+                            Value="{Binding Arc.StartAngle, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding Arc.StartAngle}" Width="40" VerticalAlignment="Center"
+                               HorizontalTextAlignment="Right"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Sweep" Width="80" VerticalAlignment="Center"/>
+                    <Slider Width="160" Minimum="0" Maximum="360" TickFrequency="1" IsSnapToTickEnabled="true"
+                            Value="{Binding Arc.SweepAngle, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding Arc.SweepAngle}" Width="40" VerticalAlignment="Center"
+                               HorizontalTextAlignment="Right"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                    <TextBlock Text="Stroke" Width="80" VerticalAlignment="Center"/>
+                    <Slider Width="160" Minimum="0" Maximum="24" TickFrequency="1" IsSnapToTickEnabled="true"
+                            Value="{Binding Arc.StrokeWidth, Mode=TwoWay}" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                    <TextBlock Text="Ring" Width="80" VerticalAlignment="Center"/>
+                    <Slider Width="160" Minimum="0" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="true"
+                            Value="{Binding Arc.RingThickness, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding Arc.RingThickness}" Width="40" VerticalAlignment="Center"
+                               HorizontalTextAlignment="Right"/>
+                </StackPanel>
+                <CheckBox Content="Sector — closed through the centre (off: edge-to-edge, closed by the chord)"
+                          IsChecked="{Binding Arc.Sector, Mode=TwoWay}" MarginBottom="4"/>
+                <CheckBox Content="Fill — off leaves the outline alone, the way a ring gauge is drawn"
+                          IsChecked="{Binding Arc.Filled, Mode=TwoWay}"/>
+            </StackPanel>
+        </StackPanel>
+
+        <!-- BORDER stand. A border is not a stroke: each SIDE has its own thickness and each CORNER its own radius, and
+             both now ride in the SDF instance - so every combination these eight sliders reach is drawn by the same
+             instanced pass that draws a plain fill, with no tessellated ring and no seam where the fill meets it.
+             The middle keeps the fill's colour, the ring the border's, which is what makes a wrong side or a swapped
+             corner visible at a glance. -->
+        <TextBlock Text="Border — a thickness per side, a radius per corner, all drawn by one SDF instance:" Margin="0,20,0,6"/>
+        <StackPanel Orientation="Horizontal">
+            <!-- The border sits over a two-tone backdrop so a TRANSLUCENT ring shows what is behind the element - which is
+                 what the alpha slider is for. The flat swatch below the stand is the reference: same colour, same alpha,
+                 no ring arithmetic. Drag alpha down and the border's CORNER must keep matching that swatch; a ring drawn
+                 as its own shape darkens there (two edges meet, the pixel is blended twice), and this one may not. -->
+            <StackPanel Orientation="Vertical" Margin="0,0,24,0">
+                <Grid Width="220" Height="140">
+                    <StackPanel Orientation="Horizontal">
+                        <Rectangle Width="110" Height="140" Fill="#0EA5E9"/>
+                        <Rectangle Width="110" Height="140" Fill="#F1F5F9"/>
+                    </StackPanel>
+                    <Border Background="#1E3A8A"
+                            BorderBrush="{Binding Border.BorderBrush}"
+                            BorderThickness="{Binding Border.Thickness}"
+                            CornerRadius="{Binding Border.Corners}"/>
+                </Grid>
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <TextBlock Text="Flat swatch:" VerticalAlignment="Center" Width="80"/>
+                    <Rectangle Width="130" Height="18" Fill="{Binding Border.SwatchBrush}"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                    <TextBlock Text="Alpha" Width="80" VerticalAlignment="Center"/>
+                    <Slider Width="130" Minimum="0" Maximum="1"
+                            Value="{Binding Border.Alpha, Mode=TwoWay}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel Orientation="Vertical" Margin="0,0,24,0">
+                <TextBlock Text="Sides" MarginBottom="4"/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Left" Width="70" VerticalAlignment="Center"/>
+                    <Slider Width="130" Minimum="0" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="true"
+                            Value="{Binding Border.Left, Mode=TwoWay}" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Top" Width="70" VerticalAlignment="Center"/>
+                    <Slider Width="130" Minimum="0" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="true"
+                            Value="{Binding Border.Top, Mode=TwoWay}" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Right" Width="70" VerticalAlignment="Center"/>
+                    <Slider Width="130" Minimum="0" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="true"
+                            Value="{Binding Border.Right, Mode=TwoWay}" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Bottom" Width="70" VerticalAlignment="Center"/>
+                    <Slider Width="130" Minimum="0" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="true"
+                            Value="{Binding Border.Bottom, Mode=TwoWay}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel Orientation="Vertical">
+                <TextBlock Text="Corners" MarginBottom="4"/>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Top left" Width="86" VerticalAlignment="Center"/>
+                    <Slider Width="130" Minimum="0" Maximum="70" TickFrequency="1" IsSnapToTickEnabled="true"
+                            Value="{Binding Border.TopLeft, Mode=TwoWay}" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Top right" Width="86" VerticalAlignment="Center"/>
+                    <Slider Width="130" Minimum="0" Maximum="70" TickFrequency="1" IsSnapToTickEnabled="true"
+                            Value="{Binding Border.TopRight, Mode=TwoWay}" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Bottom right" Width="86" VerticalAlignment="Center"/>
+                    <Slider Width="130" Minimum="0" Maximum="70" TickFrequency="1" IsSnapToTickEnabled="true"
+                            Value="{Binding Border.BottomRight, Mode=TwoWay}" VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Bottom left" Width="86" VerticalAlignment="Center"/>
+                    <Slider Width="130" Minimum="0" Maximum="70" TickFrequency="1" IsSnapToTickEnabled="true"
+                            Value="{Binding Border.BottomLeft, Mode=TwoWay}" VerticalAlignment="Center"/>
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
 
         <!-- TRANSLUCENT OVERLAP. Every stroke here is the same colour at the same alpha, so anything that draws a piece
              of coverage TWICE shows up as a darker patch. The swatch is the reference tone: a crossing that matches it

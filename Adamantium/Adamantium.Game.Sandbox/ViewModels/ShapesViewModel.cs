@@ -14,4 +14,7 @@ public partial class ShapesViewModel : TabPageViewModel
 
     /// <summary>The border stand's eight sliders: a thickness per side and a radius per corner.</summary>
     public BorderSettings Border { get; } = new();
+
+    /// <summary>The sector stand: start, sweep, thickness, and the two ways a partial ellipse closes.</summary>
+    public ArcSettings Arc { get; } = new();
 }

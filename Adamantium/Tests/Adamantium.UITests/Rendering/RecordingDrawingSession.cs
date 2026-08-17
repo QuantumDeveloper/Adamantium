@@ -48,7 +48,7 @@ internal sealed class RecordingDrawingSession : IDrawingSession
         Thickness borderThickness) => this;
 
     public IDrawingSession DrawEllipse(Rect destinationRect, Brush brush, double startAngle, double sweepAngle,
-        EllipseType ellipseType, Pen pen = null) => this;
+        EllipseType ellipseType, Pen pen = null, double ringThickness = 0) => this;
 
     public List<(TextLayout Layout, Matrix4x4F Transform, double Width)> Texts { get; } = [];
 

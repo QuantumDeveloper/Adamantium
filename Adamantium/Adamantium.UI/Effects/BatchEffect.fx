@@ -78,20 +78,26 @@ float2 SlotPixelScale(float4x4 nodeWorld)
 // `crisp` (0/1) takes the edges HARD instead of fading them over a pixel. An axis-aligned rectangle sitting on whole
 // pixels needs no fade: coverage is exactly a half ON the edge, so two abutting rectangles compose to about three
 // quarters and leave a dark hairline down their join. Off by default - a curve or a slanted edge still needs the fade.
-float4 CompositeFillStroke(float d, float4 fill, float4 stroke, float width, float align, float strokeMask, float crisp)
+// Takes the fill's distance and the STROKE's separately, because they are not always the same curve. One case needs it:
+// an ellipse cut edge-to-edge is filled as a SEGMENT (closed by its chord) but stroked as an ARC - an open ribbon, since a
+// ring gauge has two ends and not four edges. Everything else passes the one distance twice, through the wrapper below,
+// and compiles to what it did before.
+float4 CompositeFillStrokeSplit(float dFill, float dStroke, float4 fill, float4 stroke, float width, float align,
+    float strokeMask, float crisp)
 {
-    float aa = max(fwidth(d), 1e-5);
-    float covFill = saturate(0.5 - d / aa);
+    float aa = max(fwidth(dFill), 1e-5);
+    float covFill = saturate(0.5 - dFill / aa);
 
+    float aaS = max(fwidth(dStroke), 1e-5);
     float halfW = width * 0.5;
-    float dRing = abs(d - align * halfW) - halfW;            // signed distance to the stroke ring
-    float covStroke = (width > 0.0) ? saturate(0.5 - dRing / aa) * saturate(strokeMask) : 0.0;
+    float dRing = abs(dStroke - align * halfW) - halfW;      // signed distance to the stroke ring
+    float covStroke = (width > 0.0) ? saturate(0.5 - dRing / aaS) * saturate(strokeMask) : 0.0;
 
     // The crisp answer OVERWRITES the two coverages rather than being folded into their expressions: the anti-aliased
     // path then compiles to exactly what it did before this option existed.
     if (crisp > 0.5)
     {
-        covFill = step(d, 0.0);
+        covFill = step(dFill, 0.0);
         covStroke = (width > 0.0) ? step(dRing, 0.0) * saturate(strokeMask) : 0.0;
     }
 
@@ -100,6 +106,12 @@ float4 CompositeFillStroke(float d, float4 fill, float4 stroke, float width, flo
     float outA = sa + fa * (1.0 - sa);                       // stroke OVER fill, straight compositing
     float3 outRGB = (outA > 1e-6) ? (stroke.rgb * sa + fill.rgb * fa * (1.0 - sa)) / outA : float3(0.0, 0.0, 0.0);
     return float4(outRGB, outA);
+}
+
+// What every pass but one calls: fill and outline are the same curve.
+float4 CompositeFillStroke(float d, float4 fill, float4 stroke, float width, float align, float strokeMask, float crisp)
+{
+    return CompositeFillStrokeSplit(d, d, fill, stroke, width, align, strokeMask, crisp);
 }
 
 // A BORDER of its own thickness per side: the ring between the shape's outline and an INNER outline inset by (left, top,
@@ -699,7 +711,51 @@ struct EllipsePSInput
     float4 Stroke0  : TEXCOORD2;
     float4 Stroke1  : TEXCOORD3;
     float4 Dash     : TEXCOORD4;   // dash runs 2..5 (device px)
+    float4 Arc      : TEXCOORD5;   // angular cut: start, end (radians), kind
 };
+
+// The ANGULAR CUT that turns a whole ellipse into a sector or a segment, as a signed distance (device px, negative
+// inside) to the STRAIGHT part of that shape's outline. Intersected with the ellipse's own field it gives the whole
+// shape - fill, anti-aliasing and stroke all follow from the combined distance, which is why neither needs a mesh, a
+// second pass or a collector of its own.
+//
+// Two things have to be right, and they are different things:
+//  - WHICH fragments are in: decided by the ellipse's own PARAMETRIC angle (x = rx cos t, y = ry sin t), because that is
+//    the angle the tessellator sweeps. For a circle it equals the geometric angle; for anything else it does not, and
+//    using atan2(y, x) would put the cut in a visibly different place than the per-unit path puts it.
+//  - HOW FAR the fragment is from the cut: measured in device px against the straight edges themselves - the two radii
+//    of a sector, the chord of a segment - so the fade across them is one pixel wide like every other edge here.
+// `kind`: 1 = sector (closed through the centre), 2 = edge-to-edge (closed by the chord). Anything else = no cut.
+float EllipseCutDistance(float2 p, float2 h, float a0, float a1, float kind)
+{
+    float2 p0 = float2(h.x * cos(a0), h.y * sin(a0));   // where the arc starts, in device px
+    float2 p1 = float2(h.x * cos(a1), h.y * sin(a1));   // ...and where it ends
+
+    // Is the fragment inside the swept range? Its parametric angle, wrapped into [0, 2pi) from the start.
+    float t = atan2(p.y * h.x, p.x * h.y);
+    float from = t - a0;
+    from -= 6.28318530718 * floor(from / 6.28318530718);
+    bool within = from <= (a1 - a0);
+
+    if (kind < 1.5)
+    {
+        // SECTOR: the boundary is the two radii. Distance to a SEGMENT (not to the infinite line): past the rim the
+        // nearest point of the boundary is the endpoint itself, which is what keeps the corner where the arc meets the
+        // radius from bleeding outward.
+        float d0 = length(p - p0 * saturate(dot(p, p0) / max(dot(p0, p0), 1e-6)));
+        float d1 = length(p - p1 * saturate(dot(p, p1) / max(dot(p1, p1), 1e-6)));
+        float edge = min(d0, d1);
+        return within ? -edge : edge;
+    }
+
+    // EDGE-TO-EDGE: the boundary is the chord, and the shape is the ellipse on the ARC's side of it. A half-plane, so the
+    // infinite line is the honest distance - the chord's own ends sit on the rim, where the ellipse takes over.
+    float2 chord = p1 - p0;
+    float2 n = normalize(float2(chord.y, -chord.x));       // one of the two normals
+    float2 mid = float2(h.x * cos((a0 + a1) * 0.5), h.y * sin((a0 + a1) * 0.5));   // a point on the arc, to orient it
+    float side = dot(mid - p0, n) >= 0.0 ? 1.0 : -1.0;
+    return -side * dot(p - p0, n);
+}
 
 // Approximate SIGNED DISTANCE (device px) to an ellipse boundary: the implicit F = length(p/half) - 1 normalised by the
 // length of its gradient (first-order/Taylor distance). Exact for a circle (rx==ry); for rx!=ry it's the correct shape
@@ -717,7 +773,49 @@ float SdEllipse(float2 p, float2 half)
 float4 EllipseBatchPS(EllipsePSInput input) : SV_Target
 {
     float d = SdEllipse(input.Local, input.Half);
+
+    // A SECTOR or a SEGMENT is this same ellipse with a straight boundary added, so the FILL is the intersection of the
+    // two fields. The OUTLINE is a different question, and the two closings answer it differently - the tessellator draws
+    // exactly this distinction (`isClosed` is true only for a full ellipse or a Sector):
+    //   SECTOR - closed contour: filled inside AND stroked all the way round, radii included. The combined distance is
+    //            the outline, so the stroke follows it for free.
+    //   EDGE-TO-EDGE - open contour: it is an ARC, and a ribbon along an arc has two ends, not four edges. The stroke
+    //            stays on the ELLIPSE and is masked to the swept range, so a ring gauge reads as a ribbon that stops -
+    //            not as a wedge outlined across its chord (which is what it looked like before this split).
+    float dStroke = d;
     float mask = 1.0;
+
+    // A RING is the same trick turned inward: the field MINUS its own inward offset, so the shape is the band between the
+    // outline and a curve `ring` px inside it. That makes a ring gauge geometry rather than a thick stroke - its thickness
+    // stops living in the pen, so the pen is free to outline it - and it composes with the cut below into an annular
+    // sector without either knowing about the other.
+    bool ring = input.Arc.w > 0.0;
+    if (ring)
+    {
+        d = max(d, -(d + input.Arc.w));
+    }
+
+    if (input.Arc.z > 0.5)
+    {
+        d = max(d, EllipseCutDistance(input.Local, input.Half, input.Arc.x, input.Arc.y, input.Arc.z));
+        // A ring's contour is CLOSED whichever way the cut closes it (two arcs and two ends), so it is stroked whole. An
+        // open arc is the one case where the stroke stays on the ellipse and is masked to the sweep instead.
+        if (input.Arc.z > 1.5 && !ring)
+        {
+            // The ends are cut by the two radii - the same wedge a sector is bounded by, used here only as a mask.
+            float dWedge = EllipseCutDistance(input.Local, input.Half, input.Arc.x, input.Arc.y, 1.0);
+            mask = saturate(0.5 - dWedge / max(fwidth(dWedge), 1e-5));
+        }
+        else
+        {
+            dStroke = d;
+        }
+    }
+    else if (ring)
+    {
+        dStroke = d;   // a whole ring: two circles, and the stroke follows both
+    }
+
     if (input.Stroke0.z > 0.0 || input.Stroke1.y > 0.0 || input.Stroke1.z < 1.0)   // dashed or trimmed -> arc length
     {
         float perim;
@@ -728,7 +826,7 @@ float4 EllipseBatchPS(EllipsePSInput input) : SV_Target
         mask = DashTrimMaskCapped(s, s, perim, input.Stroke0.z, input.Stroke0.w, input.Stroke1.x, input.Stroke1.y,
                             input.Stroke1.z, dPerp * capScl, halfW * capScl, input.Stroke1.w, input.Dash);
     }
-    return CompositeFillStroke(d, input.Color, input.StrokeColor, input.Stroke0.x, input.Stroke0.y, mask, 0.0);
+    return CompositeFillStrokeSplit(d, dStroke, input.Color, input.StrokeColor, input.Stroke0.x, input.Stroke0.y, mask, 0.0);
 }
 
 // ---- EllipseBatchInstanced: the SAME SDF ellipse batch, per-instance EllipseItem read from a BDA STORAGE buffer by
@@ -743,6 +841,7 @@ struct EllipseData
     float4 Stroke0;      // width_px, align, dashOn, dashGap
     float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
     float4 Dash;         // dash runs 2..5 (device px); runs 0 and 1 ride in Stroke0.zw, the count in Stroke1.w
+    float4 Arc;          // x = start, y = end (RADIANS of the parametric angle), z = 0 none / 1 sector / 2 edge-to-edge
 };
 
 [shader("vertex")]
@@ -772,6 +871,7 @@ EllipsePSInput EllipseBatchInstancedVS(uint vertexId : SV_VertexID, uint instanc
     o.Stroke0 = float4(widthPx, item.Stroke0.y, item.Stroke0.z * iso, item.Stroke0.w * iso);
     o.Stroke1 = float4(item.Stroke1.x * iso, item.Stroke1.y, item.Stroke1.z, item.Stroke1.w);
     o.Dash = item.Dash * iso;
+    o.Arc = item.Arc;   // angles are angles: no pixel scale applies to them
     return o;
 }
 

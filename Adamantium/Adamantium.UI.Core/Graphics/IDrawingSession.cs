@@ -18,7 +18,9 @@ public interface IDrawingSession
     /// anything. Fill and border are ONE draw on purpose - as two shapes they share an outline, both anti-alias it, and
     /// the two halves of that edge composite into a dark hairline all the way round.</para></summary>
     IDrawingSession DrawBorder(Brush background, Rect destinationRect, CornerRadius corners, Brush borderBrush, Thickness borderThickness);
-    IDrawingSession DrawEllipse(Rect destinationRect, Brush brush, Double startAngle, Double sweepAngle, EllipseType ellipseType, Pen pen = null);
+    /// <param name="ringThickness">Leave a RING this thick (DIPs, inward from the outline) instead of a solid shape: an
+    /// annulus, or with a sweep an annular sector. It is geometry, not a stroke - so the pen stays free to outline it.</param>
+    IDrawingSession DrawEllipse(Rect destinationRect, Brush brush, Double startAngle, Double sweepAngle, EllipseType ellipseType, Pen pen = null, Double ringThickness = 0);
     IDrawingSession DrawGeometry(Brush brush, Geometry geometry, Pen pen = null);
 
     /// <summary>Draws the geometry placed by <paramref name="transform"/>, WITHOUT touching the geometry itself. A

@@ -747,7 +747,7 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
     // The per-unit tessellated fill/fringe/stroke for a NON-batched ellipse (a sector/arc, a stroked or gradient ellipse).
     private void BuildMachinery(EllipsePayload payload)
     {
-        var g = new EllipseGeometry(payload.DestinationRect, payload.StartAngle, payload.SweepAngle, payload.EllipseType);
+        var g = EllipseShape(payload);
         g.ProcessGeometry(GeometryType.Both);
         GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, payload.Brush, BufferManager, ResourceFactory);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
@@ -761,11 +761,33 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
     public void EnsureMachinery()
     {
         if (GeometryRenderer != null) return;
-        var g = new EllipseGeometry(Payload.DestinationRect, Payload.StartAngle, Payload.SweepAngle, Payload.EllipseType);
+        var g = EllipseShape(Payload);
         g.ProcessGeometry(GeometryType.Both);
         GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, Payload.Brush, BufferManager, ResourceFactory);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
         GeometryRenderer.Owner = DrawCommand.Component;
+    }
+
+    /// <summary>The shape this ellipse actually is. A RING is the outer shape with the inner one taken out of it - the
+    /// tessellated twin of what the batch does by subtracting the field's own inward offset. Both cut a band with RADIAL
+    /// ends (see EllipseBatchCollector's cut bake), which is the one closing where the two constructions agree exactly.</summary>
+    private static Geometry EllipseShape(EllipsePayload payload)
+    {
+        var outer = new EllipseGeometry(payload.DestinationRect, payload.StartAngle, payload.SweepAngle, payload.EllipseType);
+        if (!payload.HasRing) return outer;
+
+        var t = payload.RingThickness;
+        var inner = payload.DestinationRect.Deflate(new Thickness(t));
+        // A band thicker than the shape leaves no hole at all - and an inner rect turned inside out would tessellate to
+        // nonsense, so it is the solid shape that answers there.
+        if (inner.Width <= 0 || inner.Height <= 0) return outer;
+
+        return new CombinedGeometry
+        {
+            GeometryCombineMode = GeometryCombineMode.Exclude,
+            Geometry1 = outer,
+            Geometry2 = new EllipseGeometry(inner, payload.StartAngle, payload.SweepAngle, EllipseType.Sector)
+        };
     }
 
     public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
