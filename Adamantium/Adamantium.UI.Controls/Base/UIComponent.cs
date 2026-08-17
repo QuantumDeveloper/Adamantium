@@ -73,6 +73,10 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         set => SetValue(UseAnalyticAAProperty, value);
     }
 
+    /// <summary>Something changed about how much room this element asks its parent for, in a way no measure of it will
+    /// reveal. Overridden where layout lives; a component that is not measured has no parent to tell.</summary>
+    internal virtual void NotifyParentOfContributionChange() { }
+
     public static readonly AdamantiumProperty VisibilityProperty = AdamantiumProperty.Register(nameof(Visibility),
         typeof(Visibility), typeof(UIComponent),
         new PropertyMetadata(Visibility.Visible,
@@ -102,8 +106,17 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         var effective = component.GetValue<Visibility>(VisibilityProperty);
         component._visibility = effective;
 
-        if (previous != effective)
-            VisualTreeNotifications.RaiseVisibilityChanged(component);
+        if (previous == effective) return;
+
+        VisualTreeNotifications.RaiseVisibilityChanged(component);
+
+        // And tell whatever MEASURED it, because what that parent measured just changed: a collapsed child asks for
+        // nothing. Nothing else carries this. InvalidateMeasure deliberately does NOT walk up from an already-measured
+        // node - it leaves that to the layout pass, which propagates only when a re-measure CHANGES the node's
+        // DesiredSize - and DesiredSize reads zero for a collapsed element from the instant this flag is written, so by
+        // the time the pass looks there is no difference left to find. The minimized ribbon's band kept its full height
+        // that way: content moved into the flyout, row still standing.
+        component.NotifyParentOfContributionChange();
     }
       
     public static readonly AdamantiumProperty IsHitTestVisibleProperty =
