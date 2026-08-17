@@ -20,15 +20,20 @@
             <Setter.Value>
                 <ControlTemplate TargetType="RingProgressBar">
                     <Grid>
-                        <Ellipse Stroke="{ResourceReference ControlFillColorTertiary}"
-                                StrokeThickness="{TemplateBinding RingThickness}"
-                                Fill="Transparent"
-                                EllipseType="EdgeToEdge"/>
+                        <!-- The ring is a SHAPE, not a stroke: RingThickness leaves a band that thick inward from the
+                             outline (Ellipse.RingThickness), and a swept band is an annular sector - a donut slice, which
+                             is what a gauge actually is. Drawn as a thick STROKE before, which spent the pen on the shape:
+                             the band could carry no outline of its own, and its thickness had to be a stroke width.
+                             The outer edge lands in the same place either way - a centred stroke on a box deflated by half
+                             its width reaches exactly the bounds, and a band measured inward from the bounds starts there.
+                             Sector, because a band's ends are radial whichever closing is asked for (see the cut bake). -->
+                        <Ellipse Fill="{ResourceReference ControlFillColorTertiary}"
+                                RingThickness="{TemplateBinding RingThickness}"
+                                EllipseType="Sector"/>
                         <Ellipse x:Name="PART_Indicator"
-                                Stroke="{ThemeResource AccentFillColorDefault}"
-                                StrokeThickness="{TemplateBinding RingThickness}"
-                                Fill="Transparent"
-                                EllipseType="EdgeToEdge"
+                                Fill="{ThemeResource AccentFillColorDefault}"
+                                RingThickness="{TemplateBinding RingThickness}"
+                                EllipseType="Sector"
                                 StartAngle="0"
                                 StopAngle="0"
                                 RenderTransformOrigin="0.5,0.5"/>
