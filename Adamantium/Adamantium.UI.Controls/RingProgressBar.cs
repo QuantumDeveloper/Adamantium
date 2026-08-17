@@ -89,7 +89,7 @@ public class RingProgressBar : RangeBase
             // The Ellipse arc always sweeps from its own angle 0 (at 3 o'clock) in ONE direction (its StopAngle is a
             // sweep span, clamped >= 0 - it can't render a negative sweep). So the arc transform does two things: a
             // rotation puts the 0% end at StartPosition, and a vertical flip (ScaleY = -1) reverses the winding for the
-            // opposite Direction - the flip keeps the on-axis 3 o'clock start fixed, so the same rotation still applies.
+            // NON-native Direction (see ApplyArcTransform for which one that is, and why it was measured).
             _startRotate = new Transform();
             _indicator.RenderTransform = _startRotate;
         }
@@ -112,8 +112,11 @@ public class RingProgressBar : RangeBase
         if (d is RingProgressBar r) r.ApplyArcTransform();
     }
 
-    // Rotate the arc's 0% end (natively 3 o'clock) to StartPosition, and flip it vertically for a clockwise sweep - the
-    // Ellipse's native sweep runs counter-clockwise on screen, so Clockwise is the mirrored one.
+    // Rotate the arc's 0% end (natively 3 o'clock) to StartPosition, and flip it vertically for the direction that is NOT
+    // the native one. Which one that is was measured, not assumed: an Ellipse swept 0..90 fills from the right edge to the
+    // BOTTOM (UI space has y down), so its native winding is CLOCKWISE and CounterClockwise is the mirrored one - this had
+    // it the other way round and reversed both settings. The flip keeps the on-axis 3 o'clock start fixed, so the same
+    // rotation still applies either way. Pinned by RingProgressBarDirectionTests.
     private void ApplyArcTransform()
     {
         if (_startRotate == null) return;
@@ -124,7 +127,7 @@ public class RingProgressBar : RangeBase
             RingStartPosition.Left => 180.0,
             _ => 270.0,   // Top
         };
-        _startRotate.ScaleY = Direction == SweepDirection.Clockwise ? -1.0 : 1.0;
+        _startRotate.ScaleY = Direction == SweepDirection.CounterClockwise ? -1.0 : 1.0;
     }
 
     // Round to a square: the side is whichever of Width/Height the consumer set (both -> the smaller; neither -> the MinWidth
