@@ -289,6 +289,41 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     /// <summary>The retained range [first, first+count) a recorded segment currently draws.</summary>
     public (int First, int Count) SegmentRange(int index) => ((int)_segments[index].First, (int)_segments[index].Count);
 
+    /// <summary>Cut a recorded segment in two at <paramref name="firstOfSecond"/> and return the new segment's index; the
+    /// original keeps everything before the cut. Nothing moves - the arena is untouched and both halves keep drawing the
+    /// bytes they already held - so this costs one list insert.
+    /// <para>What it is for: a segment glues every control between two flushes, so the ONE op that draws it covers a whole
+    /// span of paint ranks. A control that starts drawing with a rank INSIDE that span has no correct place in a flat op
+    /// stream until the span is split at it (see RenderCache's PlaceNewSegment).</para>
+    /// <para>Capacity stays with the FIRST half: it is the tail of the original allocation, and a re-issue that grows must
+    /// grow into it, never into the second half's live items.</para></summary>
+    public int SplitSegment(int index, int firstOfSecond)
+    {
+        var s = _segments[index];
+        var offset = (uint)firstOfSecond - s.First;
+        if (offset == 0 || offset >= s.Count) return -1;   // nothing on one side of the cut: not a split
+
+        // The spare room is the TAIL of the original allocation, so it goes to the SECOND half. The first half is boxed in
+        // by live items and may not grow at all: letting it keep the capacity would let a re-issue write over the
+        // neighbour it just created.
+        var second = new Segment
+        {
+            Scissor = s.Scissor,
+            First = (uint)firstOfSecond,
+            Count = s.Count - offset,
+            Capacity = s.Capacity - offset
+        };
+        _segments[index] = s with { Count = offset, Capacity = offset };
+        _segments.Insert(index + 1, second);
+
+        // Per-segment state (a texture, a field) is keyed by index too, and both halves carry the same one.
+        OnSegmentInserted(index + 1);
+
+        // Every recorded op that names a segment by INDEX now points one further along for everything after the cut; the
+        // caller (which owns the op stream) fixes those up. Signalled by returning the new index.
+        return index + 1;
+    }
+
     /// <summary>Copy retained items out, for a caller re-issuing a segment: the instances of the groups that did NOT
     /// change are carried over as bytes rather than re-baked, so re-issuing a layer costs a copy, not a re-computation.</summary>
     public void CopyRetained(int first, int count, List<TItem> into)
@@ -420,6 +455,10 @@ internal abstract class BatchCollector<TItem> where TItem : struct
 
     /// <summary>Hook: capture per-segment state at record time (the text batch stashes the segment's atlas). Base no-op.</summary>
     protected virtual void OnSegmentRecorded(int index) { }
+
+    /// <summary>Hook: a segment was INSERTED at this index by a split, so index-keyed per-segment state has to make room
+    /// for it - carrying a copy of what the segment being split held, since both halves draw the same way. Base no-op.</summary>
+    protected virtual void OnSegmentInserted(int index) { }
 
     /// <summary>Hook: restore the per-segment state captured by <see cref="OnSegmentRecorded"/> before its draw. Base no-op.</summary>
     protected virtual void BindSegment(int index) { }

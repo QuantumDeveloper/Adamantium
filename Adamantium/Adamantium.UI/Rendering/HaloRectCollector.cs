@@ -43,6 +43,12 @@ internal sealed class HaloRectCollector : SdfBatchCollector<HaloRectItem>
         _segState[index] = _field;
     }
 
+    protected override void OnSegmentInserted(int index)
+    {
+        while (_segState.Count < index) _segState.Add(null);
+        _segState.Insert(index, index > 0 ? _segState[index - 1] : null);
+    }
+
     protected override void BindSegment(int index) => _field = _segState[index];
 
     /// <summary>Still the pending segment's field? A change of field flushes, exactly as a change of texture does for the
