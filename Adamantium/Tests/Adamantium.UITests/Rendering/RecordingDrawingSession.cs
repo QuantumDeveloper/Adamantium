@@ -50,6 +50,9 @@ internal sealed class RecordingDrawingSession : IDrawingSession
     public IDrawingSession DrawEllipse(Rect destinationRect, Brush brush, double startAngle, double sweepAngle,
         EllipseType ellipseType, Pen pen = null, double ringThickness = 0) => this;
 
+    public IDrawingSession DrawRegularPolygon(Brush brush, Rect destinationRect, int corners, Pen pen = null,
+        double ringThickness = 0, double startAngle = 0) => this;
+
     public List<(TextLayout Layout, Matrix4x4F Transform, double Width)> Texts { get; } = [];
 
     public IDrawingSession DrawText(TextRenderingParameters renderingParameters, Size desiredSize, TextLayout textLayout,

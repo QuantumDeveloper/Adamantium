@@ -117,45 +117,69 @@
                 <StackPanel Grid.Column="0" Orientation="Vertical" Margin="0,0,20,0">
                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                         <TextBlock Text="Thickness" Width="80" VerticalAlignment="Center"/>
-                        <Slider Width="130" Minimum="0" Maximum="30" Value="{Binding Stroke.StrokeWidth, Mode=TwoWay}"/>
-                        <TextBlock Text="{Binding Stroke.StrokeWidth}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                        <Slider IsValueToolTipEnabled="true" Width="130" Minimum="0" Maximum="30" Value="{Binding Stroke.StrokeWidth, Mode=TwoWay}"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="30" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding Stroke.StrokeWidth, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                         <TextBlock Text="Dash on" Width="80" VerticalAlignment="Center"/>
-                        <Slider Width="130" Minimum="0" Maximum="100" Value="{Binding Stroke.DashOn, Mode=TwoWay}"/>
-                        <TextBlock Text="{Binding Stroke.DashOn}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                        <Slider IsValueToolTipEnabled="true" Width="130" Minimum="0" Maximum="100" Value="{Binding Stroke.DashOn, Mode=TwoWay}"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="100" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding Stroke.DashOn, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                         <TextBlock Text="Dash gap" Width="80" VerticalAlignment="Center"/>
-                        <Slider Width="130" Minimum="0" Maximum="100" Value="{Binding Stroke.DashGap, Mode=TwoWay}"/>
-                        <TextBlock Text="{Binding Stroke.DashGap}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                        <Slider IsValueToolTipEnabled="true" Width="130" Minimum="0" Maximum="100" Value="{Binding Stroke.DashGap, Mode=TwoWay}"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="100" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding Stroke.DashGap, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                         <TextBlock Text="Dash offset" Width="80" VerticalAlignment="Center"/>
-                        <Slider Width="130" Minimum="0" Maximum="60" Value="{Binding Stroke.DashOffset, Mode=TwoWay}"/>
-                        <TextBlock Text="{Binding Stroke.DashOffset}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                        <Slider IsValueToolTipEnabled="true" Width="130" Minimum="0" Maximum="60" Value="{Binding Stroke.DashOffset, Mode=TwoWay}"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="60" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding Stroke.DashOffset, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                         <TextBlock Text="Trim start" Width="80" VerticalAlignment="Center"/>
-                        <Slider Width="130" Minimum="0" Maximum="1" Value="{Binding Stroke.TrimStart, Mode=TwoWay}"/>
-                        <TextBlock Text="{Binding Stroke.TrimStart}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                        <Slider IsValueToolTipEnabled="true" Width="130" Minimum="0" Maximum="1" Value="{Binding Stroke.TrimStart, Mode=TwoWay}"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="1" SmallChange="0.05"
+                                       SnapsToSmallChange="true" StringFormat="N2"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding Stroke.TrimStart, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                     </StackPanel>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Vertical">
                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                         <TextBlock Text="Trim end" Width="80" VerticalAlignment="Center"/>
-                        <Slider Width="130" Minimum="0" Maximum="1" Value="{Binding Stroke.TrimEnd, Mode=TwoWay}"/>
-                        <TextBlock Text="{Binding Stroke.TrimEnd}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                        <Slider IsValueToolTipEnabled="true" Width="130" Minimum="0" Maximum="1" Value="{Binding Stroke.TrimEnd, Mode=TwoWay}"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="1" SmallChange="0.05"
+                                       SnapsToSmallChange="true" StringFormat="N2"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding Stroke.TrimEnd, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                         <TextBlock Text="Corner" Width="80" VerticalAlignment="Center"/>
-                        <Slider Width="130" Minimum="0" Maximum="60" Value="{Binding Stroke.Corner, Mode=TwoWay}"/>
-                        <TextBlock Text="{Binding Stroke.Corner}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                        <Slider IsValueToolTipEnabled="true" Width="130" Minimum="0" Maximum="60" Value="{Binding Stroke.Corner, Mode=TwoWay}"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="60" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding Stroke.Corner, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,3,0,0">
                         <TextBlock Text="Samples" Width="80" VerticalAlignment="Center"/>
-                        <Slider Width="130" Minimum="0" Maximum="50" Value="{Binding Stroke.Samples, Mode=TwoWay}"/>
-                        <TextBlock Text="{Binding Stroke.Samples}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                        <Slider IsValueToolTipEnabled="true" Width="130" Minimum="0" Maximum="50" Value="{Binding Stroke.Samples, Mode=TwoWay}"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="50" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding Stroke.Samples, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                     </StackPanel>
                     <!-- Four caps, kept apart on purpose. Start/End are the ends of the WHOLE stroke; the two dash caps
                          are the two ends of every dash. Bound to one setting they were indistinguishable, which is
@@ -224,11 +248,17 @@
         <TextBlock Text="NURBS parameters (a B-spline has none of these):" Margin="0,20,0,6"/>
         <StackPanel Orientation="Horizontal">
             <TextBlock Text="Weight" Width="60" VerticalAlignment="Center"/>
-            <Slider Width="130" Minimum="0.1" Maximum="10" Value="{Binding Stroke.NurbsWeight, Mode=TwoWay}"/>
-            <TextBlock Text="{Binding Stroke.NurbsWeight}" Width="40" VerticalAlignment="Center" Margin="6,0,24,0"/>
+            <Slider IsValueToolTipEnabled="true" Width="130" Minimum="0.1" Maximum="10" Value="{Binding Stroke.NurbsWeight, Mode=TwoWay}"/>
+            <NumericUpDown Width="88" Minimum="0.1" Maximum="10" SmallChange="0.1"
+                           SnapsToSmallChange="true" StringFormat="N2"
+                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                           Value="{Binding Stroke.NurbsWeight, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,24,0"/>
             <TextBlock Text="Degree" Width="60" VerticalAlignment="Center"/>
-            <Slider Width="100" Minimum="1" Maximum="5" Value="{Binding Stroke.NurbsDegree, Mode=TwoWay}"/>
-            <TextBlock Text="{Binding Stroke.NurbsDegree}" Width="30" VerticalAlignment="Center" Margin="6,0,24,0"/>
+            <Slider IsValueToolTipEnabled="true" Width="100" Minimum="1" Maximum="5" Value="{Binding Stroke.NurbsDegree, Mode=TwoWay}"/>
+            <NumericUpDown Width="88" Minimum="1" Maximum="5" SmallChange="1"
+                           SnapsToSmallChange="true" StringFormat="N0"
+                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                           Value="{Binding Stroke.NurbsDegree, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,24,0"/>
             <TextBlock Text="Uniform" Width="60" VerticalAlignment="Center"/>
             <ToggleSwitch IsChecked="{Binding Stroke.NurbsUniform, Mode=TwoWay}" VerticalAlignment="Center"/>
         </StackPanel>
@@ -247,65 +277,194 @@
             <Border Width="120" Height="80" Margin="8" Background="#30FFFFFF" BorderBrush="#C0EF4444" BorderThickness="1,1,2,1" CornerRadius="0"/>
         </WrapPanel>
 
+        <!-- POLYGON stand. One shape, one number: drag Corners from 3 upward and the triangle becomes a square, a
+             hexagon, and eventually a circle you cannot tell from the ellipse batch's own. Its OWN record and pass - a
+             polygon and an ellipse share a shape of record, not a shape - but the same instanced cost, and the same ring
+             trick: hollow a triangle and you have a chevron, as geometry, with the pen still free for an outline. -->
+        <TextBlock Text="Regular polygon — from a triangle to a circle by one number:" Margin="0,20,0,6"/>
+        <StackPanel Orientation="Horizontal">
+            <!-- ONE shape, in a fixed cell: the box is a slider now, so the shape has to be free to grow without pushing
+                 the panel beside it around. -->
+            <Border Width="300" Height="300" MarginRight="24"
+                    Background="{ResourceReference CardBackgroundFillColorDefault}" CornerRadius="8">
+                <RegularPolygon Width="{Binding Polygon.BoxWidth}" Height="{Binding Polygon.BoxHeight}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center"
+                                Fill="#8B5CF6"
+                                Stroke="{Binding Polygon.StrokeBrush}"
+                                StrokeThickness="{Binding Polygon.StrokeWidth}"
+                                Corners="{Binding Polygon.CornerCount}"
+                                StartAngle="{Binding Polygon.StartAngle}"
+                                RingThickness="{Binding Polygon.RingThickness}"/>
+            </Border>
+
+            <StackPanel Orientation="Vertical">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Corners" Width="80" VerticalAlignment="Center"/>
+                    <Slider Width="200" Minimum="3" Maximum="24" TickFrequency="1" IsSnapToTickEnabled="true"
+                            IsValueToolTipEnabled="true"
+                            Value="{Binding Polygon.Corners, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="3" Maximum="24" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Polygon.Corners, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                </StackPanel>
+                <!-- Turning it must not resize it: the angle offsets the shape's own parameter, so a turned polygon keeps
+                     filling the box. Squash the box first and this is the slider that shows it. -->
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Start angle" Width="80" VerticalAlignment="Center"/>
+                    <Slider Width="200" Minimum="0" Maximum="360" TickFrequency="1" IsSnapToTickEnabled="true"
+                            IsValueToolTipEnabled="true"
+                            Value="{Binding Polygon.StartAngle, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="360" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Polygon.StartAngle, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Ring" Width="80" VerticalAlignment="Center"/>
+                    <Slider Width="200" Minimum="0" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="true"
+                            IsValueToolTipEnabled="true"
+                            Value="{Binding Polygon.RingThickness, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="40" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Polygon.RingThickness, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Stroke" Width="80" VerticalAlignment="Center"/>
+                    <Slider Width="200" Minimum="0" Maximum="16" TickFrequency="1" IsSnapToTickEnabled="true"
+                            IsValueToolTipEnabled="true"
+                            Value="{Binding Polygon.StrokeWidth, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="16" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Polygon.StrokeWidth, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Stroke alpha" Width="80" VerticalAlignment="Center"/>
+                    <Slider Width="200" Minimum="0" Maximum="1" TickFrequency="0.05" IsSnapToTickEnabled="true"
+                            IsValueToolTipEnabled="true"
+                            Value="{Binding Polygon.StrokeAlpha, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="1" SmallChange="0.05"
+                                   SnapsToSmallChange="true" StringFormat="N2"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Polygon.StrokeAlpha, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Width" Width="80" VerticalAlignment="Center"/>
+                    <Slider Width="200" Minimum="20" Maximum="280" TickFrequency="1" IsSnapToTickEnabled="true"
+                            IsValueToolTipEnabled="true"
+                            Value="{Binding Polygon.BoxWidth, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="20" Maximum="280" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Polygon.BoxWidth, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Height" Width="80" VerticalAlignment="Center"/>
+                    <Slider Width="200" Minimum="20" Maximum="280" TickFrequency="1" IsSnapToTickEnabled="true"
+                            IsValueToolTipEnabled="true"
+                            Value="{Binding Polygon.BoxHeight, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="20" Maximum="280" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Polygon.BoxHeight, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+
         <!-- SECTOR stand. A partial ellipse is not a shape of its own: the batch draws the same ellipse and intersects it
              with a straight boundary, so everything these sliders reach is one instanced pass - a wedge, a chord, a ring
-             gauge. The two closings are shown side by side because they differ in two ways worth seeing at once: a SECTOR
-             closes through the centre and strokes both radii; EDGE-TO-EDGE closes by the chord, and stroked it is an OPEN
-             arc - two ends, nothing drawn across it. Turn Fill off to see exactly that. -->
+             gauge. The two closings differ in two ways worth seeing, and the Sector switch puts them on the SAME shape: a
+             SECTOR closes through the centre and strokes both radii; EDGE-TO-EDGE closes by the chord, and stroked it is
+             an OPEN arc - two ends, nothing drawn across it. Turn Fill off to see exactly that. -->
         <TextBlock Text="Sectors — the same ellipse cut by a straight boundary:" Margin="0,20,0,6"/>
         <StackPanel Orientation="Horizontal">
-            <StackPanel Orientation="Vertical" Margin="0,0,24,0">
-                <TextBlock Text="Live" MarginBottom="4" Foreground="{ResourceReference TextFillColorSecondary}"/>
-                <Ellipse Width="180" Height="180"
+            <!-- ONE ellipse in a fixed cell, its BOX on two sliders: squash it and the cut has to follow the ellipse's own
+                 parametric angle rather than a circle's, which is the part that is easy to get wrong. -->
+            <Border Width="300" Height="300" MarginRight="24"
+                    Background="{ResourceReference CardBackgroundFillColorDefault}" CornerRadius="8">
+                <Ellipse Width="{Binding Arc.BoxWidth}" Height="{Binding Arc.BoxHeight}"
+                         HorizontalAlignment="Center" VerticalAlignment="Center"
                          Fill="{Binding Arc.Fill}"
-                         Stroke="#F59E0B"
+                         Stroke="{Binding Arc.StrokeBrush}"
                          StrokeThickness="{Binding Arc.StrokeWidth}"
                          StartAngle="{Binding Arc.StartAngle}"
                          StopAngle="{Binding Arc.SweepAngle}"
                          EllipseType="{Binding Arc.Kind}"
                          RingThickness="{Binding Arc.RingThickness}"/>
-            </StackPanel>
-
-            <!-- The same numbers in the OTHER closing, so the pair can be compared without touching a slider. -->
-            <StackPanel Orientation="Vertical" Margin="0,0,24,0">
-                <TextBlock Text="Squashed — the cut follows the ellipse's own angle" MarginBottom="4"
-                           Foreground="{ResourceReference TextFillColorSecondary}"/>
-                <Ellipse Width="220" Height="120"
-                         Fill="{Binding Arc.Fill}"
-                         Stroke="#22C55E"
-                         StrokeThickness="{Binding Arc.StrokeWidth}"
-                         StartAngle="{Binding Arc.StartAngle}"
-                         StopAngle="{Binding Arc.SweepAngle}"
-                         EllipseType="{Binding Arc.Kind}"
-                         RingThickness="{Binding Arc.RingThickness}"/>
-            </StackPanel>
+            </Border>
 
             <StackPanel Orientation="Vertical">
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                     <TextBlock Text="Start" Width="80" VerticalAlignment="Center"/>
-                    <Slider Width="160" Minimum="0" Maximum="360" TickFrequency="1" IsSnapToTickEnabled="true"
+                    <Slider Width="200" Minimum="0" Maximum="360" TickFrequency="1" IsSnapToTickEnabled="true"
+                            IsValueToolTipEnabled="true"
                             Value="{Binding Arc.StartAngle, Mode=TwoWay}" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding Arc.StartAngle}" Width="40" VerticalAlignment="Center"
-                               HorizontalTextAlignment="Right"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="360" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Arc.StartAngle, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                     <TextBlock Text="Sweep" Width="80" VerticalAlignment="Center"/>
-                    <Slider Width="160" Minimum="0" Maximum="360" TickFrequency="1" IsSnapToTickEnabled="true"
+                    <Slider Width="200" Minimum="0" Maximum="360" TickFrequency="1" IsSnapToTickEnabled="true"
+                            IsValueToolTipEnabled="true"
                             Value="{Binding Arc.SweepAngle, Mode=TwoWay}" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding Arc.SweepAngle}" Width="40" VerticalAlignment="Center"
-                               HorizontalTextAlignment="Right"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="360" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Arc.SweepAngle, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                     <TextBlock Text="Stroke" Width="80" VerticalAlignment="Center"/>
-                    <Slider Width="160" Minimum="0" Maximum="24" TickFrequency="1" IsSnapToTickEnabled="true"
+                    <Slider Width="200" Minimum="0" Maximum="24" TickFrequency="1" IsSnapToTickEnabled="true"
+                            IsValueToolTipEnabled="true"
                             Value="{Binding Arc.StrokeWidth, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="24" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Arc.StrokeWidth, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Ring" Width="80" VerticalAlignment="Center"/>
+                    <Slider Width="200" Minimum="0" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="true"
+                            IsValueToolTipEnabled="true"
+                            Value="{Binding Arc.RingThickness, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="40" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Arc.RingThickness, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Stroke alpha" Width="80" VerticalAlignment="Center"/>
+                    <Slider Width="200" Minimum="0" Maximum="1" TickFrequency="0.05" IsSnapToTickEnabled="true"
+                            IsValueToolTipEnabled="true"
+                            Value="{Binding Arc.StrokeAlpha, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="1" SmallChange="0.05"
+                                   SnapsToSmallChange="true" StringFormat="N2"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Arc.StrokeAlpha, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                    <TextBlock Text="Width" Width="80" VerticalAlignment="Center"/>
+                    <Slider Width="200" Minimum="20" Maximum="280" TickFrequency="1" IsSnapToTickEnabled="true"
+                            IsValueToolTipEnabled="true"
+                            Value="{Binding Arc.BoxWidth, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="20" Maximum="280" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Arc.BoxWidth, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                    <TextBlock Text="Ring" Width="80" VerticalAlignment="Center"/>
-                    <Slider Width="160" Minimum="0" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="true"
-                            Value="{Binding Arc.RingThickness, Mode=TwoWay}" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding Arc.RingThickness}" Width="40" VerticalAlignment="Center"
-                               HorizontalTextAlignment="Right"/>
+                    <TextBlock Text="Height" Width="80" VerticalAlignment="Center"/>
+                    <Slider Width="200" Minimum="20" Maximum="280" TickFrequency="1" IsSnapToTickEnabled="true"
+                            IsValueToolTipEnabled="true"
+                            Value="{Binding Arc.BoxHeight, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="20" Maximum="280" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Arc.BoxHeight, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                 </StackPanel>
                 <CheckBox Content="Sector — closed through the centre (off: edge-to-edge, closed by the chord)"
                           IsChecked="{Binding Arc.Sector, Mode=TwoWay}" MarginBottom="4"/>
@@ -342,8 +501,12 @@
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
                     <TextBlock Text="Alpha" Width="80" VerticalAlignment="Center"/>
-                    <Slider Width="130" Minimum="0" Maximum="1"
+                    <Slider IsValueToolTipEnabled="true" Width="130" Minimum="0" Maximum="1"
                             Value="{Binding Border.Alpha, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="1" SmallChange="0.05"
+                                   SnapsToSmallChange="true" StringFormat="N2"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Border.Alpha, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                 </StackPanel>
             </StackPanel>
 
@@ -351,23 +514,39 @@
                 <TextBlock Text="Sides" MarginBottom="4"/>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                     <TextBlock Text="Left" Width="70" VerticalAlignment="Center"/>
-                    <Slider Width="130" Minimum="0" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="true"
+                    <Slider IsValueToolTipEnabled="true" Width="130" Minimum="0" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="true"
                             Value="{Binding Border.Left, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="40" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Border.Left, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                     <TextBlock Text="Top" Width="70" VerticalAlignment="Center"/>
-                    <Slider Width="130" Minimum="0" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="true"
+                    <Slider IsValueToolTipEnabled="true" Width="130" Minimum="0" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="true"
                             Value="{Binding Border.Top, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="40" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Border.Top, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                     <TextBlock Text="Right" Width="70" VerticalAlignment="Center"/>
-                    <Slider Width="130" Minimum="0" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="true"
+                    <Slider IsValueToolTipEnabled="true" Width="130" Minimum="0" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="true"
                             Value="{Binding Border.Right, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="40" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Border.Right, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="Bottom" Width="70" VerticalAlignment="Center"/>
-                    <Slider Width="130" Minimum="0" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="true"
+                    <Slider IsValueToolTipEnabled="true" Width="130" Minimum="0" Maximum="40" TickFrequency="1" IsSnapToTickEnabled="true"
                             Value="{Binding Border.Bottom, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="40" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Border.Bottom, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                 </StackPanel>
             </StackPanel>
 
@@ -375,23 +554,39 @@
                 <TextBlock Text="Corners" MarginBottom="4"/>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                     <TextBlock Text="Top left" Width="86" VerticalAlignment="Center"/>
-                    <Slider Width="130" Minimum="0" Maximum="70" TickFrequency="1" IsSnapToTickEnabled="true"
+                    <Slider IsValueToolTipEnabled="true" Width="130" Minimum="0" Maximum="70" TickFrequency="1" IsSnapToTickEnabled="true"
                             Value="{Binding Border.TopLeft, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="70" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Border.TopLeft, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                     <TextBlock Text="Top right" Width="86" VerticalAlignment="Center"/>
-                    <Slider Width="130" Minimum="0" Maximum="70" TickFrequency="1" IsSnapToTickEnabled="true"
+                    <Slider IsValueToolTipEnabled="true" Width="130" Minimum="0" Maximum="70" TickFrequency="1" IsSnapToTickEnabled="true"
                             Value="{Binding Border.TopRight, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="70" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Border.TopRight, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
                     <TextBlock Text="Bottom right" Width="86" VerticalAlignment="Center"/>
-                    <Slider Width="130" Minimum="0" Maximum="70" TickFrequency="1" IsSnapToTickEnabled="true"
+                    <Slider IsValueToolTipEnabled="true" Width="130" Minimum="0" Maximum="70" TickFrequency="1" IsSnapToTickEnabled="true"
                             Value="{Binding Border.BottomRight, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="70" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Border.BottomRight, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                 </StackPanel>
                 <StackPanel Orientation="Horizontal">
                     <TextBlock Text="Bottom left" Width="86" VerticalAlignment="Center"/>
-                    <Slider Width="130" Minimum="0" Maximum="70" TickFrequency="1" IsSnapToTickEnabled="true"
+                    <Slider IsValueToolTipEnabled="true" Width="130" Minimum="0" Maximum="70" TickFrequency="1" IsSnapToTickEnabled="true"
                             Value="{Binding Border.BottomLeft, Mode=TwoWay}" VerticalAlignment="Center"/>
+                    <NumericUpDown Width="88" Minimum="0" Maximum="70" SmallChange="1"
+                                   SnapsToSmallChange="true" StringFormat="N0"
+                                   IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                   Value="{Binding Border.BottomLeft, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
                 </StackPanel>
             </StackPanel>
         </StackPanel>
@@ -402,8 +597,11 @@
         <TextBlock Text="Translucent overlap — a crossing must not be darker than the swatch:" Margin="0,20,0,6"/>
         <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
             <TextBlock Text="Alpha" Width="80" VerticalAlignment="Center"/>
-            <Slider Width="130" Minimum="0" Maximum="1" Value="{Binding Stroke.OverlapAlpha, Mode=TwoWay}"/>
-            <TextBlock Text="{Binding Stroke.OverlapAlpha}" Width="40" VerticalAlignment="Center" Margin="6,0,0,0"/>
+            <Slider IsValueToolTipEnabled="true" Width="130" Minimum="0" Maximum="1" Value="{Binding Stroke.OverlapAlpha, Mode=TwoWay}"/>
+            <NumericUpDown Width="88" Minimum="0" Maximum="1" SmallChange="0.05"
+                           SnapsToSmallChange="true" StringFormat="N2"
+                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                           Value="{Binding Stroke.OverlapAlpha, Mode=TwoWay}" VerticalAlignment="Center" Margin="6,0,0,0"/>
         </StackPanel>
         <WrapPanel Orientation="Horizontal">
             <!-- Reference: one flat piece of the same colour, drawn once. -->

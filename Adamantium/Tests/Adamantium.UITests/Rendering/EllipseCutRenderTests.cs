@@ -34,7 +34,7 @@ public class EllipseCutRenderTests
     private const int Half = Dim / 2;
 
     private static byte[] Render(double startAngle, double sweepAngle, EllipseType type, bool batched = true,
-        Pen pen = null, Brush fill = null, double ringThickness = 0)
+        Pen pen = null, Brush fill = null, double ringThickness = 0, Rect? rect = null)
     {
         fill ??= Brushes.White;
         var wasEnabled = EllipseBatchCollector.Enabled;
@@ -46,7 +46,8 @@ public class EllipseCutRenderTests
             using var renderer = new OffscreenTestRenderer(device, factory, Dim, Dim) { ClearColor = Colors.Black };
 
             var stage = new TestControl { Bounds = new Rect(0, 0, Dim, Dim), RenderSize = new Size(Dim, Dim) };
-            stage.RenderAction = s => s.DrawEllipse(new Rect(0, 0, Dim, Dim), fill, startAngle, sweepAngle, type, pen, ringThickness);
+            var box = rect ?? new Rect(0, 0, Dim, Dim);
+            stage.RenderAction = s => s.DrawEllipse(box, fill, startAngle, sweepAngle, type, pen, ringThickness);
 
             var root = new VisualRoot(stage, Dim, Dim);
             Assert.That(renderer.RenderFrame(root), Is.True, "off-screen frame must render");
@@ -361,6 +362,38 @@ public class EllipseCutRenderTests
         {
             EllipseBatchCollector.Enabled = wasEnabled;
         }
+    }
+
+    // A TRANSLUCENT outline on a CUT ellipse: the arc, the two straight radii and the apex where they meet all come out
+    // of the same field, so the half of the band that rides over the fill has to be a SINGLE layer of stroke over it -
+    // the same tone on the arc as on a radius. A stroke drawn as its own ribbon overlaps itself where it turns back on
+    // itself, and translucency is what makes that arithmetic visible instead of merely present.
+    [Test]
+    public void ATranslucentStroke_IsOneLayer_OnTheArcAndTheRadii()
+    {
+        var fill = new SolidColorBrush(new Color((byte)37, (byte)99, (byte)235, (byte)255));
+        var pen = new Pen(new SolidColorBrush(new Color((byte)255, (byte)255, (byte)255, (byte)77)), 8);
+        var px = Render(30, 210, EllipseType.Sector, pen: pen, fill: fill, rect: new Rect(10, 10, 44, 44));
+
+        var overFill = new[] { 103, 146, 241 };   // 0.302 white over the fill
+        var overBack = new[] { 77, 77, 77 };      // ...and over the background
+
+        Assert.Multiple(() =>
+        {
+            AssertTone(px, 13, Half, overFill, "the band over the fill, crossing the ARC");
+            AssertTone(px, 7, Half, overBack, "the band's outer half beyond the arc");
+            AssertTone(px, 41, 40, overFill, "the band over the fill, crossing a RADIUS");
+            AssertTone(px, 43, 36, overBack, "the band's other half, outside the wedge");
+            AssertTone(px, 20, Half, [37, 99, 235], "the fill itself, well inside");
+        });
+    }
+
+    private static void AssertTone(byte[] px, int x, int y, int[] expected, string what)
+    {
+        var i = (y * Dim + x) * 4;
+        int[] actual = [px[i + 2], px[i + 1], px[i]];   // the readback is BGRA
+        Assert.That(actual, Is.EqualTo(expected).Within(5),
+            $"{what} at ({x},{y}): expected ({string.Join(",", expected)}), was ({string.Join(",", actual)})");
     }
 
     // The unit factory needs one, but nothing here draws a texture or text.

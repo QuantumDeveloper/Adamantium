@@ -1,4 +1,4 @@
-﻿using Adamantium.Graphics;
+using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.Models;
 using Adamantium.Mathematics;
@@ -13,6 +13,7 @@ namespace Adamantium.ProceduralGeometry.Shapes
                 GeometryType geometryType,
                 Vector2 diameter,
                 int tessellation = 40,
+                double startAngle = 0,
                 Matrix4x4? transform = null)
             {
                 if (tessellation < 3)
@@ -21,13 +22,23 @@ namespace Adamantium.ProceduralGeometry.Shapes
                 }
 
                 Mesh mesh;
-                if (geometryType == GeometryType.Solid)
+                switch (geometryType)
                 {
-                    mesh = GenerateSolidGeometry(diameter, tessellation);
-                }
-                else
-                {
-                    mesh = GenerateOutlinedGeometry(diameter, tessellation);
+                    case GeometryType.Solid:
+                        mesh = GenerateSolidGeometry(diameter, tessellation, startAngle);
+                        break;
+                    // BOTH means both: the filled mesh AND the outline contour a stroke reads. It used to fall through to
+                    // the outline alone, so anything asking for Both got a line strip and no fill at all - which is what a
+                    // filled polygon drawing as a thin ring turned out to be.
+                    case GeometryType.Both:
+                    {
+                        mesh = GenerateSolidGeometry(diameter, tessellation, startAngle);
+                        mesh.AddContour(Corners(diameter, tessellation, startAngle), true);   // a closed loop
+                        break;
+                    }
+                    default:
+                        mesh = GenerateOutlinedGeometry(diameter, tessellation, startAngle);
+                        break;
                 }
 
                 mesh.ApplyTransform(transform);
@@ -35,16 +46,35 @@ namespace Adamantium.ProceduralGeometry.Shapes
                 return mesh;
             }
 
-            private static Mesh GenerateSolidGeometry(Vector2F diameter, int tessellation = 36)
+            /// <summary>The polygon's corners, corner 0 at <paramref name="startAngle"/> degrees from the +x axis. One
+            /// statement of where they are, so the fill, the outline and anything reading the contour cannot drift apart.
+            /// <para>The angle turns the shape along the ELLIPSE the box inscribes (it offsets the parameter, it does not
+            /// rotate the result), so a squashed polygon stays inside its box however far it is turned - which is also
+            /// what the SDF batch does with the same number.</para></summary>
+            private static List<Vector3> Corners(Vector2 radii, int tessellation, double startAngle)
+            {
+                var start = MathHelper.DegreesToRadians(startAngle);
+                var points = new List<Vector3>(tessellation);
+                for (var i = 0; i < tessellation; ++i)
+                {
+                    var angle = start + (float)Math.PI * 2 / tessellation * i;
+                    points.Add(new Vector3(radii.X * (float)Math.Cos(angle), radii.Y * (float)Math.Sin(angle), 0));
+                }
+
+                return points;
+            }
+
+            private static Mesh GenerateSolidGeometry(Vector2F diameter, int tessellation, double startAngle)
             {
                 var vertices = new List<Vector3>();
                 var uvs = new List<Vector2F>();
                 var indices = new List<int>();
                 var center = Vector3.Zero;
+                var start = MathHelper.DegreesToRadians(startAngle);
 
                 for (int i = 0; i < tessellation; ++i)
                 {
-                    float angle = (float)Math.PI * 2 / tessellation * i;
+                    float angle = start + (float)Math.PI * 2 / tessellation * i;
 
                     var x = center.X + diameter.X * (float)Math.Cos(angle);
                     var y = center.Y + diameter.Y * (float)Math.Sin(angle);
@@ -76,16 +106,18 @@ namespace Adamantium.ProceduralGeometry.Shapes
 
             private static Mesh GenerateOutlinedGeometry(
                 Vector2F diameter,
-                int tessellation = 36)
+                int tessellation,
+                double startAngle)
             {
                 var vertices = new List<Vector3>();
                 var indices = new List<int>();
                 var center = Vector3.Zero;
+                var start = MathHelper.DegreesToRadians(startAngle);
                 int lastIndex = 0;
 
                 for (int i = 0; i <= tessellation; ++i)
                 {
-                    float angle = (float)Math.PI * 2 / tessellation * i;
+                    float angle = start + (float)Math.PI * 2 / tessellation * i;
 
                     var x = center.X + diameter.X * (float)Math.Cos(angle);
                     var y = center.Y + diameter.Y * (float)Math.Sin(angle);

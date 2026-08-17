@@ -132,6 +132,20 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
       return this;
    }
 
+   IDrawingSession IDrawingSession.DrawRegularPolygon(Brush brush, Rect destinationRect, int corners, Pen pen, double ringThickness, double startAngle)
+   {
+      // Same invisible-draw skip as DrawRectangle: nothing to fill and no stroke records nothing.
+      if (!brush.IsVisible() && pen == null) return this;
+
+      var payload = new RegularPolygonPayload(brush, destinationRect, corners, pen)
+      {
+         RingThickness = ringThickness,
+         StartAngle = startAngle
+      };
+      CreateCommand(payload);
+      return this;
+   }
+
    IDrawingSession IDrawingSession.DrawGeometry(Brush brush, Geometry geometry, Pen pen)
    {
       // Same invisible-draw skip as DrawRectangle: a transparent/null fill with no stroke records nothing.

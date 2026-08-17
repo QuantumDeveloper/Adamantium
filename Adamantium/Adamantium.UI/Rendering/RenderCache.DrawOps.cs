@@ -54,6 +54,7 @@ public partial class RenderCache
                         case 9: _haloOver.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
                         case 10: _haloLivingUnder.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
                         case 11: _haloLivingOver.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
+                        case 12: _polygonBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
                         default: _textBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
                     }
                     break;
@@ -90,6 +91,12 @@ public partial class RenderCache
             // MESH, not the element - a Polygon's element box and its outline's box are not the same thing.
             case GeometryRenderUnit geom:
                 field = geom.HaloField(out shape, out fieldRange);
+                kind = HaloShape.Field;
+                return field != null;
+            // A regular polygon has an exact field of its own, but the halo pass reads rect/ellipse in closed form and
+            // everything else from a baked one - so it takes the baked route too, and pays for the mesh only here.
+            case RegularPolygonRenderUnit poly:
+                field = poly.HaloField(out shape, out fieldRange);
                 kind = HaloShape.Field;
                 return field != null;
             default:
@@ -186,6 +193,7 @@ public partial class RenderCache
         if (_haloLivingUnder != null) RecordSegment(10, _haloLivingUnder.Flush(device, fullScissor, _projectionMatrix));
         RecordSegment(0, _rectBatch.Flush(device, fullScissor, _projectionMatrix));
         RecordSegment(1, _ellipseBatch.Flush(device, fullScissor, _projectionMatrix));
+        if (_polygonBatch != null) RecordSegment(12, _polygonBatch.Flush(device, fullScissor, _projectionMatrix));
         RecordSegment(3, _gradientRectBatch.Flush(device, fullScissor, _projectionMatrix));
         RecordSegment(4, _gradientEllipseBatch.Flush(device, fullScissor, _projectionMatrix));
         RecordSegment(5, _patternBatch.Flush(device, fullScissor, _projectionMatrix));   // pattern layer: after gradients, before instanced

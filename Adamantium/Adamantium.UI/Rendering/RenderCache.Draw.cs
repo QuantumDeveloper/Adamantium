@@ -19,6 +19,7 @@ public partial class RenderCache
     // change flushes both together, preserving order.
     private RectBatchCollector _rectBatch;
     private EllipseBatchCollector _ellipseBatch;   // SDF family, same fill layer as rects (below text)
+    private RegularPolygonCollector _polygonBatch; // ...and its polygon sibling, in that same fill layer
 
     // GPU-resident transform table (one world matrix per MOTION NODE; slot 0 = identity for legacy world-space bakes). The
     // SDF vertex shaders fetch each instance's matrix by slot, so moving a node costs ONE matrix write instead of re-baking
@@ -167,6 +168,7 @@ public partial class RenderCache
         var address = _transformTable.DeviceAddress;
         if (_rectBatch != null) _rectBatch.TransformsAddress = address;
         if (_ellipseBatch != null) _ellipseBatch.TransformsAddress = address;
+        if (_polygonBatch != null) _polygonBatch.TransformsAddress = address;
         if (_gradientRectBatch != null) _gradientRectBatch.TransformsAddress = address;
         if (_gradientEllipseBatch != null) _gradientEllipseBatch.TransformsAddress = address;
         if (_patternBatch != null) _patternBatch.TransformsAddress = address;
@@ -328,6 +330,7 @@ public partial class RenderCache
             _textBatch ??= new TextBatchCollector();
             _rectBatch ??= new RectBatchCollector();
             _ellipseBatch ??= new EllipseBatchCollector();
+            _polygonBatch ??= new RegularPolygonCollector();
             _gradientRectBatch ??= new GradientRectCollector();
             _gradientEllipseBatch ??= new GradientEllipseCollector();
             _patternBatch ??= new PatternRectCollector();
@@ -335,6 +338,7 @@ public partial class RenderCache
             _textBatch.BeginFrame(device);
             _rectBatch.BeginFrame(device);
             _ellipseBatch.BeginFrame(device);
+            _polygonBatch.BeginFrame(device);
             _gradientRectBatch.BeginFrame(device);
             _gradientEllipseBatch.BeginFrame(device);
             _patternBatch.BeginFrame(device);
@@ -540,6 +544,95 @@ public partial class RenderCache
                 }
                 // Rejected (rotated/sheared world, or the instance buffer overflowed): build the body now + re-bake.
                 eru.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
+            }
+            else if (device != null && unit is RegularPolygonRenderUnit pru2 && _polygonBatch.CanBatch(pru2.PolygonPayload))
+            {
+                var polyBounds = LogicalBounds(unit.Component, wt);
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(1, polyBounds, unit.Component))
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                var bakeWorldPoly = ResolveBake(device, unit.Component, wt, out var slot4Poly);
+                if (_polygonBatch.TryAdd(pru2.PolygonPayload, bakeWorldPoly, pru2.FillOpacity, scissor, polyBounds, slot4Poly))
+                {
+                    if (_recording)
+                    {
+                        group.PatchableRectOnly = false;   // non-rect-batch draw -> not rect-splice-patchable
+                        IndexUnitBrush(unit.Component, unit, pru2.PolygonPayload.LiveBrush);
+                    }
+                    _batchScissor = scissor;
+                    _batchOpen = true;
+                    continue;
+                }
+                // Rejected (rotated/sheared world, or the instance buffer overflowed): build the body now + re-bake.
+                pru2.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
+            }
+            else if (device != null && unit is RegularPolygonRenderUnit gpru && GradientRectCollector.WantsBatchPolygon(gpru.PolygonPayload))
+            {
+                // A polygon with a GRADIENT fill: the same instanced pass the gradient rect uses, the shape still a
+                // distance field. Same collector, so the same layer - the two ride one segment.
+                var gradPolyBounds = LogicalBounds(unit.Component, wt);
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(2, gradPolyBounds, unit.Component))   // 2 = gradient-rect layer
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                var gradPolyBake = ResolveBake(device, unit.Component, wt, out var slot4GradPoly);
+                if (_gradientRectBatch.TryAddPolygon(gpru.PolygonPayload, gradPolyBake, gpru.FillOpacity, scissor, gradPolyBounds, slot4GradPoly))
+                {
+                    if (_recording)
+                    {
+                        group.PatchableRectOnly = false;
+                        IndexUnitBrush(unit.Component, unit, gpru.PolygonPayload.LiveBrush);
+                    }
+                    _batchScissor = scissor;
+                    _batchOpen = true;
+                    continue;
+                }
+                gpru.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
+            }
+            else if (device != null && unit is RegularPolygonRenderUnit ppru && PatternRectCollector.WantsBatchPolygon(ppru.PolygonPayload))
+            {
+                // A polygon with a PROCEDURAL fill (pattern or noise): the pattern pass, same layer as the rect and the
+                // ellipse forms of it.
+                var patPolyBounds = LogicalBounds(unit.Component, wt);
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(4, patPolyBounds, unit.Component))   // 4 = pattern layer
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                var patPolyBake = ResolveBake(device, unit.Component, wt, out var slot4PatPoly);
+                if (_patternBatch.TryAddPolygon(ppru.PolygonPayload, patPolyBake, ppru.FillOpacity, scissor, patPolyBounds, slot4PatPoly))
+                {
+                    if (_recording) group.PatchableRectOnly = false;
+                    _batchScissor = scissor;
+                    _batchOpen = true;
+                    continue;
+                }
+                ppru.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
+            }
+            else if (device != null && unit is RegularPolygonRenderUnit tpru && TexRectCollector.WantsBatchPolygon(tpru.PolygonPayload))
+            {
+                // A polygon whose fill is SAMPLED from a texture - a picture, a drawing, a live element. Same textured
+                // pass, same one-texture-per-segment rule.
+                var texPolyTexture = tpru.BrushTexture();
+                if (texPolyTexture == null) continue;
+                if (_texRectBatch == null)
+                {
+                    _texRectBatch = new TexRectCollector { TransformsAddress = _transformTable?.DeviceAddress ?? 0 };
+                    _texRectBatch.BeginFrame(device);
+                }
+                var texPolyBounds = LogicalBounds(unit.Component, wt);
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_texRectBatch.SameTexture(texPolyTexture)
+                    || OverlapsHigherLayer(6, texPolyBounds, unit.Component))   // 6 = textured layer
+                {
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                }
+                var texPolyBake = ResolveBake(device, unit.Component, wt, out var slot4TexPoly);
+                if (_texRectBatch.TryAddPolygon(tpru.PolygonPayload, texPolyBake, tpru.FillOpacity, scissor, texPolyBounds, texPolyTexture, slot4TexPoly))
+                {
+                    if (_recording) group.PatchableRectOnly = false;
+                    _batchScissor = scissor;
+                    _batchOpen = true;
+                    continue;
+                }
+                tpru.EnsureMachinery();
                 unit.Update(wt, _projectionMatrix, _renderScale);
             }
             else if (device != null && unit is EllipseRenderUnit geru && _gradientEllipseBatch.CanBatch(geru.EllipsePayload))

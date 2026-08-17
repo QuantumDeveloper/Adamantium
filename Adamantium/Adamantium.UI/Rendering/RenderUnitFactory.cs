@@ -30,6 +30,7 @@ public class RenderUnitFactory : IRenderUnitFactory
         _registeredFactories = new Dictionary<Type, Func<IDrawCommand, IRenderUnit>>();
         RegisterFactory<RectanglePayload>(command => new RectangleRenderUnit(command, _context));
         RegisterFactory<EllipsePayload>(command => new EllipseRenderUnit(command, _context));
+        RegisterFactory<RegularPolygonPayload>(command => new RegularPolygonRenderUnit(command, _context));
         RegisterFactory<LinePayload>(command => new LineRenderUnit(command, _context));
         RegisterFactory<ImagePayload>(command => new ImageRenderUnit(command, _context));
         RegisterFactory<GeometryPayload>(command => new GeometryRenderUnit(command, _context));

@@ -37,6 +37,17 @@ public partial class BrushesViewModel : TabPageViewModel
         };
     }
 
+    // The POLYGON every stand on this tab paints on, described by two numbers and shared by all of them: change the
+    // corner count in one panel and every preview follows, which is the point - a brush is not tied to a shape, and the
+    // same brush has to look right on a triangle, a hexagon and a near-circle.
+    [Bindable] private double _shapeCorners = 3;
+    [Bindable] private double _shapeStartAngle;
+
+    /// <summary>The corner count the shapes actually take. A double above because sliders are doubles.</summary>
+    public int ShapeCornerCount => (int)_shapeCorners;
+
+    partial void OnShapeCornersChanged(double value) => RaisePropertyChanged(nameof(ShapeCornerCount));
+
     /// <summary>The brush the "live noise" rectangle fills with; the sliders below drive its FBM params. One instance -
     /// mutating a property fires the brush's AffectsPaint change, which re-bakes the noise where it is drawn.</summary>
     public NoiseBrush LiveNoise { get; } = new NoiseBrush
@@ -106,15 +117,20 @@ public partial class BrushesViewModel : TabPageViewModel
     }
     partial void OnImageWidthChanged(double value)
     {
-        ImageTriangle = Triangle(value, _imageHeight);
         ImageStar = Star(value, _imageHeight);
+        RaisePropertyChanged(nameof(ImagePolygonSize));
     }
 
     partial void OnImageHeightChanged(double value)
     {
-        ImageTriangle = Triangle(_imageWidth, value);
         ImageStar = Star(_imageWidth, value);
+        RaisePropertyChanged(nameof(ImagePolygonSize));
     }
+
+    /// <summary>The polygon takes ONE size for both axes - the smaller of the two, so it still fits the box the sliders
+    /// set. Inscribed in an oblong box it is a perfectly good shape, but it reads as a regular one seen at an angle, and
+    /// this stand is about the BRUSH: the shape must not be the thing you notice.</summary>
+    public double ImagePolygonSize => Math.Min(_imageWidth, _imageHeight);
 
     /// <summary>The brush the "live drawing" rectangle fills with: a DRAWING rather than a picture, so the content has
     /// no pixels at all and every tile is replayed at the size it is drawn. Deliberately asymmetric, and authored in a
@@ -163,20 +179,24 @@ public partial class BrushesViewModel : TabPageViewModel
     [Bindable] private double _visualRadius = 12;
     [Bindable] private Color _visualTint = Colors.White;
 
-    [Bindable] private PointsCollection _visualTriangle = Triangle(260, 170);
     [Bindable] private PointsCollection _visualStar = Star(260, 170);
 
     partial void OnVisualWidthChanged(double value)
     {
-        VisualTriangle = Triangle(value, _visualHeight);
         VisualStar = Star(value, _visualHeight);
+        RaisePropertyChanged(nameof(VisualPolygonSize));
     }
 
     partial void OnVisualHeightChanged(double value)
     {
-        VisualTriangle = Triangle(_visualWidth, value);
         VisualStar = Star(_visualWidth, value);
+        RaisePropertyChanged(nameof(VisualPolygonSize));
     }
+
+    /// <summary>The polygon takes ONE size for both axes - the smaller of the two, so it still fits the box the sliders
+    /// set. Inscribed in an oblong box it is a perfectly good shape, but it reads as a regular one seen at an angle, and
+    /// this stand is about the BRUSH: the shape must not be the thing you notice.</summary>
+    public double VisualPolygonSize => Math.Min(_visualWidth, _visualHeight);
 
     public BrushMappingMode[] MappingModes { get; } = Enum.GetValues<BrushMappingMode>();
 
@@ -229,15 +249,20 @@ public partial class BrushesViewModel : TabPageViewModel
 
     partial void OnDrawingWidthChanged(double value)
     {
-        DrawingTriangle = Triangle(value, _drawingHeight);
         DrawingStar = Star(value, _drawingHeight);
+        RaisePropertyChanged(nameof(DrawingPolygonSize));
     }
 
     partial void OnDrawingHeightChanged(double value)
     {
-        DrawingTriangle = Triangle(_drawingWidth, value);
         DrawingStar = Star(_drawingWidth, value);
+        RaisePropertyChanged(nameof(DrawingPolygonSize));
     }
+
+    /// <summary>The polygon takes ONE size for both axes - the smaller of the two, so it still fits the box the sliders
+    /// set. Inscribed in an oblong box it is a perfectly good shape, but it reads as a regular one seen at an angle, and
+    /// this stand is about the BRUSH: the shape must not be the thing you notice.</summary>
+    public double DrawingPolygonSize => Math.Min(_drawingWidth, _drawingHeight);
 
     // One slider for a SQUARE tile: two would be noise, and the point of the stand is which mechanism does what.
     // The ORIGIN converts with the size: the sliders are read in px, and handing a px origin to a RELATIVE viewport
@@ -255,7 +280,6 @@ public partial class BrushesViewModel : TabPageViewModel
     private void PushViewbox() =>
         LiveDrawing.Viewbox = new Rect(_drawingViewboxX, _drawingViewboxY, _drawingViewboxSize, _drawingViewboxSize);
 
-    [Bindable] private PointsCollection _drawingTriangle = Triangle(320, 200);
     [Bindable] private PointsCollection _drawingStar = Star(320, 200);
 
     /// <summary>The brush the "live mesh" rectangle fills with: four corner colours blended bilinearly, driven by four
@@ -383,13 +407,12 @@ public partial class BrushesViewModel : TabPageViewModel
 
     // The band is drawn OUTSIDE the element and the engine does not grow the layout for it - that is the author's job.
     // The stand makes the point live: drag the margin down and watch the glow get cut off by the panel.
-    /// <summary>Every shape: the rect and the ellipse compute their distance, the triangle and the star READ one baked
+    /// <summary>Every shape: the rect and the ellipse compute their distance, the polygon and the star READ one baked
     /// per mesh - same pass, same falloff, so there is nothing to leave out.</summary>
     public PreviewShape[] HaloShapes { get; } = Enum.GetValues<PreviewShape>();
 
-    /// <summary>The halo stand's figures. Its box is 180x120 rather than the size sliders of the image stand, so these
-    /// are fixed - what moves here is the BAND, not the shape.</summary>
-    public PointsCollection HaloTriangle { get; } = Triangle(180, 120);
+    /// <summary>The halo stand's star. Its box is 180x120 rather than the size sliders of the image stand, so it is
+    /// fixed - what moves here is the BAND, not the shape.</summary>
     public PointsCollection HaloStar { get; } = Star(180, 120);
 
     // Off by default: with it on and a small margin the stand looks broken rather than instructive. Ticking it is the
@@ -447,13 +470,9 @@ public partial class BrushesViewModel : TabPageViewModel
     /// reflex corners and a tessellation that is nothing like a quad.</summary>
     public PointsCollection FixedStar { get; } = Star(300, 200);
 
-    /// <summary>The image stand's triangle and star, sized by the same Width/Height sliders the other figures follow -
-    /// a Polygon holds authored coordinates rather than stretching to a slot, so the points are computed here.</summary>
-    [Bindable] private PointsCollection _imageTriangle = Triangle(320, 200);
+    /// <summary>The image stand's star, sized by the same Width/Height sliders the other figures follow - a Polygon
+    /// holds authored coordinates rather than stretching to a slot, so the points are computed here.</summary>
     [Bindable] private PointsCollection _imageStar = Star(320, 200);
-
-    private static PointsCollection Triangle(double width, double height) =>
-        new([new Vector2(width / 2, 0), new Vector2(width, height), new Vector2(0, height)]);
 
     // Ten points on a circle, alternating the full radius and the 0.382 of it that makes a star read as one; first point
     // straight up, so it stands the way a star is drawn rather than resting on a vertex.
@@ -603,7 +622,6 @@ public partial class BrushesViewModel : TabPageViewModel
     partial void OnFractalPowerChanged(double value)
     {
         LiveFractal.Power = value;
-        RaisePropertyChanged(nameof(PowerText));
     }
 
     partial void OnFractalZoomExpChanged(double value)
@@ -616,25 +634,21 @@ public partial class BrushesViewModel : TabPageViewModel
     partial void OnFractalIterationsChanged(double value)
     {
         LiveFractal.Iterations = (int)value;
-        RaisePropertyChanged(nameof(IterationsText));
     }
 
     partial void OnFractalMorphSpeedChanged(double value)
     {
         LiveFractal.MorphSpeed = value;
-        RaisePropertyChanged(nameof(MorphSpeedText));
     }
 
     partial void OnFractalCxChanged(double value)
     {
         LiveFractal.C = new Vector2((float)value, (float)_fractalCy);
-        RaisePropertyChanged(nameof(CxText));
     }
 
     partial void OnFractalCyChanged(double value)
     {
         LiveFractal.C = new Vector2((float)_fractalCx, (float)value);
-        RaisePropertyChanged(nameof(CyText));
     }
 
     partial void OnFractalCenterXChanged(double value) => ApplyCenter();   // base centre, driven by mouse pan/zoom (FractalView)
@@ -643,13 +657,11 @@ public partial class BrushesViewModel : TabPageViewModel
     partial void OnFractalFineXChanged(double value)
     {
         ApplyCenter();
-        RaisePropertyChanged(nameof(FineXText));
     }
 
     partial void OnFractalFineYChanged(double value)
     {
         ApplyCenter();
-        RaisePropertyChanged(nameof(FineYText));
     }
 
     partial void OnFractalColor1Changed(Color value) => LiveFractal.Color1 = value;
@@ -667,11 +679,4 @@ public partial class BrushesViewModel : TabPageViewModel
 
     // Read-outs to the right of each slider - the sliders emit continuous doubles, so format them to stay legible.
     public string ZoomText => $"{Math.Pow(10, FractalZoomExp):0.##}×";
-    public string PowerText => FractalPower.ToString("0.##");
-    public string IterationsText => ((int)FractalIterations).ToString();
-    public string MorphSpeedText => FractalMorphSpeed.ToString("0.##");
-    public string CxText => FractalCx.ToString("0.###");
-    public string CyText => FractalCy.ToString("0.###");
-    public string FineXText => FractalFineX.ToString("0.##");
-    public string FineYText => FractalFineY.ToString("0.##");
 }
