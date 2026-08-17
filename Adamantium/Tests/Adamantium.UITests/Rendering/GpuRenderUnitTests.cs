@@ -50,17 +50,23 @@ public class GpuRenderUnitTests
 
     // A rect the SDF batch will NOT take, so the unit builds its own per-unit machinery (geometry + fringe + stroke).
     //
-    // A batchable rect (solid fill, batchable pen, UNIFORM corners) is drawn entirely - fill AND stroke - by the
-    // instanced SDF batch, so it deliberately builds ZERO renderers and no GPU buffers (RectangleRenderUnit's ctor).
-    // Every test below is about the per-unit renderers themselves (a pen builds a stroke, a resize follows the geometry,
-    // a uniform-only pen change repoints instead of reallocating, disposal frees the buffers, a per-draw blend equation
-    // is honoured) - so it must hand the unit a rect the batch rejects, or there is nothing to assert on. NON-UNIFORM
-    // corners is the smallest such knob that keeps the pen solid (a GPU stroke needs a solid pen) and the corner
-    // topology identical across sizes (so a same-topology resize can still update in place).
-    private static readonly CornerRadius Unbatchable = new(0, 2, 0, 2);
+    // A batchable rect (solid fill, a pen the SDF draws) is drawn entirely - fill AND stroke - by the instanced SDF
+    // batch, so it deliberately builds ZERO renderers and no GPU buffers (RectangleRenderUnit's ctor). Every test below
+    // is about the per-unit renderers themselves (a pen builds a stroke, a resize follows the geometry, a uniform-only
+    // pen change repoints instead of reallocating, disposal frees the buffers, a per-draw blend equation is honoured) -
+    // so it must hand the unit a rect the batch rejects, or there is nothing to assert on.
+    //
+    // The knob is the batch's own A/B switch, held off for this fixture. It used to be NON-UNIFORM corners, which the
+    // batch declined; it no longer does - each corner rides in the instance now - and any other shape-shaped knob would
+    // be a hostage to the next thing the batch learns to draw. Switching the batch off says exactly what is meant here.
+    [SetUp]
+    public void KeepTheBatchOutOfIt() => RectBatchCollector.Enabled = false;
+
+    [TearDown]
+    public void GiveTheBatchBack() => RectBatchCollector.Enabled = true;
 
     private static RectanglePayload Unbatched(Brush brush, Rect box, Pen pen) =>
-        new RectanglePayload(brush, box, Unbatchable, pen);
+        new RectanglePayload(brush, box, new CornerRadius(0), pen);
 
     private static IDrawCommand Command(object payload, float opacity = 1f)
     {

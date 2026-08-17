@@ -97,7 +97,7 @@ internal sealed class HaloRectCollector : SdfBatchCollector<HaloRectItem>
     /// <summary>Bake one command's bands into the pending segment - one instance each, drawn in the order they were
     /// baked (aura first, then shadow). False on a rotated/sheared world, where the axis-aligned instance cannot hold
     /// the shape and the caller falls back to drawing nothing rather than something wrong.</summary>
-    public bool TryAdd(HaloBand[] bands, bool inner, Rect destinationRect, double cornerRadius, HaloShape shape,
+    public bool TryAdd(HaloBand[] bands, bool inner, Rect destinationRect, ProceduralGeometry.CornerRadius corners, HaloShape shape,
         Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0,
         ITexture field = null, double fieldRange = 0)
     {
@@ -112,6 +112,8 @@ internal sealed class HaloRectCollector : SdfBatchCollector<HaloRectItem>
         EnsureCpuCapacity(Count + bands.Length);
         if (Count + bands.Length > GpuCapacity) return false;
 
+        // Slot units here, not device px - the band fields are in slot units too, and the vertex stage scales them all together.
+        var radii = RectBatchCollector.BakeRadii(corners, destinationRect, 1.0);
         var added = false;
         foreach (var band in bands)
         {
@@ -125,7 +127,8 @@ internal sealed class HaloRectCollector : SdfBatchCollector<HaloRectItem>
             {
                 Bounds = new Vector4F((float)destinationRect.X, (float)destinationRect.Y,
                     (float)destinationRect.Width, (float)destinationRect.Height),
-                Params = new Vector4F((float)cornerRadius, transformSlot, (float)shape, band.Inner ? 1f : 0f),
+                Params = new Vector4F(RectBatchCollector.MaxOf(radii), transformSlot, (float)shape, band.Inner ? 1f : 0f),
+                Radii = radii,
                 Band = new Vector4F(band.Offset.X, band.Offset.Y, band.Spread, band.Softness),
                 Color = color,
                 Field = new Vector4F((float)fieldRange, 0, 0, 0)

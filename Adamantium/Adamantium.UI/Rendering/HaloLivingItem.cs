@@ -19,6 +19,9 @@ public struct HaloLivingItem
     /// .w = 1 for a band drawn INSIDE the outline.</summary>
     public Vector4F Params;
 
+    /// <summary>The four corner radii: x = top-left, y = top-right, z = bottom-right, w = bottom-left.</summary>
+    public Vector4F Radii;
+
     /// <summary>.z = spread, .w = softness, both in SLOT units. .xy unused: an aura has no offset.</summary>
     public Vector4F Band;
 

@@ -66,11 +66,11 @@ public partial class RenderCache
 
     // WHERE a band gets its distance from - asked once and answered here, so the still band and the living one can never
     // disagree about what shape they are wrapping. A unit with no answer simply wears no band rather than a wrong one.
-    private static bool TryHaloShape(IRenderUnit unit, out Rect shape, out double radius, out HaloShape kind,
+    private static bool TryHaloShape(IRenderUnit unit, out Rect shape, out ProceduralGeometry.CornerRadius corners, out HaloShape kind,
         out ITexture field, out double fieldRange)
     {
         shape = default;
-        radius = 0;
+        corners = ProceduralGeometry.CornerRadius.Empty;
         kind = HaloShape.RoundedRect;
         field = null;
         fieldRange = 0;
@@ -79,7 +79,7 @@ public partial class RenderCache
         {
             case RectangleRenderUnit rect:
                 shape = rect.RectPayload.DestinationRect;
-                radius = rect.RectPayload.CornerRadius.TopLeft;
+                corners = rect.RectPayload.CornerRadius;
                 kind = HaloShape.RoundedRect;
                 return true;
             case EllipseRenderUnit ell when ell.EllipsePayload.StartAngle <= 0.0 && ell.EllipsePayload.SweepAngle >= 360.0:
@@ -102,7 +102,7 @@ public partial class RenderCache
     private bool CollectLivingHalo(IGraphicsDevice device, IRenderUnit unit, Matrix4x4F wt, Rect2D scissor, bool inner)
     {
         if (unit.RenderData.LivingHalo is not { } band || band.Inner != inner) return false;
-        if (!TryHaloShape(unit, out var shape, out var radius, out var kind, out var field, out var fieldRange)) return false;
+        if (!TryHaloShape(unit, out var shape, out var corners, out var kind, out var field, out var fieldRange)) return false;
 
         ref var batch = ref inner ? ref _haloLivingOver : ref _haloLivingUnder;
         if (batch == null)
@@ -115,7 +115,7 @@ public partial class RenderCache
 
         var bounds = LogicalBounds(unit.Component, wt);
         var bakeWorld = ResolveBake(device, unit.Component, wt, out var slot);
-        if (!batch.TryAdd(band, shape, radius, kind, bakeWorld, unit.RenderData.Opacity, scissor, bounds,
+        if (!batch.TryAdd(band, shape, corners, kind, bakeWorld, unit.RenderData.Opacity, scissor, bounds,
                 band.Color, slot, field, fieldRange))
         {
             return false;
@@ -135,7 +135,7 @@ public partial class RenderCache
         var bands = unit.RenderData.Halo;
         if (!HaloRectCollector.HasSide(bands, inner)) return false;
 
-        if (!TryHaloShape(unit, out var shape, out var radius, out var kind, out var field, out var fieldRange))
+        if (!TryHaloShape(unit, out var shape, out var corners, out var kind, out var field, out var fieldRange))
         {
             return false;
         }
@@ -156,7 +156,7 @@ public partial class RenderCache
 
         var haloBounds = LogicalBounds(unit.Component, wt);
         var bakeWorld = ResolveBake(device, unit.Component, wt, out var slot);
-        if (!batch.TryAdd(bands, inner, shape, radius, kind, bakeWorld,
+        if (!batch.TryAdd(bands, inner, shape, corners, kind, bakeWorld,
                 unit.RenderData.Opacity, scissor, haloBounds, slot, field, fieldRange))
         {
             return false;
@@ -223,8 +223,16 @@ public partial class RenderCache
     // replay). A Flush that drew nothing returns -1 and records nothing.
     private void RecordSegment(byte batch, int segIndex)
     {
-        if (_recording && segIndex >= 0)
-            _ops.Add(new RenderOp { Kind = RenderOpKind.Segment, Batch = batch, SegIndex = segIndex, Order = _recordOrder });
+        if (!_recording || segIndex < 0) return;
+
+        // A segment's paint span runs from the first group that filled it to the one being recorded when it flushed. Only
+        // the RECT batch is ever spliced into, so only its span is tracked; for the others the span is a point, which is
+        // all their ops are compared by.
+        _ops.Add(new RenderOp
+        {
+            Kind = RenderOpKind.Segment, Batch = batch, SegIndex = segIndex,
+            Order = _recordOrder, OrderFirst = batch == 0 ? _rectSegStart : _recordOrder
+        });
     }
 
     private static bool ScissorEquals(Rect2D a, Rect2D b)

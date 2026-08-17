@@ -19,6 +19,9 @@ public struct HaloRectItem
     /// drawn INSIDE the outline.</summary>
     public Vector4F Params;
 
+    /// <summary>The four corner radii: x = top-left, y = top-right, z = bottom-right, w = bottom-left.</summary>
+    public Vector4F Radii;
+
     /// <summary>.xy = offset, .z = spread (how far full strength reaches past the outline), .w = softness (how far it
     /// fades over). All in SLOT units; the vertex shader converts to device pixels the way every SDF batch does.</summary>
     public Vector4F Band;

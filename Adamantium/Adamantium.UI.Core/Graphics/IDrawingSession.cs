@@ -12,6 +12,12 @@ public interface IDrawingSession
     IDrawingSession DrawLine(Vector2 start, Vector2 end, Pen pen);
     IDrawingSession DrawRectangle(Brush brush, Rect destinationRect, Pen pen = null);
     IDrawingSession DrawRectangle(Brush brush, Rect destinationRect, CornerRadius corners, Pen pen = null);
+
+    /// <summary>A filled rect with a BORDER drawn inside it - each side its own thickness, each corner its own radius.
+    /// <para>Not a pen: a pen is one width offset from a contour, and four different widths are not an offset of
+    /// anything. Fill and border are ONE draw on purpose - as two shapes they share an outline, both anti-alias it, and
+    /// the two halves of that edge composite into a dark hairline all the way round.</para></summary>
+    IDrawingSession DrawBorder(Brush background, Rect destinationRect, CornerRadius corners, Brush borderBrush, Thickness borderThickness);
     IDrawingSession DrawEllipse(Rect destinationRect, Brush brush, Double startAngle, Double sweepAngle, EllipseType ellipseType, Pen pen = null);
     IDrawingSession DrawGeometry(Brush brush, Geometry geometry, Pen pen = null);
 

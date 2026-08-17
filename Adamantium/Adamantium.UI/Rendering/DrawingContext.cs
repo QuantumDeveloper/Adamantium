@@ -61,6 +61,26 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
       return ((IDrawingSession)this).DrawRectangle(brush, destinationRect, CornerRadius.Empty, pen);
    }
 
+   IDrawingSession IDrawingSession.DrawBorder(Brush background, Rect destinationRect, CornerRadius corners,
+      Brush borderBrush, Thickness borderThickness)
+   {
+      var hasBorder = borderBrush.IsVisible()
+         && (borderThickness.Left > 0 || borderThickness.Top > 0 || borderThickness.Right > 0 || borderThickness.Bottom > 0);
+      // No border to draw -> this IS a plain rect, and saying so keeps one shape one payload (a frame payload with a
+      // zero border would take the frame path in the shader for nothing).
+      if (!hasBorder)
+      {
+         return ((IDrawingSession)this).DrawRectangle(background, destinationRect, corners);
+      }
+
+      var payload = new RectanglePayload(background, destinationRect, corners, borderBrush, borderThickness)
+      {
+         AntiAlias = _currentComponent?.UseAnalyticAA ?? true
+      };
+      CreateCommand(payload);
+      return this;
+   }
+
    IDrawingSession IDrawingSession.DrawRectangle(Brush brush, Rect destinationRect, CornerRadius corners, Pen pen)
    {
       // Nothing VISIBLE to fill and no border to stroke -> draw nothing, and don't create a render unit (with its GPU

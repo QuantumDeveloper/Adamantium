@@ -44,6 +44,9 @@ internal sealed class RecordingDrawingSession : IDrawingSession
 
     public IDrawingSession DrawRectangle(Brush brush, Rect destinationRect, CornerRadius corners, Pen pen = null) => this;
 
+    public IDrawingSession DrawBorder(Brush background, Rect destinationRect, CornerRadius corners, Brush borderBrush,
+        Thickness borderThickness) => this;
+
     public IDrawingSession DrawEllipse(Rect destinationRect, Brush brush, double startAngle, double sweepAngle,
         EllipseType ellipseType, Pen pen = null) => this;
 

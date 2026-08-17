@@ -19,6 +19,9 @@ public struct FractalRectItem
     /// <summary>.x = corner radius; .y = fractal type (0 Julia, 1 Mandelbrot); .z = transform-table slot; .w = max iterations.</summary>
     public Vector4F Params;
 
+    /// <summary>The four corner radii: x = top-left, y = top-right, z = bottom-right, w = bottom-left.</summary>
+    public Vector4F Radii;
+
     /// <summary>.x/.y = complex-plane centre (pan); .z = zoom (magnification); .w = morph speed (auto-morph drift rate).</summary>
     public Vector4F Geom;
 
@@ -39,6 +42,10 @@ public struct FractalRectItem
 
     /// <summary>Stroke arc-length: x = dash offset, y = trim start, z = trim end, w = flags (join/cap codes).</summary>
     public Vector4F Stroke1;
+
+    /// <summary>Dash runs 2..5 in device px - runs 0 and 1 ride in <see cref="Stroke0"/>.zw and the RUN COUNT is
+    /// packed into <see cref="Stroke1"/>.w. A pattern longer than one ON/GAP period lives here.</summary>
+    public Vector4F Dash;
 
     /// <summary>Perturbation deep-zoom: .x = reference-orbit start index into the shared orbit buffer (OrbitAddress),
     /// .y = orbit length, .z = deep flag (1 = iterate the perturbation path), .w = reserved.</summary>

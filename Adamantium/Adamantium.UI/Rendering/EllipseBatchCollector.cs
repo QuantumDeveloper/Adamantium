@@ -84,7 +84,7 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
         // batch (no per-tile GPU buffers).
         var sx = world.M11; var sy = world.M22; var tx = world.M41; var ty = world.M42;
         var r = p.DestinationRect;
-        RectBatchCollector.BakeStroke(p.Pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1,
+        RectBatchCollector.BakeStroke(p.Pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1, out var dash,
             EllipsePerimeter(r.Width / 2.0, r.Height / 2.0));
         item = new EllipseItem
         {
@@ -95,7 +95,8 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
             Color = color,
             StrokeColor = strokeColor,
             Stroke0 = stroke0,
-            Stroke1 = stroke1
+            Stroke1 = stroke1,
+            Dash = dash
         };
         return true;
     }

@@ -67,7 +67,7 @@ internal sealed class HaloLivingCollector : SdfBatchCollector<HaloLivingItem>
     public static double MaxReach(LivingBand? band)
         => band is { Inner: false } b ? b.Reach : 0;
 
-    public bool TryAdd(LivingBand band, Rect destinationRect, double cornerRadius, HaloShape shape, Matrix4x4F world,
+    public bool TryAdd(LivingBand band, Rect destinationRect, ProceduralGeometry.CornerRadius corners, HaloShape shape, Matrix4x4F world,
         double opacity, Rect2D scissor, Rect logicalBounds, Vector4F colour, int transformSlot = 0,
         ITexture field = null, double fieldRange = 0)
     {
@@ -83,11 +83,14 @@ internal sealed class HaloLivingCollector : SdfBatchCollector<HaloLivingItem>
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
 
+        // Slot units here, not device px - the band fields are in slot units too, and the vertex stage scales them all together.
+        var radii = RectBatchCollector.BakeRadii(corners, destinationRect, 1.0);
         var item = new HaloLivingItem
         {
             Bounds = new Vector4F((float)destinationRect.X, (float)destinationRect.Y,
                 (float)destinationRect.Width, (float)destinationRect.Height),
-            Params = new Vector4F((float)cornerRadius, transformSlot, (float)shape, band.Inner ? 1f : 0f),
+            Params = new Vector4F(RectBatchCollector.MaxOf(radii), transformSlot, (float)shape, band.Inner ? 1f : 0f),
+            Radii = radii,
             Band = new Vector4F(0, 0, band.Spread, band.Softness),
             Field = new Vector4F((float)fieldRange, band.Turbulence, band.Flow, band.Detail),
             Color = colour,

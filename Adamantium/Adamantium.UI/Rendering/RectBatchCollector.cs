@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.EffectsFramework;
@@ -24,9 +25,11 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
 
     protected override IEffectPass DrawPass => Effect.BatchRectPass;
 
-    // Batchable = a visible solid fill + a batchable pen (none, or a SOLID stroke the SDF shader draws analytically),
-    // uniform corner radius. Gradient/image fill, a non-solid/dashed/trimmed pen, per-corner radii, or Enabled=off fall
-    // back to the per-unit draw. Must stay in lock-step with EllipseRenderUnit/RectangleRenderUnit.IsSdfBatchable.
+    // Batchable = a visible solid fill + a batchable pen (none, or a SOLID stroke the SDF shader draws analytically).
+    // The four corners are INDEPENDENT - each rides in the instance and the shader picks the one belonging to the
+    // fragment's own corner - so a tab head rounded only at the top batches like any other rect. Gradient/image fill,
+    // a non-solid pen or Enabled=off still fall back to the per-unit draw. Must stay in lock-step with
+    // EllipseRenderUnit/RectangleRenderUnit.IsSdfBatchable.
     /// <summary>THE one statement of what this batch draws. Static because the render UNIT has to ask the same question
     /// before it builds anything - a unit that answered it on its own copy of the rules is how they drift apart, and a
     /// drifted answer means either wasted per-unit machinery or a shape drawn twice.</summary>
@@ -35,18 +38,21 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
         if (!Enabled) return false;
         if (p.Brush is not (null or SolidColorBrush)) return false;   // gradient/image FILL -> fallback
         if (!IsPenBatchable(p.Pen)) return false;
+        // A BORDER (per-side thickness) and a PEN share one colour slot in the instance, so a payload carrying both is
+        // not something this record can express. Nothing produces that pair - the check is here so a future caller
+        // finds the per-unit path instead of a border drawn in the pen's colour.
+        if (p.HasFrame && (p.BorderBrush is not SolidColorBrush || p.Pen != null)) return false;
         // Need at least a visible fill OR a visible stroke (a hollow stroked rect batches too - fill just alpha 0).
         var hasFill = p.Brush is SolidColorBrush { Color.A: > 0 };
         var hasStroke = p.Pen is { Brush: SolidColorBrush { Color.A: > 0 } };
-        if (!hasFill && !hasStroke) return false;
-        var c = p.CornerRadius;
-        return c.TopLeft == c.TopRight && c.TopRight == c.BottomRight && c.BottomRight == c.BottomLeft;
+        var hasBorder = p.HasFrame && p.BorderBrush is SolidColorBrush { Color.A: > 0 };
+        return hasFill || hasStroke || hasBorder;
     }
 
     public bool CanBatch(RectanglePayload p) => WantsBatch(p);
 
-    // A pen the SDF stroke shader can draw analytically: none, or a SOLID-colour stroke. Dashes are supported as a single
-    // ON/GAP period (a 2-element array); a longer custom pattern still falls back to the compute expander. Trim, dash
+    // A pen the SDF stroke shader can draw analytically: none, or a SOLID-colour stroke. Dashes are supported up to a
+    // SIX-run pattern (an even count - runs 0,1 in Stroke0.zw, 2..5 in Dash); longer falls back to the compute expander. Trim, dash
     // offset and thickness are all handled per-fragment (see BatchEffect.fx), so a dashed/trimmed stroke still BATCHES -
     // which is what lets the whole virtualized grid dash without per-tile GPU buffers (the device-memory OOM).
     internal static bool IsPenBatchable(Pen pen)
@@ -55,7 +61,7 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
         if (pen.Brush is not SolidColorBrush) return false;
         var dash = pen.DashStrokeArray;
         if (dash is not { Count: > 0 }) return true;
-        if (dash.Count != 2) return false;
+        if (!IsDashPatternBatchable(dash)) return false;
 
         // The analytic mask asks "is the arc length of the NEAREST contour point inside a dash". `d` is continuous, but
         // that arc length is NOT: at a corner the nearest point jumps from one edge to the other across the bisector,
@@ -75,6 +81,13 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
         return pen.Thickness * 0.5 <= 1.5;
     }
 
+    /// <summary>A dash pattern the instance can carry: an EVEN number of runs (a pattern that does not alternate
+    /// ON/OFF whole would swap its meaning every lap round a closed contour), at most six of them - runs 0 and 1 in
+    /// <see cref="RectItem.Stroke0"/>.zw and runs 2..5 in <see cref="RectItem.Dash"/>. Anything longer keeps going to
+    /// the compute expander, which builds the pieces as real geometry.</summary>
+    internal static bool IsDashPatternBatchable(IReadOnlyList<double> dash)
+        => dash.Count is >= 2 and <= 6 && dash.Count % 2 == 0;
+
     // Bake a pen into the instance's stroke fields (shared by the rect + ellipse batches). Colour with opacity folded;
     // width/dash/offset scale by the world device scale (sx) into device px, matching the arc-length `s` the shader
     // computes; trim is a 0..1 fraction. CENTRE-aligned (half in / half out). No pen -> a zero stroke (fill only).
@@ -83,10 +96,17 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
     /// round, which is what keeps a closed dashed ring from carrying one long dash at its seam.</param>
     internal static void BakeStroke(Pen pen, double opacity, float sx,
         out Vector4F strokeColor, out Vector4F stroke0, out Vector4F stroke1, double contourLength = 0)
+        => BakeStroke(pen, opacity, sx, out strokeColor, out stroke0, out stroke1, out _, contourLength);
+
+    /// <param name="dash">Dash runs 2..5, in device px - the pattern beyond the first ON/GAP pair. Zero for the plain
+    /// two-run pattern, which is what nearly every pen carries.</param>
+    internal static void BakeStroke(Pen pen, double opacity, float sx,
+        out Vector4F strokeColor, out Vector4F stroke0, out Vector4F stroke1, out Vector4F dash, double contourLength = 0)
     {
         strokeColor = Vector4F.Zero;
         stroke0 = Vector4F.Zero;
         stroke1 = new Vector4F(0, 0, 1, 0);   // dashOffset=0, trimStart=0, trimEnd=1, flags=0
+        dash = Vector4F.Zero;
         if (pen?.Brush is not SolidColorBrush penBrush) return;
 
         var sc = penBrush.Color.ToVector4();
@@ -96,9 +116,11 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
         float dashOn = 0f, dashGap = 0f;
         var period = 0.0;
         var fit = 1.0;
-        if (pen.DashStrokeArray is { Count: 2 } d)
+        var runs = 0;
+        if (pen.DashStrokeArray is { Count: >= 2 } d && IsDashPatternBatchable(d))
         {
-            period = d[0] + d[1];
+            runs = d.Count;
+            for (var i = 0; i < runs; i++) period += d[i];
             // Fit the pattern to the outline: without it the leftover of the last period lands where the contour closes
             // and reads as one long dash, and it moves about as the shape resizes.
             if (pen.FitDashesToContour && period > 0 && contourLength > 0)
@@ -109,13 +131,20 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
 
             dashOn = (float)(d[0] * fit * sx);
             dashGap = (float)(d[1] * fit * sx);
+            // Runs 2..5 - a pattern of two carries none of them and leaves this zero.
+            dash = new Vector4F(
+                runs > 2 ? (float)(d[2] * fit * sx) : 0f,
+                runs > 3 ? (float)(d[3] * fit * sx) : 0f,
+                runs > 4 ? (float)(d[4] * fit * sx) : 0f,
+                runs > 5 ? (float)(d[5] * fit * sx) : 0f);
         }
         // Packed for the shader: four caps base-8 (codes below) - the two DASH caps (a dash's own two ends, separate so
         // it can be asymmetric), then Start/EndLineCap for the contour's real ends (which only exist when trimmed);
-        // the JOIN (0 miter, 1 bevel, 2 round) sits above them all.
+        // the JOIN (0 miter, 1 bevel, 2 round) sits above them all, and the RUN COUNT above that.
         var capFlags = CapCode(pen.DashStartCap) + 8f * CapCode(pen.DashEndCap)
                      + 64f * CapCode(pen.StartLineCap) + 512f * CapCode(pen.EndLineCap)
-                     + 4096f * JoinCode(pen.PenLineJoin);
+                     + 4096f * JoinCode(pen.PenLineJoin)
+                     + 32768f * runs;
         stroke0 = new Vector4F((float)(pen.Thickness * sx), 0f, dashOn, dashGap);
         // DashPhase is in PERIODS - so an animation runs 0 -> 1 and lands back on itself whatever the array says - and
         // becomes pixels here, alongside the pixel offset. Both take the fit, or a ring seamless in shape would still
@@ -124,16 +153,42 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
         stroke1 = new Vector4F((float)(offset * sx), (float)pen.TrimStart, (float)pen.TrimEnd, capFlags);
     }
 
-    // Outline length of a rounded rect: the four straight runs plus the corner arcs (four quarter-circles = one full
-    // circle when the radii are uniform). Only the dash FIT reads it, and only uniform corners batch here anyway.
+    // Outline length of a rounded rect: the four straight runs, each shortened by the two corners it meets, plus the four
+    // quarter-arcs. Only the dash FIT reads it. Must agree with RoundRectArc's perimeter in BatchEffect.fx, or a dashed
+    // ring would close on a different phase than it was fitted for.
     private static double RoundedRectPerimeter(Rect rect, ProceduralGeometry.CornerRadius corners)
     {
         if (rect.Width <= 0 || rect.Height <= 0) return 0;
 
-        var r = Math.Max(0, corners.TopLeft);
-        r = Math.Min(r, Math.Min(rect.Width, rect.Height) / 2.0);
-        return 2 * (rect.Width - 2 * r) + 2 * (rect.Height - 2 * r) + 2 * Math.PI * r;
+        var c = ClampCorners(corners, rect.Width, rect.Height);
+        var edges = 2 * rect.Width - c.TopLeft - c.TopRight - c.BottomLeft - c.BottomRight
+                  + 2 * rect.Height - c.TopLeft - c.BottomLeft - c.TopRight - c.BottomRight;
+        return edges + Math.PI / 2 * (c.TopLeft + c.TopRight + c.BottomRight + c.BottomLeft);
     }
+
+    // Each corner independently capped at half the shorter side, exactly as the tessellator caps it (Shapes.Rectangle's
+    // ValidateCorners) - the SDF and the geometry path must round the same shape.
+    internal static ProceduralGeometry.CornerRadius ClampCorners(ProceduralGeometry.CornerRadius c, double width, double height)
+    {
+        var max = Math.Min(width, height) / 2.0;
+        return new ProceduralGeometry.CornerRadius(
+            Math.Clamp(c.TopLeft, 0, max),
+            Math.Clamp(c.TopRight, 0, max),
+            Math.Clamp(c.BottomRight, 0, max),
+            Math.Clamp(c.BottomLeft, 0, max));
+    }
+
+    /// <summary>The four corner radii as the instance carries them: clamped to the box, scaled to device px, in the
+    /// order the shader reads them (x = TL, y = TR, z = BR, w = BL). Every rect family bakes them through here - four
+    /// copies of the rule is how the batch and the tessellator drifted apart the last time.</summary>
+    internal static Vector4F BakeRadii(ProceduralGeometry.CornerRadius corners, Rect dest, double sx)
+    {
+        var c = ClampCorners(corners, dest.Width, dest.Height);
+        return new Vector4F((float)(c.TopLeft * sx), (float)(c.TopRight * sx), (float)(c.BottomRight * sx), (float)(c.BottomLeft * sx));
+    }
+
+    /// <summary>The largest of the four - what the quad has to make room for, and all the vertex stage needs.</summary>
+    internal static float MaxOf(Vector4F radii) => Math.Max(Math.Max(radii.X, radii.Y), Math.Max(radii.Z, radii.W));
 
     // All six caps, drawn analytically by CapReach in BatchEffect.fx. Codes MATCH the geometry stroker's MapCap so the two
     // stroke paths render the same shape: 0 flat, 1 square, 2 convex round, 3 convex triangle, 4 concave triangle, 5 concave round.
@@ -181,19 +236,36 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
         // trim), CENTRE-aligned (half in / half out). Solid, dashed and trimmed strokes all draw analytically in the SDF
         // shader, so a stroked tile stays in the batch (no per-tile GPU buffers) - the whole grid can dash without OOM.
         var sx = world.M11; var sy = world.M22; var tx = world.M41; var ty = world.M42;
-        BakeStroke(p.Pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1,
+        BakeStroke(p.Pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1, out var dash,
             RoundedRectPerimeter(p.DestinationRect, p.CornerRadius));
 
         var r = p.DestinationRect;
+        var radii = BakeRadii(p.CornerRadius, r, sx);
+
+        // A BORDER instead of a pen: its four sides ride in Inset (device px, x/z horizontal so they take sx, y/w
+        // vertical so they take sy) and its colour takes the stroke slot - a payload never carries both (WantsBatch).
+        var inset = Vector4F.Zero;
+        if (p.HasFrame && p.BorderBrush is SolidColorBrush border)
+        {
+            var t = p.BorderThickness;
+            inset = new Vector4F((float)(t.Left * sx), (float)(t.Top * sy), (float)(t.Right * sx), (float)(t.Bottom * sy));
+            strokeColor = border.Color.ToVector4();
+            strokeColor.W *= (float)(opacity * border.Opacity);
+        }
+
         item = new RectItem
         {
             Bounds = new Vector4F((float)(r.X * sx + tx), (float)(r.Y * sy + ty), (float)(r.Width * sx), (float)(r.Height * sy)),
+            // .x is the LARGEST of the four: it decides how far the quad has to reach, and one number is enough for that.
             // .z = 1 means "no fringe": the shader takes the edge hard instead of fading it over a pixel.
-            Params = new Vector4F((float)(p.CornerRadius.TopLeft * sx), transformSlot, p.AntiAlias ? 0 : 1, 0),
+            Params = new Vector4F(MaxOf(radii), transformSlot, p.AntiAlias ? 0 : 1, 0),
+            Radii = radii,
             Color = color,
             StrokeColor = strokeColor,
             Stroke0 = stroke0,
-            Stroke1 = stroke1
+            Stroke1 = stroke1,
+            Dash = dash,
+            Inset = inset
         };
         return true;
     }

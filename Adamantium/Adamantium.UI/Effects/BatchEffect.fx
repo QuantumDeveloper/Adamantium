@@ -102,6 +102,41 @@ float4 CompositeFillStroke(float d, float4 fill, float4 stroke, float width, flo
     return float4(outRGB, outA);
 }
 
+// A BORDER of its own thickness per side: the ring between the shape's outline and an INNER outline inset by (left, top,
+// right, bottom). Composited in ONE call with the fill, because the two share that inner outline - drawn as two shapes,
+// both would anti-alias it and the two halves would compose into a dark hairline all the way round (which is exactly
+// what the old CombinedGeometry ring did).
+//
+// The inner box is not concentric: insetting different amounts moves the centre by half their difference. Its corners
+// shrink by the THICKER of the two sides meeting there, the same rule the tessellated ring used (Border's
+// DeflateCornerRadius) - a scalar corner cannot stay parallel to the outer one under unequal sides, and taking the
+// thicker of the pair keeps the inner arc from bulging out past the border on the heavier side.
+float4 CompositeFillBorder(float dOuter, float2 p, float2 half, float4 radii, float4 inset, int joinType,
+    float4 fill, float4 border, float crisp)
+{
+    float2 shift = float2(inset.x - inset.z, inset.y - inset.w) * 0.5;
+    float2 halfIn = max(half - float2(inset.x + inset.z, inset.y + inset.w) * 0.5, float2(0.0, 0.0));
+    float lim = min(halfIn.x, halfIn.y);
+    float4 radiiIn = clamp(radii - float4(max(inset.x, inset.y), max(inset.y, inset.z),
+                                          max(inset.z, inset.w), max(inset.w, inset.x)),
+                           float4(0.0, 0.0, 0.0, 0.0), float4(lim, lim, lim, lim));
+    float dInner = SdRoundRectJoin(p - shift, halfIn, radiiIn, joinType);
+
+    float aaO = max(fwidth(dOuter), 1e-5);
+    float aaI = max(fwidth(dInner), 1e-5);
+    float covOuter = (crisp > 0.5) ? step(dOuter, 0.0) : saturate(0.5 - dOuter / aaO);
+    float covFill  = (crisp > 0.5) ? step(dInner, 0.0) : saturate(0.5 - dInner / aaI);
+    // The border is what the shape covers and the fill does not. Written as a DIFFERENCE rather than as its own distance
+    // field so the two coverages always add up to the shape's own - no seam to over- or under-blend where they meet.
+    float covBorder = max(covOuter - covFill, 0.0);
+
+    float ba = border.a * covBorder;
+    float fa = fill.a * covFill;
+    float outA = ba + fa * (1.0 - ba);
+    float3 outRGB = (outA > 1e-6) ? (border.rgb * ba + fill.rgb * fa * (1.0 - ba)) / outA : float3(0.0, 0.0, 0.0);
+    return float4(outRGB, outA);
+}
+
 // Cap "reach" along the contour, at a fragment whose PERPENDICULAR distance from the stroke centreline is dPerp: how far
 // past a piece end the stroke still paints (SIGNED - negative reach cuts the end INWARD, giving the concave caps). All six
 // PenLineCaps analytically, no cap geometry, matching the geometry stroker's codes (StrokeEffect.fx CapSd): 0 flat,
@@ -150,8 +185,46 @@ float ArcCapScale(float curvRadius, float dPerp)
 // R / (R + dPerp), because one unit of s spans that much more at the outer radius. Adding the two raw made a concave
 // cap bite several times deeper at a corner than on a straight edge - it ate the dash there and left a hair-thin arc
 // along the outer edge, and only at corners.
+// Total length of a dash pattern of `count` runs: the first two ride in Stroke0.zw, the rest (up to four more) in Dash.
+// A pattern is always an alternating ON, OFF, ON, OFF... and always an EVEN number of runs, so it tiles seamlessly.
+float DashPatternLength(float dashOn, float dashGap, float4 rest, int count)
+{
+    float total = dashOn + dashGap;
+    if (count > 2) total += rest.x + rest.y;
+    if (count > 4) total += rest.z + rest.w;
+    return total;
+}
+
+// The dash run this fragment's phase falls in, as (distance from its START, distance to its END) - both positive inside
+// an ON run, and in a GAP the nearer neighbouring run's edge as a NEGATIVE distance with the other left "nowhere near".
+// That asymmetry is what lets a convex cap bulge into the gap it faces while the far side stays off.
+// Returned as a float2 rather than through out-parameters: a second out-parameter in this family is what made the
+// driver's NVVM compiler AV in vkCreateShadersEXT (see the note above DashTrimMaskCapped).
+float2 DashPiece(float ph, float dashOn, float dashGap, float4 rest, int count)
+{
+    float dS = 1e9;
+    float dE = 1e9;
+    float a = 0.0;
+    [unroll]
+    for (int i = 0; i < 6; i++)
+    {
+        if (i >= count) continue;
+        float len = (i == 0) ? dashOn : (i == 1) ? dashGap : (i == 2) ? rest.x : (i == 3) ? rest.y : (i == 4) ? rest.z : rest.w;
+        float b = a + len;
+        if (ph >= a && ph < b)
+        {
+            bool on = (i - 2 * (i / 2)) == 0;   // even index = an ON run
+            if (on)                       { dS = ph - a; dE = b - ph; }
+            else if (ph - a <= b - ph)    { dE = a - ph; }   // just past the previous run's END
+            else                          { dS = ph - b; }   // just before the next run's START
+        }
+        a = b;
+    }
+    return float2(dS, dE);
+}
+
 float DashTrimMask(float sTrim, float sDash, float perimeter, float dashOn, float dashGap, float dashOffset,
-    float trimStart, float trimEnd, float dPerp, float halfW, float capFlags)
+    float trimStart, float trimEnd, float dPerp, float halfW, float capFlags, float4 dashRest)
 {
     int dashStartCap = int(fmod(capFlags, 8.0));
     int dashEndCap   = int(fmod(floor(capFlags / 8.0), 8.0));
@@ -171,13 +244,14 @@ float DashTrimMask(float sTrim, float sDash, float perimeter, float dashOn, floa
     // whichever neighbouring run is nearer, so a convex cap still bulges out into the gap it faces.
     float dS = 1e9;
     float dE = 1e9;
-    float period = dashOn + dashGap;
+    int dashCount = int(floor(capFlags / 32768.0));   // how many runs the pattern has; 2 is the plain ON/GAP
+    float period = DashPatternLength(dashOn, dashGap, dashRest, dashCount);
     if (dashOn > 0.0 && period > 0.0)
     {
         float ph = frac((sDash + dashOffset) / period) * period;   // 0..period
-        if (ph <= dashOn)                            { dS = ph; dE = dashOn - ph; }
-        else if (ph - dashOn <= period - ph)         { dE = dashOn - ph; }    // just past the previous run's END
-        else                                         { dS = ph - period; }    // just before the next run's START
+        float2 de = DashPiece(ph, dashOn, dashGap, dashRest, dashCount);
+        dS = de.x;
+        dE = de.y;
     }
 
     float sdStart = (dS < tS) ? dS + CapReach(dashStartCap, dPerp, halfW)
@@ -193,7 +267,7 @@ float DashTrimMask(float sTrim, float sDash, float perimeter, float dashOn, floa
 // objects (they inline the helper too) into a device-lost, while the SOLID rect/ellipse stroke shaders compile it fine -
 // so ONLY those two call it; the fill shaders stay on the plain DashTrimMask. Do NOT re-merge them.
 float DashTrimMaskCapped(float sTrim, float sDash, float perimeter, float dashOn, float dashGap, float dashOffset,
-    float trimStart, float trimEnd, float dPerp, float halfW, float capFlags)
+    float trimStart, float trimEnd, float dPerp, float halfW, float capFlags, float4 dashRest)
 {
     int dashStartCap = int(fmod(capFlags, 8.0));
     int dashEndCap   = int(fmod(floor(capFlags / 8.0), 8.0));
@@ -218,13 +292,14 @@ float DashTrimMaskCapped(float sTrim, float sDash, float perimeter, float dashOn
 
     float dS = 1e9;
     float dE = 1e9;
-    float period = dashOn + dashGap;
+    int dashCount = int(floor(capFlags / 32768.0));
+    float period = DashPatternLength(dashOn, dashGap, dashRest, dashCount);
     if (dashOn > 0.0 && period > 0.0)
     {
         float ph = frac((sDash + dashOffset) / period) * period;
-        if (ph <= dashOn)                    { dS = ph; dE = dashOn - ph; }
-        else if (ph - dashOn <= period - ph) { dE = dashOn - ph; }
-        else                                 { dS = ph - period; }
+        float2 de = DashPiece(ph, dashOn, dashGap, dashRest, dashCount);
+        dS = de.x;
+        dE = de.y;
     }
 
     float sdStart = (dS < tS) ? dS + CapReach(dashStartCap, dPerp, halfW)
@@ -234,19 +309,46 @@ float DashTrimMaskCapped(float sTrim, float sDash, float perimeter, float dashOn
     return windowOpen * saturate(min(sdStart, sdEnd) + 0.5);
 }
 
+// The corner this fragment belongs to, out of the four (x = TL, y = TR, z = BR, w = BL - the CPU CornerRadius order).
+// SDF space has y DOWN (the quad's corner 0 is the TOP-left), so a negative Local.y is the top half. Every rounded-rect
+// helper below picks its radius through this one function, which is what keeps the four corners INDEPENDENT: the field
+// stays continuous across the axes because the +r/-r of the offset cancels on a straight edge, so neighbouring corners
+// never have to agree.
+float CornerRadiusAt(float2 p, float4 radii)
+{
+    return p.x < 0.0 ? (p.y < 0.0 ? radii.x : radii.w)
+                     : (p.y < 0.0 ? radii.y : radii.z);
+}
+
 // Arc-length `s` (device px) of the point on the ROUNDED-RECT contour nearest `p`, and the perimeter. Exact/closed-form.
 // Traversal CCW from the start of the top-right arc: TR arc, top edge, TL arc, left edge, BL arc, bottom edge, BR arc,
 // right edge. (Start point is arbitrary for dashes; dashOffset shifts the phase.)
-float RoundRectArc(float2 p, float2 b, float r, out float perimeter)
+float RoundRectArc(float2 p, float2 b, float4 radii, out float perimeter)
 {
     // Dashes are measured on the CENTRELINE. In the corner, s = corner-start + phi*r uses the fragment's ANGLE (phi),
     // not its radius, so it's already uniform across the stroke width AND continuous with the edges - the dash flows
     // around the corner exactly like on a straight edge (and like the ellipse). No per-corner "single state" is needed.
-    float ex = 2.0 * (b.x - r);
-    float ey = 2.0 * (b.y - r);
-    float qa = 1.5707963268 * r;
-    perimeter = 2.0 * ex + 2.0 * ey + 4.0 * qa;
+    // With four INDEPENDENT radii every arc and every edge has its own length, so the traversal is accumulated corner by
+    // corner instead of multiplying one quarter-arc by four. Order (CCW in SDF space, y down): BR arc, bottom edge,
+    // BL arc, left edge, TL arc, top edge, TR arc, right edge.
+    float rTL = radii.x, rTR = radii.y, rBR = radii.z, rBL = radii.w;
+    const float HALF_PI = 1.5707963268;
+    float aBR = HALF_PI * rBR, aBL = HALF_PI * rBL, aTL = HALF_PI * rTL, aTR = HALF_PI * rTR;
+    float eBottom = 2.0 * b.x - rBR - rBL;
+    float eLeft   = 2.0 * b.y - rBL - rTL;
+    float eTop    = 2.0 * b.x - rTL - rTR;
+    float eRight  = 2.0 * b.y - rTR - rBR;
+    perimeter = aBR + eBottom + aBL + eLeft + aTL + eTop + aTR + eRight;
 
+    float sBottom = aBR;                      // where each segment STARTS along the traversal
+    float sBL     = sBottom + eBottom;
+    float sLeft   = sBL + aBL;
+    float sTL     = sLeft + eLeft;
+    float sTop    = sTL + aTL;
+    float sTR     = sTop + eTop;
+    float sRight  = sTR + aTR;
+
+    float r = CornerRadiusAt(p, radii);
     float bx = b.x - r, by = b.y - r;
     float ax = abs(p.x), ay = abs(p.y);
     float cx = ax - bx, cy = ay - by;
@@ -255,28 +357,30 @@ float RoundRectArc(float2 p, float2 b, float r, out float perimeter)
     {
         float phi = atan2(cy, cx);
         float s;
-        if      (p.x >= 0.0 && p.y >= 0.0) s = phi * r;
-        else if (p.x <  0.0 && p.y >= 0.0) s = qa + ex + (1.5707963268 - phi) * r;
-        else if (p.x <  0.0 && p.y <  0.0) s = 2.0 * qa + ex + ey + phi * r;
-        else                               s = 3.0 * qa + 2.0 * ex + ey + (1.5707963268 - phi) * r;
+        if      (p.x >= 0.0 && p.y >= 0.0) s = phi * rBR;
+        else if (p.x <  0.0 && p.y >= 0.0) s = sBL + (HALF_PI - phi) * rBL;
+        else if (p.x <  0.0 && p.y <  0.0) s = sTL + phi * rTL;
+        else                               s = sTR + (HALF_PI - phi) * rTR;
         return s;
     }
     // Classify by the NEAREST edge, not just cx/cy vs the CORNER radius r: a thick stroke reaches MORE than r inside, so
     // the inner part of a top/bottom-edge stroke has cy<=0 (inside the inner box) yet is still nearest the horizontal
     // edge. Deciding by cx/cy alone mis-routed that inner sliver (width halfW-r) to the VERTICAL-edge arc-length -> a thin
     // mis-dashed line on the inner edge that only showed when halfW > r (thick stroke / small corner).
+    // An edge is anchored at the corner it STARTS from, which is not necessarily the corner nearest this fragment.
     bool horizontal = (cx <= 0.0) && (cy > 0.0 || (b.y - ay) < (b.x - ax));
     float s;
-    if (horizontal) s = (p.y >= 0.0) ? qa + (bx - p.x) : 3.0 * qa + ex + ey + (p.x + bx);
-    else            s = (p.x >= 0.0) ? 4.0 * qa + 2.0 * ex + ey + (p.y + by) : 2.0 * qa + ex + (by - p.y);
+    if (horizontal) s = (p.y >= 0.0) ? sBottom + ((b.x - rBR) - p.x) : sTop + (p.x + (b.x - rTL));
+    else            s = (p.x >= 0.0) ? sRight + (p.y + (b.y - rTR)) : sLeft + ((b.y - rBL) - p.y);
     return s;
 }
 
 // Signed distance (device px) to a rounded rect with a selectable outer-corner JOIN: 0 = miter (sharp, Chebyshev outer
 // corner), 1 = bevel (45-deg chamfer), 2 = round (Euclidean, the natural offset). Straight edges are identical across all
 // three; only the corner (both q>0) differs. This is what gives stroke-join parity with the pen (PenLineJoin).
-float SdRoundRectJoin(float2 p, float2 b, float r, int joinType)
+float SdRoundRectJoin(float2 p, float2 b, float4 radii, int joinType)
 {
+    float r = CornerRadiusAt(p, radii);
     float2 q = abs(p) - b + r;
     float inside = min(max(q.x, q.y), 0.0);
     float2 qp = max(q, float2(0.0, 0.0));
@@ -328,8 +432,9 @@ float EllipseCurvRadius(float2 p, float2 h)
 }
 
 // Same for a rounded rect: the corner arcs bend with the corner radius, the four edges are straight.
-float RoundRectCurvRadius(float2 p, float2 b, float r)
+float RoundRectCurvRadius(float2 p, float2 b, float4 radii)
 {
+    float r = CornerRadiusAt(p, radii);
     float2 q = abs(p) - (b - r);
     return (q.x > 0.0 && q.y > 0.0 && r > 0.5) ? r : 1e9;
 }
@@ -339,12 +444,14 @@ struct PSInput
     float4 Position : SV_Position;
     float2 Local    : TEXCOORD0;   // fragment position relative to the rect CENTRE (SDF space)
     float2 Half     : TEXCOORD1;   // rect half-size
-    float  Radius   : TEXCOORD2;   // corner radius
+    float4 Radii    : TEXCOORD2;   // corner radii (TL, TR, BR, BL) in device px
     float4 Color    : COLOR0;
     float4 StrokeColor : COLOR1;
     float4 Stroke0  : TEXCOORD3;
     float4 Stroke1  : TEXCOORD4;
     float  Crisp    : TEXCOORD5;   // 1 = no fringe (see CompositeFillStroke)
+    float4 Dash     : TEXCOORD6;   // dash runs 2..5 (device px)
+    float4 Inset    : TEXCOORD7;   // border thickness per side (device px)
 };
 
 // Signed distance to a rounded box (iq): negative inside, 0 on the edge, positive outside.
@@ -357,17 +464,27 @@ float SdRoundBox(float2 p, float2 b, float r)
 [shader("fragment")]
 float4 RectBatchPS(PSInput input) : SV_Target
 {
-    float r = min(input.Radius, min(input.Half.x, input.Half.y));   // a corner can't exceed half the smaller side
+    float lim = min(input.Half.x, input.Half.y);
+    float4 r4 = min(input.Radii, float4(lim, lim, lim, lim));   // a corner cannot exceed half the smaller side
     int joinType = int(fmod(floor(input.Stroke1.w / 4096.0), 8.0));  // 0 miter, 1 bevel, 2 round
-    float d = SdRoundRectJoin(input.Local, input.Half, r, joinType);
+    float d = SdRoundRectJoin(input.Local, input.Half, r4, joinType);
+
+    // A BORDER (per-side thickness) instead of a pen: fill and ring composite from the two outlines in one go. Told apart
+    // by Inset alone - a pen and a border never ride in the same instance (RectBatchCollector.WantsBatch).
+    if (any(input.Inset > 0.0))
+    {
+        return CompositeFillBorder(d, input.Local, input.Half, r4, input.Inset, joinType,
+                                   input.Color, input.StrokeColor, input.Crisp);
+    }
+
     float mask = 1.0;
     if (input.Stroke0.z > 0.0 || input.Stroke1.y > 0.0 || input.Stroke1.z < 1.0)   // dashed or trimmed -> arc length
     {
         float halfW = input.Stroke0.x * 0.5;
         float perim;
-        float s = RoundRectArc(input.Local, input.Half, r, perim);
+        float s = RoundRectArc(input.Local, input.Half, r4, perim);
         float dPerp = d - input.Stroke0.y * halfW;
-        float capScl = ArcCapScale(RoundRectCurvRadius(input.Local, input.Half, r), dPerp);
+        float capScl = ArcCapScale(RoundRectCurvRadius(input.Local, input.Half, r4), dPerp);
         // A CONCAVE cap may not eat past the middle of its dash, or a dash shorter than a thickness is consumed by
         // its own two caps and leaves only the slivers at the ribbon edges (bow-ties at every corner on a thick
         // stroke). The reach is homogeneous in (dPerp, halfW), so the limit rides in on the same scale. Convex caps
@@ -386,7 +503,7 @@ float4 RectBatchPS(PSInput input) : SV_Target
         // round (RectBatchCollector.IsPenBatchable) and the compute expander takes it, which builds the dash pieces as
         // real geometry. What is left here is the case this model is exact for: corners at least as round as the stroke.
         mask = DashTrimMaskCapped(s, s, perim, input.Stroke0.z, input.Stroke0.w, input.Stroke1.x, input.Stroke1.y,
-                            input.Stroke1.z, dPerp * capScl, halfW * capScl, input.Stroke1.w);
+                            input.Stroke1.z, dPerp * capScl, halfW * capScl, input.Stroke1.w, input.Dash);
     }
     return CompositeFillStroke(d, input.Color, input.StrokeColor, input.Stroke0.x, input.Stroke0.y, mask, input.Crisp);
 }
@@ -517,11 +634,14 @@ float4 InstancedFringePS(FringePSInput input) : SV_Target
 struct RectData
 {
     float4 Bounds;       // NODE-local x, y, w, h (world for slot-0 legacy bakes - identity matrix)
-    float4 Params;       // .x = corner radius (uniform); .y = transform-table slot; .zw reserved
+    float4 Params;       // .x = LARGEST corner radius; .y = transform-table slot; .z = no-fringe flag; .w reserved
+    float4 Radii;        // corner radii: x = TL, y = TR, z = BR, w = BL
     float4 Color;        // straight RGBA, opacity folded in
-    float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
+    float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke); the BORDER's colour when Inset is non-zero
     float4 Stroke0;      // width_px, align, dashOn, dashGap
     float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
+    float4 Dash;         // dash runs 2..5 (device px); runs 0 and 1 ride in Stroke0.zw, the count in Stroke1.w
+    float4 Inset;        // border thickness per side in device px: x left, y top, z right, w bottom (all 0 = no border)
 };
 
 [shader("vertex")]
@@ -548,7 +668,7 @@ PSInput RectBatchInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_I
     o.Position = mul(worldPos, Projection);
     o.Half   = item.Bounds.zw * 0.5 * px;
     o.Local  = (corner - 0.5) * item.Bounds.zw * px + (corner * 2.0 - 1.0) * outsetPx;
-    o.Radius = item.Params.x * iso;
+    o.Radii = item.Radii * iso;
     // The slot's alpha multiplies BOTH fill and stroke: fading a node fades what it draws, its outline included. Read
     // from the SAME record the matrix came from - no second buffer, no second address.
     float slotAlpha = nodes[(uint)item.Params.y].Params.x;
@@ -556,6 +676,11 @@ PSInput RectBatchInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_I
     o.StrokeColor = float4(item.StrokeColor.rgb, item.StrokeColor.a * slotAlpha);
     o.Stroke0 = float4(widthPx, item.Stroke0.y, item.Stroke0.z * iso, item.Stroke0.w * iso);
     o.Stroke1 = float4(item.Stroke1.x * iso, item.Stroke1.y, item.Stroke1.z, item.Stroke1.w);
+    o.Dash = item.Dash * iso;
+    // Each side follows the axis it sits on: left/right take the horizontal pixel scale, top/bottom the vertical. `iso`
+    // (the smaller of the two) is the right answer for a stroke WIDTH, which has no axis, and the wrong one here - under
+    // a squashed slot a border would come out thicker on one pair of sides than it was asked for.
+    o.Inset = item.Inset * float4(px.x, px.y, px.x, px.y);
     o.Crisp = item.Params.z;
     return o;
 }
@@ -573,6 +698,7 @@ struct EllipsePSInput
     float4 StrokeColor : COLOR1;
     float4 Stroke0  : TEXCOORD2;
     float4 Stroke1  : TEXCOORD3;
+    float4 Dash     : TEXCOORD4;   // dash runs 2..5 (device px)
 };
 
 // Approximate SIGNED DISTANCE (device px) to an ellipse boundary: the implicit F = length(p/half) - 1 normalised by the
@@ -600,7 +726,7 @@ float4 EllipseBatchPS(EllipsePSInput input) : SV_Target
         float dPerp = d - input.Stroke0.y * halfW;
         float capScl = ArcCapScale(EllipseCurvRadius(input.Local, input.Half), dPerp);
         mask = DashTrimMaskCapped(s, s, perim, input.Stroke0.z, input.Stroke0.w, input.Stroke1.x, input.Stroke1.y,
-                            input.Stroke1.z, dPerp * capScl, halfW * capScl, input.Stroke1.w);
+                            input.Stroke1.z, dPerp * capScl, halfW * capScl, input.Stroke1.w, input.Dash);
     }
     return CompositeFillStroke(d, input.Color, input.StrokeColor, input.Stroke0.x, input.Stroke0.y, mask, 0.0);
 }
@@ -616,6 +742,7 @@ struct EllipseData
     float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
     float4 Stroke0;      // width_px, align, dashOn, dashGap
     float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
+    float4 Dash;         // dash runs 2..5 (device px); runs 0 and 1 ride in Stroke0.zw, the count in Stroke1.w
 };
 
 [shader("vertex")]
@@ -644,6 +771,7 @@ EllipsePSInput EllipseBatchInstancedVS(uint vertexId : SV_VertexID, uint instanc
     o.StrokeColor = item.StrokeColor;
     o.Stroke0 = float4(widthPx, item.Stroke0.y, item.Stroke0.z * iso, item.Stroke0.w * iso);
     o.Stroke1 = float4(item.Stroke1.x * iso, item.Stroke1.y, item.Stroke1.z, item.Stroke1.w);
+    o.Dash = item.Dash * iso;
     return o;
 }
 
@@ -655,12 +783,14 @@ EllipsePSInput EllipseBatchInstancedVS(uint vertexId : SV_VertexID, uint instanc
 struct GradientRectData
 {
     float4 Bounds;       // world x, y, w, h
-    float4 Params;       // .x corner radius, .y type (1 linear/2 radial/3 conic), .z stop count, .w spread (0 pad/1 reflect/2 repeat)
+    float4 Params;       // .x LARGEST corner radius, .y type (1 linear/2 radial/3 conic), .z stop count, .w spread (0 pad/1 reflect/2 repeat)
+    float4 Radii;        // corner radii: x = TL, y = TR, z = BR, w = BL
     float4 Geom0;        // LOCAL 0..1: linear (startXY, endXY) | radial (centerXY, radiusXY)
     float4 Geom1;        // radial focal (originXY, _, _); unused for linear
     float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
     float4 Stroke0;      // width_px, align, dashOn, dashGap
     float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
+    float4 Dash;         // dash runs 2..5 (device px); runs 0 and 1 ride in Stroke0.zw, the count in Stroke1.w
     float4 Stop0; float4 Stop1; float4 Stop2; float4 Stop3;   // straight stop RGBA (opacity folded), only .z of Params valid
     float4 Stop4; float4 Stop5; float4 Stop6; float4 Stop7;
     float4 Offsets0;     // stop offsets 0..3
@@ -807,8 +937,8 @@ struct GradPSInput
 {
     float4 Position : SV_Position;
     float2 Local    : TEXCOORD0;   // fragment relative to the rect CENTRE (SDF space, device px)
-    float2 Half     : TEXCOORD1;   // rect half-size
-    float  Radius   : TEXCOORD2;   // corner radius
+    float2 Half     : TEXCOORD1;   // rect half-size (device px)
+    float4 Radii    : TEXCOORD2;   // corner radii (TL, TR, BR, BL) in device px
     nointerpolation uint InstId : TEXCOORD3;   // instance -> re-read GradientRectData in the PS for its gradient
     nointerpolation float Scale : TEXCOORD4;   // slot unit -> device px: the PS re-reads the stroke record, which is
                                                // baked in slot units, and has to match a pixel-space SDF
@@ -837,7 +967,7 @@ GradPSInput GradientRectInstancedVS(uint vertexId : SV_VertexID, uint instanceId
     o.Position = mul(worldPos, Projection);
     o.Half   = it.Bounds.zw * 0.5 * px;
     o.Local  = (corner - 0.5) * it.Bounds.zw * px + (corner * 2.0 - 1.0) * outsetPx;
-    o.Radius = it.Params.x * iso;
+    o.Radii = it.Radii * iso;
     o.InstId = instanceId;
     o.Scale  = iso;
     return o;
@@ -852,9 +982,10 @@ float4 GradientPS(GradPSInput input) : SV_Target
     GradientRectData it = items[input.InstId];
 
     bool ellipse = it.Geom1.z >= 0.5;
-    float r = min(input.Radius, min(input.Half.x, input.Half.y));
+    float lim = min(input.Half.x, input.Half.y);
+    float4 r4 = min(input.Radii, float4(lim, lim, lim, lim));
     int joinType = int(fmod(floor(it.Stroke1.w / 4096.0), 8.0));
-    float d = ellipse ? SdEllipse(input.Local, input.Half) : SdRoundRectJoin(input.Local, input.Half, r, joinType);
+    float d = ellipse ? SdEllipse(input.Local, input.Half) : SdRoundRectJoin(input.Local, input.Half, r4, joinType);
 
     float2 uv = input.Local / max(input.Half * 2.0, float2(1e-4, 1e-4)) + 0.5;   // 0..1 across the bounds
     int packedW = int(it.Params.w + 0.5);                       // Params.w packs spread (low 3 bits) + interp mode (>> 3)
@@ -879,11 +1010,11 @@ float4 GradientPS(GradPSInput input) : SV_Target
         float halfW = widthPx * 0.5;
         float perim;
         float s = ellipse ? EllipseArc(input.Local, input.Half, perim)
-                          : RoundRectArc(input.Local, input.Half, r, perim);
+                          : RoundRectArc(input.Local, input.Half, r4, perim);
         float dPerp = d - it.Stroke0.y * halfW;
-        float capScl = ArcCapScale(ellipse ? EllipseCurvRadius(input.Local, input.Half) : RoundRectCurvRadius(input.Local, input.Half, r), dPerp);
+        float capScl = ArcCapScale(ellipse ? EllipseCurvRadius(input.Local, input.Half) : RoundRectCurvRadius(input.Local, input.Half, r4), dPerp);
         mask = DashTrimMask(s, s, perim, it.Stroke0.z * sc, it.Stroke0.w * sc, it.Stroke1.x * sc, it.Stroke1.y,
-                            it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w);
+                            it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w, it.Dash * sc);
     }
     return CompositeFillStroke(d, fill, it.StrokeColor, widthPx, it.Stroke0.y, mask, 0.0);
 }
@@ -1007,11 +1138,13 @@ struct PatternRectData
 {
     float4 Bounds;       // NODE-local x, y, w, h (world for slot-0 legacy bakes - identity matrix)
     float4 Params;       // .x corner radius, .y pattern type (0 checker/1 stripes/2 dots/3 grid/4 FBM noise), .z cell (px), .w slot
+    float4 Radii;        // corner radii: x = TL, y = TR, z = BR, w = BL
     float4 Color1;       // straight RGBA, opacity folded
     float4 Color2;       // straight RGBA, opacity folded
     float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
     float4 Stroke0;      // width_px, align, dashOn, dashGap
     float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
+    float4 Dash;         // dash runs 2..5 (device px); runs 0 and 1 ride in Stroke0.zw, the count in Stroke1.w
     float4 Noise;        // FBM noise (type 4 only): x octaves, y seed, z lacunarity, w gain
     float4 Color3;       // optional MID colour for a 3-colour noise gradient-map (Color1->Color3->Color2); .w==0 = off
     float4 Anim;         // .x = offset subtracted from the clock while animating, .y = the phase held while paused
@@ -1022,7 +1155,7 @@ struct PatternPSInput
     float4 Position : SV_Position;
     float2 Local    : TEXCOORD0;   // fragment relative to the rect CENTRE (SDF space, device px)
     float2 Half     : TEXCOORD1;   // rect half-size
-    float  Radius   : TEXCOORD2;   // corner radius
+    float4 Radii    : TEXCOORD2;   // corner radii (TL, TR, BR, BL) in device px
     nointerpolation uint InstId : TEXCOORD3;   // instance -> re-read PatternRectData in the PS
     nointerpolation float Scale : TEXCOORD4;   // slot unit -> device px. The PS re-reads the record, whose stroke AND
                                                // cell size (PatternBrush.CellSize / NoiseBrush.Scale, one field) are
@@ -1050,7 +1183,7 @@ PatternPSInput PatternRectInstancedVS(uint vertexId : SV_VertexID, uint instance
     o.Position = mul(worldPos, Projection);
     o.Half   = it.Bounds.zw * 0.5 * px;
     o.Local  = (corner - 0.5) * it.Bounds.zw * px + (corner * 2.0 - 1.0) * outsetPx;
-    o.Radius = it.Params.x * iso;
+    o.Radii = it.Radii * iso;
     o.InstId = instanceId;
     o.Scale  = iso;
     return o;
@@ -1484,6 +1617,7 @@ struct TexRectData
 {
     float4 Bounds;     // NODE-local x, y, w, h - the SHAPE, which never shrinks with the picture
     float4 Params;     // .x corner radius, .y transform slot, .z repeat flag, .w mirror flags (1 = X, 2 = Y, 3 = both)
+    float4 Radii;        // corner radii: x = TL, y = TR, z = BR, w = BL
     float4 Tile;       // tile grid over the bounds: tiles per axis (.xy), grid origin in tiles (.zw)
     float4 Rotation;   // 2x2 mapping a fragment back into the unturned grid, row-major (identity = 1,0,0,1)
     float4 Drawn;      // the content's rect inside ONE tile: offsetXY, scaleXY, both in 0..1 of the tile
@@ -1496,7 +1630,7 @@ struct TexPSInput
     float4 Position : SV_Position;
     float2 Local    : TEXCOORD0;   // fragment relative to the rect CENTRE (SDF space, device px)
     float2 Half     : TEXCOORD1;   // rect half-size
-    float  Radius   : TEXCOORD2;   // corner radius
+    float4 Radii    : TEXCOORD2;   // corner radii (TL, TR, BR, BL) in device px
     nointerpolation uint InstId : TEXCOORD3;
 };
 
@@ -1519,7 +1653,7 @@ TexPSInput TexRectInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_
     o.Position = mul(worldPos, Projection);
     o.Half   = it.Bounds.zw * 0.5 * px;
     o.Local  = (corner - 0.5) * it.Bounds.zw * px + (corner * 2.0 - 1.0);
-    o.Radius = it.Params.x * iso;
+    o.Radii = it.Radii * iso;
     o.InstId = instanceId;
     return o;
 }
@@ -1533,8 +1667,9 @@ float4 TexRectPS(TexPSInput input) : SV_Target
     // A NEGATIVE baked corner radius is the ELLIPSE shape flag (a rect passes radius >= 0) - same signal the pattern
     // pass uses. Branch-free (a ?: in this pass has device-lost form on this driver): both distances, picked by a step.
     float isEllipse = step(it.Params.x, -0.0001);
-    float r = min(input.Radius, min(input.Half.x, input.Half.y));
-    float d = lerp(SdRoundRectJoin(input.Local, input.Half, r, 2),   // round join: the plain Euclidean offset, no stroke here
+    float lim = min(input.Half.x, input.Half.y);
+    float4 r4 = min(input.Radii, float4(lim, lim, lim, lim));
+    float d = lerp(SdRoundRectJoin(input.Local, input.Half, r4, 2),   // round join: the plain Euclidean offset, no stroke here
                    SdEllipse(input.Local, input.Half),
                    isEllipse);
 
@@ -1571,7 +1706,7 @@ float4 TexRectPS(TexPSInput input) : SV_Target
     float aa = max(fwidth(d), 1e-4);
     float ramp = saturate(0.5 - d / aa);
     float crisp = step(d, 0.0);
-    fill.a *= lerp(crisp, ramp, max(step(0.001, r), isEllipse));   // an ellipse is ALL curve, so it always earns the ramp
+    fill.a *= lerp(crisp, ramp, max(step(0.001, max(max(r4.x, r4.y), max(r4.z, r4.w))), isEllipse));   // an ellipse is ALL curve, so it always earns the ramp
     // Outside the content's rect there is nothing to paint - the gap a Uniform fit leaves around EVERY tile, and the
     // whole of the shape a single copy does not reach.
     float inside = step(0.0, inContent.x) * step(inContent.x, 1.0) * step(0.0, inContent.y) * step(inContent.y, 1.0);
@@ -1586,9 +1721,10 @@ float4 PatternPS(PatternPSInput input) : SV_Target
     PatternRectData it = items[input.InstId];
 
     bool ellipse = it.Params.x < 0.0;   // negative baked corner radius = the ellipse shape flag (a rect passes radius >= 0)
-    float r = min(input.Radius, min(input.Half.x, input.Half.y));
+    float lim = min(input.Half.x, input.Half.y);
+    float4 r4 = min(input.Radii, float4(lim, lim, lim, lim));
     int joinType = int(fmod(floor(it.Stroke1.w / 4096.0), 8.0));
-    float d = ellipse ? SdEllipse(input.Local, input.Half) : SdRoundRectJoin(input.Local, input.Half, r, joinType);
+    float d = ellipse ? SdEllipse(input.Local, input.Half) : SdRoundRectJoin(input.Local, input.Half, r4, joinType);
 
     // The record is baked in SLOT units, the SDF above is in device pixels - so the CELL (PatternBrush.CellSize /
     // NoiseBrush.Scale share this field) converts too, or the pattern's cell / the noise's grain would change size with
@@ -1607,11 +1743,11 @@ float4 PatternPS(PatternPSInput input) : SV_Target
         float halfW = widthPx * 0.5;
         float perim;
         float s = ellipse ? EllipseArc(input.Local, input.Half, perim)
-                          : RoundRectArc(input.Local, input.Half, r, perim);
+                          : RoundRectArc(input.Local, input.Half, r4, perim);
         float dPerp = d - it.Stroke0.y * halfW;
-        float capScl = ArcCapScale(ellipse ? EllipseCurvRadius(input.Local, input.Half) : RoundRectCurvRadius(input.Local, input.Half, r), dPerp);
+        float capScl = ArcCapScale(ellipse ? EllipseCurvRadius(input.Local, input.Half) : RoundRectCurvRadius(input.Local, input.Half, r4), dPerp);
         mask = DashTrimMask(s, s, perim, it.Stroke0.z * sc, it.Stroke0.w * sc, it.Stroke1.x * sc, it.Stroke1.y,
-                            it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w);
+                            it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w, it.Dash * sc);
     }
     return CompositeFillStroke(d, fill, it.StrokeColor, widthPx, it.Stroke0.y, mask, 0.0);
 }
@@ -1706,6 +1842,7 @@ struct HaloRectData
 {
     float4 Bounds;   // the SHAPE's rect in slot units (the drawn quad is grown from it in the VS)
     float4 Params;   // .x corner radius, .y transform slot, .z shape (0 rect, 1 ellipse), .w inner flag
+    float4 Radii;        // corner radii: x = TL, y = TR, z = BR, w = BL
     float4 Band;     // .xy offset, .z spread, .w softness - slot units
     float4 Color;
     float4 Field;    // .x = the distance range a SAMPLED field encodes, slot units (0 for an analytic shape)
@@ -1716,7 +1853,7 @@ struct HaloPSInput
     float4 Position : SV_Position;
     float2 Local    : TEXCOORD0;   // fragment from the SHAPE's centre, device px
     float2 Half     : TEXCOORD1;   // the shape's half-size, device px
-    float Radius    : TEXCOORD2;
+    float4 Radii    : TEXCOORD2;   // corner radii (TL, TR, BR, BL) in device px
     float Scale     : TEXCOORD3;
     nointerpolation uint InstId : TEXCOORD4;
 };
@@ -1744,17 +1881,18 @@ HaloPSInput HaloRectInstancedVS(uint vertexId : SV_VertexID, uint instanceId : S
     o.Position = mul(worldPos, Projection);
     o.Half   = it.Bounds.zw * 0.5 * px;
     o.Local  = (corner - 0.5) * it.Bounds.zw * px + (corner * 2.0 - 1.0) * outsetPx;
-    o.Radius = it.Params.x * iso;
+    o.Radii = it.Radii * iso;
     o.Scale  = iso;
     o.InstId = instanceId;
     return o;
 }
 
 // The shape, at an inflation: rect and ellipse from the same call so the branch is a lerp, not a jump.
-float HaloShapeDistance(float2 p, float2 half, float radius, float inflate, float isEllipse)
+float HaloShapeDistance(float2 p, float2 half, float4 radii, float inflate, float isEllipse)
 {
     float2 h = max(half + inflate, float2(0.01, 0.01));
-    float r = clamp(radius + inflate, 0.0, min(h.x, h.y));
+    float lim = min(h.x, h.y);
+    float4 r = clamp(radii + inflate, float4(0.0, 0.0, 0.0, 0.0), float4(lim, lim, lim, lim));
     return lerp(SdRoundRectJoin(p, h, r, 2), SdEllipse(p, h), isEllipse);
 }
 
@@ -1802,9 +1940,9 @@ float4 HaloRectPS(HaloPSInput input) : SV_Target
     float analyticShape = saturate(isEllipse);   // 0 rect, 1 ellipse - shape 2 never uses it, but must not extrapolate
     float rangePx = it.Field.x * sc;
     float bandFade, shapeFade;
-    float dBand = lerp(HaloShapeDistance(input.Local - offset, input.Half, input.Radius, spread, analyticShape),
+    float dBand = lerp(HaloShapeDistance(input.Local - offset, input.Half, input.Radii, spread, analyticShape),
                        HaloFieldDistance(input.Local - offset, input.Half, rangePx, spread, bandFade), sampled);
-    float dShape = lerp(HaloShapeDistance(input.Local, input.Half, input.Radius, 0.0, analyticShape),
+    float dShape = lerp(HaloShapeDistance(input.Local, input.Half, input.Radii, 0.0, analyticShape),
                         HaloFieldDistance(input.Local, input.Half, rangePx, 0.0, shapeFade), sampled);
 
     // Outer: full strength inside the thrown shape, faded to nothing one softness outside it. Inner: the mirror.
@@ -1841,6 +1979,7 @@ struct HaloLivingData
 {
     float4 Bounds;
     float4 Params;    // .x radius, .y slot, .z shape (0 rect, 1 ellipse, 2 field), .w inner
+    float4 Radii;        // corner radii: x = TL, y = TR, z = BR, w = BL
     float4 Band;      // .z spread, .w softness - slot units
     float4 Field;     // .x field range, .y turbulence, .z flow, .w detail
     float4 Color;     // used when the palette is empty
@@ -1872,7 +2011,7 @@ HaloPSInput HaloLivingVS(uint vertexId : SV_VertexID, uint instanceId : SV_Insta
     o.Position = mul(worldPos, Projection);
     o.Half   = it.Bounds.zw * 0.5 * px;
     o.Local  = (corner - 0.5) * it.Bounds.zw * px + (corner * 2.0 - 1.0) * outsetPx;
-    o.Radius = it.Params.x * iso;
+    o.Radii = it.Radii * iso;
     o.Scale  = iso;
     o.InstId = instanceId;
     return o;
@@ -1915,9 +2054,9 @@ float4 HaloLivingPS(HaloPSInput input) : SV_Target
     float rangePx = it.Field.x * sc;
 
     float bandFade, shapeFade;
-    float dBand = lerp(HaloShapeDistance(input.Local, input.Half, input.Radius, spread, analyticShape),
+    float dBand = lerp(HaloShapeDistance(input.Local, input.Half, input.Radii, spread, analyticShape),
                        HaloFieldDistance(input.Local, input.Half, rangePx, spread, bandFade), sampled);
-    float dShape = lerp(HaloShapeDistance(input.Local, input.Half, input.Radius, 0.0, analyticShape),
+    float dShape = lerp(HaloShapeDistance(input.Local, input.Half, input.Radii, 0.0, analyticShape),
                         HaloFieldDistance(input.Local, input.Half, rangePx, 0.0, shapeFade), sampled);
 
     // ALONG the outline and AWAY from it. The angle wraps, so the noise is sampled on a CIRCLE in its own space - a
@@ -2085,6 +2224,7 @@ struct FractalRectData
 {
     float4 Bounds;       // NODE-local x, y, w, h
     float4 Params;       // .x corner radius, .y type (0 Julia/1 Mandelbrot), .z transform slot, .w max iterations
+    float4 Radii;        // corner radii: x = TL, y = TR, z = BR, w = BL
     float4 Geom;         // .x/.y complex-plane centre, .z zoom, .w morph speed
     float4 Julia;        // .x/.y Julia constant C, .z animate flag, .w reserved
     float4 Color1;       // straight RGBA, opacity folded
@@ -2092,6 +2232,7 @@ struct FractalRectData
     float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
     float4 Stroke0;      // width_px, align, dashOn, dashGap
     float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
+    float4 Dash;         // dash runs 2..5 (device px); runs 0 and 1 ride in Stroke0.zw, the count in Stroke1.w
     float4 Ref;          // perturbation: .x orbit start index (into OrbitAddress), .y orbit length, .z deep flag (1=use), .w reserved
 };
 
@@ -2100,7 +2241,7 @@ struct FractalPSInput
     float4 Position : SV_Position;
     float2 Local    : TEXCOORD0;   // fragment relative to the rect CENTRE (SDF space, device px)
     float2 Half     : TEXCOORD1;   // rect half-size
-    float  Radius   : TEXCOORD2;   // corner radius
+    float4 Radii    : TEXCOORD2;   // corner radii (TL, TR, BR, BL) in device px
     nointerpolation uint InstId : TEXCOORD3;   // instance -> re-read FractalRectData in the PS
     nointerpolation float Scale : TEXCOORD4;   // slot unit -> device px, for the stroke record the PS re-reads
 };
@@ -2127,7 +2268,7 @@ FractalPSInput FractalRectInstancedVS(uint vertexId : SV_VertexID, uint instance
     o.Position = mul(worldPos, Projection);
     o.Half   = it.Bounds.zw * 0.5 * px;
     o.Local  = (corner - 0.5) * it.Bounds.zw * px + (corner * 2.0 - 1.0) * outsetPx;
-    o.Radius = it.Params.x * iso;
+    o.Radii = it.Radii * iso;
     o.InstId = instanceId;
     o.Scale  = iso;
     return o;
@@ -2174,9 +2315,10 @@ float4 FractalPS(FractalPSInput input) : SV_Target
     FractalRectData* items = (FractalRectData*)InstancesAddress;
     FractalRectData it = items[input.InstId];
 
-    float r = min(input.Radius, min(input.Half.x, input.Half.y));
+    float lim = min(input.Half.x, input.Half.y);
+    float4 r4 = min(input.Radii, float4(lim, lim, lim, lim));
     int joinType = int(fmod(floor(it.Stroke1.w / 4096.0), 8.0));
-    float d = SdRoundRectJoin(input.Local, input.Half, r, joinType);
+    float d = SdRoundRectJoin(input.Local, input.Half, r4, joinType);
 
     // Fragment -> complex plane, aspect-correct: the smaller axis spans 3/zoom around the centre, so pixels stay square.
     float minHalf = max(min(input.Half.x, input.Half.y), 1e-4);
@@ -2336,11 +2478,11 @@ float4 FractalPS(FractalPSInput input) : SV_Target
     {
         float halfW = widthPx * 0.5;
         float perim;
-        float s = RoundRectArc(input.Local, input.Half, r, perim);
+        float s = RoundRectArc(input.Local, input.Half, r4, perim);
         float dPerp = d - it.Stroke0.y * halfW;
-        float capScl = ArcCapScale(RoundRectCurvRadius(input.Local, input.Half, r), dPerp);
+        float capScl = ArcCapScale(RoundRectCurvRadius(input.Local, input.Half, r4), dPerp);
         mask = DashTrimMask(s, s, perim, it.Stroke0.z * sc, it.Stroke0.w * sc, it.Stroke1.x * sc, it.Stroke1.y,
-                            it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w);
+                            it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w, it.Dash * sc);
     }
     return CompositeFillStroke(d, fill, it.StrokeColor, widthPx, it.Stroke0.y, mask, 0.0);
 }

@@ -32,8 +32,7 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
         if (p.Brush is not GradientBrush g) return false;
         if (g is not MeshGradientBrush && g.GradientStops.Count == 0) return false;   // mesh carries corners, not stops
         if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
-        var c = p.CornerRadius;
-        return c.TopLeft == c.TopRight && c.TopRight == c.BottomRight && c.BottomRight == c.BottomLeft;
+        return true;
     }
 
     public bool CanBatch(RectanglePayload p) => WantsBatch(p);
@@ -56,13 +55,13 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
     {
         item = default;
         if (p.Brush is not GradientBrush g) return false;
-        return BakeGradientItem(g, p.DestinationRect, p.CornerRadius.TopLeft, p.Pen, world, opacity, 0f, transformSlot, out item);
+        return BakeGradientItem(g, p.DestinationRect, p.CornerRadius, p.Pen, world, opacity, 0f, transformSlot, out item);
     }
 
     // Bake a gradient fill into an instance record (shared by the rect + ellipse gradient batches). Position -> world;
     // gradient geometry + stops are RELATIVE to the rect (0..1), so one brush paints any size. False on a rotated/sheared
     // world (the axis-aligned instance can't hold it). shape (Geom1.z) selects the shader SDF: 0 rounded-rect, 1 ellipse.
-    internal static bool BakeGradientItem(GradientBrush g, Rect dest, double cornerRadius, Pen pen, Matrix4x4F world,
+    internal static bool BakeGradientItem(GradientBrush g, Rect dest, ProceduralGeometry.CornerRadius corners, Pen pen, Matrix4x4F world,
         double opacity, float shape, int transformSlot, out GradientRectItem item)
     {
         item = default;
@@ -87,14 +86,16 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
         item.Geom1.Z = shape;          // shader shape branch: 0 rounded-rect, 1 ellipse (Geom1.z is otherwise spare)
         item.Geom1.W = transformSlot;  // transform-table slot (0 = identity world bake; node-local otherwise)
 
-        RectBatchCollector.BakeStroke(pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1);
+        RectBatchCollector.BakeStroke(pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1, out var dash);
         item.StrokeColor = strokeColor;
         item.Stroke0 = stroke0;
         item.Stroke1 = stroke1;
+        item.Dash = dash;
 
         // Params.w packs BOTH the spread (0 pad/1 reflect/2 repeat) and the colour-interpolation mode (0 sRGB/1 OKLab):
         // spread + 8*mode. The shader unpacks (packed & 7) for spread and (packed >> 3) for the mode - no extra record field.
-        item.Params = new Vector4F((float)(cornerRadius * sx), type, count, (float)g.SpreadMethod + 8f * (float)g.ColorInterpolationMode);
+        item.Radii = RectBatchCollector.BakeRadii(corners, dest, sx);
+        item.Params = new Vector4F(RectBatchCollector.MaxOf(item.Radii), type, count, (float)g.SpreadMethod + 8f * (float)g.ColorInterpolationMode);
         return true;
     }
 }

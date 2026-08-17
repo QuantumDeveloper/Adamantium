@@ -84,77 +84,49 @@ public class Border : Decorator
       var cornerRadius = CornerRadius;
       base.OnRender(context);
 
-      var outerRect = new Rect(new Size(ActualWidth, ActualHeight));
-      // Inset by the FULL border thickness and shrink the corner radii concentrically, so the border ring keeps a
-      // uniform width all the way around (including the rounded corners) instead of pinching at them.
-      var innerRect = outerRect.Deflate(borderThickness);
-      var innerRadius = DeflateCornerRadius(cornerRadius, borderThickness);
-
       var ctx = context.ForControl(this);
 
       var hasThickness = borderThickness.Left != 0 || borderThickness.Top != 0 || borderThickness.Right != 0 || borderThickness.Bottom != 0;
 
-      // UNIFORM border (equal thickness on all sides + equal corner radii): draw the fill AND the border as ONE rounded
-      // rect with a pen, so it goes to the SDF item-background batch - reconstructed analytically and self-anti-aliased in
-      // one instanced draw, exactly like a plain solid fill. The old separate CombinedGeometry ring went through the per-
-      // unit analytic-AA fringe, whose outward-offset ring OVER-BLENDED its own coincident inner/outer edges (a 1px ring is
-      // as thin as the fringe) and hatched the corners - visible on a translucent card (the menu). The batch's SDF stroke
-      // is CENTRE-aligned, so drawing the pen on the rect inset by HALF the thickness lands the stroke in the outer
-      // `thickness` px == a WPF inside border, with the fill composited under it in the same pass.
-      if (borderThickness.IsUniform && cornerRadius.IsUniform && hasThickness && BorderBrush.IsVisible())
-      {
-         // The ring onto whole PIXELS - edges and thickness alike. Off the grid, a 1-DIP line at a fractional scale is
-         // drawn at half coverage on each side and reads as no line at all (see DevicePixels).
-         var t = borderThickness.Left;
-         var ring = outerRect;
-         this.Snap(ref ring, ref t);
-
-         var half = t * 0.5;
-         var penRect = ring.Deflate(new Thickness(half));
-         var penRadius = new CornerRadius(Math.Max(0.0, cornerRadius.TopLeft - half));
-         var fill = Background.IsVisible() ? Background : Brushes.Transparent;
-         ctx.DrawRectangle(fill, penRect, penRadius, new Pen(BorderBrush, t));
-         return;
-      }
-
-      // Fallback (no border, or a NON-uniform border/corner the SDF rect model can't express): the solid fill still SDF-
-      // batches; the ring goes through the per-unit path. Only record draws that produce visible pixels - a transparent
-      // brush would otherwise still build a fill unit + fringe every frame (the ListBox FPS drop); hit-testing is
-      // bounds-based, so nothing depends on the invisible draw.
-      // BOTH onto whole pixels, and through the same rounding. A fill's edge is where two surfaces meet, and off the
-      // grid it lands at partial coverage: a soft end where a plate should stop dead, and a hairline down the join of
-      // two flush plates. Snapping only one of the two is worse than snapping neither - the ring and the fill under it
-      // then disagree by a fraction of a pixel, which is a visible kink along the edge where they meet. Shared
-      // coordinates round identically, so the two stay registered. No-op under anything but a plain offset.
-      var outer = outerRect;
-      var inner = innerRect;
-      this.Snap(ref inner);
-      this.Snap(ref outer);
-
-      if (Background.IsVisible())
-         ctx.DrawRectangle(Background, inner, innerRadius);
+      // ONE draw for the whole border, whatever its sides and corners are: DrawBorder is a fill plus a ring of its own
+      // thickness per side, composited from two outlines in one SDF pass. Its own primitive rather than a pen, because a
+      // pen is ONE width offset from a contour and four widths are not an offset of anything - which is why unequal
+      // sides used to leave for a per-unit CombinedGeometry ring, a different class of cost for the commonest chrome in
+      // a theme. That ring also OVER-BLENDED the outline it shares with the fill (both anti-alias it, and two halves of
+      // one edge compose to a dark hairline) - unavoidable while they are two shapes, gone now that they are one.
+      //
+      // Onto whole PIXELS - the box and the thickness alike. Off the grid, a 1-DIP line at a fractional scale is drawn at
+      // half coverage on each side and reads as no line at all (see DevicePixels). The two must round TOGETHER: snapping
+      // one of them leaves the ring and the fill under it disagreeing by a fraction of a pixel, a visible kink along the
+      // edge where they meet.
+      var box = new Rect(new Size(ActualWidth, ActualHeight));
+      this.Snap(ref box);
 
       if (hasThickness && BorderBrush.IsVisible())
       {
-         var combined = new CombinedGeometry
+         var t = borderThickness;
+         if (t.IsUniform)
          {
-            GeometryCombineMode = GeometryCombineMode.Exclude,
-            Geometry1 = new RectangleGeometry(outer, cornerRadius),
-            Geometry2 = new RectangleGeometry(inner, innerRadius)
-         };
-         ctx.DrawGeometry(BorderBrush, combined);
+            // A uniform border rounds its ONE thickness the same way the box was rounded, so the ring lands on whole
+            // pixels too. Unequal sides have no single number to snap and keep what they were given.
+            var one = t.Left;
+            var ring = new Rect(new Size(ActualWidth, ActualHeight));
+            this.Snap(ref ring, ref one);
+            t = new Thickness(one);
+         }
+
+         var fill = Background.IsVisible() ? Background : Brushes.Transparent;
+         ctx.DrawBorder(fill, box, cornerRadius, BorderBrush, t);
+         return;
+      }
+
+      // No border: just the fill. Only record draws that produce visible pixels - a transparent brush would otherwise
+      // still build a fill unit + fringe every frame (the ListBox FPS drop); hit-testing is bounds-based, so nothing
+      // depends on the invisible draw.
+      if (Background.IsVisible())
+      {
+         ctx.DrawRectangle(Background, box, cornerRadius);
       }
    }
 
-   // Each corner shrinks by the thickness of the two edges meeting there (clamped at 0) so the inner curve stays
-   // parallel to the outer one. Scalar (circular) corners can't be perfectly concentric under non-uniform thickness;
-   // taking the larger adjacent edge keeps the inner arc from bulging past the border on the thicker side.
-   private static CornerRadius DeflateCornerRadius(CornerRadius radius, Thickness border)
-   {
-      return new CornerRadius(
-         Math.Max(0.0, radius.TopLeft - Math.Max(border.Left, border.Top)),
-         Math.Max(0.0, radius.TopRight - Math.Max(border.Top, border.Right)),
-         Math.Max(0.0, radius.BottomRight - Math.Max(border.Right, border.Bottom)),
-         Math.Max(0.0, radius.BottomLeft - Math.Max(border.Bottom, border.Left)));
-   }
 }

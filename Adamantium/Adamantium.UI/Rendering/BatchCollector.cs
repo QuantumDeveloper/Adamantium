@@ -195,6 +195,11 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     /// <summary>Per-frame hook for derived state (e.g. lazily creating the effect). Base does nothing.</summary>
     protected virtual void OnBeginFrame(IGraphicsDevice device) { }
 
+    /// <summary>Whether anything is waiting to be flushed. The recorder needs it to know WHERE the next segment's paint
+    /// span begins: a segment glues every control that falls between two flushes, so its span starts with the first one
+    /// that put something in it - and the only moment that is knowable is while the segment is still empty.</summary>
+    public bool HasPending => _hasUnion;
+
     /// <summary>Does a unit's logical bounds overlap the pending segment? A later overlapping unit must draw AFTER a
     /// flush (painter's order); spatially disjoint units (a list's stacked items) don't.</summary>
     public bool OverlapsPending(Rect r)

@@ -255,7 +255,7 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
         if (DrawCommand?.RenderData is { } rd) rd.Opacity = opacity;
     }
 
-    public void Update(Matrix4x4F transform, Matrix4x4F projection, double renderScale)
+    public virtual void Update(Matrix4x4F transform, Matrix4x4F projection, double renderScale)
     {
         // Keep ALL of the unit's renderers pointed at the CURRENT RenderData. UpdateWithDrawCommand repoints the body
         // unconditionally but the fringe/stroke only on a geometry/brush/pen change - so an OPACITY-only change (a
@@ -545,7 +545,7 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
 
     public RectangleRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
-        // A batchable rect (solid, no pen, uniform corners) is drawn ENTIRELY by the item-background SDF batch, which
+        // A batchable rect (solid fill, a pen the SDF draws, corners rounded any which way) is drawn ENTIRELY by the item-background SDF batch, which
         // self-AAs - so build ZERO per-unit machinery: no tessellation, no geometry/fringe/stroke, no GPU buffers. This
         // is what makes a big virtualized tile grid cheap: a slider shrink that realizes hundreds of tiles no longer
         // tessellates + allocates per tile (that was the 1-fps freeze and the resize OOM). The rare rejected case
@@ -555,17 +555,74 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
         BuildMachinery(Payload);
     }
 
+    /// <summary>The BORDER ring, when this rect carries a per-side border and the batch would not take it (a rotated or
+    /// sheared world). Its own renderer because a ring and a fill are two meshes in two brushes; the batch draws both
+    /// from one instance, and only this fallback has to split them.</summary>
+    public UIRenderComponent FrameRenderer { get; private set; }
+
+    // The ring joins the unit's own lifecycle: placed with the body, drawn OVER it (a border sits on top of its own
+    // fill), and disposed with it. Missing any of the four is a renderer that draws at last frame's place, or leaks.
+    public override void Update(Matrix4x4F transform, Matrix4x4F projection, double renderScale)
+    {
+        base.Update(transform, projection, renderScale);
+        if (FrameRenderer == null) return;
+        FrameRenderer.RenderData = DrawCommand?.RenderData ?? FrameRenderer.RenderData;
+        FrameRenderer.Update(Place(transform), projection);
+    }
+
+    public override void PreRender()
+    {
+        base.PreRender();
+        FrameRenderer?.PreRender();
+    }
+
+    public override void Render()
+    {
+        base.Render();
+        FrameRenderer?.Render();
+    }
+
+    protected override void Dispose(bool disposeManagedResources)
+    {
+        FrameRenderer?.Dispose();
+        FrameRenderer = null;
+        base.Dispose(disposeManagedResources);
+    }
+
     // The per-unit fill/fringe/stroke renderers for a NON-batched rect. Tessellates once here; the buffers themselves are
     // still allocated lazily on first draw (see UIRenderComponent.SetMesh).
     private void BuildMachinery(RectanglePayload payload)
     {
-        var g = new RectangleGeometry(payload.DestinationRect, payload.CornerRadius);
+        // A framed rect fills only what the border leaves, and the ring is drawn over it.
+        var fillRect = payload.HasFrame ? payload.FrameInnerRect : payload.DestinationRect;
+        var fillCorners = payload.HasFrame ? payload.FrameInnerCorners : payload.CornerRadius;
+        var g = new RectangleGeometry(fillRect, fillCorners);
         g.ProcessGeometry(GeometryType.Both);
         GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, payload.Brush, BufferManager, ResourceFactory);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
         GeometryRenderer.Owner = DrawCommand.Component;
         ProcessFillFringe(g, payload.Brush);
         ProcessStrokeData(payload.Pen, g);
+        BuildFrame(payload);
+    }
+
+    // The ring itself: the outline minus what the fill occupies. Only for the fallback - the batch needs no geometry.
+    private void BuildFrame(RectanglePayload payload)
+    {
+        if (!payload.HasFrame || payload.BorderBrush is null) return;
+
+        var ring = new CombinedGeometry
+        {
+            GeometryCombineMode = GeometryCombineMode.Exclude,
+            Geometry1 = new RectangleGeometry(payload.DestinationRect, payload.CornerRadius),
+            Geometry2 = new RectangleGeometry(payload.FrameInnerRect, payload.FrameInnerCorners)
+        };
+        ring.ProcessGeometry(GeometryType.Both);
+        FrameRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, ring.Mesh, payload.LiveBorderBrush, BufferManager, ResourceFactory)
+        {
+            RenderData = DrawCommand.RenderData,
+            Owner = DrawCommand.Component
+        };
     }
 
     // The item-background batch reads the fill opacity here: a batchable rect has no GeometryRenderer to carry RenderData.
@@ -577,11 +634,14 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
     public void EnsureMachinery()
     {
         if (GeometryRenderer != null) return;
-        var g = new RectangleGeometry(Payload.DestinationRect, Payload.CornerRadius);
+        var fillRect = Payload.HasFrame ? Payload.FrameInnerRect : Payload.DestinationRect;
+        var fillCorners = Payload.HasFrame ? Payload.FrameInnerCorners : Payload.CornerRadius;
+        var g = new RectangleGeometry(fillRect, fillCorners);
         g.ProcessGeometry(GeometryType.Both);
         GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, Payload.Brush, BufferManager, ResourceFactory);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
         GeometryRenderer.Owner = DrawCommand.Component;
+        BuildFrame(Payload);
     }
 
     public override void UpdateWithDrawCommand(IDrawCommand drawCommand)

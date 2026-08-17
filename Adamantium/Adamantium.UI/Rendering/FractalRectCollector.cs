@@ -91,8 +91,7 @@ internal sealed class FractalRectCollector : SdfBatchCollector<FractalRectItem>
         {
             return false;
         }
-        var c = p.CornerRadius;
-        return c.TopLeft == c.TopRight && c.TopRight == c.BottomRight && c.BottomRight == c.BottomLeft;
+        return true;
     }
 
     // Bake one fractal rounded-rect fill. False only if it can't be baked (rotated/sheared world or a GPU-buffer overflow) -
@@ -188,20 +187,23 @@ internal sealed class FractalRectCollector : SdfBatchCollector<FractalRectItem>
         var c2 = f.Color2.ToVector4();
         c2.W *= alpha;
 
-        RectBatchCollector.BakeStroke(p.Pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1);
+        RectBatchCollector.BakeStroke(p.Pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1, out var dash);
 
         var r = p.DestinationRect;
+        var radii = RectBatchCollector.BakeRadii(p.CornerRadius, r, sx);
         item = new FractalRectItem
         {
             Bounds = new Vector4F((float)(r.X * sx + tx), (float)(r.Y * sy + ty), (float)(r.Width * sx), (float)(r.Height * sy)),
-            Params = new Vector4F((float)(p.CornerRadius.TopLeft * sx), (int)f.Fractal, transformSlot, f.Iterations),
+            Params = new Vector4F(RectBatchCollector.MaxOf(radii), (int)f.Fractal, transformSlot, f.Iterations),
+            Radii = radii,
             Geom = new Vector4F((float)f.Center.X, (float)f.Center.Y, (float)f.Zoom, (float)f.Power),   // .w = Multibrot exponent (MorphSpeed lives on FractalClock now)
             Julia = new Vector4F((float)f.C.X, (float)f.C.Y, f.Animate ? 1f : 0f, (int)f.Formula),
             Color1 = c1,
             Color2 = c2,
             StrokeColor = strokeColor,
             Stroke0 = stroke0,
-            Stroke1 = stroke1
+            Stroke1 = stroke1,
+            Dash = dash
         };
         return true;
     }

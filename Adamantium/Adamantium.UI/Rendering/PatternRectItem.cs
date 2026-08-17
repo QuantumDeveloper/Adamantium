@@ -20,6 +20,9 @@ public struct PatternRectItem
     /// (device px; the base noise cell for type 4); .w = transform-table slot.</summary>
     public Vector4F Params;
 
+    /// <summary>The four corner radii: x = top-left, y = top-right, z = bottom-right, w = bottom-left.</summary>
+    public Vector4F Radii;
+
     /// <summary>Primary (background) colour, straight RGBA, opacity folded into .w.</summary>
     public Vector4F Color1;
 
@@ -34,6 +37,10 @@ public struct PatternRectItem
 
     /// <summary>Stroke arc-length: x = dash offset, y = trim start, z = trim end, w = flags (join/cap codes).</summary>
     public Vector4F Stroke1;
+
+    /// <summary>Dash runs 2..5 in device px - runs 0 and 1 ride in <see cref="Stroke0"/>.zw and the RUN COUNT is
+    /// packed into <see cref="Stroke1"/>.w. A pattern longer than one ON/GAP period lives here.</summary>
+    public Vector4F Dash;
 
     /// <summary>FBM noise params (pattern type 4 only; zero otherwise): x = octaves, y = seed, z = lacunarity, w = gain.</summary>
     public Vector4F Noise;
