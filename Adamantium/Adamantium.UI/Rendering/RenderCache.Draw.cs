@@ -1422,6 +1422,11 @@ public partial class RenderCache
             return true;   // drew nothing, still draws nothing
         }
 
+        // A recorded segment that paints ACROSS this rank has to be cut at it first - otherwise there is no index in the op
+        // stream that means "here": before that one op the newcomer paints under controls it must cover, after it over
+        // controls it must not.
+        SplitSegmentSpanningRank(group.Order);
+
         var seg = _rectBatch.AllocateSegment(device, patch.Items, patch.Scissor);
         if (seg < 0) return false;
 
@@ -1461,6 +1466,82 @@ public partial class RenderCache
 
         while (at > 0 && _ops[at - 1].Kind == RenderOpKind.Scissor) at--;
         return at;
+    }
+
+    /// <summary>Cut the recorded rect segment that paints ACROSS <paramref name="order"/> into the part that paints before
+    /// it and the part that paints after, so the op stream has a place to put a newcomer of that rank. Nothing is re-baked
+    /// and no bytes move - the two halves keep drawing the items they already held.
+    /// <para>The cut point comes from the GROUPS: their runs record which slots belong to whom, and a walk fills a segment
+    /// in rank order, so the first slot owned by a later-ranked group is where the two halves part. Without this the
+    /// newcomer went in whole segments early or whole segments late, and stayed wrong until a full walk - seen as a rect
+    /// that had to sit ON a card drawn underneath it, and as the flake in ViewportResize_Splices.</para></summary>
+    private void SplitSegmentSpanningRank(long order)
+    {
+        for (var i = 0; i < _ops.Count; i++)
+        {
+            var op = _ops[i];
+            if (op.Kind != RenderOpKind.Segment || op.Batch != 0) continue;
+            if (op.OrderFirst >= order || order >= op.Order) continue;   // does not span this rank
+
+            var cut = FirstSlotPaintedAfter(op.SegIndex, order);
+            if (cut < 0) continue;   // its whole content paints BEFORE the newcomer after all - nothing to cut
+
+            var second = _rectBatch.SplitSegment(op.SegIndex, cut);
+            if (second < 0) continue;
+
+            // The split INSERTED a segment, so every op naming one at or after it now names the wrong one.
+            for (var k = 0; k < _ops.Count; k++)
+            {
+                var other = _ops[k];
+                if (other.Kind != RenderOpKind.Segment || other.Batch != 0 || other.SegIndex < second) continue;
+                other.SegIndex++;
+                _ops[k] = other;
+            }
+
+            // ...and so does every layer this frame's OTHER patches resolved BEFORE the split (phase 1b runs before any
+            // mutation, by design). A stale index here re-issues the wrong layer, which is the same shift-by-one bug in a
+            // form nothing in the picture would explain.
+            for (var k = 0; k < _patchBuf.Count; k++)
+            {
+                var other = _patchBuf[k];
+                if (other.Layer < second) continue;
+                other.Layer++;
+                _patchBuf[k] = other;
+            }
+
+            for (var k = 0; k < _patchLayers.Count; k++)
+            {
+                if (_patchLayers[k] >= second) _patchLayers[k]++;
+            }
+
+            var spanEnd = op.Order;
+            op.Order = order;   // this half now ends before the newcomer
+            _ops[i] = op;
+            _ops.Insert(i + 1, new RenderOp
+            {
+                Kind = RenderOpKind.Segment, Batch = 0, SegIndex = second, Order = spanEnd, OrderFirst = order
+            });
+            return;   // one rank cuts one segment: the halves no longer span it
+        }
+    }
+
+    // The first slot inside this segment that belongs to a group painting AFTER the given rank, or -1 if none does. Only
+    // groups the current walk described can answer - a stale group's runs point at slots that have since been reassigned.
+    private int FirstSlotPaintedAfter(int segIndex, long order)
+    {
+        var (first, count) = _rectBatch.SegmentRange(segIndex);
+        var cut = -1;
+        foreach (var group in _groups)
+        {
+            if (group.WalkVersion != _walkVersion || group.Order <= order) continue;
+            foreach (var run in group.RectRuns)
+            {
+                if (run.First < first || run.First >= first + count) continue;
+                if (cut < 0 || run.First < cut) cut = run.First;
+            }
+        }
+
+        return cut > first ? cut : -1;   // a cut at the very start is not a cut: the whole segment paints after
     }
 
     // A group's units map onto its run one-for-one only when the run accounts for all of them; a partly-culled group gives

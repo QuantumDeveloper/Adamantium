@@ -40,6 +40,12 @@ internal sealed class HaloLivingCollector : SdfBatchCollector<HaloLivingItem>
         _segState[index] = _field;
     }
 
+    protected override void OnSegmentInserted(int index)
+    {
+        while (_segState.Count < index) _segState.Add(null);
+        _segState.Insert(index, index > 0 ? _segState[index - 1] : null);
+    }
+
     protected override void BindSegment(int index) => _field = _segState[index];
 
     public bool SameField(ITexture field) => field == null || _field == null || _field == field;

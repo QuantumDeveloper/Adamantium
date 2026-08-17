@@ -165,29 +165,29 @@ public class BorderPatchRenderTests
     // The neighbour's unit COUNT changes (0 -> 1), which is the splice path: runs are excised, appended and renumbered
     // around the borders. A slot that ends up belonging to somebody else is how a border silently loses its ring.
     //
-    // FAILS TODAY, deterministically, and it is not about borders - the same scene with plain rects fails identically.
-    // A batch SEGMENT glues every control between two flushes and the op that draws it carries one rank, so a newcomer
-    // whose rank lands INSIDE that span has nowhere correct to go: inserted before the op it paints under the cards it
-    // must cover (measured: the newcomer came out rgb 25,115,0 against 0,128,0 from a walk), inserted after it would
-    // cover cards that paint later. The segment has to be SPLIT at that rank; both cheaper answers were tried and each
-    // breaks the other half (see OpIndexForRank).
-    // Kept as the repro because until now this defect was only ever seen as a 1-in-6 flake in
-    // ViewportResize_Splices_AndKeepsDrawnGeometryFresh, which is far too thin a thread to fix a paint-order bug by.
+    // This is the one that found the paint-order defect this fixture was written for, and it was never about borders - the
+    // same scene with plain rects failed identically. A batch SEGMENT glues every control between two flushes while the op
+    // drawing it carries one rank, so a newcomer whose rank lands INSIDE that span had nowhere correct to go: inserted
+    // before the op it painted UNDER the card it must cover (measured: rgb 25,115,0 where a walk gives 0,128,0), and
+    // inserted after it would cover cards that paint later. The segment is now cut at the newcomer's rank.
+    // Until this test the defect was only ever seen as a 1-in-6 flake in ViewportResize_Splices - far too thin a thread
+    // to fix a paint-order bug by.
     [Test]
-    [Explicit("Reproduces the open paint-order defect (docs/RENDER_CACHE_REDESIGN.md §7): a spliced newcomer whose rank falls inside a segment's span")]
-    public void ANeighbourAppearing_DoesNotCostABorderItsRing()
+    public void ANeighbourAppearing_LandsOnTopOfTheCard_NotUnderIt()
     {
         using var scene = NewScene();
-        var ringBefore = BorderPixels(Pixels(scene.Renderer));
+        Assert.That(BorderPixels(Pixels(scene.Renderer)), Is.GreaterThan(0), "the setup must actually draw rings");
 
         scene.Extras[2].RenderAction = s => s.DrawRectangle(Brushes.Green, new Rect(0, 0, 8, RowHeight));
         scene.Extras[2].Invalidate();
         scene.Draw();
 
         var patched = Pixels(scene.Renderer);
-        Assert.That(BorderPixels(patched), Is.EqualTo(ringBefore),
-            "a rect appearing next door must not take a border's ring with it");
-        AssertMatchesAFullWalk(scene, patched, "and the frame must match a full walk");
+        Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.True,
+            "and it must still be a patch - a correct picture bought with a full walk is the other half of this bug");
+        // The newcomer paints AFTER its row's card, so it legitimately covers part of that card's ring. What it may not do
+        // is differ from what the walk draws, which is what the count alone cannot tell.
+        AssertMatchesAFullWalk(scene, patched, "the newcomer must land exactly where a full walk puts it");
     }
 
     // ...and again, with the newcomer VANISHING - the other half of the splice, where a run is excised and what follows

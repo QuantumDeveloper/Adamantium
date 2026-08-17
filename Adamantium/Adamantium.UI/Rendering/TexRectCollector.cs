@@ -43,6 +43,12 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
         _segState[index] = _texture;
     }
 
+    protected override void OnSegmentInserted(int index)
+    {
+        while (_segState.Count < index) _segState.Add(null);
+        _segState.Insert(index, index > 0 ? _segState[index - 1] : null);
+    }
+
     protected override void BindSegment(int index) => _texture = _segState[index];
 
     /// <summary>Still the pending segment's texture? One draw binds one texture, so a change flushes the batch - the
