@@ -404,10 +404,9 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             // had. Measured on a docking panel returning from a window: its tab strip measured 272x36 while the grid one
             // level up stayed at 0 and "valid", so the strip was drawn empty until something else disturbed the tree.
             // NOT while the parent is measuring US - that cascade is already computing its own size from this one.
-            if (previousDesired != desiredSize
-                && VisualParent is MeasurableUIComponent { IsMeasureValid: true, _measuring: false, IsMeasureBoundary: false } parent)
+            if (previousDesired != desiredSize)
             {
-                parent.InvalidateMeasure();
+                NotifyParentOfContributionChange();
             }
             // Cache the AVAILABLE size this measure ran with - the gate above compares the next availableSize against
             // it to skip a redundant re-measure. (Storing DesiredSize here was the bug: desired != available for any
@@ -787,6 +786,20 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
     /// boundary automatically - just like WPF. An auto-sized element (either dimension NaN) measures to fit its
     /// children, so a child's size change DOES propagate up. A virtualizing items host overrides this further.</summary>
     public virtual bool IsMeasureBoundary => !Double.IsNaN(Width) && !Double.IsNaN(Height);
+
+    /// <summary>The one place that decides WHEN a parent has to hear that this element's contribution changed - both
+    /// callers (a measure that came out a different size, and a visibility write, which no measure can reveal because a
+    /// collapsed element reports zero from the instant the flag lands) go through here.
+    /// <para>Not while the parent is measuring US: that cascade is already computing its own size from this one. Not a
+    /// measure BOUNDARY (fixed size, or a virtualizing host whose extent is count x cell): propagating in is spurious
+    /// and, running outside the panel's own layout mute, re-dirties it every iteration.</para></summary>
+    internal override void NotifyParentOfContributionChange()
+    {
+        if (VisualParent is MeasurableUIComponent { IsMeasureValid: true, _measuring: false, IsMeasureBoundary: false } parent)
+        {
+            parent.InvalidateMeasure();
+        }
+    }
 
     public virtual void InvalidateMeasure()
     {
