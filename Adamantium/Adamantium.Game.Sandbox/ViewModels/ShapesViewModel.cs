@@ -17,4 +17,7 @@ public partial class ShapesViewModel : TabPageViewModel
 
     /// <summary>The sector stand: start, sweep, thickness, and the two ways a partial ellipse closes.</summary>
     public ArcSettings Arc { get; } = new();
+
+    /// <summary>The polygon stand: one slider from a triangle to a circle.</summary>
+    public PolygonSettings Polygon { get; } = new();
 }

@@ -130,7 +130,7 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
         {
             return false;
         }
-        if (!Bake(p.Brush, p.DestinationRect, p.CornerRadius, false, world, opacity, transformSlot, out var baked))
+        if (!Bake(p.Brush, p.DestinationRect, p.CornerRadius, BrushShape.Rect, world, opacity, transformSlot, out var baked))
         {
             return false;
         }
@@ -166,7 +166,39 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
         {
             return false;
         }
-        if (!Bake(p.Brush, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, true, world, opacity, transformSlot, out var baked))
+        if (!Bake(p.Brush, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, BrushShape.Ellipse, world, opacity, transformSlot, out var baked))
+        {
+            return false;
+        }
+
+        _texture = texture;
+        Items[Count++] = baked[0];
+        MarkPending(scissor, logicalBounds);
+        return true;
+    }
+
+    // POLYGON variant: a regular polygon with a textured fill (a picture, a drawing, a live element) batches into the
+    // SAME pass. The shape stays a field - one instanced draw, crisp at any zoom - and only the source of the colour
+    // differs. A NineSliceBrush does not come here for the same reason it does not come to the ellipse: nine quads cut on
+    // four straight lines mean nothing on a shape that is not a rect.
+    /// <summary>THE one statement for the polygon form - the render unit asks THIS, never its own copy.</summary>
+    public static bool WantsBatchPolygon(RegularPolygonPayload p)
+    {
+        if (!Enabled) return false;
+        if (p.Brush is not TileBrush || p.Brush is NineSliceBrush) return false;
+        if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
+        return !RegularPolygonCollector.NeedsArcLength(p.Pen);
+    }
+
+    public bool CanBatchPolygon(RegularPolygonPayload p) => WantsBatchPolygon(p);
+
+    public bool TryAddPolygon(RegularPolygonPayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds,
+        ITexture texture, int transformSlot = 0)
+    {
+        EnsureCpuCapacity(Count + 1);
+        if (Count + 1 > GpuCapacity) return false;
+        if (!Bake(p.Brush, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, BrushShape.Polygon(p, (float)world.M11),
+                world, opacity, transformSlot, out var baked))
         {
             return false;
         }
@@ -180,7 +212,7 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
     // Bake a textured fill into 1 or 9 instance records. Position -> world; false on a rotated/sheared world (the
     // axis-aligned instance cannot hold it) so the caller falls back to the per-unit path. The four corner radii ride in
     // Radii, scaled with the world; Params.x carries the LARGEST of them, or -1 as the ELLIPSE shape flag.
-    private static bool Bake(Brush brush, Rect destinationRect, ProceduralGeometry.CornerRadius corners, bool ellipse, Matrix4x4F world, double opacity,
+    private static bool Bake(Brush brush, Rect destinationRect, ProceduralGeometry.CornerRadius corners, BrushShape shape, Matrix4x4F world, double opacity,
         int transformSlot, out TexRectItem[] items)
     {
         items = null;
@@ -196,8 +228,9 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
         var ty = world.M42;
         var r = destinationRect;
         var bounds = new Rect(r.X * sx + tx, r.Y * sy + ty, r.Width * sx, r.Height * sy);
-        var radii = ellipse ? Vector4F.Zero : RectBatchCollector.BakeRadii(corners, r, sx);
-        var radius = ellipse ? -1f : RectBatchCollector.MaxOf(radii);
+        var rectRadii = RectBatchCollector.BakeRadii(corners, r, sx);
+        var radii = shape.RadiiFor(rectRadii);
+        var radius = shape.RadiusFlag(rectRadii);
 
         items = brush switch
         {

@@ -21,6 +21,14 @@ public interface IDrawingSession
     /// <param name="ringThickness">Leave a RING this thick (DIPs, inward from the outline) instead of a solid shape: an
     /// annulus, or with a sweep an annular sector. It is geometry, not a stroke - so the pen stays free to outline it.</param>
     IDrawingSession DrawEllipse(Rect destinationRect, Brush brush, Double startAngle, Double sweepAngle, EllipseType ellipseType, Pen pen = null, Double ringThickness = 0);
+    /// <summary>A REGULAR POLYGON inscribed in the rect: N corners evenly round it, the first on the +x axis. Three is a
+    /// triangle and enough of them is a circle, so one shape covers chevrons, ticks, diamonds and hexagons.</summary>
+    /// <param name="ringThickness">Leave a RING this thick (DIPs, inward) instead of a solid shape - a hollow triangle,
+    /// as geometry rather than a stroke.</param>
+    /// <param name="startAngle">Where corner 0 sits, in DEGREES from the +x axis - what stands a triangle on a corner
+    /// instead of pointing it right.</param>
+    IDrawingSession DrawRegularPolygon(Brush brush, Rect destinationRect, int corners, Pen pen = null, Double ringThickness = 0, Double startAngle = 0);
+
     IDrawingSession DrawGeometry(Brush brush, Geometry geometry, Pen pen = null);
 
     /// <summary>Draws the geometry placed by <paramref name="transform"/>, WITHOUT touching the geometry itself. A

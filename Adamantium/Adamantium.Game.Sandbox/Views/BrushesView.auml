@@ -37,14 +37,16 @@
                                  Visibility="{Binding HaloShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Ellipse}"/>
                         <!-- Tessellated shapes: their band reads a distance field baked per mesh, so it follows a
                              concave outline - the star's notches keep their own glow instead of being bridged over. -->
-                        <Polygon Points="{Binding HaloTriangle}"
+                        <RegularPolygon Width="120" Height="120"
+                                 Corners="{Binding ShapeCornerCount}"
+                                 StartAngle="{Binding ShapeStartAngle}"
                                  Fill="#E2E8F0"
                                  HorizontalAlignment="Center"
                                  VerticalAlignment="Center"
                                  Margin="{Binding HaloMargin, Converter={conv:DoubleToThicknessConverter}}"
                                  Aura="{Binding LiveAura}"
                                  Shadow="{Binding LiveShadow}"
-                                 Visibility="{Binding HaloShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Triangle}"/>
+                                 Visibility="{Binding HaloShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Polygon}"/>
                         <Polygon Points="{Binding HaloStar}"
                                  Fill="#E2E8F0"
                                  HorizontalAlignment="Center"
@@ -58,9 +60,36 @@
                 <StackPanel Orientation="Vertical" Width="300" MarginLeft="16" VerticalAlignment="Center">
                     <TextBlock Text="Paint it on" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <DropDown ItemsSource="{Binding HaloShapes}" SelectedItem="{Binding HaloShape, Mode=TwoWay}" Width="280" MarginBottom="10"/>
+                    <!-- Only for the polygon: on a rect or an ellipse these two numbers mean nothing, and a control that
+                         does nothing is worse than one that is not there. -->
+                    <StackPanel Orientation="Vertical" Visibility="{Binding HaloShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Polygon}">
+                        <!-- The polygon's two numbers, shared by every stand on this tab: change them here and all of them follow. -->
+                        <TextBlock Text="Corners — 3 is a triangle, enough of them a circle" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="6">
+                            <Slider Value="{Binding ShapeCorners, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="3" Maximum="24"
+                                    TickFrequency="1" IsSnapToTickEnabled="true" Width="180"/>
+                            <NumericUpDown Width="88" Minimum="3" Maximum="24" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding ShapeCorners, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
+                        <TextBlock Text="Start angle — where corner 0 sits" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Value="{Binding ShapeStartAngle, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="360"
+                                    TickFrequency="1" IsSnapToTickEnabled="true" Width="180"/>
+                            <NumericUpDown Width="88" Minimum="0" Maximum="360" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding ShapeStartAngle, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
+                    </StackPanel>
                     <StackPanel Orientation="Vertical" Visibility="{Binding HaloShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Rectangle}">
                         <TextBlock Text="Corner radius" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                        <Slider Value="{Binding HaloRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="60" Width="280" MarginBottom="10"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Value="{Binding HaloRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="60" Width="186"/>
+                            <NumericUpDown Width="88" Minimum="0" Maximum="60" SmallChange="1"
+                                           SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding HaloRadius, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
                     </StackPanel>
                     <!-- Margin is LAYOUT, not a band parameter - it does nothing to the glow itself. It is here only to
                          show the one rule the engine will not keep for you: bounds are never grown to fit a band, so a
@@ -68,15 +97,39 @@
                     <CheckBox Content="Clip to the element's box" IsChecked="{Binding HaloClip, Mode=TwoWay}" MarginBottom="4"/>
                     <TextBlock Text="Margin — layout, not a band setting. With the clip on, drop it below the radius and the band is cut: bounds are never grown to fit a glow."
                                TextWrapping="WrapByWords" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding HaloMargin, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="70" Width="280" MarginBottom="14"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="14">
+                        <Slider Value="{Binding HaloMargin, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="70" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="70" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding HaloMargin, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
 
                     <CheckBox Content="AURA — no direction" IsChecked="{Binding AuraOn, Mode=TwoWay}" FontSize="14" MarginBottom="6"/>
                     <TextBlock Text="Radius — how far it reaches" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding AuraRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="60" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding AuraRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="60" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="60" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding AuraRadius, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Spread — solid rim before the fade" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding AuraSpread, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="30" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding AuraSpread, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="30" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="30" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding AuraSpread, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Opacity" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding AuraOpacity, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding AuraOpacity, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="1" SmallChange="0.05"
+                                       SnapsToSmallChange="true" StringFormat="N2"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding AuraOpacity, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <CheckBox Content="Inner (glow inward — needs no margin at all)" IsChecked="{Binding AuraInner, Mode=TwoWay}" MarginBottom="6"/>
                     <TextBlock Text="Colour" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding AuraColor, Mode=TwoWay}" MarginBottom="14"/>
@@ -86,11 +139,29 @@
                     <TextBlock Text="ALIVE — the reach breathes" FontSize="14" MarginBottom="6"/>
                     <TextBlock Text="Turbulence — how far the reach wanders (0 = still)"
                                TextWrapping="WrapByWords" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding AuraTurbulence, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="2" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding AuraTurbulence, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="2" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="2" SmallChange="0.05"
+                                       SnapsToSmallChange="true" StringFormat="N2"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding AuraTurbulence, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Flow — how fast it drifts" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding AuraFlow, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="3" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding AuraFlow, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="3" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="3" SmallChange="0.05"
+                                       SnapsToSmallChange="true" StringFormat="N2"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding AuraFlow, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Detail — how many tongues run around it" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding AuraDetail, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0.5" Maximum="12" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding AuraDetail, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0.5" Maximum="12" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0.5" Maximum="12" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding AuraDetail, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <CheckBox Content="Palette — travel four colours instead of one" IsChecked="{Binding AuraPalette, Mode=TwoWay}" MarginBottom="6"/>
                     <StackPanel Orientation="Vertical" Visibility="{Binding AuraPalette, Converter={conv:BoolToVisibilityConverter}}">
                         <TextBlock Text="The four it travels through" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
@@ -107,15 +178,45 @@
                 <StackPanel Orientation="Vertical" Width="300" MarginLeft="24" VerticalAlignment="Center">
                     <CheckBox Content="SHADOW — thrown where the light is not" IsChecked="{Binding ShadowOn, Mode=TwoWay}" FontSize="14" MarginBottom="6"/>
                     <TextBlock Text="Offset X / Y" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding ShadowOffsetX, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="-40" Maximum="40" Width="280" MarginBottom="6"/>
-                    <Slider Value="{Binding ShadowOffsetY, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="-40" Maximum="40" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="6">
+                        <Slider Value="{Binding ShadowOffsetX, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="-40" Maximum="40" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="-40" Maximum="40" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding ShadowOffsetX, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding ShadowOffsetY, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="-40" Maximum="40" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="-40" Maximum="40" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding ShadowOffsetY, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Blur radius — how soft the edge is" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding ShadowBlur, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="60" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding ShadowBlur, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="60" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="60" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding ShadowBlur, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Spread — how HIGH it floats (negative peeks out from one edge)"
                                TextWrapping="WrapByWords" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding ShadowSpread, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="-20" Maximum="30" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding ShadowSpread, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="-20" Maximum="30" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="-20" Maximum="30" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding ShadowSpread, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Opacity" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding ShadowOpacity, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding ShadowOpacity, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="1" SmallChange="0.05"
+                                       SnapsToSmallChange="true" StringFormat="N2"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding ShadowOpacity, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <CheckBox Content="Inner (inset — the pressed look)" IsChecked="{Binding ShadowInner, Mode=TwoWay}" MarginBottom="6"/>
                     <TextBlock Text="Colour" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding ShadowColor, Mode=TwoWay}"/>
@@ -343,13 +444,16 @@
                                  Height="{Binding ImageHeight}"
                                  Fill="{Binding LiveImage}"
                                  Visibility="{Binding ImageShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Ellipse}"/>
-                        <!-- A Polygon keeps its authored coordinates, so its points follow the size sliders from the
-                             view-model rather than stretching to the slot. -->
-                        <Polygon Points="{Binding ImageTriangle}"
+                        <!-- The polygon takes its shape from two numbers (below), so the same preview is a triangle, a
+                             hexagon or a near-circle without a second control ever being touched. -->
+                        <RegularPolygon Width="{Binding ImagePolygonSize}"
+                                 Height="{Binding ImagePolygonSize}"
+                                 Corners="{Binding ShapeCornerCount}"
+                                 StartAngle="{Binding ShapeStartAngle}"
                                  Fill="{Binding LiveImage}"
                                  HorizontalAlignment="Center"
                                  VerticalAlignment="Center"
-                                 Visibility="{Binding ImageShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Triangle}"/>
+                                 Visibility="{Binding ImageShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Polygon}"/>
                         <Polygon Points="{Binding ImageStar}"
                                  Fill="{Binding LiveImage}"
                                  HorizontalAlignment="Center"
@@ -360,20 +464,71 @@
                 <StackPanel Orientation="Vertical" Width="300" MarginLeft="16" VerticalAlignment="Center">
                     <TextBlock Text="Paint it on" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <DropDown ItemsSource="{Binding PreviewShapes}" SelectedItem="{Binding ImageShape, Mode=TwoWay}" Width="280" MarginBottom="10"/>
+                    <!-- Only for the polygon: on a rect or an ellipse these two numbers mean nothing, and a control that
+                         does nothing is worse than one that is not there. -->
+                    <StackPanel Orientation="Vertical" Visibility="{Binding ImageShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Polygon}">
+                        <!-- The polygon's two numbers, shared by every stand on this tab: change them here and all of them follow. -->
+                        <TextBlock Text="Corners — 3 is a triangle, enough of them a circle" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="6">
+                            <Slider Value="{Binding ShapeCorners, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="3" Maximum="24"
+                                    TickFrequency="1" IsSnapToTickEnabled="true" Width="180"/>
+                            <NumericUpDown Width="88" Minimum="3" Maximum="24" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding ShapeCorners, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
+                        <TextBlock Text="Start angle — where corner 0 sits" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Value="{Binding ShapeStartAngle, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="360"
+                                    TickFrequency="1" IsSnapToTickEnabled="true" Width="180"/>
+                            <NumericUpDown Width="88" Minimum="0" Maximum="360" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding ShapeStartAngle, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
+                    </StackPanel>
                     <TextBlock Text="Tile mode" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <DropDown ItemsSource="{Binding TileModes}" SelectedItem="{Binding ImageTileMode, Mode=TwoWay}" Width="280" MarginBottom="10"/>
                     <TextBlock Text="Stretch (only while Tile mode is None)" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <DropDown ItemsSource="{Binding Stretches}" SelectedItem="{Binding ImageStretch, Mode=TwoWay}" Width="280" MarginBottom="10"/>
                     <TextBlock Text="Tile size" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding ImageTile, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="8" Maximum="160" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding ImageTile, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="8" Maximum="160" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="8" Maximum="160" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding ImageTile, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Width" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding ImageWidth, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="40" Maximum="340" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding ImageWidth, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="40" Maximum="340" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="40" Maximum="340" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding ImageWidth, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Height" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding ImageHeight, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="40" Maximum="220" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding ImageHeight, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="40" Maximum="220" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="40" Maximum="220" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding ImageHeight, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Corner radius" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding ImageRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="100" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding ImageRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="100" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="100" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding ImageRadius, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Grid rotation — turns the TILING" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding ImageRotation, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="360" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding ImageRotation, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="360" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="360" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding ImageRotation, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Tint" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding ImageTint, Mode=TwoWay}"/>
                 </StackPanel>
@@ -399,11 +554,14 @@
                                  Height="{Binding DrawingHeight}"
                                  Fill="{Binding LiveDrawing}"
                                  Visibility="{Binding DrawingShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Ellipse}"/>
-                        <Polygon Points="{Binding DrawingTriangle}"
+                        <RegularPolygon Width="{Binding DrawingPolygonSize}"
+                                 Height="{Binding DrawingPolygonSize}"
+                                 Corners="{Binding ShapeCornerCount}"
+                                 StartAngle="{Binding ShapeStartAngle}"
                                  Fill="{Binding LiveDrawing}"
                                  HorizontalAlignment="Center"
                                  VerticalAlignment="Center"
-                                 Visibility="{Binding DrawingShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Triangle}"/>
+                                 Visibility="{Binding DrawingShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Polygon}"/>
                         <Polygon Points="{Binding DrawingStar}"
                                  Fill="{Binding LiveDrawing}"
                                  HorizontalAlignment="Center"
@@ -414,6 +572,27 @@
                 <StackPanel Orientation="Vertical" Width="300" MarginLeft="16">
                     <TextBlock Text="Paint it on" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <DropDown ItemsSource="{Binding PreviewShapes}" SelectedItem="{Binding DrawingShape, Mode=TwoWay}" Width="280" MarginBottom="10"/>
+                    <!-- Only for the polygon: on a rect or an ellipse these two numbers mean nothing, and a control that
+                         does nothing is worse than one that is not there. -->
+                    <StackPanel Orientation="Vertical" Visibility="{Binding DrawingShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Polygon}">
+                        <!-- The polygon's two numbers, shared by every stand on this tab: change them here and all of them follow. -->
+                        <TextBlock Text="Corners — 3 is a triangle, enough of them a circle" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="6">
+                            <Slider Value="{Binding ShapeCorners, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="3" Maximum="24"
+                                    TickFrequency="1" IsSnapToTickEnabled="true" Width="180"/>
+                            <NumericUpDown Width="88" Minimum="3" Maximum="24" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding ShapeCorners, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
+                        <TextBlock Text="Start angle — where corner 0 sits" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Value="{Binding ShapeStartAngle, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="360"
+                                    TickFrequency="1" IsSnapToTickEnabled="true" Width="180"/>
+                            <NumericUpDown Width="88" Minimum="0" Maximum="360" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding ShapeStartAngle, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
+                    </StackPanel>
                     <TextBlock Text="Tile mode" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <DropDown ItemsSource="{Binding TileModes}" SelectedItem="{Binding DrawingTileMode, Mode=TwoWay}" Width="280" MarginBottom="10"/>
                     <TextBlock Text="Stretch — fits the content inside ONE tile" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
@@ -425,29 +604,95 @@
                     <TextBlock Text="Viewport units — px, or a fraction of the shape" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <DropDown ItemsSource="{Binding MappingModes}" SelectedItem="{Binding DrawingViewportUnits, Mode=TwoWay}" Width="280" MarginBottom="10"/>
                     <TextBlock Text="Viewport size — one tile (sizes the SINGLE copy too, so None puts it in a corner)" Foreground="{ResourceReference TextFillColorSecondary}" TextWrapping="WrapByWords" MarginBottom="2"/>
-                    <Slider Value="{Binding DrawingViewportSize, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="16" Maximum="200" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding DrawingViewportSize, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="16" Maximum="200" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="16" Maximum="200" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding DrawingViewportSize, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Viewport origin X — shifts the whole grid" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding DrawingViewportOriginX, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="-100" Maximum="100" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding DrawingViewportOriginX, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="-100" Maximum="100" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="-100" Maximum="100" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding DrawingViewportOriginX, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Viewport origin Y" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding DrawingViewportOriginY, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="-100" Maximum="100" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding DrawingViewportOriginY, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="-100" Maximum="100" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="-100" Maximum="100" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding DrawingViewportOriginY, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                 </StackPanel>
                 <StackPanel Orientation="Vertical" Width="300" MarginLeft="16">
                     <TextBlock Text="Viewbox X — which part of the drawing a tile shows" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding DrawingViewboxX, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding DrawingViewboxX, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="1" SmallChange="0.05"
+                                       SnapsToSmallChange="true" StringFormat="N2"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding DrawingViewboxX, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Viewbox Y" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding DrawingViewboxY, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding DrawingViewboxY, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="1" SmallChange="0.05"
+                                       SnapsToSmallChange="true" StringFormat="N2"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding DrawingViewboxY, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Viewbox size — 1 is the whole drawing" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding DrawingViewboxSize, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0.1" Maximum="1" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding DrawingViewboxSize, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0.1" Maximum="1" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0.1" Maximum="1" SmallChange="0.05"
+                                       SnapsToSmallChange="true" StringFormat="N2"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding DrawingViewboxSize, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Width" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding DrawingWidth, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="40" Maximum="340" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding DrawingWidth, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="40" Maximum="340" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="40" Maximum="340" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding DrawingWidth, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Height" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding DrawingHeight, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="40" Maximum="220" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding DrawingHeight, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="40" Maximum="220" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="40" Maximum="220" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding DrawingHeight, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Corner radius" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding DrawingRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="100" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding DrawingRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="100" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="100" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding DrawingRadius, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Grid rotation — turns the TILING, not the content" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding DrawingRotation, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="360" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding DrawingRotation, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="360" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="360" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding DrawingRotation, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Opacity" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding DrawingOpacity, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding DrawingOpacity, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="1" SmallChange="0.05"
+                                       SnapsToSmallChange="true" StringFormat="N2"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding DrawingOpacity, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Tint" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding DrawingTint, Mode=TwoWay}"/>
                 </StackPanel>
@@ -465,6 +710,8 @@
                     <Border x:Name="ReflectionSource" Width="240" Height="150" Background="#101418" CornerRadius="8">
                         <StackPanel Orientation="Vertical" Margin="14">
                             <TextBlock Text="I am a live element" MarginBottom="8"/>
+                            <!-- No field beside this one: the slider is INSIDE the brush's source, so anything added here
+                                 is repainted in the reflection too. What this stand shows is the reflection, not a form. -->
                             <Slider Value="{Binding VisualSourceValue, Mode=TwoWay}" Minimum="10" Maximum="180" Width="200" MarginBottom="10"/>
                             <!-- 44 = two whole rows of the pattern's 22px cell. At 34 the second row landed on the
                                  element's own edge and came out sliced in half, which reads as a rendering fault. -->
@@ -516,11 +763,14 @@
                                              Tint="{Binding VisualTint}"/>
                             </Ellipse.Fill>
                         </Ellipse>
-                        <Polygon Points="{Binding VisualTriangle}"
+                        <RegularPolygon Width="{Binding VisualPolygonSize}"
+                                 Height="{Binding VisualPolygonSize}"
+                                 Corners="{Binding ShapeCornerCount}"
+                                 StartAngle="{Binding ShapeStartAngle}"
                                  HorizontalAlignment="Center"
                                  VerticalAlignment="Center"
-                                 Visibility="{Binding VisualShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Triangle}">
-                            <Polygon.Fill>
+                                 Visibility="{Binding VisualShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Polygon}">
+                            <RegularPolygon.Fill>
                                 <VisualBrush Visual="{Binding ElementName=ReflectionSource}"
                                              TileMode="{Binding VisualTileMode}"
                                              Stretch="{Binding VisualStretch}"
@@ -528,8 +778,8 @@
                                              Viewport="{Binding VisualViewportSize, Converter={conv:DoubleToSquareViewportConverter}}"
                                              RotationAngle="{Binding VisualRotation}"
                                              Tint="{Binding VisualTint}"/>
-                            </Polygon.Fill>
-                        </Polygon>
+                            </RegularPolygon.Fill>
+                        </RegularPolygon>
                         <Polygon Points="{Binding VisualStar}"
                                  HorizontalAlignment="Center"
                                  VerticalAlignment="Center"
@@ -550,6 +800,27 @@
                 <StackPanel Orientation="Vertical" Width="290" MarginLeft="16">
                     <TextBlock Text="Paint it on" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <DropDown ItemsSource="{Binding PreviewShapes}" SelectedItem="{Binding VisualShape, Mode=TwoWay}" Width="270" MarginBottom="10"/>
+                    <!-- Only for the polygon: on a rect or an ellipse these two numbers mean nothing, and a control that
+                         does nothing is worse than one that is not there. -->
+                    <StackPanel Orientation="Vertical" Visibility="{Binding VisualShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Polygon}">
+                        <!-- The polygon's two numbers, shared by every stand on this tab: change them here and all of them follow. -->
+                        <TextBlock Text="Corners — 3 is a triangle, enough of them a circle" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="6">
+                            <Slider Value="{Binding ShapeCorners, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="3" Maximum="24"
+                                    TickFrequency="1" IsSnapToTickEnabled="true" Width="170"/>
+                            <NumericUpDown Width="88" Minimum="3" Maximum="24" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding ShapeCorners, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
+                        <TextBlock Text="Start angle — where corner 0 sits" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Value="{Binding ShapeStartAngle, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="360"
+                                    TickFrequency="1" IsSnapToTickEnabled="true" Width="170"/>
+                            <NumericUpDown Width="88" Minimum="0" Maximum="360" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding ShapeStartAngle, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
+                    </StackPanel>
                     <TextBlock Text="Tile mode" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <DropDown ItemsSource="{Binding TileModes}" SelectedItem="{Binding VisualTileMode, Mode=TwoWay}" Width="270" MarginBottom="10"/>
                     <TextBlock Text="Stretch — fits the source inside ONE tile" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
@@ -562,17 +833,53 @@
 
                 <StackPanel Orientation="Vertical" Width="290" MarginLeft="16">
                     <TextBlock Text="Tile size (px) — smaller than the shape starts tiling" Foreground="{ResourceReference TextFillColorSecondary}" TextWrapping="WrapByWords" MarginBottom="2"/>
-                    <Slider Value="{Binding VisualViewportSize, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="30" Maximum="300" Width="270" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding VisualViewportSize, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="30" Maximum="300" Width="176"/>
+                        <NumericUpDown Width="88" Minimum="30" Maximum="300" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding VisualViewportSize, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Grid rotation" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding VisualRotation, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="360" Width="270" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding VisualRotation, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="360" Width="176"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="360" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding VisualRotation, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Width" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding VisualWidth, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="60" Maximum="290" Width="270" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding VisualWidth, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="60" Maximum="290" Width="176"/>
+                        <NumericUpDown Width="88" Minimum="60" Maximum="290" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding VisualWidth, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Height" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding VisualHeight, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="60" Maximum="220" Width="270" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding VisualHeight, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="60" Maximum="220" Width="176"/>
+                        <NumericUpDown Width="88" Minimum="60" Maximum="220" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding VisualHeight, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Corner radius" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding VisualRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="100" Width="270" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding VisualRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="100" Width="176"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="100" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding VisualRadius, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Opacity" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding VisualOpacity, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="270" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding VisualOpacity, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="1" Width="176"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="1" SmallChange="0.05"
+                                       SnapsToSmallChange="true" StringFormat="N2"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding VisualOpacity, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Tint" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding VisualTint, Mode=TwoWay}"/>
                 </StackPanel>
@@ -585,10 +892,10 @@
                                Visibility="{Binding MeshShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Rectangle}"/>
                     <Ellipse Width="300" Height="200" Fill="{Binding LiveMesh}"
                              Visibility="{Binding MeshShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Ellipse}"/>
-                    <Polygon Points="150,0 300,200 0,200" Fill="{Binding LiveMesh}"
+                    <RegularPolygon Width="200" Height="200" Corners="{Binding ShapeCornerCount}" StartAngle="{Binding ShapeStartAngle}" Fill="{Binding LiveMesh}"
                              HorizontalAlignment="Center"
                              VerticalAlignment="Center"
-                             Visibility="{Binding MeshShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Triangle}"/>
+                             Visibility="{Binding MeshShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Polygon}"/>
                     <Polygon Points="{Binding FixedStar}" Fill="{Binding LiveMesh}"
                              HorizontalAlignment="Center"
                              VerticalAlignment="Center"
@@ -597,6 +904,27 @@
                 <StackPanel Orientation="Vertical" Width="300" MarginLeft="16" VerticalAlignment="Center">
                     <TextBlock Text="Paint it on" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <DropDown ItemsSource="{Binding PreviewShapes}" SelectedItem="{Binding MeshShape, Mode=TwoWay}" Width="280" MarginBottom="10"/>
+                    <!-- Only for the polygon: on a rect or an ellipse these two numbers mean nothing, and a control that
+                         does nothing is worse than one that is not there. -->
+                    <StackPanel Orientation="Vertical" Visibility="{Binding MeshShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Polygon}">
+                        <!-- The polygon's two numbers, shared by every stand on this tab: change them here and all of them follow. -->
+                        <TextBlock Text="Corners — 3 is a triangle, enough of them a circle" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="6">
+                            <Slider Value="{Binding ShapeCorners, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="3" Maximum="24"
+                                    TickFrequency="1" IsSnapToTickEnabled="true" Width="180"/>
+                            <NumericUpDown Width="88" Minimum="3" Maximum="24" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding ShapeCorners, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
+                        <TextBlock Text="Start angle — where corner 0 sits" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Value="{Binding ShapeStartAngle, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="360"
+                                    TickFrequency="1" IsSnapToTickEnabled="true" Width="180"/>
+                            <NumericUpDown Width="88" Minimum="0" Maximum="360" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding ShapeStartAngle, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
+                    </StackPanel>
                     <TextBlock Text="Corners (top-left / top-right)" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <StackPanel Orientation="Horizontal" MarginBottom="10">
                         <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding MeshTopLeft, Mode=TwoWay}" MarginRight="8"/>
@@ -609,7 +937,13 @@
                     </StackPanel>
                     <StackPanel Orientation="Vertical" Visibility="{Binding MeshShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Rectangle}">
                         <TextBlock Text="Corner radius" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                        <Slider Value="{Binding MeshRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="100" Width="280"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Slider Value="{Binding MeshRadius, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="100" Width="186"/>
+                            <NumericUpDown Width="88" Minimum="0" Maximum="100" SmallChange="1"
+                                           SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding MeshRadius, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
                     </StackPanel>
                 </StackPanel>
             </StackPanel>
@@ -630,14 +964,38 @@
                     <TextBlock Text="Skin" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <DropDown ItemsSource="{Binding Skins}" SelectedItem="{Binding Skin, Mode=TwoWay}" Width="280" MarginBottom="10"/>
                     <TextBlock Text="Width" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding SliceWidth, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="40" Maximum="340" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding SliceWidth, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="40" Maximum="340" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="40" Maximum="340" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding SliceWidth, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Height" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding SliceHeight, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="40" Maximum="220" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding SliceHeight, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="40" Maximum="220" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="40" Maximum="220" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding SliceHeight, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Cut — where the SOURCE is cut (0.25 = these skins&apos; own 16px frame; move it and the pieces take each other&apos;s pixels)"
                                TextWrapping="WrapByWords" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding SliceCut, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0.05" Maximum="0.45" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding SliceCut, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0.05" Maximum="0.45" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0.05" Maximum="0.45" SmallChange="0.05"
+                                       SnapsToSmallChange="true" StringFormat="N2"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding SliceCut, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Border (0 = the source's own pixels)" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding SliceBorder, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="48" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding SliceBorder, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="48" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="48" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding SliceBorder, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <TextBlock Text="Edge mode" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <DropDown ItemsSource="{Binding EdgeModes}" SelectedItem="{Binding SliceEdgeMode, Mode=TwoWay}" Width="280" MarginBottom="10"/>
                     <CheckBox Content="Draw the centre" IsChecked="{Binding SliceDrawCenter, Mode=TwoWay}" MarginBottom="6"/>
@@ -655,10 +1013,10 @@
                                Visibility="{Binding PatternShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Rectangle}"/>
                     <Ellipse Width="300" Height="200" Fill="{Binding LivePattern}"
                              Visibility="{Binding PatternShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Ellipse}"/>
-                    <Polygon Points="150,0 300,200 0,200" Fill="{Binding LivePattern}"
+                    <RegularPolygon Width="200" Height="200" Corners="{Binding ShapeCornerCount}" StartAngle="{Binding ShapeStartAngle}" Fill="{Binding LivePattern}"
                              HorizontalAlignment="Center"
                              VerticalAlignment="Center"
-                             Visibility="{Binding PatternShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Triangle}"/>
+                             Visibility="{Binding PatternShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Polygon}"/>
                     <Polygon Points="{Binding FixedStar}" Fill="{Binding LivePattern}"
                              HorizontalAlignment="Center"
                              VerticalAlignment="Center"
@@ -667,17 +1025,56 @@
                 <StackPanel Orientation="Vertical" Width="300" MarginLeft="16" VerticalAlignment="Center">
                     <TextBlock Text="Paint it on" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <DropDown ItemsSource="{Binding PreviewShapes}" SelectedItem="{Binding PatternShape, Mode=TwoWay}" Width="280" MarginBottom="10"/>
+                    <!-- Only for the polygon: on a rect or an ellipse these two numbers mean nothing, and a control that
+                         does nothing is worse than one that is not there. -->
+                    <StackPanel Orientation="Vertical" Visibility="{Binding PatternShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Polygon}">
+                        <!-- The polygon's two numbers, shared by every stand on this tab: change them here and all of them follow. -->
+                        <TextBlock Text="Corners — 3 is a triangle, enough of them a circle" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="6">
+                            <Slider Value="{Binding ShapeCorners, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="3" Maximum="24"
+                                    TickFrequency="1" IsSnapToTickEnabled="true" Width="180"/>
+                            <NumericUpDown Width="88" Minimum="3" Maximum="24" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding ShapeCorners, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
+                        <TextBlock Text="Start angle — where corner 0 sits" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Value="{Binding ShapeStartAngle, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="360"
+                                    TickFrequency="1" IsSnapToTickEnabled="true" Width="180"/>
+                            <NumericUpDown Width="88" Minimum="0" Maximum="360" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding ShapeStartAngle, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
+                    </StackPanel>
                     <TextBlock Text="Pattern type" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <DropDown ItemsSource="{Binding PatternTypes}" SelectedItem="{Binding PatternKind, Mode=TwoWay}" Width="280" MarginBottom="10"/>
                     <TextBlock Text="Cell size" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding PatternCell, Mode=TwoWay}" Minimum="6" Maximum="60" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding PatternCell, Mode=TwoWay}" Minimum="6" Maximum="60" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="6" Maximum="60" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding PatternCell, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <StackPanel Orientation="Vertical" Visibility="{Binding PatternKind, Converter={conv:PatternParamVisibilityConverter}, ConverterParameter=Hatch}">
                         <TextBlock Text="Hatch angle" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                        <Slider Value="{Binding PatternHatchAngle, Mode=TwoWay}" Minimum="0" Maximum="180" Width="280" MarginBottom="10"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Value="{Binding PatternHatchAngle, Mode=TwoWay}" Minimum="0" Maximum="180" Width="186"/>
+                            <NumericUpDown Width="88" Minimum="0" Maximum="180" SmallChange="1"
+                                           SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding PatternHatchAngle, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
                     </StackPanel>
                     <StackPanel Orientation="Vertical" Visibility="{Binding PatternShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Rectangle}">
                         <TextBlock Text="Corner radius" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                        <Slider Value="{Binding PatternRadius, Mode=TwoWay}" Minimum="0" Maximum="100" Width="280" MarginBottom="10"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Value="{Binding PatternRadius, Mode=TwoWay}" Minimum="0" Maximum="100" Width="186"/>
+                            <NumericUpDown Width="88" Minimum="0" Maximum="100" SmallChange="1"
+                                           SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding PatternRadius, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
                     </StackPanel>
                     <TextBlock Text="Colours (background / feature)" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <StackPanel Orientation="Horizontal">
@@ -694,10 +1091,10 @@
                                Visibility="{Binding NoiseShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Rectangle}"/>
                     <Ellipse Width="300" Height="200" Fill="{Binding LiveNoise}"
                              Visibility="{Binding NoiseShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Ellipse}"/>
-                    <Polygon Points="150,0 300,200 0,200" Fill="{Binding LiveNoise}"
+                    <RegularPolygon Width="200" Height="200" Corners="{Binding ShapeCornerCount}" StartAngle="{Binding ShapeStartAngle}" Fill="{Binding LiveNoise}"
                              HorizontalAlignment="Center"
                              VerticalAlignment="Center"
-                             Visibility="{Binding NoiseShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Triangle}"/>
+                             Visibility="{Binding NoiseShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Polygon}"/>
                     <Polygon Points="{Binding FixedStar}" Fill="{Binding LiveNoise}"
                              HorizontalAlignment="Center"
                              VerticalAlignment="Center"
@@ -706,32 +1103,95 @@
                 <StackPanel Orientation="Vertical" Width="300" MarginLeft="16" VerticalAlignment="Center">
                     <TextBlock Text="Paint it on" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <DropDown ItemsSource="{Binding PreviewShapes}" SelectedItem="{Binding NoiseShape, Mode=TwoWay}" Width="280" MarginBottom="10"/>
+                    <!-- Only for the polygon: on a rect or an ellipse these two numbers mean nothing, and a control that
+                         does nothing is worse than one that is not there. -->
+                    <StackPanel Orientation="Vertical" Visibility="{Binding NoiseShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Polygon}">
+                        <!-- The polygon's two numbers, shared by every stand on this tab: change them here and all of them follow. -->
+                        <TextBlock Text="Corners — 3 is a triangle, enough of them a circle" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="6">
+                            <Slider Value="{Binding ShapeCorners, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="3" Maximum="24"
+                                    TickFrequency="1" IsSnapToTickEnabled="true" Width="180"/>
+                            <NumericUpDown Width="88" Minimum="3" Maximum="24" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding ShapeCorners, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
+                        <TextBlock Text="Start angle — where corner 0 sits" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Value="{Binding ShapeStartAngle, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="360"
+                                    TickFrequency="1" IsSnapToTickEnabled="true" Width="180"/>
+                            <NumericUpDown Width="88" Minimum="0" Maximum="360" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding ShapeStartAngle, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
+                    </StackPanel>
                     <TextBlock Text="Noise type" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
                     <DropDown ItemsSource="{Binding NoiseTypes}" SelectedItem="{Binding NoiseKind, Mode=TwoWay}" Width="280" MarginBottom="10"/>
                     <CheckBox Content="Animate (flow — best with Worley)" IsChecked="{Binding NoiseAnimate, Mode=TwoWay}" MarginBottom="6"/>
                     <TextBlock Text="Flow speed" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                    <Slider Value="{Binding NoiseFlowSpeed, Mode=TwoWay}" Minimum="0.1" Maximum="3" Width="280" MarginBottom="10"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Value="{Binding NoiseFlowSpeed, Mode=TwoWay}" Minimum="0.1" Maximum="3" Width="186"/>
+                        <NumericUpDown Width="88" Minimum="0.1" Maximum="3" SmallChange="0.05"
+                                       SnapsToSmallChange="true" StringFormat="N2"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding NoiseFlowSpeed, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                    </StackPanel>
                     <StackPanel Orientation="Vertical" Visibility="{Binding NoiseShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Rectangle}">
                         <TextBlock Text="Corner radius" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                        <Slider Value="{Binding NoiseRadius, Mode=TwoWay}" Minimum="0" Maximum="100" Width="280" MarginBottom="10"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Value="{Binding NoiseRadius, Mode=TwoWay}" Minimum="0" Maximum="100" Width="186"/>
+                            <NumericUpDown Width="88" Minimum="0" Maximum="100" SmallChange="1"
+                                           SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding NoiseRadius, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
                     </StackPanel>
                     <StackPanel Orientation="Vertical" Visibility="{Binding NoiseKind, Converter={conv:NoiseParamVisibilityConverter}, ConverterParameter=Scale}">
                         <TextBlock Text="Scale" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                        <Slider Value="{Binding NoiseScale, Mode=TwoWay}" Minimum="6" Maximum="120" Width="280" MarginBottom="10"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Value="{Binding NoiseScale, Mode=TwoWay}" Minimum="6" Maximum="120" Width="186"/>
+                            <NumericUpDown Width="88" Minimum="6" Maximum="120" SmallChange="1"
+                                           SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding NoiseScale, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
                     </StackPanel>
                     <StackPanel Orientation="Vertical" Visibility="{Binding NoiseKind, Converter={conv:NoiseParamVisibilityConverter}, ConverterParameter=Fbm}">
                         <TextBlock Text="Octaves" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                        <Slider Value="{Binding NoiseOctaves, Mode=TwoWay}" Minimum="1" Maximum="8" Width="280" MarginBottom="10"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Value="{Binding NoiseOctaves, Mode=TwoWay}" Minimum="1" Maximum="8" Width="186"/>
+                            <NumericUpDown Width="88" Minimum="1" Maximum="8" SmallChange="1"
+                                           SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding NoiseOctaves, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
                     </StackPanel>
                     <StackPanel Orientation="Vertical" Visibility="{Binding NoiseKind, Converter={conv:NoiseParamVisibilityConverter}, ConverterParameter=Seed}">
                         <TextBlock Text="Seed" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                        <Slider Value="{Binding NoiseSeed, Mode=TwoWay}" Minimum="0" Maximum="50" Width="280" MarginBottom="10"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Value="{Binding NoiseSeed, Mode=TwoWay}" Minimum="0" Maximum="50" Width="186"/>
+                            <NumericUpDown Width="88" Minimum="0" Maximum="50" SmallChange="1"
+                                           SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding NoiseSeed, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
                     </StackPanel>
                     <StackPanel Orientation="Vertical" Visibility="{Binding NoiseKind, Converter={conv:NoiseParamVisibilityConverter}, ConverterParameter=Fbm}">
                         <TextBlock Text="Lacunarity" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                        <Slider Value="{Binding NoiseLacunarity, Mode=TwoWay}" Minimum="1.5" Maximum="3.5" Width="280" MarginBottom="10"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Value="{Binding NoiseLacunarity, Mode=TwoWay}" Minimum="1.5" Maximum="3.5" Width="186"/>
+                            <NumericUpDown Width="88" Minimum="1.5" Maximum="3.5" SmallChange="0.05"
+                                           SnapsToSmallChange="true" StringFormat="N2"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding NoiseLacunarity, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
                         <TextBlock Text="Gain" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
-                        <Slider Value="{Binding NoiseGain, Mode=TwoWay}" Minimum="0.2" Maximum="0.8" Width="280" MarginBottom="10"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Value="{Binding NoiseGain, Mode=TwoWay}" Minimum="0.2" Maximum="0.8" Width="186"/>
+                            <NumericUpDown Width="88" Minimum="0.2" Maximum="0.8" SmallChange="0.05"
+                                           SnapsToSmallChange="true" StringFormat="N2"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding NoiseGain, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
                     </StackPanel>
                     <CheckBox Content="Fire palette (off = use colours below)" IsChecked="{Binding NoiseFirePalette, Mode=TwoWay}" MarginBottom="6"
                               Visibility="{Binding NoiseKind, Converter={conv:NoiseParamVisibilityConverter}, ConverterParameter=FirePalette}"/>
@@ -776,14 +1236,14 @@
 
             <TextBlock Text="Gradients — arbitrary shapes (Polygon / Path)" FontSize="18" Margin="0,20,0,10"/>
             <WrapPanel Orientation="Horizontal">
-                <Polygon Points="70,0 140,120 0,120" Margin="10">
-                    <Polygon.Fill>
+                <RegularPolygon Width="120" Height="120" Corners="{Binding ShapeCornerCount}" StartAngle="{Binding ShapeStartAngle}" Margin="10">
+                    <RegularPolygon.Fill>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
                             <GradientStop Color="#F472B6" Offset="0"/>
                             <GradientStop Color="#7C3AED" Offset="1"/>
                         </LinearGradientBrush>
-                    </Polygon.Fill>
-                </Polygon>
+                    </RegularPolygon.Fill>
+                </RegularPolygon>
                 <Polygon Points="60,0 75,45 120,45 84,72 96,116 60,90 24,116 36,72 0,45 45,45" Margin="10">
                     <Polygon.Fill>
                         <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.4" RadiusX="0.55" RadiusY="0.55">
@@ -889,43 +1349,68 @@
                               MarginBottom="12"/>
                     <TextBlock Text="Power — Multibrot exponent d" Foreground="{ResourceReference TextFillColorSecondary}"/>
                     <StackPanel Orientation="Horizontal" MarginBottom="8">
-                        <Slider Value="{Binding FractalPower, Mode=TwoWay}" Minimum="2" Maximum="8" IsMoveToPointEnabled="true" Width="230"/>
-                        <TextBlock Text="{Binding PowerText}" Width="52" MarginLeft="8" VerticalAlignment="Center" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                        <Slider Value="{Binding FractalPower, Mode=TwoWay}" Minimum="2" Maximum="8" IsMoveToPointEnabled="true" Width="176"/>
+                        <NumericUpDown Width="88" Minimum="2" Maximum="8" SmallChange="0.1"
+                                       SnapsToSmallChange="true" StringFormat="N2"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding FractalPower, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
                     </StackPanel>
                     <TextBlock Text="Zoom (log, ×)" Foreground="{ResourceReference TextFillColorSecondary}"/>
                     <StackPanel Orientation="Horizontal" MarginBottom="8">
-                        <Slider Value="{Binding FractalZoomExp, Mode=TwoWay}" Minimum="-0.52" Maximum="15" IsMoveToPointEnabled="true" Width="230"/>
+                        <Slider Value="{Binding FractalZoomExp, Mode=TwoWay}" Minimum="-0.52" Maximum="15" IsMoveToPointEnabled="true" Width="120"/>
+                        <NumericUpDown Width="88" Minimum="-0.52" Maximum="15" SmallChange="0.1"
+                                       SnapsToSmallChange="true" StringFormat="N2"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding FractalZoomExp, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
                         <TextBlock Text="{Binding ZoomText}" MarginLeft="8" VerticalAlignment="Center" Foreground="{ResourceReference TextFillColorSecondary}"/>
                     </StackPanel>
                     <TextBlock Text="Iterations" Foreground="{ResourceReference TextFillColorSecondary}"/>
                     <StackPanel Orientation="Horizontal" MarginBottom="8">
-                        <Slider Value="{Binding FractalIterations, Mode=TwoWay}" Minimum="20" Maximum="400" IsMoveToPointEnabled="true" Width="230"/>
-                        <TextBlock Text="{Binding IterationsText}" Width="52" MarginLeft="8" VerticalAlignment="Center" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                        <Slider Value="{Binding FractalIterations, Mode=TwoWay}" Minimum="20" Maximum="400" IsMoveToPointEnabled="true" Width="176"/>
+                        <NumericUpDown Width="88" Minimum="20" Maximum="400" SmallChange="1"
+                                       SnapsToSmallChange="true" StringFormat="N0"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding FractalIterations, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
                     </StackPanel>
                     <TextBlock Text="Morph speed" Foreground="{ResourceReference TextFillColorSecondary}"/>
                     <StackPanel Orientation="Horizontal" MarginBottom="8">
-                        <Slider Value="{Binding FractalMorphSpeed, Mode=TwoWay}" Minimum="0" Maximum="4" IsMoveToPointEnabled="true" Width="230"/>
-                        <TextBlock Text="{Binding MorphSpeedText}" Width="52" MarginLeft="8" VerticalAlignment="Center" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                        <Slider Value="{Binding FractalMorphSpeed, Mode=TwoWay}" Minimum="0" Maximum="4" IsMoveToPointEnabled="true" Width="176"/>
+                        <NumericUpDown Width="88" Minimum="0" Maximum="4" SmallChange="0.1"
+                                       SnapsToSmallChange="true" StringFormat="N2"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding FractalMorphSpeed, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
                     </StackPanel>
                     <TextBlock Text="C.x (Julia constant)" Foreground="{ResourceReference TextFillColorSecondary}"/>
                     <StackPanel Orientation="Horizontal" MarginBottom="8">
-                        <Slider Value="{Binding FractalCx, Mode=TwoWay}" Minimum="-1" Maximum="1" IsMoveToPointEnabled="true" Width="230"/>
-                        <TextBlock Text="{Binding CxText}" Width="52" MarginLeft="8" VerticalAlignment="Center" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                        <Slider Value="{Binding FractalCx, Mode=TwoWay}" Minimum="-1" Maximum="1" IsMoveToPointEnabled="true" Width="176"/>
+                        <NumericUpDown Width="88" Minimum="-1" Maximum="1" SmallChange="0.01"
+                                       SnapsToSmallChange="true" StringFormat="N3"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding FractalCx, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
                     </StackPanel>
                     <TextBlock Text="C.y (Julia constant)" Foreground="{ResourceReference TextFillColorSecondary}"/>
                     <StackPanel Orientation="Horizontal" MarginBottom="8">
-                        <Slider Value="{Binding FractalCy, Mode=TwoWay}" Minimum="-1" Maximum="1" IsMoveToPointEnabled="true" Width="230"/>
-                        <TextBlock Text="{Binding CyText}" Width="52" MarginLeft="8" VerticalAlignment="Center" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                        <Slider Value="{Binding FractalCy, Mode=TwoWay}" Minimum="-1" Maximum="1" IsMoveToPointEnabled="true" Width="176"/>
+                        <NumericUpDown Width="88" Minimum="-1" Maximum="1" SmallChange="0.01"
+                                       SnapsToSmallChange="true" StringFormat="N3"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding FractalCy, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
                     </StackPanel>
                     <TextBlock Text="Pan X — fine, ×(1/zoom), stays precise deep (drag the fractal for coarse)" Foreground="{ResourceReference TextFillColorSecondary}"/>
                     <StackPanel Orientation="Horizontal" MarginBottom="8">
-                        <Slider Value="{Binding FractalFineX, Mode=TwoWay}" Minimum="-1" Maximum="1" IsMoveToPointEnabled="true" Width="230"/>
-                        <TextBlock Text="{Binding FineXText}" Width="52" MarginLeft="8" VerticalAlignment="Center" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                        <Slider Value="{Binding FractalFineX, Mode=TwoWay}" Minimum="-1" Maximum="1" IsMoveToPointEnabled="true" Width="176"/>
+                        <NumericUpDown Width="88" Minimum="-1" Maximum="1" SmallChange="0.01"
+                                       SnapsToSmallChange="true" StringFormat="N3"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding FractalFineX, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
                     </StackPanel>
                     <TextBlock Text="Fine pan Y — ×(1/zoom)" Foreground="{ResourceReference TextFillColorSecondary}"/>
                     <StackPanel Orientation="Horizontal">
-                        <Slider Value="{Binding FractalFineY, Mode=TwoWay}" Minimum="-1" Maximum="1" IsMoveToPointEnabled="true" Width="230"/>
-                        <TextBlock Text="{Binding FineYText}" Width="52" MarginLeft="8" VerticalAlignment="Center" Foreground="{ResourceReference TextFillColorSecondary}"/>
+                        <Slider Value="{Binding FractalFineY, Mode=TwoWay}" Minimum="-1" Maximum="1" IsMoveToPointEnabled="true" Width="176"/>
+                        <NumericUpDown Width="88" Minimum="-1" Maximum="1" SmallChange="0.01"
+                                       SnapsToSmallChange="true" StringFormat="N3"
+                                       IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                       Value="{Binding FractalFineY, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="8"/>
                     </StackPanel>
                 </StackPanel>
                 <!-- Colours: right of the controls, in the free zone. Cohesive ColorPickerButton controls - a swatch that
@@ -990,22 +1475,22 @@
                        MarginTop="12"
                        MarginBottom="6"/>
             <WrapPanel Orientation="Horizontal">
-                <Polygon Points="60,0 120,110 0,110" Margin="10">
-                    <Polygon.Fill>
+                <RegularPolygon Width="110" Height="110" Corners="{Binding ShapeCornerCount}" StartAngle="{Binding ShapeStartAngle}" Margin="10">
+                    <RegularPolygon.Fill>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,1" ColorInterpolationMode="Srgb">
                             <GradientStop Color="#2563EB" Offset="0"/>
                             <GradientStop Color="#FACC15" Offset="1"/>
                         </LinearGradientBrush>
-                    </Polygon.Fill>
-                </Polygon>
-                <Polygon Points="60,0 120,110 0,110" Margin="10">
-                    <Polygon.Fill>
+                    </RegularPolygon.Fill>
+                </RegularPolygon>
+                <RegularPolygon Width="110" Height="110" Corners="{Binding ShapeCornerCount}" StartAngle="{Binding ShapeStartAngle}" Margin="10">
+                    <RegularPolygon.Fill>
                         <LinearGradientBrush StartPoint="0,0" EndPoint="1,1" ColorInterpolationMode="Oklab">
                             <GradientStop Color="#2563EB" Offset="0"/>
                             <GradientStop Color="#FACC15" Offset="1"/>
                         </LinearGradientBrush>
-                    </Polygon.Fill>
-                </Polygon>
+                    </RegularPolygon.Fill>
+                </RegularPolygon>
             </WrapPanel>
 
             <!-- NINE-SLICE: one 64x64 picture dressing four different sizes. The orange corners are drawn at their own

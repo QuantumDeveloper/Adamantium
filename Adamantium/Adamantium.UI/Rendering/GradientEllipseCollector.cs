@@ -46,7 +46,7 @@ internal sealed class GradientEllipseCollector : SdfBatchCollector<GradientRectI
     {
         item = default;
         if (p.Brush is not GradientBrush g) return false;
-        // cornerRadius = 0 (unused by the ellipse branch); shape = 1 selects the ellipse SDF in the shared gradient shader.
-        return GradientRectCollector.BakeGradientItem(g, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, p.Pen, world, opacity, 1f, transformSlot, out item);
+        // cornerRadius = 0 (unused by the ellipse branch); the shape selects the ellipse SDF in the shared gradient shader.
+        return GradientRectCollector.BakeGradientItem(g, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, p.Pen, world, opacity, BrushShape.Ellipse, transformSlot, out item);
     }
 }

@@ -137,6 +137,7 @@ public partial class RenderCache
 
         _rectBatch?.DisposeGpuResources(device);
         _ellipseBatch?.DisposeGpuResources(device);
+        _polygonBatch?.DisposeGpuResources(device);
         _textBatch?.DisposeGpuResources(device);
         _gradientRectBatch?.DisposeGpuResources(device);
         _gradientEllipseBatch?.DisposeGpuResources(device);
@@ -152,6 +153,7 @@ public partial class RenderCache
 
         _rectBatch = null;
         _ellipseBatch = null;
+        _polygonBatch = null;
         _textBatch = null;
         _gradientRectBatch = null;
         _gradientEllipseBatch = null;

@@ -714,6 +714,51 @@ struct EllipsePSInput
     float4 Arc      : TEXCOORD5;   // angular cut: start, end (radians), kind
 };
 
+// A REGULAR POLYGON, in the same family as the ellipse and for the same reason: it is one field, and the only thing that
+// separates a triangle from a circle is how many corners you ask for (large N is a circle to the pixel). Exact, so it
+// self-anti-aliases and strokes like everything else here.
+//
+// `p` and `half` are the same as the ellipse's, and the shape is INSCRIBED in that box: the maths runs in normalised
+// space (circumradius 1) and the distance is scaled back by the smaller half-axis - the same first-order treatment of an
+// anisotropic box that SdEllipse gives, so a squashed polygon behaves like a squashed circle.
+//
+// The first vertex sits at angle 0, on the +x axis, because that is where the tessellator puts it (Shapes.Polygon walks
+// 2*pi*i/N from there) - a polygon that batches must be the same polygon that the fallback tessellates, rotation
+// included.
+float SdRegularPolygon(float2 p, float2 half, float n, float startAngle)
+{
+    float2 h = max(half, float2(1e-6, 1e-6));
+    float2 q = p / h;                       // normalised: the shape is the unit circumradius polygon
+
+    // Turn the shape by rolling the SAMPLE the other way - and do it HERE, in normalised space, where the corners sit on
+    // a unit circle. Rotating the fragment before the divide would rotate the box too, so a squashed hexagon would swing
+    // out of the slot it is inscribed in; rotating after it moves the corners along the ellipse the box inscribes, which
+    // is exactly what Shapes.Polygon does with the same angle (radii * cos/sin of start + 2*pi*i/N).
+    float ca = cos(startAngle);
+    float sa = sin(startAngle);
+    q = float2(q.x * ca + q.y * sa, q.y * ca - q.x * sa);
+
+    float an = 3.14159265 / n;              // half of one sector
+
+    // Fold into a single half-sector, measured from the +x axis so that vertex 0 lands on it. What is left is a point
+    // whose x runs along the apothem and whose y is its (positive) offset along the edge.
+    float a = atan2(q.y, q.x);
+    float wrapped = a - 2.0 * an * floor(a / (2.0 * an) + 0.5);   // into [-an, an], centred on a VERTEX
+    float2 folded = length(q) * float2(cos(wrapped), abs(sin(wrapped)));
+
+    // Distance to the edge running from that vertex to the next: a segment, so a point past the vertex measures to the
+    // vertex itself rather than to the edge's infinite line.
+    float2 v0 = float2(1.0, 0.0);
+    float2 v1 = float2(cos(2.0 * an), sin(2.0 * an));
+    float2 e = v1 - v0;
+    float2 w = folded - v0;
+    float2 d = w - e * saturate(dot(w, e) / max(dot(e, e), 1e-9));
+
+    // Inside is the side the centre is on. cross(e, w) changes sign exactly across the edge's line.
+    float side = (e.x * w.y - e.y * w.x) > 0.0 ? -1.0 : 1.0;
+    return length(d) * side * min(h.x, h.y);
+}
+
 // The ANGULAR CUT that turns a whole ellipse into a sector or a segment, as a signed distance (device px, negative
 // inside) to the STRAIGHT part of that shape's outline. Intersected with the ellipse's own field it gives the whole
 // shape - fill, anti-aliasing and stroke all follow from the combined distance, which is why neither needs a mesh, a
@@ -767,6 +812,26 @@ float SdEllipse(float2 p, float2 half)
     float L = max(length(nq), 1e-6);
     float2 grad = float2(nq.x / h.x, nq.y / h.y) / L;   // d(F)/d(p)
     return (L - 1.0) / max(length(grad), 1e-6);
+}
+
+// THE shape a BRUSH pass paints on. Three passes (gradient, pattern, texture) each draw a rounded rect, an ellipse or a
+// regular polygon and differ only in where the COLOUR comes from - so which shape that is gets stated once, here, rather
+// than three times in three pixel shaders.
+//
+// A polygon carries no corner radii, so its own numbers ride in exactly that field: .x corners, .y start angle in
+// radians, .z ring thickness in device px. The shape selector is the pass's own (a negative baked radius for the pattern
+// and texture passes, Geom1.z for the gradient one), resolved to 0 rect / 1 ellipse / 2 polygon before the call.
+float BrushShapeDistance(float2 p, float2 half, float4 radii, int joinType, float shape)
+{
+    // Branch-FREE, and not as a matter of taste: a ?: in the textured pass has device-lost form on this driver (see
+    // TexRectPS), and this function is now shared by that pass. Both other distances are cheap; the polygon's trig is
+    // the only real cost, and only shapes that ask for it reach this function at all.
+    float dPoly = SdRegularPolygon(p, half, max(radii.x, 3.0), radii.y);
+    dPoly = lerp(dPoly, max(dPoly, -(dPoly + radii.z)), step(0.0001, radii.z));   // a RING, exactly as in pass Polygon
+
+    float dRect = SdRoundRectJoin(p, half, radii, joinType);
+    float dEllipse = SdEllipse(p, half);
+    return lerp(lerp(dRect, dEllipse, step(0.5, shape)), dPoly, step(1.5, shape));
 }
 
 [shader("fragment")]
@@ -873,6 +938,80 @@ EllipsePSInput EllipseBatchInstancedVS(uint vertexId : SV_VertexID, uint instanc
     o.Dash = item.Dash * iso;
     o.Arc = item.Arc;   // angles are angles: no pixel scale applies to them
     return o;
+}
+
+// ---- RegularPolygon batch: a shape of its own, drawn from its own record. A triangle and a circle differ by ONE number
+// here - how many corners - and everything else (fill, stroke, ring, anti-aliasing) follows from the same field, so the
+// family that draws chevrons, ticks, diamonds and hexagons costs one instanced draw like the rest.
+// Deliberately NOT a flag on the ellipse: they share a shape of record, not a shape.
+struct PolygonData
+{
+    float4 Bounds;       // NODE-local x, y, w, h (world for slot-0 bakes)
+    float4 Params;       // .x = transform-table slot; .y = CORNERS (3 and up); .z = ring thickness in device px; .w = start angle (RADIANS)
+    float4 Color;        // straight RGBA, opacity folded in
+    float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
+    float4 Stroke0;      // width_px, align, dashOn, dashGap
+    float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
+    float4 Dash;         // dash runs 2..5 (device px)
+};
+
+struct PolygonPSInput
+{
+    float4 Position : SV_Position;
+    float2 Local    : TEXCOORD0;   // fragment relative to the shape's CENTRE (SDF space, device px)
+    float2 Half     : TEXCOORD1;   // half-extents of the box the polygon is inscribed in
+    float4 Color    : COLOR0;
+    float4 StrokeColor : COLOR1;
+    float4 Stroke0  : TEXCOORD2;
+    float4 Stroke1  : TEXCOORD3;
+    float4 Dash     : TEXCOORD4;
+    float3 Shape    : TEXCOORD5;   // x = corners, y = ring thickness (device px), z = start angle (radians)
+};
+
+[shader("vertex")]
+PolygonPSInput PolygonBatchInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_InstanceID)
+{
+    PolygonData* items = (PolygonData*)InstancesAddress;
+    PolygonData item = items[instanceId];
+
+    PolygonPSInput o;
+    float2 corner = float2(vertexId & 1u, (vertexId >> 1u) & 1u);
+    NodeSlot* nodes = (NodeSlot*)TransformsAddress;
+    float4x4 nodeWorld = nodes[(uint)item.Params.x].World;
+    float2 px = SlotPixelScale(nodeWorld);
+    float iso = min(px.x, px.y);
+
+    float widthPx = item.Stroke0.x * iso;
+    float outsetPx = max(widthPx * (0.5 * (1.0 + item.Stroke0.y) + 0.5), 0.0) + 1.0;
+    float2 localPos = item.Bounds.xy + corner * item.Bounds.zw + (corner * 2.0 - 1.0) * (outsetPx / px);
+    float4 worldPos = mul(float4(localPos, 0.0, 1.0), nodeWorld);
+    o.Position = mul(worldPos, Projection);
+    o.Half   = item.Bounds.zw * 0.5 * px;
+    o.Local  = (corner - 0.5) * item.Bounds.zw * px + (corner * 2.0 - 1.0) * outsetPx;
+
+    float slotAlpha = nodes[(uint)item.Params.x].Params.x;
+    o.Color  = float4(item.Color.rgb, item.Color.a * slotAlpha);
+    o.StrokeColor = float4(item.StrokeColor.rgb, item.StrokeColor.a * slotAlpha);
+    o.Stroke0 = float4(widthPx, item.Stroke0.y, item.Stroke0.z * iso, item.Stroke0.w * iso);
+    o.Stroke1 = float4(item.Stroke1.x * iso, item.Stroke1.y, item.Stroke1.z, item.Stroke1.w);
+    o.Dash = item.Dash * iso;
+    o.Shape = float3(item.Params.y, item.Params.z * iso, item.Params.w);   // an ANGLE does not scale with the DPI
+    return o;
+}
+
+[shader("fragment")]
+float4 PolygonBatchPS(PolygonPSInput input) : SV_Target
+{
+    float d = SdRegularPolygon(input.Local, input.Half, max(input.Shape.x, 3.0), input.Shape.z);
+
+    // A RING, exactly as the ellipse does it: the field minus its own inward offset, so the thickness is geometry and the
+    // pen stays free. A hollow triangle is a chevron nobody has to draw by hand.
+    if (input.Shape.y > 0.0)
+    {
+        d = max(d, -(d + input.Shape.y));
+    }
+
+    return CompositeFillStroke(d, input.Color, input.StrokeColor, input.Stroke0.x, input.Stroke0.y, 1.0, 0.0);
 }
 
 // ---- GradientRect: the SAME SDF rounded-rect batch, but the FILL is a LINEAR or RADIAL gradient (up to 8 stops)
@@ -1081,11 +1220,13 @@ float4 GradientPS(GradPSInput input) : SV_Target
     GradientRectData* items = (GradientRectData*)InstancesAddress;
     GradientRectData it = items[input.InstId];
 
-    bool ellipse = it.Geom1.z >= 0.5;
+    float shape = it.Geom1.z;          // 0 rect, 1 ellipse, 2 regular polygon (its numbers ride in Radii)
+    bool ellipse = shape >= 0.5 && shape < 1.5;
+    bool polygon = shape >= 1.5;
     float lim = min(input.Half.x, input.Half.y);
-    float4 r4 = min(input.Radii, float4(lim, lim, lim, lim));
+    float4 r4 = lerp(min(input.Radii, float4(lim, lim, lim, lim)), input.Radii, step(1.5, shape));
     int joinType = int(fmod(floor(it.Stroke1.w / 4096.0), 8.0));
-    float d = ellipse ? SdEllipse(input.Local, input.Half) : SdRoundRectJoin(input.Local, input.Half, r4, joinType);
+    float d = BrushShapeDistance(input.Local, input.Half, r4, joinType, shape);
 
     float2 uv = input.Local / max(input.Half * 2.0, float2(1e-4, 1e-4)) + 0.5;   // 0..1 across the bounds
     int packedW = int(it.Params.w + 0.5);                       // Params.w packs spread (low 3 bits) + interp mode (>> 3)
@@ -1766,12 +1907,12 @@ float4 TexRectPS(TexPSInput input) : SV_Target
 
     // A NEGATIVE baked corner radius is the ELLIPSE shape flag (a rect passes radius >= 0) - same signal the pattern
     // pass uses. Branch-free (a ?: in this pass has device-lost form on this driver): both distances, picked by a step.
-    float isEllipse = step(it.Params.x, -0.0001);
+    float isPolygon = step(it.Params.x, -1.5);
+    float isEllipse = step(it.Params.x, -0.0001) * (1.0 - isPolygon);
     float lim = min(input.Half.x, input.Half.y);
-    float4 r4 = min(input.Radii, float4(lim, lim, lim, lim));
-    float d = lerp(SdRoundRectJoin(input.Local, input.Half, r4, 2),   // round join: the plain Euclidean offset, no stroke here
-                   SdEllipse(input.Local, input.Half),
-                   isEllipse);
+    float4 r4 = lerp(min(input.Radii, float4(lim, lim, lim, lim)), input.Radii, isPolygon);
+    // round join: the plain Euclidean offset, no stroke here
+    float d = BrushShapeDistance(input.Local, input.Half, r4, 2, isEllipse + isPolygon * 2.0);
 
     // 0..1 across the shape -> TILE space -> the content's rect inside one tile -> the source's sub-rectangle. The
     // REPEAT is done here with frac() rather than by a wrapping sampler: the sampler would wrap the WHOLE texture, and
@@ -1820,11 +1961,15 @@ float4 PatternPS(PatternPSInput input) : SV_Target
     PatternRectData* items = (PatternRectData*)InstancesAddress;
     PatternRectData it = items[input.InstId];
 
-    bool ellipse = it.Params.x < 0.0;   // negative baked corner radius = the ellipse shape flag (a rect passes radius >= 0)
+    // The baked corner radius is the shape flag: >= 0 a rect, -1 an ellipse, -2 a regular polygon (whose corners, start
+    // angle and ring ride in the Radii it has no use for otherwise).
+    float isPolygon = step(it.Params.x, -1.5);
+    float shape = isPolygon * 2.0 + step(it.Params.x, -0.0001) * (1.0 - isPolygon);
+    bool ellipse = shape > 0.5 && shape < 1.5;   // the arc-length branch below still needs to know which curve it is
     float lim = min(input.Half.x, input.Half.y);
-    float4 r4 = min(input.Radii, float4(lim, lim, lim, lim));
+    float4 r4 = lerp(min(input.Radii, float4(lim, lim, lim, lim)), input.Radii, step(1.5, shape));
     int joinType = int(fmod(floor(it.Stroke1.w / 4096.0), 8.0));
-    float d = ellipse ? SdEllipse(input.Local, input.Half) : SdRoundRectJoin(input.Local, input.Half, r4, joinType);
+    float d = BrushShapeDistance(input.Local, input.Half, r4, joinType, shape);
 
     // The record is baked in SLOT units, the SDF above is in device pixels - so the CELL (PatternBrush.CellSize /
     // NoiseBrush.Scale share this field) converts too, or the pattern's cell / the noise's grain would change size with
@@ -2701,6 +2846,15 @@ technique Batch
         Profile = 6.6;
         VertexShader = EllipseBatchInstancedVS;
         PixelShader = EllipseBatchPS;
+    }
+
+    // Regular polygons - a triangle and a circle differ by one number, the corner count.
+    pass Polygon
+    {
+        EffectName = "BatchEffect";
+        Profile = 6.6;
+        VertexShader = PolygonBatchInstancedVS;
+        PixelShader = PolygonBatchPS;
     }
 
     // SDF rounded-rect OR ellipse fills with a LINEAR/RADIAL GRADIENT fill (per-instance GradientRectData; PS reads the

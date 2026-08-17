@@ -1060,3 +1060,112 @@ public class TextRenderUnit : RenderUnit<TextPayload>
         GeometryRenderer.RenderData = drawCommand.RenderData;
     }
 }
+/// <summary>The render unit for a REGULAR POLYGON. Batchable ones build NOTHING - the SDF pass reconstructs the shape
+/// from its distance field and self-anti-aliases - so a board full of chevrons costs one draw and no GPU buffers. The
+/// rejected case (a rotated or sheared world, or a per-frame overflow) tessellates on demand, exactly as the rect and
+/// ellipse units do.</summary>
+public class RegularPolygonRenderUnit : RenderUnit<RegularPolygonPayload>
+{
+    public RegularPolygonPayload PolygonPayload => Payload;
+
+    public double FillOpacity => DrawCommand?.RenderData?.Opacity ?? 1.0;
+
+    private FrozenMesh _haloMesh;
+
+    private static bool IsSdfBatchable(RegularPolygonPayload p) =>
+        RegularPolygonCollector.WantsBatch(p) || GradientRectCollector.WantsBatchPolygon(p) ||
+        PatternRectCollector.WantsBatchPolygon(p) || TexRectCollector.WantsBatchPolygon(p);
+
+    internal ITexture BrushTexture() => TexRectCollector.BrushTexture(Payload.Brush, ResourceFactory,
+        Payload.DestinationRect.Size, DrawCommand.Component);
+
+    /// <summary>The distance field an AURA or a SHADOW on this polygon reads, baked once per shape and shared by every
+    /// element wearing the same one. The band is the one thing here that wants a mesh - a batched polygon has none, the
+    /// pass reconstructs it from its field - so the shape is tessellated ON DEMAND and only for the polygons that
+    /// actually wear a band. Null when there is no boundary to measure from; the element then wears no band at all
+    /// rather than a wrong one.</summary>
+    internal ITexture HaloField(out Rect localBounds, out double range)
+    {
+        localBounds = default;
+        range = 0;
+
+        if (_haloMesh == null)
+        {
+            var g = PolygonShape(Payload);
+            g.ProcessGeometry(GeometryType.Both);
+            _haloMesh = FrozenMesh.From(g.Mesh, g.Bounds);
+        }
+
+        if (_haloMesh is not { HasPoints: true }) return null;
+
+        localBounds = _haloMesh.Bounds;
+        return Context.HaloFields.GetOrCreate(_haloMesh, ResourceFactory, out range);
+    }
+
+    public RegularPolygonRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
+    {
+        if (IsSdfBatchable(Payload)) return;
+        BuildMachinery(Payload);
+    }
+
+    private void BuildMachinery(RegularPolygonPayload payload)
+    {
+        var g = PolygonShape(payload);
+        g.ProcessGeometry(GeometryType.Both);
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, payload.Brush, BufferManager, ResourceFactory);
+        GeometryRenderer.RenderData = DrawCommand.RenderData;
+        GeometryRenderer.Owner = DrawCommand.Component;
+        ProcessFillFringe(g, payload.Brush);
+        ProcessStrokeData(payload.Pen, g);
+    }
+
+    private static Geometry PolygonShape(RegularPolygonPayload payload) =>
+        RegularPolygonGeometry.Build(payload.DestinationRect, payload.Corners, payload.StartAngle, payload.RingThickness);
+
+    // A batchable polygon the batch REJECTED this frame must draw itself, so build its BODY on demand.
+    public void EnsureMachinery()
+    {
+        if (GeometryRenderer != null) return;
+        var g = PolygonShape(Payload);
+        g.ProcessGeometry(GeometryType.Both);
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, Payload.Brush, BufferManager, ResourceFactory);
+        GeometryRenderer.RenderData = DrawCommand.RenderData;
+        GeometryRenderer.Owner = DrawCommand.Component;
+    }
+
+    public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
+    {
+        if (drawCommand.Payload is not RegularPolygonPayload inputPayload) return;
+
+        // A different shape is a different field: drop the baked one so a band re-reads the polygon it now wraps.
+        if (Payload.RequiresBufferRebuild(inputPayload)) _haloMesh = null;
+
+        // Fast path: no machinery (a batchable polygon) - just repoint payload/command, no tessellation, no buffers.
+        if (GeometryRenderer == null)
+        {
+            DrawCommand = drawCommand;
+            Payload = inputPayload;
+            if (!IsSdfBatchable(inputPayload)) BuildMachinery(inputPayload);
+            return;
+        }
+
+        var rebuild = Payload.RequiresBufferRebuild(inputPayload);
+        var geometry = PolygonShape(inputPayload);
+        if (rebuild)
+        {
+            geometry.ProcessGeometry(GeometryType.Both);
+            ((GeometryRenderComponent)GeometryRenderer).UpdateGeometry(geometry.Mesh);
+        }
+
+        ((GeometryRenderComponent)GeometryRenderer).Background = inputPayload.LiveBrush;
+        DrawCommand = drawCommand;
+        Payload = inputPayload;
+        GeometryRenderer.RenderData = drawCommand.RenderData;
+
+        if (rebuild || !Equals(Payload.Pen, inputPayload.Pen))
+        {
+            geometry.ProcessGeometry(GeometryType.Both);
+            ProcessStrokeData(inputPayload.Pen, geometry);
+        }
+    }
+}

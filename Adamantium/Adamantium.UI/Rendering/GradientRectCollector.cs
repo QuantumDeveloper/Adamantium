@@ -55,14 +55,46 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
     {
         item = default;
         if (p.Brush is not GradientBrush g) return false;
-        return BakeGradientItem(g, p.DestinationRect, p.CornerRadius, p.Pen, world, opacity, 0f, transformSlot, out item);
+        return BakeGradientItem(g, p.DestinationRect, p.CornerRadius, p.Pen, world, opacity, BrushShape.Rect, transformSlot, out item);
+    }
+
+    // POLYGON variant: a regular polygon with a gradient fill batches into the SAME pass - the shape is still a field, so
+    // it stays one instanced draw and keeps its own anti-aliasing. Only where the colour comes from differs.
+    /// <summary>THE one statement for the polygon form - the render unit asks THIS, never its own copy.</summary>
+    public static bool WantsBatchPolygon(RegularPolygonPayload p)
+    {
+        if (!Enabled) return false;
+        if (p.Brush is not GradientBrush g) return false;
+        if (g is not MeshGradientBrush && g.GradientStops.Count == 0) return false;   // mesh carries corners, not stops
+        if (!RectBatchCollector.IsPenBatchable(p.Pen)) return false;
+        return !RegularPolygonCollector.NeedsArcLength(p.Pen);
+    }
+
+    public bool CanBatchPolygon(RegularPolygonPayload p) => WantsBatchPolygon(p);
+
+    public bool TryAddPolygon(RegularPolygonPayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0)
+    {
+        EnsureCpuCapacity(Count + 1);
+        if (Count + 1 > GpuCapacity) return false;
+        if (!BakePolygonItem(p, world, opacity, transformSlot, out var item)) return false;
+        Items[Count++] = item;
+        MarkPending(scissor, logicalBounds);
+        return true;
+    }
+
+    public static bool BakePolygonItem(RegularPolygonPayload p, Matrix4x4F world, double opacity, int transformSlot, out GradientRectItem item)
+    {
+        item = default;
+        if (p.Brush is not GradientBrush g) return false;
+        return BakeGradientItem(g, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, p.Pen, world, opacity,
+            BrushShape.Polygon(p, (float)world.M11), transformSlot, out item);
     }
 
     // Bake a gradient fill into an instance record (shared by the rect + ellipse gradient batches). Position -> world;
     // gradient geometry + stops are RELATIVE to the rect (0..1), so one brush paints any size. False on a rotated/sheared
     // world (the axis-aligned instance can't hold it). shape (Geom1.z) selects the shader SDF: 0 rounded-rect, 1 ellipse.
     internal static bool BakeGradientItem(GradientBrush g, Rect dest, ProceduralGeometry.CornerRadius corners, Pen pen, Matrix4x4F world,
-        double opacity, float shape, int transformSlot, out GradientRectItem item)
+        double opacity, BrushShape shape, int transformSlot, out GradientRectItem item)
     {
         item = default;
         const float eps = 1e-4f;
@@ -83,7 +115,7 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
         var type = GradientBake.PackGeometry(g, out var geom0, out var geom1);
         item.Geom0 = geom0;
         item.Geom1 = geom1;
-        item.Geom1.Z = shape;          // shader shape branch: 0 rounded-rect, 1 ellipse (Geom1.z is otherwise spare)
+        item.Geom1.Z = (float)shape.Kind;   // shader shape branch: 0 rounded-rect, 1 ellipse, 2 polygon (Geom1.z is otherwise spare)
         item.Geom1.W = transformSlot;  // transform-table slot (0 = identity world bake; node-local otherwise)
 
         RectBatchCollector.BakeStroke(pen, opacity, (float)sx, out var strokeColor, out var stroke0, out var stroke1, out var dash);
@@ -94,8 +126,9 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
 
         // Params.w packs BOTH the spread (0 pad/1 reflect/2 repeat) and the colour-interpolation mode (0 sRGB/1 OKLab):
         // spread + 8*mode. The shader unpacks (packed & 7) for spread and (packed >> 3) for the mode - no extra record field.
-        item.Radii = RectBatchCollector.BakeRadii(corners, dest, sx);
-        item.Params = new Vector4F(RectBatchCollector.MaxOf(item.Radii), type, count, (float)g.SpreadMethod + 8f * (float)g.ColorInterpolationMode);
+        var rectRadii = RectBatchCollector.BakeRadii(corners, dest, sx);
+        item.Radii = shape.RadiiFor(rectRadii);
+        item.Params = new Vector4F(shape.RadiusFlag(rectRadii), type, count, (float)g.SpreadMethod + 8f * (float)g.ColorInterpolationMode);
         return true;
     }
 }
