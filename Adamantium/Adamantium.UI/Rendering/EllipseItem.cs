@@ -36,4 +36,14 @@ public struct EllipseItem
     /// <summary>Dash runs 2..5 in device px - runs 0 and 1 ride in <see cref="Stroke0"/>.zw and the RUN COUNT is
     /// packed into <see cref="Stroke1"/>.w. A pattern longer than one ON/GAP period lives here.</summary>
     public Vector4F Dash;
+
+    /// <summary>The angular CUT: x = start, y = end, both in RADIANS of the ellipse's own parametric angle (the one the
+    /// tessellator sweeps: x = rx·cos t, y = ry·sin t - which is NOT the geometric angle unless rx == ry); z = how the
+    /// cut closes (0 = no cut, a whole ellipse; 1 = <c>Sector</c>, through the centre; 2 = <c>EdgeToEdge</c>, by the
+    /// chord); w = RING thickness in device px, measured inward from the outline (0 = solid).
+    /// <para>A sector and a segment are the same ellipse with a STRAIGHT boundary added, so they need no shape of their
+    /// own: the field is intersected with that boundary and the stroke follows the combined outline for free. A RING is
+    /// the same trick inward - the field minus its own offset - which turns a ring gauge from a thick stroke into a
+    /// shape, thickness and all, and hands the pen back for a real outline.</para></summary>
+    public Vector4F Arc;
 }

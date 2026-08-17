@@ -92,10 +92,23 @@ public class Ellipse : Shape
       set => SetValue(EllipseTypeProperty, value);
    }
 
+   /// <summary>Leave a RING this thick (DIPs, inward from the outline) instead of a solid shape - with a sweep, an annular
+   /// sector. It is GEOMETRY: a ring gauge drawn this way keeps its pen for a real outline, and its thickness is no longer
+   /// a stroke width that also has to serve as the shape.</summary>
+   public static readonly AdamantiumProperty RingThicknessProperty = AdamantiumProperty.Register(nameof(RingThickness),
+      typeof(Double), typeof(Ellipse),
+      new PropertyMetadata(0.0, PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsRender));
+
+   public Double RingThickness
+   {
+      get => GetValue<Double>(RingThicknessProperty);
+      set => SetValue(RingThicknessProperty, value);
+   }
+
    protected override void OnRender(IDrawingContext context)
    {
       var destRect = Rect.Deflate(StrokeThickness / 2);
-      context.ForControl(this).DrawEllipse(destRect, Fill, StartAngle, StopAngle, EllipseType, GetPen());
+      context.ForControl(this).DrawEllipse(destRect, Fill, StartAngle, StopAngle, EllipseType, GetPen(), RingThickness);
    }
 
    // Tight hit test: inside the ellipse (the bounding-box corners are excluded - the main false positive), and for an

@@ -109,12 +109,13 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
       return this;
    }
 
-   IDrawingSession IDrawingSession.DrawEllipse(Rect destinationRect, 
-      Brush brush, 
-      double startAngle, 
+   IDrawingSession IDrawingSession.DrawEllipse(Rect destinationRect,
+      Brush brush,
+      double startAngle,
       double sweepAngle,
-      EllipseType ellipseType, 
-      Pen pen)
+      EllipseType ellipseType,
+      Pen pen,
+      double ringThickness)
    {
       var payload = new EllipsePayload(
          brush,
@@ -123,7 +124,10 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
          sweepAngle,
          ellipseType,
          pen
-      );
+      )
+      {
+         RingThickness = ringThickness
+      };
       CreateCommand(payload);
       return this;
    }

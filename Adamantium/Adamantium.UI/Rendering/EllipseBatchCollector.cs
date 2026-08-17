@@ -25,9 +25,11 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
 
     protected override IEffectPass DrawPass => Effect.BatchEllipsePass;
 
-    // Batchable = a visible solid fill + a batchable pen (none, or a SOLID stroke the SDF shader draws analytically), a
-    // FULL ellipse (StartAngle 0 .. SweepAngle 360). A sector/arc, a non-solid/dashed/trimmed pen, a gradient/image fill,
-    // or Enabled=off falls back to the per-unit tessellated draw. Lock-step with EllipseRenderUnit.IsSdfBatchable.
+    // Batchable = a visible solid fill + a batchable pen (none, or a SOLID stroke the SDF shader draws analytically). A
+    // SECTOR and a SEGMENT batch too: both are this same ellipse with a straight boundary added, which the field
+    // intersects (see EllipseCutDistance) - so neither needs a shape, a pass or a collector of its own. A gradient/image
+    // fill, a non-solid pen or Enabled=off still falls back to the per-unit tessellated draw. Lock-step with
+    // EllipseRenderUnit.IsSdfBatchable.
     /// <summary>THE one statement of what this batch draws - the render unit asks THIS, never its own copy.</summary>
     public static bool WantsBatch(EllipsePayload p)
     {
@@ -40,12 +42,26 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
         var hasFill = p.Brush is SolidColorBrush { Color.A: > 0 };
         var hasStroke = p.Pen is { Brush: SolidColorBrush { Color.A: > 0 } };
         if (!hasFill && !hasStroke) return false;
-        // An ARC is just an angular slice the pixel shader cuts out of the same field, so it batches like anything else.
-        // A SECTOR does not: it closes the wedge with two straight radial edges, which is a different outline and not
-        // something the ellipse field describes - that one keeps the tessellated path.
-        // TODO(arc): the shader can cut the wedge (EllipseData.Arc), but batching arcs currently loses the device -
-        // unfinished, so arcs still take the tessellated path. Re-enable together with the EdgeToEdge check.
-        return p.StartAngle <= 0.0 && p.SweepAngle >= 360.0;
+        return IsCutBatchable(p);
+    }
+
+    /// <summary>Whether the angular cut is one this batch can draw. A WHOLE ellipse always is. A partial one is, with two
+    /// honest exceptions:
+    /// <list type="bullet">
+    /// <item>a NEGATIVE sweep - the tessellator mirrors the whole traversal for it (start included), and a batch that
+    /// guessed at that rule would draw a different shape than the fallback;</item>
+    /// <item>a DASHED or TRIMMED pen on a cut shape - dashes are placed by arc length along the ELLIPSE, and a sector's
+    /// outline is arc plus straight edges, so the pattern would be fitted to a contour the shape does not have.</item>
+    /// </list></summary>
+    internal static bool IsCutBatchable(EllipsePayload p)
+    {
+        if (p.SweepAngle >= 360.0) return true;   // not cut at all - see BakeCut, the start angle is irrelevant here
+        if (p.SweepAngle <= 0.0) return false;
+
+        var pen = p.Pen;
+        if (pen == null) return true;
+        var dashed = pen.DashStrokeArray is { Count: > 0 };
+        return !dashed && pen.TrimStart <= 0.0 && pen.TrimEnd >= 1.0;
     }
 
     public bool CanBatch(EllipsePayload p) => WantsBatch(p);
@@ -96,9 +112,32 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
             StrokeColor = strokeColor,
             Stroke0 = stroke0,
             Stroke1 = stroke1,
-            Dash = dash
+            Dash = dash,
+            Arc = BakeCut(p, sx)
         };
         return true;
+    }
+
+    // The angular cut, in the ellipse's own PARAMETRIC angle (radians) - the angle the tessellator sweeps, so the batch
+    // and the fallback cut at the same place. .z says how the shape closes: 0 whole, 1 sector (through the centre),
+    // 2 edge-to-edge (by the chord).
+    private static Vector4F BakeCut(EllipsePayload p, double sx)
+    {
+        // .w is the RING, and it is independent of the cut: a whole ellipse can be a ring, and a sector can have a hole.
+        var ring = (float)(p.RingThickness * sx);
+        // A WHOLE sweep is not cut at all, and the start angle has nothing to say about it - where a closed contour begins
+        // is not a property of the shape. Baking a cut anyway put both bounding rays of the wedge on the SAME ray, and
+        // anti-aliasing that non-existent edge left a one-pixel seam running out from the centre. The tessellator draws
+        // this case closed (its `isClosed` asks only about the sweep), so cutting here also split the two paths.
+        if (p.SweepAngle >= 360.0) return new Vector4F(0, 0, 0, ring);
+
+        var start = MathHelper.DegreesToRadians(p.StartAngle);
+        var end = start + MathHelper.DegreesToRadians(p.SweepAngle);
+        // A BAND's ends are RADIAL, whichever closing was asked for. A chord across a band is not a shape anybody means by
+        // a ring gauge or a donut slice, and it is also the closing the tessellated fallback cannot reproduce: there the
+        // ring is the outer shape minus the inner one, and only the radial ends of the two line up exactly.
+        var kind = p.EllipseType == EllipseType.Sector || ring > 0 ? 1f : 2f;
+        return new Vector4F((float)start, (float)end, kind, ring);
     }
 
     // Ramanujan's second approximation - exact enough that the dash fit lands on a whole number of periods (the error is
