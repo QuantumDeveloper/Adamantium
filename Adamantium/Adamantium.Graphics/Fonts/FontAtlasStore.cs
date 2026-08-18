@@ -7,11 +7,10 @@ namespace Adamantium.Graphics.Fonts
 {
     public static class FontAtlasStore
     {
-        private static Dictionary<FontParameters, FontAtlas> _fontAtlasMap;
-        static FontAtlasStore()
-        {
-            _fontAtlasMap = new Dictionary<FontParameters, FontAtlas>();
-        }
+        // Concurrent because more than one thread reaches it: text is laid out wherever the layout pass runs, and a
+        // virtualizing panel measures its tiles across cores. Creating the atlas itself is still a GPU call and belongs
+        // to the thread that owns the device.
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<FontParameters, FontAtlas> _fontAtlasMap = new();
         /// <summary>Rasterize glyphs INLINE instead of on a worker. A live window can let text fill in over the next
         /// frames, because there are next frames; a ONE-SHOT render - a bitmap, a designer preview, an off-screen test -
         /// has only the frame it is asked for, and text missing from it is text missing for good. Those paths turn this
@@ -20,13 +19,7 @@ namespace Adamantium.Graphics.Fonts
 
         public static FontAtlas GetOrCreateFrom(IGraphicsDevice graphicsDevice, Typeface typeface, FontParameters fontParameters)
         {
-            if (!_fontAtlasMap.TryGetValue(fontParameters, out var atlas))
-            {
-                atlas = new FontAtlas(graphicsDevice, typeface, fontParameters);
-                _fontAtlasMap.Add(fontParameters, atlas);
-            }
-
-            return atlas;
+            return _fontAtlasMap.GetOrAdd(fontParameters, _ => new FontAtlas(graphicsDevice, typeface, fontParameters));
         }
 
         /// <summary>Upload every atlas's finished glyphs, on the thread that owns the device. Called once a frame by the

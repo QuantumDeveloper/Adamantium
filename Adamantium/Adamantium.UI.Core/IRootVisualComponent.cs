@@ -4,6 +4,11 @@ namespace Adamantium.UI.Core;
 
 public interface IRootVisualComponent : IUIComponent
 {
+   /// <summary>This surface is drawn ONCE - a bitmap bake, a designer preview, an off-screen test - so nothing inside it
+   /// may leave work for "the next frame": there is none. A window says false, and its content is free to arrive over the
+   /// frames that follow (see ContentPresenter.DeferContent).</summary>
+   bool RendersOnce => false;
+
    /// <summary>A desktop point (physical pixels) in this surface's own LOGICAL coordinates. The one place the two
    /// units meet, and it needs this surface's scale to do it - see <see cref="PixelPoint"/>.</summary>
    Vector2 PointToClient(PixelPoint point);

@@ -33,7 +33,18 @@
                     TabStripPlacement="{Binding TabPlacement}"
                     SelectionIndicatorPlacement="{Binding IndicatorPlacement}"
                     ContentTransition="{Binding SlideMode}"
+                    DeferContent="True"
                     ShowCloseButton="True">
+            <!-- A tab body is thousands of elements; it is built off the loop thread, so the tab itself opens at once
+                 and shows this until its content is ready. -->
+            <TabControl.LoadingTemplate>
+                <DataTemplate>
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <BusyIndicator IsActive="True" Margin="0,0,0,12"/>
+                        <TextBlock Text="Loading..." HorizontalTextAlignment="Center" Opacity="0.6"/>
+                    </StackPanel>
+                </DataTemplate>
+            </TabControl.LoadingTemplate>
             <!-- Drag a tab AWAY from the strip (across it, not along it) and let go: it gets its own window. -->
             <TabControl.Behaviors>
                 <behaviors:TabTearOffBehavior/>

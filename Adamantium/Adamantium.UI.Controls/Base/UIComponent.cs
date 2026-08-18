@@ -857,6 +857,10 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         // Back on screen: whatever its triggers had running before it left starts again, at the phase it stopped on.
         ResumeTriggerActions();
 
+        // ...and what was asked for while it was NOT in the tree at all - a spinner started by a trigger inside a view
+        // built off the loop thread - runs now, because now there is something to animate.
+        Core.Media.Animation.AnimationManager.StartDeferred(this);
+
         OnAttachedToVisualTree(e);
         AttachedToVisualTreeEvent?.Invoke(this, e);
 

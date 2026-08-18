@@ -102,8 +102,68 @@ public static class AnimationManager
         }
     }
 
+    // An element OUTSIDE the live tree does not animate: there is nothing on screen to move, so every tick would be work
+    // spent on nobody - and it would mark a scene the element is not in. It is out either because it is PARKED
+    // (x:KeepAlive, which exists to keep it quiet) or because it has not gone up yet - a view still being built, possibly
+    // on another thread, where touching the heartbeat lists would race the thread that ticks them. Both are one question,
+    // and the ELEMENT answers it: no ambient flag to set and to remember.
+    private static bool CanAnimate(AdamantiumComponent target)
+        => target is not IUIComponent visual || (visual.IsAttachedToVisualTree && !visual.IsParked);
+
+    // A target that is not a visual (a Transform, a gradient stop) has no attachment of its own, so it can only be judged
+    // by the element that owns it - see DeferIfOutOfTree.
+
+    // What was asked for while the target was out of the tree. WAITING, not dropped: the enter action of a trigger runs
+    // ONCE, as the condition becomes true - a spinner inside a view built off the loop thread starts there and nowhere
+    // else, and Resume only re-runs what a DETACH suspended, which never happened to a view that was never attached. So
+    // the request is kept and made when the element goes up. Weak keys: a build the user walked away from is collected
+    // with everything it asked for.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<AdamantiumComponent, List<Action>> Deferred = new();
+
+    private static void Defer(AdamantiumComponent target, Action start)
+    {
+        var pending = Deferred.GetValue(target, static _ => new List<Action>());
+        lock (pending) pending.Add(start);
+    }
+
+    /// <summary>Is this out of the live tree - parked, or still being materialized off the loop thread? Then
+    /// <paramref name="start"/> is KEPT and made when it goes up, and the caller must do nothing now. This is what a
+    /// trigger's enter action asks, so the claim it makes and the phase it reads happen on the thread that owns them and
+    /// in the order it wrote them.
+    /// <para><paramref name="wakeOn"/> is WHO the request waits on, and it is not always the target: what a loader
+    /// animates is a Transform, a gradient stop, a brush - things that never enter the visual tree and are therefore
+    /// never told that they have. The element that OWNS them is; waiting on the target instead means waiting for an
+    /// event that cannot happen, which is a spinner that never spins.</para></summary>
+    public static bool DeferIfOutOfTree(AdamantiumComponent target, AdamantiumComponent wakeOn, Action start)
+    {
+        if (target == null) return false;
+        if (CanAnimate(target) && CanAnimate(wakeOn)) return false;
+
+        Defer(wakeOn ?? target, start);
+        return true;
+    }
+
+    /// <summary>Runs what was asked for while <paramref name="target"/> was outside the tree. Called as it attaches.</summary>
+    public static void StartDeferred(AdamantiumComponent target)
+    {
+        if (target == null || !Deferred.TryGetValue(target, out var pending)) return;
+
+        Action[] starts;
+        lock (pending)
+        {
+            if (pending.Count == 0) return;
+            starts = pending.ToArray();
+            pending.Clear();
+        }
+
+        Deferred.Remove(target);
+        foreach (var start in starts) start();
+    }
+
     internal static void Begin(AdamantiumComponent target, AdamantiumProperty property, DoubleAnimation animation, Action completed)
     {
+        if (DeferIfOutOfTree(target, target, () => Begin(target, property, animation, completed))) return;
+
         // Re-animating the same property restarts from the new animation - drop any in-flight one first.
         RemoveWhere(a => a.Animates(target, property));
         var running = new RunningAnimation(target, property, animation, completed);
@@ -115,6 +175,8 @@ public static class AnimationManager
     /// that drives one of the same properties.</summary>
     internal static void BeginKeyFrame(AdamantiumComponent target, Animation animation, Action completed, double resumeElapsed = 0)
     {
+        if (DeferIfOutOfTree(target, target, () => BeginKeyFrame(target, animation, completed, resumeElapsed))) return;
+
         var running = new RunningKeyFrameAnimation(target, animation, completed, resumeElapsed);
         foreach (var property in running.Properties)
             RemoveWhere(a => a.Animates(target, property));

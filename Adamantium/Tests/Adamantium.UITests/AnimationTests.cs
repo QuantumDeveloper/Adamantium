@@ -16,6 +16,15 @@ namespace Adamantium.UITests;
 [TestFixture]
 public class AnimationTests
 {
+    // The heartbeat runs what is ON SCREEN: an element outside the tree is not animated, because there is nothing there to
+    // move. So a host in these tests goes up the same way a real one does.
+    private static Border OnScreen()
+    {
+        var border = new Border();
+        new Rendering.TestRoot(100, 100).Add(border);
+        return border;
+    }
+
     [Test]
     public void DoubleAnimation_InterpolatesAndCompletes()
     {
@@ -178,7 +187,7 @@ public class AnimationTests
     [Test]
     public void PropertyTrigger_EnterAction_RunsAnimation()
     {
-        var border = new Border();
+        var border = OnScreen();
 
         var trigger = new PropertyTrigger { Property = "Width", Value = 200.0 };
         var anim = new Animation { Duration = TimeSpan.FromSeconds(1), Easing = new LinearEasing() };
@@ -222,8 +231,8 @@ public class AnimationTests
         var sharedBrush = new SolidColorBrush(Colors.White);
         var run = new RunAnimationAction { TargetName = "SkeletonPulseFill", Animation = PulseOpacity() };
         var stop = new StopAnimationAction { TargetName = "SkeletonPulseFill" };
-        var listA = new KeyedTargetContext(new Border(), sharedBrush);
-        var listB = new KeyedTargetContext(new Border(), sharedBrush);
+        var listA = new KeyedTargetContext(OnScreen(), sharedBrush);
+        var listB = new KeyedTargetContext(OnScreen(), sharedBrush);
 
         run.Invoke(listA);
         run.Invoke(listB);
@@ -243,7 +252,7 @@ public class AnimationTests
         // LOOPING animation started by the enter action would then tick forever against a brush nobody paints with.
         AnimationManager.Reset();
         var sharedBrush = new SolidColorBrush(Colors.White);
-        var host = new Border();
+        var host = OnScreen();
 
         var trigger = new PropertyTrigger { Property = "Width", Value = 200.0 };
         trigger.EnterActions.Add(new RunAnimationAction { TargetName = "SkeletonPulseFill", Animation = PulseOpacity() });
