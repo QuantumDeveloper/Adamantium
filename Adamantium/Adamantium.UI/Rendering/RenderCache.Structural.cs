@@ -85,6 +85,7 @@ public partial class RenderCache
     // new sorted place (the applier re-sorts on the Reranks below). No Render, no draw commands, no unit work.
     private void RenumberOrder(IRootVisualComponent visualRoot, RenderPacket packet)
     {
+        LayerProbe.Renumbers++;
         _orderByControl.Clear();
 
         var stack = _walkStack;
