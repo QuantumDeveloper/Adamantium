@@ -159,9 +159,9 @@ namespace Adamantium.Mathematics
 
         public static Color Get(string name)
         {
-            if (name.StartsWith("#"))
+            if (name.Length > 0 && name[0] == '#')
             {
-                var colorText = name.Replace("#", "");
+                var colorText = name.Substring(1);
                 var argb = Convert.ToUInt32(colorText, 16);
                 // #RRGGBB (and shorter) carry no alpha - treat them as fully opaque, like every other toolkit. Only
                 // #AARRGGBB specifies its own alpha. Without this, 6-digit hex parsed as alpha 0 (fully transparent).
