@@ -98,7 +98,7 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
     private void UpdateDataContext()
     {
         // Re-resolve this element's own bindings against the new context. Propagation to logical children is handled by
-        // value inheritance (InheritanceParent -> ParentPropertyChanged), not an explicit push — which also keeps a
+        // value inheritance (resolved on read from the InheritanceParent chain), not an explicit push — which also keeps a
         // child's locally-set DataContext intact and works regardless of build order.
         BindingEngine.RefreshBindings(this);
     }

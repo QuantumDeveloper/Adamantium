@@ -91,6 +91,9 @@ public sealed class VisualRenderer : IVisualRenderer
     private (RenderCache Cache, uint Width, uint Height) BuildDetachedCache(IUIComponent visual, Size size, double scale)
     {
         EnsureDevice();
+        // A bake has ONE frame - whatever its text has not rasterized yet would simply be missing from the picture - so
+        // glyphs are filled INLINE here, unlike a live window which lets them arrive over the following frames.
+        Adamantium.Graphics.Fonts.FontAtlasStore.SynchronousFill = true;
         var root = new VisualRoot(visual, size.Width, size.Height);
         var layoutSize = new Size(size.Width, size.Height);
         ((IMeasurableComponent)root).Measure(layoutSize);
@@ -100,6 +103,7 @@ public sealed class VisualRenderer : IVisualRenderer
         cache.BuildFromVisualTree(root);
         cache.ProcessCommands(root.GetProjectionMatrix(), scale);
 
+        Adamantium.Graphics.Fonts.FontAtlasStore.SynchronousFill = false;
         return (cache, (uint)Math.Max(1, size.Width * scale), (uint)Math.Max(1, size.Height * scale));
     }
 

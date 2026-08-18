@@ -360,7 +360,7 @@ public class ContentPresenter : InputUIComponent
     {
         // The auto-generated TextBlock carries an EXPLICIT Foreground/FontSize (set when it was built), so inheritance
         // wouldn't reach it - re-push on change. TEMPLATED content needs nothing here: it inherits the presenter's
-        // Foreground/FontSize naturally (the change cascades via ParentPropertyChanged), now that no per-TextBlock Style
+        // Foreground/FontSize naturally (the value is inherited through the ancestor chain), now that no per-TextBlock Style
         // sits at a higher priority masking it - see TextBlockStyleSet.
         //
         // ONLY the generated one. An AUTHORED TextBlock handed over as content is not ours to write into: an explicit

@@ -21,6 +21,7 @@ public partial class RenderCache
     public void ApplyFrame()
     {
         BeginApplyFrame();
+        AdoptReadyGlyphs();   // glyphs that finished rasterizing since the last frame land here
         while (_published.TryDequeue(out var packet))
         {
             ApplyPacket(packet);
@@ -66,7 +67,25 @@ public partial class RenderCache
         if (_warmAtlases.Count == 0) return;
 
         var text = _glyphWarmBuf.ToString();
-        foreach (var atlas in _warmAtlases) atlas.Warm(text);
+        // ASKED for, not waited on: the batch goes to a worker and this frame goes out with whatever the atlas
+        // already holds. Pooling the packet's characters still matters - the generator parallelises across the glyphs it is
+        // handed, so one batch keeps every core busy where fifty single-glyph requests would not.
+        foreach (var atlas in _warmAtlases) atlas.RequestAsync(text);
+    }
+
+    /// <summary>Take in the glyphs the workers finished - device work, so it belongs on this side - and rebuild the text
+    /// blocks that were built before their letters arrived. Nothing else about the frame changes, so this costs a walk of
+    /// the text units and the quad rebuild of the few that were waiting.</summary>
+    private void AdoptReadyGlyphs()
+    {
+        if (_renderUnitFactory.GraphicsDevice == null) return;
+        if (!Adamantium.Graphics.Fonts.FontAtlasStore.PumpReadyGlyphs()) return;
+
+        foreach (var group in _groups)
+        foreach (var unit in group.Units)
+        {
+            if (unit is RenderUnits.TextRenderUnit text) text.RefreshGlyphsIfArrived();
+        }
     }
 
     // What the recorded op stream actually baked out of a snapshot: where the element is, how big it is, what clips it.

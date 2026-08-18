@@ -35,6 +35,23 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
    /// path knows nothing about any of it.</summary>
    public bool CanAttachToOwner { get; private set; }
 
+   /// <summary>Whether ANY type declares this property as inheriting. A value that is never inherited has nothing to say
+   /// to a child, so a write of it must not wake one - and that is the common case: a handful of properties inherit
+   /// (DataContext, Foreground, FontSize) and hundreds do not. Set at registration/override, so the write path answers
+   /// it with a field read.</summary>
+   public bool CanInherit { get; private set; }
+
+   /// <summary>The INHERITANCE EPOCH: bumped whenever anything that can change what a descendant inherits happens - an
+   /// explicit write of an inheriting property anywhere, or a re-parenting. A cached inherited value is good while its
+   /// container carries the current epoch and is re-resolved from the ancestors when it does not.
+   /// <para>Deliberately GLOBAL rather than per property or per subtree: the bump has to be O(1) (it sits on the write
+   /// path), and a stale stamp costs one ancestor walk on the next READ of that one property - measured at ~0.7 us.
+   /// Being coarse makes it re-walk a little more often; being cheap is what lets the write side stop pushing a value
+   /// into every descendant it has.</para></summary>
+   internal static long InheritanceEpoch;
+
+   internal static void BumpInheritanceEpoch() => System.Threading.Interlocked.Increment(ref InheritanceEpoch);
+
    // Wiring, done once per property that can carry an attachable value. It rides the per-property Changed hook the
    // property system raises anyway, which is why setting a value costs nothing for this: no branch, no type test, no
    // mention of brushes - or of anything else that may later want an owner - anywhere in AdamantiumComponent.
@@ -116,6 +133,9 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
       }
 
       defaultValues.Add(ownerType, metadata);
+      // Once ANY declaration inherits, the property can inherit - an override may add it for a derived type and never
+      // takes it away for the type that had it.
+      CanInherit |= metadata.Inherits;
       metadataCache.Clear();   // a previously-resolved (base-walked) entry may now resolve to this newer, more-derived one
    }
 

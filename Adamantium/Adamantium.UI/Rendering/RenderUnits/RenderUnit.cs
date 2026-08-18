@@ -979,6 +979,19 @@ public class TextRenderUnit : RenderUnit<TextPayload>
 
     public override Matrix4x4F Place(Matrix4x4F world) => Payload.LocalTransform * world;
 
+    /// <summary>Letters this block was waiting on have landed in the atlas: lay its quads out again and re-freeze the
+    /// glyph run the batch bakes from. Costs nothing for a block whose glyphs were all there (the version check), which
+    /// is every block after the first frames of a new tab.</summary>
+    public void RefreshGlyphsIfArrived()
+    {
+        if (Payload?.TextLayout is not { NeedsGlyphRefresh: true } layout) return;
+
+        layout.RefreshGlyphs(GraphicsDevice);
+        if (TextComponent != null) TextComponent.GlyphRun = layout.SnapshotGlyphs();
+        // The frozen run is what the batch reads, so the element has to be re-recorded for the new one to be drawn.
+        DrawCommand?.Component?.InvalidateRender(false);
+    }
+
     public TextRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
         Payload.TextLayout.Update(GraphicsDevice);

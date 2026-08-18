@@ -21,6 +21,9 @@ public static class AdamantiumPropertyMap
    // reflection walk thousands of times. Cached here; invalidated on any registration (static-init only, never hot).
    private static readonly ConcurrentDictionary<Type, AdamantiumProperty[]> Flattened = new();
 
+   // The same flattened set keyed by NAME, built beside Flattened and dropped with it.
+   private static readonly ConcurrentDictionary<Type, Dictionary<string, AdamantiumProperty>> FlattenedByName = new();
+
    /// <summary>
    /// Attached registered properties by type.
    /// </summary>
@@ -77,6 +80,10 @@ public static class AdamantiumPropertyMap
       return Flattened.GetOrAdd(type, FlattenRegistered);
    }
 
+   /// <summary>The same set as <see cref="GetRegistered(Type)"/>, as the ARRAY it is stored as - so a caller that walks
+   /// it per instance (the component constructor) neither goes through an interface nor asks its Count separately.</summary>
+   internal static AdamantiumProperty[] GetRegisteredArray(Type type) => Flattened.GetOrAdd(type, FlattenRegistered);
+
    // Walks the type hierarchy ONCE (own + every base), running each level's static ctor so its properties are
    // registered, and returns the collected list. Cached by GetRegistered so this reflection walk runs once per type.
    private static AdamantiumProperty[] FlattenRegistered(Type type)
@@ -121,16 +128,23 @@ public static class AdamantiumPropertyMap
          throw new ArgumentNullException(nameof(name));
       }
 
-      var results = GetRegistered(type);
+      // First wins, exactly as the scan this replaces did: FlattenRegistered walks the CONCRETE type first and its bases
+      // after, so the most-derived declaration of a name is the one kept.
+      return FlattenedByName.GetOrAdd(type, BuildNameMap).GetValueOrDefault(name);
+   }
 
-      foreach (var p in results)
+   // The flattened set keyed by NAME. The scan this replaces compared strings down the whole list - about 60 of them for
+   // a plain control, more for a deep one - and it sits on the hot path of every by-name write: a COMPILED TEMPLATE is
+   // full of SetValue("BorderThickness", ...), and so is every Setter a style applies. Built once per type.
+   private static Dictionary<string, AdamantiumProperty> BuildNameMap(Type type)
+   {
+      var map = new Dictionary<string, AdamantiumProperty>(StringComparer.Ordinal);
+      foreach (var property in GetRegistered(type))
       {
-         if (p.Name == name)
-         {
-            return p;
-         }
+         map.TryAdd(property.Name, property);
       }
-      return null;
+
+      return map;
    }
 
    /// <summary>
@@ -260,6 +274,7 @@ public static class AdamantiumPropertyMap
 
       // a new property changes the flattened list of this type AND any derived type
       Flattened.Clear();
+      FlattenedByName.Clear();
 
       if (!property.IsAttached) 
          return;

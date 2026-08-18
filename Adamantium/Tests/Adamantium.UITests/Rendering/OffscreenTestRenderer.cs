@@ -22,6 +22,10 @@ namespace Adamantium.UITests.Rendering;
 /// </summary>
 internal sealed class OffscreenTestRenderer : IDisposable
 {
+    // An off-screen render is a ONE-SHOT: there is no next frame for asynchronously rasterized glyphs to appear in, so
+    // this path fills them inline - the same rule a RenderTargetBitmap bake follows (see VisualRenderer).
+    static OffscreenTestRenderer() => Adamantium.Graphics.Fonts.FontAtlasStore.SynchronousFill = true;
+
     private readonly IGraphicsDevice _device;
     private readonly RenderCache _renderCache;
     private readonly RenderCache _adornerCache;

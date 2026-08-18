@@ -16,6 +16,32 @@ namespace Adamantium.Graphics.Fonts
     {
         private TextureAtlasGenerator atlasGenerator;
         private Dictionary<uint, Glyph> processedGlyphs;
+
+        // Glyphs whose MSDF is being generated on a worker RIGHT NOW, and the finished data waiting to be uploaded.
+        // Generation is arithmetic and needs no device; the upload does - so the two live on different threads and meet
+        // here.
+        private readonly HashSet<uint> _inFlight = new();
+        private readonly Queue<IReadOnlyList<GlyphTextureData>> _ready = new();
+        private readonly Dictionary<uint, Glyph> _generated = new();
+        private readonly object _asyncGate = new();
+
+        /// <summary>Bumped whenever glyphs LAND in the atlas. A text block built while some of its glyphs were still
+        /// being rasterized compares this against the version it built at and rebuilds when they differ - that is what
+        /// makes an asynchronous fill appear without anybody polling for a particular glyph.</summary>
+        public int Version { get; private set; }
+
+        /// <summary>True while any glyph for this atlas is still being rasterized or waiting to be uploaded.</summary>
+        public bool HasPendingGlyphs
+        {
+            get
+            {
+                lock (_asyncGate)
+                {
+                    return _inFlight.Count > 0 || _ready.Count > 0;
+                }
+            }
+        }
+
         private bool _warnedLayersExhausted;
         
         private SamplerState assignedSamplerState;
@@ -112,6 +138,102 @@ namespace Adamantium.Graphics.Fonts
         public void Warm(string text)
         {
             if (!string.IsNullOrEmpty(text)) Update(text);
+        }
+
+        /// <summary>Ask for a text's glyphs WITHOUT waiting for them. What is missing goes to a worker (MSDF generation is
+        /// arithmetic - no device, no shared mutable state), and the result is uploaded later by <see cref="PumpReady"/> on
+        /// the thread that owns the device. The frame does not stop for it: text draws with the glyphs it has and the rest
+        /// arrive over the next frames, each landing bumping <see cref="Version"/> so the blocks rebuild themselves.
+        /// <para>Measured on the Brushes tab: 80 new glyphs cost 650-830 ms of MSDF, which was 88% of the apply phase and
+        /// the single biggest item in opening a tab. It is the same work either way - it simply stops being in the way.</para></summary>
+        public void RequestAsync(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+
+            // A render with no "next frame" (a bitmap, a preview, an off-screen test) cannot let its letters arrive later.
+            if (FontAtlasStore.SynchronousFill)
+            {
+                Update(text);
+                Version++;
+                return;
+            }
+
+            var uniqueSymbols = new string(text.Distinct().ToArray());
+            var glyphs = Font.TranslateIntoGlyphs(uniqueSymbols);
+
+            List<Glyph> toGenerate = null;
+            lock (_asyncGate)
+            {
+                foreach (var glyph in glyphs.Distinct(x => x.Index))
+                {
+                    if (processedGlyphs.ContainsKey(glyph.Index) || !_inFlight.Add(glyph.Index)) continue;
+                    (toGenerate ??= new List<Glyph>()).Add(glyph);
+                }
+            }
+
+            if (toGenerate == null) return;
+
+            // ONE task for the whole batch: the generator parallelises across the glyphs it is given, so handing it the
+            // batch keeps every core busy - the reason the caller pools a frame's text in the first place.
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                IReadOnlyList<GlyphTextureData> data;
+                try
+                {
+                    data = atlasGenerator.GenerateTextureForGlyphs(toGenerate);
+                }
+                catch
+                {
+                    // A glyph that cannot be rasterized must not wedge the queue: let it out of flight and go on. The
+                    // block that wanted it draws without it, exactly as it does for a glyph the font has no outline for.
+                    lock (_asyncGate)
+                    {
+                        foreach (var glyph in toGenerate) _inFlight.Remove(glyph.Index);
+                    }
+                    return;
+                }
+
+                lock (_asyncGate)
+                {
+                    _ready.Enqueue(data);
+                    foreach (var glyph in toGenerate) _generated[glyph.Index] = glyph;
+                }
+            });
+        }
+
+        /// <summary>Upload whatever the workers finished, on the thread that owns the device. Cheap - the expensive half
+        /// (the MSDF itself) already happened elsewhere; measured at 12 ms against 650 for the generation. Returns true
+        /// when something landed, which is the caller's cue that text built earlier is now out of date.</summary>
+        public bool PumpReady()
+        {
+            IReadOnlyList<GlyphTextureData> batch = null;
+            var landed = false;
+
+            while (true)
+            {
+                lock (_asyncGate)
+                {
+                    if (_ready.Count == 0) break;
+                    batch = _ready.Dequeue();
+                }
+
+                if (batch.Count > 0) ProcessTextureData(batch);
+
+                lock (_asyncGate)
+                {
+                    foreach (var pair in _generated)
+                    {
+                        processedGlyphs[pair.Key] = pair.Value;
+                        _inFlight.Remove(pair.Key);
+                    }
+                    _generated.Clear();
+                }
+
+                landed = true;
+            }
+
+            if (landed) Version++;
+            return landed;
         }
 
         private Glyph[] GetNotProcessedGlyphs(IEnumerable<Glyph> glyphs)
