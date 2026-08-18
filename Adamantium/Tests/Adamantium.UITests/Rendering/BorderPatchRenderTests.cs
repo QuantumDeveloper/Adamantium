@@ -190,6 +190,37 @@ public class BorderPatchRenderTests
         AssertMatchesAFullWalk(scene, patched, "the newcomer must land exactly where a full walk puts it");
     }
 
+    // TWO patches in ONE frame, with a SPLIT between them. The newcomer's placement cuts a recorded segment in two, and
+    // the OTHER patch had already been resolved against a segment before that cut (the frame resolves every patch first,
+    // then mutates - by design, so a refusal costs nothing). While a segment was named by its POSITION in the draw order,
+    // that resolved name meant a different segment after the insert, and the frame re-issued somebody else's layer: the
+    // shift-by-one that used to be held off by three synchronised fix-up loops. Segments carry stable ids now, so there is
+    // nothing to keep in sync - and this is the test that would have caught a loop nobody remembered to write.
+    [Test]
+    public void TwoPatchesInOneFrame_AroundASplit_EachReissuesItsOwnLayer()
+    {
+        using var scene = NewScene();
+        Assert.That(BorderPixels(Pixels(scene.Renderer)), Is.GreaterThan(0), "the setup must actually draw rings");
+
+        // The newcomer: rank inside a recorded segment's span, so placing it cuts that segment.
+        scene.Extras[1].RenderAction = s => s.DrawRectangle(Brushes.Green, new Rect(0, 0, 8, RowHeight));
+        scene.Extras[1].Invalidate();
+
+        // ...and a LATER card whose drawn unit count changes in the same frame, so it goes through the layer re-issue.
+        scene.Borders[3].RenderAction = s =>
+        {
+            s.DrawRectangle(Brushes.Blue, new Rect(4, 2, Dim - 8, RowHeight - 4));
+            s.DrawRectangle(Brushes.Yellow, new Rect(6, 4, 10, RowHeight - 8));
+        };
+        scene.Borders[3].Invalidate();
+
+        scene.Draw();
+
+        var patched = Pixels(scene.Renderer);
+        AssertMatchesAFullWalk(scene, patched,
+            "each patch must land in its OWN layer, however the split moved the segments around it");
+    }
+
     // ...and again, with the newcomer VANISHING - the other half of the splice, where a run is excised and what follows
     // is renumbered down. Repeated on purpose: the arena reuses freed blocks, so the second lap hands out a USED slot.
     [Test]

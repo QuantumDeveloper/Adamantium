@@ -43,23 +43,23 @@ public partial class RenderCache
                 case RenderOpKind.Segment:
                     switch (op.Batch)
                     {
-                        case 0: _rectBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
-                        case 1: _ellipseBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
-                        case 3: _gradientRectBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
-                        case 4: _gradientEllipseBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
-                        case 5: _patternBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
-                        case 6: _fractalBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
-                        case 7: _texRectBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
-                        case 8: _haloUnder.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
-                        case 9: _haloOver.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
-                        case 10: _haloLivingUnder.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
-                        case 11: _haloLivingOver.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
-                        case 12: _polygonBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
-                        default: _textBatch.DrawRecordedSegment(device, op.SegIndex, fullScissor, _projectionMatrix); break;
+                        case 0: _rectBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                        case 1: _ellipseBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                        case 3: _gradientRectBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                        case 4: _gradientEllipseBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                        case 5: _patternBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                        case 6: _fractalBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                        case 7: _texRectBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                        case 8: _haloUnder.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                        case 9: _haloOver.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                        case 10: _haloLivingUnder.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                        case 11: _haloLivingOver.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                        case 12: _polygonBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                        default: _textBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
                     }
                     break;
                 case RenderOpKind.InstancedFlush:
-                    _instancedFill.ReplayFlush(op.SegIndex, fullScissor, _projectionMatrix);
+                    _instancedFill.ReplayFlush(op.SegId, fullScissor, _projectionMatrix);
                     break;
             }
         }
@@ -206,7 +206,7 @@ public partial class RenderCache
             var fi = _instancedFill.Flush(fullScissor, _projectionMatrix);
             if (_recording && fi >= 0)
             {
-                _ops.Add(new RenderOp { Kind = RenderOpKind.InstancedFlush, SegIndex = fi, Order = _recordOrder });
+                _ops.Add(new RenderOp { Kind = RenderOpKind.InstancedFlush, SegId = fi, Order = _recordOrder });
             }
         }
 
@@ -223,22 +223,26 @@ public partial class RenderCache
         }
 
         RecordSegment(2, _textBatch.Flush(device, fullScissor, _projectionMatrix));
+        if (_probeFlushed) { LayerProbe.Cycle(); _probeFlushed = false; }
         scissorNarrowed = false;
         _batchOpen = false;
     }
 
     // Record a batch segment op (the immediate draw already happened in Flush; this only appends it for a clean-frame
     // replay). A Flush that drew nothing returns -1 and records nothing.
-    private void RecordSegment(byte batch, int segIndex)
+    private bool _probeFlushed;
+
+    private void RecordSegment(byte batch, int segId)
     {
-        if (!_recording || segIndex < 0) return;
+        if (segId >= 0) { _probeFlushed = true; LayerProbe.Segment(); }
+        if (!_recording || segId < 0) return;
 
         // A segment's paint span runs from the first group that filled it to the one being recorded when it flushed. Only
         // the RECT batch is ever spliced into, so only its span is tracked; for the others the span is a point, which is
         // all their ops are compared by.
         _ops.Add(new RenderOp
         {
-            Kind = RenderOpKind.Segment, Batch = batch, SegIndex = segIndex,
+            Kind = RenderOpKind.Segment, Batch = batch, SegId = segId,
             Order = _recordOrder, OrderFirst = batch == 0 ? _rectSegStart : _recordOrder
         });
     }

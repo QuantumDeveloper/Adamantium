@@ -53,8 +53,26 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     // bytes). Cleared at BeginFrame; a segment's index is stable within the frame that recorded it.
     // Capacity is the ROOM a range owns, Count what it currently draws - so a layer re-issued one item larger fits where
     // it already is instead of moving, and blocks freed by one edit are the right size for the next.
-    protected struct Segment { public Rect2D Scissor; public uint Count; public uint First; public uint Capacity; }
+    // Id is how EVERYONE outside names a segment. The list stays ordered by draw order, so a split has to insert into the
+    // middle of it - and an index taken before that insert means a different segment after it. That shift used to be the
+    // caller's problem, fixed up in three places at once (the op stream, the pending patches, their resolved layers), and
+    // a missed one re-issued the wrong segment: the same picture as a slot-off-by-one, with nothing in the frame to explain
+    // it. An id survives the insert, so there is nothing to fix up; ids are never reused, so a reference held across a
+    // frame resolves to NOTHING instead of to whatever moved into that index.
+    protected struct Segment { public int Id; public Rect2D Scissor; public uint Count; public uint First; public uint Capacity; }
     private readonly List<Segment> _segments = new();
+    private readonly Dictionary<int, int> _indexById = new();
+    private int _nextSegmentId;
+
+    /// <summary>Where a segment currently sits in draw order, or -1 if this id is not part of the recorded frame.</summary>
+    private int IndexOf(int id) => _indexById.TryGetValue(id, out var index) ? index : -1;
+
+    // Re-point the id map from that index to the end of the list. Called after an insert, which is the only thing that moves a
+    // segment's index.
+    private void Reindex(int from)
+    {
+        for (var i = from; i < _segments.Count; i++) _indexById[_segments[i].Id] = i;
+    }
 
     // Ranges vacated by a re-issued layer, handed back so the next re-issue reuses them instead of growing the arena.
     private readonly List<(int First, int Count)> _freeBlocks = new();
@@ -106,6 +124,7 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         _segmentStart = 0;
         _hasUnion = false;
         _segments.Clear();
+        _indexById.Clear();
         _freeBlocks.Clear();
         EnsureRing(device);
         SelectSlot(device);
@@ -224,21 +243,26 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         // replays this exact segment via DrawRecordedSegment (same code path, no upload) - so the immediate draw here
         // and the replayed draw are byte-for-byte the same.
         var index = _segments.Count;
-        _segments.Add(new Segment { Scissor = _scissor, Count = (uint)count, First = (uint)segStart, Capacity = (uint)count });
+        var id = ++_nextSegmentId;
+        _segments.Add(new Segment { Id = id, Scissor = _scissor, Count = (uint)count, First = (uint)segStart, Capacity = (uint)count });
+        _indexById[id] = index;
         OnSegmentRecorded(index);
 
         _segmentStart = Count;
         _hasUnion = false;
 
-        DrawRecordedSegment(device, index, fullScissor, projection);
-        return index;
+        DrawRecordedSegment(device, id, fullScissor, projection);
+        return id;
     }
 
     /// <summary>Draw a segment recorded this frame (by its <see cref="Flush"/> index): set its clip, bind any per-segment
     /// state, issue the instanced draw, restore <paramref name="fullScissor"/>. Called by the immediate draw in Flush AND
     /// by RenderCache's clean-frame op replay - the latter re-issues last frame's segments with zero re-bake/upload.</summary>
-    public void DrawRecordedSegment(IGraphicsDevice device, int index, Rect2D fullScissor, Matrix4x4F projection)
+    public void DrawRecordedSegment(IGraphicsDevice device, int id, Rect2D fullScissor, Matrix4x4F projection)
     {
+        var index = IndexOf(id);
+        if (index < 0) return;   // not part of this recorded frame - draw nothing rather than draw somebody else
+
         var s = _segments[index];
         if (s.Count == 0) return;   // re-issued to nothing - nothing left to draw
         device.SetScissors(s.Scissor);
@@ -261,17 +285,22 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         for (var i = 0; i < _segments.Count; i++)
         {
             var s = _segments[i];
-            if (s.Count > 0 && slot >= s.First && slot < s.First + s.Count) return i;
+            if (s.Count > 0 && slot >= s.First && slot < s.First + s.Count) return s.Id;
         }
         return -1;
     }
 
-    public Rect2D GetSegmentScissor(int index) => _segments[index].Scissor;
+    public Rect2D GetSegmentScissor(int id)
+    {
+        var index = IndexOf(id);
+        return index < 0 ? null : _segments[index].Scissor;
+    }
 
     /// TEMP (flicker hunt): what this recorded segment actually draws, for the walk-vs-replay trace comparison.
-    public string DescribeSegment(int index)
+    public string DescribeSegment(int id)
     {
-        if (index < 0 || index >= _segments.Count) return $"seg[{index}] MISSING (have {_segments.Count})";
+        var index = IndexOf(id);
+        if (index < 0) return $"seg#{id} MISSING (have {_segments.Count})";
         var s = _segments[index];
         var x = s.Scissor?.Offset?.X ?? -1;
         var y = s.Scissor?.Offset?.Y ?? -1;
@@ -287,7 +316,11 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     public int RetainedCount => Count;
 
     /// <summary>The retained range [first, first+count) a recorded segment currently draws.</summary>
-    public (int First, int Count) SegmentRange(int index) => ((int)_segments[index].First, (int)_segments[index].Count);
+    public (int First, int Count) SegmentRange(int id)
+    {
+        var index = IndexOf(id);
+        return index < 0 ? (-1, 0) : ((int)_segments[index].First, (int)_segments[index].Count);
+    }
 
     /// <summary>Cut a recorded segment in two at <paramref name="firstOfSecond"/> and return the new segment's index; the
     /// original keeps everything before the cut. Nothing moves - the arena is untouched and both halves keep drawing the
@@ -297,8 +330,11 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     /// stream until the span is split at it (see RenderCache's PlaceNewSegment).</para>
     /// <para>Capacity stays with the FIRST half: it is the tail of the original allocation, and a re-issue that grows must
     /// grow into it, never into the second half's live items.</para></summary>
-    public int SplitSegment(int index, int firstOfSecond)
+    public int SplitSegment(int id, int firstOfSecond)
     {
+        var index = IndexOf(id);
+        if (index < 0) return -1;
+
         var s = _segments[index];
         var offset = (uint)firstOfSecond - s.First;
         if (offset == 0 || offset >= s.Count) return -1;   // nothing on one side of the cut: not a split
@@ -308,6 +344,7 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         // neighbour it just created.
         var second = new Segment
         {
+            Id = ++_nextSegmentId,
             Scissor = s.Scissor,
             First = (uint)firstOfSecond,
             Count = s.Count - offset,
@@ -319,9 +356,9 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         // Per-segment state (a texture, a field) is keyed by index too, and both halves carry the same one.
         OnSegmentInserted(index + 1);
 
-        // Every recorded op that names a segment by INDEX now points one further along for everything after the cut; the
-        // caller (which owns the op stream) fixes those up. Signalled by returning the new index.
-        return index + 1;
+        // The insert moved every later segment one along - which is why nobody outside holds an index. Fixed HERE, once.
+        Reindex(index + 1);
+        return second.Id;
     }
 
     /// <summary>Copy retained items out, for a caller re-issuing a segment: the instances of the groups that did NOT
@@ -341,8 +378,11 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     /// cheap shape of a layer edit, a hover backdrop being one item among a screenful. The head never moves and the upload
     /// covers the edit plus the tail it pushed.
     /// False when the result no longer fits the room this segment owns; the caller then relocates it whole.</summary>
-    public bool ReplaceInSegment(IGraphicsDevice device, int index, int at, int replaced, ReadOnlySpan<TItem> items)
+    public bool ReplaceInSegment(IGraphicsDevice device, int id, int at, int replaced, ReadOnlySpan<TItem> items)
     {
+        var index = IndexOf(id);
+        if (index < 0) return false;
+
         var s = _segments[index];
         var newCount = (int)s.Count - replaced + items.Length;
         if (newCount > (int)s.Capacity) return false;
@@ -358,7 +398,7 @@ internal abstract class BatchCollector<TItem> where TItem : struct
 
         var touched = items.Length + (delta != 0 ? tailLen + Math.Max(0, -delta) : 0);
         UploadRange(first + at, touched);
-        _segments[index] = new Segment { Scissor = s.Scissor, Count = (uint)newCount, First = s.First, Capacity = s.Capacity };
+        _segments[index] = s with { Count = (uint)newCount };
         return true;
     }
 
@@ -390,12 +430,17 @@ internal abstract class BatchCollector<TItem> where TItem : struct
 
         items.CopyTo(Items.AsSpan(first));
         UploadRange(first, items.Length);
-        _segments.Add(new Segment { Scissor = scissor, Count = (uint)items.Length, First = (uint)first, Capacity = (uint)want });
-        return _segments.Count - 1;
+        var id = ++_nextSegmentId;
+        _indexById[id] = _segments.Count;
+        _segments.Add(new Segment { Id = id, Scissor = scissor, Count = (uint)items.Length, First = (uint)first, Capacity = (uint)want });
+        return id;
     }
 
-    public bool RepointSegment(IGraphicsDevice device, int index, ReadOnlySpan<TItem> items, Rect2D scissor)
+    public bool RepointSegment(IGraphicsDevice device, int id, ReadOnlySpan<TItem> items, Rect2D scissor)
     {
+        var index = IndexOf(id);
+        if (index < 0) return false;
+
         PrepareRetainedWrite(device);
 
         var s = _segments[index];
@@ -406,7 +451,7 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         {
             items.CopyTo(Items.AsSpan((int)s.First));
             UploadRange((int)s.First, need);
-            _segments[index] = new Segment { Scissor = scissor, Count = (uint)need, First = s.First, Capacity = s.Capacity };
+            _segments[index] = s with { Scissor = scissor, Count = (uint)need };
             return true;
         }
 
@@ -435,7 +480,7 @@ internal abstract class BatchCollector<TItem> where TItem : struct
 
         items.CopyTo(Items.AsSpan(first));
         UploadRange(first, need);
-        _segments[index] = new Segment { Scissor = scissor, Count = (uint)need, First = (uint)first, Capacity = (uint)want };
+        _segments[index] = s with { Scissor = scissor, Count = (uint)need, First = (uint)first, Capacity = (uint)want };
         return true;
     }
 

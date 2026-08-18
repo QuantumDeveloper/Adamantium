@@ -85,7 +85,10 @@ public partial class RenderCache
         public Rect2D Scissor;    // Scissor
         public IRenderUnit Unit;  // Unit
         public byte Batch;        // Segment: which collector (0 rect, 1 ellipse, 2 text, 3 gradient-rect, 4 gradient-ellipse, 5 pattern, 6 fractal, 7 textured)
-        public int SegIndex;      // Segment: index into that collector's recorded segment list; InstancedFlush: flush index
+        // Segment: the collector's STABLE segment id (see BatchCollector.Segment.Id) - never an index, so a split that
+        // inserts a segment in the middle of the draw order leaves every recorded op naming exactly what it named before.
+        // InstancedFlush: that collector's flush index (its list is append-only within a frame, so there is nothing to shift).
+        public int SegId;
 
         // Paint rank of the group being recorded when this op was emitted. The stream is written in rank order, so a
         // control that starts drawing later knows exactly where its op belongs - by its OWN rank, not by guessing from
@@ -251,6 +254,12 @@ public partial class RenderCache
     private readonly int _traceCacheId = System.Threading.Interlocked.Increment(ref _traceNextCacheId);
     private int _traceComposited;
 
+    // SCRATCH (§5a phase 1 verification): force every frame through the WALK. ADAM_NO_PATCH=1 kills the partial/spliced
+    // patch paths, ADAM_NO_REPLAY=1 kills the clean-frame op replay. A visual defect that survives both is not in the
+    // retained machinery at all - which is the one question a single run can answer.
+    private static readonly bool PatchDisabled = Environment.GetEnvironmentVariable("ADAM_NO_PATCH") == "1";
+    private static readonly bool ReplayDisabled = Environment.GetEnvironmentVariable("ADAM_NO_REPLAY") == "1";
+
     private void RenderCore(IGraphicsDevice device, Rect2D fullScissor)
     {
         // This frame's transform-table copy, picked BEFORE anything writes a matrix or draws - the composited animations
@@ -264,7 +273,7 @@ public partial class RenderCache
 
         // Clean-frame replay: re-issue the last recorded walk's op stream and skip the per-unit loop (the retained buffers
         // still hold its bytes). Only a fully-Clean build qualifies; a Partial/Full re-walks and re-records.
-        if (device != null && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Clean && OpsMatchTransforms)
+        if (device != null && !ReplayDisabled && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Clean && OpsMatchTransforms)
         {
             LastFrameReplayed = true;
             ExecuteOps(device, fullScissor);
@@ -275,7 +284,7 @@ public partial class RenderCache
         // splice). Patch just those slots, then replay - O(dirty). ONLY when nothing MOVED (!LastBuildTransformDirty):
         // ExecuteOps redraws batch segments from last frame's baked positions, so a MOVE would leave batched fills stale
         // while per-unit draws follow the new transform (the "outline runs ahead of its fill" tear) -> fall through to the walk.
-        if (device != null && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Partial
+        if (device != null && !PatchDisabled && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Partial
             && !LastBuildTransformDirty && OpsMatchTransforms && !_partialSpliced && _rectBatch != null && TryPartialReplay(device, fullScissor))
         { LastFrameReplayed = true; return; }
 
@@ -283,7 +292,7 @@ public partial class RenderCache
         // different number of segments). Its group re-rendered in place; here the retained BATCH is patched by segment
         // surgery (excise its old run, its re-baked items append as a new segment spliced into the op stream at the same
         // paint position) then replayed. O(dirty groups). Falls back to the full walk on anything not yet patchable.
-        if (device != null && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Partial
+        if (device != null && !PatchDisabled && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Partial
             && !LastBuildTransformDirty && OpsMatchTransforms && _partialSpliced && _rectBatch != null && TrySplicedPatch(device, fullScissor))
         { LastFrameReplayed = true; return; }
 
@@ -304,6 +313,7 @@ public partial class RenderCache
         _recording = device != null;   // a device walk records its op stream for a later clean-frame replay
         if (_recording)
         {
+            LayerProbe.FrameStart();
             _ops.Clear(); 
             _opsReplayable = true; 
             _rectSlotByUnit.Clear();
@@ -1380,8 +1390,11 @@ public partial class RenderCache
             var layer = TargetLayer(p.Group);
             if (layer < 0) return false;   // TargetLayer already named which of its three answers it gave
             if (FindSegmentOp(layer) < 0) return SpliceRefused("noLayerOp");
-            // One segment draws under ONE clip; a group that now sits under a different one cannot join it.
-            if (p.Items.Length > 0 && !ScissorEquals(_rectBatch.GetSegmentScissor(layer), p.Scissor)) return SpliceRefused("otherClip");
+            // One segment draws under ONE clip; a group that now sits under a different one cannot join it. A layer whose
+            // id is no longer part of the recorded frame has no clip to compare either - refuse rather than guess.
+            var layerScissor = _rectBatch.GetSegmentScissor(layer);
+            if (layerScissor == null) return SpliceRefused("staleLayer");
+            if (p.Items.Length > 0 && !ScissorEquals(layerScissor, p.Scissor)) return SpliceRefused("otherClip");
             p.Layer = layer;
             _patchBuf[n] = p;
             if (!_patchLayers.Contains(layer)) _patchLayers.Add(layer);
@@ -1410,6 +1423,7 @@ public partial class RenderCache
     // by nine different means.
     private static bool SpliceRefused(string reason)
     {
+        LayerProbe.Refusals++;
         if (Core.Diagnostics.FrameTrace.Enabled) Core.Diagnostics.FrameTrace.Refuser = reason;
         return false;
     }
@@ -1421,11 +1435,11 @@ public partial class RenderCache
         return true;
     }
 
-    // The op index that draws rect-batch segment <paramref name="segIndex"/>.
-    private int FindSegmentOp(int segIndex)
+    // The op index that draws rect-batch segment <paramref name="segId"/>.
+    private int FindSegmentOp(int segId)
     {
         for (var i = 0; i < _ops.Count; i++)
-            if (_ops[i].Kind == RenderOpKind.Segment && _ops[i].Batch == 0 && _ops[i].SegIndex == segIndex) return i;
+            if (_ops[i].Kind == RenderOpKind.Segment && _ops[i].Batch == 0 && _ops[i].SegId == segId) return i;
         return -1;
     }
 
@@ -1449,6 +1463,7 @@ public partial class RenderCache
 
         var layer = patch.Layer;
         var (first, count) = _rectBatch.SegmentRange(layer);
+        if (first < 0) return false;   // the layer is gone from this recorded frame; the walk rebuilds it
         var scissor = _rectBatch.GetSegmentScissor(layer);
         var group = patch.Group;
 
@@ -1457,7 +1472,12 @@ public partial class RenderCache
         var replaced = 0;
         foreach (var run in group.RectRuns) replaced += run.Count;
 
-        if (at < 0 || at + replaced > count) return true;   // its run is not in this layer after all - leave the frame be
+        // Its run is not inside this layer after all - the layer was cut under it by another patch in this same frame (a
+        // newcomer whose rank landed inside its span). This patch cannot be honoured, and "leave the frame be" was the
+        // wrong answer to that: the frame went out claiming to be patched while this card kept the pixels it had before,
+        // which a full walk does not draw (BorderPatchRenderTests.TwoPatchesInOneFrame_AroundASplit). Refuse, and the walk
+        // draws the truth - being patchable through a cut is what an arena per layer buys, not something to fake here.
+        if (at < 0 || at + replaced > count) return SpliceRefused("runOutsideLayerAfterSplit");
 
         // The cheap path: edit inside the room the layer already owns, moving only what follows the edit. Only when the
         // layer has outgrown its room does it relocate, and then it does have to be carried across whole.
@@ -1525,7 +1545,7 @@ public partial class RenderCache
 
         _ops.Insert(OpIndexForRank(group.Order), new RenderOp
         {
-            Kind = RenderOpKind.Segment, Batch = 0, SegIndex = seg, Order = group.Order
+            Kind = RenderOpKind.Segment, Batch = 0, SegId = seg, Order = group.Order
         });
 
         var (first, _) = _rectBatch.SegmentRange(seg);
@@ -1576,43 +1596,22 @@ public partial class RenderCache
             if (op.Kind != RenderOpKind.Segment || op.Batch != 0) continue;
             if (op.OrderFirst >= order || order >= op.Order) continue;   // does not span this rank
 
-            var cut = FirstSlotPaintedAfter(op.SegIndex, order);
+            var cut = FirstSlotPaintedAfter(op.SegId, order);
             if (cut < 0) continue;   // its whole content paints BEFORE the newcomer after all - nothing to cut
 
-            var second = _rectBatch.SplitSegment(op.SegIndex, cut);
+            var second = _rectBatch.SplitSegment(op.SegId, cut);
             if (second < 0) continue;
+            LayerProbe.Splits++;
 
-            // The split INSERTED a segment, so every op naming one at or after it now names the wrong one.
-            for (var k = 0; k < _ops.Count; k++)
-            {
-                var other = _ops[k];
-                if (other.Kind != RenderOpKind.Segment || other.Batch != 0 || other.SegIndex < second) continue;
-                other.SegIndex++;
-                _ops[k] = other;
-            }
-
-            // ...and so does every layer this frame's OTHER patches resolved BEFORE the split (phase 1b runs before any
-            // mutation, by design). A stale index here re-issues the wrong layer, which is the same shift-by-one bug in a
-            // form nothing in the picture would explain.
-            for (var k = 0; k < _patchBuf.Count; k++)
-            {
-                var other = _patchBuf[k];
-                if (other.Layer < second) continue;
-                other.Layer++;
-                _patchBuf[k] = other;
-            }
-
-            for (var k = 0; k < _patchLayers.Count; k++)
-            {
-                if (_patchLayers[k] >= second) _patchLayers[k]++;
-            }
-
+            // Nothing to fix up: every op, every pending patch and every layer this frame resolved names its segment by
+            // ID, and the split gave the new half an id of its own. This is what used to be three synchronised loops over
+            // the op stream, the patch buffer and its resolved layers - and the bug when one of them was missed.
             var spanEnd = op.Order;
             op.Order = order;   // this half now ends before the newcomer
             _ops[i] = op;
             _ops.Insert(i + 1, new RenderOp
             {
-                Kind = RenderOpKind.Segment, Batch = 0, SegIndex = second, Order = spanEnd, OrderFirst = order
+                Kind = RenderOpKind.Segment, Batch = 0, SegId = second, Order = spanEnd, OrderFirst = order
             });
             return;   // one rank cuts one segment: the halves no longer span it
         }
@@ -1620,9 +1619,9 @@ public partial class RenderCache
 
     // The first slot inside this segment that belongs to a group painting AFTER the given rank, or -1 if none does. Only
     // groups the current walk described can answer - a stale group's runs point at slots that have since been reassigned.
-    private int FirstSlotPaintedAfter(int segIndex, long order)
+    private int FirstSlotPaintedAfter(int segId, long order)
     {
-        var (first, count) = _rectBatch.SegmentRange(segIndex);
+        var (first, count) = _rectBatch.SegmentRange(segId);
         var cut = -1;
         foreach (var group in _groups)
         {
