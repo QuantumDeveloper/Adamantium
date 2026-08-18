@@ -21,6 +21,10 @@ internal sealed class TestRoot : UIComponent, IRootVisualComponent
         ClientHeight = height;
     }
 
+    /// <summary>The harness draws a frame at a time on demand, exactly like a bake - so content inside it is built where
+    /// it is asked for instead of arriving later.</summary>
+    public bool RendersOnce => true;
+
     public void Add(IUIComponent child) => AddVisualChild(child);
     public void Remove(IUIComponent child) => RemoveVisualChild(child);
 
@@ -49,6 +53,10 @@ internal sealed class TestControl : UIComponent
 {
     /// <summary>Called from OnRender; emit whatever draw commands the test needs. Null = draws nothing.</summary>
     public Action<IDrawingSession> RenderAction;
+
+    /// <summary>The harness draws a frame at a time on demand, exactly like a bake - so content inside it is built where
+    /// it is asked for instead of arriving later.</summary>
+    public bool RendersOnce => true;
 
     public void Add(IUIComponent child) => AddVisualChild(child);
     public void Remove(IUIComponent child) => RemoveVisualChild(child);

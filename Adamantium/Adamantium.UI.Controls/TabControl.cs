@@ -58,6 +58,16 @@ public class TabControl : Selector
     public static readonly AdamantiumProperty ContentTransitionDurationProperty = AdamantiumProperty.Register(nameof(ContentTransitionDuration),
         typeof(double), typeof(TabControl), new PropertyMetadata(0.25));
 
+    /// <summary>Build a selected tab's body AWAY from the loop thread: the tab opens at once showing
+    /// <see cref="LoadingTemplate"/>, and its content appears when it is ready. For bodies whose construction costs
+    /// hundreds of milliseconds - see <see cref="ContentPresenter.DeferContent"/>, which does the work.</summary>
+    public static readonly AdamantiumProperty DeferContentProperty = AdamantiumProperty.Register(nameof(DeferContent),
+        typeof(bool), typeof(TabControl), new PropertyMetadata(false));
+
+    /// <summary>What stands in the body's place while it is being built.</summary>
+    public static readonly AdamantiumProperty LoadingTemplateProperty = AdamantiumProperty.Register(nameof(LoadingTemplate),
+        typeof(DataTemplate), typeof(TabControl), new PropertyMetadata(null));
+
     /// <summary>Which edge the tab strip sits on (default <see cref="TabStripPlacement.Top"/>). Each value selects its
     /// own control template via a theme trigger, so a placement can fully restyle the strip.</summary>
     public static readonly AdamantiumProperty TabStripPlacementProperty = AdamantiumProperty.Register(nameof(TabStripPlacement),
@@ -378,6 +388,18 @@ public class TabControl : Selector
     {
         get => GetValue<ContentTransition>(ContentTransitionProperty);
         set => SetValue(ContentTransitionProperty, value);
+    }
+
+    public bool DeferContent
+    {
+        get => GetValue<bool>(DeferContentProperty);
+        set => SetValue(DeferContentProperty, value);
+    }
+
+    public DataTemplate LoadingTemplate
+    {
+        get => GetValue<DataTemplate>(LoadingTemplateProperty);
+        set => SetValue(LoadingTemplateProperty, value);
     }
 
     /// <summary>Duration (seconds) of the tab-content transition.</summary>

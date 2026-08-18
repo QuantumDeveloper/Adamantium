@@ -274,7 +274,9 @@
                                               ContentTemplate="{TemplateBinding SelectedContentTemplate}"
                                               ContentTemplateSelector="{TemplateBinding SelectedContentTemplateSelector}"
                                               ContentTransition="{TemplateBinding ContentTransition}"
-                                              TransitionDuration="{TemplateBinding ContentTransitionDuration}"/>
+                                              TransitionDuration="{TemplateBinding ContentTransitionDuration}"
+                                              DeferContent="{TemplateBinding DeferContent}"
+                                              LoadingTemplate="{TemplateBinding LoadingTemplate}"/>
                         </Border>
                     </Grid>
                     <ControlTemplate.Triggers>
@@ -355,7 +357,9 @@
                                               ContentTemplate="{TemplateBinding SelectedContentTemplate}"
                                               ContentTemplateSelector="{TemplateBinding SelectedContentTemplateSelector}"
                                               ContentTransition="{TemplateBinding ContentTransition}"
-                                              TransitionDuration="{TemplateBinding ContentTransitionDuration}"/>
+                                              TransitionDuration="{TemplateBinding ContentTransitionDuration}"
+                                              DeferContent="{TemplateBinding DeferContent}"
+                                              LoadingTemplate="{TemplateBinding LoadingTemplate}"/>
                         </Border>
                         <!-- Strip + ▾ overflow (Auto column beside the * scroller) - see the Top template for the rationale. -->
                         <Grid x:Name="StripRow" Grid.Row="1" ColumnDefinitions="*,Auto">
@@ -526,7 +530,9 @@
                                               ContentTemplate="{TemplateBinding SelectedContentTemplate}"
                                               ContentTemplateSelector="{TemplateBinding SelectedContentTemplateSelector}"
                                               ContentTransition="{TemplateBinding ContentTransition}"
-                                              TransitionDuration="{TemplateBinding ContentTransitionDuration}"/>
+                                              TransitionDuration="{TemplateBinding ContentTransitionDuration}"
+                                              DeferContent="{TemplateBinding DeferContent}"
+                                              LoadingTemplate="{TemplateBinding LoadingTemplate}"/>
                         </Border>
                     </Grid>
                     <ControlTemplate.Triggers>
@@ -578,7 +584,9 @@
                                               ContentTemplate="{TemplateBinding SelectedContentTemplate}"
                                               ContentTemplateSelector="{TemplateBinding SelectedContentTemplateSelector}"
                                               ContentTransition="{TemplateBinding ContentTransition}"
-                                              TransitionDuration="{TemplateBinding ContentTransitionDuration}"/>
+                                              TransitionDuration="{TemplateBinding ContentTransitionDuration}"
+                                              DeferContent="{TemplateBinding DeferContent}"
+                                              LoadingTemplate="{TemplateBinding LoadingTemplate}"/>
                         </Border>
                         <!-- Strip + ▾ overflow in an Auto ROW below the * scroller (vertical strip - see the Left template). -->
                         <Grid x:Name="StripRow" Grid.Column="1" RowDefinitions="*,Auto">

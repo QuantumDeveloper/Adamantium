@@ -23,7 +23,9 @@ internal static class ContentTransitions
     public static void Run(ContentTransition direction, double durationSeconds, Size size,
         IUIComponent incoming, IUIComponent outgoing, Action onOutgoingComplete)
     {
-        if (direction == ContentTransition.None || incoming == null)
+        // Nothing coming in is not nothing happening: content can be on its way (built off the loop thread) while what it
+        // replaces still has to leave. What is leaving leaves either way; only the entrance is skipped.
+        if (direction == ContentTransition.None || (incoming == null && outgoing == null))
         {
             onOutgoingComplete?.Invoke();
             return;

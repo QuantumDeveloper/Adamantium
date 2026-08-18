@@ -31,6 +31,18 @@ public class RunAnimationAction : IUndoableTriggerAction, ITargetedTriggerAction
         var target = context.FindTarget(TargetName);
         if (target is not AdamantiumComponent animTarget) return;
 
+        // An enter action runs ONCE, as its condition becomes true - which, for a view built off the loop thread, is
+        // while it is still being built. It cannot simply be skipped (nothing would ever ask again: the resume path only
+        // re-runs what a DETACH suspended) and it cannot run here either, because the claim below and the phase above
+        // live in tables the loop thread owns. So the whole action waits for the element to go up.
+        if (Media.Animation.AnimationManager.DeferIfOutOfTree(
+                animTarget, context.HostComponent as AdamantiumComponent, () => Start(context, animTarget))) return;
+
+        Start(context, animTarget);
+    }
+
+    private void Start(ITriggerExecutionContext context, AdamantiumComponent animTarget)
+    {
         var resume = ResumePhase.Remove((context.HostComponent, this), out var phase) ? phase : 0;
 
         // Claim the target for this trigger's HOST before starting: a SHARED target (a keyed theme brush every loading

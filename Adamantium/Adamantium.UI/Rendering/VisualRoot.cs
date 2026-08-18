@@ -38,6 +38,10 @@ internal sealed class VisualRoot : MeasurableUIComponent, IRootVisualComponent
         return finalSize;
     }
 
+    /// <summary>A detached render is the definition of one-shot: it is laid out, recorded and drawn once, and whatever
+    /// was left for later is simply missing from the picture.</summary>
+    public bool RendersOnce => true;
+
     public double Left { get; set; }
     public double Top { get; set; }
     public string Title { get; set; }

@@ -8,14 +8,20 @@ namespace Adamantium.Core.DependencyInjection
 {
     public class AdamantiumDependencyContainer : IDependencyContainer
     {
-        private readonly Dictionary<Type, DependencyInjectionDetails> _registrations;
+        // Concurrent because resolution is no longer a one-thread affair: a view can be built off the loop thread while
+        // the loop resolves something of its own, and the lenient path WRITES here (auto-registering a type it was asked
+        // for). A plain dictionary torn by that reads as a missing registration - or as nothing at all.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<Type, DependencyInjectionDetails> _registrations;
 
         // Service-type -> concrete implementation redirect, populated by AutoRegister so an interface resolves to the
         // single registration of its implementation (keeps a singleton shared across interface and concrete resolves).
-        private readonly Dictionary<Type, Type> _aliases = new Dictionary<Type, Type>();
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<Type, Type> _aliases = new();
 
-        // Tracks the in-flight resolution chain to fail fast on a circular dependency instead of stack-overflowing.
-        private readonly HashSet<Type> _resolving = new HashSet<Type>();
+        // The in-flight resolution CHAIN, to fail fast on a circular dependency instead of stack-overflowing. It belongs
+        // to the call stack that is resolving, not to the container: two threads resolving at once are two independent
+        // chains, and sharing one set makes the second one read "already resolving" - a circular dependency reported for
+        // a type that has none. That is what a view built off the loop thread ran into while another was still building.
+        [ThreadStatic] private static HashSet<Type> _resolving;
 
         /// <summary>
         /// When true, resolving an unregistered type throws instead of auto-registering it as Transient. Turn this on
@@ -30,7 +36,7 @@ namespace Adamantium.Core.DependencyInjection
         
         public AdamantiumDependencyContainer()
         {
-            _registrations = new Dictionary<Type, DependencyInjectionDetails>();
+            _registrations = new System.Collections.Concurrent.ConcurrentDictionary<Type, DependencyInjectionDetails>();
             RegisterSingleton<IEventAggregator, EventAggregator>();
         }
 
@@ -126,7 +132,8 @@ namespace Adamantium.Core.DependencyInjection
                 info = _registrations[type];
             }
 
-            if (!_resolving.Add(type))
+            var resolving = _resolving ??= new HashSet<Type>();
+            if (!resolving.Add(type))
             {
                 throw new ArgumentException($"Circular dependency detected while resolving '{type.FullName}'.");
             }
@@ -137,7 +144,7 @@ namespace Adamantium.Core.DependencyInjection
             }
             finally
             {
-                _resolving.Remove(type);
+                resolving.Remove(type);
             }
         }
 

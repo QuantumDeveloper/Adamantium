@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Adamantium.Graphics.Fonts;
 using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Text;
@@ -30,9 +32,23 @@ public class ContentPresenter : InputUIComponent
     private TemplateResult _outgoingTemplateResult;
     private bool _isContentChanged;
     private bool _transitionPending;
+    private bool _transitionRunning;
+    private Action _afterTransition;
     private bool _textIsGenerated;                             // is _currentRoot the TextBlock this presenter generated?
     private bool _lastContentRebuilt;                          // did the last measure REBUILD the visual (vs data-only reuse)?
     private Size _lastArrangeSize = new(double.NaN, double.NaN);   // last finalSize we actually walked in ArrangeOverride
+    // Deferred content: what is being built away from the loop thread, and which build is still the current one. The
+    // token supersedes a build whose content has already been replaced - the user who switches tabs twice must not get
+    // the first tab's body handed to them when it finally lands.
+    private int _deferToken;
+    private bool _deferInFlight;
+
+    // Deferred builds run ONE AT A TIME, process-wide. A view on its way up touches registries written for a single
+    // builder - the container's resolution chain, the view locator's cache, the theme's memos - and two overlapping
+    // builds turn "already resolving" into a circular dependency that does not exist, which is a tab that never arrives.
+    // One queue also keeps a burst of tab switches from starting five builds nobody is waiting for any more.
+    private static readonly System.Threading.SemaphoreSlim BuildQueue = new(1, 1);
+
     private Size _lastMeasuredInner;   // what MeasureOverride last returned - WITHOUT this element's margin/transform
     private Size _lastContentDesired;  // ...and the content size that produced it - the cache is only good while it holds
 
@@ -47,6 +63,18 @@ public class ContentPresenter : InputUIComponent
 
     public static readonly AdamantiumProperty ContentTemplateSelectorProperty = AdamantiumProperty.Register(nameof(ContentTemplateSelector),
         typeof(DataTemplateSelector), typeof(ContentPresenter), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure, OnContentTemplateSelectorChanged));
+
+    /// <summary>Build this presenter's content AWAY from the loop thread: the presenter shows its
+    /// <see cref="LoadingTemplate"/> at once and adopts the real visual when it is ready. For content whose construction
+    /// is measured in hundreds of milliseconds (a tab body is thousands of elements) - not for list items, which are
+    /// cheap and would only flash.</summary>
+    public static readonly AdamantiumProperty DeferContentProperty = AdamantiumProperty.Register(nameof(DeferContent),
+        typeof(Boolean), typeof(ContentPresenter), new PropertyMetadata(false));
+
+    /// <summary>What stands in the content's place while it is being built (a spinner, a skeleton). Optional: without it
+    /// the presenter simply shows nothing until the content lands.</summary>
+    public static readonly AdamantiumProperty LoadingTemplateProperty = AdamantiumProperty.Register(nameof(LoadingTemplate),
+        typeof(DataTemplate), typeof(ContentPresenter), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure));
 
     public static readonly AdamantiumProperty ContentTransitionProperty = AdamantiumProperty.Register(nameof(ContentTransition),
         typeof(ContentTransition), typeof(ContentPresenter), new PropertyMetadata(ContentTransition.None));
@@ -117,7 +145,8 @@ public class ContentPresenter : InputUIComponent
         // list rebinding a recycled container to another item). Keep the visual AND its render units/GPU buffers - the
         // data updates by itself via the container's DataContext (the item template's {Binding}s re-resolve). Rebuilding
         // here would dispose and recreate every buffer each scroll frame (the OutOfDeviceMemory under fast scroll).
-        if (newContent != null && newContent is not IUIComponent && _currentRoot != null && _currentTemplate != null)
+        if (newContent != null && newContent is not IUIComponent && _currentRoot != null && _currentTemplate != null
+            && !_deferInFlight)
         {
             var reuseTemplate = ContentTemplate ?? ContentTemplateSelector?.SelectTemplate(newContent, this);
             if (ReferenceEquals(reuseTemplate, _currentTemplate))
@@ -170,6 +199,11 @@ public class ContentPresenter : InputUIComponent
             else Release(_currentRoot, _currentTemplateResult);
         }
 
+        // Whatever is still being built off-thread was built for content that is no longer ours: bump the token so it
+        // lands into nothing (see AdoptDeferred) instead of replacing the visual that comes next.
+        _deferToken++;
+        _deferInFlight = false;
+
         _currentRoot = null;
         _currentTemplateResult = null;
         _currentTemplate = null;
@@ -180,7 +214,7 @@ public class ContentPresenter : InputUIComponent
 
         // The slide distance is the laid-out size, so defer starting it to the next arrange (size known there). If a
         // transition was expected but produced no new root, drop the kept-alive outgoing content now.
-        _transitionPending = animate && _currentRoot != null;
+        _transitionPending = animate && (_currentRoot != null || _outgoingRoot != null);
         if (animate && !_transitionPending)
             RemoveOutgoing();
 
@@ -222,11 +256,17 @@ public class ContentPresenter : InputUIComponent
         else
         {
             var dataTemplate = ContentTemplate ?? ContentTemplateSelector?.SelectTemplate(newContent, this);
+            if (dataTemplate != null && WantsDeferredBuild)
+            {
+                _currentTemplate = dataTemplate;
+                StartDeferredBuild(newContent, dataTemplate);
+                return;
+            }
+
             if (dataTemplate != null)
             {
-                _currentTemplateResult = dataTemplate.Build(this);
-                _currentRoot = _currentTemplateResult?.RootComponent;
-                _currentTemplate = dataTemplate;   // remember it so a recycled rebind to the same template reuses this visual
+                BuildFromTemplate(newContent, dataTemplate);
+                return;
             }
             else
             {
@@ -253,6 +293,155 @@ public class ContentPresenter : InputUIComponent
             SetContentContext(newContent);
         }
 
+    }
+
+    /// <summary>Builds the visual from its template right here, on the calling thread - the ordinary path, and the one a
+    /// failed background build falls back to.</summary>
+    private void BuildFromTemplate(object content, DataTemplate template)
+    {
+        _currentTemplateResult = template.Build(this);
+        _currentRoot = _currentTemplateResult?.RootComponent;
+        _currentTemplate = template;   // remember it so a recycled rebind to the same template reuses this visual
+
+        if (_currentRoot == null) return;
+
+        AddVisualChild(_currentRoot);
+        AddLogicalChild(_currentRoot);
+        SetContentContext(content);
+        InvalidateMeasure();
+    }
+
+    /// <summary>Puts the loading visual in the content's place. It is the current visual like any other, so measure,
+    /// arrange and teardown need to know nothing about it.</summary>
+    private void ShowLoadingVisual(object content)
+    {
+        if (!_deferInFlight || _currentRoot != null) return;
+
+        var loading = LoadingTemplate?.Build(this);
+        if (loading?.RootComponent == null) return;
+
+        _currentTemplateResult = loading;
+        _currentRoot = loading.RootComponent;
+        AddVisualChild(_currentRoot);
+        AddLogicalChild(_currentRoot);
+        SetContentContext(content);
+        InvalidateMeasure();
+    }
+
+    /// <summary>Lets go of what is on screen now - the loading visual, when the real content is about to take its place.</summary>
+    private void DropCurrent()
+    {
+        if (_currentRoot == null) return;
+
+        Release(_currentRoot, _currentTemplateResult);
+        _currentRoot = null;
+        _currentTemplateResult = null;
+    }
+
+    /// <summary>Deferred only where there ARE next frames for it to arrive in. A one-shot surface - a bitmap bake, a
+    /// designer preview, an off-screen test - has exactly one, and a spinner in it is a spinner for good; the surface
+    /// itself says so (see IRootVisualComponent.RendersOnce), so nothing has to be switched on around the render.</summary>
+    private bool WantsDeferredBuild =>
+        DeferContent && !Design.IsDesignMode && (RootVisual as IRootVisualComponent)?.RendersOnce != true;
+
+    /// <summary>Shows the loading visual now and builds the real one on a worker. The presenter goes on living with a
+    /// perfectly ordinary child in the meantime - the loading visual IS the current visual - so measure, arrange and the
+    /// teardown path need to know nothing about any of this.</summary>
+    private void StartDeferredBuild(object content, DataTemplate template)
+    {
+        var token = ++_deferToken;
+        _deferInFlight = true;
+
+        // The loading visual belongs to the tab being ENTERED, so it takes no part in the one that is leaving: while the
+        // swap plays, the area the old content vacates stays empty, and the spinner appears after it - and only if the
+        // content has still not arrived by then (if it has, it takes the place directly and no spinner is ever seen).
+        if (_outgoingRoot == null) ShowLoadingVisual(content);
+        else _afterTransition = () => ShowLoadingVisual(content);
+
+        Task.Run(async () =>
+        {
+            TemplateResult built = null;
+            Exception failure = null;
+
+            await BuildQueue.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                // Its turn came - but is it still wanted? A tab the user has already left costs nothing to skip, and
+                // skipping it is what lets the tab they ARE waiting for start now instead of after it.
+                if (token != System.Threading.Volatile.Read(ref _deferToken)) return;
+
+                // The subtree belongs to nobody until it is handed over: nothing in the live tree can reach it, and it
+                // reaches nothing that is not thread-safe - what it might have (the animation heartbeat) is kept out by
+                // the elements themselves, which do not animate until they are in a tree.
+                built = template.Build(this);
+            }
+            catch (Exception e)
+            {
+                failure = e;
+            }
+            finally
+            {
+                BuildQueue.Release();
+            }
+
+            LoopSignal.Post(() => AdoptDeferred(token, content, template, built, failure));
+        });
+    }
+
+    /// <summary>Takes the finished subtree in, on the loop thread. A build whose content has already been replaced is
+    /// dropped - it was built for a tab the user has left.</summary>
+    private void AdoptDeferred(int token, object content, DataTemplate template, TemplateResult built, Exception failure)
+    {
+        if (failure != null)
+        {
+            Console.WriteLine(failure);
+        }
+
+        if (token != _deferToken)
+        {
+            // The user left before it was ready. Showing it now would put the tab they LEFT in front of the one they
+            // chose, so it is not shown - but it is finished work, and a view that asked to be kept waits by reference
+            // instead of being thrown away, exactly as one that was on screen does. Parked with an unknown host size, so
+            // the return measures it once (it never was measured - it never was in a tree).
+            if (built?.RootComponent is { } finished && ParkedVisuals.ShouldKeep(finished))
+            {
+                ParkedVisuals.Keep(content, finished, built, template, new Size(Double.NaN, Double.NaN));
+                return;
+            }
+
+            built?.Destroy();
+            return;
+        }
+
+        // The swap this content belongs to is still playing: the tab that was left is on its way out and the loading
+        // visual on its way in. Slipping the content in underneath that leaves the OUTGOING tab sliding over content it
+        // has nothing to do with - which is what a deferred tab looked like on the way out. It waits for its own swap.
+        if (_transitionPending || _transitionRunning)
+        {
+            _afterTransition = () => AdoptDeferred(token, content, template, built, failure);
+            return;
+        }
+
+        _deferInFlight = false;
+
+        if (built?.RootComponent == null)
+        {
+            // Nothing came back. A spinner that never ends is worse than the pause it was meant to hide, so the content
+            // is built HERE, the ordinary way - and a view that is genuinely broken throws where it always threw.
+            DropCurrent();
+            BuildFromTemplate(content, template);
+            return;
+        }
+
+        // The loading visual has done its job: it goes the ordinary way, because that is all it ever was.
+        DropCurrent();
+
+        _currentTemplateResult = built;
+        _currentRoot = built.RootComponent;
+        AddVisualChild(_currentRoot);
+        AddLogicalChild(_currentRoot);
+        SetContentContext(content);
+        InvalidateMeasure();
     }
 
     private void RemoveOutgoing()
@@ -301,7 +490,19 @@ public class ContentPresenter : InputUIComponent
     {
         // Sliding content can extend past the presenter while it moves; clip it (enforcement depends on renderer clip).
         ClipToBounds = true;
-        ContentTransitions.Run(ContentTransition, TransitionDuration, size, _currentRoot, _outgoingRoot, RemoveOutgoing);
+        _transitionRunning = true;
+        ContentTransitions.Run(ContentTransition, TransitionDuration, size, _currentRoot, _outgoingRoot, TransitionFinished);
+    }
+
+    // The swap is over: the old content goes, and anything that was waiting for the swap to finish happens now.
+    private void TransitionFinished()
+    {
+        _transitionRunning = false;
+        RemoveOutgoing();
+
+        var waiting = _afterTransition;
+        _afterTransition = null;
+        waiting?.Invoke();
     }
 
     private static void OnContentTemplateChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
@@ -337,6 +538,18 @@ public class ContentPresenter : InputUIComponent
     {
         get => GetValue<DataTemplateSelector>(ContentTemplateSelectorProperty);
         set => SetValue(ContentTemplateSelectorProperty, value);
+    }
+
+    public bool DeferContent
+    {
+        get => GetValue<bool>(DeferContentProperty);
+        set => SetValue(DeferContentProperty, value);
+    }
+
+    public DataTemplate LoadingTemplate
+    {
+        get => GetValue<DataTemplate>(LoadingTemplateProperty);
+        set => SetValue(LoadingTemplateProperty, value);
     }
 
     public ContentTransition ContentTransition

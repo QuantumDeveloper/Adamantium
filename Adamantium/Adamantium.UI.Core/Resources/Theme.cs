@@ -200,7 +200,10 @@ public class Theme : AdamantiumComponent, ITheme
     public StyleSet MergedStyles { get; }
 
     // Cache of the matched-and-ordered style set per runtime type, for components with no id and no classes (see below).
-    private readonly Dictionary<Type, Style[]> _typeStyleCache = [];
+    // Concurrent because styling is no longer a one-thread affair: a subtree can be materialized off the loop thread
+    // (deferred tab content) and a virtualizing panel rebinds its tiles across cores, so this memo is written from more
+    // than one thread. The value is a pure function of the type, so two threads racing compute the same array.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<Type, Style[]> _typeStyleCache = new();
 
     public Style[] FindStylesForComponent(IFundamentalUIComponent component)
     {
