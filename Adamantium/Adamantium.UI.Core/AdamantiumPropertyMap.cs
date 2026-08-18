@@ -212,7 +212,13 @@ public static class AdamantiumPropertyMap
       }
 
       if (property.IsRegisteredForType(type)) return true;
-      
+
+      // The answer is memoised against the type ASKED ABOUT, not only the one that declares the property. A property is
+      // declared once on a base (Styles, Triggers, DataContext on FundamentalUIComponent) and written on hundreds of
+      // derived types; remembering only the declaring type left every one of those writes walking the base chain and
+      // running RunClassConstructor at each level, under a lock - measured at ~330 ms of a tab's build.
+      var asked = type;
+
       while (type != null)
       {
          // Ensure the type's static constructor has been run.
@@ -224,7 +230,7 @@ public static class AdamantiumPropertyMap
             {
                if (container.Exists(property.Name))
                {
-                  property.AddRegisteredType(type);
+                  property.AddRegisteredType(asked);
                   return true;
                }
             }

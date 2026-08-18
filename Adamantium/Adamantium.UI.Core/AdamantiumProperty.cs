@@ -19,7 +19,7 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
    // both static-init-time only, so this Clear never runs hot).
    private readonly System.Collections.Concurrent.ConcurrentDictionary<Type, PropertyMetadata> metadataCache = new();
 
-   private HashSet<Type> registeredTypes;
+   private System.Collections.Concurrent.ConcurrentDictionary<Type, bool> registeredTypes;
 
    private static Int32 nextPropertyId = 1;
 
@@ -94,12 +94,12 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
 
    internal bool IsRegisteredForType(Type type)
    {
-      return registeredTypes.Contains(type);
+      return registeredTypes.ContainsKey(type);
    }
 
    internal void AddRegisteredType(Type type)
    {
-      registeredTypes.Add(type);
+      registeredTypes[type] = true;
    }
    
    public bool IsValidValue(object value)
@@ -213,7 +213,7 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
          throw new ArgumentException(" 'Name' could not contain periods");
       }
 
-      registeredTypes = new HashSet<Type>();
+      registeredTypes = new System.Collections.Concurrent.ConcurrentDictionary<Type, bool>();
       defaultValues = new Dictionary<Type, PropertyMetadata>();
       IsAttached = false;
       ReadOnly = false;
@@ -237,7 +237,7 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
       {
          throw new ArgumentException("'Name' could not contain periods");
       }
-      registeredTypes = new HashSet<Type>();
+      registeredTypes = new System.Collections.Concurrent.ConcurrentDictionary<Type, bool>();
       defaultValues = new Dictionary<Type, PropertyMetadata>();
       IsAttached = false;
       ReadOnly = false;
@@ -260,7 +260,7 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
       {
          throw new ArgumentException(" 'Name' could not contain periods");
       }
-      registeredTypes = new HashSet<Type>();
+      registeredTypes = new System.Collections.Concurrent.ConcurrentDictionary<Type, bool>();
       defaultValues = new Dictionary<Type, PropertyMetadata>();
       IsAttached = false;
       ReadOnly = false;
