@@ -60,6 +60,10 @@ public class TextLayout : DisposableObject
     public Size RealTextDimensions { get; private set; }
 
     private bool _textUpdated;
+
+    // Which atlas VERSION this block's glyph quads were built against. Behind the atlas = some of its glyphs have
+    // arrived since, and the quads have to be built again.
+    private int _atlasVersion = -1;
     private bool _vertexBufferDirty;
 
     public TextLayout(Typeface typeface, IFont font)
@@ -608,6 +612,17 @@ public class TextLayout : DisposableObject
     /// can warm them all in ONE batch - see <see cref="FontAtlas.Warm"/>: rasterizing a glyph is MSDF work (~23 ms in Debug),
     /// and the generator parallelises across glyphs, but the per-block path can only ever hand it the handful of characters
     /// that ONE block introduced. Fifty new blocks in a frame then rasterize ~fifty glyphs one after another, on one core.</summary>
+    /// <summary>Glyphs have landed in the atlas since this block built its quads, so what it holds is missing letters it
+    /// could draw now. The render side asks this to decide what to rebuild after an asynchronous fill.</summary>
+    public bool NeedsGlyphRefresh => FontAtlas != null && FontAtlas.Version != _atlasVersion;
+
+    /// <summary>Re-run the quad build against the atlas as it stands now (see <see cref="NeedsGlyphRefresh"/>).</summary>
+    public void RefreshGlyphs(IGraphicsDevice graphicsDevice)
+    {
+        _textUpdated = true;
+        Update(graphicsDevice);
+    }
+
     public FontAtlas EnsureAtlas(IGraphicsDevice graphicsDevice) =>
         FontAtlas ??= FontAtlasStore.GetOrCreateFrom(graphicsDevice, Typeface,
             FontParameters.Default(sortingVariant: GlyphSortingVariant.ByIndex));
@@ -620,7 +635,14 @@ public class TextLayout : DisposableObject
         // (_textUpdated stays set) once ProcessText has run.
         if (!_textUpdated || _wordData == null) return;
 
-        EnsureAtlas(graphicsDevice).Update(Text + ".");
+        // ASK for the glyphs, do not WAIT for them. Rasterizing one is MSDF arithmetic (~8 ms apiece even with every core
+        // busy), and a tab full of new text used to pay all of it before its first frame could go out - measured at 88%
+        // of the whole apply phase. The work is the same either way; what changes is that the frame no longer stands
+        // still for it. Glyphs land over the next frames, each landing bumping the atlas VERSION, and a block whose
+        // version is behind rebuilds its quads (see NeedsGlyphRefresh) - so text fills in instead of holding up the tab.
+        var atlas = EnsureAtlas(graphicsDevice);
+        atlas.RequestAsync(Text + ".");
+        _atlasVersion = atlas.Version;
         ElementsCount = 0;
         // NOTE: the per-block GPU VertexBuffer is NOT created here. It's only needed by the DIRECT draw path
         // (rotated/sheared text); the common batched path bakes fontItems into the shared aggregate buffer via
@@ -661,15 +683,22 @@ public class TextLayout : DisposableObject
                     Depth = 1.0f
                 };
             }
-            else
+            else if (gd != null)
             {
                 item = new FontItem
                 {
                     ArrangeRect = word.Rect,
                     Source = FontAtlas.GetUVCoordinatesForGlyph(word.Glyph.Index),
-                    Layer = gd?.DepthLayer ?? 0,
+                    Layer = gd.DepthLayer,
                     Depth = 1.0f
                 };
+            }
+            else
+            {
+                // Not rasterized YET (it was asked for above and is on its way): emit no quad at all. Emitting one with
+                // whatever the atlas would answer for an unknown glyph draws a piece of a NEIGHBOUR - a smear where a
+                // letter should be - which is worse than the letter arriving a frame later.
+                continue;
             }
             fontItems[ElementsCount] = item;
             ElementsCount++;

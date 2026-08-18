@@ -213,7 +213,10 @@ public class Theme : AdamantiumComponent, ITheme
         // cache it by type. This collapses the per-element theme scan from O(all theme styles) to O(1) on repeats, so
         // realizing N identical containers (e.g. 40 MenuItems) scans the styles once per DISTINCT type, not once per element.
         // Class/id-bearing components are rare; they take the full scan every time (correctness over their cold path).
-        var cacheable = component.Id == null && component.ClassNames.Count == 0;
+        // IsNullOrEmpty, not == null: Id is registered with String.Empty as its default (an unset Id reads as ""), so a
+        // null test made EVERY component uncacheable and the scan below ran per element instead of per type. Measured on
+        // the Brushes tab: 450 ms of a 2.2 s build, 104 us per element, for a lookup that is meant to be a dictionary hit.
+        var cacheable = string.IsNullOrEmpty(component.Id) && component.ClassNames.Count == 0;
         if (cacheable && _typeStyleCache.TryGetValue(type, out var cached)) return cached;
 
         // A styled TYPE is a BOUNDARY (DefaultStyleKey semantics): among the IS-A candidates, keep the type styles of only
