@@ -62,6 +62,13 @@ public interface IUIComponent : IFundamentalUIComponent
     /// its generator is re-entered mid-enumeration.</para></summary>
     IUIComponent LayoutRoot { get; }
 
+    /// <summary>Which STAGE draws this element - the window content, the popup/overlay layer, the adorners - and so
+    /// whose dirty marks its own are. Inherited down the subtree at attach, like <see cref="LayoutRoot"/>, because the
+    /// answer is the same for a whole subtree and a mark is far too hot a path to go looking for it.
+    /// <para>Null until a stage claims the subtree, which means the window content: that is what one shared set of marks
+    /// used to mean for everybody.</para></summary>
+    RenderDirtyScope RenderScope { get; }
+
     Int32 ZIndex { get; set; }
 
     /// <summary>Whether this component's shapes are anti-aliased. Off for an axis-aligned rectangle on whole pixels,

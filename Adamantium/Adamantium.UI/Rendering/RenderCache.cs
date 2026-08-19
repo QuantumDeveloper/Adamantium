@@ -41,6 +41,10 @@ public partial class RenderCache
         // In the paint order (_groups) right now? A hidden control keeps its group + units but leaves the order.
         public bool InOrder;
 
+        // Written INTO every rect instance this group bakes, so the arena can always say whose a slot is - see
+        // RectBatchCollector.TryAdd. Small and dense (an int per group, never reused within a frame).
+        public int Tag;
+
         public readonly List<IRenderUnit> Units = new();
 
         // Per-group rect-batch slot runs + whether EVERY drawn unit is rect-batched, for the spliced-patch draw path;
@@ -85,6 +89,9 @@ public partial class RenderCache
 
     private bool HoldsUnits(IUIComponent component) =>
         _recordedUnits.TryGetValue(component.RenderId, out var entry) && entry.Units > 0;
+
+    // The detach generation this cache has already reconciled (see ApplyPacket).
+    private long _reconciledDetachGen;
 
     private readonly IRenderUnitFactory _renderUnitFactory;
 
@@ -198,6 +205,7 @@ public partial class RenderCache
         _packet = null;
     }
 
+
     private void RecordFrameCore(IRootVisualComponent visualRoot)
     {
         _movedBuf.Clear();   // filled only by a PARTIAL (a Full re-freezes everything from its packet anyway)
@@ -277,7 +285,7 @@ public partial class RenderCache
         {
             _packet.Reset(RenderBuildKind.Structural);
             _packet.ProjectionMatrix = visualRoot.GetProjectionMatrix();
-            if (RecordStructuralFrame(visualRoot, _packet)) return;            // refused -> everything it recorded is superseded by the full walk (which Resets it)
+            if (RecordStructuralFrame(visualRoot, _packet)) return;
         }
 
         RecordFullFrame(visualRoot);

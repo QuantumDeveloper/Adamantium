@@ -646,7 +646,7 @@ float4 InstancedFringePS(FringePSInput input) : SV_Target
 struct RectData
 {
     float4 Bounds;       // NODE-local x, y, w, h (world for slot-0 legacy bakes - identity matrix)
-    float4 Params;       // .x = LARGEST corner radius; .y = transform-table slot; .z = no-fringe flag; .w reserved
+    float4 Params;       // .x = LARGEST corner radius; .y = transform-table slot; .z = no-fringe flag; .w unused
     float4 Radii;        // corner radii: x = TL, y = TR, z = BR, w = BL
     float4 Color;        // straight RGBA, opacity folded in
     float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke); the BORDER's colour when Inset is non-zero
@@ -654,6 +654,9 @@ struct RectData
     float4 Stroke1;      // dashOffset, trimStart, trimEnd, flags
     float4 Dash;         // dash runs 2..5 (device px); runs 0 and 1 ride in Stroke0.zw, the count in Stroke1.w
     float4 Inset;        // border thickness per side in device px: x left, y top, z right, w bottom (all 0 = no border)
+    int OwnerTag;        // CPU bookkeeping (which paint group baked this instance) - never read here, but it is part of
+                         // the record, so the layout has to know about it or every instance after the first would be
+                         // read from the wrong offset
 };
 
 [shader("vertex")]

@@ -18,6 +18,15 @@ namespace Adamantium.UI.Controls;
 /// </summary>
 public class TabItem : ContentControl, ISelectable, ISpringLoadable
 {
+    /// <summary>A tab's Content is its PAGE, and the page is drawn by the TabControl's body presenter - never by the tab
+    /// itself, which lives in the strip and shows a header. So it does not fall back to hosting its own content while it
+    /// is without a template, the way an ordinary content control does.
+    /// <para>Measured: a theme swap re-styles the tree over several frames, and in that window every templated control is
+    /// briefly template-less. For a tab that meant the whole page parented into its header card - the strip measured
+    /// itself to the page (480,132 px tall), the body's row collapsed to nothing, and the page was drawn across the tab
+    /// headers.</para></summary>
+    protected override bool HostsContentWithoutTemplate => false;
+
     public static readonly AdamantiumProperty HeaderProperty = AdamantiumProperty.Register(nameof(Header),
         typeof(object), typeof(TabItem), new PropertyMetadata(null, PropertyMetadataOptions.AffectsMeasure));
 

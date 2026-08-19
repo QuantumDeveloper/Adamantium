@@ -21,7 +21,9 @@ namespace Adamantium.UI.Rendering;
 // per-segment draw (DrawSegment). Grouping (which items share a segment) is decided by the caller (RenderCache).
 internal abstract class BatchCollector<TItem> where TItem : struct
 {
-    private static readonly int Stride = Marshal.SizeOf<TItem>();
+    // Size of ONE instance. Static readonly, so it is computed once per closed type - a Marshal.SizeOf per DRAW showed up
+    // as microseconds a call in the replay breakdown, and a replayed frame issues dozens of them.
+    protected static readonly int Stride = Marshal.SizeOf<TItem>();
 
     protected TItem[] Items;
     protected int Count;               // items written this frame (across all segments, monotonic within a frame)
@@ -90,6 +92,13 @@ internal abstract class BatchCollector<TItem> where TItem : struct
 
     /// <summary>A pending (not-yet-flushed) segment exists.</summary>
     public bool Active => Count > _segmentStart;
+
+    /// <summary>How many slots the retained arena currently holds, and what one of them holds. The cache sweeps them to
+    /// find any whose owner has stopped drawing - the arena issues segments as RANGES, so such a slot is drawn by its
+    /// neighbours' draw call.</summary>
+    public int SlotCount => Count;
+
+    public TItem ItemAt(int slot) => Items[slot];
 
     /// <summary>Absolute slot index of the item written by the LAST successful TryAdd (= its position in the retained
     /// buffer). RenderCache records it per unit during the walk so a partial-replay can address that unit's slot.</summary>
@@ -540,6 +549,19 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     /// updated - instead of re-baking every unit (the O(N) draw-phase cost of a partial). The caller must NOT have begun a
     /// new frame (Items/_gpu still hold the last walk's data) and slot must be within that retained data.
     /// </summary>
+    /// <summary>Blanks the slots of a run without touching the segment they sit in. A segment is issued as a RANGE, so a
+    /// control that stops drawing cannot simply be forgotten: its instances stay inside somebody else's range and are
+    /// re-issued with it on every replayed frame. Reclaiming the range belongs to the next recording walk; until then the
+    /// bytes have to draw nothing.</summary>
+    public void BlankRun(IGraphicsDevice device, uint first, uint count)
+    {
+        if (count == 0 || first + count > (uint)Count) return;
+
+        PrepareRetainedWrite(device);
+        for (var i = 0u; i < count; i++) Items[first + i] = default;
+        UploadRange((int)first, (int)count);
+    }
+
     public void UpdateSlot(IGraphicsDevice device, int slot, TItem item)
     {
         PrepareRetainedWrite(device);

@@ -10,6 +10,10 @@ public static class LayerProbe
     public static long Frames, Cycles, Segments, MaxCycles, MaxSegments;
     public static long Splits, SplitsAvoided, Renumbers, Refusals;
 
+    // Phase 3: how often a control leaving the paint order costs a pass over the arena, and how many slots that pass
+    // covered. The phase is verified on these being small and rare - a sweep per hidden control, not per frame.
+    public static long OrphanSweeps, OrphanSweptSlots;
+
     private static long _cyclesThisFrame, _segmentsThisFrame;
 
     public static void FrameStart()
@@ -32,6 +36,7 @@ public static class LayerProbe
     {
         Frames = Cycles = Segments = MaxCycles = MaxSegments = 0;
         Splits = SplitsAvoided = Renumbers = Refusals = 0;
+        OrphanSweeps = OrphanSweptSlots = 0;
         _cyclesThisFrame = _segmentsThisFrame = 0;
     }
 
@@ -42,6 +47,7 @@ public static class LayerProbe
     {
         var f = Math.Max(1, Frames);
         return $"layers/frame {Cycles / (double)f:0.0} (max {MaxCycles}) | segments/frame {Segments / (double)f:0.0} (max {MaxSegments})"
-               + $" | recorded frames {Frames} | splits {Splits} (avoided {SplitsAvoided}) | renumbers {Renumbers} | patch refusals {Refusals}";
+               + $" | recorded frames {Frames} | splits {Splits} (avoided {SplitsAvoided}) | renumbers {Renumbers} | patch refusals {Refusals}"
+               + $" | orphan sweeps {OrphanSweeps} over {OrphanSweptSlots} slots";
     }
 }

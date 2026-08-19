@@ -1,3 +1,4 @@
+using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using Adamantium.Core.DependencyInjection;
@@ -67,6 +68,8 @@ public partial class GalleryViewModel
         // Docking owns a navigation region too (its area IS a region), so it comes from DI as well - put back where it
         // stands in the list above, ahead of Tiles.
         Tabs.Insert(Tabs.IndexOf(Tabs.First(t => t is TilesViewModel)), resolver.Resolve<DockingViewModel>());
-        SelectedTab = Tabs[2];
+        SelectedTab = Environment.GetEnvironmentVariable("ADAM_PROBE_TAB") is { } probe
+            ? Tabs.First(t => t.GetType().Name.StartsWith(probe))
+            : Tabs[2];
     }
 }

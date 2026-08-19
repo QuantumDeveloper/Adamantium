@@ -48,8 +48,14 @@ public class PopupRenderProcessor : EntityProcessor<WindowRenderService>
         window.LayoutPopups();
 
         var flat = Flatten(window.PopupRoots, window);
+
+        // These are OURS to redraw, so their dirty marks are ours too. Sharing one set with the content meant a hovered
+        // menu item told the content stage it had work, and the content stage then had to recognise the marks as coming
+        // from a tree it does not draw and step over them - one symptom of a set with no owner (see RenderDirtyRouter).
+        foreach (var root in window.PopupRoots) ClaimScope(root);
+
         // Rebuild (component walk + rasterization) only when the open set / geometry / a popup's position changed.
-        if (OverlayChanged(flat))
+        if (_gate.HasChanged(flat))
         {
             _cache.BuildFromComponents(flat, projection);
             _cache.ProcessCommands(projection, AssociatedService.RenderScale);
@@ -60,31 +66,14 @@ public class PopupRenderProcessor : EntityProcessor<WindowRenderService>
         _cache.PreRender();
     }
 
-    private HashSet<Guid> _prevIds = new();
-    private readonly Dictionary<Guid, Vector3F> _prevPos = new();
+    private readonly OverlayRebuildGate _gate = new();
 
-    // True if the overlay's rendered result could differ from last frame: the set of drawn components changed, any of
-    // them has invalid geometry (content changed / re-measured), or any moved (target followed, animation). Walks the
-    // flattened popups once reading flags + transforms - far cheaper than rebuilding + re-rasterizing them every frame.
-    private bool OverlayChanged(IReadOnlyList<IUIComponent> flat)
+    // This stage's own marks. One per stage, not per popup: they are recorded, gated and cleared together.
+    private readonly RenderDirtyScope _scope = RenderDirtyRouter.NewScope();
+
+    private void ClaimScope(IUIComponent root)
     {
-        var changed = false;
-        var ids = new HashSet<Guid>();
-        foreach (var c in flat)
-        {
-            ids.Add(c.RenderId);
-            if (!c.IsGeometryValid) changed = true;
-            var pos = c.WorldTransform.TranslationVector;
-            if (!_prevPos.TryGetValue(c.RenderId, out var prev) || !prev.Equals(pos)) { changed = true; _prevPos[c.RenderId] = pos; }
-        }
-        if (!changed && !ids.SetEquals(_prevIds)) changed = true;
-        if (changed)
-        {
-            _prevIds = ids;
-            if (_prevPos.Count > ids.Count)   // drop transforms of components no longer shown
-                foreach (var gone in new List<Guid>(_prevPos.Keys)) if (!ids.Contains(gone)) _prevPos.Remove(gone);
-        }
-        return changed;
+        if (root is Controls.Base.UIComponent component) component.ClaimRenderScope(_scope);
     }
 
     // Render the overlay with the SAME device + full-window scissor the content pass uses, so the popup layer runs the

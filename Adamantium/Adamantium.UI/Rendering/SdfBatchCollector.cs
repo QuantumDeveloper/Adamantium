@@ -51,7 +51,13 @@ internal abstract class SdfBatchCollector<TItem> : BatchCollector<TItem> where T
         device.DepthTestEnabled = true;
         device.DepthWriteEnable = true;
         device.DepthCompareFunction = CompareOp.Always;
+        // WRITTEN EVERY DRAW, deliberately. Skipping the ones that "did not change since last time" is worth microseconds
+        // a draw and was tried - but what a parameter holds is a property of the EFFECT, and this collector is not the
+        // only thing that draws through one: an off-screen bake (a VisualBrush, a bitmap, a snapshot) renders with its
+        // own projection in between, and a cache of what THIS collector last sent then skips restoring ours. The result
+        // is content drawn through somebody else's projection - which is not a slow frame but a wrong picture.
         Effect.Projection.SetValue(projection);
+
         // The SDF shapes measure themselves in DEVICE pixels (SlotPixelScale), which needs the render target's pixel
         // size; without it the shader falls back to the raw slot space, where an anisotropically scaled slot smears the
         // shape's edge along its long axis.
@@ -60,8 +66,7 @@ internal abstract class SdfBatchCollector<TItem> : BatchCollector<TItem> where T
         device.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
 
         device.VertexType = null;
-        var stride = (ulong)System.Runtime.InteropServices.Marshal.SizeOf<TItem>();
-        Effect.InstancesAddress.SetValue(buffer.GetDeviceAddress() + firstInstance * stride);
+        Effect.InstancesAddress.SetValue(buffer.GetDeviceAddress() + firstInstance * (ulong)Stride);
         Effect.TransformsAddress.SetValue(TransformsAddress);
 
         DrawPass.Apply();

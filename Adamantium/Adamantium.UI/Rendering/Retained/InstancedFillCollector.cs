@@ -182,6 +182,11 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     /// the frame fence, so last frame's GPU reads are done); a new key allocates lazily on its first add.</summary>
     public void BeginFrame()
     {
+        // Forget what the effect was last told (see SetupInstancedState): it is a device resource and can be rebuilt
+        // under us, and a memory of what the PREVIOUS instance held would skip writing those numbers into the new one.
+        _lastProjection = default;
+        _lastTransforms = 0;
+
         // Same rule as BatchCollector: advance per WRITE, not per frame index. These buffers are read by every replay
         // frame that follows the walk that filled them, so returning to a copy by frame index overwrites one that
         // in-flight replays are still drawing from.
@@ -893,8 +898,17 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     public ulong TransformsAddress { get; set; }
 
 
+    // What the effect was last told this FRAME. Every SetValue crosses the binding layer, and a replayed frame calls this
+    // once per flush record - measured at 37 us apiece, for numbers that do not change between the draws of one frame.
+    // Forgotten at BeginFrame rather than kept across frames: the effect is a device resource, and a memory of what a
+    // previous instance held would skip writing them into a new one.
+    private Matrix4x4F _lastProjection;
+    private ulong _lastTransforms;
+
     private void SetupInstancedState(Matrix4x4F projection)
     {
+        // Written every time - see SdfBatchCollector.DrawSegment for why a "same as last time" cache is not this
+        // collector's to keep: an off-screen bake draws through the same effect with its own projection in between.
         _effect.Projection.SetValue(projection);
         _effect.TransformsAddress.SetValue(TransformsAddress);
 

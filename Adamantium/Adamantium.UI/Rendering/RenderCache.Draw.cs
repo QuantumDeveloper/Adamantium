@@ -104,7 +104,136 @@ public partial class RenderCache
         public long OrderFirst;
     }
     private readonly List<RenderOp> _ops = new();
+
+    // The same stream, said in the terms the frame is actually built in: one entry per LAYER (see RenderLayer), in draw
+    // order, each owning a range of _ops and the rank INTERVAL it covers. The ops stay one contiguous array - that is what
+    // a replay walks - and the layers are what gives that array its structure: where a newcomer belongs, and which set it
+    // may join without its order mattering.
+    private readonly List<RenderLayer> _layers = new();
+
     private long _recordOrder;   // paint rank of the group currently being recorded - stamped onto every op it emits
+
+    // The layer being written. A layer runs until the batches are FLUSHED, because that is exactly when the engine itself
+    // decides "what came before cannot be reordered with what comes next" - the flush happens on an overlap.
+    private RenderLayer _openLayer;
+
+    /// <summary>Appends an op to the stream and to the layer it belongs to. Every recorded op goes through here, so the
+    /// layer list can never disagree with the stream about what the frame draws.</summary>
+    private void RecordOp(in RenderOp op)
+    {
+        if (_openLayer == null)
+        {
+            _openLayer = new RenderLayer { OpFirst = _ops.Count };
+            _layers.Add(_openLayer);
+        }
+
+        _ops.Add(op);
+        _openLayer.OpCount++;
+        _openLayer.Cover(op.Order);
+        if (op.Kind == RenderOpKind.Segment)
+        {
+            _openLayer.Cover(op.OrderFirst);
+            _openLayer.Runs.Add((op.Batch, op.SegId));
+        }
+    }
+
+    /// <summary>Ends the layer being written: whatever is recorded next is strictly after everything in it.</summary>
+    private void CloseLayer() => _openLayer = null;
+
+    // Group identity as the ARENA sees it: written into every instance the group bakes, so a slot can always name its
+    // owner however many times its bytes have been copied around since (see RectBatchCollector.TryAdd).
+    private readonly Dictionary<int, ControlGroup> _groupByTag = new();
+    private int _nextGroupTag;
+
+    private int TagOf(ControlGroup group)
+    {
+        if (group.Tag == 0)
+        {
+            group.Tag = ++_nextGroupTag;
+            _groupByTag[group.Tag] = group;
+        }
+
+        return group.Tag;
+    }
+
+    /// <summary>Blanks the instances of controls that have left the paint order but whose bytes a live segment still
+    /// issues. A segment is drawn as a RANGE, so a control that stopped drawing is re-issued along with the neighbours it
+    /// sits between - which is a scrollbar a grown window no longer needs, still painting its track at the size it had
+    /// when it was last required, on every replayed frame.
+    /// <para>Ownership is read out of the instance itself, so no path that shuffles the arena can lose it. Reclaiming the
+    /// slots stays the next recording walk's job - this only makes what nobody draws draw nothing.</para></summary>
+    // Groups that left the paint order since the last sweep. Named rather than searched for: scanning the whole arena on
+    // every frame that hid something put a pass over thousands of slots into the middle of ordinary hover frames, and
+    // that shows up as exactly the thing a smooth window cannot have - some frames costing much more than their
+    // neighbours for no visible reason.
+    private readonly List<ControlGroup> _leftTheOrder = new();
+
+    private void BlankOrphanInstances(IGraphicsDevice device)
+    {
+        if (_rectBatch == null || device == null) return;
+
+        foreach (var group in _leftTheOrder)
+        {
+            if (group.InOrder || group.Tag == 0) continue;   // came back before anyone looked
+            foreach (var run in group.RectRuns)
+            {
+                LayerProbe.OrphanSweptSlots += run.Count;
+                _rectBatch.BlankOwned(device, (uint)run.First, (uint)run.Count, group.Tag);
+            }
+        }
+
+        LayerProbe.OrphanSweeps++;
+    }
+
+    /// <summary>Whether the layers still describe the stream they were built from: their op ranges tile it in order,
+    /// leaving no op out and claiming none twice. Asked by tests, because a layer list that has drifted would place a
+    /// newcomer into a set it does not belong to - a wrong picture, not a slow frame.</summary>
+    public bool LayersDescribeTheStream(out string why)
+    {
+        var at = 0;
+        foreach (var layer in _layers)
+        {
+            if (layer.OpFirst != at)
+            {
+                why = $"layer {layer} does not begin where the previous one ended ({at})";
+                return false;
+            }
+
+            at += layer.OpCount;
+        }
+
+        why = at == _ops.Count ? null : $"layers cover {at} ops, the stream holds {_ops.Count}";
+        return at == _ops.Count;
+    }
+
+    /// <summary>The layer an op index now belongs to, after an insert moved everything behind it along.</summary>
+    private void NoteOpInserted(int index)
+    {
+        // WHICH layer grew by this op. Every insert must land in exactly one of them: the layers tile the stream, and a
+        // layer's range is what a replay reads through, so an op no layer claims does not simply go undrawn - it slides
+        // every later layer's window by one, and the frame is then assembled out of pieces of its neighbours. That is
+        // what a theme swap showed as another tab's content painted across the tab strip.
+        //
+        // The subtle case is the BOUNDARY: a new op's place is found by rank and then backed up over the scissor ops that
+        // set up the draw after it, which lands it exactly BETWEEN two layers. "Strictly inside" claims neither of them.
+        // It belongs to the layer that ENDS there - it paints with what came before, not with what the next flush begins.
+        var taken = -1;
+        for (var i = 0; i < _layers.Count; i++)
+        {
+            var layer = _layers[i];
+            var end = layer.OpFirst + layer.OpCount;
+
+            if (index >= layer.OpFirst && index < end) { taken = i; break; }
+            if (index == end) { taken = i; continue; }   // the boundary: this layer takes it, unless the next one starts here
+            if (index < layer.OpFirst) { if (taken < 0) taken = i; break; }
+        }
+
+        if (taken < 0) taken = _layers.Count - 1;
+        if (taken < 0) return;   // nothing recorded yet - the op opens the stream, and the walk will open its layer
+
+        _layers[taken].OpCount++;
+        for (var i = taken + 1; i < _layers.Count; i++) _layers[i].OpFirst++;
+    }
 
     // Where the rect batch's PENDING segment's paint span begins: the rank of the first group that put something in it.
     // Noted while the segment is still empty, because afterwards there is nothing left to read it from - and a splice that
@@ -296,6 +425,28 @@ public partial class RenderCache
 
     // TEMP trace: several caches (one per window, plus each window's adorner layer) write into one ring, so a frame has to
     // say whose it is - otherwise a quiet cache's cheap frames and a busy one's expensive frames read as one bimodal blur.
+    /// SCRATCH: the window cache, so a probe can ask what the recorded stream actually draws while a phantom is on screen.
+    public static RenderCache LastCache;
+
+    /// SCRATCH: what this cache would replay right now - one line per group that owns retained rect slots.
+    public string DumpGroups()
+    {
+        var sb = new System.Text.StringBuilder($"ops {_ops.Count} (replayed={LastFrameReplayed}, kind={LastBuildKind}), groups {_groups.Count}");
+        sb.Append(System.Environment.NewLine);
+        foreach (var g in _groups)
+        {
+            var slots = 0;
+            foreach (var r in g.RectRuns) slots += r.Count;
+            if (slots == 0 && g.Units.Count == 0) continue;
+
+            var c = g.Component;
+            sb.Append($"  {c?.GetType().Name} vis={c?.Visibility} op={ApplySnap(c).SelfOpacity:0.00} bounds={c?.Bounds} slots={slots} units={g.Units.Count} walk={(g.WalkVersion == _walkVersion ? "current" : "STALE")}")
+              .Append(System.Environment.NewLine);
+        }
+
+        return sb.ToString();
+    }
+
     private static int _traceNextCacheId;
     private readonly int _traceCacheId = System.Threading.Interlocked.Increment(ref _traceNextCacheId);
     private int _traceComposited;
@@ -361,7 +512,9 @@ public partial class RenderCache
         _recording = device != null;   // a device walk records its op stream for a later clean-frame replay
         if (_recording)
         {
-            _ops.Clear(); 
+            _ops.Clear();
+            _layers.Clear();
+            _openLayer = null; 
             _opsReplayable = true; 
             _rectSlotByUnit.Clear();
             _sdfSlotByUnit.Clear();
@@ -535,7 +688,7 @@ public partial class RenderCache
                 if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(0, rectBounds, unit.Component))   // 0 = rect layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var bakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Rect);
-                if (_rectBatch.TryAdd(rru.RectPayload, bakeWorld, rru.FillOpacity, scissor, rectBounds, slot4Rect))
+                if (_rectBatch.TryAdd(rru.RectPayload, bakeWorld, rru.FillOpacity, scissor, rectBounds, slot4Rect, TagOf(group)))
                 {
                     if (_recording)
                     {
@@ -1031,7 +1184,7 @@ public partial class RenderCache
 
             if (_recording) { group.PatchableRectOnly = false; MarkNodeNotAware(unit.Component); }   // per-unit draw: world-baked RenderData
             unit.Render();
-            if (_recording) _ops.Add(new RenderOp { Kind = RenderOpKind.Unit, Unit = unit, Order = _recordOrder });
+            if (_recording) RecordOp(new RenderOp { Kind = RenderOpKind.Unit, Unit = unit, Order = _recordOrder });
             }
 
             // End of a clone run's subtree: rewind to its first group under the next matrix, or leave the run.
@@ -1065,6 +1218,14 @@ public partial class RenderCache
             _opsMatrixVersion = _transformTable?.MatrixVersion ?? 0;
             _opsLayoutVersion = _transformTable?.LayoutMatrixVersion ?? 0;
             _layoutChangedSinceRecord = false;
+        }
+
+        // ONLY when something left the paint order this frame: an ordinary frame pays nothing, and the sweep is a pass
+        // over the arena that reads each instance own owner tag.
+        if (_leftTheOrder.Count > 0)
+        {
+            BlankOrphanInstances(device);
+            _leftTheOrder.Clear();
         }
     }
 
@@ -1216,7 +1377,7 @@ public partial class RenderCache
 
     private void RecordScissor(Rect2D scissor)
     {
-        if (_recording) _ops.Add(new RenderOp { Kind = RenderOpKind.Scissor, Scissor = scissor, Order = _recordOrder });
+        if (_recording) RecordOp(new RenderOp { Kind = RenderOpKind.Scissor, Scissor = scissor, Order = _recordOrder });
     }
 
 
@@ -1237,6 +1398,7 @@ public partial class RenderCache
             // every frame but isn't in the paint tree) contributes nothing: the op stream is unchanged, so skip it and let
             // the replay stand. The common hover case (nothing visible changed).
             if (!_groupById.TryGetValue(comp.RenderId, out var g)) continue;
+
             foreach (var u in g.Units)
                 if (!IsSlotPatchable(u))
                 {
@@ -1608,10 +1770,12 @@ public partial class RenderCache
         var seg = _rectBatch.AllocateSegment(device, patch.Items, patch.Scissor);
         if (seg < 0) return false;
 
-        _ops.Insert(OpIndexForRank(group.Order), new RenderOp
+        var at = OpIndexForRank(group.Order);
+        _ops.Insert(at, new RenderOp
         {
             Kind = RenderOpKind.Segment, Batch = 0, SegId = seg, Order = group.Order
         });
+        NoteOpInserted(at);
 
         _rectBatch.GrowSegmentBounds(seg, patch.Bounds);
         var (first, _) = _rectBatch.SegmentRange(seg);
@@ -1689,6 +1853,7 @@ public partial class RenderCache
             {
                 Kind = RenderOpKind.Segment, Batch = 0, SegId = second, Order = spanEnd, OrderFirst = order
             });
+            NoteOpInserted(i + 1);
             return;   // one rank cuts one segment: the halves no longer span it
         }
     }

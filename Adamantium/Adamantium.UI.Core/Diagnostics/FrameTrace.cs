@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Text;
 
 namespace Adamantium.UI.Core.Diagnostics;
@@ -88,6 +89,48 @@ public static class FrameTrace
     }
 
     /// <summary>The ring oldest-first, one line per frame.</summary>
+    /// <summary>What a frame COSTS, said as a distribution rather than an average: an average hides exactly the thing a
+    /// smooth window depends on, which is that the slow frames are rare AND not much slower. Walks and replays are
+    /// reported apart, because mixing them averages two different frames into a number that describes neither.</summary>
+    public static string Percentiles()
+    {
+        var count = Math.Min(_next, Capacity);
+        if (count == 0) return "frame times: nothing recorded";
+
+        var start = _next - count;
+        // PER CACHE: a window and an empty adorner layer share this ring, and one costs milliseconds where the other
+        // costs microseconds - mixed together they make a distribution that describes neither.
+        var byCache = new Dictionary<(int Cache, bool Replayed), List<Entry>>();
+        for (var n = 0; n < count; n++)
+        {
+            var e = _ring[(start + n) & (Capacity - 1)];
+            var key = (e.Cache, e.Replayed);
+            if (!byCache.TryGetValue(key, out var list)) byCache[key] = list = new List<Entry>();
+            list.Add(e);
+        }
+
+        var text = new StringBuilder("frame draw ms, per cache:");
+        foreach (var (key, entries) in byCache)
+        {
+            text.Append(Environment.NewLine).Append("  ").Append(Describe($"cache {key.Cache} {(key.Replayed ? "replay" : "walk")}", entries));
+        }
+
+        return text.ToString();
+    }
+
+    private static string Describe(string name, List<Entry> entries)
+    {
+        if (entries.Count == 0) return $"{name} none";
+
+        entries.Sort(static (a, b) => a.DrawMs.CompareTo(b.DrawMs));
+        double At(double q) => entries[Math.Min(entries.Count - 1, (int)(entries.Count * q))].DrawMs;
+
+        double ops = 0, unitOps = 0;
+        foreach (var e in entries) { ops += e.Ops; unitOps += e.UnitOps; }
+        return $"{name} n={entries.Count} p50 {At(0.50):F2} p95 {At(0.95):F2} p99 {At(0.99):F2} max {entries[^1].DrawMs:F2}"
+             + $" | ops {ops / entries.Count:F0} of which per-unit {unitOps / entries.Count:F0}";
+    }
+
     public static string Dump()
     {
         var text = new StringBuilder();

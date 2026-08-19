@@ -121,8 +121,17 @@ public class ContentControl : Control, IContentControl
 
    protected virtual void OnContentChanged(object oldContent, object newContent)
    {
-      
+
    }
+
+   /// <summary>Whether this control shows its <see cref="Content"/> ITSELF while it has no template. True for an
+   /// ordinary content control: a button with no style should still show its label.
+   /// <para>False where the content is somebody else's to draw. A tab container is the case that named this: its
+   /// Content is the PAGE, which the TabControl's body presenter shows - the container itself only ever draws a header
+   /// in the strip. A theme swap re-styles the tree over several frames, so every templated control spends a moment
+   /// without one; for a tab that moment put an entire page inside a header card, and the strip measured itself to it
+   /// (a 480,000-pixel-tall tab strip with the page drawn across it).</para></summary>
+   protected virtual bool HostsContentWithoutTemplate => true;
    
    private void UpdateVisualsForContent(object content)
    {
@@ -136,7 +145,9 @@ public class ContentControl : Control, IContentControl
       RemoveOutgoing();
 
       // Templated path: PART_ContentPresenter hosts the content (and runs its own transition). Drop any direct child.
-      if (Template != null)
+      // ...and the same for a control whose content is NOT its to show (see HostsContentWithoutTemplate): being between
+      // templates is not a reason to put it on screen anyway.
+      if (Template != null || !HostsContentWithoutTemplate)
       {
          if (_currentVisualChild != null)
          {
