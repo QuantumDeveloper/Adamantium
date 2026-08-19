@@ -97,6 +97,7 @@ namespace Adamantium.Graphics
                 MemoryFlags,
                 out VulkanBuffer,
                 out _allocation);
+            _deviceAddress = 0;
         }
 
         private bool IsHostVisible => MemoryFlags.HasFlag(MemoryPropertyFlags.HostVisible);
@@ -117,6 +118,7 @@ namespace Adamantium.Graphics
         private void Initialize(DataPointer dataPointer)
         {
             CreateBuffer(TotalSize, BufferUsageFlags.TransferDst | Usage, MemoryFlags, out VulkanBuffer, out _allocation);
+            _deviceAddress = 0;
             if (IsHostVisible)
             {
                 // Host-mappable (A): write the initial data straight in - no redundant full-size staging copy.
@@ -387,11 +389,17 @@ namespace Adamantium.Graphics
                 UploadViaStaging(fromData, offsetInBytes); // device-local: can't map, go through staging
         }
         
+        private UInt64 _deviceAddress;
+
+        /// <summary>The buffer's GPU address. It does not change while the buffer lives, and it was being asked of the
+        /// driver on EVERY draw that reads through it - a marshalled call each time, on the frame's hot path.</summary>
         public UInt64 GetDeviceAddress()
         {
+            if (_deviceAddress != 0) return _deviceAddress;
+
             var bufferDeviceAddressInfo = new BufferDeviceAddressInfo();
             bufferDeviceAddressInfo.Buffer = VulkanBuffer;
-            return GraphicsDevice.LogicalDevice.GetBufferDeviceAddress(bufferDeviceAddressInfo);
+            return _deviceAddress = GraphicsDevice.LogicalDevice.GetBufferDeviceAddress(bufferDeviceAddressInfo);
         }
 
         public VulkanBuffer GetBuffer()

@@ -190,15 +190,12 @@ public sealed class EffectPass : DisposableObject, IEffectPass
 
         }
 
-        // 5. BIND SHADERS
-        foreach (var stage in stages)
+        // 5. BIND SHADERS - unless this command buffer already has THIS pass's shaders on it. A run of draws of one
+        // material re-bound the same handles per draw, and every bind is a marshalled call.
+        if (!graphicsDevice.ShadersBoundFor(this))
         {
-            graphicsDevice.BindShader(graphicsDevice.CurrentCommandBuffer, stage.Stage, stage.ShaderObject);
-        }
-
-        if (!geometryStagePresent)
-        {
-            graphicsDevice.BindShader(graphicsDevice.CurrentCommandBuffer, ShaderStageFlagBits.GeometryBit, null);
+            BindAllStages();
+            graphicsDevice.ShadersBound(this);
         }
 
         // 6. SEND PUSH DATA — strictly AFTER binding shaders (in the reference, push data goes
@@ -259,6 +256,36 @@ public sealed class EffectPass : DisposableObject, IEffectPass
     }
 
     // === VK_EXT_descriptor_buffer: CB/texture/sampler descriptors are written into descriptor buffers ===
+    // The stage list of a pass does not change once its shaders exist, so the arrays vkCmdBindShadersEXT wants are built
+    // ONCE and re-used. A pass that also has to say "no geometry shader" carries that entry in the same arrays: one call
+    // instead of one per stage plus one for the null.
+    private ShaderStageFlagBits[] _bindStages;
+    private ShaderEXT[] _bindShaders;
+
+    private void BindAllStages()
+    {
+        if (_bindStages == null || _bindStages.Length != stages.Count + (geometryStagePresent ? 0 : 1))
+        {
+            var count = stages.Count + (geometryStagePresent ? 0 : 1);
+            _bindStages = new ShaderStageFlagBits[count];
+            _bindShaders = new ShaderEXT[count];
+        }
+
+        for (var i = 0; i < stages.Count; i++)
+        {
+            _bindStages[i] = stages[i].Stage;
+            _bindShaders[i] = stages[i].ShaderObject;
+        }
+
+        if (!geometryStagePresent)
+        {
+            _bindStages[^1] = ShaderStageFlagBits.GeometryBit;
+            _bindShaders[^1] = null;
+        }
+
+        graphicsDevice.BindShaders(graphicsDevice.CurrentCommandBuffer, _bindStages, _bindShaders);
+    }
+
     private void ApplyBuffer()
     {
         Effect.CurrentTechnique = Technique;

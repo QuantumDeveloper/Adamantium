@@ -68,6 +68,16 @@ internal sealed class TransformTable
     /// moved by the time the stream is re-issued, that frame is drawing instances baked against older matrices.</summary>
     public ulong MatrixVersion { get; private set; }
 
+    /// <summary>The version of matrix writes that did NOT come from the compositor. A recorded op stream survives a
+    /// compositor move - the batches read their slot matrix LIVE and the composited per-unit draws are re-pointed at
+    /// replay - but it does NOT survive a LAYOUT move, which is baked into the ops themselves. Comparing the two versions
+    /// separately is what lets one spinning loader keep animating without forcing the whole window to re-record.</summary>
+    public ulong LayoutMatrixVersion { get; private set; }
+
+    /// <summary>Set while the COMPOSITOR is writing (its own matrices for this frame), so those writes do not count as
+    /// layout movement.</summary>
+    public bool CompositedWrite { get; set; }
+
     /// <summary>Allocated slot count / GPU capacity (diagnostics).</summary>
     public int SlotCount => _count;
     public int GpuCapacity => _gpuCapacity;
@@ -154,6 +164,7 @@ internal sealed class TransformTable
             _cpu[slot].Params.X = alpha;
             _version[slot]++;
             MatrixVersion++;
+            if (!CompositedWrite) LayoutMatrixVersion++;
         }
 
         if (_gpu == null || slot >= _gpuCapacity) return;
@@ -230,6 +241,7 @@ internal sealed class TransformTable
             _cpu[slot].World = world;
             _version[slot]++;
             MatrixVersion++;
+            if (!CompositedWrite) LayoutMatrixVersion++;
         }
 
         if (_gpu == null || slot >= _gpuCapacity) return;   // no GPU room yet: EnsureResources sends it on the next frame

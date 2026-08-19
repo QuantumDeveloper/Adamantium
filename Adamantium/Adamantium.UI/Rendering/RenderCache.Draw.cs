@@ -124,8 +124,53 @@ public partial class RenderCache
     // that layout. While it is set, the retained stream describes an older frame than the snapshot does.
     private bool _layoutChangedSinceRecord;
 
-    private bool OpsMatchTransforms =>
-        !_layoutChangedSinceRecord && (_transformTable == null || _transformTable.MatrixVersion == _opsMatrixVersion);
+    private ulong _opsLayoutVersion;
+
+    private bool OpsMatchTransforms
+    {
+        get
+        {
+            if (_layoutChangedSinceRecord) return false;
+            if (_transformTable == null) return true;
+            if (_transformTable.MatrixVersion == _opsMatrixVersion) return true;   // nothing moved at all
+
+            // Something moved - but a COMPOSITOR move does not invalidate the stream by itself: the batches read their
+            // slot matrix live, and the composited per-unit draws are re-pointed as they replay (see ExecuteOps). Only a
+            // LAYOUT move is baked into the ops. Without this distinction one spinning loader made the whole window
+            // re-record every frame - measured on the Loaders tab: 4538 records in 10 s, and its draw phase three times
+            // the Layout tab's.
+            if (_transformTable.LayoutMatrixVersion != _opsLayoutVersion) return false;
+
+            return CompositedMovesKeepOpsValid();
+        }
+    }
+
+    // The one thing a composited move CAN invalidate: a recorded Scissor op, which is a world-space rect. It goes stale
+    // when the mover clips (its own rect moved with it) or when something inside it clips (that rect is positioned by the
+    // mover). A spinner, a pulse, a slid-in panel with no clip inside it - none of those touch a clip, which is the common
+    // case this exists for.
+    private bool CompositedMovesKeepOpsValid()
+    {
+        foreach (var owner in _compositedOwners)
+        {
+            if (SubtreeClips(owner)) return false;
+        }
+
+        return true;
+    }
+
+    private static bool SubtreeClips(IUIComponent node)
+    {
+        if (node == null) return false;
+        if (node.ClipToBounds) return true;
+
+        foreach (var child in node.VisualChildren)
+        {
+            if (SubtreeClips(child)) return true;
+        }
+
+        return false;
+    }
     private bool _recording;       // this frame runs the walk and is appending ops
     private bool _opsRecorded;     // _ops holds a complete frame from a prior walk
     private bool _opsReplayable;   // the recorded stream faithfully reproduces the frame (currently always true - see above)
@@ -213,6 +258,7 @@ public partial class RenderCache
         }
         finally
         {
+
             if (Core.Diagnostics.FrameTrace.Enabled)
             {
                 var clones = 0;
@@ -269,7 +315,9 @@ public partial class RenderCache
         // The animations this thread plays by itself. BEFORE the clean-frame early-out on purpose: a composited animation
         // changes what the retained op stream draws (a matrix, a re-baked colour slot), so an otherwise CLEAN frame is
         // exactly when it must still apply - the loop can be stalled in a theme cascade and the spinner keeps turning.
+        if (_transformTable != null) _transformTable.CompositedWrite = true;
         ApplyCompositedAnimations(device);
+        if (_transformTable != null) _transformTable.CompositedWrite = false;
 
         // Clean-frame replay: re-issue the last recorded walk's op stream and skip the per-unit loop (the retained buffers
         // still hold its bytes). Only a fully-Clean build qualifies; a Partial/Full re-walks and re-records.
@@ -313,7 +361,6 @@ public partial class RenderCache
         _recording = device != null;   // a device walk records its op stream for a later clean-frame replay
         if (_recording)
         {
-            LayerProbe.FrameStart();
             _ops.Clear(); 
             _opsReplayable = true; 
             _rectSlotByUnit.Clear();
@@ -362,7 +409,7 @@ public partial class RenderCache
             _haloLivingOver?.BeginFrame(device);
             _haloOverOwner = null;
             // Transform table: this frame's copy, and its address on the collectors that were just (re)created above.
-            BeginTransformFrame(device);
+        BeginTransformFrame(device);
             var sceneClean = LastBuildKind == RenderBuildKind.Clean;
             // Incremental upload: a Clean frame re-bakes byte-identical items into slots the buffers already hold, so Flush
             // skips the redundant upload (zero bytes move on an idle frame).
@@ -1016,6 +1063,7 @@ public partial class RenderCache
             _opsRecorded = true; _recording = false;
             // The transform + layout state this op stream was recorded AGAINST. A replay is faithful only while it holds.
             _opsMatrixVersion = _transformTable?.MatrixVersion ?? 0;
+            _opsLayoutVersion = _transformTable?.LayoutMatrixVersion ?? 0;
             _layoutChangedSinceRecord = false;
         }
     }
@@ -1302,6 +1350,8 @@ public partial class RenderCache
         public Rect2D Scissor;        // the group's clip (all units of one component share it)
         public bool InPlace;          // count-stable recolor -> per-slot UpdateSlot, no surgery
         public int Layer;             // the layer this group's items belong to, resolved ONCE before anything is mutated
+        public Rect Bounds;           // what it covers, in logical coordinates - the ONLY thing that decides whether its
+                                      // order inside a layer matters at all (see §5a: overlap is the merge rule)
     }
 
     // Draw a partial whose dirty controls changed their unit COUNT (a hover backdrop appearing, a live chart) by editing
@@ -1345,6 +1395,7 @@ public partial class RenderCache
             var items = new List<RectItem>(group.Units.Count);
             var scissor = fullScissor;
             var haveScissor = false;
+            var bounds = Rect.Empty;
             foreach (var u in group.Units)
             {
                 if (u is not RectangleRenderUnit rru || !_rectBatch.CanBatch(rru.RectPayload)) return SpliceRefused("notARect");
@@ -1359,12 +1410,13 @@ public partial class RenderCache
                 var bakeWorld = ResolveBake(device, u.Component, wt, out var slot);
                 if (!RectBatchCollector.BakeItem(rru.RectPayload, bakeWorld, rru.FillOpacity, slot, out var item)) return SpliceRefused("notBakeable");
                 items.Add(item);
+                bounds = bounds.IsEmpty ? LogicalBounds(u.Component, wt) : Union(bounds, LogicalBounds(u.Component, wt));
             }
 
             // Count-stable recolor (every unit already holds a retained slot): patch in place, no surgery/fragmentation.
             var inPlace = items.Count == group.Units.Count && items.Count == runTotal && AllUnitsHaveSlots(group);
             if (!inPlace) appendTotal += items.Count;
-            _patchBuf.Add(new GroupPatch { Group = group, Items = items.ToArray(), Scissor = scissor, InPlace = inPlace });
+            _patchBuf.Add(new GroupPatch { Group = group, Items = items.ToArray(), Scissor = scissor, InPlace = inPlace, Bounds = bounds });
         }
 
         // ---- Phase 1b: which LAYER does each surgery group belong to (no mutation) ----
@@ -1423,10 +1475,20 @@ public partial class RenderCache
     // by nine different means.
     private static bool SpliceRefused(string reason)
     {
-        LayerProbe.Refusals++;
         if (Core.Diagnostics.FrameTrace.Enabled) Core.Diagnostics.FrameTrace.Refuser = reason;
         return false;
     }
+
+    private static Rect Union(Rect a, Rect b)
+    {
+        var l = Math.Min(a.X, b.X);
+        var t = Math.Min(a.Y, b.Y);
+        var r = Math.Max(a.Right, b.Right);
+        var bottom = Math.Max(a.Bottom, b.Bottom);
+        return new Rect(l, t, r - l, bottom - t);
+    }
+
+    private static bool Overlaps(Rect a, Rect b) => a.X < b.Right && b.X < a.Right && a.Y < b.Bottom && b.Y < a.Bottom;
 
     private bool AllUnitsHaveSlots(ControlGroup group)
     {
@@ -1492,6 +1554,8 @@ public partial class RenderCache
 
         // The layer may have moved, and everything after the edit shifted by the size difference. Re-index every group
         // that draws in it - runs and unit slots both, or a later patch would address freed space.
+        // The layer now covers what this patch put into it, and the next placement has to see that.
+        _rectBatch.GrowSegmentBounds(layer, patch.Bounds);
         var (newFirst, _) = _rectBatch.SegmentRange(layer);
         var delta = patch.Items.Length - replaced;
         var editEnd = first + at + replaced;
@@ -1535,10 +1599,11 @@ public partial class RenderCache
             return true;   // drew nothing, still draws nothing
         }
 
-        // A recorded segment that paints ACROSS this rank has to be cut at it first - otherwise there is no index in the op
-        // stream that means "here": before that one op the newcomer paints under controls it must cover, after it over
-        // controls it must not.
-        SplitSegmentSpanningRank(group.Order);
+        // A recorded segment that paints ACROSS this rank is a LAYER in the sense of §5a: a set of draws whose mutual order
+        // does not matter, because nothing in it overlaps anything else in it. So the newcomer only needs a place of its own
+        // when it OVERLAPS what that layer draws - then order decides what covers what, and the layer has to be cut at its
+        // rank. When it does not overlap, there is nothing to decide: it joins the layer and the segment stays whole.
+        SplitSegmentSpanningRank(group.Order, patch.Bounds);
 
         var seg = _rectBatch.AllocateSegment(device, patch.Items, patch.Scissor);
         if (seg < 0) return false;
@@ -1548,6 +1613,7 @@ public partial class RenderCache
             Kind = RenderOpKind.Segment, Batch = 0, SegId = seg, Order = group.Order
         });
 
+        _rectBatch.GrowSegmentBounds(seg, patch.Bounds);
         var (first, _) = _rectBatch.SegmentRange(seg);
         group.RectRuns.Clear();
         group.RectRuns.Add((first, patch.Items.Length));
@@ -1588,13 +1654,23 @@ public partial class RenderCache
     /// in rank order, so the first slot owned by a later-ranked group is where the two halves part. Without this the
     /// newcomer went in whole segments early or whole segments late, and stayed wrong until a full walk - seen as a rect
     /// that had to sit ON a card drawn underneath it, and as the flake in ViewportResize_Splices.</para></summary>
-    private void SplitSegmentSpanningRank(long order)
+    private void SplitSegmentSpanningRank(long order, Rect newcomer)
     {
         for (var i = 0; i < _ops.Count; i++)
         {
             var op = _ops[i];
             if (op.Kind != RenderOpKind.Segment || op.Batch != 0) continue;
             if (op.OrderFirst >= order || order >= op.Order) continue;   // does not span this rank
+
+            // THE MERGE RULE, and the whole point of a layer: what this segment draws is mutually order-independent, so a
+            // newcomer that does not touch any of it is order-independent with it too. Cutting then would buy nothing and
+            // cost a segment - which is what a rank-only test did on every single placement.
+            var covered = _rectBatch.SegmentBounds(op.SegId);
+            if (!newcomer.IsEmpty && !covered.IsEmpty && !Overlaps(covered, newcomer))
+            {
+                LayerProbe.SplitsAvoided++;
+                continue;
+            }
 
             var cut = FirstSlotPaintedAfter(op.SegId, order);
             if (cut < 0) continue;   // its whole content paints BEFORE the newcomer after all - nothing to cut

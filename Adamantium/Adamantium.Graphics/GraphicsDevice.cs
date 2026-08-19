@@ -49,6 +49,32 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     // Dynamic-state cache: last value emitted per state, so a draw only re-emits what changed.
     // Invalidated (_stateInitialized=false) at BeginDraw - a fresh command buffer has undefined dynamic state.
     private bool _stateInitialized;
+
+    // What the command buffer was last TOLD, for the state that was being re-sent on every draw. Measured on the Layout
+    // tab: a frame replays ~16 draws and each one sent its viewport and scissor TWICE (once from SetViewports/SetScissors,
+    // once unconditionally here) plus three colour-blend calls - and every one of those marshals a struct through
+    // Marshal.SizeOf, which was 27% of the whole draw phase. Sending only what CHANGED is the same picture with a third
+    // of the calls.
+    private Viewport _cViewport;
+    private uint _cViewportCount;
+    private Rect2D _cScissor;
+    private uint _cScissorCount;
+    private ColorBlendEquationEXT _cBlendEq;
+    private bool _cBlendEnable;
+    private ColorComponentFlagBits _cWriteMask;
+    private bool _cBlendKnown;
+
+    private static bool SameViewport(Viewport a, Viewport b)
+        => a.X == b.X && a.Y == b.Y && a.Width == b.Width && a.Height == b.Height && a.MinDepth == b.MinDepth && a.MaxDepth == b.MaxDepth;
+
+    private static bool SameScissor(Rect2D a, Rect2D b)
+        => a != null && b != null && a.Offset.X == b.Offset.X && a.Offset.Y == b.Offset.Y
+           && a.Extent.Width == b.Extent.Width && a.Extent.Height == b.Extent.Height;
+
+    private static bool SameBlend(ColorBlendEquationEXT a, ColorBlendEquationEXT b)
+        => a.SrcColorBlendFactor == b.SrcColorBlendFactor && a.DstColorBlendFactor == b.DstColorBlendFactor
+           && a.ColorBlendOp == b.ColorBlendOp && a.SrcAlphaBlendFactor == b.SrcAlphaBlendFactor
+           && a.DstAlphaBlendFactor == b.DstAlphaBlendFactor && a.AlphaBlendOp == b.AlphaBlendOp;
     private Type _cVertexType;
     private bool _cRasterizerDiscard;
     private PrimitiveTopology _cTopology;
@@ -481,9 +507,26 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         return new EffectPass(logger, effect, technique, pass, name);
     }
 
+    // Which pass's shader objects the CURRENT command buffer already has bound. A pass applied again for the next draw of
+    // the same material rebound the same handles, stage by stage, through a marshalled call each - and a frame is mostly
+    // runs of the same material. Cleared with the rest of the dynamic state at BeginDraw, because a fresh command buffer
+    // has none of it.
+    private object _boundShaderPass;
+
+    /// <summary>Are this pass's shaders already bound to the current command buffer?</summary>
+    public bool ShadersBoundFor(object pass) => _stateInitialized && ReferenceEquals(_boundShaderPass, pass);
+
+    /// <summary>Remember that this pass's shaders are now bound.</summary>
+    public void ShadersBound(object pass) => _boundShaderPass = pass;
+
     public void BindShader(CommandBuffer cmd, ShaderStageFlagBits stage, ShaderEXT shader)
     {
         cmd.BindShadersEXT(1, stage, shader);
+    }
+
+    public void BindShaders(CommandBuffer cmd, ShaderStageFlagBits[] stages, ShaderEXT[] shaders)
+    {
+        cmd.BindShadersEXT((uint)stages.Length, stages, shaders);
     }
 
     public RenderPass CreateRenderPass(RenderPassCreateInfo createInfo)
@@ -945,6 +988,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
         // Fresh command buffer => dynamic state is undefined, so the state cache must re-emit everything next draw.
         _stateInitialized = false;
+        _boundShaderPass = null;
 
         //Log.Logger.Information($"Begin Command buffer on {DeviceType} device {DeviceId}");
         result = commandBuffer.BeginCommandBuffer(beginInfo);
@@ -1282,6 +1326,10 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     {
         if (viewports == null || viewports.Length == 0) return;
 
+        // Unchanged means nothing to say: this used to rewrite the tracking collection (which locks) and marshal the
+        // viewport to the command buffer on every call, and the draw that follows sends it AGAIN through SetDrawingState.
+        if (viewports.Length == 1 && viewportsArray.Length == 1 && SameViewport(viewports[0], viewportsArray[0])) return;
+
         this.viewports.Clear();
         this.viewports.AddRange(viewports);
         viewportsArray = viewports;
@@ -1292,6 +1340,9 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     public void SetScissors(params Rect2D[] scissors)
     {
         if (scissors == null || scissors.Length == 0) return;
+
+        // Same as SetViewports: a run of draws under one clip asked for the same rect over and over.
+        if (scissors.Length == 1 && scissorsArray.Length == 1 && SameScissor(scissors[0], scissorsArray[0])) return;
 
         this.scissors.Clear();
         this.scissors.AddRange(scissors);
@@ -1353,9 +1404,21 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     private void SetDrawingState(CommandBuffer commandBuffer)
     {
-        // Viewport/scissor are re-emitted every draw (cheap; scissor will also vary per clip region later).
-        commandBuffer.SetViewportWithCount((uint)viewportsArray.Length, viewportsArray);
-        commandBuffer.SetScissorWithCount((uint)scissorsArray.Length, scissorsArray);
+        // Viewport/scissor: only when they actually differ from what this command buffer was last told. They vary per clip
+        // region, but a run of draws under ONE clip - which is what a batch segment is - re-sent the same rect every time.
+        if (!_stateInitialized || viewportsArray.Length != _cViewportCount || (viewportsArray.Length == 1 && !SameViewport(viewportsArray[0], _cViewport)) || viewportsArray.Length > 1)
+        {
+            commandBuffer.SetViewportWithCount((uint)viewportsArray.Length, viewportsArray);
+            _cViewportCount = (uint)viewportsArray.Length;
+            if (viewportsArray.Length == 1) _cViewport = viewportsArray[0];
+        }
+
+        if (!_stateInitialized || scissorsArray.Length != _cScissorCount || (scissorsArray.Length == 1 && !SameScissor(scissorsArray[0], _cScissor)) || scissorsArray.Length > 1)
+        {
+            commandBuffer.SetScissorWithCount((uint)scissorsArray.Length, scissorsArray);
+            _cScissorCount = (uint)scissorsArray.Length;
+            if (scissorsArray.Length == 1) _cScissor = scissorsArray[0];
+        }
 
         // Emit each remaining dynamic state only when it changed since the previous draw. The cache is
         // invalidated at BeginDraw, so the first draw of a command buffer still emits everything.
@@ -1426,11 +1489,16 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         if (!_stateInitialized || _cLogicOp != LogicOperationsEnabled)
         { commandBuffer.SetLogicOpEnableEXT(LogicOperationsEnabled); _cLogicOp = LogicOperationsEnabled; }
 
-        // Colour-blend state stays always-emitted: it's the one that actually varies between UI draws (e.g.
-        // text uses premultiplied) and these structs aren't cheaply comparable.
-        commandBuffer.SetColorBlendEquationEXT(0, 1, ColorBlendEquation);
-        commandBuffer.SetColorBlendEnableEXT(0, 1, ColorBlendEnabled);
-        commandBuffer.SetColorWriteMaskEXT(0, 1, ColorComponentFlags);
+        // Colour-blend state DOES vary between UI draws (text uses premultiplied), which is why it used to be sent every
+        // time - but comparing six enum fields is nothing against three marshalled calls, and a run of same-material draws
+        // sends none of them.
+        if (!_stateInitialized || !_cBlendKnown || !SameBlend(_cBlendEq, ColorBlendEquation))
+        { commandBuffer.SetColorBlendEquationEXT(0, 1, ColorBlendEquation); _cBlendEq = ColorBlendEquation; }
+        if (!_stateInitialized || !_cBlendKnown || _cBlendEnable != (bool)ColorBlendEnabled)
+        { commandBuffer.SetColorBlendEnableEXT(0, 1, ColorBlendEnabled); _cBlendEnable = ColorBlendEnabled; }
+        if (!_stateInitialized || !_cBlendKnown || _cWriteMask != ColorComponentFlags)
+        { commandBuffer.SetColorWriteMaskEXT(0, 1, ColorComponentFlags); _cWriteMask = ColorComponentFlags; }
+        _cBlendKnown = true;
 
         _stateInitialized = true;
     }

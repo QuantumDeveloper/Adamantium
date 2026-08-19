@@ -8,7 +8,7 @@ namespace Adamantium.UI.Rendering;
 public static class LayerProbe
 {
     public static long Frames, Cycles, Segments, MaxCycles, MaxSegments;
-    public static long Splits, Renumbers, Refusals;
+    public static long Splits, SplitsAvoided, Renumbers, Refusals;
 
     private static long _cyclesThisFrame, _segmentsThisFrame;
 
@@ -27,6 +27,14 @@ public static class LayerProbe
         _segmentsThisFrame = 0;
     }
 
+    /// <summary>Zero everything - for a test that asks a question about ONE frame it drives itself.</summary>
+    public static void Reset()
+    {
+        Frames = Cycles = Segments = MaxCycles = MaxSegments = 0;
+        Splits = SplitsAvoided = Renumbers = Refusals = 0;
+        _cyclesThisFrame = _segmentsThisFrame = 0;
+    }
+
     public static void Cycle() => _cyclesThisFrame++;
     public static void Segment() => _segmentsThisFrame++;
 
@@ -34,6 +42,6 @@ public static class LayerProbe
     {
         var f = Math.Max(1, Frames);
         return $"layers/frame {Cycles / (double)f:0.0} (max {MaxCycles}) | segments/frame {Segments / (double)f:0.0} (max {MaxSegments})"
-               + $" | recorded frames {Frames} | splits {Splits} | renumbers {Renumbers} | patch refusals {Refusals}";
+               + $" | recorded frames {Frames} | splits {Splits} (avoided {SplitsAvoided}) | renumbers {Renumbers} | patch refusals {Refusals}";
     }
 }
