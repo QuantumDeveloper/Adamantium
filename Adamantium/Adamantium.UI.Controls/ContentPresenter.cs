@@ -225,7 +225,7 @@ public class ContentPresenter : InputUIComponent
     {
         // Coming back to a view that was parked: put it back as it was. Not building it again IS the point - the rebuild
         // is the pause x:KeepAlive exists to avoid.
-        if (ParkedVisuals.TryTake(newContent, this, out var parkedRoot, out var parkedBuilt, out var parkedTemplate, out var parkedHostSize))
+        if (ParkedVisuals.TryTake(this, newContent, this, out var parkedRoot, out var parkedBuilt, out var parkedTemplate, out var parkedHostSize))
         {
             // Came home to a different window or after a theme swap: drop the mark first, so the attach below revalidates
             // every node the ordinary way. Same world - the mark stays and the attach skips what it would recompute.
@@ -256,6 +256,7 @@ public class ContentPresenter : InputUIComponent
         else
         {
             var dataTemplate = ContentTemplate ?? ContentTemplateSelector?.SelectTemplate(newContent, this);
+
             if (dataTemplate != null && WantsDeferredBuild)
             {
                 _currentTemplate = dataTemplate;
@@ -405,7 +406,7 @@ public class ContentPresenter : InputUIComponent
             // the return measures it once (it never was measured - it never was in a tree).
             if (built?.RootComponent is { } finished && ParkedVisuals.ShouldKeep(finished))
             {
-                ParkedVisuals.Keep(content, finished, built, template, new Size(Double.NaN, Double.NaN));
+                ParkedVisuals.Keep(this, content, finished, built, template, new Size(Double.NaN, Double.NaN));
                 return;
             }
 
@@ -461,7 +462,7 @@ public class ContentPresenter : InputUIComponent
     /// taking it out of the tree is this presenter's job, because only it knows what removal means here.</summary>
     private void ParkCurrent(object key, IUIComponent root, TemplateResult built, DataTemplate template)
     {
-        ParkedVisuals.Keep(key, root, built, template, _lastArrangeSize);
+        ParkedVisuals.Keep(this, key, root, built, template, _lastArrangeSize);
         RemoveVisualChild(root);
         RemoveLogicalChild(root);
     }

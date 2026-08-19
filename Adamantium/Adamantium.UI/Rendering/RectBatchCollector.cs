@@ -272,11 +272,41 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
 
     // Bake one solid rounded-rect fill into the pending segment. False only if it can't be baked (rotated/sheared world
     // or a GPU-buffer overflow this frame) - the caller then draws that rect via the per-unit path.
-    public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0)
+    /// <summary>Blanks every instance whose owner tag is in <paramref name="gone"/> - the controls that have left the
+    /// paint order - without touching the segments they sit in. Done here rather than slot-by-slot from the cache
+    /// because that meant one upload per slot; a run of dead neighbours (a whole scrollbar, a whole recycled row) is one
+    /// upload, and the scan reads each instance's tag by reference instead of copying it.</summary>
+    public void BlankOwned(IGraphicsDevice device, uint first, uint count, int ownerTag)
+    {
+        if (count == 0 || first + count > (uint)Count) return;
+
+        // The tag decides, not the caller: between the control leaving the order and this sweep a walk may have re-laid
+        // the arena and handed these very slots to somebody else. Blanking them then would erase live content - which is
+        // exactly what a run-list-based version of this did.
+        var runStart = -1;
+        for (var i = 0u; i <= count; i++)
+        {
+            var slot = (int)(first + i);
+            var mine = i < count && Items[slot].OwnerTag == ownerTag && FindSegmentContaining(slot) >= 0;
+            if (mine)
+            {
+                if (runStart < 0) runStart = slot;
+                continue;
+            }
+
+            if (runStart < 0) continue;
+            BlankRun(device, (uint)runStart, (uint)(slot - runStart));
+            runStart = -1;
+        }
+    }
+
+    public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0,
+        int ownerTag = 0)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
         if (!BakeItem(p, world, opacity, transformSlot, out var item)) return false;   // rotation/shear -> per-unit
+        item.OwnerTag = ownerTag;   // travels with the bytes through every copy the arena makes - see RectItem.OwnerTag
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
         return true;

@@ -142,6 +142,22 @@ public partial class RenderCache
             _applySnap[entry.Key] = entry.Value;
         }
 
+        // Something left the tree since the last build. Withdrawing what it drew is the reconcile's job, and it used to
+        // ride on a FULL walk - which the redesign made rare, so a detached view kept its place in the order and the
+        // retained op stream went on re-issuing it, frozen at the size it had when it left.
+        if (_reconciledDetachGen != Core.RenderDirty.DetachGeneration && packet.Kind != RenderBuildKind.Full)
+        {
+            _reconciledDetachGen = Core.RenderDirty.DetachGeneration;
+            if (ReconcileDetachedControls() > 0)
+            {
+                // Those units are gone, so the op stream and the recorded slots no longer describe the scene: the draw
+                // pass must re-walk instead of replaying, exactly as after a splice.
+                if (LastBuildKind != RenderBuildKind.Full) LastBuildKind = RenderBuildKind.Structural;
+                _partialDirty.Clear();
+                _partialSpliced = false;
+            }
+        }
+
         switch (packet.Kind)
         {
             case RenderBuildKind.Clean:
@@ -173,7 +189,8 @@ public partial class RenderCache
                 break;
 
             case RenderBuildKind.Full:
-                ApplyFullWalk(packet);   // GPU: rebuild the paint-order groups from the packet
+                ApplyFullWalk(packet);   // GPU: rebuild the paint-order groups from the packet (reconciles as it goes)
+                _reconciledDetachGen = Core.RenderDirty.DetachGeneration;
                 _built = true;
                 // A full walk re-records the whole scene, so earlier packets' dirty entries are covered - and their unit
                 // sets are gone (groups rebuilt), which would mis-patch the batch. Drop them.
@@ -394,6 +411,7 @@ public partial class RenderCache
         if (!group.InOrder) return;
         _groups.Remove(group);
         group.InOrder = false;
+        _leftTheOrder.Add(group);   // its instances are still in the arena - see BlankOrphanInstances
     }
 
     // Queue a group for this frame's ONE merge into the paint order. Deduped: the same group can be named twice in a packet

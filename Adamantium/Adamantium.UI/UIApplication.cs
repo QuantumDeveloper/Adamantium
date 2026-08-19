@@ -487,7 +487,6 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         var t = Stopwatch.StartNew();
         OnWindowAdded(wnd);
         t.Stop();
-        Log.Logger.Information($"Service created in {t.ElapsedMilliseconds} ms");
     }
 
     protected virtual void OnWindowClosed(IWindow wnd)
@@ -655,7 +654,9 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         var remaining = target - elapsed;
         if (remaining >= 1.0) Thread.Sleep((int)remaining);
 
-        if (!RenderDirty.HasWork && !AnimationManager.HasActiveAnimations)
+        // EVERY stage, not just the content: the popups and the adorners keep their own marks now, and a frame owed to
+        // one of them is owed by the loop all the same.
+        if (!RenderDirty.AnyHasWork && !AnimationManager.HasActiveAnimations)
             LoopSignal.Wait(IdleWakeMs, cancellationTokenSource.Token);
 
         _loopFrameStart = Stopwatch.GetTimestamp();

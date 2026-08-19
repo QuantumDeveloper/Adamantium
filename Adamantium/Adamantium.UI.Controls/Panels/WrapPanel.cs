@@ -204,6 +204,13 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
    private double _lastViewportScroll;
    private const double DefaultViewportScroll = 1080.0;   // fallback viewport (px) before any real one is known
 
+   // ...and the same for the FLOW axis, for the same reason. A parent probing the natural width measures with infinity
+   // there, and infinity is not "infinitely many columns": (int)(inf / cell) SATURATES to int.MaxValue, so the extent
+   // comes out as int.MaxValue x cell - measured as a tab strip 257,698,037,640 wide after a theme swap, with a height of
+   // zero to go with it (count + columns - 1 overflows int, so the line count divides to nothing).
+   private double _lastViewportFlow;
+   private const double DefaultViewportFlow = 1920.0;
+
    private bool _measuringHorizontal;               // orientation snapshot for OnSlotBound (called from SetWindow)
    private bool _cellGrew;                           // did a bound tile grow the auto cell? -> another MaxCellPasses pass
    private System.Action<IUIComponent> _onSlotBound; // cached delegate (no per-frame closure alloc)
@@ -500,6 +507,16 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
       var viewportFlow = horizontal ? availableSize.Width : availableSize.Height;
       var viewportScroll = horizontal ? availableSize.Height : availableSize.Width;
 
+      // An UNCONSTRAINED flow axis is a parent asking "what is your natural width", not a viewport that wide. Answering
+      // it with infinity divided by the cell gives int.MaxValue columns (the conversion saturates) and an extent of
+      // int.MaxValue x cell - which is not a big number but a broken one: it propagates up as a desired size no window
+      // can hold, and everything sharing that layout is stretched to match. The scroll axis has always fallen back to the
+      // last real viewport here; the flow axis has to do the same.
+      if (double.IsInfinity(viewportFlow))
+         viewportFlow = _lastViewportFlow > 0 ? _lastViewportFlow : DefaultViewportFlow;
+      else if (viewportFlow > 0)
+         _lastViewportFlow = viewportFlow;
+
       // The data set changed -> the cached uniform cell may no longer represent the items; re-establish it.
       if (count != _lastItemCount)
       {
@@ -594,6 +611,7 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
       var totalLines = (SlotCount(count) + _columns - 1) / _columns;
       var flowExtent = _columns * _cellFlow;
       var scrollExtent = totalLines * _cellScroll;
+
       return horizontal ? new Size(flowExtent, scrollExtent) : new Size(scrollExtent, flowExtent);
    }
 

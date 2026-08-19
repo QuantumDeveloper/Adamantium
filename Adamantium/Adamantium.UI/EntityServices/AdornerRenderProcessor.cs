@@ -38,6 +38,11 @@ public class AdornerRenderProcessor : EntityProcessor<WindowRenderService>
     // the fence) did GPU work in the update phase, which is a use-after-free hazard once the render thread runs concurrently
     // with update. This mirrors PopupRenderProcessor, which moved its build here for the same reason. The overlay units come
     // from the window's adorners, bound to the adorned elements' live WorldTransform (still valid - after this frame's layout).
+    private readonly OverlayRebuildGate _gate = new();
+
+    // This stage's own marks - see RenderDirtyRouter.
+    private readonly RenderDirtyScope _scope = RenderDirtyRouter.NewScope();
+
     public override void PreRender()
     {
         if (_cache == null) return;
@@ -58,11 +63,21 @@ public class AdornerRenderProcessor : EntityProcessor<WindowRenderService>
                 continue;
             
             LayoutAdorner(adorner);
+            // Drawn by THIS stage, so its marks are this stage's - see RenderDirtyRouter. A focus ring pulsing on a
+            // window otherwise told the content it had work to do, every frame the ring moved.
+            if (adorner is Controls.Base.UIComponent component) component.ClaimRenderScope(_scope);
             Flatten(adorner, _flat);
         }
 
-        _cache.BuildFromComponents(_flat, projection);
-        _cache.ProcessCommands(projection, AssociatedService.RenderScale);
+        // The same gate the popup stage uses: rebuild only when this stage could look different from last frame. Without
+        // it the adorners were walked and re-recorded on EVERY frame - measured at 2732 walks in 25 idle seconds, to draw
+        // nothing at all.
+        if (_gate.HasChanged(_flat))
+        {
+            _cache.BuildFromComponents(_flat, projection);
+            _cache.ProcessCommands(projection, AssociatedService.RenderScale);
+        }
+
         _cache.PreRender();
     }
 

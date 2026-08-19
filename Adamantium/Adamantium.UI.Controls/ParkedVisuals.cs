@@ -17,10 +17,18 @@ public static class ParkedVisuals
 {
     private static int _limit = 20;
 
-    private static readonly Dictionary<object, Entry> _kept = new();
+    // Keyed by the content AND by the presenter that parked it. The content alone is not enough: one view model is shown
+    // by more than one presenter at a time - a tab's body draws the page, and the tab's HEADER draws a label from the very
+    // same view model. Keyed by content only, the header asked "is there a visual for this?" during a re-template and was
+    // handed the whole PAGE, which it then hosted inside the header card. The strip measured itself to it (480,132 px
+    // tall), the body's row collapsed to nothing, and the page was drawn across the tab headers - which is what a theme
+    // swap looked like after visiting a tab.
+    private readonly record struct Slot(object Owner, object Key);
+
+    private static readonly Dictionary<Slot, Entry> _kept = new();
 
     // Insertion order of the evictable ones, oldest first - what "the oldest is let go" means without a timestamp.
-    private static readonly List<object> _evictable = [];
+    private static readonly List<Slot> _evictable = [];
 
     /// <summary>How many <see cref="NavigationCacheMode.Enabled"/> visuals are kept before the oldest is let go.
     /// <see cref="NavigationCacheMode.Required"/> ones are never counted and never evicted - that is the difference
@@ -49,22 +57,23 @@ public static class ParkedVisuals
     /// <summary>Park <paramref name="root"/> and remember it under <paramref name="key"/>. The caller still does the
     /// removing - a presenter removes its child, an adapter clears its Content - because only it knows what "remove"
     /// means for it; this marks the subtree FIRST, so that removal reads as "coming back" and not as "thrown away".</summary>
-    public static void Keep(object key, IUIComponent root, TemplateResult built = null, DataTemplate template = null,
+    public static void Keep(object owner, object key, IUIComponent root, TemplateResult built = null, DataTemplate template = null,
         Mathematics.Size hostSize = default)
     {
-        if (key == null || root == null) return;
+        if (owner == null || key == null || root == null) return;
 
         // What the world looked like when it left, so the return can ask ONE question instead of revalidating six
         // thousand nodes: same window, same theme?
         var world = new World(root.RootVisual, Core.Resources.ThemeManager.Version);
 
+        var slot = new Slot(owner, key);
         ParkedSubtree.Park(root);
-        _kept[key] = new Entry(root, built, template, ModeOf(root), hostSize, world);
+        _kept[slot] = new Entry(root, built, template, ModeOf(root), hostSize, world);
 
         if (ModeOf(root) != NavigationCacheMode.Required)
         {
-            _evictable.Remove(key);
-            _evictable.Add(key);
+            _evictable.Remove(slot);
+            _evictable.Add(slot);
             Evict();
         }
     }
@@ -72,7 +81,7 @@ public static class ParkedVisuals
     /// <summary>Takes the visual kept under <paramref name="key"/>, if any. It is NOT unparked here: the caller has to
     /// put it back in the tree first, and unparking before that would tell the renderer it is live while it is nowhere.
     /// Use <see cref="ParkedSubtree.Unpark"/> once it is attached.</summary>
-    public static bool TryTake(object key, IUIComponent host, out IUIComponent root, out TemplateResult built,
+    public static bool TryTake(object owner, object key, IUIComponent host, out IUIComponent root, out TemplateResult built,
         out DataTemplate template, out Mathematics.Size hostSize)
     {
         root = null;
@@ -80,9 +89,12 @@ public static class ParkedVisuals
         template = null;
         hostSize = default;
 
-        if (key == null || !_kept.Remove(key, out var entry)) return false;
+        if (owner == null || key == null) return false;
 
-        _evictable.Remove(key);
+        var slot = new Slot(owner, key);
+        if (!_kept.Remove(slot, out var entry)) return false;
+
+        _evictable.Remove(slot);
         root = entry.Root;
         built = entry.Built;
         template = entry.Template;

@@ -41,7 +41,7 @@ public sealed class ContentControlRegionAdapter : IRegionAdapter
         // supplied it has to.
         if (_currentViewModel != null && content.Content is IUIComponent leaving && ParkedVisuals.ShouldKeep(leaving))
         {
-            ParkedVisuals.Keep(_currentViewModel, leaving);
+            ParkedVisuals.Keep(content, _currentViewModel, leaving);
         }
 
         _currentViewModel = viewModel;
@@ -52,7 +52,7 @@ public sealed class ContentControlRegionAdapter : IRegionAdapter
         }
 
         // Returning: the parked view goes back in as it was - the rebuild it avoids is the pause this exists for.
-        if (ParkedVisuals.TryTake(viewModel, content, out var parked, out _, out _, out _))
+        if (ParkedVisuals.TryTake(content, viewModel, content, out var parked, out _, out _, out _))
         {
             content.Content = parked;
             ParkedSubtree.Unpark(parked);

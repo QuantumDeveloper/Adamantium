@@ -790,6 +790,32 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     /// A plain field, deliberately not a registered property: the draw walk reads it per group, per frame.</summary>
     public IReadOnlyList<Matrix4x4F> RenderClones { get; set; }
 
+    /// <summary>See <see cref="IUIComponent.RenderScope"/>. Inherited from the parent at attach; a stage sets its own on
+    /// the root of what it draws (<see cref="ClaimRenderScope"/>).</summary>
+    public RenderDirtyScope RenderScope { get; private set; }
+
+    private RenderDirtyScope _ownRenderScope;
+
+    /// <summary>Declares that this subtree is drawn by a stage of its own, so its marks are that stage's rather than the
+    /// window content's - a hovered menu item has no business making the content look for what changed in it. Applied to
+    /// the subtree at once, since it is already up by the time a stage takes it.</summary>
+    internal void ClaimRenderScope(RenderDirtyScope scope)
+    {
+        _ownRenderScope = scope;
+        if (ReferenceEquals(RenderScope, scope)) return;
+
+        RenderScope = scope;
+        foreach (UIComponent child in VisualChildren) child.InheritRenderScope(scope);
+    }
+
+    private void InheritRenderScope(RenderDirtyScope scope)
+    {
+        if (_ownRenderScope != null) return;   // a stage of its own - it and everything under it keep theirs
+
+        RenderScope = scope;
+        foreach (UIComponent child in VisualChildren) child.InheritRenderScope(scope);
+    }
+
     /// <summary>Quiet everything this element drives while it waits out of the tree. Removal already suspends what
     /// TRIGGERS run (DetachedFromVisualTree -> SuspendTriggerActions); animations are the half detachment does NOT stop,
     /// so a parked view would otherwise keep costing a frame forever - see animation-lifecycle-detach-leak.</summary>
@@ -843,6 +869,11 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         // tree, where the visual root owns layout as it always did.
         LayoutRoot = _isLayoutBoundary ? this : (VisualParent as UIComponent)?.LayoutRoot;
 
+        // ...and the same for the STAGE that draws it: a subtree a stage has claimed keeps its own marks, everything
+        // else marks the window content. Inherited rather than searched for, because a mark must not walk anything - it
+        // happens thousands of times in a frame that scrolls.
+        RenderScope = _ownRenderScope ?? (VisualParent as UIComponent)?.RenderScope;
+
         // While detached, a control's cached render units are freed (RenderCache.ReconcileDetachedControls). On re-attach
         // it is still geometry-valid, so its Render() would record nothing and it would draw blank (e.g. a TabItem body
         // shown, hidden by switching tabs, then shown again). Invalidate so the next render pass rebuilds its units; the
@@ -875,8 +906,15 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         }
     }
 
-    private void DetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+    private void DetachedFromVisualTree(VisualTreeAttachmentEventArgs e, bool isSubtreeRoot = true)
     {
+        // The renderer has to withdraw what a departed control drew, and THIS is where the fact happens - attachment
+        // flipping, whatever route led here. Reading it off the child collection's notification instead missed every path
+        // that detaches directly (SetVisualParent re-parenting, DetachFromRoot when a window or a popup layer goes), and a
+        // view that left one of those ways kept its place in the paint order: drawn from the retained frame, frozen at the
+        // size it had when it left. Once per subtree - the recursion below carries the same departure.
+        if (isSubtreeRoot) Core.RenderDirty.MarkDetached();
+
         // Clear the root link so IsAttachedToVisualTree (=> RootVisual != null) flips to false for this subtree.
         RootVisual = null;
         LayoutRoot = null;
@@ -893,7 +931,7 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         {
             foreach (UIComponent visual in VisualChildren)
             {
-                visual.DetachedFromVisualTree(e);
+                visual.DetachedFromVisualTree(e, false);
             }
         }
     }

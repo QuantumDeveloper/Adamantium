@@ -17,8 +17,13 @@ public partial class RenderCache
     // baked transform (nothing moved on a Clean frame).
     private void ExecuteOps(IGraphicsDevice device, Rect2D fullScissor)
     {
-        foreach (var op in _ops)
+        // LAYER by layer, and inside a layer in the order it was recorded. The two are the same sequence - a layer owns a
+        // contiguous range of the stream - and saying it this way is what makes the structure of a recorded frame legible:
+        // the stream is a flat list, the layers are what it MEANS.
+        foreach (var layer in _layers)
+        for (var i = layer.OpFirst; i < layer.OpFirst + layer.OpCount; i++)
         {
+            var op = _ops[i];
             switch (op.Kind)
             {
                 case RenderOpKind.Scissor:
@@ -206,7 +211,7 @@ public partial class RenderCache
             var fi = _instancedFill.Flush(fullScissor, _projectionMatrix);
             if (_recording && fi >= 0)
             {
-                _ops.Add(new RenderOp { Kind = RenderOpKind.InstancedFlush, SegId = fi, Order = _recordOrder });
+                RecordOp(new RenderOp { Kind = RenderOpKind.InstancedFlush, SegId = fi, Order = _recordOrder });
             }
         }
 
@@ -224,6 +229,10 @@ public partial class RenderCache
 
         RecordSegment(2, _textBatch.Flush(device, fullScissor, _projectionMatrix));
         if (_flushedSomething) { LayerProbe.Cycle(); _flushedSomething = false; }
+
+        // The cycle is over, and with it the LAYER: a flush happens precisely when the next draw can no longer be
+        // reordered with what is pending, so whatever is recorded from here belongs strictly after all of it.
+        CloseLayer();
         scissorNarrowed = false;
         _batchOpen = false;
     }
@@ -242,7 +251,7 @@ public partial class RenderCache
         // A segment's paint span runs from the first group that filled it to the one being recorded when it flushed. Only
         // the RECT batch is ever spliced into, so only its span is tracked; for the others the span is a point, which is
         // all their ops are compared by.
-        _ops.Add(new RenderOp
+        RecordOp(new RenderOp
         {
             Kind = RenderOpKind.Segment, Batch = batch, SegId = segId,
             Order = _recordOrder, OrderFirst = batch == 0 ? _rectSegStart : _recordOrder
@@ -391,7 +400,18 @@ public partial class RenderCache
     // re-inserted by a later splice (its "already there" would be a lie) and would silently stop drawing.
     private void ClearOrder()
     {
-        foreach (var group in _groups) group.InOrder = false;
+        foreach (var group in _groups)
+        {
+            group.InOrder = false;
+
+            // Everyone leaves here, and whoever the walk does not put back has instances left in the arena with nobody
+            // to speak for them - a segment is issued as a RANGE, so they are drawn along with their neighbours. The ones
+            // that DO come back are skipped when the sweep runs (they are in the order again by then), so this costs a
+            // flag check apiece. Leaving it out is what painted a departed tab's sliders across the tab strip after a
+            // theme swap: the swap walks in full, and a full walk empties the order right here.
+            _leftTheOrder.Add(group);
+        }
+
         _groups.Clear();
     }
 
@@ -540,21 +560,42 @@ public partial class RenderCache
     /// <para>A PARKED control is the third case: out of the tree, but coming back. Freeing its units would throw away
     /// exactly what parking exists to keep - rebuilding them is the pause a kept-alive view is meant to avoid - so the
     /// keep signal is "attached OR parked".</para></summary>
-    private void ReconcileDetachedControls()
+    // Out of the tree and not parked - whatever else is true of it, it does not draw. Read off the GROUP's own component:
+    // a group can hold no units at all (a control whose draws are all instanced), and units[0] would then say nothing.
+    private static bool LeftTheTree(ControlGroup group)
+    {
+        var component = group.Component ?? (group.Units.Count > 0 ? group.Units[0].Component : null);
+        return component != null && !component.IsAttachedToVisualTree && !component.IsParked;
+    }
+
+    private int ReconcileDetachedControls()
     {
         List<Guid> detached = null;
         foreach (var pair in _groupById)
         {
-            var units = pair.Value.Units;
-            if (units.Count == 0
-                || units[0].Component.IsAttachedToVisualTree
-                || units[0].Component.IsParked) continue;
+            if (!LeftTheTree(pair.Value)) continue;
             (detached ??= new List<Guid>()).Add(pair.Key);
         }
 
-        if (detached == null) return;
-        foreach (var id in detached)
-            RemoveAndDeferDispose(id);
+        // The PAINT ORDER is a separate list, and it is the one that draws. A group can sit in it while the dictionary no
+        // longer names it, and the sweep above would then never reach it - so sweep the order for itself.
+        var removed = 0;
+        for (var i = _groups.Count - 1; i >= 0; i--)
+        {
+            if (!LeftTheTree(_groups[i])) continue;
+            _groups[i].InOrder = false;
+            _groups.RemoveAt(i);
+            removed++;
+        }
+
+        if (detached != null)
+        {
+            removed += detached.Count;
+            foreach (var id in detached)
+                RemoveAndDeferDispose(id);
+        }
+
+        return removed;
     }
 
     /// <summary>Drops the cache entry and defer-disposes its units (deferred until the frame fence signals, as the GPU may

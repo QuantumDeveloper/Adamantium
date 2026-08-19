@@ -57,13 +57,18 @@ public class ParkedVisualsLimitTests
         Assert.That(held[3] && held[4], Is.True, "the newest survive");
     }
 
+    // One owner for the whole set: the store is keyed by WHO parked a visual as well as by what it was parked for (a
+    // view model is shown by more than one presenter - see ParkedVisuals), and these tests are about the limit, which is
+    // a property of the store as a whole.
+    private static readonly object Owner = new();
+
     private static object[] Park(int count, NavigationCacheMode mode)
     {
         var keys = new object[count];
         for (var i = 0; i < count; i++)
         {
             keys[i] = new object();
-            ParkedVisuals.Keep(keys[i], new ParkedView { Mode = mode });
+            ParkedVisuals.Keep(Owner, keys[i], new ParkedView { Mode = mode });
         }
 
         return keys;
@@ -75,7 +80,7 @@ public class ParkedVisualsLimitTests
         var held = new bool[keys.Length];
         for (var i = 0; i < keys.Length; i++)
         {
-            held[i] = ParkedVisuals.TryTake(keys[i], null, out _, out _, out _, out _);
+            held[i] = ParkedVisuals.TryTake(Owner, keys[i], null, out _, out _, out _, out _);
         }
 
         return held;

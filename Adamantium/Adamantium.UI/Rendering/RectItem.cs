@@ -16,7 +16,7 @@ public struct RectItem
     public Vector4F Bounds;
 
     /// <summary>.x = the LARGEST corner radius (what the quad has to make room for); .y = transform-table slot;
-    /// .z = 1 when the fill must not be anti-aliased; .w reserved.</summary>
+    /// .z = 1 when the fill must not be anti-aliased; .w unused.</summary>
     public Vector4F Params;
 
     /// <summary>The four corner radii, in the CPU <c>CornerRadius</c> order: x = top-left, y = top-right,
@@ -48,4 +48,14 @@ public struct RectItem
     /// <para>Why not the pen: a pen is ONE width offset from a contour. Four widths are not an offset of anything, and a
     /// border with different sides is what every second control in a theme asks for.</para></summary>
     public Vector4F Inset;
+
+    /// <summary>WHOSE instance this is - the paint group that baked it. CPU bookkeeping: no shader reads it.
+    /// <para>It is here, in the instance, rather than in a table beside it, because the arena moves these bytes
+    /// constantly - a re-issued layer copies its neighbours over, a patch rebuilds a whole range - and anything kept
+    /// alongside would have to be moved by every one of those paths. That is a rule that gets forgotten, and forgetting
+    /// it blanks LIVE content. Riding in the instance, ownership travels with the bytes by construction.</para>
+    /// <para>What it is FOR: a segment is drawn as a RANGE, so the instances of a control that stopped drawing are
+    /// re-issued along with the neighbours they sit between - a scrollbar the window outgrew, still painting its track
+    /// at the size it had when it was last needed. Knowing whose each slot is, is what lets exactly those be blanked.</para></summary>
+    public int OwnerTag;
 }
