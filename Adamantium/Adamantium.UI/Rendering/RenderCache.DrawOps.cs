@@ -223,18 +223,20 @@ public partial class RenderCache
         }
 
         RecordSegment(2, _textBatch.Flush(device, fullScissor, _projectionMatrix));
-        if (_probeFlushed) { LayerProbe.Cycle(); _probeFlushed = false; }
+        if (_flushedSomething) { LayerProbe.Cycle(); _flushedSomething = false; }
         scissorNarrowed = false;
         _batchOpen = false;
     }
 
     // Record a batch segment op (the immediate draw already happened in Flush; this only appends it for a clean-frame
     // replay). A Flush that drew nothing returns -1 and records nothing.
-    private bool _probeFlushed;
+    // A LAYER is one flush cycle - the set whose mutual order does not matter (§5a). Counted here because this is where
+    // one ends: two increments per cycle, which is what phase 3 is verified against.
+    private bool _flushedSomething;
 
     private void RecordSegment(byte batch, int segId)
     {
-        if (segId >= 0) { _probeFlushed = true; LayerProbe.Segment(); }
+        if (segId >= 0) { _flushedSomething = true; LayerProbe.Segment(); }
         if (!_recording || segId < 0) return;
 
         // A segment's paint span runs from the first group that filled it to the one being recorded when it flushed. Only

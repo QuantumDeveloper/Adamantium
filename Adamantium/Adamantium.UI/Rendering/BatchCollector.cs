@@ -59,7 +59,16 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     // a missed one re-issued the wrong segment: the same picture as a slot-off-by-one, with nothing in the frame to explain
     // it. An id survives the insert, so there is nothing to fix up; ids are never reused, so a reference held across a
     // frame resolves to NOTHING instead of to whatever moved into that index.
-    protected struct Segment { public int Id; public Rect2D Scissor; public uint Count; public uint First; public uint Capacity; }
+    // Bounds are the segment's PAINT-ORDER footprint - the union of what it draws, in logical coordinates, kept from the
+    // pending union it was flushed from. The walk needs it live (which is what the pending union is for); a RECORDED segment
+    // needs it too, because a newcomer placed into an existing frame can only be told "your order inside this layer does not
+    // matter" by asking whether it overlaps what the layer already draws (see §5a: that is the merge rule, and the only
+    // reason a cut is ever needed).
+    protected struct Segment
+    {
+        public int Id; public Rect2D Scissor; public uint Count; public uint First; public uint Capacity;
+        public double L, T, R, B; public bool HasBounds;
+    }
     private readonly List<Segment> _segments = new();
     private readonly Dictionary<int, int> _indexById = new();
     private int _nextSegmentId;
@@ -244,7 +253,11 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         // and the replayed draw are byte-for-byte the same.
         var index = _segments.Count;
         var id = ++_nextSegmentId;
-        _segments.Add(new Segment { Id = id, Scissor = _scissor, Count = (uint)count, First = (uint)segStart, Capacity = (uint)count });
+        _segments.Add(new Segment
+        {
+            Id = id, Scissor = _scissor, Count = (uint)count, First = (uint)segStart, Capacity = (uint)count,
+            L = _uL, T = _uT, R = _uR, B = _uB, HasBounds = _hasUnion
+        });
         _indexById[id] = index;
         OnSegmentRecorded(index);
 
@@ -296,6 +309,38 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         return index < 0 ? null : _segments[index].Scissor;
     }
 
+    /// <summary>What this recorded segment covers, in logical coordinates - empty when it never had bounds (a stale id, or
+    /// a segment re-issued to nothing).</summary>
+    public Rect SegmentBounds(int id)
+    {
+        var index = IndexOf(id);
+        if (index < 0) return Rect.Empty;
+
+        var s = _segments[index];
+        return s.HasBounds && s.Count > 0 ? new Rect(s.L, s.T, s.R - s.L, s.B - s.T) : Rect.Empty;
+    }
+
+    /// <summary>Grow a recorded segment's footprint by what a patch has just put into it - a layer that gained an item now
+    /// covers it, and the next placement has to see that.</summary>
+    public void GrowSegmentBounds(int id, Rect bounds)
+    {
+        var index = IndexOf(id);
+        if (index < 0) return;
+
+        var s = _segments[index];
+        if (!s.HasBounds)
+        {
+            _segments[index] = s with { L = bounds.X, T = bounds.Y, R = bounds.Right, B = bounds.Bottom, HasBounds = true };
+            return;
+        }
+
+        _segments[index] = s with
+        {
+            L = Math.Min(s.L, bounds.X), T = Math.Min(s.T, bounds.Y),
+            R = Math.Max(s.R, bounds.Right), B = Math.Max(s.B, bounds.Bottom)
+        };
+    }
+
     /// TEMP (flicker hunt): what this recorded segment actually draws, for the walk-vs-replay trace comparison.
     public string DescribeSegment(int id)
     {
@@ -342,13 +387,17 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         // The spare room is the TAIL of the original allocation, so it goes to the SECOND half. The first half is boxed in
         // by live items and may not grow at all: letting it keep the capacity would let a re-issue write over the
         // neighbour it just created.
+        // Both halves inherit the whole footprint: which items went where is known, but their individual bounds are not
+        // kept, and claiming a smaller cover than a half actually draws would let a later placement decide "no overlap"
+        // about something it does overlap. Coarse is safe here; wrong is not.
         var second = new Segment
         {
             Id = ++_nextSegmentId,
             Scissor = s.Scissor,
             First = (uint)firstOfSecond,
             Count = s.Count - offset,
-            Capacity = s.Capacity - offset
+            Capacity = s.Capacity - offset,
+            L = s.L, T = s.T, R = s.R, B = s.B, HasBounds = s.HasBounds
         };
         _segments[index] = s with { Count = offset, Capacity = offset };
         _segments.Insert(index + 1, second);
@@ -433,7 +482,7 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         var id = ++_nextSegmentId;
         _indexById[id] = _segments.Count;
         _segments.Add(new Segment { Id = id, Scissor = scissor, Count = (uint)items.Length, First = (uint)first, Capacity = (uint)want });
-        return id;
+        return id;   // its footprint comes from the caller (GrowSegmentBounds): only it knows the logical bounds it baked
     }
 
     public bool RepointSegment(IGraphicsDevice device, int id, ReadOnlySpan<TItem> items, Rect2D scissor)

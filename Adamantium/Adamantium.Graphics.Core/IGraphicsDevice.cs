@@ -152,6 +152,17 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
 
     void BindShader(CommandBuffer cmd, ShaderStageFlagBits stage, ShaderEXT shader);
 
+    /// <summary>Bind a pass.s stages in ONE call. vkCmdBindShadersEXT takes arrays; binding them one at a time cost a
+    /// marshalled call per stage, four times per pass switch, on every frame.</summary>
+    void BindShaders(CommandBuffer cmd, ShaderStageFlagBits[] stages, ShaderEXT[] shaders);
+
+    /// <summary>Are this pass.s shader objects already bound to the current command buffer? A run of draws of one material
+    /// re-bound the same handles per draw, and every bind is a marshalled call.</summary>
+    bool ShadersBoundFor(object pass);
+
+    /// <summary>Remember that this pass.s shaders are now bound to the current command buffer.</summary>
+    void ShadersBound(object pass);
+
     DescriptorSetLayout CreateDescriptorSetLayout(DescriptorSetLayoutCreateInfo layoutCreateInfo);
     
     CommandBuffer CurrentCommandBuffer { get; }
