@@ -23,6 +23,15 @@ internal abstract class BatchArena
     /// INSTANCE, not per type: the halo family runs two arenas of one type, one drawn under its shapes and one over.</summary>
     public byte BatchId { get; set; }
 
+    /// <summary>Does a recorded op draw THIS arena segment? Almost every family is a Segment op named by its id; the
+    /// instanced fill is drawn by a flush op instead, because a flush covers every key of one clip under one coverage
+    /// mark. Asked of the arena rather than assumed by the caller.</summary>
+    public virtual bool MatchesOp(RenderOpKind kind, int segId, int mySegment) =>
+        kind == RenderOpKind.Segment && segId == mySegment;
+
+    /// <summary>The op kind that draws this arena - a Segment for every batched family, a flush for the instanced fill.</summary>
+    public virtual RenderOpKind OpKind => RenderOpKind.Segment;
+
     /// <summary>Retained slot count (the next staged append starts here).</summary>
     public abstract int RetainedCount { get; }
 

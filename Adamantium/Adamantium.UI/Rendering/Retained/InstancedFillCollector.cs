@@ -345,6 +345,8 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         }
         if (seg.Count + 1 > seg.GpuCapacity) return false;   // this frame's GPU buffer is full -> per-unit fallback
 
+        LastArena = _arenas.TryGetValue(key, out var known) ? known : _arenas[key] = new InstancedKeyArena(this, seg);
+        LastSlot = seg.Count;   // ...and which slot of that arena it is, so the walk can note the group run
         seg.Items[seg.Count++] = GeometryInstance.FromLocal(local, color, transformSlot);
 
         _scissor = scissor;
@@ -981,6 +983,199 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         seg.MeshUploaded = true;
         _keys[key] = seg;
         return seg;
+    }
+
+    // ---- Retained ARENA surface (see InstancedKeyArena) -------------------------------------------------------------
+    // A key's instances are one append-only array and a flush record keeps a contiguous run of it under one clip - which
+    // is a segment, said in this collector's own words. Everything below is that translation and nothing more; the flush,
+    // its coverage mark and the deferred overlays are untouched.
+
+    /// <summary>The arena and slot the last accepted SOLID instance went to - read by the walk right after TryAdd, the
+    /// same way the SDF batches expose LastSlot.</summary>
+    public BatchArena LastArena { get; private set; }
+    public int LastSlot { get; private set; }
+
+    /// <summary>Which RenderOp.Batch an instanced flush is recorded under.</summary>
+    public const byte ArenaBatchId = 13;
+
+    private readonly Dictionary<GeometryKey, InstancedKeyArena> _arenas = new();
+
+    /// <summary>The arena for the key this unit's SOLID fill would join, or null when it has none (another family, no
+    /// drawable mesh). One arena per key: a slot number only means something inside its own array.</summary>
+    public BatchArena ArenaFor(GeometryRenderUnit unit)
+    {
+        if (!unit.TryGetInstancedFill(out var key, out var meshObj, out _)) return null;
+        if (meshObj is not FrozenMesh mesh) return null;
+        var seg = GetOrCreate(key, mesh);
+        if (seg == null) return null;
+
+        if (!_arenas.TryGetValue(key, out var arena)) _arenas[key] = arena = new InstancedKeyArena(this, seg);
+        return arena;
+    }
+
+    internal int KeyCount(object key) => key is KeySegment seg ? seg.Count : 0;
+
+    internal int KeyCapacityLeft(object key) => key is KeySegment seg ? seg.GpuCapacity - seg.Count : 0;
+
+    /// <summary>The run this key draws in that flush record, or (-1, -1) when the record does not draw this key at all.</summary>
+    internal (int First, int Count) KeyRange(object key, int flush)
+    {
+        if (key is not KeySegment seg || flush < 0 || flush >= _flushRecords.Count) return (-1, -1);
+
+        var rec = _flushRecords[flush];
+        foreach (var entry in rec.Keys)
+        {
+            if (ReferenceEquals(entry.Seg, seg)) return ((int)entry.First, (int)entry.Count);
+        }
+
+        return (-1, -1);
+    }
+
+    /// <summary>Which recorded flush draws the slot this key holds - the way back from a group's run to its segment.</summary>
+    internal int KeyFlushContaining(object key, int slot)
+    {
+        if (key is not KeySegment seg) return -1;
+
+        for (var i = 0; i < _flushRecords.Count; i++)
+        {
+            foreach (var entry in _flushRecords[i].Keys)
+            {
+                if (ReferenceEquals(entry.Seg, seg) && slot >= entry.First && slot < entry.First + entry.Count) return i;
+            }
+        }
+
+        return -1;
+    }
+
+    internal Rect2D FlushScissor(int flush) => flush >= 0 && flush < _flushRecords.Count ? _flushRecords[flush].Scissor : null;
+
+    /// <summary>Bake one unit's SOLID instance into the patch stage, for THIS key only - a unit whose shape hashes to a
+    /// different mesh belongs to another arena and must not be written into this one's array.</summary>
+    internal bool TryStageSolid(object key, IRenderUnit unit, Matrix4x4F world, int transformSlot, List<GeometryInstance> stage)
+    {
+        if (key is not KeySegment seg) return false;
+        if (unit is not GeometryRenderUnit gru) return false;
+        if (!gru.TryGetInstancedFill(out var unitKey, out var meshObj, out var color)) return false;
+        if (meshObj is not FrozenMesh mesh || !ReferenceEquals(GetOrCreate(unitKey, mesh), seg)) return false;
+
+        stage.Add(GeometryInstance.FromLocal(gru.Place(world), color, transformSlot));
+        return true;
+    }
+
+    /// <summary>Replace [at, at+replaced) of this key's run in that flush with a staged range: the tail of the key's own
+    /// array shifts, and every LATER run of the same key moves with it. Nothing else in the collector is touched, and the
+    /// op that draws the flush stays exactly where it stands - so paint order holds by construction.</summary>
+    internal bool ReplaceInKey(object key, int flush, int at, int replaced, List<GeometryInstance> stage, int stageFirst, int stageCount,
+        List<IRenderUnit> stagedUnits)
+    {
+        // A record draws its key runs AND the deferred fringe/stroke of the units collected with them, in ONE list shared
+        // by every group in that flush. Re-issuing a run cannot say which entries of that list were this group's, so a
+        // group that draws an overlay is refused here rather than repaired into a record whose ink no longer matches it.
+        foreach (var u in stagedUnits)
+        {
+            if (u is GeometryRenderUnit { HasPerUnitOverlay: true }) return false;
+        }
+
+        if (key is not KeySegment seg || flush < 0 || flush >= _flushRecords.Count) return false;
+        if (seg.Gpu == null) return false;
+
+        var rec = _flushRecords[flush];
+        var index = rec.Keys.FindIndex(k => ReferenceEquals(k.Seg, seg));
+        if (index < 0) return false;
+
+        var entry = rec.Keys[index];
+        var first = (int)entry.First;
+        var count = (int)entry.Count;
+        if (at < 0 || replaced < 0 || at + replaced > count) return false;
+
+        var delta = stageCount - replaced;
+        if (seg.Count + delta > seg.GpuCapacity) return false;   // no room in this key's buffer -> the walk compacts it
+
+        var editAt = first + at;
+        var tailAt = editAt + replaced;
+        var tailLen = seg.Count - tailAt;
+        if (delta != 0 && tailLen > 0) Array.Copy(seg.Items, tailAt, seg.Items, tailAt + delta, tailLen);
+        for (var i = 0; i < stageCount; i++) seg.Items[editAt + i] = stage[stageFirst + i];
+
+        seg.Count += delta;
+        seg.Flushed = seg.Count;
+        rec.Keys[index] = (seg, entry.First, (uint)(count + delta));
+
+        // Every later run of THIS key shifted by the same amount - in this record and in the ones after it.
+        for (var f = flush; f < _flushRecords.Count; f++)
+        {
+            var other = _flushRecords[f];
+            for (var k = 0; k < other.Keys.Count; k++)
+            {
+                var later = other.Keys[k];
+                if (!ReferenceEquals(later.Seg, seg) || later.First <= entry.First) continue;
+                other.Keys[k] = (later.Seg, (uint)(later.First + delta), later.Count);
+            }
+        }
+
+        var touched = Math.Min(stageCount + (delta != 0 ? tailLen + Math.Max(0, -delta) : 0), seg.Count - editAt);
+        if (touched > 0) seg.Gpu.SetData(seg.Items.AsSpan(editAt, touched), (uint)(editAt * InstanceStride));
+        return true;
+    }
+
+    /// <summary>Give a staged run a flush of its OWN - a control that drew no vector fill until now. A new record rather
+    /// than a new entry in an existing one: a record carries ONE coverage mark and one clip, and joining a stranger's
+    /// group would put this shape's fringe under a mark that is not its own.</summary>
+    internal int AllocateFlushForKey(object key, Rect2D scissor, List<GeometryInstance> stage, int stageFirst, int stageCount,
+        List<IRenderUnit> stagedUnits)
+    {
+        if (key is not KeySegment seg || stageCount <= 0) return -1;
+
+        // A key that has never drawn has no instance buffer yet - the walk builds it lazily on the first add, and a patch
+        // that places the FIRST shape of a mesh is exactly that case. Same lazy build, same reason (a whole ring, not one
+        // buffer, or this key spends its life writing a copy the frames in flight are still reading).
+        EnsureInstanceRing(seg);
+        if (seg.Gpu == null) return -1;
+        while (seg.Count + stageCount > seg.Items.Length) Array.Resize(ref seg.Items, seg.Items.Length * 2);
+        if (seg.Count + stageCount > seg.GpuCapacity) return -1;
+
+        var first = seg.Count;
+        for (var i = 0; i < stageCount; i++) seg.Items[first + i] = stage[stageFirst + i];
+        seg.Count += stageCount;
+        seg.Flushed = seg.Count;
+        seg.Gpu.SetData(seg.Items.AsSpan(first, stageCount), (uint)(first * InstanceStride));
+
+        var rec = AddFlushRecord();
+        rec.Reset();
+        rec.Scissor = scissor;
+        rec.StencilRef = Math.Min(++_groupRef, CoverageMarkBits);
+        rec.Keys.Add((seg, (uint)first, (uint)stageCount));
+        // ...and the ink. A cross is a STROKED path: its shape rides the instance buffer, everything visible about it is
+        // the deferred overlay, and a record without these units draws the shape and none of it.
+        foreach (var u in stagedUnits) rec.Units.Add(u);
+        return _flushRecords.Count - 1;
+    }
+
+    // The lazy instance ring, shared by the walk (TryAdd) and by a patch placing a brand-new shape.
+    private void EnsureInstanceRing(KeySegment seg)
+    {
+        if (seg.Gpu != null || !seg.MeshUploaded) return;
+
+        var copies = (int)Math.Max(1u, _device.MaxFramesInFlight);
+        if (seg.GpuRing != null) DeferRing(seg.GpuRing);
+        seg.GpuRing = new Buffer[copies];
+        for (var i = 0; i < copies; i++)
+        {
+            seg.GpuRing[i] = Buffer.New<GeometryInstance>(_device, (uint)seg.Items.Length,
+                BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+        }
+
+        seg.Gpu = seg.GpuRing[_writeCursor % copies];
+        seg.GpuCapacity = seg.Items.Length;
+        seg.Recreated = true;
+    }
+
+    internal void UpdateKeySlot(object key, int slot, GeometryInstance item)
+    {
+        if (key is not KeySegment seg || seg.Gpu == null || slot < 0 || slot >= seg.Count) return;
+
+        seg.Items[slot] = item;
+        seg.Gpu.SetData(seg.Items.AsSpan(slot, 1), (uint)(slot * InstanceStride));
     }
 }
 

@@ -529,6 +529,7 @@ public class LayerPlacementRenderTests
     [Test]
     public void AVectorFillThatStartsDrawing_IsSplicedInLikeARectangle()
     {
+        FrameTrace.Enabled = true;   // so a refusal names itself in the message below
         using var scene = NewScene();
 
         scene.Far[1].RenderAction = s => s.DrawGeometry(Brushes.Green, new RectangleGeometry(new Rect(4, 0, 20, CardHeight)));
@@ -539,6 +540,32 @@ public class LayerPlacementRenderTests
         Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.True,
             $"a vector fill must splice like a rectangle (refused by {FrameTrace.Refuser})");
         AssertMatchesAFullWalk(scene, patched, "and what it splices in must be what a walk draws");
+    }
+
+    // Hide and SHOW again, with a vector fill - a close button's glyph is a Path, and showing one is the case a hover
+    // makes dozens of times a minute. The patch must put back exactly what it took away; a splice that succeeds and draws
+    // nothing is worse than one that refuses, because the refusal at least walks and gets it right.
+    [Test]
+    public void AVectorFillHiddenAndShownAgain_IsPutBackExactly()
+    {
+        FrameTrace.Enabled = true;
+        using var scene = NewScene();
+
+        scene.Over[1].RenderAction = s => s.DrawGeometry(Brushes.Lime, new RectangleGeometry(new Rect(0, 0, 8, 8)));
+        scene.Over[1].Invalidate();
+        RenderDirty.MarkStructural();
+        scene.Draw();
+        var shown = Pixels(scene.Renderer);
+        Assert.That(CountLime(shown), Is.Not.Zero, "it has to be drawing in the first place");
+
+        scene.Over[1].Visibility = Visibility.Hidden;
+        scene.Draw();
+        Assert.That(CountLime(Pixels(scene.Renderer)), Is.Zero, $"hiding must take it off the frame (by {FrameTrace.Refuser})");
+
+        scene.Over[1].Visibility = Visibility.Visible;
+        scene.Draw();
+        Assert.That(DifferingPixels(shown, Pixels(scene.Renderer)), Is.Zero,
+            $"showing it again must put back exactly what it drew (by {FrameTrace.Refuser})");
     }
 
     private static int CountLime(byte[] pixels)

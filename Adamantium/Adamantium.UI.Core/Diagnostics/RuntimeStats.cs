@@ -37,6 +37,10 @@ public static class RuntimeStats
     public static double LastRenderProcMs;
     /// <summary>RenderCache.Render - the content draw pass (batch + command recording).</summary>
     public static double LastRenderDrawMs;
+
+    /// <summary>TEMP: the out-of-pass PreRender sweep - it visits every unit of every group on EVERY frame, so whether
+    /// that matters is a question a number answers, not a guess.</summary>
+    public static double LastPreRenderMs;
     /// <summary>Overlay stages (adorner + popup) draw.</summary>
     public static double LastProcessorsMs;
 

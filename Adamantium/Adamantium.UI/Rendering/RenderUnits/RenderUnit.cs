@@ -284,6 +284,11 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
     /// a geometry drawn by a <see cref="Adamantium.UI.Core.Media.Drawings.Drawing"/> carries its own placement.</summary>
     public virtual Matrix4x4F Place(Matrix4x4F world) => world;
 
+    /// <summary>Has this unit anything to do out of the render pass at all? The sweep below runs on EVERY frame over
+    /// every unit of every group, and for a batched rect - which is most of a scene - all three of these are null, so it
+    /// was three virtual calls to do nothing. Asked as a field read instead.</summary>
+    public bool NeedsPreRender => GeometryRenderer != null || FillFringeRenderer != null || StrokeRenderer != null;
+
     public virtual void PreRender()
     {
         GeometryRenderer?.PreRender();
@@ -982,14 +987,17 @@ public class TextRenderUnit : RenderUnit<TextPayload>
     /// <summary>Letters this block was waiting on have landed in the atlas: lay its quads out again and re-freeze the
     /// glyph run the batch bakes from. Costs nothing for a block whose glyphs were all there (the version check), which
     /// is every block after the first frames of a new tab.</summary>
-    public void RefreshGlyphsIfArrived()
+    /// <returns>Whether letters actually landed - the caller has to know, because a frame that replays the recorded
+    /// stream would draw the run as it was: empty.</returns>
+    public bool RefreshGlyphsIfArrived()
     {
-        if (Payload?.TextLayout is not { NeedsGlyphRefresh: true } layout) return;
+        if (Payload?.TextLayout is not { NeedsGlyphRefresh: true } layout) return false;
 
         layout.RefreshGlyphs(GraphicsDevice);
         if (TextComponent != null) TextComponent.GlyphRun = layout.SnapshotGlyphs();
         // The frozen run is what the batch reads, so the element has to be re-recorded for the new one to be drawn.
         DrawCommand?.Component?.InvalidateRender(false);
+        return true;
     }
 
     public TextRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
