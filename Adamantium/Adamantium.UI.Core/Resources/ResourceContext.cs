@@ -45,9 +45,28 @@ public static class ResourceContext
         }
     }
 
-    // Inline resources authored right on the element: <X><ResourceContext.Resources>...</ResourceContext.Resources></X>.
-    // Always LOCAL scope - the whole point is a private, tree-scoped dictionary that is invisible outside this subtree
-    // (no {ResourceReference} from elsewhere can reach it). For a Theme/Global dictionary, link a type via Source instead.
+    // The scope the inline Resources below are published into. LOCAL by default - a private, tree-scoped dictionary that
+    // is invisible outside this subtree. Set it to Theme on a theme (icons belong to the theme: another theme may declare
+    // the same keys) or to Global for an app-wide set, without having to move the entries into a separate linked type.
+    public static readonly AdamantiumProperty ScopeProperty =
+        AdamantiumProperty.RegisterAttached("Scope", typeof(ResourceScope), typeof(AdamantiumComponent),
+            new PropertyMetadata(ResourceScope.Local));
+
+    public static ResourceScope GetScope(AdamantiumComponent element)
+    {
+        return element.GetValue<ResourceScope>(ScopeProperty);
+    }
+
+    public static void SetScope(AdamantiumComponent element, ResourceScope value)
+    {
+        element.SetValue(ScopeProperty, value);
+    }
+
+    // The element's resources: <X><ResourceContext.Resources>...</ResourceContext.Resources></X>. Two kinds of child,
+    // freely mixed - a <ResourceLink> naming a dictionary TYPE (its own .auml file: a palette, an icon set) and a keyed
+    // object declared right here. Scoped by ResourceContext.Scope (Local unless said otherwise); a link may state its own
+    // Scope to override that. Attributes are applied before property elements, so the scope is already known here
+    // however the two are ordered in the markup.
     public static readonly AdamantiumProperty ResourcesProperty =
         AdamantiumProperty.RegisterAttached<ResourceDictionary>("Resources", typeof(AdamantiumComponent));
 
@@ -61,7 +80,15 @@ public static class ResourceContext
         element.SetValue(ResourcesProperty, value);
         if (value == null) return;
 
-        UIAppContext.Current.ResourceManager.AddSource(element, value, ResourceScope.Local);
+        // A THEME publishes nothing until it is the current one - the same rule its palette link follows, so declaring
+        // 20 themes doesn't put 20 icon sets into the Theme scope at once. The ThemeManager activates it.
+        if (element is ITheme) return;
+
+        var scope = RegisterResources(element, value);
+
+        // A GLOBAL dictionary is app-wide and must outlive the element that declared it (a theme swap unloads and
+        // reloads the subtree) - exactly as a Global Source does.
+        if (scope == ResourceScope.Global) return;
 
         if (element is IInputComponent inputComponent)
         {
@@ -75,5 +102,23 @@ public static class ResourceContext
 
             UIAppContext.Current.ResourceManager.RemoveSources(adamantiumComponent);
         }
+    }
+
+    // Publish a Resources block: first the linked dictionary FILES, then the block's own keyed entries. Every one of
+    // them is registered under the SAME owner, so RemoveSources(element) takes the whole block back down at once.
+    // Returns the scope the block landed in. A link may name its own Scope; left at the default it follows the block.
+    internal static ResourceScope RegisterResources(AdamantiumComponent element, ResourceDictionary resources)
+    {
+        var scope = GetScope(element);
+        var manager = UIAppContext.Current.ResourceManager;
+
+        foreach (var include in resources.Includes)
+        {
+            if (include?.Source == null) continue;
+            manager.AddSource(element, include.Source, include.Scope == ResourceScope.Local ? scope : include.Scope);
+        }
+
+        manager.AddSource(element, resources, scope);
+        return scope;
     }
 }

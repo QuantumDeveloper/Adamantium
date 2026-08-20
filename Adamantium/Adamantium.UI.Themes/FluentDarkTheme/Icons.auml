@@ -1,0 +1,13 @@
+<ResourceDictionary xmlns:x="http://adamantium/ui/xaml/extensions"
+        xmlns="http://adamantium/ui">
+
+    <!-- Shared vector icons. SDF shapes, not font glyphs: they render regardless of the UI font's coverage and stay
+         crisp at any scale. Each is x:Shared="False", so every template that asks gets its own visual - a visual has one
+         parent. Size and colour are stated here, so changing them is one edit rather than one per template. -->
+
+    <RegularPolygon x:Key="IconChevronDown" x:Shared="False" Corners="3" StartAngle="90"
+                    Width="10" Height="10" Fill="{ResourceReference TextFillColorSecondary}"/>
+    <RegularPolygon x:Key="IconChevronRight" x:Shared="False" Corners="3" StartAngle="0"
+                    Width="10" Height="10" Fill="{ResourceReference TextFillColorSecondary}"/>
+
+</ResourceDictionary>

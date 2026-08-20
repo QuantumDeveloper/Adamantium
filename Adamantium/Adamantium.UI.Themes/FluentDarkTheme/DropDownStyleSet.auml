@@ -48,10 +48,8 @@
                                         Content="{TemplateBinding DisplayContent}"
                                         ContentTemplate="{TemplateBinding ItemTemplate}"
                                         ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"/>
-                                <Path x:Name="Chevron" Grid.Column="1"
-                                        Data="M0,0 L8,0 L4,5 Z"
-                                        Fill="{ResourceReference TextFillColorSecondary}"
-                                        Width="8" Height="5"
+                                <ContentPresenter x:Name="Chevron" Grid.Column="1"
+                                        Content="{ResourceReference IconChevronDown}"
                                         Margin="8 0 0 0"
                                         VerticalAlignment="Center"/>
                             </Grid>

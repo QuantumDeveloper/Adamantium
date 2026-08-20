@@ -3,7 +3,14 @@
        xmlns:x="http://adamantium/ui/xaml/extensions"
 	   xmlns:fluentDark="clr-namespace:Adamantium.UI.Themes.FluentDarkTheme"
 	   Name="FluentLight"
-       ResourceContext.Source="{ResourceLink Source={x:Type fluentDark:BrushesLight}, Scope=Theme}">
+       ResourceContext.Scope="Theme">
+
+	<!-- This theme's palette and icons, each in its own file - see FluentDark. The icon shapes are shared with the dark
+	     theme; their colour is not, it resolves against whichever palette is current. -->
+	<ResourceContext.Resources>
+		<ResourceLink Source="{x:Type fluentDark:BrushesLight}"/>
+		<ResourceLink Source="{x:Type fluentDark:Icons}"/>
+	</ResourceContext.Resources>
 
 	<Theme.StyleIncludes>
 		<StyleInclude Source="{x:Type fluentDark:TextBlockStyleSet}"/>

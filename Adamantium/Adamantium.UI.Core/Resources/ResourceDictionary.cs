@@ -1,10 +1,16 @@
 ﻿using Adamantium.Core.Collections;
+using Adamantium.UI.Core.MarkupExtensions;
 
 namespace Adamantium.UI.Core.Resources;
 
 public class ResourceDictionary : IResourceDictionary
 {
     private readonly AdamantiumDictionary<string, object> resourceCache;
+
+    /// <summary>Other dictionaries this one pulls in - each a <see cref="ResourceLink"/> naming a dictionary TYPE (its
+    /// own .auml file). Authored as the unkeyed children of ResourceContext.Resources; registered alongside this
+    /// dictionary's own entries, so one block links a palette, an icon set and whatever else belongs together.</summary>
+    public List<ResourceLink> Includes { get; } = [];
 
     private bool _isInitialized;
     private bool _isInitializing;

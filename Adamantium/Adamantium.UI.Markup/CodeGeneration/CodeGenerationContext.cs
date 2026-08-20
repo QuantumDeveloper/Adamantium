@@ -256,11 +256,12 @@ public class CodeGenerationContext
                 var valueTypeName = value.TypeReference.GetFullTypeName();
                 var valueResolvedType = Metadata.TypeResolver.Resolve(valueTypeName);
 
-                // A ResourceDictionary-typed property authored as INLINE keyed children (ResourceContext.Resources):
+                // A ResourceDictionary-typed property authored as CHILDREN (ResourceContext.Resources): keyed objects
+                // declared right there, and <ResourceLink>s naming dictionary FILES to pull in.
                 //   <X><ResourceContext.Resources><SolidColorBrush x:Key="Accent"/></ResourceContext.Resources></X>
-                // Build a dictionary instance, add each x:Key'd child to it, and hand it to the setter. The child build
-                // runs with isResource:false so it does NOT emit the resource-file's trailing keyed Add - we add here,
-                // into THIS dictionary. Local + tree-scoped + live via {ObservableResource}.
+                // Build a dictionary instance, fill it, and hand it to the setter. The child build runs with
+                // isResource:false so it does NOT emit the resource-file's trailing keyed Add - we add here, into THIS
+                // dictionary. Scoped by ResourceContext.Scope; live via {ObservableResource}.
                 if (Metadata.DefaultTypeContainer.ResourceDictionary != null && resolvedType != null
                     && (resolvedType.FullName == Metadata.DefaultTypeContainer.ResourceDictionary.FullName
                         || resolvedType.InheritsFrom(Metadata.DefaultTypeContainer.ResourceDictionary.FullName))
@@ -270,8 +271,24 @@ public class CodeGenerationContext
                     TextGenerator.WriteLine($"var {rdVar} = new {Metadata.DefaultTypeContainer.ResourceDictionary.FullName}();");
                     foreach (var entry in prop.Values.OfType<AumlAstObjectNode>())
                     {
+                        // A <ResourceLink> child is not an entry but a LINK to a dictionary FILE, so it goes to Includes
+                        // instead of being keyed in: one block pulls in a palette, an icon set and its own entries alike.
+                        var entryType = Metadata.TypeResolver.Resolve(entry.TypeReference.GetFullTypeName());
+                        if (Metadata.DefaultTypeContainer.ResourceLink != null && entryType != null
+                            && entryType.FullName == Metadata.DefaultTypeContainer.ResourceLink.FullName)
+                        {
+                            var linkName = ProcessControlElements(entry, diagnostics, isResource: false);
+                            TextGenerator.WriteLine($"{rdVar}.Includes.Add({linkName});");
+                            continue;
+                        }
+
                         var entryKey = GetKeyDirective(entry);
-                        var entryName = ProcessControlElements(entry, diagnostics, isResource: false);
+                        // x:Shared="False" works here exactly as it does in a resource FILE: store a factory so every ask
+                        // builds its own object. An inline dictionary is where an icon (one visual, many templates) lives,
+                        // and a visual has ONE parent - without this the second user of the key would steal it.
+                        var entryName = IsPerTarget(entry)
+                            ? EmitPerTargetValue(entry, false, diagnostics)
+                            : ProcessControlElements(entry, diagnostics, isResource: false);
                         if (!string.IsNullOrEmpty(entryKey))
                             TextGenerator.WriteLine($@"{rdVar}.Add(""{entryKey}"", {entryName});");
                         else
@@ -626,6 +643,10 @@ public class CodeGenerationContext
                     // rest) exactly like a regular property. Emitting the raw text only ever compiled for the int-typed
                     // ones (Grid.Column="0"); a string like ToolTip="hint" broke as bare C# identifiers.
                     var expr = BuildValueExpression(prop.GetTextValue(), resolvedType);
+                    // The ROOT element has no parent variable - it IS the generated class, as the object-valued path
+                    // below already knows. Writing CurrentParent unguarded emitted `SetX(, value)` for an attached
+                    // property authored on the root (ResourceContext.Scope on a Theme).
+                    var attachedTarget = isRoot ? "this" : CurrentParent;
 
                     // Inside a ControlTemplate the value belongs to the TEMPLATE, not to the element, so write it at
                     // Template priority - exactly as a regular property is written above. The static CLR setter writes at
@@ -635,13 +656,13 @@ public class CodeGenerationContext
                     if (CurrentTemplate != null)
                     {
                         TextGenerator.WriteLine(
-                            $"{CurrentParent}.SetValue({propRef.OwnerType.GetFullTypeName()}.{propRef.Name}Property, " +
+                            $"{attachedTarget}.SetValue({propRef.OwnerType.GetFullTypeName()}.{propRef.Name}Property, " +
                             $"{expr}, Adamantium.UI.Core.ValuePriority.Template);");
                     }
                     else
                     {
                         TextGenerator.WriteLine(
-                            $"{propRef.OwnerType.GetFullTypeName()}.Set{propRef.Name}({CurrentParent}, {expr});");
+                            $"{propRef.OwnerType.GetFullTypeName()}.Set{propRef.Name}({attachedTarget}, {expr});");
                     }
                 }
                 // A collection populated by CHILD ELEMENTS (<Grid.RowDefinitions><RowDefinition/>...) -> new + Add per
