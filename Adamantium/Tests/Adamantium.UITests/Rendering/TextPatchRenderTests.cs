@@ -150,20 +150,48 @@ public class TextPatchRenderTests
             "the untouched neighbour must be drawn exactly as a full walk draws it");
     }
 
+    // The count change with a NEIGHBOUR in the same batch - which is what a diagnostics plate always has, and what an
+    // app always has. Re-issuing a run means everything after it in that segment shifts, so this is where an offset that
+    // is right for one block on its own goes wrong: the frame keeps showing the text it had, and only something that
+    // forces a walk (moving the mouse) puts the new one up.
     [Test]
-    public void GlyphCountChange_RefusesThePatch_AndStillDrawsTheNewText()
+    public void GlyphCountChange_WithANeighbour_StillShowsTheNewText()
     {
-        // NEGATIVE: the run is a FIXED span of the retained buffer. More (or fewer) glyphs no longer fit it, so the patch
-        // must be refused rather than written - a shorter run would leave the tail of the old text on screen.
+        using var scene = NewScene("600 fps", "layout 0.02");
+
+        scene.Blocks[0].Text = "1200 fps";
+        scene.Draw();
+        Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.True, "it must be spliced, not walked");
+        AssertMatchesAFullWalk(scene, Pixels(scene.Renderer), "the longer text AND its neighbour must be what a walk draws");
+
+        scene.Blocks[0].Text = "6 fps";
+        scene.Draw();
+        Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.True, "...and so must the shrink");
+        AssertMatchesAFullWalk(scene, Pixels(scene.Renderer), "the shorter text must not leave a tail, nor move its neighbour");
+    }
+
+    [Test]
+    public void GlyphCountChange_ReIssuesTheRun_InsteadOfWalkingTheScene()
+    {
+        // The run is a FIXED span, so more (or fewer) glyphs cannot be written INTO it - but that is an argument about
+        // WHERE they go, not about redrawing the window. The block's run is re-issued inside the segment it lives in, the
+        // same repair every batched family gets. Measured live before this: one fps plate ticking cost a 25 ms walk of the
+        // whole scene, four times a second, on top of whatever the app was actually doing.
+        // Both directions, because they fail differently: a longer run has to fit somewhere, and a SHORTER one has to take
+        // the tail of the old text off the screen with it.
         using var scene = NewScene("600 fps");
 
         scene.Blocks[0].Text = "1200 fps";
         scene.Draw();
 
-        Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.False,
-            "a block that grew no longer fits the run it owns - the frame must fall back to the walk");
-        AssertMatchesAFullWalk(scene, Pixels(scene.Renderer),
-            "and the fallback must still put the NEW text on screen");
+        Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.True, "a block that GREW must be re-issued, not walked");
+        AssertMatchesAFullWalk(scene, Pixels(scene.Renderer), "and the patched frame must show the new, longer text");
+
+        scene.Blocks[0].Text = "6 fps";
+        scene.Draw();
+
+        Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.True, "...and so must one that SHRANK");
+        AssertMatchesAFullWalk(scene, Pixels(scene.Renderer), "with no tail of the longer text left behind");
     }
 
     [Test]
@@ -182,6 +210,29 @@ public class TextPatchRenderTests
         Assert.That(DifferingPixels(white, red), Is.Not.Zero,
             "the colour really did change - otherwise this would pass on a frame that drew nothing");
         AssertMatchesAFullWalk(scene, red, "the recoloured glyphs must match what a full walk bakes");
+    }
+    [Test]
+    public void ZZ_ProbeGlyphSplice()
+    {
+        var dir = @"C:\Users\admin\AppData\Local\Temp\claude\c--AdamantiumEngine\59dccca2-1dca-4200-8d54-0ce21d208615\scratchpad\";
+        using var scene = NewScene("600 fps");
+        Shot(scene, dir + "1-before.png");
+
+        scene.Blocks[0].Text = "1200 fps";
+        scene.Draw();
+        Shot(scene, dir + "2-patched.png");
+        TestContext.Out.WriteLine("replayed=" + scene.Renderer.Cache.LastFrameReplayed + " " + scene.Renderer.Cache.DumpGroups());
+
+        RenderDirty.MarkStructural();
+        scene.Draw();
+        Shot(scene, dir + "3-walk.png");
+        TestContext.Out.WriteLine("walk " + scene.Renderer.Cache.DumpGroups());
+    }
+
+    private static void Shot(Scene scene, string path)
+    {
+        using var img = scene.Renderer.RenderTarget.ResolveTexture.ReadbackToImage();
+        img.Save(path, Adamantium.Imaging.ImageFileType.Png);
     }
 }
 

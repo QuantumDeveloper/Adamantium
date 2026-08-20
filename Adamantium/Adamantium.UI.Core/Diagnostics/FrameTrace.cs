@@ -37,6 +37,15 @@ public static class FrameTrace
     /// <summary>TEMP: the unit type that last cost a frame its patch.</summary>
     public static string Refuser;
 
+    /// <summary>TEMP: why the RECORD fell back to a full walk of the tree. A full walk is the most expensive frame there
+    /// is, and "structural" is not a reason - the splice refuses for half a dozen unrelated causes and each has its own
+    /// fix. Set at every point that gives up; read on the next frame that is recorded Full.</summary>
+    public static string FullWalkReason;
+
+    /// <summary>TEMP: WHAT made the retained stream stale against the layout (why=4). "The layout changed" is not a
+    /// cause - a forgiven node move, a resize and a re-parent all land here and none of them is fixed the same way.</summary>
+    public static string LayoutChangedBy;
+
     /// <summary>TEMP: which content took the slot-write fast path away from a motion node, counted by "node &lt;- content".</summary>
     public static readonly Dictionary<string, int> NotAware = new();
 
@@ -62,7 +71,7 @@ public static class FrameTrace
                 _incidents.Add(new Entry
                 {
                     DrawMs = drawMs, Kind = kind, Replayed = replayed, Clones = clones, Why = why,
-                    By = why is 5 or 6 ? Refuser : null, Cache = cache, Composited = composited, Ops = ops, UnitOps = unitOps,
+                    By = kind == 3 ? FullWalkReason : why == 4 ? LayoutChangedBy : why is 5 or 6 ? Refuser : null, Cache = cache, Composited = composited, Ops = ops, UnitOps = unitOps,
                     LayoutMs = RuntimeStats.LastLayoutPassMs, BuildMs = RuntimeStats.LastRenderBuildMs
                 });
             }
@@ -74,7 +83,7 @@ public static class FrameTrace
         _ring[i].Replayed = replayed;
         _ring[i].Clones = clones;
         _ring[i].Why = why;
-        _ring[i].By = why is 5 or 6 ? Refuser : null;
+        _ring[i].By = kind == 3 ? FullWalkReason : why == 4 ? LayoutChangedBy : why is 5 or 6 ? Refuser : null;
         _ring[i].Cache = cache;
         _ring[i].Composited = composited;
         _ring[i].Ops = ops;
@@ -84,6 +93,18 @@ public static class FrameTrace
     private const int IncidentLimit = 4096;
 
     private static readonly System.Collections.Generic.List<Entry> _incidents = new();
+
+    /// <summary>How many long frames have been recorded - a mark a caller can take now and read back from later, so a
+    /// report can say "the ones from THIS second" instead of "all of them".</summary>
+    public static int IncidentCount => _incidents.Count;
+
+    /// <summary>The long frames recorded since <paramref name="mark"/>.</summary>
+    public static string DumpIncidentsSince(int mark)
+    {
+        var text = new StringBuilder();
+        for (var n = Math.Max(0, mark); n < _incidents.Count; n++) Format(text, _incidents[n]);
+        return text.ToString();
+    }
 
     /// <summary>Every frame that walked or ran long, oldest-first - kept out of the ring so it cannot be evicted.</summary>
     public static string DumpIncidents()

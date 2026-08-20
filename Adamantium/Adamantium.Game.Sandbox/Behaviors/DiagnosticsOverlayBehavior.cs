@@ -45,6 +45,12 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
     private readonly System.Collections.Generic.Dictionary<string, int> _churn = new();
     private int _peakChurn;
 
+    // The fewest frames any one second has presented so far, and where that second started in the incident list.
+    private long _worstSecondFrames = long.MaxValue;
+    private int _secondLoopFrames;   // loop frames accumulated across this second window
+    private long _worstSecondFrom;
+    private int _worstSecondMark;
+
     private void NoteChurn(string what, Adamantium.UI.Core.IUIComponent c)
     {
         if (!_running) return;
@@ -190,7 +196,33 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
             // EVERY second, appended. A "peak" file picks one second by one criterion and throws the rest away - and the
             // criterion picked the initial fill, which measures more than any drag ever will, so the file froze on the
             // startup second and the thing being hunted was never written at all. A history cannot lose the event.
+            // THE WORST SECOND, kept whole. Every peak file above picks its second by ITS OWN criterion, and the second a
+            // tester reports is picked by a different one entirely - the picture stuttered. So keep the one where the
+            // FEWEST frames went out, with everything that happened in it side by side: that is the second to read.
+            // The first ten are skipped - a cold start beats any stutter and would own this file forever.
+            // BOTH rates, and the worse of them decides. The render thread keeps presenting while a heavy Update crawls,
+            // so a stalled loop leaves the presented count almost untouched - and a stalled loop is exactly what a
+            // stuttering picture is. Judged by the presented count alone, this file never noticed the event at all.
+            var framesThisSecond = presented - _worstSecondFrom;
+            var loopThisSecond = _secondLoopFrames;
+            _worstSecondFrom = presented;
+            _secondLoopFrames = 0;
+            if (_second > 10 && Math.Min(framesThisSecond, loopThisSecond) < _worstSecondFrames)
+            {
+                _worstSecondFrames = Math.Min(framesThisSecond, loopThisSecond);
+                System.IO.File.WriteAllText(@"C:\AdamantiumEngine\worst-second.log",
+                    $"WORST SECOND SO FAR: loop {loopThisSecond} fps, presented {framesThisSecond} fps (second {_second})\n\n"
+                    + build + "\n" + layout + "\n" + churn + "\n"
+                    + "long frames in it:\n" + FrameTrace.DumpIncidentsSince(_worstSecondMark));
+            }
+            _worstSecondMark = FrameTrace.IncidentCount;
+
             _second++;
+            // EVERY second gets a line about what entered or left the drawn set, busy or not. The question a churn number
+            // answers is "is this still going on?", and a file that keeps only the busy seconds cannot tell a fill that
+            // ends from one that never does.
+            System.IO.File.AppendAllText(@"C:\AdamantiumEngine\churn-history.log",
+                $"second {_second}: churn {churnTotal}, created {created}, updated {updated}, arrange {arrange - _lastArrange}\n");
             if (measure - _lastMeasure > 50 || created + updated > 500)
             {
                 System.IO.File.AppendAllText(@"C:\AdamantiumEngine\layout-history.log",
@@ -199,6 +231,7 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
         }
 
         _lastMeasure = measure; _lastArrange = arrange; _lastBindings = bindings;
+        _secondLoopFrames += _windowFrames;
         _windowElapsed = 0; _windowFrames = 0; _windowMaxLayoutMs = 0; _windowDeferred = false;
         _windowMaxRecord = 0; _windowMaxApply = 0;
         _sumLayout = _sumBuild = _sumProc = _sumDraw = _sumProcs = 0;

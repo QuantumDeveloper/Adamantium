@@ -14,6 +14,11 @@ public static class LayerProbe
     // covered. The phase is verified on these being small and rare - a sweep per hidden control, not per frame.
     public static long OrphanSweeps, OrphanSweptSlots;
 
+    // FAZA 3 measurement: a layer re-issued INSIDE the room it owns costs a range upload and nothing else; one that has
+    // outgrown that room is carried to the end of the arena, and every group drawing in it has to be re-indexed. The
+    // second number is what a per-layer arena is supposed to remove, so it has to be known before anything is rewritten.
+    public static long SegmentEditsInPlace, SegmentRelocations, RelocatedSlots;
+
     private static long _cyclesThisFrame, _segmentsThisFrame;
 
     public static void FrameStart()
@@ -48,6 +53,6 @@ public static class LayerProbe
         var f = Math.Max(1, Frames);
         return $"layers/frame {Cycles / (double)f:0.0} (max {MaxCycles}) | segments/frame {Segments / (double)f:0.0} (max {MaxSegments})"
                + $" | recorded frames {Frames} | splits {Splits} (avoided {SplitsAvoided}) | renumbers {Renumbers} | patch refusals {Refusals}"
-               + $" | orphan sweeps {OrphanSweeps} over {OrphanSweptSlots} slots";
+               + $" | orphan sweeps {OrphanSweeps} over {OrphanSweptSlots} slots | layer edits in place {SegmentEditsInPlace}, relocations {SegmentRelocations} over {RelocatedSlots} slots";
     }
 }

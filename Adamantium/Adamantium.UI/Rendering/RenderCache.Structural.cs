@@ -29,17 +29,16 @@ public partial class RenderCache
         // The ranks describe the tree of the last full walk. A different root (or none yet) - nothing to splice into.
         if (!ReferenceEquals(_lastVisualRoot, visualRoot) || !HasRank(visualRoot))
         {
-
-            return false;
+            return GaveUp("otherRoot");
         }
         if (!PlanStructuralChange())
         {
             // Ran out of rank SPACE, not information (each insert into a gap halves it). Renumbering is cheap - an
             // order-only walk + a re-sort - unlike re-recording the whole tree, so don't fall back for it.
-            if (!_needRenumber) return false;
+            if (!_needRenumber) return GaveUp("cannotPlace");
 
             RenumberOrder(visualRoot, packet);
-            if (!PlanStructuralChange()) return false;
+            if (!PlanStructuralChange()) return GaveUp("cannotPlaceAfterRenumber");
         }
 
         // The geometry-dirty components ride along (as in a Partial). Pre-validate against the PLAN before anything
@@ -48,7 +47,7 @@ public partial class RenderCache
         foreach (var component in _geometryDirtyBuffer)
         {
             if (_plannedSet.Contains(component) || _removedSet.Contains(component)) continue;
-            if (ClassifyReRender(component) == PartialRecord.Fallback) return false;
+            if (ClassifyReRender(component) == PartialRecord.Fallback) return GaveUp($"dirtyNotPlaceable<{component.GetType().Name}>");
         }
 
         // ---- COMMIT: from here nothing can refuse. ----
@@ -92,13 +91,15 @@ public partial class RenderCache
         var visited = _walkVisited;
         stack.Clear();
         visited.Clear();
-        stack.Push(visualRoot);
+        stack.Push((visualRoot, false));
         long order = 0;
 
         while (stack.Count > 0)
         {
-            var component = stack.Pop();
-            if (component.Visibility != Visibility.Visible) continue;
+            var (component, _) = stack.Pop();
+            // Same rule as the full walk: only COLLAPSED leaves the order. A hidden element keeps its rank, so coming
+            // back is a refill of a group that never moved rather than a placement.
+            if (component.Visibility == Visibility.Collapsed) continue;
             if (!visited.Add(component)) continue;
 
             _orderByControl[component.RenderId] = order;
@@ -106,10 +107,17 @@ public partial class RenderCache
             if (HoldsUnits(component)) packet.Reranks.Add(new KeyValuePair<IUIComponent, long>(component, order));
             order += OrderGap;
 
-            PushChildrenInPaintOrder(stack, component.VisualChildren);
+            PushChildrenInPaintOrder(stack, component.VisualChildren, false);
         }
 
         _needRenumber = false;
+    }
+
+    // TEMP: name the give-up so a full walk in the trace says WHY it is one.
+    private static bool GaveUp(string reason)
+    {
+        if (Core.Diagnostics.FrameTrace.Enabled) Core.Diagnostics.FrameTrace.FullWalkReason = reason;
+        return false;
     }
 
     private bool PlanStructuralChange()
@@ -157,7 +165,7 @@ public partial class RenderCache
         }
 
         foreach (var (parent, _) in _addsByParent)
-            if (!PlanNewChildren(parent)) return false;
+            if (!PlanNewChildren(parent)) return GaveUp($"newChildren<{parent.GetType().Name}>");
 
         // 3. What LEFT the drawn set. The subtree is still intact (a detach doesn't tear it apart), so walk it; anything
         //    inside that actually MOVED was planned above and is skipped.

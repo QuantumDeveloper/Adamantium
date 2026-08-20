@@ -1,4 +1,5 @@
 using System;
+using Adamantium.UI.Core.Graphics;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.EffectsFramework;
@@ -148,5 +149,16 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
 
         var h = (a - b) * (a - b) / ((a + b) * (a + b));
         return Math.PI * (a + b) * (1 + 3 * h / (10 + Math.Sqrt(4 - 3 * h)));
+    }
+
+    /// <summary>Bake one unit into the patch stage - see BatchArena. Same bake TryAdd uses; it just lands in the stage
+    /// instead of the arena, because a patch has to know the whole frame is repairable before it changes any of it.</summary>
+    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot)
+    {
+        if (unit is not RenderUnits.EllipseRenderUnit u || !CanBatch(u.EllipsePayload)) return false;
+        if (!BakeItem(u.EllipsePayload, world, u.FillOpacity, transformSlot, out var item)) return false;
+
+        Stage.Add(item);
+        return true;
     }
 }

@@ -6,6 +6,7 @@ using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Fonts;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Rendering.RenderUnits;
 using Adamantium.Vulkan.Core;
@@ -34,6 +35,69 @@ internal sealed class TextBatchCollector : BatchCollector<GlyphItem>
     public TextBatchCollector() : base(8192) { }
 
     protected override void OnBeginFrame(IGraphicsDevice device) => _segState.Clear();
+
+    // The atlas the glyphs staged for this patch need. A text segment binds ONE atlas, so a repair that would put glyphs
+    // of another one into it is refused rather than drawn with the wrong sheet.
+    private FontAtlas _stagedAtlas;
+    private FontRenderer _stagedRenderer;
+
+    /// <summary>Bake a block's glyphs into the patch stage - the text answer to BatchArena.TryStage. This is the half a
+    /// changed glyph COUNT needs: the in-place re-bake (UpdateRun) only ever covered a count that held steady, and
+    /// anything that grew or shrank - a counter, a clock, an fps plate - fell through to a walk of the whole scene.</summary>
+    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot)
+    {
+        if (unit is not TextRenderUnit tru || tru.TextComponent is not { } tc) return false;
+        if (!CanBatch(tc, out var atlas)) return false;
+        if (_stagedAtlas != null && atlas != _stagedAtlas) return false;   // one patch, one sheet
+
+        // The unit's OWN placement on top of the bake - a Drawing's text run sits at its own spot inside the element.
+        // The walk folds it in the same way; without it the glyphs land at the element's origin instead of the run's.
+        var placed = tru.Place(world);
+
+        var first = Stage.Count;
+        for (var i = 0; i < tc.GlyphRun.Count; i++) Stage.Add(default);
+        if (!PackInto(tc, placed, transformSlot, CollectionsMarshal.AsSpan(Stage).Slice(first, tc.GlyphRun.Count)))
+        {
+            Stage.RemoveRange(first, Stage.Count - first);
+            return false;
+        }
+
+        _stagedAtlas = atlas;
+        _stagedRenderer = tc.FontRenderer;
+        return true;
+    }
+
+    public override void ClearStage()
+    {
+        base.ClearStage();
+        _stagedAtlas = null;
+        _stagedRenderer = null;
+    }
+
+    // A repaired segment keeps drawing with the sheet it was recorded against, so the staged glyphs have to belong to it.
+    private bool SegmentTakesStagedAtlas(int id)
+    {
+        var index = IndexOfSegment(id);
+        if (index < 0 || index >= _segState.Count) return false;
+        return _segState[index].Atlas == _stagedAtlas;
+    }
+
+    public override bool ReplaceStagedInSegment(IGraphicsDevice device, int id, int at, int replaced, int stageFirst, int stageCount)
+        => SegmentTakesStagedAtlas(id) && base.ReplaceStagedInSegment(device, id, at, replaced, stageFirst, stageCount);
+
+    public override bool RepointSegmentAroundStage(IGraphicsDevice device, int id, int first, int at, int replaced, int count,
+        Rect2D scissor, int stageFirst, int stageCount)
+        => SegmentTakesStagedAtlas(id)
+           && base.RepointSegmentAroundStage(device, id, first, at, replaced, count, scissor, stageFirst, stageCount);
+
+    public override int AllocateSegmentFromStage(IGraphicsDevice device, Rect2D scissor, int stageFirst, int stageCount)
+    {
+        // A brand-new segment has no sheet yet - it takes the staged one, which is what OnSegmentRecorded would have
+        // written had a walk produced it.
+        _atlas = _stagedAtlas;
+        _fontRenderer = _stagedRenderer;
+        return base.AllocateSegmentFromStage(device, scissor, stageFirst, stageCount);
+    }
 
     protected override void OnSegmentRecorded(int index)
     {
@@ -105,6 +169,11 @@ internal sealed class TextBatchCollector : BatchCollector<GlyphItem>
     // colour. NO world matrix is applied here - the glyph VS applies the node matrix (from the transform table at the slot)
     // on the GPU. False (no write) for a rotated/sheared RELATIVE transform. Mirrors RectBatchCollector's bake.
     private bool Pack(TextRenderComponent tc, Matrix4x4F relWorld, int transformSlot, int at)
+        => PackInto(tc, relWorld, transformSlot, Items.AsSpan(at, tc.GlyphRun.Count));
+
+    /// <summary>Bake one block's glyphs into <paramref name="dst"/>. Where they land is the caller's business - the
+    /// retained arena during a walk, the patch stage during a repair - and the bake is the same either way.</summary>
+    private static bool PackInto(TextRenderComponent tc, Matrix4x4F relWorld, int transformSlot, Span<GlyphItem> dst)
     {
         const float eps = 1e-4f;
         if (Math.Abs(relWorld.M12) > eps || Math.Abs(relWorld.M21) > eps) return false;
@@ -120,7 +189,7 @@ internal sealed class TextBatchCollector : BatchCollector<GlyphItem>
         for (var i = 0; i < run.Count; i++)
         {
             var d = glyphs[i].ArrangeRect;   // local x, y, w, h
-            Items[at + i] = new GlyphItem
+            dst[i] = new GlyphItem
             {
                 LocalRect = new Vector4F((d.X + ax) * sx + tx, (d.Y + ay) * sy + ty, d.Z * sx, d.W * sy),
                 Source = glyphs[i].Source,

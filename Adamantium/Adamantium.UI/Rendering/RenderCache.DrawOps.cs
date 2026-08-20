@@ -135,7 +135,7 @@ public partial class RenderCache
         ref var batch = ref inner ? ref _haloLivingOver : ref _haloLivingUnder;
         if (batch == null)
         {
-            batch = new HaloLivingCollector { TransformsAddress = _transformTable?.DeviceAddress ?? 0 };
+            batch = new HaloLivingCollector { BatchId = (byte)(inner ? 11 : 10), TransformsAddress = _transformTable?.DeviceAddress ?? 0 };
             batch.BeginFrame(device);
         }
 
@@ -172,7 +172,7 @@ public partial class RenderCache
         ref var batch = ref inner ? ref _haloOver : ref _haloUnder;
         if (batch == null)
         {
-            batch = new HaloRectCollector { TransformsAddress = _transformTable?.DeviceAddress ?? 0 };
+            batch = new HaloRectCollector { BatchId = (byte)(inner ? 9 : 8), TransformsAddress = _transformTable?.DeviceAddress ?? 0 };
             batch.BeginFrame(device);
         }
 
@@ -362,12 +362,22 @@ public partial class RenderCache
         var visited = _walkVisited;
         stack.Clear();
         visited.Clear();
-        stack.Push(visualRoot);
+        stack.Push((visualRoot, false));
         while (stack.Count > 0)
         {
-            var component = stack.Pop();
+            var (component, hiddenByAncestor) = stack.Pop();
 
-            if (component.Visibility != Visibility.Visible) continue;
+            // COLLAPSED leaves the paint order - it is out of the layout too, and nothing under it has a place. HIDDEN
+            // does not: it holds its slot and its rank and simply paints nothing. Dropping it here is what made showing
+            // it again unplaceable - no rank to splice into - and every hover affordance coming back cost the most
+            // expensive frame there is, a full walk (measured: 120 of them, `dirtyNotPlaceable<Button>`).
+            if (component.Visibility == Visibility.Collapsed) continue;
+
+            // Hidden is INHERITED: hiding an element hides what is inside it. The walk used to stop at a hidden element
+            // and so never reached its children at all; now that it walks through them to keep their ranks, it has to
+            // carry the fact down itself - otherwise a hidden button's visible content goes on drawing, which is a close
+            // button showing its glyph on every tab until the pointer touches one.
+            var hidden = hiddenByAncestor || component.Visibility != Visibility.Visible;
 
             // A component must render exactly once per frame: if the tree makes one reachable twice (a content host
             // referenced from two places), it would join the paint order twice -> drawn TWICE (overdraw). Guard here.
@@ -383,13 +393,15 @@ public partial class RenderCache
 
 
             _drawingContextInternal.Clear();
-            component.Render(_drawingContext);
-            var commands = CopyCommands(_drawingContextInternal.GetDrawCommands());
-            packet.Draws.Add(new ComponentDraw(component, commands, wasGeometryValid, order, component.RenderClones));
-            MirrorUnits(component, commands.Count, wasGeometryValid);
+            component.Render(_drawingContext);   // rendered even when hidden: that is what consumes its dirty flag
+            var commands = hidden
+                ? CopyCommands(System.Array.Empty<IDrawCommand>())   // holds its place, draws nothing
+                : CopyCommands(_drawingContextInternal.GetDrawCommands());
+            packet.Draws.Add(new ComponentDraw(component, commands, hidden ? false : wasGeometryValid, order, component.RenderClones));
+            MirrorUnits(component, commands.Count, hidden ? false : wasGeometryValid);
             order += OrderGap;
 
-            PushChildrenInPaintOrder(stack, component.VisualChildren);
+            PushChildrenInPaintOrder(stack, component.VisualChildren, hidden);
         }
 
         // Mirror the applier's ReconcileDetachedControls: it frees the units of controls no longer in the tree, so the
@@ -444,7 +456,7 @@ public partial class RenderCache
     // Push a component's children so the stack pops them in PAINT order (drawn first = underneath). Fast path (the norm):
     // no explicit ZIndex -> document order (push reversed). Otherwise composite by ZIndex then document order - the same
     // precedence the hit-test's ZSort uses - so a raised child (e.g. a tab mid-drag) draws over its siblings.
-    private static void PushChildrenInPaintOrder(Stack<IUIComponent> stack, IReadOnlyCollection<IUIComponent> children)
+    private static void PushChildrenInPaintOrder(Stack<(IUIComponent Node, bool Hidden)> stack, IReadOnlyCollection<IUIComponent> children, bool hidden)
     {
         var anyZ = false;
         foreach (var child in children)
@@ -457,12 +469,12 @@ public partial class RenderCache
             if (children is IReadOnlyList<IUIComponent> list)
             {
                 for (var i = list.Count - 1; i >= 0; i--)
-                    stack.Push(list[i]);
+                    stack.Push((list[i], hidden));
             }
             else
             {
                 foreach (var child in children.Reverse())
-                    stack.Push(child);
+                    stack.Push((child, hidden));
             }
             return;
         }
@@ -473,7 +485,7 @@ public partial class RenderCache
                      .ThenByDescending(x => x.index)
                      .Select(x => x.child))
         {
-            stack.Push(child);
+            stack.Push((child, hidden));
         }
     }
 

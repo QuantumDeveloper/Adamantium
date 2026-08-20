@@ -4,7 +4,9 @@ using System.Runtime.InteropServices;
 using Adamantium.Graphics.Core;
 using Adamantium.Imaging;
 using Adamantium.Mathematics;
+using Adamantium.ProceduralGeometry.Shapes;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Diagnostics;
 using Adamantium.UI.Core.Graphics;
 using Adamantium.UI.Core.Media;
 using Adamantium.UI.Rendering;
@@ -490,6 +492,83 @@ public class LayerPlacementRenderTests
         scene.Over[1].Visibility = Visibility.Visible;
         scene.Draw();
         Assert.That(DifferingPixels(shown, Pixels(scene.Renderer)), Is.Zero, "showing it again must put back exactly what it drew");
+    }
+
+    // Hiding is INHERITED, and a WALK has to honour that as much as a patch does. The walk stops at nothing now - it goes
+    // through a hidden element to keep its subtree's ranks - so it has to carry "hidden" down itself. It did not, and the
+    // hidden element's visible children went on drawing: every tab wore its close-button glyph until the pointer touched
+    // one, which is the state a fresh window opens in.
+    [Test]
+    public void AChildOfAHiddenParent_IsGoneFromAWALKedFrameToo()
+    {
+        using var scene = NewScene();
+
+        var glyph = Placed(new Rect(0, 0, 8, CardHeight));
+        glyph.RenderAction = s => s.DrawRectangle(Brushes.Lime, new Rect(0, 0, 4, 4));
+        scene.Over[1].Add(glyph);
+        scene.Over[1].RenderAction = s => s.DrawRectangle(Brushes.Red, new Rect(0, 0, 6, CardHeight));
+        scene.Over[1].Invalidate();
+        RenderDirty.MarkStructural();
+        scene.Draw();
+        Assert.That(CountLime(Pixels(scene.Renderer)), Is.Not.Zero, "the child has to be drawing in the first place");
+
+        scene.Over[1].Visibility = Visibility.Hidden;
+        RenderDirty.MarkStructural();   // a WALK, not the patch - that is the path this pins
+        scene.Draw();
+
+        Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.False, "this test is about the walk");
+        Assert.That(CountLime(Pixels(scene.Renderer)), Is.Zero, "a hidden parent must take what its children draw with it");
+    }
+
+    // A control whose fill is arbitrary GEOMETRY - a Path, which is what a close button's glyph is - must be spliced in
+    // like any other batched family. It is not: that fill lives in InstancedFillCollector, which is not a BatchArena at
+    // all (per-KEY storage with its own ring, four parallel instance families, and a flush record on top), so the splice
+    // has nothing to name and the frame walks. Measured live: hovering one close button costs 389 walks in eight seconds
+    // of flipping, every one of them `notOneArena<Path>` / `noArena<Path>`.
+    // RED ON PURPOSE - it is the specification for making that collector an arena.
+    [Test]
+    public void AVectorFillThatStartsDrawing_IsSplicedInLikeARectangle()
+    {
+        using var scene = NewScene();
+
+        scene.Far[1].RenderAction = s => s.DrawGeometry(Brushes.Green, new RectangleGeometry(new Rect(4, 0, 20, CardHeight)));
+        scene.Far[1].Invalidate();
+        scene.Draw();
+
+        var patched = Pixels(scene.Renderer);
+        Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.True,
+            $"a vector fill must splice like a rectangle (refused by {FrameTrace.Refuser})");
+        AssertMatchesAFullWalk(scene, patched, "and what it splices in must be what a walk draws");
+    }
+
+    private static int CountLime(byte[] pixels)
+    {
+        var n = 0;
+        for (var i = 0; i < pixels.Length; i += 4)
+        {
+            if (pixels[i] < 200 && pixels[i + 1] > 200 && pixels[i + 2] < 200) n++;   // BGRA
+        }
+
+        return n;
+    }
+
+    // The unit of repair is the SEGMENT, and every batched family is drawn from one - so which family a control happens
+    // to draw with has no business deciding whether its frame can be patched. It did: the splice baked rectangles and
+    // refused everything else, so an ellipse appearing beside one cost a walk of the whole window. Measured on a live
+    // scene, the same refusal for a text block was 25 walks at ~25 ms apiece.
+    [Test]
+    public void AnEllipseThatStartsDrawing_IsSplicedInLikeARectangle()
+    {
+        using var scene = NewScene();
+
+        scene.Far[1].RenderAction = s => s.DrawEllipse(new Rect(4, 0, 20, CardHeight), Brushes.Green, 0, 360, default(EllipseType));
+        scene.Far[1].Invalidate();
+        scene.Draw();
+
+        var patched = Pixels(scene.Renderer);
+        Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.True,
+            $"an ellipse must splice like a rectangle (refused by {FrameTrace.Refuser})");
+        AssertMatchesAFullWalk(scene, patched, "and what it splices in must be what a walk draws");
     }
 
     // The unit factory needs one, but nothing here draws a texture or text.
