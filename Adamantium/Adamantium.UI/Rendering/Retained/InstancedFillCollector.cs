@@ -699,6 +699,30 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
     private FlushRecord AddFlushRecord() { var r = new FlushRecord(); _flushRecords.Add(r); return r; }
 
+    // Asked BEFORE the state is set, not discovered inside the loop. A pipeline, five stencil writes and two scissor
+    // sets went in ahead of a loop that then skipped every single entry - a mesh with no closed boundary has no fringe,
+    // and a textured run with no texture is not drawn at all. Checking a handful of list entries is the cheap half.
+    private static bool AnyRing(List<(KeySegment Seg, uint First, uint Count)> keys)
+    {
+        foreach (var k in keys)
+            if (k.Seg.RingBuffer != null) return true;
+        return false;
+    }
+
+    private static bool AnyDrawableRing(List<(KeySegment Seg, uint First, uint Count, ITexture Texture)> keys)
+    {
+        foreach (var k in keys)
+            if (k.Seg.RingBuffer != null && k.Texture != null) return true;
+        return false;
+    }
+
+    private static bool AnyTexture(List<(KeySegment Seg, uint First, uint Count, ITexture Texture)> keys)
+    {
+        foreach (var k in keys)
+            if (k.Texture != null) return true;
+        return false;
+    }
+
     /// <summary>The next LIVE flush record, blank and counted. Records are pooled and reused from index 0 by every
     /// recording walk, so the ones the current frame is made of are exactly <c>[0, _flushCount)</c> - everything past
     /// that is a leftover from some longer frame. Both the walk and a patch take their record through here, so a patch's
@@ -745,7 +769,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         // The analytic-AA fringe of those same instances: the shared ring per key, drawn with the SAME instance buffer
         // range as the body above, one draw per key. This is what the deferred per-unit fringe loop used to do one
         // element at a time (a pipeline switch + a uniform matrix each), which measured ~90% of the draw phase.
-        if (rec.Keys.Count > 0 && AnalyticAa.Enabled)
+        if (rec.Keys.Count > 0 && AnalyticAa.Enabled && AnyRing(rec.Keys))
         {
             SetupFringeState(projection);
 
@@ -816,7 +840,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
         // Textured instanced fills for this group (same shared meshes, textured pass + per-instance textured buffer).
         // ONE texture per draw, so each run binds its own - a run ends where the texture changes.
-        if (rec.TexKeys.Count > 0)
+        if (rec.TexKeys.Count > 0 && AnyTexture(rec.TexKeys))
         {
             SetupInstancedState(projection);
             _device.SetScissors(rec.Scissor);
@@ -841,7 +865,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         }
 
         // The gradient instances' fringe: shared ring, same instance buffer, coloured by the gradient per fragment.
-        if (rec.GradKeys.Count > 0 && AnalyticAa.Enabled)
+        if (rec.GradKeys.Count > 0 && AnalyticAa.Enabled && AnyRing(rec.GradKeys))
         {
             SetupFringeState(projection);
             _device.SetScissors(rec.Scissor);
@@ -857,7 +881,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         }
 
         // The pattern/noise instances' fringe, same shape as the solid one above: shared ring, same instance buffer.
-        if (rec.PatKeys.Count > 0 && AnalyticAa.Enabled)
+        if (rec.PatKeys.Count > 0 && AnalyticAa.Enabled && AnyRing(rec.PatKeys))
         {
             SetupFringeState(projection);
             _device.SetScissors(rec.Scissor);
@@ -874,7 +898,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
         // The textured instances' fringe: same ring, same instance buffer, and the SAME texture the body sampled - the
         // ring samples the picture rather than taking one flat colour, so the edge is the shape's own edge.
-        if (rec.TexKeys.Count > 0 && AnalyticAa.Enabled)
+        if (rec.TexKeys.Count > 0 && AnalyticAa.Enabled && AnyDrawableRing(rec.TexKeys))
         {
             SetupFringeState(projection);
             _device.SetScissors(rec.Scissor);
@@ -1061,6 +1085,22 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     }
 
     internal Rect2D FlushScissor(int flush) => flush >= 0 && flush < _flushCount ? _flushRecords[flush].Scissor : null;
+
+    /// <summary>Take this component's deferred fringe/stroke out of every LIVE record. The other half of "it stopped
+    /// drawing": its shape rides the instance buffer and blanks with it, but its ink is a per-unit draw the record holds
+    /// by reference, and a stroked path is nothing BUT ink - a tab's close cross left a bare stroke hanging on the frame
+    /// with no shape under it, and it only went away when the next full walk happened to re-record.</summary>
+    internal void DropUnitsOf(IUIComponent component)
+    {
+        if (component == null) return;
+
+        for (var i = 0; i < _flushCount; i++)
+        {
+            var units = _flushRecords[i].Units;
+            for (var k = units.Count - 1; k >= 0; k--)
+                if (ReferenceEquals(units[k].Component, component)) units.RemoveAt(k);
+        }
+    }
 
     /// <summary>Make this key's slots draw nothing, in place. A zeroed instance carries a zero transform slot and a zero
     /// colour, so it covers no pixel - the same answer BlankRun gives every other family.</summary>

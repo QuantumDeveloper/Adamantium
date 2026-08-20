@@ -62,6 +62,11 @@ internal abstract class BatchArena
     /// keeps its RANK, and coming back is an edit rather than a new place in the stream.</summary>
     public abstract void BlankSlots(IGraphicsDevice device, int first, int count);
 
+    /// <summary>Stop drawing this component's deferred fringe/stroke. Blanking its slots is only half of "it stopped
+    /// drawing" for a family that defers ink to a per-unit draw: the shape goes, the INK stays, and a stroked path (a
+    /// tab's close cross) leaves its stroke on the frame with nothing under it. Families that defer nothing say nothing.</summary>
+    public virtual void DropOverlayOf(IUIComponent component) { }
+
     // ---- staging -----------------------------------------------------------------------------------------------
     // A patch validates the WHOLE frame before it changes anything, so baking and mutating are two phases. The baked
     // items wait here, in the arena that will hold them; a patch owns the range [first, first+count) it appended.
