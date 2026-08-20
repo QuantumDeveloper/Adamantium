@@ -100,6 +100,8 @@ internal sealed class FakeRenderUnit : IRenderUnit
     public int DeferDisposeCount { get; private set; }
 
     public void Update(Matrix4x4F transform, Matrix4x4F projection, double renderScale) => UpdateCount++;
+    public bool NeedsPreRender => false;
+
     public void PreRender() => PreRenderCount++;
     public void Render() => RenderCount++;
 

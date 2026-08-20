@@ -109,7 +109,12 @@ public class ForwardWindowRenderer : WindowRendererBase
     public override void PreRender()
     {
         if (Window == null) return;
+
+        // TEMP measurement: this sweep visits every unit of every group on EVERY frame, replayed ones included. Whether
+        // that costs anything is a question a number answers.
+        var preRenderStart = Stopwatch.GetTimestamp();
         _renderCache.PreRender();
+        RuntimeStats.LastPreRenderMs = Stopwatch.GetElapsedTime(preRenderStart).TotalMilliseconds;
     }
 
     private double _lastRecordMs;

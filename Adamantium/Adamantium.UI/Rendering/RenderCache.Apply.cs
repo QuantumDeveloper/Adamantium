@@ -81,11 +81,22 @@ public partial class RenderCache
         if (_renderUnitFactory.GraphicsDevice == null) return;
         if (!Adamantium.Graphics.Fonts.FontAtlasStore.PumpReadyGlyphs()) return;
 
+        var arrived = false;
         foreach (var group in _groups)
         foreach (var unit in group.Units)
         {
-            if (unit is RenderUnits.TextRenderUnit text) text.RefreshGlyphsIfArrived();
+            if (unit is RenderUnits.TextRenderUnit text) arrived |= text.RefreshGlyphsIfArrived();
         }
+
+        // Letters that land are a change to what the frame DRAWS, and this one is announced by nobody: the marks are the
+        // loop thread's and this runs on the render thread, so a mark made here can be cleared before the recorder ever
+        // sees it. Say it where it cannot be lost - the retained stream describes a run that is no longer the run - and
+        // ask for the frame that re-records it. Until this, a block whose letters arrived late stayed BLANK until some
+        // unrelated event (a mouse move) happened to force a walk.
+        if (!arrived) return;
+
+        StreamStaleBecause("glyphsArrived");
+        Core.LoopSignal.Request();
     }
 
     // What the recorded op stream actually baked out of a snapshot: where the element is, how big it is, what clips it.

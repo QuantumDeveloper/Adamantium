@@ -19,7 +19,10 @@ public class Program
         {
             var t = new System.Threading.Thread(() =>
             {
-                System.Threading.Thread.Sleep(6000);   // let the first tab settle: we are measuring the steady state
+                // Let the first tab SETTLE. Six seconds was enough once and is not any more - a heavy tab now builds for
+                // longer than that, and a probe that starts inside the build measures the build. Configurable, because
+                // "how long does this take to settle" is exactly what changes.
+                System.Threading.Thread.Sleep(Environment.GetEnvironmentVariable("ADAM_PROBE_SETTLE") is { } warm ? int.Parse(warm) : 6000);
 
                 // WHO enters or leaves the drawn set while the probe runs. Counted for the whole window, not just the
                 // self-driven pan: a spike a hand reproduces has to be attributable the same way one the harness makes is.
@@ -40,6 +43,7 @@ public class Program
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 var limit = Environment.GetEnvironmentVariable("ADAM_PROBE_SECONDS") is { } sec ? double.Parse(sec) : 20;
                 double layout = 0;
+                double sumPre = 0;
                 double sumRecord = 0, sumApply = 0, sumProc = 0, sumDraw = 0, sumProcessors = 0, sumLayout = 0;
                 double maxDraw = 0, maxApply = 0, maxRecord = 0;
                 long samples = 0;
@@ -50,6 +54,7 @@ public class Program
                 {
                     var st = typeof(Adamantium.UI.Core.Diagnostics.RuntimeStats);
                     if (Adamantium.UI.Core.Diagnostics.RuntimeStats.LastLayoutPassMs > layout) layout = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastLayoutPassMs;
+                    sumPre += Adamantium.UI.Core.Diagnostics.RuntimeStats.LastPreRenderMs;
                     sumLayout += Adamantium.UI.Core.Diagnostics.RuntimeStats.LastLayoutPassMs;
                     sumRecord += Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordMs;
                     sumApply += Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyMs;
@@ -195,7 +200,7 @@ public class Program
                 var s = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRenderDrawMs;
                 System.IO.File.WriteAllText(log,
                     $"layout peak {layout:0} ms | WORST SECOND {(worstSecond == long.MaxValue ? 0 : worstSecond)} fps | presented {frames} in {sw.Elapsed.TotalSeconds:0.0} s = {frames / sw.Elapsed.TotalSeconds:0} fps" + System.Environment.NewLine
-                    + $"sampled avg ms: layout {sumLayout * inv:0.00} record {sumRecord * inv:0.00} apply {sumApply * inv:0.00} proc {sumProc * inv:0.00} draw {sumDraw * inv:0.00} processors {sumProcessors * inv:0.00}" + System.Environment.NewLine
+                    + $"sampled avg ms: prerender {sumPre * inv:0.00} layout {sumLayout * inv:0.00} record {sumRecord * inv:0.00} apply {sumApply * inv:0.00} proc {sumProc * inv:0.00} draw {sumDraw * inv:0.00} processors {sumProcessors * inv:0.00}" + System.Environment.NewLine
                     + $"sampled max ms: record {maxRecord:0.0} apply {maxApply:0.0} draw {maxDraw:0.0} | frame budget at {frames / sw.Elapsed.TotalSeconds:0} fps = {1000.0 / (frames / sw.Elapsed.TotalSeconds):0.00} ms" + System.Environment.NewLine
                     + Adamantium.UI.Core.Diagnostics.FrameTrace.Percentiles() + System.Environment.NewLine
                     + Adamantium.UI.Rendering.LayerProbe.Dump() + System.Environment.NewLine

@@ -25,6 +25,12 @@ namespace Adamantium.Game.Sandbox.Behaviors;
 /// </summary>
 public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
 {
+    // The PLATE is permanent - it shows what a frame costs, on screen, and that is cheap. Its FILE DUMPS are not: eight
+    // writes a second plus a counter on every measure and arrange, which on an otherwise idle scene is the instrument
+    // becoming the thing it measures. Off unless asked for, so the numbers on screen are the app's and not mine.
+    private static readonly bool Dumps =
+        Environment.GetEnvironmentVariable("ADAM_PLATE_DUMPS") == "1" || Environment.GetEnvironmentVariable("ADAM_PROBE_LOG") != null;
+
     private const double RefreshSeconds = 0.25;   // rewrite the text ~4x/sec - readable, and cheap (no per-frame raster)
 
     private long _lastMeasure, _lastArrange, _lastBindings, _lastPresented;
@@ -53,9 +59,23 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
 
     private void NoteChurn(string what, Adamantium.UI.Core.IUIComponent c)
     {
-        if (!_running) return;
+        if (!_running || !Dumps) return;   // counting and writing are for a HUNT, not for every hover
         var key = $"{what} {c.GetType().Name} '{(c as UIComponent)?.Name}' -> {c.Visibility}";
         lock (_churn) _churn[key] = _churn.TryGetValue(key, out var had) ? had + 1 : 1;
+
+        // A SHOW/HIDE is rare, and it is the event being hunted - so it is written the MOMENT it happens rather than
+        // counted into a second that may well be read after that second has been reset. A ring, a peak and a per-second
+        // tally all throw away exactly the thing somebody is trying to reproduce by hand.
+        if (what != "hidden-flip") return;
+
+        try
+        {
+            System.IO.File.AppendAllText(@"C:\AdamantiumEngine\flips.log", $"{DateTime.Now:HH:mm:ss.fff}  {key}\n");
+        }
+        catch
+        {
+            // a diagnostic must never be the reason a frame fails
+        }
     }
 
     private string DumpChurn(out int total)
@@ -86,8 +106,8 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
         _lastArrange = MeasurableUIComponent.TotalArrangeCalls;
         _lastBindings = RuntimeStats.BindingUpdatesApplied;
         _running = true;
-        FrameTrace.Enabled = true;      // TEMP
-        LayoutTrace.Counting = true;   // TEMP
+        FrameTrace.Enabled = Dumps;      // TEMP
+        LayoutTrace.Counting = Dumps;   // TEMP
         AnimationManager.AddTicker(dt => Advance(target, dt));
     }
 
@@ -141,10 +161,13 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
             $"bindings {bindings - _lastBindings}    anim {AnimationManager.ActiveCount}";
 
         // TEMP: dump the in-memory frame ring once a second (four refresh windows) - one file write, not one per frame.
-        if (++_traceWindows >= 4)
+        if (Dumps && ++_traceWindows >= 4)
         {
             _traceWindows = 0;
-            System.IO.File.WriteAllText(@"C:\AdamantiumEngine\frames.log", FrameTrace.Dump());
+            // The whole RING is deliberately NOT dumped. It was 723 KB rebuilt into one string and written to disk every
+            // second, on a scene otherwise doing nothing - a large-object allocation and 700 KB of I/O per second, which
+            // is the instrument becoming the thing it measures. It showed as a static tab whose frame time wandered
+            // between 0.9 and 2.2 ms. Only the LONG frames are kept, which is all anybody has ever read.
             System.IO.File.WriteAllText(@"C:\AdamantiumEngine\incidents.log", FrameTrace.DumpIncidents());
 
             // WHO marked layout dirty over the last second, biggest first. Reset per dump, so a drag reads as "this is

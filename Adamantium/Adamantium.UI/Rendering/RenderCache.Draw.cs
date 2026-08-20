@@ -12,6 +12,10 @@ using Adamantium.Vulkan.Core;
 
 namespace Adamantium.UI.Rendering;
 
+// What one recorded draw IS. At namespace scope because an ARENA is asked whether a recorded op draws it (see
+// BatchArena.MatchesOp) - the instanced fill is drawn by a flush op, not by a segment op, and that is its own business.
+internal enum RenderOpKind : byte { Scissor, Unit, Segment, InstancedFlush }
+
 public partial class RenderCache
 {
     // Item-background batch (solid rounded-rect fills -> one SDF-AA'd instanced draw). Rects are the LOWER layer
@@ -78,7 +82,6 @@ public partial class RenderCache
     // walk emits (scissor changes, per-unit draws, batch segments, instanced flushes), and the next Clean frame REPLAYS it:
     // the retained batch/instance buffers still hold last frame's bytes (BeginFrame skipped, uploads skipped by SceneClean).
     // _opsReplayable is the escape hatch for a draw type the flat stream can't reproduce (there is none today).
-    private enum RenderOpKind : byte { Scissor, Unit, Segment, InstancedFlush }
     private struct RenderOp
     {
         public RenderOpKind Kind;
@@ -446,7 +449,7 @@ public partial class RenderCache
         foreach (var group in _groups)
         foreach (var unit in group.Units)
         {
-            unit.PreRender();
+            if (unit.NeedsPreRender) unit.PreRender();
         }
     }
 
@@ -1144,7 +1147,9 @@ public partial class RenderCache
                     // instance buffer). A unit that still draws a per-unit overlay - a stroke, or a fringe the instanced
                     // path doesn't cover - bakes THAT from RenderData at record time, and it is re-pointed at the flush
                     // (PrepareOverlay) on any frame that moved it. So the node keeps its slot-write fast path either way.
-                    if (_recording) group.PatchableBatchedOnly = false;
+                    // Its run is noted like any other family's: the KEY is an arena and this instance is a slot in it.
+                    if (_recording && _instancedFill.LastArena is { } fillArena)
+                        NoteBatched(group, fillArena, _instancedFill.LastSlot);
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;   // fill batched; fringe/stroke drawn at the flush, over the fill
@@ -1818,7 +1823,7 @@ public partial class RenderCache
     private int FindSegmentOp(BatchArena arena, int segId)
     {
         for (var i = 0; i < _ops.Count; i++)
-            if (_ops[i].Kind == RenderOpKind.Segment && _ops[i].Batch == arena.BatchId && _ops[i].SegId == segId) return i;
+            if (_ops[i].Batch == arena.BatchId && arena.MatchesOp(_ops[i].Kind, _ops[i].SegId, segId)) return i;
         return -1;
     }
 
@@ -1864,6 +1869,7 @@ public partial class RenderCache
             EllipseRenderUnit eru => _ellipseBatch.CanBatch(eru.EllipsePayload) ? _ellipseBatch
                 : _gradientEllipseBatch.CanBatch(eru.EllipsePayload) ? _gradientEllipseBatch : null,
             RenderUnits.TextRenderUnit tru => tru.TextComponent is { } tc && _textBatch.CanBatch(tc, out _) ? _textBatch : null,
+            RenderUnits.GeometryRenderUnit gru => _instancedFill?.ArenaFor(gru),
             _ => null
         };
     }
@@ -1941,6 +1947,11 @@ public partial class RenderCache
         foreach (var g in _groups)
         {
             if (g.WalkVersion != _walkVersion || ReferenceEquals(g, group)) continue;
+            // ...groups of THIS arena only. A slot number means something solely inside the array it indexes, and with a
+            // family per arena two of them overlap numerically all the time - so without this a re-issue silently
+            // re-pointed the runs of an unrelated family whose numbers happened to fall in the same range, and whatever
+            // it drew stayed on screen as it was (the close button's highlight stuck lit).
+            if (!ReferenceEquals(g.Arena, arena)) continue;
             var touched = false;
             for (var r = 0; r < g.Runs.Count; r++)
             {
@@ -1992,7 +2003,7 @@ public partial class RenderCache
         var at = OpIndexForRank(group.Order);
         _ops.Insert(at, new RenderOp
         {
-            Kind = RenderOpKind.Segment, Batch = arena.BatchId, SegId = seg, Order = group.Order
+            Kind = arena.OpKind, Batch = arena.BatchId, SegId = seg, Order = group.Order
         });
         NoteOpInserted(at);
 
