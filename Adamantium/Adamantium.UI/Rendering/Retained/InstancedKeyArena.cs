@@ -74,6 +74,8 @@ internal sealed class InstancedKeyArena : BatchArena
     public override void BlankSlots(IGraphicsDevice device, int first, int count)
         => _collector.BlankKeySlots(_key, first, count);
 
+    public override void DropOverlayOf(IUIComponent component) => _collector.DropUnitsOf(component);
+
     public override void ClearStage()
     {
         _stage.Clear();

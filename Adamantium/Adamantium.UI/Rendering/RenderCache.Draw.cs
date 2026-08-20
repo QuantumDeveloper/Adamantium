@@ -1600,6 +1600,7 @@ public partial class RenderCache
         public Rect2D Scissor;        // the group's clip (all units of one component share it)
         public bool InPlace;          // count-stable recolor -> per-slot UpdateSlot, no surgery
         public bool Blank;            // stopped drawing -> zero its slots and KEEP the run, so coming back is an edit
+        public IUIComponent Component;// whose it is - a blanked group has no units left to ask
         public int Layer;             // the layer this group's items belong to, resolved ONCE before anything is mutated
         public Rect Bounds;           // what it covers, in logical coordinates - the ONLY thing that decides whether its
                                       // order inside a layer matters at all (see §5a: overlap is the merge rule)
@@ -1689,7 +1690,7 @@ public partial class RenderCache
             if (!inPlace && !blank) appendTotal += staged;
             _patchBuf.Add(new GroupPatch
             {
-                Group = group, Arena = arena, StageFirst = stageFirst, StageCount = staged,
+                Group = group, Arena = arena, StageFirst = stageFirst, StageCount = staged, Component = comp,
                 Scissor = scissor, InPlace = inPlace, Blank = blank, Bounds = bounds
             });
         }
@@ -1750,7 +1751,10 @@ public partial class RenderCache
         foreach (var p in _patchBuf)
         {
             if (!p.Blank) continue;
-            foreach (var run in p.Group.Runs) p.Arena.BlankSlots(device, run.First, run.Count);
+            foreach (var run in p.Group.Runs) 
+                p.Arena.BlankSlots(device, run.First, run.Count);
+            // The shape is gone; so must be its ink. A stroked path is nothing BUT ink.
+            p.Arena.DropOverlayOf(p.Component);
             // Its runs are still ITS runs - kept current so the next patch repairs them instead of dropping them as a
             // stranger's slots. Units are left alone: staging nothing also means "culled off its clip", and those units
             // very much still exist.
@@ -1793,7 +1797,9 @@ public partial class RenderCache
 
     private static bool SpliceRefused(string reason)
     {
-        if (Core.Diagnostics.FrameTrace.Enabled) Core.Diagnostics.FrameTrace.Refuser = reason;
+        if (Core.Diagnostics.FrameTrace.Enabled) 
+            Core.Diagnostics.FrameTrace.Refuser = reason;
+        
         return false;
     }
 
@@ -2188,6 +2194,4 @@ public partial class RenderCache
         var i = group.Runs[0].First;
         foreach (var u in group.Units) _rectSlotByUnit[u] = i++;
     }
-
-
 }
