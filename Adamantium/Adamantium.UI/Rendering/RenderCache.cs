@@ -90,6 +90,12 @@ public partial class RenderCache
     private bool HoldsUnits(IUIComponent component) =>
         _recordedUnits.TryGetValue(component.RenderId, out var entry) && entry.Units > 0;
 
+    /// <summary>The dirty marks THIS cache builds from. A cache draws one surface - a window's content, a popup layer, an
+    /// adorner layer - and each of those has its own marks (see RenderDirtyRouter), so "is there work?" is a question
+    /// about this one, never about the application.
+    /// <para>Defaults to the window-content scope, which is where everything marks until a stage claims a subtree.</para></summary>
+    public Core.RenderDirtyScope Dirty { get; set; } = Core.RenderDirtyRouter.Default;
+
     // The detach generation this cache has already reconciled (see ApplyPacket).
     private long _reconciledDetachGen;
 
@@ -191,9 +197,8 @@ public partial class RenderCache
     }
 
     /// <summary>RECORD half of the frame build (DEVICE-FREE, update thread): decides the build kind, runs
-    /// component.Render, and fills <see cref="_packet"/> with the draws the applier realizes. Captures the
-    /// RenderDirty-derived draw state WHILE RenderDirty is still populated (the applier and the loop-level clear run
-    /// later).</summary>
+    /// component.Render, and fills <see cref="_packet"/> with the draws the applier realizes. Captures the dirty-derived
+    /// draw state while the marks are still there, then CLEARS them - they are this surface's own.</summary>
     public void RecordFrame(IRootVisualComponent visualRoot)
     {
         _packet = RentPacket();
@@ -203,6 +208,12 @@ public partial class RenderCache
         CaptureSnapshot();
         _published.Enqueue(_packet);   // hand it over; the applier drains the queue (see ApplyFrame)
         _packet = null;
+
+        // The marks are consumed: everything this record needed is in the packet. Clearing them HERE - by the surface
+        // that owns them - is what one shared set made impossible: it had to wait until every window had recorded, or
+        // the first to finish would wipe marks the second had not read yet. The applier never touches them (it would
+        // race the next Update); this runs on the recording thread, which is the same one that marks.
+        Dirty.Clear();
     }
 
 
@@ -214,16 +225,16 @@ public partial class RenderCache
         _packet.ProjectionMatrix = visualRoot.GetProjectionMatrix();
 
         // Fully clean: re-draw the retained units as-is. (Unless a prior frame deferred a full walk - pay that first.)
-        if (_built && !RenderDirty.HasWork && !_forceFullNextFrame) return;
+        if (_built && !Dirty.HasWork && !_forceFullNextFrame) return;
 
         // Non-structural change -> PARTIAL: re-render only the geometry-dirty components in place; the retained groups
         // stay. Drop world/clip memos ONLY on a MOVE (transform-dirty) - a geometry-only partial (a hover recolour) moved
         // nothing, so cached transforms stay valid (skipping the O(N) re-bake of thousands of units). An UNNAMEABLE move
         // (an unowned Transform ticking) can't tell which snapshot entries went stale -> escalate to a full record.
-        if (_built && !RenderDirty.IsStructural && !RenderDirty.IsTransformUnknown && !_forceFullNextFrame)
+        if (_built && !Dirty.IsStructural && !Dirty.IsTransformUnknown && !_forceFullNextFrame)
         {
             _packet.Kind = RenderBuildKind.Partial;
-            if (RenderDirty.IsTransform)
+            if (Dirty.IsTransform)
             {
                 // Snapshot is re-frozen incrementally (CaptureSnapshot re-freezes only the moved entries); the applier
                 // drops the world memos.
@@ -232,7 +243,7 @@ public partial class RenderCache
 
             // Snapshot the dirty set under RenderDirty's write lock: Render can mark MORE geometry mid-loop, and marks
             // also arrive from other threads (parallel arrange, a Dispatcher-thread Image invalidation).
-            RenderDirty.SnapshotGeometryInto(_geometryDirtyBuffer);
+            Dirty.SnapshotGeometryInto(_geometryDirtyBuffer);
 
             // Record each dirty component; a Fallback stops the pass.
             var fellBack = false;
@@ -246,10 +257,10 @@ public partial class RenderCache
 
             // Partial stands ONLY if nothing structural surfaced and the dirty set didn't grow (a Render re-marking
             // geometry escalates to a full walk so that change isn't dropped).
-            if (!fellBack && !RenderDirty.IsStructural && RenderDirty.GeometryCount == _geometryDirtyBuffer.Count)
+            if (!fellBack && !Dirty.IsStructural && Dirty.GeometryCount == _geometryDirtyBuffer.Count)
             {
                 // Geometry-only partial -> nothing moved -> the applier can skip the per-unit transform re-bake (proc).
-                _packet.IsTransformDirty = RenderDirty.IsTransform;
+                _packet.IsTransformDirty = Dirty.IsTransform;
                 // What changed (draw phase patches these slots + replays) and which motion nodes moved. Read HERE, while
                 // RenderDirty is still populated (it is cleared after the record phase; the applier must never touch it).
                 _packet.PartialDirty.AddRange(_geometryDirtyBuffer);
@@ -257,11 +268,11 @@ public partial class RenderCache
                 // Paint-dirty components ride the SAME list: not re-rendered, their commands hold the brush BY REFERENCE,
                 // so the draw pass's slot patch re-bakes from the (now different) brush - a recolour costs a re-bake, not
                 // a re-record.
-                RenderDirty.SnapshotPaintInto(_paintDirtyBuffer);
+                Dirty.SnapshotPaintInto(_paintDirtyBuffer);
                 _packet.PartialDirty.AddRange(_paintDirtyBuffer);
 
-                RenderDirty.SnapshotNodesInto(_packet.MovedNodes);   // under the write lock (MarkNodeTransform runs on other threads too)
-                RenderDirty.SnapshotMovedInto(_movedBuf);            // the MOVED components - CaptureSnapshot re-freezes just these
+                Dirty.SnapshotNodesInto(_packet.MovedNodes);   // under the write lock (MarkNodeTransform runs on other threads too)
+                Dirty.SnapshotMovedInto(_movedBuf);            // the MOVED components - CaptureSnapshot re-freezes just these
 
                 return;   // packet.Kind == Partial -> ApplyFrame runs the partial apply
             }
@@ -281,7 +292,7 @@ public partial class RenderCache
         // STRUCTURAL: content entered/left the drawn set; every change NAMES its component, so the paint order can be
         // spliced (O(changed)) instead of re-walking the whole tree. Refuses anything it can't place locally -> the full
         // walk below is the self-healing fallback (it renumbers with fresh gaps).
-        if (_built && !RenderDirty.IsStructuralUnknown && !RenderDirty.IsTransformUnknown && !_forceFullNextFrame)
+        if (_built && !Dirty.IsStructuralUnknown && !Dirty.IsTransformUnknown && !_forceFullNextFrame)
         {
             _packet.Reset(RenderBuildKind.Structural);
             _packet.ProjectionMatrix = visualRoot.GetProjectionMatrix();
@@ -306,7 +317,7 @@ public partial class RenderCache
         // A full walk rebuilds the PAINT ORDER, but the snapshot is a per-component freeze of transform/size/clip - so
         // keep it and re-freeze only what the marks NAME (geometry / move / motion node / structural). Anything the marks
         // CANNOT name (an unattributed move, a settling theme/DPI swap) drops the whole snapshot.
-        var reFreezeEverything = RenderDirty.IsStructuralUnknown || RenderDirty.IsTransformUnknown;
+        var reFreezeEverything = Dirty.IsStructuralUnknown || Dirty.IsTransformUnknown;
         if (reFreezeEverything)
         {
             _snap.Clear();
@@ -315,10 +326,10 @@ public partial class RenderCache
         _snapFullCapture = false;
 
         // What changed, for CaptureSnapshot to re-freeze. Read HERE, while RenderDirty is still populated.
-        RenderDirty.SnapshotGeometryInto(_geometryDirtyBuffer);
-        RenderDirty.SnapshotStructuralInto(_structuralBuf);
-        RenderDirty.SnapshotMovedInto(_movedBuf);
-        RenderDirty.SnapshotNodesInto(_movedNodesCapture);
+        Dirty.SnapshotGeometryInto(_geometryDirtyBuffer);
+        Dirty.SnapshotStructuralInto(_structuralBuf);
+        Dirty.SnapshotMovedInto(_movedBuf);
+        Dirty.SnapshotNodesInto(_movedNodesCapture);
 
         RecordFullWalk(visualRoot, _packet);   // device-free: walk + component.Render + copy commands into the packet
     }

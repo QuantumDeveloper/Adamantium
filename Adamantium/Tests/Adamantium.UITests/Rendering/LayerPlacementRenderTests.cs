@@ -431,6 +431,33 @@ public class LayerPlacementRenderTests
         }
     }
 
+    // A CLIPPED control draws in a segment of its own (a batch is flushed when the next draw needs another scissor), so
+    // when it stops drawing that segment has nobody left in it. What is pinned here is what a test CAN pin: the frame
+    // that follows still equals a walk, and the layers still tile the stream exactly.
+    // <para>What it deliberately does NOT claim is that the draw call itself disappeared. It does - the sweep drops a
+    // segment that draws nothing - but hiding a control also marks the frame structural, and the rebuild that follows
+    // re-lays the stream without it anyway. The two are indistinguishable from here: the sweep earns its keep only where
+    // no rebuild follows at all, which is the live replayed frame this harness cannot produce.</para>
+    [Test]
+    public void AClippedControlThatStopsDrawing_LeavesTheFrameEqualToAWalk()
+    {
+        using var scene = NewScene();
+
+        scene.Over[1].ClipToBounds = true;
+        scene.Over[1].RenderAction = s => s.DrawRectangle(Brushes.Red, new Rect(0, 0, 6, CardHeight));
+        scene.Over[1].Invalidate();
+        RenderDirty.MarkStructural();
+        scene.Draw();
+
+        scene.Over[1].Visibility = Visibility.Collapsed;
+        scene.Over[1].Invalidate();
+        scene.Draw();
+        scene.Draw();
+
+        Assert.That(scene.Renderer.Cache.LayersDescribeTheStream(out var why), Is.True, why);
+        AssertMatchesAFullWalk(scene, Pixels(scene.Renderer), "the frame still equals what a walk draws");
+    }
+
     // The unit factory needs one, but nothing here draws a texture or text.
     private sealed class StubResourceFactory : IResourceFactory
     {

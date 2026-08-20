@@ -28,8 +28,15 @@ public class AdornerRenderProcessor : EntityProcessor<WindowRenderService>
     {
         var device = AssociatedService.GraphicsDevice;
         var resourceFactory = AssociatedService.EntityWorld.DependencyResolver.Resolve<IResourceFactory>();
-        _cache = new RenderCache(new DrawingContext(), new RenderUnitFactory(device, resourceFactory));
+        _cache = new RenderCache(new DrawingContext(), new RenderUnitFactory(device, resourceFactory))
+        {
+            Dirty = _scope   // this stage builds from ITS marks, not from the window content's
+        };
     }
+
+    /// <summary>This stage is going: its marks go with it, or a window opened and closed all session would leave one
+    /// scope behind per stage per window - and every app-wide event walks them all.</summary>
+    protected override void OnDetached() => RenderDirtyRouter.Forget(_scope);
 
     public override void Update(AppTime gameTime) { }   // building moved to PreRender (after the fence wait) - see below
 

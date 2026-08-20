@@ -44,6 +44,28 @@ public class Program
                     System.Threading.Thread.Sleep(15);
                 }
                 var inv = samples > 0 ? 1.0 / samples : 0;
+
+                // TEMP self-check (ADAM_THEME_SWAP=1): swap the theme from here and report the tab strip's height after
+                // each swap. ~36 is a strip; anything larger is the "page inside a tab header" fault this hunt closed.
+                var stripReport = "(not asked)";
+                if (Environment.GetEnvironmentVariable("ADAM_THEME_SWAP") == "1")
+                {
+                    var themes = Adamantium.UI.Core.UIAppContext.Current?.ThemeManager;
+                    var win = Adamantium.UI.UIApplication.Current?.MainWindow;
+                    if (themes != null && win != null)
+                    {
+                        stripReport = string.Empty;
+                        for (var lap = 0; lap < 2; lap++)
+                        {
+                            var wanted = themes.CurrentTheme?.Name == "FluentLight" ? "FluentDark" : "FluentLight";
+                            var next = themes[wanted];
+                            Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => themes.SetTheme(next));
+                            System.Threading.Thread.Sleep(6000);
+                            stripReport += $"after {wanted}: strip {StripHeight(win):0} px; ";
+                        }
+                    }
+                }
+
                 var frames = Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames - startFrames;
                 var s = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRenderDrawMs;
                 System.IO.File.WriteAllText(log,
@@ -51,13 +73,32 @@ public class Program
                     + $"sampled avg ms: layout {sumLayout * inv:0.00} record {sumRecord * inv:0.00} apply {sumApply * inv:0.00} proc {sumProc * inv:0.00} draw {sumDraw * inv:0.00} processors {sumProcessors * inv:0.00}" + System.Environment.NewLine
                     + $"sampled max ms: record {maxRecord:0.0} apply {maxApply:0.0} draw {maxDraw:0.0} | frame budget at {frames / sw.Elapsed.TotalSeconds:0} fps = {1000.0 / (frames / sw.Elapsed.TotalSeconds):0.00} ms" + System.Environment.NewLine
                     + Adamantium.UI.Core.Diagnostics.FrameTrace.Percentiles() + System.Environment.NewLine
-                    + Adamantium.UI.Rendering.LayerProbe.Dump() + System.Environment.NewLine);
+                    + Adamantium.UI.Rendering.LayerProbe.Dump() + System.Environment.NewLine
+                    + "theme swap: " + stripReport + System.Environment.NewLine);
                 if (Environment.GetEnvironmentVariable("ADAM_PROBE_EXIT") == "1") Environment.Exit(0);
             }) { IsBackground = true };
             t.Start();
         }
         gameApp.IsFixedTimeStep = false;
         SetUp(gameApp);
+    }
+
+    // TEMP: the tab strip's height, for the self-check above.
+    private static double StripHeight(object win)
+    {
+        var content = win.GetType().GetProperty("Content")?.GetValue(win) as Adamantium.UI.Core.IUIComponent;
+        if (content == null) return -1;
+
+        var stack = new System.Collections.Generic.Stack<Adamantium.UI.Core.IUIComponent>();
+        stack.Push(content);
+        while (stack.Count > 0)
+        {
+            var node = stack.Pop();
+            if (node.GetType().Name == "TabStripScroller") return node.RenderSize.Height;
+            foreach (var child in node.VisualChildren) stack.Push(child);
+        }
+
+        return -1;
     }
 
     private static void SetUp(AdamantiumGameApplication gameApp)

@@ -72,6 +72,16 @@ public class ForwardWindowRenderer : WindowRendererBase
     {
         if (window != null) RenderScale = window.DpiScale.X;
         base.SetWindow(window);
+
+        // ...and marks of its OWN. One set shared by every window is why it could not be cleared when a window finished
+        // recording - the next one would then re-record nothing (see the comment in RenderCache.ApplyFrame) - and why a
+        // mark anywhere woke everyone. The window's root claims the scope, so everything under it routes there by a
+        // field read rather than by a search.
+        if (window is Controls.Base.UIComponent root)
+        {
+            _renderCache.Dirty = Core.RenderDirtyRouter.NewScope();
+            root.ClaimRenderScope(_renderCache.Dirty);
+        }
     }
 
     private void OnDpiChanged(object sender, EventArgs e)
@@ -162,6 +172,7 @@ public class ForwardWindowRenderer : WindowRendererBase
     {
         _renderCache.DisposeUnits();
         _renderCache.DisposeDeviceResources();   // the batch rings + transform table: nothing else owns them
+        Core.RenderDirtyRouter.Forget(_renderCache.Dirty);   // ...and this window's marks: nobody records from them now
         base.Dispose();
     }
 

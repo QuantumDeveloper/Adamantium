@@ -145,9 +145,9 @@ public partial class RenderCache
         // Something left the tree since the last build. Withdrawing what it drew is the reconcile's job, and it used to
         // ride on a FULL walk - which the redesign made rare, so a detached view kept its place in the order and the
         // retained op stream went on re-issuing it, frozen at the size it had when it left.
-        if (_reconciledDetachGen != Core.RenderDirty.DetachGeneration && packet.Kind != RenderBuildKind.Full)
+        if (_reconciledDetachGen != Dirty.DetachGeneration && packet.Kind != RenderBuildKind.Full)
         {
-            _reconciledDetachGen = Core.RenderDirty.DetachGeneration;
+            _reconciledDetachGen = Dirty.DetachGeneration;
             if (ReconcileDetachedControls() > 0)
             {
                 // Those units are gone, so the op stream and the recorded slots no longer describe the scene: the draw
@@ -190,7 +190,7 @@ public partial class RenderCache
 
             case RenderBuildKind.Full:
                 ApplyFullWalk(packet);   // GPU: rebuild the paint-order groups from the packet (reconciles as it goes)
-                _reconciledDetachGen = Core.RenderDirty.DetachGeneration;
+                _reconciledDetachGen = Dirty.DetachGeneration;
                 _built = true;
                 // A full walk re-records the whole scene, so earlier packets' dirty entries are covered - and their unit
                 // sets are gone (groups rebuilt), which would mis-patch the batch. Drop them.
@@ -224,15 +224,11 @@ public partial class RenderCache
         for (var a = component.VisualParent; a != null; a = a.VisualParent)
             if (a.Visibility != Visibility.Visible) return PartialRecord.Skip;
 
-        // From a FOREIGN tree (a popup/menu/tooltip PopupRoot, drawn by the popup stage's OWN cache). Skip WITHOUT
-        // rendering: Render() would consume its IsGeometryValid=false, and that flag is what PopupRenderProcessor's
-        // rebuild gate (OverlayChanged) polls - the MAIN cache eating it starved the gate (a menu hover never redrew).
-        if (_lastVisualRoot != null)
-        {
-            var top = component;
-            while (top.VisualParent != null) top = top.VisualParent;
-            if (!ReferenceEquals(top, _lastVisualRoot)) return PartialRecord.Skip;
-        }
+        // A component from a FOREIGN tree (a popup, a menu, a tooltip - drawn by that stage's OWN cache) does not reach
+        // here at all any more: marks go to the scope of the surface that draws them, and this cache reads only its own
+        // (see RenderDirtyRouter). It used to arrive, and had to be recognised and stepped over WITHOUT rendering,
+        // because rendering it would consume the IsGeometryValid the popup stage's gate polls - the main cache eating it
+        // starved the gate and a menu hover never redrew. That was a symptom of one set with no owner, not a rule.
 
         // Marked dirty EXTERNALLY (an animation heartbeat) while its own geometry is still VALID: Render() would no-op and
         // record ZERO commands, read as "now draws nothing" -> the units get DELETED (the mass tile vanish on ease-back).
