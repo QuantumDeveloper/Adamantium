@@ -265,6 +265,11 @@ public class TabStripScroller : InputUIComponent, IContainer
             _viewport = IsHorizontal ? finalSize.Width : finalSize.Height;
             ClampOffset();
             UpdateScrollState();
+            // The panned child is a render MOTION NODE: its subtree bakes in ITS space and rides its transform-table
+            // slot, so a pan rewrites one matrix and replays the recorded frame instead of re-walking the window.
+            if (child is UIComponent panned) 
+                panned.IsRenderMotionNode = true;
+
             var rect = IsHorizontal
                 ? new Rect(-_offset, 0, Math.Max(_extent, finalSize.Width), finalSize.Height)
                 : new Rect(0, -_offset, finalSize.Width, Math.Max(_extent, finalSize.Height));

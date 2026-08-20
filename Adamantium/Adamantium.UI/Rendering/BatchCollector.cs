@@ -319,6 +319,56 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         return -1;
     }
 
+    /// <summary>Is every slot of this run blank - written by nobody? Asked before a range is handed back, so a stale run
+    /// cannot take a live neighbour with it. The base class cannot read an instance's fields, so the derived collector
+    /// answers; a family with nothing to say answers "no" and simply never reclaims.</summary>
+    protected virtual bool IsBlank(int first, int count) => false;
+
+    /// <summary>Gives a departed control's run back to the arena, when the run sits at an EDGE of the segment holding
+    /// it. A segment is drawn as one range, so a run in its middle cannot be handed to anybody - splitting the segment
+    /// to reclaim it would buy a slot at the price of a whole extra draw call, which is the wrong trade. At an edge the
+    /// range simply shrinks: nothing moves, every other slot keeps its address, and the instances stop being issued.
+    /// <para>At the HEAD the space is free for anyone (it leaves the segment entirely). At the TAIL it stays the
+    /// segment's own room - which is what lets the control come back into the same place without moving a neighbour.</para>
+    /// </summary>
+    /// <returns>Whether the run left the drawn range.</returns>
+    public bool ReclaimRun(int first, int count)
+    {
+        if (count <= 0) return false;
+
+        var index = IndexOf(FindSegmentContaining(first));
+        if (index < 0) return false;
+
+        var s = _segments[index];
+        var last = first + count;
+        if (last > s.First + s.Count) return false;   // the run is not wholly inside what this segment draws
+
+        // ...and it must be EMPTY - every slot in it already blanked. A group's runs can be stale: a walk that did not
+        // visit the group reassigns its slots to whoever it recorded there, so the run may now name somebody else's
+        // instances (which is why the blanking checks the owner tag before it writes). Shrinking a range by a stale
+        // length takes a live neighbour out of the draw with it - measured as a card that vanished from the frame.
+        if (!IsBlank(first, count)) return false;
+
+        if (first == (int)s.First)
+        {
+            s.First += (uint)count;
+            s.Count -= (uint)count;
+            s.Capacity -= (uint)count;
+            _segments[index] = s;
+            _freeBlocks.Add((first, count));
+            return true;
+        }
+
+        if (last == (int)(s.First + s.Count))
+        {
+            s.Count -= (uint)count;
+            _segments[index] = s;   // the room past Count stays this segment's, to grow back into
+            return true;
+        }
+
+        return false;
+    }
+
     public Rect2D GetSegmentScissor(int id)
     {
         var index = IndexOf(id);

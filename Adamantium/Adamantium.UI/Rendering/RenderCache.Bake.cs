@@ -46,6 +46,10 @@ public partial class RenderCache
     // APPLIER-owned: the moved nodes of the packets drained for THIS draw (it rewrites their table matrices, then clears).
     // The recorder must not read it - it takes the frame's moved nodes off RenderDirty into packet.MovedNodes.
     private readonly List<IUIComponent> _movedNodesBuf = new();
+    // APPLIER-owned: this packet's moved nodes whose move the retained stream survives (nothing under them clips).
+    private readonly HashSet<IUIComponent> _forgivenMoves = new();
+    // The nodes whose matrices THIS frame rewrote - the replay re-points the per-unit draws under them.
+    private readonly HashSet<IUIComponent> _movedNodeOwners = new();
     // RECORDER-owned: the components that MOVED this frame - CaptureSnapshot re-freezes exactly their snapshot entries.
     private readonly List<IUIComponent> _movedBuf = new();
     private bool _snapFullCapture;   // adorner build only: re-capture the snapshot from the retained units
@@ -453,14 +457,20 @@ public partial class RenderCache
     private void MarkNodeNotAware(IUIComponent component)
     {
         var node = NodeOf(component);
-        if (node != null) _nodeAllAware[node.RenderId] = false;
+        if (node == null) return;
+        _nodeAllAware[node.RenderId] = false;
+        Core.Diagnostics.FrameTrace.NoteNotAware(node.GetType().Name + " <- " + component.GetType().Name);
     }
 
     // Apply the moved nodes' new matrices (64B each) before a replay-based draw; stale position memos drop and rebuild
     // lazily O(dirty). Returns false when ANY moved node has non-aware retained content - the caller full-walks.
     private bool RefreshMovedNodes(IGraphicsDevice device)
     {
-        if (_movedNodesBuf.Count == 0) return true;
+        if (_movedNodesBuf.Count == 0)
+        {
+            _movedNodeOwners.Clear();   // nothing moved this frame - the replay re-points nothing
+            return true;
+        }
         foreach (var node in _movedNodesBuf)
             if (!_nodeAllAware.GetValueOrDefault(node.RenderId, false))
                 return false;
@@ -472,9 +482,13 @@ public partial class RenderCache
         // -> a full walk, which clears every memo.
         _worldCache.Clear();
         _relWorldCache.Clear();
+        _movedNodeOwners.Clear();
         foreach (var node in _movedNodesBuf)
+        {
             if (_transformTable.TryGetSlot(node.RenderId, out var slot))
                 _transformTable.SetMatrix(device, slot, World(node));
+            _movedNodeOwners.Add(node);   // the replay re-points the per-unit draws under them
+        }
         _movedNodesBuf.Clear();
         return true;
     }

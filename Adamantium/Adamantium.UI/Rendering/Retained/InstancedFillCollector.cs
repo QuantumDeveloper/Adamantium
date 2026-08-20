@@ -687,6 +687,11 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         return _flushCount - 1;
     }
 
+    /// <summary>Asked before each deferred fringe/stroke is drawn. A per-unit overlay bakes its transform at record time,
+    /// so on a frame where something MOVED it has to be re-pointed - exactly as a recorded per-unit draw is. Set by the
+    /// render cache, which is the only one that knows what moved.</summary>
+    public Action<IRenderUnit> PrepareOverlay { get; set; }
+
     /// <summary>Re-issue a flush recorded earlier this cycle (a clean-frame replay): same key draws + deferred unit
     /// fringe/stroke, NO re-upload (the retained instance buffers still hold the bytes).</summary>
     public void ReplayFlush(int index, Rect2D fullScissor, Matrix4x4F projection)
@@ -881,6 +886,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             _device.SetScissors(rec.Scissor);
             foreach (var u in rec.Units)
             {
+                PrepareOverlay?.Invoke(u);
                 u.Render();
             }
             _device.SetScissors(fullScissor);

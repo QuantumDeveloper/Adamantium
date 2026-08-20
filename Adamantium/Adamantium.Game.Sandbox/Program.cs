@@ -20,6 +20,22 @@ public class Program
             var t = new System.Threading.Thread(() =>
             {
                 System.Threading.Thread.Sleep(6000);   // let the first tab settle: we are measuring the steady state
+
+                // WHO enters or leaves the drawn set while the probe runs. Counted for the whole window, not just the
+                // self-driven pan: a spike a hand reproduces has to be attributable the same way one the harness makes is.
+                var churn = new System.Collections.Generic.Dictionary<string, int>();
+                void Note(string what, Adamantium.UI.Core.IUIComponent c)
+                {
+                    var key = what + " " + c.GetType().Name + " '" + (c as Adamantium.UI.Controls.Base.UIComponent)?.Name + "' -> "
+                              + c.Visibility;
+                    lock (churn) churn[key] = churn.TryGetValue(key, out var had) ? had + 1 : 1;
+                }
+                Adamantium.UI.Core.VisualTreeNotifications.Attached += c => Note("attached", c);
+                Adamantium.UI.Core.VisualTreeNotifications.Detached += c => Note("detached", c);
+                Adamantium.UI.Core.VisualTreeNotifications.VisibilityChanged += c => Note("collapsed-flip", c);
+                Adamantium.UI.Core.VisualTreeNotifications.ShownOrHidden += c => Note("hidden-flip", c);
+                Adamantium.UI.Core.VisualTreeNotifications.ClipChanged += c => Note("clip", c);
+
                 var startFrames = Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames;
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 var limit = Environment.GetEnvironmentVariable("ADAM_PROBE_SECONDS") is { } sec ? double.Parse(sec) : 20;
@@ -27,6 +43,9 @@ public class Program
                 double sumRecord = 0, sumApply = 0, sumProc = 0, sumDraw = 0, sumProcessors = 0, sumLayout = 0;
                 double maxDraw = 0, maxApply = 0, maxRecord = 0;
                 long samples = 0;
+                var secondStart = System.Diagnostics.Stopwatch.GetTimestamp();
+                var secondFrames = Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames;
+                var worstSecond = long.MaxValue;
                 while (sw.Elapsed.TotalSeconds < limit)
                 {
                     var st = typeof(Adamantium.UI.Core.Diagnostics.RuntimeStats);
@@ -42,8 +61,64 @@ public class Program
                     if (Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordMs > maxRecord) maxRecord = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordMs;
                     samples++;
                     System.Threading.Thread.Sleep(15);
+
+                    // The WORST SECOND, not the average: a drop that lasts a few seconds disappears into a 40-second
+                    // mean, and the per-frame ring only holds the last couple of thousand frames - at a thousand a
+                    // second that is the last two. A minimum survives both.
+                    if (System.Diagnostics.Stopwatch.GetElapsedTime(secondStart).TotalSeconds >= 1.0)
+                    {
+                        var thisSecond = Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames - secondFrames;
+                        if (thisSecond < worstSecond) worstSecond = thisSecond;
+                        secondFrames = Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames;
+                        secondStart = System.Diagnostics.Stopwatch.GetTimestamp();
+                    }
                 }
                 var inv = samples > 0 ? 1.0 / samples : 0;
+
+                // TEMP (ADAM_STRIP_SCROLL=1): pan the tab STRIP back and forth while a heavy tab is open - the reported
+                // drop from ~700 fps to ~100. Driven from here so the cost can be attributed without a hand on the mouse.
+                if (Environment.GetEnvironmentVariable("ADAM_STRIP_SCROLL") == "1")
+                {
+                    var win = Adamantium.UI.UIApplication.Current?.MainWindow;
+                    var strip = win?.Content is Adamantium.UI.Core.IUIComponent c ? FindStrip(c) : null;
+                    if (strip != null)
+                    {
+                        var startedAt = Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames;
+                        var clock = System.Diagnostics.Stopwatch.StartNew();
+                        // Park just inside the far end, so the small oscillation below cannot reach either end whatever
+                        // the strip's range turns out to be (it differs run to run with the headers' widths).
+                        Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => { strip.Pan(1e6); strip.Pan(-24); });
+                        System.Threading.Thread.Sleep(300);
+                        Adamantium.UI.Core.Diagnostics.LayoutTrace.Counting = true;
+
+                        // TWO costs, measured apart, because they answer different questions and only one of them is the
+                        // strip's own. MOVING: a small oscillation that stays inside the range - nothing crosses the clip,
+                        // no chevron flips, so what it costs is the move itself. TRAVELLING: full sweeps that reach both
+                        // ends - headers cross the clip and the chevrons appear and disappear, each of which is a
+                        // structural change. Mixed into one number they hid each other, and the mix swung run to run with
+                        // however long the strip happened to be.
+                        var moveFrames = Run(4, () => strip.Pan(_pan = -_pan));
+                        var moveFps = moveFrames / 4.0;
+                        var movePans = _panned;
+
+                        var travelFrames = Run(4, () =>
+                        {
+                            if (strip.Pan(_sweep)) return true;
+                            _sweep = -_sweep;   // reached an end - turn around
+                            return strip.Pan(_sweep);
+                        });
+                        var travelFps = travelFrames / 4.0;
+
+                        var panned = Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames - startedAt;
+                        Adamantium.UI.Core.Diagnostics.LayoutTrace.Counting = false;
+                        System.IO.File.AppendAllText(log + ".strip.txt",
+                            $"moving the strip (no clip crossings): {moveFps:0} fps, {movePans} pans" + Environment.NewLine
+                            + $"travelling end to end: {travelFps:0} fps, {_panned - movePans} pans" + Environment.NewLine
+                            + Adamantium.UI.Core.Diagnostics.FrameTrace.Percentiles() + Environment.NewLine
+                            + Adamantium.UI.Rendering.LayerProbe.Dump() + Environment.NewLine
+                            + Adamantium.UI.Core.Diagnostics.LayoutTrace.DumpCounts() + Environment.NewLine);
+                    }
+                }
 
                 // TEMP self-check (ADAM_THEME_SWAP=1): swap the theme from here and report the tab strip's height after
                 // each swap. ~36 is a strip; anything larger is the "page inside a tab header" fault this hunt closed.
@@ -69,18 +144,64 @@ public class Program
                 var frames = Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames - startFrames;
                 var s = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRenderDrawMs;
                 System.IO.File.WriteAllText(log,
-                    $"layout peak {layout:0} ms | presented {frames} in {sw.Elapsed.TotalSeconds:0.0} s = {frames / sw.Elapsed.TotalSeconds:0} fps" + System.Environment.NewLine
+                    $"layout peak {layout:0} ms | WORST SECOND {(worstSecond == long.MaxValue ? 0 : worstSecond)} fps | presented {frames} in {sw.Elapsed.TotalSeconds:0.0} s = {frames / sw.Elapsed.TotalSeconds:0} fps" + System.Environment.NewLine
                     + $"sampled avg ms: layout {sumLayout * inv:0.00} record {sumRecord * inv:0.00} apply {sumApply * inv:0.00} proc {sumProc * inv:0.00} draw {sumDraw * inv:0.00} processors {sumProcessors * inv:0.00}" + System.Environment.NewLine
                     + $"sampled max ms: record {maxRecord:0.0} apply {maxApply:0.0} draw {maxDraw:0.0} | frame budget at {frames / sw.Elapsed.TotalSeconds:0} fps = {1000.0 / (frames / sw.Elapsed.TotalSeconds):0.00} ms" + System.Environment.NewLine
                     + Adamantium.UI.Core.Diagnostics.FrameTrace.Percentiles() + System.Environment.NewLine
                     + Adamantium.UI.Rendering.LayerProbe.Dump() + System.Environment.NewLine
-                    + "theme swap: " + stripReport + System.Environment.NewLine);
+                    + "theme swap: " + stripReport + System.Environment.NewLine
+                    + "churn:" + System.Environment.NewLine
+                    + string.Join(System.Environment.NewLine, System.Linq.Enumerable.Select(
+                        System.Linq.Enumerable.OrderByDescending(churn, p => p.Value), p => $"  {p.Value,5}  {p.Key}"))
+                    + System.Environment.NewLine);
+
+                // Every frame that ran LONG, one line each: what kind of build it was, why it could not replay, and how
+                // much of it was layout and record. A spike a hand reproduces is only worth anything if it names itself.
+                System.IO.File.WriteAllText(log + ".frames.txt",
+                    "not node-aware:" + System.Environment.NewLine
+                    + string.Join(System.Environment.NewLine, System.Linq.Enumerable.Select(
+                        System.Linq.Enumerable.OrderByDescending(Adamantium.UI.Core.Diagnostics.FrameTrace.NotAware, p => p.Value),
+                        p => $"  {p.Value,5}  {p.Key}")) + System.Environment.NewLine
+                    + Adamantium.UI.Core.Diagnostics.FrameTrace.DumpIncidents());
                 if (Environment.GetEnvironmentVariable("ADAM_PROBE_EXIT") == "1") Environment.Exit(0);
             }) { IsBackground = true };
             t.Start();
         }
         gameApp.IsFixedTimeStep = false;
         SetUp(gameApp);
+    }
+
+    private static int _panned;   // TEMP: pans that actually moved the strip - a harness that pans nothing measures nothing
+    private static double _pan = 8;      // the small oscillation's current direction
+    private static double _sweep = 48;   // the end-to-end sweep's current direction (a wheel notch)
+
+    // TEMP: post one pan per frame-ish for the given seconds, and report the frames presented while doing it.
+    private static long Run(double seconds, Func<bool> pan)
+    {
+        var from = Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        while (clock.Elapsed.TotalSeconds < seconds)
+        {
+            Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => { if (pan()) System.Threading.Interlocked.Increment(ref _panned); });
+            System.Threading.Thread.Sleep(16);
+        }
+
+        return Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames - from;
+    }
+
+    // TEMP: the tab strip, for the pan self-check above.
+    private static Adamantium.UI.Controls.TabStripScroller FindStrip(Adamantium.UI.Core.IUIComponent root)
+    {
+        var stack = new System.Collections.Generic.Stack<Adamantium.UI.Core.IUIComponent>();
+        stack.Push(root);
+        while (stack.Count > 0)
+        {
+            var node = stack.Pop();
+            if (node is Adamantium.UI.Controls.TabStripScroller strip) return strip;
+            foreach (var child in node.VisualChildren) stack.Push(child);
+        }
+
+        return null;
     }
 
     // TEMP: the tab strip's height, for the self-check above.

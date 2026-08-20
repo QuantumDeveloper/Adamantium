@@ -16,6 +16,10 @@ internal static class RenderDirtyBridge
         VisualTreeNotifications.Detached += RenderDirty.MarkStructural;
         VisualTreeNotifications.VisibilityChanged += RenderDirty.MarkStructural;
 
+        // Shown or hidden WITHOUT leaving the layout: the paint order is untouched, so it is a content change - of this
+        // element and of everything under it, since a hidden element hides its subtree with it.
+        VisualTreeNotifications.ShownOrHidden += RenderDirty.MarkSubtreeGeometry;
+
         // Its clip changed -> the ops for its whole subtree carry a different scissor, so the recorded frame no longer
         // describes this one. STRUCTURAL, like a show/hide: what is re-recorded is not just this element's own draws.
         VisualTreeNotifications.ClipChanged += RenderDirty.MarkStructural;

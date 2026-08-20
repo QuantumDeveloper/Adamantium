@@ -226,13 +226,22 @@ public partial class RenderCache
         foreach (var group in _leftTheOrder)
         {
             if (group.InOrder || group.Tag == 0) continue;   // came back before anyone looked
+            var reclaimedAll = true;
             foreach (var run in group.RectRuns)
             {
                 LayerProbe.OrphanSweptSlots += run.Count;
                 var segment = _rectBatch.FindSegmentContaining(run.First);
                 _rectBatch.BlankOwned(device, (uint)run.First, (uint)run.Count, group.Tag);
-                if (segment >= 0) _emptiedSegments.Add(_rectBatch.SegmentIdAt(segment));
+
+                // ...and give the run back where it can be given back at all: at an edge of its segment the range simply
+                // shrinks, so those instances stop being ISSUED rather than being issued blank. In the middle they stay
+                // blanked - see BatchCollector.ReclaimRun for why splitting to reclaim them is the wrong trade.
+                reclaimedAll &= _rectBatch.ReclaimRun(run.First, run.Count);
+                if (segment >= 0) _emptiedSegments.Add(segment);
             }
+
+            // Runs it no longer owns anywhere: keeping them would let a later patch address space that is now free.
+            if (reclaimedAll) group.RectRuns.Clear();
         }
 
         // A segment whose every instance has just been blanked is a draw call that paints nothing. Let it go: the op
@@ -539,8 +548,10 @@ public partial class RenderCache
 
         // Clean-frame replay: re-issue the last recorded walk's op stream and skip the per-unit loop (the retained buffers
         // still hold its bytes). Only a fully-Clean build qualifies; a Partial/Full re-walks and re-records.
-        if (device != null && !ReplayDisabled && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Clean && OpsMatchTransforms)
+        if (device != null && !ReplayDisabled && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Clean && OpsMatchTransforms
+            && RefreshMovedNodes(device))   // moved nodes first: write their matrices, or the replay draws them where they were
         {
+            AcceptPatchedTransforms();
             LastFrameReplayed = true;
             ExecuteOps(device, fullScissor);
             return;
@@ -636,7 +647,7 @@ public partial class RenderCache
             if (InstancedFillCollector.Enabled)
             {
                 _instanceBuffers ??= new GpuBufferManager(device);
-                _instancedFill ??= new InstancedFillCollector(device, _instanceBuffers);
+                _instancedFill ??= new InstancedFillCollector(device, _instanceBuffers) { PrepareOverlay = RepointIfItMoved };
                 _instancedFill.TransformsAddress = _transformTable.DeviceAddress;   // instance VS fetches its slot matrix
                 _instancedFill.BeginFrame();
                 _instancedFill.SceneClean = sceneClean;
@@ -1125,16 +1136,11 @@ public partial class RenderCache
                 if (_instancedFill.TryAdd(gru, fillBake, scissor, LogicalBounds(unit.Component, wt), slot4Fill))
                 {
                     gru.FillInstanced = true;
-                    // The fill AND its analytic-AA fringe now both ride the slot (one shared ring per mesh, drawn from
-                    // the same instance buffer), so such a unit keeps the node aware. A unit that still has a per-unit
-                    // overlay - a stroke, or a fringe the instanced path doesn't cover - does NOT: that draw bakes its
-                    // transform from RenderData at record time, so a slot write would move the fill and leave its own
-                    // outline behind, the exact tear the transform table removed.
-                    if (_recording)
-                    {
-                        group.PatchableRectOnly = false;
-                        if (gru.HasPerUnitOverlay) MarkNodeNotAware(unit.Component);
-                    }
+                    // The fill AND its analytic-AA fringe both ride the slot (one shared ring per mesh, drawn from the same
+                    // instance buffer). A unit that still draws a per-unit overlay - a stroke, or a fringe the instanced
+                    // path doesn't cover - bakes THAT from RenderData at record time, and it is re-pointed at the flush
+                    // (PrepareOverlay) on any frame that moved it. So the node keeps its slot-write fast path either way.
+                    if (_recording) group.PatchableRectOnly = false;
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;   // fill batched; fringe/stroke drawn at the flush, over the fill
@@ -1152,13 +1158,9 @@ public partial class RenderCache
                 if (_instancedFill.TryAddGradient(ggru, gradBake, scissor, LogicalBounds(unit.Component, wt), slot4GradFill))
                 {
                     ggru.FillInstanced = true;
-                    // The fill rides the slot now; only a per-unit overlay (its fringe, still per-unit here, or a
-                    // stroke) bakes its transform at record time and so costs the node its slot-write fast path.
-                    if (_recording)
-                    {
-                        group.PatchableRectOnly = false;
-                        if (ggru.HasPerUnitOverlay) MarkNodeNotAware(unit.Component);
-                    }
+                    // The fill rides the slot now; a per-unit overlay (its fringe, still per-unit here, or a stroke)
+                    // bakes its transform at record time and is re-pointed at the flush - see PrepareOverlay.
+                    if (_recording) group.PatchableRectOnly = false;
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -1175,13 +1177,8 @@ public partial class RenderCache
                 if (_instancedFill.TryAddPattern(pgru, patBake, scissor, LogicalBounds(unit.Component, wt), slot4PatFill))
                 {
                     pgru.FillInstanced = true;
-                    // As the gradient above: the fill rides the slot, so only a real per-unit overlay costs the node
-                    // its slot-write fast path.
-                    if (_recording)
-                    {
-                        group.PatchableRectOnly = false;
-                        if (pgru.HasPerUnitOverlay) MarkNodeNotAware(unit.Component);
-                    }
+                    // As the gradient above: the fill rides the slot, the overlay is re-pointed at the flush.
+                    if (_recording) group.PatchableRectOnly = false;
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -1198,11 +1195,7 @@ public partial class RenderCache
                 if (_instancedFill.TryAddTextured(tgru, texBake, scissor, LogicalBounds(unit.Component, wt), slot4TexFill))
                 {
                     tgru.FillInstanced = true;
-                    if (_recording)
-                    {
-                        group.PatchableRectOnly = false;
-                        if (tgru.HasPerUnitOverlay) MarkNodeNotAware(unit.Component);
-                    }
+                    if (_recording) group.PatchableRectOnly = false;
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -1249,7 +1242,9 @@ public partial class RenderCache
                 }
             }
 
-            if (_recording) { group.PatchableRectOnly = false; MarkNodeNotAware(unit.Component); }   // per-unit draw: world-baked RenderData
+            // A per-unit draw bakes its world into RenderData - but it is recorded as its own op, so a replay can re-point
+            // it (see ExecuteOps). It costs the group its rect-only slot patch, not the node its move.
+            if (_recording) group.PatchableRectOnly = false;
             unit.Render();
             if (_recording) RecordOp(new RenderOp { Kind = RenderOpKind.Unit, Unit = unit, Order = _recordOrder });
             }
@@ -1470,7 +1465,10 @@ public partial class RenderCache
                 if (!IsSlotPatchable(u))
                 {
                     // TEMP: name the type that costs the frame its patch.
-                    if (Core.Diagnostics.FrameTrace.Enabled) Core.Diagnostics.FrameTrace.Refuser = u.GetType().Name;
+                    // WHOSE unit, not just what kind: two text blocks refuse for different reasons and only the owner
+                    // says which - the control's type and name are what a reproduction can be matched against.
+                    if (Core.Diagnostics.FrameTrace.Enabled)
+                        Core.Diagnostics.FrameTrace.Refuser = $"{u.GetType().Name}<{u.Component?.GetType().Name}>{Says(u)}{WhyNotPatchable(u)}";
                     return false;   // a per-unit / text / instanced / no-longer-batchable dirty unit -> full walk
                 }
         }
@@ -1496,7 +1494,13 @@ public partial class RenderCache
     // is checked against the table version to catch transforms that changed UNDER it, but the patch just validated the ones
     // it wrote (RefreshMovedNodes proves the moved subtrees are node-aware), so those must not count as a mismatch. Left
     // counting, the first patch made every following frame walk - one hover cost every other frame the whole scene.
-    private void AcceptPatchedTransforms() => _opsMatrixVersion = _transformTable?.MatrixVersion ?? 0;
+    // The LAYOUT version rides along: a node move is a layout write, and left counting it the very first pan made every
+    // following frame walk - the stream would be declared stale by the write that was made to keep it current.
+    private void AcceptPatchedTransforms()
+    {
+        _opsMatrixVersion = _transformTable?.MatrixVersion ?? 0;
+        _opsLayoutVersion = _transformTable?.LayoutMatrixVersion ?? 0;
+    }
 
     // Does this unit's GPU data live in ONE retained SDF-batch slot we can rewrite in place? The whole precondition for
     // repainting without re-walking. Anything else (text, per-unit geometry, an instanced fill) keeps its bytes elsewhere.
@@ -1619,7 +1623,8 @@ public partial class RenderCache
             foreach (var r in group.RectRuns) runTotal += r.Count;
             // A group DESCRIBED by the last walk must have been rect-only - else it also drew per-unit/text/instanced content
             // whose recorded ops we can't excise (stale Unit ops would even replay disposed units).
-            if (walked && !group.PatchableRectOnly) return SpliceRefused("notRectOnly");
+            if (walked && !group.PatchableRectOnly)
+                return SpliceRefused($"notRectOnly<{comp.GetType().Name}>{(group.Units.Count > 0 ? Says(group.Units[0]) : "")}");
 
             var items = new List<RectItem>(group.Units.Count);
             var scissor = fullScissor;
@@ -1627,7 +1632,8 @@ public partial class RenderCache
             var bounds = Rect.Empty;
             foreach (var u in group.Units)
             {
-                if (u is not RectangleRenderUnit rru || !_rectBatch.CanBatch(rru.RectPayload)) return SpliceRefused("notARect");
+                if (u is not RectangleRenderUnit rru || !_rectBatch.CanBatch(rru.RectPayload))
+                    return SpliceRefused($"notARect<{u.GetType().Name} in {comp.GetType().Name}>");
                 u.SetEffectiveOpacity(EffectiveOpacity(u.Component));   // a splice may ride an opacity cascade too
                 var wt = World(u.Component);
                 if (!haveScissor)
@@ -1702,6 +1708,27 @@ public partial class RenderCache
 
     // TEMP: name WHICH of the splice's preconditions sent the frame to the full walk - there are nine and they are fixed
     // by nine different means.
+    // TEMP: which of IsSlotPatchable's four conditions a text unit failed - "text refuses" is not a finding, and the
+    // four have nothing to do with each other.
+    private string WhyNotPatchable(IRenderUnit unit)
+    {
+        if (unit is not RenderUnits.TextRenderUnit tru) return string.Empty;
+        if (!_textRunByUnit.TryGetValue(unit, out var run)) return " noRecordedRun";
+        if (tru.TextComponent is not { } tc) return " noTextComponent";
+        if (!_textBatch.CanBatch(tc, out var atlas)) return " cantBatch";
+        if (atlas != run.Atlas) return " otherAtlas";
+        if (tc.GlyphRun.Count != run.Count) return $" glyphs {run.Count}->{tc.GlyphRun.Count}";
+        return " ?";
+    }
+
+    // TEMP: the first few characters a text unit draws. Two TextBlocks are the same type and the same name (none), and
+    // what they SAY is the only thing that tells a diagnostics plate from a tab header.
+    private static string Says(IRenderUnit unit)
+    {
+        if (unit is not RenderUnits.TextRenderUnit tru || tru.TextComponent?.TextLayout?.Text is not { } text) return string.Empty;
+        return " \"" + (text.Length > 20 ? text[..20] : text).Replace('\n', '|') + "\"";
+    }
+
     private static bool SpliceRefused(string reason)
     {
         if (Core.Diagnostics.FrameTrace.Enabled) Core.Diagnostics.FrameTrace.Refuser = reason;

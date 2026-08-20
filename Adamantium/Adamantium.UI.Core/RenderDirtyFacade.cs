@@ -18,6 +18,8 @@ public static class RenderDirty
 
     public static void MarkPaint(IUIComponent component) => RenderDirtyRouter.Of(component).MarkPaint(component);
 
+    public static void MarkSubtreeGeometry(IUIComponent root) => RenderDirtyRouter.Of(root).MarkSubtreeGeometry(root);
+
     /// <summary>Something MOVED. Without a component the mover has no owner to name (a bare Transform ticking), and no
     /// scope can be ruled out - so they all hear it, exactly as with an unnameable structural change.</summary>
     public static void MarkTransform(IUIComponent component)

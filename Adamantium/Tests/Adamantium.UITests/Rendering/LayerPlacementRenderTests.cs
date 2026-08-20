@@ -458,6 +458,40 @@ public class LayerPlacementRenderTests
         AssertMatchesAFullWalk(scene, Pixels(scene.Renderer), "the frame still equals what a walk draws");
     }
 
+    // HIDING is not a structural change: the control keeps its slot, its size and its rank, and simply stops painting.
+    // So the recorded frame is PATCHED - its group empties where it stands - instead of being discarded for a walk of the
+    // whole window. That is what a hover affordance costs while a tab strip scrolls under a still pointer: measured on a
+    // heavy tab, one close button appearing and vanishing was a full-scene walk apiece, ~105 of them in eight seconds.
+    [Test]
+    public void AControlThatHides_IsPatchedOutOfTheFrameInsteadOfRebuildingIt()
+    {
+        using var scene = NewScene();
+
+        // A CHILD draws too - the case this is really about is a button whose glyph is a child of it, and hiding the
+        // button has to take the glyph with it and bring it back.
+        var glyph = Placed(new Rect(0, 0, 8, CardHeight));
+        glyph.RenderAction = s => s.DrawRectangle(Brushes.Lime, new Rect(0, 0, 4, 4));
+        scene.Over[1].Add(glyph);
+
+        scene.Over[1].RenderAction = s => s.DrawRectangle(Brushes.Red, new Rect(0, 0, 6, CardHeight));
+        scene.Over[1].Invalidate();
+        RenderDirty.MarkStructural();
+        scene.Draw();
+        var shown = Pixels(scene.Renderer);
+
+        scene.Over[1].Visibility = Visibility.Hidden;
+        scene.Draw();
+
+        var hidden = Pixels(scene.Renderer);
+        Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.True, "hiding it must patch the recorded frame, not re-walk the scene");
+        Assert.That(DifferingPixels(shown, hidden), Is.Not.Zero, "...and it must actually stop drawing");
+        AssertMatchesAFullWalk(scene, hidden, "what the patch leaves must be what a walk draws");
+
+        scene.Over[1].Visibility = Visibility.Visible;
+        scene.Draw();
+        Assert.That(DifferingPixels(shown, Pixels(scene.Renderer)), Is.Zero, "showing it again must put back exactly what it drew");
+    }
+
     // The unit factory needs one, but nothing here draws a texture or text.
     private sealed class StubResourceFactory : IResourceFactory
     {
