@@ -158,8 +158,10 @@ public class ThemeManager : IThemeManager
         ThemeChanged?.Invoke(this, args);
     }
 
-    // (Re)register the theme's linked palette into the resource manager. The ResourceLink authored as ResourceContext.Source
-    // on the theme element is kept as an attached-property value, so we can re-add it every time the theme becomes current.
+    // (Re)register the theme's resources into the resource manager: its ResourceContext.Resources block (the palette,
+    // the icons - each its own linked dictionary file) and, for a theme that still states one, the single
+    // ResourceContext.Source link. Both are kept as attached-property values, so we can re-add them every time the
+    // theme becomes current.
     private void ActivateThemeSources(ITheme theme)
     {
         if (theme is not AdamantiumComponent component) return;
@@ -167,6 +169,10 @@ public class ThemeManager : IThemeManager
         var link = ResourceContext.GetSource(component);
         if (link?.Source != null)
             _resourceManager.AddSource(component, link.Source, link.Scope);
+
+        var resources = ResourceContext.GetResources(component);
+        if (resources != null)
+            ResourceContext.RegisterResources(component, resources);
     }
 
     public void ApplyTheme(ITheme theme, IFundamentalUIComponent component)

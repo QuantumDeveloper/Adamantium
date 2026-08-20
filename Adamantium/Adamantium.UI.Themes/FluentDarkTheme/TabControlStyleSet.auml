@@ -242,10 +242,8 @@
                                           Focusable="False"
                                           MinWidth="28" Padding="4 0" Visibility="Collapsed" BorderThickness="0"
                                           HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                          Background="{ResourceReference SolidBackgroundFillColorBase}">
-                                <Path Data="M0,0 L8,0 L4,5 Z" Fill="{ResourceReference TextFillColorSecondary}"
-                                      Width="8" Height="5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </ToggleButton>
+                                          Background="{ResourceReference SolidBackgroundFillColorBase}"
+                                          Content="{ResourceReference IconChevronDown}"/>
                             <!-- Flyout list of every tab (wired in code), opened below the ▾ (edge-aware via FlipToFit).
                                  The card + its ListBox build LAZILY on first open (ChildTemplate): a list carries a scroll
                                  host and two scrollbars, and most tab strips never overflow at all. The list is taken from
@@ -404,10 +402,8 @@
                                           Focusable="False"
                                           MinWidth="28" Padding="4 0" Visibility="Collapsed" BorderThickness="0"
                                           HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                          Background="{ResourceReference SolidBackgroundFillColorBase}">
-                                <Path Data="M0,0 L8,0 L4,5 Z" Fill="{ResourceReference TextFillColorSecondary}"
-                                      Width="8" Height="5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </ToggleButton>
+                                          Background="{ResourceReference SolidBackgroundFillColorBase}"
+                                          Content="{ResourceReference IconChevronDown}"/>
                             <Popup x:Name="PART_TabOverflowPopup" Grid.Row="1" Grid.Column="2" Placement="Bottom" FlipToFit="True" VerticalOffset="2">
                                 <Popup.ChildTemplate>
                                     <ControlTemplate TargetType="Popup">
@@ -502,10 +498,8 @@
                                           Focusable="False"
                                           MinHeight="24" Padding="0 4" Visibility="Collapsed" BorderThickness="0"
                                           HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                          Background="{ResourceReference SolidBackgroundFillColorBase}">
-                                <Path Data="M0,0 L8,0 L4,5 Z" Fill="{ResourceReference TextFillColorSecondary}"
-                                      Width="8" Height="5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </ToggleButton>
+                                          Background="{ResourceReference SolidBackgroundFillColorBase}"
+                                          Content="{ResourceReference IconChevronDown}"/>
                             <Popup x:Name="PART_TabOverflowPopup" Grid.Row="1" Placement="Bottom" FlipToFit="True" VerticalOffset="2">
                                 <Popup.ChildTemplate>
                                     <ControlTemplate TargetType="Popup">
@@ -631,10 +625,8 @@
                                           Focusable="False"
                                           MinHeight="24" Padding="0 4" Visibility="Collapsed" BorderThickness="0"
                                           HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                          Background="{ResourceReference SolidBackgroundFillColorBase}">
-                                <Path Data="M0,0 L8,0 L4,5 Z" Fill="{ResourceReference TextFillColorSecondary}"
-                                      Width="8" Height="5" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </ToggleButton>
+                                          Background="{ResourceReference SolidBackgroundFillColorBase}"
+                                          Content="{ResourceReference IconChevronDown}"/>
                             <Popup x:Name="PART_TabOverflowPopup" Grid.Row="1" Placement="Bottom" FlipToFit="True" VerticalOffset="2">
                                 <Popup.ChildTemplate>
                                     <ControlTemplate TargetType="Popup">

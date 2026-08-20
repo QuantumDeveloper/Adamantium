@@ -43,11 +43,10 @@
                                 <TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}"
                                         Foreground="{ResourceReference TextFillColorSecondary}"
                                         FontSize="12" VerticalAlignment="Center" Margin="24 0 0 0"/>
-                                <!-- Vector chevron (not a glyph - a Path always renders regardless of the UI font's coverage). -->
-                                <Path x:Name="Chevron" Grid.Column="3"
-                                        Data="M0,0 L5,4 L0,8 Z"
-                                        Fill="{ResourceReference TextFillColorSecondary}"
-                                        Width="5" Height="8" Visibility="Collapsed"
+                                <!-- Vector chevron, not a glyph: it renders regardless of the UI font's coverage. -->
+                                <ContentPresenter x:Name="Chevron" Grid.Column="3"
+                                        Content="{ResourceReference IconChevronRight}"
+                                        Visibility="Collapsed"
                                         VerticalAlignment="Center" Margin="16 0 0 0"/>
                             </Grid>
                         </Border>

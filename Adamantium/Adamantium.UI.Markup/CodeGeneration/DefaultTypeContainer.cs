@@ -19,6 +19,7 @@ public class DefaultTypeContainer
         TemplateBindingExpression = typeResolver.ResolveByShortName("TemplateBindingExpression");
         TemplateResult = typeResolver.ResolveByShortName("TemplateResult");
         PerTargetValue = typeResolver.ResolveByShortName("PerTargetValue");
+        ResourceLink = typeResolver.ResolveByShortName("ResourceLink");
     }
     
     public IResolvedType TypeParser { get; }
@@ -45,6 +46,8 @@ public class DefaultTypeContainer
     public IResolvedType TemplateResult { get; }
 
     public IResolvedType PerTargetValue { get; }
+
+    public IResolvedType ResourceLink { get; }
 
     public static DefaultTypeContainer ResolveFrom(ITypeResolver typeResolver)
     {
