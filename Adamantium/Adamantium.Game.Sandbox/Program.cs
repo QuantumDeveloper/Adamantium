@@ -120,6 +120,56 @@ public class Program
                     }
                 }
 
+                // TEMP (ADAM_LIST_SCROLL=1): scroll the heavy tab's own list, which is the workload the per-layer arena
+                // (§5a phase 3) was argued from - slot renumbering, segment cuts, layers relocated out of their room.
+                // Panning the tab strip barely touches any of that, so it cannot answer whether that rewrite is worth it.
+                if (Environment.GetEnvironmentVariable("ADAM_LIST_SCROLL") == "1")
+                {
+                    var win = Adamantium.UI.UIApplication.Current?.MainWindow;
+                    var viewer = win?.Content is Adamantium.UI.Core.IUIComponent c ? Find<Adamantium.UI.Controls.ScrollViewer>(c) : null;
+                    if (viewer != null)
+                    {
+                        Adamantium.UI.Rendering.LayerProbe.Reset();
+                        var down = 40.0;
+                        var listFrames = Run(8, () =>
+                        {
+                            var at = viewer.ScrollOffset;
+                            if (at.Y + down < 0) down = -down;
+                            viewer.SetScrollOffset(new Adamantium.Mathematics.Vector2(at.X, at.Y + down));
+                            if (viewer.ScrollOffset.Y == at.Y) down = -down;   // hit an end - turn around
+                            return true;
+                        });
+                        System.IO.File.AppendAllText(log + ".list.txt",
+                            $"scrolling the list: {listFrames / 8.0:0} fps" + Environment.NewLine
+                            + Adamantium.UI.Core.Diagnostics.FrameTrace.Percentiles() + Environment.NewLine
+                            + Adamantium.UI.Rendering.LayerProbe.Dump() + Environment.NewLine);
+                    }
+                }
+
+                // TEMP (ADAM_CLOSE_FLIP=1): show and hide a tab's close button, which is what HOVERING one does - the
+                // reported "the plate stops updating and the frame gets worse when the pointer rests on a close button".
+                // Driven from here so it can be attributed without a hand on the mouse.
+                if (Environment.GetEnvironmentVariable("ADAM_CLOSE_FLIP") == "1")
+                {
+                    var win = Adamantium.UI.UIApplication.Current?.MainWindow;
+                    var button = win?.Content is Adamantium.UI.Core.IUIComponent c ? FindNamed(c, "PART_CloseButton") : null;
+                    if (button != null)
+                    {
+                        Adamantium.UI.Rendering.LayerProbe.Reset();
+                        var show = true;
+                        var flipFrames = Run(8, () =>
+                        {
+                            button.Visibility = show ? Adamantium.UI.Core.Visibility.Visible : Adamantium.UI.Core.Visibility.Hidden;
+                            show = !show;
+                            return true;
+                        });
+                        System.IO.File.AppendAllText(log + ".flip.txt",
+                            $"flipping a close button: {flipFrames / 8.0:0} fps" + Environment.NewLine
+                            + Adamantium.UI.Core.Diagnostics.FrameTrace.Percentiles() + Environment.NewLine
+                            + Adamantium.UI.Rendering.LayerProbe.Dump() + Environment.NewLine);
+                    }
+                }
+
                 // TEMP self-check (ADAM_THEME_SWAP=1): swap the theme from here and report the tab strip's height after
                 // each swap. ~36 is a strip; anything larger is the "page inside a tab header" fault this hunt closed.
                 var stripReport = "(not asked)";
@@ -187,6 +237,36 @@ public class Program
         }
 
         return Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames - from;
+    }
+
+    // TEMP: the first control of a kind under a root - the harnesses need to reach a viewer or a strip by type.
+    private static T Find<T>(Adamantium.UI.Core.IUIComponent root) where T : class
+    {
+        var stack = new System.Collections.Generic.Stack<Adamantium.UI.Core.IUIComponent>();
+        stack.Push(root);
+        while (stack.Count > 0)
+        {
+            var node = stack.Pop();
+            if (node is T hit) return hit;
+            foreach (var child in node.VisualChildren) stack.Push(child);
+        }
+
+        return null;
+    }
+
+    // TEMP: the first control with this Name under a root.
+    private static Adamantium.UI.Controls.Base.UIComponent FindNamed(Adamantium.UI.Core.IUIComponent root, string name)
+    {
+        var stack = new System.Collections.Generic.Stack<Adamantium.UI.Core.IUIComponent>();
+        stack.Push(root);
+        while (stack.Count > 0)
+        {
+            var node = stack.Pop();
+            if (node is Adamantium.UI.Controls.Base.UIComponent ui && ui.Name == name) return ui;
+            foreach (var child in node.VisualChildren) stack.Push(child);
+        }
+
+        return null;
     }
 
     // TEMP: the tab strip, for the pan self-check above.

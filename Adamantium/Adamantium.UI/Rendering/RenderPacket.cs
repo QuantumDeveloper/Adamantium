@@ -47,6 +47,15 @@ internal sealed class RenderPacket
     /// <summary>Partial only: whether the dirty set was a MOVE (positions changed) vs a geometry-only change.</summary>
     public bool IsTransformDirty;
 
+    /// <summary>The components that MOVED - named, so the draw can ask whether it is patching all of them. A move only
+    /// forces a rebuild because the recorded frame bakes positions; a mover whose slots this same frame re-bakes does
+    /// not need one.</summary>
+    public readonly List<IUIComponent> Moved = new();
+
+    /// <summary>Something moved that could not be named (a bare Transform ticking with no owner). Then Moved is not the
+    /// whole story and nothing about movement can be forgiven.</summary>
+    public bool TransformUnknown;
+
     /// <summary>Something MOVED (or the whole paint order was rebuilt), so the applier's derived per-frame memos - the
     /// composed world/clip/node transforms - are stale and must be dropped before it draws. Carried HERE, on the packet,
     /// rather than cleared by the recorder: those memos are APPLIER-owned state, and the recorder (the loop thread in the
@@ -85,6 +94,8 @@ internal sealed class RenderPacket
         Reranks.Clear();
         SnapReset = false;
         IsTransformDirty = false;
+        TransformUnknown = false;
+        Moved.Clear();
         ClearMemos = false;
     }
 }

@@ -5,6 +5,7 @@ using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Graphics;
 using Adamantium.Vulkan.Core;
 
 namespace Adamantium.UI.Rendering;
@@ -19,7 +20,7 @@ namespace Adamantium.UI.Rendering;
 //
 // Derived types add: item baking (their own TryAdd, which writes into Items/Count then calls MarkPending) and the
 // per-segment draw (DrawSegment). Grouping (which items share a segment) is decided by the caller (RenderCache).
-internal abstract class BatchCollector<TItem> where TItem : struct
+internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
 {
     // Size of ONE instance. Static readonly, so it is computed once per closed type - a Marshal.SizeOf per DRAW showed up
     // as microseconds a call in the replay breakdown, and a replayed frame issues dozens of them.
@@ -78,12 +79,15 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     /// <summary>Where a segment currently sits in draw order, or -1 if this id is not part of the recorded frame.</summary>
     private int IndexOf(int id) => _indexById.TryGetValue(id, out var index) ? index : -1;
 
+    /// <summary>Same, for a derived collector that keeps per-segment state of its own (the text sheet).</summary>
+    protected int IndexOfSegment(int id) => IndexOf(id);
+
     /// <summary>The id of the segment sitting at this position in draw order - the way back from a position (which is
     /// what a slot search answers) to the NAME everything outside uses.</summary>
-    public int SegmentIdAt(int index) => index >= 0 && index < _segments.Count ? _segments[index].Id : -1;
+    public override int SegmentIdAt(int index) => index >= 0 && index < _segments.Count ? _segments[index].Id : -1;
 
     /// <summary>Is this id still part of the recorded frame?</summary>
-    public bool HasSegment(int id) => _indexById.ContainsKey(id);
+    public override bool HasSegment(int id) => _indexById.ContainsKey(id);
 
     // Re-point the id map from that index to the end of the list. Called after an insert, which is the only thing that moves a
     // segment's index.
@@ -309,7 +313,7 @@ internal abstract class BatchCollector<TItem> where TItem : struct
 
     /// <summary>The recorded segment whose retained range contains <paramref name="slot"/>, or -1. Zero-count (fully
     /// excluded) segments never match.</summary>
-    public int FindSegmentContaining(int slot)
+    public override int FindSegmentContaining(int slot)
     {
         for (var i = 0; i < _segments.Count; i++)
         {
@@ -369,7 +373,7 @@ internal abstract class BatchCollector<TItem> where TItem : struct
         return false;
     }
 
-    public Rect2D GetSegmentScissor(int id)
+    public override Rect2D GetSegmentScissor(int id)
     {
         var index = IndexOf(id);
         return index < 0 ? null : _segments[index].Scissor;
@@ -377,18 +381,18 @@ internal abstract class BatchCollector<TItem> where TItem : struct
 
     /// <summary>What this recorded segment covers, in logical coordinates - empty when it never had bounds (a stale id, or
     /// a segment re-issued to nothing).</summary>
-    public Rect SegmentBounds(int id)
+    public override Rect SegmentBounds(int id)
     {
         var index = IndexOf(id);
         if (index < 0) return Rect.Empty;
 
         var s = _segments[index];
-        return s.HasBounds && s.Count > 0 ? new Rect(s.L, s.T, s.R - s.L, s.B - s.T) : Rect.Empty;
+        return s is { HasBounds: true, Count: > 0 } ? new Rect(s.L, s.T, s.R - s.L, s.B - s.T) : Rect.Empty;
     }
 
     /// <summary>Grow a recorded segment's footprint by what a patch has just put into it - a layer that gained an item now
     /// covers it, and the next placement has to see that.</summary>
-    public void GrowSegmentBounds(int id, Rect bounds)
+    public override void GrowSegmentBounds(int id, Rect bounds)
     {
         var index = IndexOf(id);
         if (index < 0) return;
@@ -408,7 +412,7 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     }
 
     /// TEMP (flicker hunt): what this recorded segment actually draws, for the walk-vs-replay trace comparison.
-    public string DescribeSegment(int id)
+    public override string DescribeSegment(int id)
     {
         var index = IndexOf(id);
         if (index < 0) return $"seg#{id} MISSING (have {_segments.Count})";
@@ -421,13 +425,47 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     }
 
     /// <summary>Free retained capacity for patch appends this frame (capacity only grows at the next BeginFrame).</summary>
-    public int PatchCapacityLeft => _gpuCapacity - Count;
+    public override int PatchCapacityLeft => _gpuCapacity - Count;
 
     /// <summary>Retained slot count (the next patch append starts here).</summary>
-    public int RetainedCount => Count;
+    public override int RetainedCount => Count;
+
+    // Where a patch's freshly baked items wait between its validate phase and its mutate phase (see BatchArena). Typed,
+    // so the bytes never leave this collector; the patch only ever names the range it appended.
+    protected readonly List<TItem> Stage = new();
+
+    public override void ClearStage() => Stage.Clear();
+
+    public override int StagedCount => Stage.Count;
+
+    /// <summary>A family that cannot bake a unit from a payload says so, and the patch refuses - which is what every
+    /// family did before any of them could stage.</summary>
+    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot) => false;
+
+    public override bool ReplaceStagedInSegment(IGraphicsDevice device, int id, int at, int replaced, int stageFirst, int stageCount)
+        => ReplaceInSegment(device, id, at, replaced, CollectionsMarshal.AsSpan(Stage).Slice(stageFirst, stageCount));
+
+    public override bool RepointSegmentAroundStage(IGraphicsDevice device, int id, int first, int at, int replaced, int count,
+        Rect2D scissor, int stageFirst, int stageCount)
+    {
+        _rebake.Clear();
+        CopyRetained(first, at, _rebake);
+        for (var i = 0; i < stageCount; i++) _rebake.Add(Stage[stageFirst + i]);
+        CopyRetained(first + at + replaced, count - at - replaced, _rebake);
+        return RepointSegment(device, id, CollectionsMarshal.AsSpan(_rebake), scissor);
+    }
+
+    public override void UpdateSlotFromStage(IGraphicsDevice device, int slot, int stageIndex)
+        => UpdateSlot(device, slot, Stage[stageIndex]);
+
+    public override int AllocateSegmentFromStage(IGraphicsDevice device, Rect2D scissor, int stageFirst, int stageCount)
+        => AllocateSegment(device, CollectionsMarshal.AsSpan(Stage).Slice(stageFirst, stageCount), scissor);
+
+    // Scratch for a relocating re-issue: head + staged + tail, assembled once and handed over as one span.
+    private readonly List<TItem> _rebake = new();
 
     /// <summary>The retained range [first, first+count) a recorded segment currently draws.</summary>
-    public (int First, int Count) SegmentRange(int id)
+    public override (int First, int Count) SegmentRange(int id)
     {
         var index = IndexOf(id);
         return index < 0 ? (-1, 0) : ((int)_segments[index].First, (int)_segments[index].Count);
@@ -441,7 +479,7 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     /// stream until the span is split at it (see RenderCache's PlaceNewSegment).</para>
     /// <para>Capacity stays with the FIRST half: it is the tail of the original allocation, and a re-issue that grows must
     /// grow into it, never into the second half's live items.</para></summary>
-    public int SplitSegment(int id, int firstOfSecond)
+    public override int SplitSegment(int id, int firstOfSecond)
     {
         var index = IndexOf(id);
         if (index < 0) return -1;

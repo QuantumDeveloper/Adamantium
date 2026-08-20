@@ -1,4 +1,5 @@
 using System;
+using Adamantium.UI.Core.Graphics;
 using System.Collections.Generic;
 using Adamantium.Graphics.Core.EffectsFramework;
 using Adamantium.Mathematics;
@@ -129,6 +130,17 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
         var rectRadii = RectBatchCollector.BakeRadii(corners, dest, sx);
         item.Radii = shape.RadiiFor(rectRadii);
         item.Params = new Vector4F(shape.RadiusFlag(rectRadii), type, count, (float)g.SpreadMethod + 8f * (float)g.ColorInterpolationMode);
+        return true;
+    }
+
+    /// <summary>Bake one unit into the patch stage - see BatchArena. Same bake TryAdd uses; it just lands in the stage
+    /// instead of the arena, because a patch has to know the whole frame is repairable before it changes any of it.</summary>
+    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot)
+    {
+        if (unit is not RenderUnits.RectangleRenderUnit u || !CanBatch(u.RectPayload)) return false;
+        if (!BakeItem(u.RectPayload, world, u.FillOpacity, transformSlot, out var item)) return false;
+
+        Stage.Add(item);
         return true;
     }
 }

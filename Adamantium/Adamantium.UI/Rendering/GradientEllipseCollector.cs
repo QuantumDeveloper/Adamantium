@@ -1,4 +1,5 @@
 using Adamantium.Graphics.Core.EffectsFramework;
+using Adamantium.UI.Core.Graphics;
 using Adamantium.Mathematics;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Media;
@@ -48,5 +49,16 @@ internal sealed class GradientEllipseCollector : SdfBatchCollector<GradientRectI
         if (p.Brush is not GradientBrush g) return false;
         // cornerRadius = 0 (unused by the ellipse branch); the shape selects the ellipse SDF in the shared gradient shader.
         return GradientRectCollector.BakeGradientItem(g, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, p.Pen, world, opacity, BrushShape.Ellipse, transformSlot, out item);
+    }
+
+    /// <summary>Bake one unit into the patch stage - see BatchArena. Same bake TryAdd uses; it just lands in the stage
+    /// instead of the arena, because a patch has to know the whole frame is repairable before it changes any of it.</summary>
+    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot)
+    {
+        if (unit is not RenderUnits.EllipseRenderUnit u || !CanBatch(u.EllipsePayload)) return false;
+        if (!BakeItem(u.EllipsePayload, world, u.FillOpacity, transformSlot, out var item)) return false;
+
+        Stage.Add(item);
+        return true;
     }
 }

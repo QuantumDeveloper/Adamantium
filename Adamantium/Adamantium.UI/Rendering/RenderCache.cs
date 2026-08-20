@@ -47,10 +47,12 @@ public partial class RenderCache
 
         public readonly List<IRenderUnit> Units = new();
 
-        // Per-group rect-batch slot runs + whether EVERY drawn unit is rect-batched, for the spliced-patch draw path;
-        // anything else falls back to the full walk.
-        public readonly List<(int First, int Count)> RectRuns = new();
-        public bool PatchableRectOnly;
+        // Per-group batch slot runs + the ARENA they live in, for the spliced-patch draw path. One arena per group: a
+        // group whose units land in two different families has no single segment to repair and falls back to the walk,
+        // which is what PatchableBatchedOnly records - along with content that is in no arena at all (a per-unit draw).
+        public readonly List<(int First, int Count)> Runs = new();
+        public BatchArena Arena;
+        public bool PatchableBatchedOnly;
         public int WalkVersion = -1;   // which recording walk last described this group (distinguishes NEW groups)
     }
 
@@ -70,7 +72,10 @@ public partial class RenderCache
     // 63-bit space is ample, so be generous.
     private const long OrderGap = 1L << 30;
     private IRootVisualComponent _lastVisualRoot;             // the tree these ranks describe
-    private readonly Stack<IUIComponent> _walkStack = new();      // reused by RecordFullWalk (it ran on every structural frame)
+    // The walk carries "hidden" WITH the traversal rather than looking it up per node: hiding is inherited, and the walk
+    // now goes THROUGH a hidden element (to keep its subtree ranked) instead of stopping at it. A set lookup on every
+    // component of every full walk is exactly the wrong place for a hash.
+    private readonly Stack<(IUIComponent Node, bool Hidden)> _walkStack = new();   // reused by RecordFullWalk
     private readonly HashSet<IUIComponent> _walkVisited = new();
     private bool _forceFullNextFrame;                         // the applier hit a state only a full RECORD can fix (see ApplyPacket)
 
@@ -273,6 +278,8 @@ public partial class RenderCache
 
                 Dirty.SnapshotNodesInto(_packet.MovedNodes);   // under the write lock (MarkNodeTransform runs on other threads too)
                 Dirty.SnapshotMovedInto(_movedBuf);            // the MOVED components - CaptureSnapshot re-freezes just these
+                _packet.Moved.AddRange(_movedBuf);             // ...and the draw asks whether it is patching all of them
+                _packet.TransformUnknown = Dirty.IsTransformUnknown;
 
                 return;   // packet.Kind == Partial -> ApplyFrame runs the partial apply
             }
@@ -349,12 +356,14 @@ public partial class RenderCache
     // root drawn by its own cache).
     private bool IsDrawn(IUIComponent component)
     {
-        if (component.Visibility != Visibility.Visible || !component.IsAttachedToVisualTree) return false;
+        // In the paint ORDER, which HIDDEN content still is - it holds its rank and paints nothing. Only COLLAPSED
+        // leaves, and it takes its whole subtree with it.
+        if (component.Visibility == Visibility.Collapsed || !component.IsAttachedToVisualTree) return false;
         var c = component;
         while (c.VisualParent != null)
         {
             c = c.VisualParent;
-            if (c.Visibility != Visibility.Visible) return false;
+            if (c.Visibility == Visibility.Collapsed) return false;
         }
         return ReferenceEquals(c, _lastVisualRoot);
     }

@@ -226,8 +226,11 @@ public partial class RenderCache
         foreach (var group in _leftTheOrder)
         {
             if (group.InOrder || group.Tag == 0) continue;   // came back before anyone looked
+            // OWNERSHIP rides in the instance, and only a rect instance carries it (RectItem.OwnerTag). Another family's
+            // orphans are left to the next walk rather than blanked on a guess about whose slots those are.
+            if (!ReferenceEquals(group.Arena, _rectBatch)) continue;
             var reclaimedAll = true;
-            foreach (var run in group.RectRuns)
+            foreach (var run in group.Runs)
             {
                 LayerProbe.OrphanSweptSlots += run.Count;
                 var segment = _rectBatch.FindSegmentContaining(run.First);
@@ -241,7 +244,7 @@ public partial class RenderCache
             }
 
             // Runs it no longer owns anywhere: keeping them would let a later patch address space that is now free.
-            if (reclaimedAll) group.RectRuns.Clear();
+            if (reclaimedAll) group.Runs.Clear();
         }
 
         // A segment whose every instance has just been blanked is a draw call that paints nothing. Let it go: the op
@@ -386,7 +389,8 @@ public partial class RenderCache
 
     private const int MaxRetainedOps = 256;   // op stream past this -> a splice yields to a full walk that recompacts
     private readonly List<GroupPatch> _patchBuf = new();   // TrySplicedPatch: staged per-group patches (validated before mutation)
-    private readonly List<int> _patchLayers = new();     // the LAYERS those patches land in - each re-issued once, whole
+    private readonly HashSet<int> _patchLayers = new();  // the LAYERS those patches land in - each re-issued once, whole
+    private int _cloneReserve;   // clone slots this frame reserved - counted once, read by the trace
     private readonly List<RectItem> _rebakeBuf = new();
 
     // Picks the transform-table copy this frame writes and draws from, and hands its address to every collector that
@@ -415,6 +419,7 @@ public partial class RenderCache
             if (group.Clones is { Count: > 0 } clones) reserve += clones.Count;
         }
 
+        _cloneReserve = reserve;   // ...and the trace reads it from here instead of counting the scene again
         _transformTable.Reserve(reserve);
         _transformTable.EnsureResources(device);
 
@@ -466,11 +471,10 @@ public partial class RenderCache
 
             if (Core.Diagnostics.FrameTrace.Enabled)
             {
-                var clones = 0;
-                foreach (var g in _groups)
-                {
-                    if (g.Clones is { Count: > 0 } c) clones += c.Count;
-                }
+                // Counted where they are DECIDED, not by scanning the scene here: this runs on every frame the plate is
+                // up - which is every frame - and a diagnostic that walks the whole paint order to report a number is the
+                // instrument becoming the thing it measures.
+                var clones = _cloneReserve;
 
                 var unitOps = 0;
                 foreach (var op in _ops)
@@ -512,7 +516,7 @@ public partial class RenderCache
         foreach (var g in _groups)
         {
             var slots = 0;
-            foreach (var r in g.RectRuns) slots += r.Count;
+            foreach (var r in g.Runs) slots += r.Count;
             if (slots == 0 && g.Units.Count == 0) continue;
 
             var c = g.Component;
@@ -615,14 +619,16 @@ public partial class RenderCache
         // Text + item-background + instanced-fill batches: reset per frame. Device renders only - GPU-free tests skip batching.
         if (device != null)
         {
-            _textBatch ??= new TextBatchCollector();
-            _rectBatch ??= new RectBatchCollector();
-            _ellipseBatch ??= new EllipseBatchCollector();
-            _polygonBatch ??= new RegularPolygonCollector();
-            _gradientRectBatch ??= new GradientRectCollector();
-            _gradientEllipseBatch ??= new GradientEllipseCollector();
-            _patternBatch ??= new PatternRectCollector();
-            _fractalBatch ??= new FractalRectCollector();
+            // The BatchId is how a recorded op finds its way back to the arena that drew it (see ArenaOf) - the same
+            // numbers ExecuteOps switches on, said once, here.
+            _textBatch ??= new TextBatchCollector { BatchId = 2 };
+            _rectBatch ??= new RectBatchCollector { BatchId = 0 };
+            _ellipseBatch ??= new EllipseBatchCollector { BatchId = 1 };
+            _polygonBatch ??= new RegularPolygonCollector { BatchId = 12 };
+            _gradientRectBatch ??= new GradientRectCollector { BatchId = 3 };
+            _gradientEllipseBatch ??= new GradientEllipseCollector { BatchId = 4 };
+            _patternBatch ??= new PatternRectCollector { BatchId = 5 };
+            _fractalBatch ??= new FractalRectCollector { BatchId = 6 };
             _textBatch.BeginFrame(device);
             _rectBatch.BeginFrame(device);
             _ellipseBatch.BeginFrame(device);
@@ -681,7 +687,7 @@ public partial class RenderCache
                 // unpatchable says exactly that, and costs nothing else.
                 // (Refusing to replay instead was the first attempt, and it cost the whole window its fast path for as
                 // long as any skeleton was on screen: 600 fps -> 180.)
-                group.PatchableRectOnly = false;
+                group.PatchableBatchedOnly = false;
             }
 
             foreach (var unit in group.Units)
@@ -695,8 +701,9 @@ public partial class RenderCache
                 // An EMPTY rect segment will begin with whatever group first puts a rect in it, and that is this one or a
                 // later one - so keep moving the mark until something lands.
                 if (_rectBatch == null || !_rectBatch.HasPending) _rectSegStart = group.Order;
-                group.RectRuns.Clear();
-                group.PatchableRectOnly = true;
+                group.Runs.Clear();
+                group.Arena = null;
+                group.PatchableBatchedOnly = true;
                 group.WalkVersion = _walkVersion;
             }
 
@@ -753,7 +760,7 @@ public partial class RenderCache
                 over |= CollectLivingHalo(device, unit, wt, scissor, inner: true);
                 if ((under || over) && _recording)
                 {
-                    group.PatchableRectOnly = false;   // a band is not a rect slot; the fast-path patch can't reproduce it
+                    group.PatchableBatchedOnly = false;   // a band is not a rect slot; the fast-path patch can't reproduce it
                 }
             }
 
@@ -773,12 +780,7 @@ public partial class RenderCache
                         var slot = _rectBatch.LastSlot;
                         _rectSlotByUnit[unit] = slot;   // for a later fast-path partial replay
                         IndexUnitBrush(unit.Component, unit, rru.RectPayload.LiveBrush);   // for a composited paint re-bake
-                        // Extend/open this group's contiguous slot run (for the spliced-patch segment surgery).
-                        var runs = group.RectRuns;
-                        if (runs.Count > 0 && runs[^1].First + runs[^1].Count == slot)
-                            runs[^1] = (runs[^1].First, runs[^1].Count + 1);
-                        else
-                            runs.Add((slot, 1));
+                        NoteBatched(group, _rectBatch, slot);
                     }
                     _batchScissor = scissor;
                     _batchOpen = true;
@@ -801,8 +803,8 @@ public partial class RenderCache
                 {
                     if (_recording)
                     {
-                        group.PatchableRectOnly = false;   // gradient: node-aware, but not rect-splice-patchable
-                        _sdfSlotByUnit[unit] = (SdfSlotKind.GradientRect, _gradientRectBatch.LastSlot);   // ...but PAINT-patchable
+                        _sdfSlotByUnit[unit] = (SdfSlotKind.GradientRect, _gradientRectBatch.LastSlot);
+                        NoteBatched(group, _gradientRectBatch, _gradientRectBatch.LastSlot);
                         IndexUnitBrush(unit.Component, unit, grru.RectPayload.LiveBrush);
                     }
                     _batchScissor = scissor;
@@ -822,8 +824,8 @@ public partial class RenderCache
                 {
                     if (_recording)
                     {
-                        group.PatchableRectOnly = false;   // non-rect-batch draw -> not rect-splice-patchable
-                        _sdfSlotByUnit[unit] = (SdfSlotKind.Ellipse, _ellipseBatch.LastSlot);   // ...but PAINT-patchable
+                        _sdfSlotByUnit[unit] = (SdfSlotKind.Ellipse, _ellipseBatch.LastSlot);
+                        NoteBatched(group, _ellipseBatch, _ellipseBatch.LastSlot);
                         IndexUnitBrush(unit.Component, unit, eru.EllipsePayload.LiveBrush);
                     }
                     _batchScissor = scissor;
@@ -844,7 +846,7 @@ public partial class RenderCache
                 {
                     if (_recording)
                     {
-                        group.PatchableRectOnly = false;   // non-rect-batch draw -> not rect-splice-patchable
+                        group.PatchableBatchedOnly = false;   // non-rect-batch draw -> not rect-splice-patchable
                         IndexUnitBrush(unit.Component, unit, pru2.PolygonPayload.LiveBrush);
                     }
                     _batchScissor = scissor;
@@ -867,7 +869,7 @@ public partial class RenderCache
                 {
                     if (_recording)
                     {
-                        group.PatchableRectOnly = false;
+                        group.PatchableBatchedOnly = false;
                         IndexUnitBrush(unit.Component, unit, gpru.PolygonPayload.LiveBrush);
                     }
                     _batchScissor = scissor;
@@ -887,7 +889,7 @@ public partial class RenderCache
                 var patPolyBake = ResolveBake(device, unit.Component, wt, out var slot4PatPoly);
                 if (_patternBatch.TryAddPolygon(ppru.PolygonPayload, patPolyBake, ppru.FillOpacity, scissor, patPolyBounds, slot4PatPoly))
                 {
-                    if (_recording) group.PatchableRectOnly = false;
+                    if (_recording) group.PatchableBatchedOnly = false;
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -903,7 +905,7 @@ public partial class RenderCache
                 if (texPolyTexture == null) continue;
                 if (_texRectBatch == null)
                 {
-                    _texRectBatch = new TexRectCollector { TransformsAddress = _transformTable?.DeviceAddress ?? 0 };
+                    _texRectBatch = new TexRectCollector { BatchId = 7, TransformsAddress = _transformTable?.DeviceAddress ?? 0 };
                     _texRectBatch.BeginFrame(device);
                 }
                 var texPolyBounds = LogicalBounds(unit.Component, wt);
@@ -915,7 +917,7 @@ public partial class RenderCache
                 var texPolyBake = ResolveBake(device, unit.Component, wt, out var slot4TexPoly);
                 if (_texRectBatch.TryAddPolygon(tpru.PolygonPayload, texPolyBake, tpru.FillOpacity, scissor, texPolyBounds, texPolyTexture, slot4TexPoly))
                 {
-                    if (_recording) group.PatchableRectOnly = false;
+                    if (_recording) group.PatchableBatchedOnly = false;
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -934,8 +936,8 @@ public partial class RenderCache
                 {
                     if (_recording)
                     {
-                        group.PatchableRectOnly = false;   // gradient: node-aware, but not rect-splice-patchable
-                        _sdfSlotByUnit[unit] = (SdfSlotKind.GradientEllipse, _gradientEllipseBatch.LastSlot);   // ...but PAINT-patchable
+                        _sdfSlotByUnit[unit] = (SdfSlotKind.GradientEllipse, _gradientEllipseBatch.LastSlot);
+                        NoteBatched(group, _gradientEllipseBatch, _gradientEllipseBatch.LastSlot);
                         IndexUnitBrush(unit.Component, unit, geru.EllipsePayload.LiveBrush);
                     }
                     _batchScissor = scissor;
@@ -960,7 +962,7 @@ public partial class RenderCache
                 {
                     if (_recording)
                     {
-                        group.PatchableRectOnly = false;   // pattern: node-aware, not paint/splice-patchable in v1
+                        group.PatchableBatchedOnly = false;   // pattern: node-aware, not paint/splice-patchable in v1
                     }
                     _batchScissor = scissor;
                     _batchOpen = true;
@@ -985,7 +987,7 @@ public partial class RenderCache
                     // _sdfSlotByUnit entry, so a dirty pattern falls to a full walk (patterns are static backdrops).
                     if (_recording)
                     {
-                        group.PatchableRectOnly = false;
+                        group.PatchableBatchedOnly = false;
                     }
                     _batchScissor = scissor;
                     _batchOpen = true;
@@ -1009,7 +1011,7 @@ public partial class RenderCache
                 {
                     if (_recording)
                     {
-                        group.PatchableRectOnly = false;
+                        group.PatchableBatchedOnly = false;
                     }
                     _batchScissor = scissor;
                     _batchOpen = true;
@@ -1033,7 +1035,7 @@ public partial class RenderCache
                 // device out of memory.
                 if (_texRectBatch == null)
                 {
-                    _texRectBatch = new TexRectCollector { TransformsAddress = _transformTable?.DeviceAddress ?? 0 };
+                    _texRectBatch = new TexRectCollector { BatchId = 7, TransformsAddress = _transformTable?.DeviceAddress ?? 0 };
                     _texRectBatch.BeginFrame(device);
                 }
                 var texBounds = LogicalBounds(unit.Component, wt);
@@ -1047,7 +1049,7 @@ public partial class RenderCache
                 {
                     if (_recording)
                     {
-                        group.PatchableRectOnly = false;
+                        group.PatchableBatchedOnly = false;
                     }
                     _batchScissor = scissor;
                     _batchOpen = true;
@@ -1067,7 +1069,7 @@ public partial class RenderCache
                 }
                 if (_texRectBatch == null)
                 {
-                    _texRectBatch = new TexRectCollector { TransformsAddress = _transformTable?.DeviceAddress ?? 0 };
+                    _texRectBatch = new TexRectCollector { BatchId = 7, TransformsAddress = _transformTable?.DeviceAddress ?? 0 };
                     _texRectBatch.BeginFrame(device);
                 }
                 var texEllBounds = LogicalBounds(unit.Component, wt);
@@ -1081,7 +1083,7 @@ public partial class RenderCache
                 {
                     if (_recording)
                     {
-                        group.PatchableRectOnly = false;
+                        group.PatchableBatchedOnly = false;
                     }
                     _batchScissor = scissor;
                     _batchOpen = true;
@@ -1106,9 +1108,11 @@ public partial class RenderCache
                 {
                     if (_recording)
                     {
-                        group.PatchableRectOnly = false;   // text is a separate collector, not rect-splice-patchable...
-                        // ...but SLOT-patchable: remember the run so a later re-render of the same glyph count patches it.
+                        // SLOT-patchable while the glyph count holds; and when it does NOT, the run is what the splice
+                        // re-issues - so the glyphs are noted as this group's run in the text arena, exactly as a rect
+                        // group notes its own.
                         _textRunByUnit[unit] = (textFirst, _textBatch.RetainedCount - textFirst, atlas);
+                        for (var g = textFirst; g < _textBatch.RetainedCount; g++) NoteBatched(group, _textBatch, g);
                     }
                     _batchScissor = scissor;
                     _batchOpen = true;
@@ -1140,7 +1144,7 @@ public partial class RenderCache
                     // instance buffer). A unit that still draws a per-unit overlay - a stroke, or a fringe the instanced
                     // path doesn't cover - bakes THAT from RenderData at record time, and it is re-pointed at the flush
                     // (PrepareOverlay) on any frame that moved it. So the node keeps its slot-write fast path either way.
-                    if (_recording) group.PatchableRectOnly = false;
+                    if (_recording) group.PatchableBatchedOnly = false;
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;   // fill batched; fringe/stroke drawn at the flush, over the fill
@@ -1160,7 +1164,7 @@ public partial class RenderCache
                     ggru.FillInstanced = true;
                     // The fill rides the slot now; a per-unit overlay (its fringe, still per-unit here, or a stroke)
                     // bakes its transform at record time and is re-pointed at the flush - see PrepareOverlay.
-                    if (_recording) group.PatchableRectOnly = false;
+                    if (_recording) group.PatchableBatchedOnly = false;
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -1178,7 +1182,7 @@ public partial class RenderCache
                 {
                     pgru.FillInstanced = true;
                     // As the gradient above: the fill rides the slot, the overlay is re-pointed at the flush.
-                    if (_recording) group.PatchableRectOnly = false;
+                    if (_recording) group.PatchableBatchedOnly = false;
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -1195,7 +1199,7 @@ public partial class RenderCache
                 if (_instancedFill.TryAddTextured(tgru, texBake, scissor, LogicalBounds(unit.Component, wt), slot4TexFill))
                 {
                     tgru.FillInstanced = true;
-                    if (_recording) group.PatchableRectOnly = false;
+                    if (_recording) group.PatchableBatchedOnly = false;
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -1244,7 +1248,7 @@ public partial class RenderCache
 
             // A per-unit draw bakes its world into RenderData - but it is recorded as its own op, so a replay can re-point
             // it (see ExecuteOps). It costs the group its rect-only slot patch, not the node its move.
-            if (_recording) group.PatchableRectOnly = false;
+            if (_recording) group.PatchableBatchedOnly = false;
             unit.Render();
             if (_recording) RecordOp(new RenderOp { Kind = RenderOpKind.Unit, Unit = unit, Order = _recordOrder });
             }
@@ -1464,6 +1468,12 @@ public partial class RenderCache
             foreach (var u in g.Units)
                 if (!IsSlotPatchable(u))
                 {
+                    // A text block whose glyph COUNT moved is not patchable IN PLACE - its run is a fixed span - but it is
+                    // repairable by re-issuing that run, which is what the splice does for any batched family. Nothing
+                    // is mutated yet, so hand the frame over instead of walking the scene.
+                    if (u is RenderUnits.TextRenderUnit && ReferenceEquals(g.Arena, _textBatch) && g.PatchableBatchedOnly)
+                        return TrySplicedPatch(device, fullScissor);
+
                     // TEMP: name the type that costs the frame its patch.
                     // WHOSE unit, not just what kind: two text blocks refuse for different reasons and only the owner
                     // says which - the control's type and name are what a reproduction can be matched against.
@@ -1579,7 +1589,9 @@ public partial class RenderCache
     private struct GroupPatch
     {
         public ControlGroup Group;
-        public RectItem[] Items;      // re-baked instances of the group's (non-culled) units, in unit order
+        public BatchArena Arena;      // the family this group draws from - the one segment its repair happens in
+        public int StageFirst;        // where its re-baked instances wait inside that arena's stage, in unit order
+        public int StageCount;
         public Rect2D Scissor;        // the group's clip (all units of one component share it)
         public bool InPlace;          // count-stable recolor -> per-slot UpdateSlot, no surgery
         public int Layer;             // the layer this group's items belong to, resolved ONCE before anything is mutated
@@ -1607,6 +1619,7 @@ public partial class RenderCache
 
         // ---- Phase 1: validate + bake (no mutation) ----
         _patchBuf.Clear();
+        _stagedArenas.Clear();
         var appendTotal = 0;
         foreach (var comp in _partialDirty)
         {
@@ -1618,22 +1631,30 @@ public partial class RenderCache
             // them would blank a live neighbour for a frame (the hover "blink"). A stale group has nothing of its own to
             // excise: drop its runs and re-append fresh. (A splice re-append below re-stamps WalkVersion.)
             var walked = group.WalkVersion == _walkVersion;
-            if (!walked) group.RectRuns.Clear();
+            if (!walked) group.Runs.Clear();
             var runTotal = 0;
-            foreach (var r in group.RectRuns) runTotal += r.Count;
-            // A group DESCRIBED by the last walk must have been rect-only - else it also drew per-unit/text/instanced content
-            // whose recorded ops we can't excise (stale Unit ops would even replay disposed units).
-            if (walked && !group.PatchableRectOnly)
-                return SpliceRefused($"notRectOnly<{comp.GetType().Name}>{(group.Units.Count > 0 ? Says(group.Units[0]) : "")}");
+            foreach (var r in group.Runs) runTotal += r.Count;
+            // A group DESCRIBED by the last walk must have drawn from ONE arena and nothing else - else it also drew
+            // per-unit/text/instanced content whose recorded ops we can't excise (stale Unit ops would even replay
+            // disposed units), or it is spread over two segments and there is no single one to repair.
+            if (walked && !group.PatchableBatchedOnly)
+                return SpliceRefused($"notOneArena<{comp.GetType().Name}>{(group.Units.Count > 0 ? Says(group.Units[0]) : "")}");
 
-            var items = new List<RectItem>(group.Units.Count);
+            // WHICH arena repairs it. A group the walk described says so itself; a group that drew nothing yet is placed
+            // into the arena its units would go to, which is decided by asking them to bake.
+            var arena = group.Arena ?? ArenaFor(group);
+            if (arena == null) return SpliceRefused($"noArena<{comp.GetType().Name}>");
+
+            // Emptied ONCE per patch, not per group: two groups repairing the same family stage into the same buffer and
+            // each owns the range it appended.
+            if (_stagedArenas.Add(arena)) arena.ClearStage();
+            var stageFirst = arena.StagedCount;
+            var staged = 0;
             var scissor = fullScissor;
             var haveScissor = false;
             var bounds = Rect.Empty;
             foreach (var u in group.Units)
             {
-                if (u is not RectangleRenderUnit rru || !_rectBatch.CanBatch(rru.RectPayload))
-                    return SpliceRefused($"notARect<{u.GetType().Name} in {comp.GetType().Name}>");
                 u.SetEffectiveOpacity(EffectiveOpacity(u.Component));   // a splice may ride an opacity cascade too
                 var wt = World(u.Component);
                 if (!haveScissor)
@@ -1643,15 +1664,23 @@ public partial class RenderCache
                     if (cull) break;   // whole component off-clip: it contributes no items (units share the component)
                 }
                 var bakeWorld = ResolveBake(device, u.Component, wt, out var slot);
-                if (!RectBatchCollector.BakeItem(rru.RectPayload, bakeWorld, rru.FillOpacity, slot, out var item)) return SpliceRefused("notBakeable");
-                items.Add(item);
+                if (!arena.TryStage(u, bakeWorld, slot))
+                    return SpliceRefused($"notStageable<{u.GetType().Name} in {comp.GetType().Name}>");
+                // How many INSTANCES it added, which is not how many units were asked: one rectangle is one instance, one
+                // text block is a whole run of glyphs. Counting units here left a repaired block drawing its first glyph
+                // and nothing else.
+                staged = arena.StagedCount - stageFirst;
                 bounds = bounds.IsEmpty ? LogicalBounds(u.Component, wt) : Union(bounds, LogicalBounds(u.Component, wt));
             }
 
             // Count-stable recolor (every unit already holds a retained slot): patch in place, no surgery/fragmentation.
-            var inPlace = items.Count == group.Units.Count && items.Count == runTotal && AllUnitsHaveSlots(group);
-            if (!inPlace) appendTotal += items.Count;
-            _patchBuf.Add(new GroupPatch { Group = group, Items = items.ToArray(), Scissor = scissor, InPlace = inPlace, Bounds = bounds });
+            var inPlace = staged == group.Units.Count && staged == runTotal && AllUnitsHaveSlots(group);
+            if (!inPlace) appendTotal += staged;
+            _patchBuf.Add(new GroupPatch
+            {
+                Group = group, Arena = arena, StageFirst = stageFirst, StageCount = staged,
+                Scissor = scissor, InPlace = inPlace, Bounds = bounds
+            });
         }
 
         // ---- Phase 1b: which LAYER does each surgery group belong to (no mutation) ----
@@ -1667,7 +1696,7 @@ public partial class RenderCache
             if (p.InPlace) continue;
 
             // Nothing recorded for this control yet: it gets its own segment, placed by its own paint rank.
-            if (p.Group.RectRuns.Count == 0)
+            if (p.Group.Runs.Count == 0)
             {
                 p.Layer = -1;
                 _patchBuf[n] = p;
@@ -1676,23 +1705,25 @@ public partial class RenderCache
 
             var layer = TargetLayer(p.Group);
             if (layer < 0) return false;   // TargetLayer already named which of its three answers it gave
-            if (FindSegmentOp(layer) < 0) return SpliceRefused("noLayerOp");
+            if (FindSegmentOp(p.Arena, layer) < 0) return SpliceRefused("noLayerOp");
             // One segment draws under ONE clip; a group that now sits under a different one cannot join it. A layer whose
             // id is no longer part of the recorded frame has no clip to compare either - refuse rather than guess.
-            var layerScissor = _rectBatch.GetSegmentScissor(layer);
+            var layerScissor = p.Arena.GetSegmentScissor(layer);
             if (layerScissor == null) return SpliceRefused("staleLayer");
-            if (p.Items.Length > 0 && !ScissorEquals(layerScissor, p.Scissor)) return SpliceRefused("otherClip");
+            if (p.StageCount > 0 && !ScissorEquals(layerScissor, p.Scissor)) return SpliceRefused("otherClip");
             p.Layer = layer;
             _patchBuf[n] = p;
-            if (!_patchLayers.Contains(layer)) _patchLayers.Add(layer);
+            _patchLayers.Add(layer);
         }
 
         // ---- Phase 2: mutate (can no longer fail) ----
         foreach (var p in _patchBuf)
         {
             if (!p.InPlace) continue;   // count-stable recolour: the slots are already the right ones
+            // In place only ever happens for a group whose every unit holds a RECT slot (AllUnitsHaveSlots asks that
+            // map), so its arena is the rect one - said through the patch all the same, because that is where it is known.
             var i = 0;
-            foreach (var u in p.Group.Units) _rectBatch.UpdateSlot(device, _rectSlotByUnit[u], p.Items[i++]);
+            foreach (var u in p.Group.Units) p.Arena.UpdateSlotFromStage(device, _rectSlotByUnit[u], p.StageFirst + i++);
         }
 
         foreach (var p in _patchBuf)
@@ -1746,6 +1777,36 @@ public partial class RenderCache
 
     private static bool Overlaps(Rect a, Rect b) => a.X < b.Right && b.X < a.Right && a.Y < b.Bottom && b.Y < a.Bottom;
 
+    // Hand this group's glyph range back out to its blocks, in unit order - each takes as many slots as it has glyphs.
+    // Anything that does not add up (a partly-culled group, a run that no longer covers them) gives its entries up rather
+    // than keep a guess; the next walk restores them.
+    private void ReslotTextRuns(ControlGroup group)
+    {
+        var total = 0;
+        foreach (var run in group.Runs) total += run.Count;
+
+        var glyphs = 0;
+        foreach (var u in group.Units)
+        {
+            if (u is RenderUnits.TextRenderUnit { TextComponent: { } tc }) glyphs += tc.GlyphRun?.Count ?? 0;
+        }
+
+        if (group.Runs.Count != 1 || total != glyphs)
+        {
+            foreach (var u in group.Units) _textRunByUnit.Remove(u);
+            return;
+        }
+
+        var at = group.Runs[0].First;
+        foreach (var u in group.Units)
+        {
+            if (u is not RenderUnits.TextRenderUnit { TextComponent: { } tc }) continue;
+            var count = tc.GlyphRun?.Count ?? 0;
+            _textRunByUnit[u] = (at, count, tc.GlyphRun?.Atlas);
+            at += count;
+        }
+    }
+
     private bool AllUnitsHaveSlots(ControlGroup group)
     {
         foreach (var u in group.Units)
@@ -1754,10 +1815,10 @@ public partial class RenderCache
     }
 
     // The op index that draws rect-batch segment <paramref name="segId"/>.
-    private int FindSegmentOp(int segId)
+    private int FindSegmentOp(BatchArena arena, int segId)
     {
         for (var i = 0; i < _ops.Count; i++)
-            if (_ops[i].Kind == RenderOpKind.Segment && _ops[i].Batch == 0 && _ops[i].SegId == segId) return i;
+            if (_ops[i].Kind == RenderOpKind.Segment && _ops[i].Batch == arena.BatchId && _ops[i].SegId == segId) return i;
         return -1;
     }
 
@@ -1765,9 +1826,64 @@ public partial class RenderCache
     // in one is repaired inside it; a group that does not gets its own (see PlaceNewSegment), so this only ever answers
     // for the former. It used to hunt for a neighbour.s layer to join, which is how the placement came to depend on what
     // else the frame happened to contain.
+    // Arenas whose stage this patch has already emptied (see TrySplicedPatch).
+    private readonly HashSet<BatchArena> _stagedArenas = new();
+
+    /// <summary>The arena a recorded Segment op draws from - the way back from what the stream SAYS to the thing that
+    /// holds the bytes. The same table ExecuteOps switches on; a family whose collector this cache never created has no
+    /// arena and its ops are simply left alone.</summary>
+    private BatchArena ArenaOf(byte batch) => batch switch
+    {
+        0 => _rectBatch,
+        1 => _ellipseBatch,
+        2 => _textBatch,
+        3 => _gradientRectBatch,
+        4 => _gradientEllipseBatch,
+        5 => _patternBatch,
+        6 => _fractalBatch,
+        7 => _texRectBatch,
+        8 => _haloUnder,
+        9 => _haloOver,
+        10 => _haloLivingUnder,
+        11 => _haloLivingOver,
+        12 => _polygonBatch,
+        _ => _textBatch
+    };
+
+    /// <summary>Which arena would hold what this group draws, for a group the last walk never described (it drew nothing
+    /// until now, so it has no arena of its own yet). Asked in the walk's own order of preference - a solid fill before
+    /// its gradient form - so the patch puts it where a walk would have.</summary>
+    private BatchArena ArenaFor(ControlGroup group)
+    {
+        if (group.Units.Count == 0) return _rectBatch;   // draws nothing: no arena is touched either way
+
+        return group.Units[0] switch
+        {
+            RectangleRenderUnit rru => _rectBatch.CanBatch(rru.RectPayload) ? _rectBatch
+                : _gradientRectBatch.CanBatch(rru.RectPayload) ? _gradientRectBatch : null,
+            EllipseRenderUnit eru => _ellipseBatch.CanBatch(eru.EllipsePayload) ? _ellipseBatch
+                : _gradientEllipseBatch.CanBatch(eru.EllipsePayload) ? _gradientEllipseBatch : null,
+            RenderUnits.TextRenderUnit tru => tru.TextComponent is { } tc && _textBatch.CanBatch(tc, out _) ? _textBatch : null,
+            _ => null
+        };
+    }
+
+    // This group put one more instance into an arena: extend its contiguous run, or open a new one. A group draws from
+    // ONE arena - that is what makes "repair the segment it lives in" a sentence at all - so a second family disqualifies
+    // it from the splice, exactly as content in no arena does.
+    private static void NoteBatched(ControlGroup group, BatchArena arena, int slot)
+    {
+        if (group.Arena == null) group.Arena = arena;
+        else if (!ReferenceEquals(group.Arena, arena)) group.PatchableBatchedOnly = false;
+
+        var runs = group.Runs;
+        if (runs.Count > 0 && runs[^1].First + runs[^1].Count == slot) runs[^1] = (runs[^1].First, runs[^1].Count + 1);
+        else runs.Add((slot, 1));
+    }
+
     private int TargetLayer(ControlGroup group)
     {
-        var own = _rectBatch.FindSegmentContaining(group.RectRuns[0].First);
+        var own = group.Arena.FindSegmentContaining(group.Runs[0].First);
         if (own < 0 && Core.Diagnostics.FrameTrace.Enabled) Core.Diagnostics.FrameTrace.Refuser = "runOutsideAnyLayer";
         return own;
     }
@@ -1780,15 +1896,16 @@ public partial class RenderCache
         if (patch.Layer < 0) return PlaceNewSegment(device, patch);
 
         var layer = patch.Layer;
-        var (first, count) = _rectBatch.SegmentRange(layer);
+        var arena = patch.Arena;
+        var (first, count) = arena.SegmentRange(layer);
         if (first < 0) return false;   // the layer is gone from this recorded frame; the walk rebuilds it
-        var scissor = _rectBatch.GetSegmentScissor(layer);
+        var scissor = arena.GetSegmentScissor(layer);
         var group = patch.Group;
 
         // WHERE inside the layer this group's items sit: its own run, which is the only reason it is in this layer at all.
-        var at = group.RectRuns[0].First - first;
+        var at = group.Runs[0].First - first;
         var replaced = 0;
-        foreach (var run in group.RectRuns) replaced += run.Count;
+        foreach (var run in group.Runs) replaced += run.Count;
 
         // Its run is not inside this layer after all - the layer was cut under it by another patch in this same frame (a
         // newcomer whose rank landed inside its span). This patch cannot be honoured, and "leave the frame be" was the
@@ -1799,43 +1916,50 @@ public partial class RenderCache
 
         // The cheap path: edit inside the room the layer already owns, moving only what follows the edit. Only when the
         // layer has outgrown its room does it relocate, and then it does have to be carried across whole.
-        if (!_rectBatch.ReplaceInSegment(device, layer, at, replaced, patch.Items))
+        if (arena.ReplaceStagedInSegment(device, layer, at, replaced, patch.StageFirst, patch.StageCount))
         {
-            _rebakeBuf.Clear();
-            _rectBatch.CopyRetained(first, at, _rebakeBuf);
-            _rebakeBuf.AddRange(patch.Items);
-            _rectBatch.CopyRetained(first + at + replaced, count - at - replaced, _rebakeBuf);
-            if (!_rectBatch.RepointSegment(device, layer, CollectionsMarshal.AsSpan(_rebakeBuf), scissor)) return false;
+            LayerProbe.SegmentEditsInPlace++;
+        }
+        else
+        {
+            // Outgrew the room this layer owns: it is carried to the end of the arena and every group drawing in it is
+            // re-indexed below. THE cost a per-layer arena exists to remove - counted, so the rewrite is judged and not
+            // assumed.
+            LayerProbe.SegmentRelocations++;
+            LayerProbe.RelocatedSlots += count;
+            if (!arena.RepointSegmentAroundStage(device, layer, first, at, replaced, count, scissor, patch.StageFirst, patch.StageCount))
+                return false;
         }
 
         // The layer may have moved, and everything after the edit shifted by the size difference. Re-index every group
         // that draws in it - runs and unit slots both, or a later patch would address freed space.
         // The layer now covers what this patch put into it, and the next placement has to see that.
-        _rectBatch.GrowSegmentBounds(layer, patch.Bounds);
-        var (newFirst, _) = _rectBatch.SegmentRange(layer);
-        var delta = patch.Items.Length - replaced;
+        arena.GrowSegmentBounds(layer, patch.Bounds);
+        var (newFirst, _) = arena.SegmentRange(layer);
+        var delta = patch.StageCount - replaced;
         var editEnd = first + at + replaced;
         foreach (var g in _groups)
         {
             if (g.WalkVersion != _walkVersion || ReferenceEquals(g, group)) continue;
             var touched = false;
-            for (var r = 0; r < g.RectRuns.Count; r++)
+            for (var r = 0; r < g.Runs.Count; r++)
             {
-                var run = g.RectRuns[r];
+                var run = g.Runs[r];
                 if (run.First < first || run.First >= first + count) continue;
-                g.RectRuns[r] = (run.First - first + newFirst + (run.First >= editEnd ? delta : 0), run.Count);
+                g.Runs[r] = (run.First - first + newFirst + (run.First >= editEnd ? delta : 0), run.Count);
                 touched = true;
             }
 
             if (touched) ReslotUnits(g);
         }
 
-        group.RectRuns.Clear();
+        group.Runs.Clear();
         group.WalkVersion = _walkVersion;
-        if (patch.Items.Length > 0)
+        if (patch.StageCount > 0)
         {
-            group.RectRuns.Add((newFirst + at, patch.Items.Length));
-            group.PatchableRectOnly = true;
+            group.Runs.Add((newFirst + at, patch.StageCount));
+            group.Arena = arena;
+            group.PatchableBatchedOnly = true;
         }
 
         ReslotUnits(group);
@@ -1848,7 +1972,7 @@ public partial class RenderCache
     private bool PlaceNewSegment(IGraphicsDevice device, GroupPatch patch)
     {
         var group = patch.Group;
-        if (patch.Items.Length == 0)
+        if (patch.StageCount == 0)
         {
             group.WalkVersion = _walkVersion;
             ReslotUnits(group);
@@ -1861,21 +1985,23 @@ public partial class RenderCache
         // rank. When it does not overlap, there is nothing to decide: it joins the layer and the segment stays whole.
         SplitSegmentSpanningRank(group.Order, patch.Bounds);
 
-        var seg = _rectBatch.AllocateSegment(device, patch.Items, patch.Scissor);
+        var arena = patch.Arena;
+        var seg = arena.AllocateSegmentFromStage(device, patch.Scissor, patch.StageFirst, patch.StageCount);
         if (seg < 0) return false;
 
         var at = OpIndexForRank(group.Order);
         _ops.Insert(at, new RenderOp
         {
-            Kind = RenderOpKind.Segment, Batch = 0, SegId = seg, Order = group.Order
+            Kind = RenderOpKind.Segment, Batch = arena.BatchId, SegId = seg, Order = group.Order
         });
         NoteOpInserted(at);
 
-        _rectBatch.GrowSegmentBounds(seg, patch.Bounds);
-        var (first, _) = _rectBatch.SegmentRange(seg);
-        group.RectRuns.Clear();
-        group.RectRuns.Add((first, patch.Items.Length));
-        group.PatchableRectOnly = true;
+        arena.GrowSegmentBounds(seg, patch.Bounds);
+        var (first, _) = arena.SegmentRange(seg);
+        group.Runs.Clear();
+        group.Runs.Add((first, patch.StageCount));
+        group.Arena = arena;
+        group.PatchableBatchedOnly = true;
         group.WalkVersion = _walkVersion;
         ReslotUnits(group);
         return true;
@@ -1936,23 +2062,25 @@ public partial class RenderCache
         for (var i = 0; i < _ops.Count; i++)
         {
             var op = _ops[i];
-            if (op.Kind != RenderOpKind.Segment || op.Batch != 0) continue;
+            if (op.Kind != RenderOpKind.Segment) continue;
+            var spanned = ArenaOf(op.Batch);
+            if (spanned == null) continue;
             if (op.OrderFirst >= order || order >= op.Order) continue;   // does not span this rank
 
             // THE MERGE RULE, and the whole point of a layer: what this segment draws is mutually order-independent, so a
             // newcomer that does not touch any of it is order-independent with it too. Cutting then would buy nothing and
             // cost a segment - which is what a rank-only test did on every single placement.
-            var covered = _rectBatch.SegmentBounds(op.SegId);
+            var covered = spanned.SegmentBounds(op.SegId);
             if (!newcomer.IsEmpty && !covered.IsEmpty && !Overlaps(covered, newcomer))
             {
                 LayerProbe.SplitsAvoided++;
                 continue;
             }
 
-            var cut = FirstSlotPaintedAfter(op.SegId, order);
+            var cut = FirstSlotPaintedAfter(spanned, op.SegId, order);
             if (cut < 0) continue;   // its whole content paints BEFORE the newcomer after all - nothing to cut
 
-            var second = _rectBatch.SplitSegment(op.SegId, cut);
+            var second = spanned.SplitSegment(op.SegId, cut);
             if (second < 0) continue;
             LayerProbe.Splits++;
 
@@ -1964,7 +2092,7 @@ public partial class RenderCache
             _ops[i] = op;
             _ops.Insert(i + 1, new RenderOp
             {
-                Kind = RenderOpKind.Segment, Batch = 0, SegId = second, Order = spanEnd, OrderFirst = order
+                Kind = RenderOpKind.Segment, Batch = op.Batch, SegId = second, Order = spanEnd, OrderFirst = order
             });
             NoteOpInserted(i + 1);
             return;   // one rank cuts one segment: the halves no longer span it
@@ -1973,14 +2101,19 @@ public partial class RenderCache
 
     // The first slot inside this segment that belongs to a group painting AFTER the given rank, or -1 if none does. Only
     // groups the current walk described can answer - a stale group's runs point at slots that have since been reassigned.
-    private int FirstSlotPaintedAfter(int segId, long order)
+    private int FirstSlotPaintedAfter(BatchArena arena, int segId, long order)
     {
-        var (first, count) = _rectBatch.SegmentRange(segId);
+        var (first, count) = arena.SegmentRange(segId);
         var cut = -1;
-        foreach (var group in _groups)
+        // From the first group ranked AFTER the newcomer, found by bisection - `_groups` is sorted by rank, and everything
+        // before that point is answered by the rank alone. Scanning from the front asked the whole scene a question it had
+        // already answered, once per placement, and placements are now on the CHEAP path.
+        for (var i = FirstGroupAfter(order); i < _groups.Count; i++)
         {
-            if (group.WalkVersion != _walkVersion || group.Order <= order) continue;
-            foreach (var run in group.RectRuns)
+            var group = _groups[i];
+            if (group.WalkVersion != _walkVersion) continue;
+            if (!ReferenceEquals(group.Arena, arena)) continue;   // a slot number only means something inside its own arena
+            foreach (var run in group.Runs)
             {
                 if (run.First < first || run.First >= first + count) continue;
                 if (cut < 0 || run.First < cut) cut = run.First;
@@ -1994,15 +2127,28 @@ public partial class RenderCache
     // its entries up rather than keep a guess, and the next walk restores them.
     private void ReslotUnits(ControlGroup group)
     {
+        // TEXT keeps its own map, and it is a RANGE per unit rather than a slot: a block owns a whole glyph run. Leaving
+        // it behind after a re-issue is what froze a live readout - the block went on patching the offsets it was
+        // recorded at, which by then belonged to whatever had moved into them, so its own text simply stopped changing
+        // until something forced a walk.
+        if (ReferenceEquals(group.Arena, _textBatch))
+        {
+            ReslotTextRuns(group);
+            return;
+        }
+
+        // Everything else keeps its slots in _sdfSlotByUnit, written by the walk; the map below is the RECT one.
+        if (group.Arena != null && !ReferenceEquals(group.Arena, _rectBatch)) return;
+
         var total = 0;
-        foreach (var run in group.RectRuns) total += run.Count;
-        if (total != group.Units.Count || group.RectRuns.Count != 1)
+        foreach (var run in group.Runs) total += run.Count;
+        if (total != group.Units.Count || group.Runs.Count != 1)
         {
             foreach (var u in group.Units) _rectSlotByUnit.Remove(u);
             return;
         }
 
-        var i = group.RectRuns[0].First;
+        var i = group.Runs[0].First;
         foreach (var u in group.Units) _rectSlotByUnit[u] = i++;
     }
 

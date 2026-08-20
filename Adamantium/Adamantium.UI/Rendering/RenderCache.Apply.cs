@@ -105,6 +105,47 @@ public partial class RenderCache
         && a.IsMotionNode == b.IsMotionNode
         && ReferenceEquals(a.RenderParent, b.RenderParent);
 
+    /// <summary>Index of the first group ranked AFTER <paramref name="order"/>, by bisection - `_groups` is kept sorted by
+    /// paint rank, so nothing needs to be scanned to find a place in it.</summary>
+    private int FirstGroupAfter(long order)
+    {
+        int low = 0, high = _groups.Count;
+        while (low < high)
+        {
+            var mid = (low + high) >> 1;
+            if (_groups[mid].Order > order) high = mid;
+            else low = mid + 1;
+        }
+
+        return low;
+    }
+
+    // Whether every mover this packet names can be answered for by patching it: all of them named (an unnameable move -
+    // a bare Transform ticking with no owner - means the list is not the whole story), and none of them clipping.
+    private bool MovesAreForgivable(RenderPacket packet)
+    {
+        if (!packet.IsTransformDirty || packet.TransformUnknown || packet.Moved.Count == 0) return false;
+
+        foreach (var moved in packet.Moved)
+        {
+            if (!SubtreeClips(moved)) continue;
+            StreamStaleBecause($"moverClips<{moved.GetType().Name}>");
+            return false;
+        }
+
+        return true;
+    }
+
+    // Whether THIS packet's ordinary movers were forgiven (read by the Partial case below).
+    private bool _movesForgiven;
+
+    // TEMP: name what staled the stream, so why=4 says which of its causes it was.
+    private void StreamStaleBecause(string reason)
+    {
+        _layoutChangedSinceRecord = true;
+        if (Core.Diagnostics.FrameTrace.Enabled) Core.Diagnostics.FrameTrace.LayoutChangedBy = reason;
+    }
+
     // Realize ONE packet. The per-frame results the draw pass reads are MERGED across the packets drained this frame: a
     // Full supersedes everything before it; two Partials union their dirty sets.
     private void ApplyPacket(RenderPacket packet)
@@ -148,9 +189,18 @@ public partial class RenderCache
         _forgivenMoves.Clear();
         foreach (var node in packet.MovedNodes)
         {
-            if (SubtreeClips(node)) _layoutChangedSinceRecord = true;
+            if (SubtreeClips(node)) StreamStaleBecause($"movedNodeClips<{node.GetType().Name}>");
             else _forgivenMoves.Add(node);
         }
+
+        // ...and the same question for the ORDINARY movers this packet names. A move forces a rebuild because the frame
+        // baked where things are - but only for what it baked and nobody re-bakes. A mover the patch touches is re-baked
+        // from its new world by the patch itself; what it cannot answer for is a recorded SCISSOR under it, a world rect
+        // nothing re-derives. Decided HERE, before the snapshot delta below reads _forgivenMoves.
+        // Measured on the heavy list: 277 walks in eight seconds of scrolling, every one of them "transform-dirty",
+        // 3.5 ms apiece - the movers had been named all along and nobody asked who they were.
+        _movesForgiven = MovesAreForgivable(packet);
+        if (_movesForgiven) _forgivenMoves.UnionWith(packet.Moved);
 
         foreach (var entry in packet.SnapDelta)
         {
@@ -160,7 +210,7 @@ public partial class RenderCache
                 // A forgiven node's entry differs in its PLACE and nothing else - that is the move itself, and the slot
                 // write carries it. Anything more (it resized, gained a clip, changed parent) is a real layout change.
                 if (!known || !_forgivenMoves.Contains(entry.Key) || !SameGeometryApartFromPlace(previous, entry.Value))
-                    _layoutChangedSinceRecord = true;
+                    StreamStaleBecause(known ? $"moved<{entry.Key.GetType().Name}>" : $"new<{entry.Key.GetType().Name}>");
             }
             _applySnap[entry.Key] = entry.Value;
         }
@@ -196,23 +246,46 @@ public partial class RenderCache
                     ApplyReRender(draw.Component, draw.Commands, draw.Order, draw.Clones);
 
                 if (LastBuildKind != RenderBuildKind.Full) LastBuildKind = RenderBuildKind.Partial;
-                LastBuildTransformDirty |= packet.IsTransformDirty;
                 _partialDirty.AddRange(packet.PartialDirty);
                 _movedNodesBuf.AddRange(packet.MovedNodes);
+
+                // A forgiven mover is PATCHED - that is the whole basis for forgiving it, since the patch is what re-bakes
+                // its slots from the new world (see MovesAreForgivable, decided before the snapshot delta is folded in).
+                if (_movesForgiven) _partialDirty.AddRange(packet.Moved);
+                LastBuildTransformDirty |= packet.IsTransformDirty && !_movesForgiven;
                 break;
             }
 
             case RenderBuildKind.Structural:
+            {
+                // A control that starts drawing is a count change from nothing, which is exactly what the splice repairs:
+                // it is given its own segment, placed by its own paint rank, and no recorded op moves. So an ARRIVAL does
+                // not have to cost the frame a walk of the window - a hover affordance, a scroll chevron, an edge fade.
+                // A DEPARTURE does, and stays on the old path: what left has no group left to name, so the splice cannot
+                // reach the ops still drawing it, and a patched frame would keep painting a control that is gone. That is
+                // the phantom the removal tests pin - AControlThatStoppedDrawing_IsGoneFromAPlainREPLAY and its family.
+                // Ranks must also be untouched: a RENUMBER moves everyone, which is not a local change by any reading.
+                var local = packet.Removed.Count == 0 && packet.Undrawn.Count == 0
+                            && packet.Reranks.Count == 0 && !packet.SnapReset && !_layoutChangedSinceRecord;
+
                 ApplyStructural(packet);
-                // A Full recorded later in this same drain supersedes it; else this is the strongest kind so far.
-                if (LastBuildKind != RenderBuildKind.Full) LastBuildKind = RenderBuildKind.Structural;
-                LastBuildTransformDirty = true;
-                // The unit set changed, so the op stream + recorded rect slots are stale and the draw pass must re-walk
-                // (only Clean/Partial replay). Any earlier partial slot-patch state in this drain is therefore moot.
+                if (LastBuildKind != RenderBuildKind.Full)
+                    LastBuildKind = local ? RenderBuildKind.Partial : RenderBuildKind.Structural;
+                LastBuildTransformDirty = !local;
                 _partialDirty.Clear();
+                if (local)
+                {
+                    foreach (var draw in packet.Draws) _partialDirty.Add(draw.Component);
+                    _partialSpliced = true;
+                }
+                else
+                {
+                    _partialSpliced = false;
+                }
+
                 _movedNodesBuf.AddRange(packet.MovedNodes);
-                _partialSpliced = false;
                 break;
+            }
 
             case RenderBuildKind.Full:
                 ApplyFullWalk(packet);   // GPU: rebuild the paint-order groups from the packet (reconciles as it goes)
@@ -351,13 +424,10 @@ public partial class RenderCache
         if (needsInsert)
         {
             // Insert by paint rank, before the first group that ranks after it. Existing groups never move; the rank came
-            // WITH the draw.
-            var pos = _groups.Count;
-            for (var i = 0; i < _groups.Count; i++)
-            {
-                if (_groups[i].Order > order) { pos = i; break; }
-            }
-            _groups.Insert(pos, group);
+            // WITH the draw. Found by BISECTION, not by a scan: the list is kept sorted by rank, and a scan from the front
+            // is O(scene) for every control that starts drawing - which, now that an arrival is patched instead of walked,
+            // happens on the cheap path where a scene-sized loop has no business being.
+            _groups.Insert(FirstGroupAfter(order), group);
             group.InOrder = true;
         }
     }
