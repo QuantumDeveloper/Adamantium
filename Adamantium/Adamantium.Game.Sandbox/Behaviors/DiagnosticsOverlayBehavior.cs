@@ -39,8 +39,43 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
     private int _second;   // TEMP: index in the appended history
     private double _windowMaxRecord, _windowMaxApply;
 
+    // TEMP: WHO entered or left the drawn set over the last second. Every one of these is a structural change, and a
+    // structural change is the one thing that can still cost a walk of the whole window - so when a spike is reproduced
+    // by hand, this is what names it. Same shape as the layout counters beside it: reset per dump, busiest second kept.
+    private readonly System.Collections.Generic.Dictionary<string, int> _churn = new();
+    private int _peakChurn;
+
+    private void NoteChurn(string what, Adamantium.UI.Core.IUIComponent c)
+    {
+        if (!_running) return;
+        var key = $"{what} {c.GetType().Name} '{(c as UIComponent)?.Name}' -> {c.Visibility}";
+        lock (_churn) _churn[key] = _churn.TryGetValue(key, out var had) ? had + 1 : 1;
+    }
+
+    private string DumpChurn(out int total)
+    {
+        var text = new System.Text.StringBuilder();
+        total = 0;
+        lock (_churn)
+        {
+            foreach (var pair in System.Linq.Enumerable.OrderByDescending(_churn, p => p.Value))
+            {
+                text.Append($"  {pair.Value,5}  {pair.Key}\n");
+                total += pair.Value;
+            }
+        }
+
+        return $"tree churn this second: {total}\n{text}";
+    }
+
     protected override void OnAttached(TextBlock target)
     {
+        Adamantium.UI.Core.VisualTreeNotifications.Attached += c => NoteChurn("attached", c);
+        Adamantium.UI.Core.VisualTreeNotifications.Detached += c => NoteChurn("detached", c);
+        Adamantium.UI.Core.VisualTreeNotifications.VisibilityChanged += c => NoteChurn("collapsed-flip", c);
+        Adamantium.UI.Core.VisualTreeNotifications.ShownOrHidden += c => NoteChurn("hidden-flip", c);
+        Adamantium.UI.Core.VisualTreeNotifications.ClipChanged += c => NoteChurn("clip", c);
+
         _lastMeasure = MeasurableUIComponent.TotalMeasureCalls;
         _lastArrange = MeasurableUIComponent.TotalArrangeCalls;
         _lastBindings = RuntimeStats.BindingUpdatesApplied;
@@ -120,6 +155,16 @@ public class DiagnosticsOverlayBehavior : Behavior<TextBlock>
             }
 
             LayoutTrace.ResetCounts();
+
+            var churn = DumpChurn(out var churnTotal);
+            System.IO.File.WriteAllText(@"C:\AdamantiumEngine\churn.log", churn);
+            if (churnTotal > _peakChurn)
+            {
+                _peakChurn = churnTotal;
+                System.IO.File.WriteAllText(@"C:\AdamantiumEngine\churn-peak.log", churn);
+            }
+
+            lock (_churn) _churn.Clear();
 
             // ...and what the BUILD spent itself on over the same second: which half, and whether the apply was building
             // units from scratch or updating the ones it had. Peak-kept for the same reason.

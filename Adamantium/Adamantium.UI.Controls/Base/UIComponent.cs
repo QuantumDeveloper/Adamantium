@@ -85,8 +85,9 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
             PropertyMetadataOptions.AffectsRender,
             OnVisibilityChanged));
 
-    // A show/hide changes the DRAWN set (a unit enters/leaves the paint order), so it is a STRUCTURAL change for the render
-    // cache, which NAMES the component so the change can be spliced instead of re-derived by walking the whole tree.
+    // COLLAPSING changes the DRAWN set (a unit leaves the paint order), so it is a STRUCTURAL change for the render cache,
+    // which NAMES the component so the change can be spliced instead of re-derived by walking the whole tree. Hiding is
+    // the lesser fact - see below.
     //
     // UnsetValue means the property was never assigned - but the component's EFFECTIVE visibility was still the default
     // (Visible), so a control going straight from that default to Collapsed really did leave the drawn set. Treating that as
@@ -108,7 +109,15 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
         if (previous == effective) return;
 
-        VisualTreeNotifications.RaiseVisibilityChanged(component);
+        // Hidden <-> Visible keeps the element's slot and its size: nothing enters or leaves the paint ORDER, only what
+        // is painted changes. Said that way it is a content change of this element and its subtree, which the retained
+        // frame patches - where a structural change discards the frame and re-walks the window. That difference is a
+        // close button appearing on hover costing a full-scene walk, once per tab a scrolling strip carries past the
+        // pointer. Collapsed is the other thing: it leaves the layout too, and stays structural.
+        if (previous != Visibility.Collapsed && effective != Visibility.Collapsed)
+            VisualTreeNotifications.RaiseShownOrHidden(component);
+        else
+            VisualTreeNotifications.RaiseVisibilityChanged(component);
 
         // And tell whatever MEASURED it, because what that parent measured just changed: a collapsed child asks for
         // nothing. Nothing else carries this. InvalidateMeasure deliberately does NOT walk up from an already-measured

@@ -37,6 +37,15 @@ public static class FrameTrace
     /// <summary>TEMP: the unit type that last cost a frame its patch.</summary>
     public static string Refuser;
 
+    /// <summary>TEMP: which content took the slot-write fast path away from a motion node, counted by "node &lt;- content".</summary>
+    public static readonly Dictionary<string, int> NotAware = new();
+
+    public static void NoteNotAware(string what)
+    {
+        if (!Enabled) return;
+        lock (NotAware) NotAware[what] = NotAware.TryGetValue(what, out var had) ? had + 1 : 1;
+    }
+
     public static void Add(double drawMs, byte kind, bool replayed, int clones, byte why, int cache, int composited,
         int ops, int unitOps)
     {
@@ -46,7 +55,7 @@ public static class FrameTrace
         // a dropdown) is pushed out while the tester is still typing "done". Frames that ran LONG are kept separately and
         // never evicted. Filtered by COST, not by path: an empty adorner layer walks every single frame at 0.03 ms and
         // filled the whole list with itself in seconds, evicting the room for what was being hunted.
-        if (drawMs > 5.0)
+        if (drawMs > 3.0)
         {
             if (_incidents.Count < IncidentLimit)
             {
@@ -115,8 +124,36 @@ public static class FrameTrace
             text.Append(Environment.NewLine).Append("  ").Append(Describe($"cache {key.Cache} {(key.Replayed ? "replay" : "walk")}", entries));
         }
 
+        // WHY a frame walked instead of patching. A walk of a heavy scene costs tens of milliseconds where a patch costs
+        // a fraction of one, so the reason is the whole question - and an average frame time cannot name it.
+        var reasons = new Dictionary<byte, int>();
+        for (var n = 0; n < count; n++)
+        {
+            var e = _ring[(start + n) & (Capacity - 1)];
+            if (e.Replayed) continue;
+            reasons[e.Why] = reasons.TryGetValue(e.Why, out var had) ? had + 1 : 1;
+        }
+
+        if (reasons.Count > 0)
+        {
+            text.Append(Environment.NewLine).Append("  walked because:");
+            foreach (var (why, n) in reasons) text.Append(' ').Append(WhyName(why)).Append('=').Append(n);
+        }
+
         return text.ToString();
     }
+
+    private static string WhyName(byte why) => why switch
+    {
+        0 => "nothing-to-replay",
+        1 => "nothing-recorded",
+        2 => "stream-unusable",
+        3 => "transform-dirty",
+        4 => "layout-changed-since-record",
+        5 => "splice-refused",
+        6 => "slot-patch-refused",
+        _ => "why-" + why
+    };
 
     private static string Describe(string name, List<Entry> entries)
     {

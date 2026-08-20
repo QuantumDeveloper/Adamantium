@@ -97,6 +97,14 @@ public partial class RenderCache
         && a.IsMotionNode == b.IsMotionNode
         && ReferenceEquals(a.RenderParent, b.RenderParent);
 
+    // Everything SameGeometry looks at except WHERE the element is. A motion node that only moved differs here and
+    // nowhere else, and that difference is exactly the one its transform-table slot carries for the whole subtree.
+    private static bool SameGeometryApartFromPlace(LayoutSnapshot a, LayoutSnapshot b) =>
+        a.RenderSize == b.RenderSize
+        && a.ClipToBounds == b.ClipToBounds
+        && a.IsMotionNode == b.IsMotionNode
+        && ReferenceEquals(a.RenderParent, b.RenderParent);
+
     // Realize ONE packet. The per-frame results the draw pass reads are MERGED across the packets drained this frame: a
     // Full supersedes everything before it; two Partials union their dirty sets.
     private void ApplyPacket(RenderPacket packet)
@@ -133,12 +141,27 @@ public partial class RenderCache
         // ...but a snapshot ENTRY is not a layout change: it is re-published whenever a component re-renders, and a hover
         // re-publishes an entry whose transform, size and clip are word for word the ones the stream already baked. So
         // compare what the stream actually baked, instead of taking the entry's presence as proof of movement.
-        if (packet.MovedNodes.Count > 0) _layoutChangedSinceRecord = true;
+        // ...and a moved MOTION NODE is not a layout change either, for the same reason a composited move isn't: the
+        // batches read the node's slot matrix live, and the draw re-points what rides it (RefreshMovedNodes, which also
+        // proves every drawn unit under the node is node-aware). The one thing the move CAN stale is a recorded SCISSOR -
+        // a world-space rect nothing re-derives - so a node whose subtree clips still forces the rebuild.
+        _forgivenMoves.Clear();
+        foreach (var node in packet.MovedNodes)
+        {
+            if (SubtreeClips(node)) _layoutChangedSinceRecord = true;
+            else _forgivenMoves.Add(node);
+        }
 
         foreach (var entry in packet.SnapDelta)
         {
-            if (!_applySnap.TryGetValue(entry.Key, out var previous) || !SameGeometry(previous, entry.Value))
-                _layoutChangedSinceRecord = true;
+            var known = _applySnap.TryGetValue(entry.Key, out var previous);
+            if (!known || !SameGeometry(previous, entry.Value))
+            {
+                // A forgiven node's entry differs in its PLACE and nothing else - that is the move itself, and the slot
+                // write carries it. Anything more (it resized, gained a clip, changed parent) is a real layout change.
+                if (!known || !_forgivenMoves.Contains(entry.Key) || !SameGeometryApartFromPlace(previous, entry.Value))
+                    _layoutChangedSinceRecord = true;
+            }
             _applySnap[entry.Key] = entry.Value;
         }
 
@@ -161,7 +184,10 @@ public partial class RenderCache
         switch (packet.Kind)
         {
             case RenderBuildKind.Clean:
-                break;   // re-draw the retained units as-is (nothing to realize)
+                // Nothing to realize - but a node that MOVED still has to have its matrix written before the replay, or
+                // the frame draws the subtree where it was last recorded.
+                _movedNodesBuf.AddRange(packet.MovedNodes);
+                break;
 
             case RenderBuildKind.Partial:
             {
@@ -204,25 +230,37 @@ public partial class RenderCache
     }
 
     // The record+apply decision for one dirty component: Skip = reuse its cached units as-is (nothing recorded);
-    // Fallback = the caller must do a full walk; Recorded = its commands were captured into the packet for the applier.
-    private enum PartialRecord { Skip, Fallback, Recorded }
+    // Fallback = the caller must do a full walk; Recorded = its commands were captured into the packet for the applier;
+    // Undrawn = it is HIDDEN and keeps its place in the paint order, so it records ZERO commands (see RecordReRender).
+    private enum PartialRecord { Skip, Fallback, Recorded, Undrawn }
 
     // The DECISION for one geometry-dirty component - PURE: it reads state and renders nothing, so the structural pass can
     // pre-validate the frame before it commits to anything (see RecordStructuralFrame).
     private PartialRecord ClassifyReRender(IUIComponent component)
     {
-        // Invisible (Collapsed/Hidden - a recycled container, an auto-hide ScrollBar re-marking dirty on mouse-move):
-        // draws NOTHING, nothing to record. Its units are retained and its dirty flag stays set until it is shown again,
-        // so it re-records at the right time (the structural splice that puts it back), not now. A full walk here meant a
-        // whole-tree re-record for every hidden container that so much as re-bound.
-        if (component.Visibility != Visibility.Visible) return PartialRecord.Skip;
+        // COLLAPSED - out of the layout as well as out of the frame: draws NOTHING and nothing to record. Its units are
+        // retained and its dirty flag stays set until it is shown again, so it re-records at the right time (the
+        // structural splice that puts it back), not now. A full walk here meant a whole-tree re-record for every
+        // collapsed container that so much as re-bound.
+        if (component.Visibility == Visibility.Collapsed) return PartialRecord.Skip;
 
         // Not in the live paint tree: DETACHED, or hidden by a COLLAPSED ancestor. The full walk never reaches it, so it
         // has no rank and draws nothing - yet it used to force a full rebuild EVERY dirty frame. Skip: it holds no units
         // (a real detach/collapse is STRUCTURAL and already removed them).
         if (!component.IsAttachedToVisualTree) return PartialRecord.Skip;
+
+        var hidden = component.Visibility == Visibility.Hidden;
         for (var a = component.VisualParent; a != null; a = a.VisualParent)
-            if (a.Visibility != Visibility.Visible) return PartialRecord.Skip;
+        {
+            if (a.Visibility == Visibility.Collapsed) return PartialRecord.Skip;
+            if (a.Visibility == Visibility.Hidden) hidden = true;
+        }
+
+        // HIDDEN (itself, or under something hidden): it holds its slot and its rank and simply paints nothing. Saying so
+        // - recording zero commands - empties its group in place, which is a count change the retained frame patches.
+        // Without a rank there is nothing to patch INTO (a full walk while it was hidden never gave it one), and the
+        // structural path has to put it back.
+        if (hidden) return HasRank(component) ? PartialRecord.Undrawn : PartialRecord.Skip;
 
         // A component from a FOREIGN tree (a popup, a menu, a tooltip - drawn by that stage's OWN cache) does not reach
         // here at all any more: marks go to the scope of the surface that draws them, and this cache reads only its own
@@ -248,12 +286,17 @@ public partial class RenderCache
     private PartialRecord RecordReRender(IUIComponent component, RenderPacket packet)
     {
         var decision = ClassifyReRender(component);
-        if (decision != PartialRecord.Recorded) return decision;
+        if (decision is PartialRecord.Skip or PartialRecord.Fallback) return decision;
 
         var rank = RankOf(component);
         _drawingContextInternal.Clear();
         component.Render(_drawingContext);   // NB: consumes the dirty flag (Render sets IsGeometryValid back to true)
-        var commands = CopyCommands(_drawingContextInternal.GetDrawCommands());
+        // A HIDDEN element is rendered and its commands DROPPED, rather than not rendered at all: rendering is what
+        // consumes the dirty flag, and an element that stays dirty is re-recorded every frame forever. What it says it
+        // would draw is simply not what it draws while hidden.
+        var commands = decision == PartialRecord.Undrawn
+            ? CopyCommands(System.Array.Empty<IDrawCommand>())
+            : CopyCommands(_drawingContextInternal.GetDrawCommands());
         packet.Draws.Add(new ComponentDraw(component, commands, false, rank, component.RenderClones));
         MirrorUnits(component, commands.Count, false);   // it WAS dirty: no commands now means "draws nothing" -> units freed
         return PartialRecord.Recorded;

@@ -41,8 +41,11 @@ public partial class RenderCache
                     // end up a fraction of a step apart and the element jitters. Coherence on a replay comes from
                     // refusing to replay once the layout moved (see _layoutChangedSinceRecord), not from updating one
                     // half of the frame.
-                    if (_compositedOwners.Count > 0 && op.Unit.Component is { } c && _compositedOwners.Contains(c))
-                        op.Unit.Update(World(c), _projectionMatrix, _renderScale);
+                    //
+                    // ...and the same holds for a unit under a node that MOVED this frame: RefreshMovedNodes has just
+                    // written that node's matrix, so both halves are being taken from one position in one frame - which
+                    // is the condition the paragraph above is really about.
+                    RepointIfItMoved(op.Unit);
                     op.Unit.Render();
                     break;
                 case RenderOpKind.Segment:
@@ -68,6 +71,19 @@ public partial class RenderCache
                     break;
             }
         }
+    }
+
+    // A draw that baked its transform at RECORD time, on a frame where its element is somewhere else: re-point it. Two
+    // kinds of mover qualify, and only those two - the compositor, which moved it on this thread, and a motion node whose
+    // matrix this frame has just rewritten (RefreshMovedNodes). Both mean the batched half and this half are being taken
+    // from one position in one frame; re-pointing anything else is what tears a frame in two.
+    private void RepointIfItMoved(IRenderUnit unit)
+    {
+        if (_compositedOwners.Count == 0 && _movedNodeOwners.Count == 0) return;
+        if (unit.Component is not { } c) return;
+        if (!_compositedOwners.Contains(c) && !(_movedNodeOwners.Count > 0 && _movedNodeOwners.Contains(NodeOf(c)))) return;
+
+        unit.Update(World(c), _projectionMatrix, _renderScale);
     }
 
     // WHERE a band gets its distance from - asked once and answered here, so the still band and the living one can never

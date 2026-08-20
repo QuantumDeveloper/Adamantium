@@ -58,6 +58,20 @@ public sealed class RenderDirtyScope
         LoopSignal.Request();   // the scene changed - the loop owes a frame
     }
 
+    /// <summary>Marks <paramref name="root"/> and everything drawn under it as re-rendering. A hidden element hides its
+    /// subtree with it, so all of them must say what they draw now (which, while it is hidden, is nothing).</summary>
+    public void MarkSubtreeGeometry(IUIComponent root)
+    {
+        if (root == null) return;
+
+        // Listing it as dirty is not enough: a component whose OWN geometry still reads valid is stepped over by the
+        // partial record (it would re-render to the same commands), so a child of something just shown would never say
+        // it draws again and its group would stay empty - the close button's glyph missing on hover.
+        root.InvalidateRender(false);
+        MarkGeometry(root);
+        foreach (var child in root.VisualChildren) MarkSubtreeGeometry(child);
+    }
+
     /// <summary>Atomically snapshot the geometry-dirty set into <paramref name="buffer"/> under the same lock
     /// <see cref="MarkGeometry"/> writes with, so a concurrent mark (parallel arrange / a Dispatcher-thread invalidation)
     /// can't corrupt the enumeration. The set itself is NOT cleared here (the build clears it via <see cref="Clear"/>).</summary>
