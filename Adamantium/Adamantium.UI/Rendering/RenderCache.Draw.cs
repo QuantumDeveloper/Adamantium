@@ -1459,7 +1459,7 @@ public partial class RenderCache
     {
         // Moved motion nodes first: rewrite their table matrices (64B each) so the replayed segments draw the scrolled
         // subtrees at their new position. A moved node with non-node-aware retained content bails to the full walk.
-        if (!RefreshMovedNodes(device)) return false;
+        if (!RefreshMovedNodes(device)) return SpliceRefused("movedNode");
 
         _opacityChain.Clear();   // a paint-only opacity change may have re-frozen the dirty subtree's snapshot; recompose it
 
@@ -1497,7 +1497,7 @@ public partial class RenderCache
                 u.SetEffectiveOpacity(EffectiveOpacity(u.Component));   // a paint change may be an opacity change
                 var bakeWorld = ResolveBake(device, u.Component, World(u.Component), out var slot);
                 if (!PatchSlot(device, u, bakeWorld, slot))
-                    return false;   // became non-bakeable (rotated); the full walk re-bakes everything anyway
+                    return SpliceRefused($"notBakeable<{u.Component?.GetType().Name}>");   // rotated; the walk re-bakes anyway
             }
         }
         AcceptPatchedTransforms();
@@ -1599,6 +1599,7 @@ public partial class RenderCache
         public int StageCount;
         public Rect2D Scissor;        // the group's clip (all units of one component share it)
         public bool InPlace;          // count-stable recolor -> per-slot UpdateSlot, no surgery
+        public bool Blank;            // stopped drawing -> zero its slots and KEEP the run, so coming back is an edit
         public int Layer;             // the layer this group's items belong to, resolved ONCE before anything is mutated
         public Rect Bounds;           // what it covers, in logical coordinates - the ONLY thing that decides whether its
                                       // order inside a layer matters at all (see §5a: overlap is the merge rule)
@@ -1680,11 +1681,16 @@ public partial class RenderCache
 
             // Count-stable recolor (every unit already holds a retained slot): patch in place, no surgery/fragmentation.
             var inPlace = staged == group.Units.Count && staged == runTotal && AllUnitsHaveSlots(group);
-            if (!inPlace) appendTotal += staged;
+            // It STOPPED drawing (hidden, or culled off its clip) but the frame still describes where it draws. Zero the
+            // slots and leave the run alone: excising it costs its segment its shape and hands it a brand-new one - and a
+            // new OP - the moment it comes back, which is a stream that only ever grows. A hovered close button flipping
+            // hidden/shown took the stream from 29 ops to 64 and the replay from 0.68 to 1.54 ms.
+            var blank = !inPlace && walked && staged == 0 && runTotal > 0;
+            if (!inPlace && !blank) appendTotal += staged;
             _patchBuf.Add(new GroupPatch
             {
                 Group = group, Arena = arena, StageFirst = stageFirst, StageCount = staged,
-                Scissor = scissor, InPlace = inPlace, Bounds = bounds
+                Scissor = scissor, InPlace = inPlace, Blank = blank, Bounds = bounds
             });
         }
 
@@ -1698,7 +1704,7 @@ public partial class RenderCache
         for (var n = 0; n < _patchBuf.Count; n++)
         {
             var p = _patchBuf[n];
-            if (p.InPlace) continue;
+            if (p.InPlace || p.Blank) continue;   // a blank keeps its run where it is, so it needs no layer resolved
 
             // Nothing recorded for this control yet: it gets its own segment, placed by its own paint rank.
             if (p.Group.Runs.Count == 0)
@@ -1710,7 +1716,17 @@ public partial class RenderCache
 
             var layer = TargetLayer(p.Group);
             if (layer < 0) return false;   // TargetLayer already named which of its three answers it gave
-            if (FindSegmentOp(p.Arena, layer) < 0) return SpliceRefused("noLayerOp");
+            // Its run names a segment NO RECORDED OP DRAWS - the stream was re-recorded without it (it was not drawing
+            // when that walk went past). Runs that nothing draws describe nothing, which is the same situation as a group
+            // the last walk never visited: drop them and give it a place of its own, instead of costing the whole frame a
+            // walk over one control's stale bookkeeping.
+            if (FindSegmentOp(p.Arena, layer) < 0)
+            {
+                p.Group.Runs.Clear();
+                p.Layer = -1;
+                _patchBuf[n] = p;
+                continue;
+            }
             // One segment draws under ONE clip; a group that now sits under a different one cannot join it. A layer whose
             // id is no longer part of the recorded frame has no clip to compare either - refuse rather than guess.
             var layerScissor = p.Arena.GetSegmentScissor(layer);
@@ -1733,7 +1749,17 @@ public partial class RenderCache
 
         foreach (var p in _patchBuf)
         {
-            if (p.InPlace) continue;
+            if (!p.Blank) continue;
+            foreach (var run in p.Group.Runs) p.Arena.BlankSlots(device, run.First, run.Count);
+            // Its runs are still ITS runs - kept current so the next patch repairs them instead of dropping them as a
+            // stranger's slots. Units are left alone: staging nothing also means "culled off its clip", and those units
+            // very much still exist.
+            p.Group.WalkVersion = _walkVersion;
+        }
+
+        foreach (var p in _patchBuf)
+        {
+            if (p.InPlace || p.Blank) continue;
             if (!ReissueLayer(device, p)) return SpliceRefused("arenaFull");
         }
 

@@ -648,6 +648,11 @@ internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
     /// control that stops drawing cannot simply be forgotten: its instances stay inside somebody else's range and are
     /// re-issued with it on every replayed frame. Reclaiming the range belongs to the next recording walk; until then the
     /// bytes have to draw nothing.</summary>
+    public override void BlankSlots(IGraphicsDevice device, int first, int count)
+    {
+        if (first >= 0 && count > 0) BlankRun(device, (uint)first, (uint)count);
+    }
+
     public void BlankRun(IGraphicsDevice device, uint first, uint count)
     {
         if (count == 0 || first + count > (uint)Count) return;

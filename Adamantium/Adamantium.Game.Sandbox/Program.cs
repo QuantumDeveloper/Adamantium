@@ -213,7 +213,11 @@ public class Program
                 // Every frame that ran LONG, one line each: what kind of build it was, why it could not replay, and how
                 // much of it was layout and record. A spike a hand reproduces is only worth anything if it names itself.
                 System.IO.File.WriteAllText(log + ".frames.txt",
-                    "not node-aware:" + System.Environment.NewLine
+                    "patch refusals by reason:" + System.Environment.NewLine
+                    + string.Join(System.Environment.NewLine, System.Linq.Enumerable.Select(
+                        System.Linq.Enumerable.OrderByDescending(Adamantium.UI.Core.Diagnostics.FrameTrace.Refusals, p => p.Value),
+                        p => $"  {p.Value,5}  {p.Key}")) + System.Environment.NewLine
+                    + "not node-aware:" + System.Environment.NewLine
                     + string.Join(System.Environment.NewLine, System.Linq.Enumerable.Select(
                         System.Linq.Enumerable.OrderByDescending(Adamantium.UI.Core.Diagnostics.FrameTrace.NotAware, p => p.Value),
                         p => $"  {p.Value,5}  {p.Key}")) + System.Environment.NewLine

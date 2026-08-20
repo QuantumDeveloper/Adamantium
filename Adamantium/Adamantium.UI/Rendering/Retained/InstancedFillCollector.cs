@@ -631,9 +631,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
         // Record this group's draws + upload each key's new instances NOW (recording frame). The record captures the
         // buffer range (first,count) per key so replay re-issues the exact same draw with no upload.
-        var rec = _flushCount < _flushRecords.Count ? _flushRecords[_flushCount] : AddFlushRecord();
-        _flushCount++;
-        rec.Reset();
+        var rec = TakeFlushRecord();
         rec.Scissor = _scissor;
         // Clamped to the field, NOT left to wrap: a mark past it writes back as 0 through the write mask, and a fringe
         // testing Greater against 0 draws nowhere. Past exhaustion the caller has already stopped relying on marks.
@@ -700,6 +698,18 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         => DrawFlushRecord(_flushRecords[index], fullScissor, projection);
 
     private FlushRecord AddFlushRecord() { var r = new FlushRecord(); _flushRecords.Add(r); return r; }
+
+    /// <summary>The next LIVE flush record, blank and counted. Records are pooled and reused from index 0 by every
+    /// recording walk, so the ones the current frame is made of are exactly <c>[0, _flushCount)</c> - everything past
+    /// that is a leftover from some longer frame. Both the walk and a patch take their record through here, so a patch's
+    /// flush is part of the frame it is patching instead of landing in the dead tail where no recorded op draws it.</summary>
+    private FlushRecord TakeFlushRecord()
+    {
+        var rec = _flushCount < _flushRecords.Count ? _flushRecords[_flushCount] : AddFlushRecord();
+        _flushCount++;
+        rec.Reset();
+        return rec;
+    }
 
     private void DrawFlushRecord(FlushRecord rec, Rect2D fullScissor, Matrix4x4F projection)
     {
@@ -1020,7 +1030,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     /// <summary>The run this key draws in that flush record, or (-1, -1) when the record does not draw this key at all.</summary>
     internal (int First, int Count) KeyRange(object key, int flush)
     {
-        if (key is not KeySegment seg || flush < 0 || flush >= _flushRecords.Count) return (-1, -1);
+        if (key is not KeySegment seg || flush < 0 || flush >= _flushCount) return (-1, -1);
 
         var rec = _flushRecords[flush];
         foreach (var entry in rec.Keys)
@@ -1031,12 +1041,15 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         return (-1, -1);
     }
 
-    /// <summary>Which recorded flush draws the slot this key holds - the way back from a group's run to its segment.</summary>
+    /// <summary>Which recorded flush draws the slot this key holds - the way back from a group's run to its segment.
+    /// Only the LIVE records are asked: a leftover from a longer frame still holds the ranges it had then, and answering
+    /// with one of those named a flush no recorded op draws - which is how a hovered close button refused its patch 151
+    /// times in ten seconds and took a walk of the window each time.</summary>
     internal int KeyFlushContaining(object key, int slot)
     {
         if (key is not KeySegment seg) return -1;
 
-        for (var i = 0; i < _flushRecords.Count; i++)
+        for (var i = 0; i < _flushCount; i++)
         {
             foreach (var entry in _flushRecords[i].Keys)
             {
@@ -1047,7 +1060,17 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         return -1;
     }
 
-    internal Rect2D FlushScissor(int flush) => flush >= 0 && flush < _flushRecords.Count ? _flushRecords[flush].Scissor : null;
+    internal Rect2D FlushScissor(int flush) => flush >= 0 && flush < _flushCount ? _flushRecords[flush].Scissor : null;
+
+    /// <summary>Make this key's slots draw nothing, in place. A zeroed instance carries a zero transform slot and a zero
+    /// colour, so it covers no pixel - the same answer BlankRun gives every other family.</summary>
+    internal void BlankKeySlots(object key, int first, int count)
+    {
+        if (key is not KeySegment seg || first < 0 || count <= 0 || first + count > seg.Count) return;
+
+        for (var i = 0; i < count; i++) seg.Items[first + i] = default;
+        seg.Gpu?.SetData(seg.Items.AsSpan(first, count), (uint)(first * InstanceStride));
+    }
 
     /// <summary>Bake one unit's SOLID instance into the patch stage, for THIS key only - a unit whose shape hashes to a
     /// different mesh belongs to another arena and must not be written into this one's array.</summary>
@@ -1076,7 +1099,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             if (u is GeometryRenderUnit { HasPerUnitOverlay: true }) return false;
         }
 
-        if (key is not KeySegment seg || flush < 0 || flush >= _flushRecords.Count) return false;
+        if (key is not KeySegment seg || flush < 0 || flush >= _flushCount) return false;
         if (seg.Gpu == null) return false;
 
         var rec = _flushRecords[flush];
@@ -1101,8 +1124,8 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         seg.Flushed = seg.Count;
         rec.Keys[index] = (seg, entry.First, (uint)(count + delta));
 
-        // Every later run of THIS key shifted by the same amount - in this record and in the ones after it.
-        for (var f = flush; f < _flushRecords.Count; f++)
+        // Every later run of THIS key shifted by the same amount - in this record and in the LIVE ones after it.
+        for (var f = flush; f < _flushCount; f++)
         {
             var other = _flushRecords[f];
             for (var k = 0; k < other.Keys.Count; k++)
@@ -1140,15 +1163,14 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         seg.Flushed = seg.Count;
         seg.Gpu.SetData(seg.Items.AsSpan(first, stageCount), (uint)(first * InstanceStride));
 
-        var rec = AddFlushRecord();
-        rec.Reset();
+        var rec = TakeFlushRecord();
         rec.Scissor = scissor;
         rec.StencilRef = Math.Min(++_groupRef, CoverageMarkBits);
         rec.Keys.Add((seg, (uint)first, (uint)stageCount));
         // ...and the ink. A cross is a STROKED path: its shape rides the instance buffer, everything visible about it is
         // the deferred overlay, and a record without these units draws the shape and none of it.
         foreach (var u in stagedUnits) rec.Units.Add(u);
-        return _flushRecords.Count - 1;
+        return _flushCount - 1;
     }
 
     // The lazy instance ring, shared by the walk (TryAdd) and by a patch placing a brand-new shape.
