@@ -34,8 +34,28 @@ public static class FrameTrace
 
     public static bool Enabled;
 
-    /// <summary>TEMP: the unit type that last cost a frame its patch.</summary>
-    public static string Refuser;
+    /// <summary>TEMP: the unit type that last cost a frame its patch. Every assignment is TALLIED below, because the
+    /// name of one frame's refuser answers "what happened here" and not "what is worth fixing" - there are ten exits and
+    /// only a count over a run says which of them a scenario actually takes.</summary>
+    public static string Refuser
+    {
+        get => _refuser;
+        set
+        {
+            _refuser = value;
+            if (!Enabled || value == null) return;
+            // Tally the REASON, not the instance: the detail carries a control's type and the words it draws, so keyed
+            // whole it would be a list of thousands of one-offs instead of ten numbers.
+            var cut = value.AsSpan().IndexOfAny('<', ' ');
+            var reason = cut < 0 ? value : value[..cut];
+            lock (Refusals) Refusals[reason] = Refusals.TryGetValue(reason, out var had) ? had + 1 : 1;
+        }
+    }
+
+    private static string _refuser;
+
+    /// <summary>TEMP: how many frames each refusal reason cost, over the whole run.</summary>
+    public static readonly Dictionary<string, int> Refusals = new();
 
     /// <summary>TEMP: why the RECORD fell back to a full walk of the tree. A full walk is the most expensive frame there
     /// is, and "structural" is not a reason - the splice refuses for half a dozen unrelated causes and each has its own

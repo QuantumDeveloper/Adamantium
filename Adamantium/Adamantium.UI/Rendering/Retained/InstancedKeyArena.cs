@@ -71,6 +71,9 @@ internal sealed class InstancedKeyArena : BatchArena
         return $"instanced key flush {id} [{first}..{first + count})";
     }
 
+    public override void BlankSlots(IGraphicsDevice device, int first, int count)
+        => _collector.BlankKeySlots(_key, first, count);
+
     public override void ClearStage()
     {
         _stage.Clear();
