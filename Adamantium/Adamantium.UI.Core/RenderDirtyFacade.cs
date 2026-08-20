@@ -18,11 +18,33 @@ public static class RenderDirty
 
     public static void MarkPaint(IUIComponent component) => RenderDirtyRouter.Of(component).MarkPaint(component);
 
-    public static void MarkTransform(IUIComponent component) => RenderDirtyRouter.Of(component).MarkTransform(component);
+    /// <summary>Something MOVED. Without a component the mover has no owner to name (a bare Transform ticking), and no
+    /// scope can be ruled out - so they all hear it, exactly as with an unnameable structural change.</summary>
+    public static void MarkTransform(IUIComponent component)
+    {
+        if (component != null)
+        {
+            RenderDirtyRouter.Of(component).MarkTransform(component);
+            return;
+        }
+
+        foreach (var scope in RenderDirtyRouter.All()) scope.MarkTransform(null);
+    }
 
     public static void MarkNodeTransform(IUIComponent node) => RenderDirtyRouter.Of(node).MarkNodeTransform(node);
 
-    public static void MarkStructural(IUIComponent component = null) => RenderDirtyRouter.Of(component).MarkStructural(component);
+    /// <summary>A structural change. WITHOUT a component it is an unnameable one - something changed about the drawn set
+    /// and nobody can say what - so it reaches EVERY scope: no owner can be ruled out.</summary>
+    public static void MarkStructural(IUIComponent component = null)
+    {
+        if (component != null)
+        {
+            RenderDirtyRouter.Of(component).MarkStructural(component);
+            return;
+        }
+
+        foreach (var scope in RenderDirtyRouter.All()) scope.MarkStructural();
+    }
 
     public static void MarkDetached() => RenderDirtyRouter.Default.MarkDetached();
 
@@ -77,9 +99,19 @@ public static class RenderDirty
 
     public static bool IsSettlingStructural => RenderDirtyRouter.Default.IsSettlingStructural;
 
-    public static void ForceStructuralUntilSettled() => RenderDirtyRouter.Default.ForceStructuralUntilSettled();
+    /// <summary>A multi-frame state swap has begun (a theme, a DPI change). It re-styles EVERYTHING, so every scope has
+    /// to keep walking in full until the cascade drains - a window whose scope was not told would keep replaying the
+    /// frame it recorded under the old theme.</summary>
+    public static void ForceStructuralUntilSettled()
+    {
+        foreach (var scope in RenderDirtyRouter.All()) scope.ForceStructuralUntilSettled();
+    }
 
-    public static void NotifyLayoutQuiescent() => RenderDirtyRouter.Default.NotifyLayoutQuiescent();
+    /// <summary>...and the layout says the cascade has drained. Also everyone's business, for the same reason.</summary>
+    public static void NotifyLayoutQuiescent()
+    {
+        foreach (var scope in RenderDirtyRouter.All()) scope.NotifyLayoutQuiescent();
+    }
 
     /// <summary>Clears EVERY scope's marks - the once-per-frame clear, after every window and every stage has recorded.
     /// Per-scope clearing is what makes "clear as soon as my own record is done" possible; until the stages own their

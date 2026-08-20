@@ -276,6 +276,21 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
     /// paint order - without touching the segments they sit in. Done here rather than slot-by-slot from the cache
     /// because that meant one upload per slot; a run of dead neighbours (a whole scrollbar, a whole recycled row) is one
     /// upload, and the scan reads each instance's tag by reference instead of copying it.</summary>
+    /// <summary>Does this segment still draw anything at all - is any instance in it owned by somebody? A segment whose
+    /// every instance has been blanked is a draw call that paints nothing, and the layer holding it can let it go.</summary>
+    public bool SegmentDrawsNothing(int id)
+    {
+        var (first, count) = SegmentRange(id);
+        if (first < 0 || count == 0) return true;
+
+        for (var i = 0; i < count; i++)
+        {
+            if (Items[first + i].OwnerTag != 0) return false;
+        }
+
+        return true;
+    }
+
     public void BlankOwned(IGraphicsDevice device, uint first, uint count, int ownerTag)
     {
         if (count == 0 || first + count > (uint)Count) return;

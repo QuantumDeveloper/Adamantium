@@ -255,7 +255,7 @@ public partial class RenderCache
         // Element opacity lives IN the snapshot (unlike a brush recolour, which re-bakes from the brush BY REFERENCE), so a
         // paint-dirty component whose opacity ACTUALLY changed must re-publish its entry - on any build kind. Gated on a
         // real change so the common brush pulse (~470 cards/frame) re-freezes nothing.
-        RenderDirty.SnapshotPaintInto(_opacityCheckBuf);
+        Dirty.SnapshotPaintInto(_opacityCheckBuf);
         foreach (var c in _opacityCheckBuf)
             if (IsDrawn(c) && (!_snap.TryGetValue(c, out var f) || f.Opacity != (float)c.Opacity || f.SelfOpacity != (float)c.SelfOpacity))
                 RefreshSnapshot(c);

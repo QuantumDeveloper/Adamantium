@@ -167,23 +167,90 @@ public partial class RenderCache
     // that shows up as exactly the thing a smooth window cannot have - some frames costing much more than their
     // neighbours for no visible reason.
     private readonly List<ControlGroup> _leftTheOrder = new();
+    private readonly HashSet<int> _emptiedSegments = new();
+
+    /// <summary>Takes a rect segment's op out of the recorded stream - the segment draws nothing any more - and tells the
+    /// layer that held it. The layer keeps its place in the frame: what it lost is one run, not its interval.</summary>
+    private void DropSegmentOp(int segId)
+    {
+        for (var i = 0; i < _ops.Count; i++)
+        {
+            if (_ops[i].Kind != RenderOpKind.Segment || _ops[i].Batch != 0 || _ops[i].SegId != segId) continue;
+
+            _ops.RemoveAt(i);
+            NoteOpRemoved(i);
+            return;
+        }
+    }
+
+    /// <summary>The mirror of <see cref="NoteOpInserted"/>: the layer that held the op loses one, and everything behind
+    /// it moves back. The layers must keep tiling the stream exactly - a range that has slid by one is a frame assembled
+    /// out of its neighbours' pieces.</summary>
+    private void NoteOpRemoved(int index)
+    {
+        var taken = false;
+        for (var i = 0; i < _layers.Count; i++)
+        {
+            var layer = _layers[i];
+            if (taken)
+            {
+                layer.OpFirst--;
+                continue;
+            }
+
+            if (index < layer.OpFirst)
+            {
+                layer.OpFirst--;
+                continue;
+            }
+
+            if (index < layer.OpFirst + layer.OpCount)
+            {
+                layer.OpCount--;
+                taken = true;
+            }
+        }
+
+        foreach (var layer in _layers)
+        {
+            for (var r = layer.Runs.Count - 1; r >= 0; r--)
+                if (layer.Runs[r].Batch == 0 && !_rectBatch.HasSegment(layer.Runs[r].SegId)) layer.Runs.RemoveAt(r);
+        }
+    }
 
     private void BlankOrphanInstances(IGraphicsDevice device)
     {
         if (_rectBatch == null || device == null) return;
 
+        _emptiedSegments.Clear();
         foreach (var group in _leftTheOrder)
         {
             if (group.InOrder || group.Tag == 0) continue;   // came back before anyone looked
             foreach (var run in group.RectRuns)
             {
                 LayerProbe.OrphanSweptSlots += run.Count;
+                var segment = _rectBatch.FindSegmentContaining(run.First);
                 _rectBatch.BlankOwned(device, (uint)run.First, (uint)run.Count, group.Tag);
+                if (segment >= 0) _emptiedSegments.Add(_rectBatch.SegmentIdAt(segment));
             }
+        }
+
+        // A segment whose every instance has just been blanked is a draw call that paints nothing. Let it go: the op
+        // leaves the stream and the layer holding it loses that run - which is what "an empty layer closes" means in
+        // practice. The slots stay allocated until the next recording walk re-lays the arena, because they still sit
+        // inside a range other segments' draws are indexed against.
+        foreach (var id in _emptiedSegments)
+        {
+            if (!_rectBatch.SegmentDrawsNothing(id)) continue;
+            DropSegmentOp(id);
         }
 
         LayerProbe.OrphanSweeps++;
     }
+
+    /// <summary>How many draw operations the recorded frame replays. Tests read it to see that work actually LEFT the
+    /// frame - a control that stopped drawing should cost one draw call less, not one blanked instance more.</summary>
+    public int RecordedOpCount => _ops.Count;
 
     /// <summary>Whether the layers still describe the stream they were built from: their op ranges tile it in order,
     /// leaving no op out and claiming none twice. Asked by tests, because a layer list that has drifted would place a
@@ -1799,15 +1866,34 @@ public partial class RenderCache
     // is why the span is recorded at all.
     private int OpIndexForRank(long order)
     {
-        var at = _ops.Count;
-        for (var i = 0; i < _ops.Count; i++)
+        // Ask the LAYERS first: they are the frame's structure, ordered and non-overlapping, so the rank picks one of
+        // them - and only that layer's own ops have to be looked at. A scan of the whole stream answered the same
+        // question by reading every op of every layer, including the ones whose ranks say nothing about this one.
+        var from = 0;
+        var to = _ops.Count;
+        foreach (var layer in _layers)
+        {
+            if (layer.OpCount == 0) continue;
+            if (order > layer.RankLast) continue;      // strictly earlier than the newcomer - keep going
+
+            // The first layer that reaches this rank: either it covers it (place INSIDE, by rank) or it begins after it
+            // (place before the whole layer).
+            from = layer.OpFirst;
+            to = layer.Covers(order) ? layer.OpFirst + layer.OpCount : layer.OpFirst;
+            break;
+        }
+
+        var at = to;
+        for (var i = from; i < to; i++)
         {
             if (_ops[i].Order <= order) continue;
             at = i;
             break;
         }
 
-        while (at > 0 && _ops[at - 1].Kind == RenderOpKind.Scissor) at--;
+        // Never straight after a Scissor op: that op sets up the draw that FOLLOWS it, and slipping in between the two
+        // would draw the newcomer under somebody else's clip.
+        while (at > from && _ops[at - 1].Kind == RenderOpKind.Scissor) at--;
         return at;
     }
 

@@ -44,7 +44,7 @@ public partial class RenderCache
 
         // The geometry-dirty components ride along (as in a Partial). Pre-validate against the PLAN before anything
         // renders - a dirty component the partial path cannot place is a refusal, and it must be found first.
-        RenderDirty.SnapshotGeometryInto(_geometryDirtyBuffer);
+        Dirty.SnapshotGeometryInto(_geometryDirtyBuffer);
         foreach (var component in _geometryDirtyBuffer)
         {
             if (_plannedSet.Contains(component) || _removedSet.Contains(component)) continue;
@@ -66,7 +66,7 @@ public partial class RenderCache
         // A component's Render can mark MORE geometry dirty (an image decode). Those marks clear with the rest, so a
         // component that arrived mid-pass would be lost and stay dirty forever - force a full walk NEXT frame instead
         // (the request keeps it from being dropped; the loop only runs when something asks - see LoopSignal).
-        if (RenderDirty.GeometryCount != _geometryDirtyBuffer.Count)
+        if (Dirty.GeometryCount != _geometryDirtyBuffer.Count)
         {
             _forceFullNextFrame = true;
             Core.LoopSignal.Request();
@@ -76,8 +76,8 @@ public partial class RenderCache
         // draw (no op-stream replay). That cost lands on the render thread - the point of moving the record off the loop.
         packet.IsTransformDirty = true;
         packet.ClearMemos = true;
-        RenderDirty.SnapshotNodesInto(packet.MovedNodes);
-        RenderDirty.SnapshotMovedInto(_movedBuf);
+        Dirty.SnapshotNodesInto(packet.MovedNodes);
+        Dirty.SnapshotMovedInto(_movedBuf);
         return true;
     }
 
@@ -115,7 +115,7 @@ public partial class RenderCache
     private bool PlanStructuralChange()
     {
         _needRenumber = false;
-        RenderDirty.SnapshotStructuralInto(_structuralBuf);
+        Dirty.SnapshotStructuralInto(_structuralBuf);
         _placeRoots.Clear();
         _addsByParent.Clear();
         _plannedList.Clear();

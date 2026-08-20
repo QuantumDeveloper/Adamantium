@@ -78,6 +78,13 @@ internal abstract class BatchCollector<TItem> where TItem : struct
     /// <summary>Where a segment currently sits in draw order, or -1 if this id is not part of the recorded frame.</summary>
     private int IndexOf(int id) => _indexById.TryGetValue(id, out var index) ? index : -1;
 
+    /// <summary>The id of the segment sitting at this position in draw order - the way back from a position (which is
+    /// what a slot search answers) to the NAME everything outside uses.</summary>
+    public int SegmentIdAt(int index) => index >= 0 && index < _segments.Count ? _segments[index].Id : -1;
+
+    /// <summary>Is this id still part of the recorded frame?</summary>
+    public bool HasSegment(int id) => _indexById.ContainsKey(id);
+
     // Re-point the id map from that index to the end of the list. Called after an insert, which is the only thing that moves a
     // segment's index.
     private void Reindex(int from)
