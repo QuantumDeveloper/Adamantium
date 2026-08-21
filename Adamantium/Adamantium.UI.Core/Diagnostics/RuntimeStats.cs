@@ -44,6 +44,15 @@ public static class RuntimeStats
     /// <summary>Overlay stages (adorner + popup) draw.</summary>
     public static double LastProcessorsMs;
 
+    /// <summary>The four steps of a frame that are NOT recording or drawing content, and which together were most of a
+    /// frame while nobody was looking: BeginDraw (its fence wait is where a frame waits for the GPU to be done with the
+    /// slot, plus the acquire), EndDraw (finalize + blit to the swapchain image), Submit (hand the queue the work), and
+    /// Present. Named separately because they have four different fixes and only one of them is "the GPU is busy".</summary>
+    public static double LastBeginDrawMs;
+    public static double LastEndDrawMs;
+    public static double LastSubmitMs;
+    public static double LastPresentMs;
+
     /// <summary>Cumulative count of frames actually PRESENTED. With a dedicated render thread this is the only honest frame
     /// rate: the loop's own rate measures Update + record, and the two are deliberately decoupled - a heavy Update must not
     /// drag the presented frame rate down with it (that is the entire point of the split). Sample by delta.</summary>

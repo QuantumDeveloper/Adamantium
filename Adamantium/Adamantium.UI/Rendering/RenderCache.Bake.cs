@@ -71,6 +71,13 @@ public partial class RenderCache
     // window (whose loop a mark would wake into a concurrent, hanging render). Adorners (the default) pass false.
     public void BuildFromComponents(IReadOnlyList<IUIComponent> components, Matrix4x4F projectionMatrix, bool readOnly = false)
     {
+        // Letters that finished rasterizing since the last build have to be taken into THIS cache's units first. An
+        // overlay never runs ApplyFrame - this method fuses record and apply - so without the call here the adoption
+        // only ever happened for the window's content cache, and a popup's text kept the empty run it was first built
+        // with. Rebuilding alone does NOT fix that: the run lives on the text unit and is re-frozen by the adoption,
+        // not by the walk. Together with the gate now asking about arrivals, this is what puts a late glyph on screen.
+        AdoptReadyGlyphs();
+
         // A FULL rebuild every call. Must record LastBuildKind=Full: the batches' Clean-frame upload-skip reads it, else
         // the overlay batch skips every GPU upload - its SSBO never fills and the whole overlay renders nothing.
         LastBuildKind = RenderBuildKind.Full;

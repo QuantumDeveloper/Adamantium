@@ -90,7 +90,9 @@ public class WindowRenderService : UiRenderService
     
     public override void Present()
     {
+        var t0 = Stopwatch.GetTimestamp();
         windowRenderer?.Present();
+        RuntimeStats.LastPresentMs = Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
     }
 
     public override void UnloadContent()
@@ -181,6 +183,9 @@ public class WindowRenderService : UiRenderService
         GraphicsDevice.Presenter = windowRenderer.Presenter;
         // Record shared-surface latch copies BEFORE BeginRendering so this frame's compositing samples the freshly
         // latched private textures (zero latency), and the copies aren't recorded inside the render pass.
+        var beginStart = Stopwatch.GetTimestamp();
+        try
+        {
         return GraphicsDevice.BeginDraw(beforeRenderPass: _ =>
         {
             // Build the content render cache HERE - inside beforeRenderPass, which runs after BeginDraw's fence wait
@@ -207,6 +212,13 @@ public class WindowRenderService : UiRenderService
             windowRenderer.PreRender();
             PreRenderProcessors();   // adorner stage compute (stroke expander) before the render pass
         });
+        }
+        finally
+        {
+            // Includes the fence wait for this slot AND the record/apply/prerender done in beforeRenderPass - those are
+            // timed on their own, so the WAIT is what is left when they are taken off this number.
+            RuntimeStats.LastBeginDrawMs = Stopwatch.GetElapsedTime(beginStart).TotalMilliseconds;
+        }
     }
 
     public override void Draw(AppTime gameTime)
@@ -224,12 +236,20 @@ public class WindowRenderService : UiRenderService
 
     public override void EndDraw()
     {
+        var t0 = Stopwatch.GetTimestamp();
         GraphicsDevice.EndDraw();
         // The content cache is built in BeginDraw (beforeRenderPass) now, not here: it must reflect the frame BEFORE
         // that frame is drawn, not one frame late. EndDraw only finalizes and blits the rendered frame to the swapchain.
-        GraphicsDevice.BlitImage(GraphicsDevice.CurrentCommandBuffer,
-            GraphicsDevice.CurrentRenderTarget.ResolveTexture,
-            windowRenderer.Presenter.GetCurrentImage());
+        // No image, no blit: EndDraw acquires it now (see GraphicsDevice.EndDraw), and a failed acquire means there is
+        // nothing to copy into and nothing to present.
+        if (GraphicsDevice.HasSwapchainImage)
+        {
+            GraphicsDevice.BlitImage(GraphicsDevice.CurrentCommandBuffer,
+                GraphicsDevice.CurrentRenderTarget.ResolveTexture,
+                windowRenderer.Presenter.GetCurrentImage());
+        }
+
+        RuntimeStats.LastEndDrawMs = Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
     }
 
     public override void FrameEnded()

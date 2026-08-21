@@ -43,6 +43,7 @@ public class Program
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 var limit = Environment.GetEnvironmentVariable("ADAM_PROBE_SECONDS") is { } sec ? double.Parse(sec) : 20;
                 double layout = 0;
+                double sumBegin = 0, sumEnd = 0, sumSubmit = 0, sumPresent = 0, sumFence = 0, sumAcquire = 0, sumSetup = 0;
                 double sumPre = 0;
                 double sumRecord = 0, sumApply = 0, sumProc = 0, sumDraw = 0, sumProcessors = 0, sumLayout = 0;
                 double maxDraw = 0, maxApply = 0, maxRecord = 0;
@@ -55,6 +56,13 @@ public class Program
                     var st = typeof(Adamantium.UI.Core.Diagnostics.RuntimeStats);
                     if (Adamantium.UI.Core.Diagnostics.RuntimeStats.LastLayoutPassMs > layout) layout = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastLayoutPassMs;
                     sumPre += Adamantium.UI.Core.Diagnostics.RuntimeStats.LastPreRenderMs;
+                    sumBegin += Adamantium.UI.Core.Diagnostics.RuntimeStats.LastBeginDrawMs;
+                    sumEnd += Adamantium.UI.Core.Diagnostics.RuntimeStats.LastEndDrawMs;
+                    sumSubmit += Adamantium.UI.Core.Diagnostics.RuntimeStats.LastSubmitMs;
+                    sumPresent += Adamantium.UI.Core.Diagnostics.RuntimeStats.LastPresentMs;
+                    sumFence += Adamantium.Graphics.GraphicsDevice.LastFenceWaitMs;
+                    sumAcquire += Adamantium.Graphics.GraphicsDevice.LastAcquireMs;
+                    sumSetup += Adamantium.Graphics.GraphicsDevice.LastBeginSetupMs;
                     sumLayout += Adamantium.UI.Core.Diagnostics.RuntimeStats.LastLayoutPassMs;
                     sumRecord += Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordMs;
                     sumApply += Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyMs;
@@ -201,6 +209,8 @@ public class Program
                 System.IO.File.WriteAllText(log,
                     $"layout peak {layout:0} ms | WORST SECOND {(worstSecond == long.MaxValue ? 0 : worstSecond)} fps | presented {frames} in {sw.Elapsed.TotalSeconds:0.0} s = {frames / sw.Elapsed.TotalSeconds:0} fps" + System.Environment.NewLine
                     + $"sampled avg ms: prerender {sumPre * inv:0.00} layout {sumLayout * inv:0.00} record {sumRecord * inv:0.00} apply {sumApply * inv:0.00} proc {sumProc * inv:0.00} draw {sumDraw * inv:0.00} processors {sumProcessors * inv:0.00}" + System.Environment.NewLine
+                    + $"frame steps avg ms: beginDraw {sumBegin * inv:0.00} = fence {sumFence * inv:0.00} + setup {sumSetup * inv:0.00} + record/apply/prerender {(sumRecord + sumApply + sumPre) * inv:0.00} + acquire {sumAcquire * inv:0.00}" + System.Environment.NewLine
+                    + $"                    endDraw {sumEnd * inv:0.00} submit {sumSubmit * inv:0.00} present {sumPresent * inv:0.00}" + System.Environment.NewLine
                     + $"sampled max ms: record {maxRecord:0.0} apply {maxApply:0.0} draw {maxDraw:0.0} | frame budget at {frames / sw.Elapsed.TotalSeconds:0} fps = {1000.0 / (frames / sw.Elapsed.TotalSeconds):0.00} ms" + System.Environment.NewLine
                     + Adamantium.UI.Core.Diagnostics.FrameTrace.Percentiles() + System.Environment.NewLine
                     + Adamantium.UI.Rendering.LayerProbe.Dump() + System.Environment.NewLine
@@ -213,7 +223,8 @@ public class Program
                 // Every frame that ran LONG, one line each: what kind of build it was, why it could not replay, and how
                 // much of it was layout and record. A spike a hand reproduces is only worth anything if it names itself.
                 System.IO.File.WriteAllText(log + ".frames.txt",
-                    "patch refusals by reason:" + System.Environment.NewLine
+                    "presentation extensions: " + DescribePresentationSupport() + System.Environment.NewLine
+                    + "patch refusals by reason:" + System.Environment.NewLine
                     + string.Join(System.Environment.NewLine, System.Linq.Enumerable.Select(
                         System.Linq.Enumerable.OrderByDescending(Adamantium.UI.Core.Diagnostics.FrameTrace.Refusals, p => p.Value),
                         p => $"  {p.Value,5}  {p.Key}")) + System.Environment.NewLine
@@ -264,6 +275,19 @@ public class Program
     }
 
     // TEMP: the first control with this Name under a root.
+    /// <summary>Which presentation extensions this MACHINE turned out to have - asked of the device, so a report from a
+    /// different GPU or a Mac says what was true there rather than what the wish list hoped for.</summary>
+    private static string DescribePresentationSupport()
+    {
+        var service = Adamantium.UI.UIApplication.Current?.Container
+            ?.Resolve<Adamantium.Graphics.Core.IGraphicsDeviceService>();
+        var main = (service as Adamantium.UI.Services.GraphicsDeviceService)?.MainGraphicsDevice;
+        if (main == null) return "no device";
+
+        return $"swapchainMaintenance {main.SupportsSwapchainMaintenance} | presentWait {main.SupportsPresentWait}"
+             + $" | incrementalPresent {main.SupportsIncrementalPresent}";
+    }
+
     private static Adamantium.UI.Controls.Base.UIComponent FindNamed(Adamantium.UI.Core.IUIComponent root, string name)
     {
         var stack = new System.Collections.Generic.Stack<Adamantium.UI.Core.IUIComponent>();

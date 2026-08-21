@@ -32,8 +32,18 @@ namespace Adamantium.Graphics.Fonts
                 landed |= atlas.PumpReady();
             }
 
+            if (landed) LandedVersion++;
+
             return landed;
         }
+
+        /// <summary>Bumped every time letters land. There is more than one render cache - window content, the adorner
+        /// stage, the popup stage - and the pump drains a QUEUE, so only the FIRST one to ask is told that something
+        /// arrived; the rest get false and would never refresh their own text. A version they can each remember answers
+        /// "did anything land since I last looked" for every one of them, independently of who did the pumping.
+        /// <para>Without it a SlidePanel opened with a blank close cross the first time and a correct one the second,
+        /// once the atlas was warm.</para></summary>
+        public static int LandedVersion { get; private set; }
 
         /// <summary>Is any atlas still rasterizing? While this is true the renderer keeps asking for frames, so the
         /// glyphs that arrive have a frame to appear in.</summary>

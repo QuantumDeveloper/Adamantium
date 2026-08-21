@@ -216,21 +216,35 @@ namespace Adamantium.Graphics.Core
 
         PresentModeKHR ChooseSwapPresentMode(PresentModeKHR[] availablePresentModes)
         {
-            PresentModeKHR bestMode = PresentModeKHR.FifoKhr;
+            // IMMEDIATE first, Mailbox second, Fifo last. Mailbox looks like the better choice and is the usual advice -
+            // but it hands images back to the application on the DISPLAY's schedule, and AcquireNextImage is a
+            // SYNCHRONOUS block in the frame loop: with update and render on one thread, that back-pressure paces the
+            // whole engine, not just the presenting. Measured on the Layout tab: acquire 0.6-0.8 ms per frame with the
+            // GPU fence wait at 0.00, unchanged by a fourth image and unchanged by acquiring late. Immediate has no such
+            // schedule to wait on.
+            var wanted = Description.PresentPolicy switch
+            {
+                PresentPolicy.Immediate => PresentModeKHR.ImmediateKhr,
+                PresentPolicy.Adaptive => PresentModeKHR.MailboxKhr,
+                _ => PresentModeKHR.FifoKhr
+            };
 
             foreach (var availablePresentMode in availablePresentModes)
             {
-                if (availablePresentMode == PresentModeKHR.MailboxKhr)
+                if (availablePresentMode == wanted) return wanted;
+            }
+
+            // Second choice: an Immediate that is not offered falls to Mailbox - still unthrottled from the application's
+            // side. Anything else falls to Fifo, which every driver must support, rather than to tearing nobody asked for.
+            if (Description.PresentPolicy == PresentPolicy.Immediate)
+            {
+                foreach (var availablePresentMode in availablePresentModes)
                 {
-                    return availablePresentMode;
-                }
-                else if (availablePresentMode == PresentModeKHR.ImmediateKhr)
-                {
-                    bestMode = availablePresentMode;
+                    if (availablePresentMode == PresentModeKHR.MailboxKhr) return PresentModeKHR.MailboxKhr;
                 }
             }
 
-            return bestMode;
+            return PresentModeKHR.FifoKhr;
         }
 
         Extent2D ChooseSwapExtent(SurfaceCapabilitiesKHR capabilities)

@@ -104,7 +104,10 @@ public sealed class GraphicsDeviceService : PropertyChangedBase, IGraphicsDevice
     internal void CreateMainDevice(string name, bool debugEnabled = true)
     {
         MainGraphicsDevice?.Dispose();
-        MainGraphicsDevice = MainGraphicsDevice.Create(GraphicsDeviceFactory, 3, name, debugEnabled);
+        // TEMP knob for the in-flight depth measurement (ADAM_FRAMES_IN_FLIGHT). This is what MaxFramesInFlight is taken
+        // from, i.e. how far the CPU may run ahead of the GPU before it blocks on a slot's fence.
+        var inFlight = Environment.GetEnvironmentVariable("ADAM_FRAMES_IN_FLIGHT") is { } f && uint.TryParse(f, out var n) ? n : 3;
+        MainGraphicsDevice = MainGraphicsDevice.Create(GraphicsDeviceFactory, inFlight, name, debugEnabled);
         // The main device now creates and owns its resource-loader device + shared descriptor heap; we only read them.
         MainGraphicsDevice.Disposing += GraphicsDeviceDisposing;
 

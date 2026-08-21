@@ -12,6 +12,7 @@
         Width="1280"
         Height="720"
         AnalyticAntialiasing="{Binding AnalyticAa, Mode=TwoWay}"
+        PresentPolicy="{Binding PresentPolicy, Mode=TwoWay}"
         ResizeMode="{Binding WindowResizeMode, Mode=TwoWay}"
         LeftWindowCommands="{Binding LeftWindowCommands}"
         RightWindowCommands="{Binding RightWindowCommands}"
@@ -61,6 +62,15 @@
                 <ToggleSwitch Content="Analytic AA"
                               IsChecked="{Binding AnalyticAa, Mode=TwoWay}"
                               Margin="0,0,0,12"/>
+                <!-- How frames reach the screen. Unlike the AA switch this one REBUILDS the swapchain (a present mode is
+                     chosen when it is created), so the picture blinks once on change - that is the honest cost until
+                     VK_KHR_swapchain_maintenance1 is wired up, which can change the mode in place. Watch the plate:
+                     Immediate drops the acquire block to ~0.01 ms, Adaptive pays 0.6-0.8 ms a frame for a tear-free
+                     picture, VSync locks to the display. -->
+                <TextBlock Text="Presentation" Margin="0,0,0,4"/>
+                <DropDown ItemsSource="{Binding PresentPolicies}"
+                          SelectedItem="{Binding PresentPolicy, Mode=TwoWay}"
+                          Margin="0,0,0,12"/>
                 <TextBlock FontSize="13"
                            Foreground="LightGreen"
                            TextWrapping="WrapBySymbols"

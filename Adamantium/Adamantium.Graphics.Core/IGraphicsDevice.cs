@@ -227,6 +227,10 @@ public unsafe interface IGraphicsDevice : IDrawableDevice, IDynamicStateDevice, 
     // The present path gates on it so a skipped/aborted frame during resize never presents a stale/unacquired image.
     bool CanPresent { get; }
 
+    /// <summary>Whether this frame holds a swapchain image. It is acquired in EndDraw - the frame renders offscreen and
+    /// needs the image only for the blit - so a caller must ask before blitting or presenting.</summary>
+    bool HasSwapchainImage { get; }
+
     MainGraphicsDevice MainDevice { get; }
 
     Fence GetCurrentFence();

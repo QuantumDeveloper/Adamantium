@@ -44,7 +44,7 @@ internal sealed class TextBatchCollector : BatchCollector<GlyphItem>
     /// <summary>Bake a block's glyphs into the patch stage - the text answer to BatchArena.TryStage. This is the half a
     /// changed glyph COUNT needs: the in-place re-bake (UpdateRun) only ever covered a count that held steady, and
     /// anything that grew or shrank - a counter, a clock, an fps plate - fell through to a walk of the whole scene.</summary>
-    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot)
+    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag)
     {
         if (unit is not TextRenderUnit tru || tru.TextComponent is not { } tc) return false;
         if (!CanBatch(tc, out var atlas)) return false;

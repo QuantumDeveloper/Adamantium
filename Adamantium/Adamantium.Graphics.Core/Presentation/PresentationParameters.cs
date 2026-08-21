@@ -15,6 +15,7 @@ namespace Adamantium.Graphics.Core.Presentation
             DepthFormat = DepthFormat.Depth32Stencil8X24;
             BuffersCount = 3;
             ImageColorSpace = ColorSpace.SRGBNonlinear;
+            PresentPolicy = PresentPolicy.Adaptive;
         }
 
         public PresentationParameters(PresentationParameters parameters)
@@ -40,7 +41,12 @@ namespace Adamantium.Graphics.Core.Presentation
             PresentMode = parameters.PresentMode;
             Clipped = parameters.Clipped;
             TransparentComposition = parameters.TransparentComposition;
+            PresentPolicy = parameters.PresentPolicy;
         }
+
+        /// <summary>How this surface's frames should reach the screen. An intent, not a Vulkan mode - the presenter maps
+        /// it onto whatever the surface actually offers, and Fifo is always there as the floor.</summary>
+        public PresentPolicy PresentPolicy { get; set; }
 
         /// <summary>Ask the desktop to compose this surface with PER-PIXEL alpha instead of treating it as opaque.
         /// <para>Honoured only if the surface reports it (<c>supportedCompositeAlpha</c>) - it is a property of the

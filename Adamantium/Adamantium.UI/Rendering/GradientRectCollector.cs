@@ -135,7 +135,7 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
 
     /// <summary>Bake one unit into the patch stage - see BatchArena. Same bake TryAdd uses; it just lands in the stage
     /// instead of the arena, because a patch has to know the whole frame is repairable before it changes any of it.</summary>
-    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot)
+    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag)
     {
         if (unit is not RenderUnits.RectangleRenderUnit u || !CanBatch(u.RectPayload)) return false;
         if (!BakeItem(u.RectPayload, world, u.FillOpacity, transformSlot, out var item)) return false;

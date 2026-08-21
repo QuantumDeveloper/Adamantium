@@ -42,9 +42,8 @@
                                             Width="28" Height="28"
                                             Background="Transparent" BorderThickness="0" Padding="0"
                                             VerticalAlignment="Top">
-                                        <TextBlock Text="×" FontSize="16"
-                                                   HorizontalTextAlignment="Center" VerticalTextAlignment="Center"
-                                                   Foreground="{ResourceReference TextFillColorSecondary}"/>
+                                        <Image Source="{ResourceReference CloseIcon}" Width="10" Height="10"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Button>
                                 </Grid>
                                 <ContentPresenter Grid.Row="1"

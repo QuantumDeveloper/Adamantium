@@ -3,6 +3,7 @@
         xmlns:x="http://adamantium/ui/xaml/extensions"
         x:CreateInDesignTime="False"
         Title="Ribbon"
+        PresentPolicy="{Binding PresentPolicy, Mode=TwoWay}"
         TitleBarHeight="38"
         Width="1180"
         Height="720">

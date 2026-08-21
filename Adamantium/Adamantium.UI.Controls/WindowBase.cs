@@ -1,4 +1,5 @@
 ﻿using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Presentation;
 using Adamantium.UI.Controls.Adorners;
 using Adamantium.UI.Controls.Buttons;
 using Adamantium.UI.Core;
@@ -302,6 +303,34 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         if (Equals(e.OldValue, e.NewValue)) return;
 
         (component as WindowBase)?.Renderer?.InvalidatePresenter();
+    }
+
+    /// <summary>How this window's frames reach the screen: tear-free and paced, or as fast as the engine can produce
+    /// them. <see cref="Presentation.PresentPolicy.Inherit"/> (the default) means "whatever the application says" - most
+    /// applications set it once, and a window that needs its own - a 3D viewport wanting no presentation back-pressure,
+    /// a tool window that does not care - states it. It belongs to the WINDOW because each one owns its swapchain and
+    /// they can sit on different displays.
+    /// <para>Settable at any time. A swapchain picks its present mode when it is CREATED, so this marks the renderer
+    /// stale and the rebuild happens at the next frame boundary - the same path a resize takes. (With
+    /// VK_KHR_swapchain_maintenance1 the mode can be changed without a rebuild; that is a later step, and this property
+    /// is what it will read.)</para></summary>
+    public static readonly AdamantiumProperty PresentPolicyProperty = AdamantiumProperty.Register(nameof(PresentPolicy),
+        typeof(PresentPolicy), typeof(WindowBase), new PropertyMetadata(PresentPolicy.Inherit, PresentPolicyChanged));
+
+    private static void PresentPolicyChanged(AdamantiumComponent component, AdamantiumPropertyChangedEventArgs e)
+    {
+        // As with transparent composition: the callback fires on every write, and a rebuild costs a device-idle wait
+        // plus every render target, so a write that said nothing must not buy one. And never rebuild from the setter -
+        // it runs on whatever thread wrote the property while the render thread may be mid-frame.
+        if (Equals(e.OldValue, e.NewValue)) return;
+
+        (component as WindowBase)?.Renderer?.InvalidatePresenter();
+    }
+
+    public PresentPolicy PresentPolicy
+    {
+        get => GetValue<PresentPolicy>(PresentPolicyProperty);
+        set => SetValue(PresentPolicyProperty, value);
     }
 
     /// <summary>Uniform translucency of the whole window, 0..1. Composed by the desktop, so the content underneath

@@ -30,7 +30,10 @@ public abstract class UiRenderService : EntityService
 
     public override void Submit()
     {
+        var t0 = System.Diagnostics.Stopwatch.GetTimestamp();
         GraphicsDevice.Submit();
+        Adamantium.UI.Core.Diagnostics.RuntimeStats.LastSubmitMs =
+            System.Diagnostics.Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
     }
 
     public void TraverseInDepth(IUIComponent visualComponent, Action<IUIComponent> action)
