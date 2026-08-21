@@ -1,13 +1,23 @@
 <ResourceDictionary xmlns:x="http://adamantium/ui/xaml/extensions"
         xmlns="http://adamantium/ui">
 
-    <!-- Shared vector icons. SDF shapes, not font glyphs: they render regardless of the UI font's coverage and stay
-         crisp at any scale. Each is x:Shared="False", so every template that asks gets its own visual - a visual has one
-         parent. Size and colour are stated here, so changing them is one edit rather than one per template. -->
+    <!-- Close: two crossing strokes. Stroked, not filled - it IS a stroke, and saying so keeps it honest at any size. -->
+    <DrawingImage x:Key="CloseIcon">
+        <GeometryDrawing Geometry="M0,0 L10,10 M10,0 L0,10"
+                         Stroke="{ResourceReference TextFillColorSecondary}"
+                         StrokeThickness="1"/>
+    </DrawingImage>
 
-    <RegularPolygon x:Key="IconChevronDown" x:Shared="False" Corners="3" StartAngle="90"
-                    Width="10" Height="10" Fill="{ResourceReference TextFillColorSecondary}"/>
-    <RegularPolygon x:Key="IconChevronRight" x:Shared="False" Corners="3" StartAngle="0"
-                    Width="10" Height="10" Fill="{ResourceReference TextFillColorSecondary}"/>
+    <!-- Chevrons: a filled triangle, one shape rotated by where it points. Kept as geometry rather than the SDF
+         RegularPolygon they used to be, so the whole set is one kind of thing. -->
+    <DrawingImage x:Key="ChevronDownIcon">
+        <GeometryDrawing Geometry="M0,3 L10,3 L5,9 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
+    </DrawingImage>
+
+    <DrawingImage x:Key="ChevronRightIcon">
+        <GeometryDrawing Geometry="M3,0 L9,5 L3,10 Z"
+                         Brush="{ResourceReference TextFillColorSecondary}"/>
+    </DrawingImage>
 
 </ResourceDictionary>

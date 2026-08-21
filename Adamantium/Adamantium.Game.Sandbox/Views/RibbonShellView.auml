@@ -1,5 +1,6 @@
 ﻿<View xmlns="http://adamantium/ui"
-      xmlns:x="http://adamantium/ui/xaml/extensions">
+      xmlns:x="http://adamantium/ui/xaml/extensions"
+      xmlns:behaviors="clr-namespace:Adamantium.Game.Sandbox.Behaviors">
     <!-- An editor shell: a ribbon band, a document surface, a status line. Exercises the three command sizes, commands
          greying out on CanExecute, two-way toggles, ordinary controls inside a group, a separator breaking a column,
          and the quick-access bar in the caption reading the SAME view model (see RibbonWindow.auml). -->
@@ -499,6 +500,25 @@
         <Border Grid.Row="2" Height="26" Background="{ResourceReference SolidBackgroundFillColorTertiary}">
             <TextBlock Text="{Binding Status}" VerticalAlignment="Center" Margin="12 0" FontSize="12"
                        Foreground="{ResourceReference TextFillColorSecondary}"/>
+        </Border>
+
+        <!-- The SAME diagnostics plate the main window carries, so the two shells can be compared side by side under one
+             setting: this window has its own swapchain, so its presentation is its own too. Spans the content row and is
+             pinned top-right, out of the band's way. -->
+        <Border Grid.Row="1" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,16,0"
+                Width="280" Padding="10" Background="#CC202020">
+            <StackPanel Orientation="Vertical">
+                <TextBlock Text="Presentation" Margin="0,0,0,4"
+                           Foreground="{ResourceReference TextFillColorSecondary}"/>
+                <DropDown ItemsSource="{Binding PresentPolicies}"
+                          SelectedItem="{Binding PresentPolicy, Mode=TwoWay}"
+                          Margin="0,0,0,10"/>
+                <TextBlock FontSize="13" Foreground="LightGreen" TextWrapping="WrapBySymbols" Text="diagnostics…">
+                    <TextBlock.Behaviors>
+                        <behaviors:DiagnosticsOverlayBehavior/>
+                    </TextBlock.Behaviors>
+                </TextBlock>
+            </StackPanel>
         </Border>
     </Grid>
 </View>

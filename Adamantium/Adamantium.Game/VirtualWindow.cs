@@ -201,6 +201,18 @@ public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopu
     public static readonly AdamantiumProperty ShowWindowBorderProperty = AdamantiumProperty.Register(nameof(ShowWindowBorder),
         typeof(bool), typeof(VirtualWindow), new PropertyMetadata(true));
 
+    /// <summary>A virtual window has no swapchain of its own - it is composed into a host - so this simply follows the
+    /// application, and is here to satisfy the contract every window shares.</summary>
+    public static readonly AdamantiumProperty PresentPolicyProperty = AdamantiumProperty.Register(nameof(PresentPolicy),
+        typeof(Adamantium.Graphics.Core.Presentation.PresentPolicy), typeof(VirtualWindow),
+        new PropertyMetadata(Adamantium.Graphics.Core.Presentation.PresentPolicy.Inherit));
+
+    public Adamantium.Graphics.Core.Presentation.PresentPolicy PresentPolicy
+    {
+        get => GetValue<Adamantium.Graphics.Core.Presentation.PresentPolicy>(PresentPolicyProperty);
+        set => SetValue(PresentPolicyProperty, value);
+    }
+
     public bool ShowWindowBorder
     {
         get => GetValue<bool>(ShowWindowBorderProperty);

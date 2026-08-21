@@ -75,6 +75,11 @@ public interface IWindow : IRootVisualComponent, IContentControl
     /// window is simply opaque and says so.</para></summary>
     bool UseTransparentComposition { get; set; }
 
+    /// <summary>How this window's frames reach the screen, or Inherit to follow the application's setting. Each window
+    /// owns its own swapchain and they can sit on different displays, so the choice belongs here - with an
+    /// application-wide default for the usual case where it is set once.</summary>
+    Adamantium.Graphics.Core.Presentation.PresentPolicy PresentPolicy { get; set; }
+
     /// <summary>The ONE draggable caption region (client DIP): the bounds of the title bar's drag-area element. A point
     /// inside it is HTCAPTION (native window drag + Aero Snap); everything else - commands, buttons - stays HTCLIENT and
     /// clickable. A TitleBar publishes this on layout; the platform worker reads it (a plain Rect, thread-safe) from the

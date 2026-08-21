@@ -76,10 +76,29 @@ public partial class RenderCache
     /// <summary>Take in the glyphs the workers finished - device work, so it belongs on this side - and rebuild the text
     /// blocks that were built before their letters arrived. Nothing else about the frame changes, so this costs a walk of
     /// the text units and the quad rebuild of the few that were waiting.</summary>
+    /// <summary>The glyph-arrival version this cache has already taken account of. Per CACHE, because the arrival is
+    /// global and the adoption is not.</summary>
+    private int _seenGlyphVersion;
+
     private void AdoptReadyGlyphs()
     {
         if (_renderUnitFactory.GraphicsDevice == null) return;
-        if (!Adamantium.Graphics.Fonts.FontAtlasStore.PumpReadyGlyphs()) return;
+
+        // Pumping the atlas and ADOPTING into this cache are two different things, and tying them together was the bug.
+        // PumpReadyGlyphs drains a QUEUE: whoever asks first takes the batch and returns true, everyone after it gets
+        // false. There is more than one cache - window content, the adorner stage, the popup stage - and each asks in its
+        // own Apply, so the first one adopted the new letters for ITS groups and the popup's cache bailed out here and
+        // left its text with no recorded run. A SlidePanel opened with a blank close cross the first time and a correct
+        // one the second, once the atlas was warm: `by=TextRenderUnit<TextBlock> noRecordedRun`.
+        //
+        // So the gate is kept - walking every unit on every frame would declare the stream stale constantly and cost the
+        // patch its frame - but it is asked PER CACHE: pump for the side effect, then compare a version this cache
+        // remembers. Whoever wins the race to the queue, everyone sees that something landed exactly once.
+        Adamantium.Graphics.Fonts.FontAtlasStore.PumpReadyGlyphs();
+
+        var landedVersion = Adamantium.Graphics.Fonts.FontAtlasStore.LandedVersion;
+        if (landedVersion == _seenGlyphVersion) return;
+        _seenGlyphVersion = landedVersion;
 
         var arrived = false;
         foreach (var group in _groups)
@@ -130,25 +149,6 @@ public partial class RenderCache
 
         return low;
     }
-
-    // Whether every mover this packet names can be answered for by patching it: all of them named (an unnameable move -
-    // a bare Transform ticking with no owner - means the list is not the whole story), and none of them clipping.
-    private bool MovesAreForgivable(RenderPacket packet)
-    {
-        if (!packet.IsTransformDirty || packet.TransformUnknown || packet.Moved.Count == 0) return false;
-
-        foreach (var moved in packet.Moved)
-        {
-            if (!SubtreeClips(moved)) continue;
-            StreamStaleBecause($"moverClips<{moved.GetType().Name}>");
-            return false;
-        }
-
-        return true;
-    }
-
-    // Whether THIS packet's ordinary movers were forgiven (read by the Partial case below).
-    private bool _movesForgiven;
 
     // TEMP: name what staled the stream, so why=4 says which of its causes it was.
     private void StreamStaleBecause(string reason)
@@ -204,14 +204,17 @@ public partial class RenderCache
             else _forgivenMoves.Add(node);
         }
 
-        // ...and the same question for the ORDINARY movers this packet names. A move forces a rebuild because the frame
-        // baked where things are - but only for what it baked and nobody re-bakes. A mover the patch touches is re-baked
-        // from its new world by the patch itself; what it cannot answer for is a recorded SCISSOR under it, a world rect
-        // nothing re-derives. Decided HERE, before the snapshot delta below reads _forgivenMoves.
-        // Measured on the heavy list: 277 walks in eight seconds of scrolling, every one of them "transform-dirty",
-        // 3.5 ms apiece - the movers had been named all along and nobody asked who they were.
-        _movesForgiven = MovesAreForgivable(packet);
-        if (_movesForgiven) _forgivenMoves.UnionWith(packet.Moved);
+        // ORDINARY movers are NOT forgiven. They were, briefly: the argument was that a mover the patch touches is
+        // re-baked from its new world by the patch itself, so only a recorded SCISSOR under it could go stale. The
+        // argument is wrong somewhere it matters - drag-and-drop proved it on a live stand: the drop gap did not open,
+        // then everything jumped and overlapped when a walk finally came, which is a frame drawn from positions that
+        // moved. Turning the forgiveness off made the drag correct again, and that decides it: correctness is not traded
+        // for a saving. A saving, moreover, that could not be reproduced - the same scroll measured 279, 294, 289 and
+        // 413 fps across four runs, a spread wider than the difference being claimed.
+        //
+        // A MOTION NODE is a different thing and stays forgiven above: its matrix lives in the transform table, the
+        // batches read the slot live, and RefreshMovedNodes proves every unit under it is node-aware. That is where the
+        // scroll's measured win actually comes from.
 
         foreach (var entry in packet.SnapDelta)
         {
@@ -260,10 +263,7 @@ public partial class RenderCache
                 _partialDirty.AddRange(packet.PartialDirty);
                 _movedNodesBuf.AddRange(packet.MovedNodes);
 
-                // A forgiven mover is PATCHED - that is the whole basis for forgiving it, since the patch is what re-bakes
-                // its slots from the new world (see MovesAreForgivable, decided before the snapshot delta is folded in).
-                if (_movesForgiven) _partialDirty.AddRange(packet.Moved);
-                LastBuildTransformDirty |= packet.IsTransformDirty && !_movesForgiven;
+                LastBuildTransformDirty |= packet.IsTransformDirty;
                 break;
             }
 

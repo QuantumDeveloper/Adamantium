@@ -238,6 +238,16 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
 
     public uint MaxFramesInFlight { get; private set; }
 
+    /// <summary>TEMP: how long the last frame spent blocked on its slot's fence - the CPU waiting for the GPU.</summary>
+    public static double LastFenceWaitMs;
+
+    /// <summary>TEMP: how long the last frame spent inside AcquireNextImage - the CPU waiting for the PRESENT ENGINE.</summary>
+    public static double LastAcquireMs;
+
+    /// <summary>TEMP: BeginDraw with the fence wait, the acquire and the beforeRenderPass callback taken off - command
+    /// buffer reset/begin, image transitions and BeginRendering. Pure driver-side setup work.</summary>
+    public static double LastBeginSetupMs;
+
     public ulong FrameTicket { get; private set; }
 
     public List<EffectPool> EffectPools { get; private set; }
@@ -931,7 +941,11 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         CanPresent = false;
         LastFrameError = null;
         var renderFence = InFlightFences[CurrentFrame];
+        // TEMP: the CPU blocks HERE until the GPU is done with this slot. Timed on its own because "BeginDraw is a third
+        // of the frame" does not say whether we are waiting for the GPU or doing work - and those have opposite fixes.
+        var fenceStart = System.Diagnostics.Stopwatch.GetTimestamp();
         var result = LogicalDevice.WaitForFences(1, renderFence, true, ulong.MaxValue);
+        LastFenceWaitMs = System.Diagnostics.Stopwatch.GetElapsedTime(fenceStart).TotalMilliseconds;
 
         FrameTicket++;
         MainDevice.OnFrameStarted();
@@ -972,6 +986,7 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         //     }
         // }
 
+        var setupStart = System.Diagnostics.Stopwatch.GetTimestamp();
         var commandBuffer = commandBuffers[CurrentFrame];
 
         var beginInfo = new CommandBufferBeginInfo();
@@ -1005,24 +1020,19 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         TransitionImagesForRendering(commandBuffer, renderTargets);
         TransitionDepthBufferForRendering(commandBuffer, depthBuffer);
 
+        LastBeginSetupMs = System.Diagnostics.Stopwatch.GetElapsedTime(setupStart).TotalMilliseconds;
+
         // Out-of-render-pass work (e.g. shared-surface latch copies) must be recorded here, before BeginRendering,
         // so a later in-pass draw can sample the result the SAME frame (no latency).
         beforeRenderPass?.Invoke(commandBuffer);
 
+        var renderingStart = System.Diagnostics.Stopwatch.GetTimestamp();
         BeginRendering(commandBuffer, false, depth, stencil);
+        LastBeginSetupMs += System.Diagnostics.Stopwatch.GetElapsedTime(renderingStart).TotalMilliseconds;
 
         // LATE acquire (see the note near the top of BeginDraw): every fallible step above - CB begin, image transitions,
         // the beforeRenderPass record, BeginRendering - has run WITHOUT touching the swapchain image, so a failure there
         // aborts the frame with no dangling acquired image. Only now, committed to Submit + Present, do we take one.
-        if (Presenter is SwapChainGraphicsPresenter)
-        {
-            if (!Presenter.AcquireNextImage(null, ImageAvailableSemaphores[CurrentFrame]))
-            {
-                LastFrameError = $"swapchain AcquireNextImage failed{DescribeRecentValidation()}";
-                return false;
-            }
-        }
-
         return true;
     }
 
@@ -1123,10 +1133,36 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         }
     }
 
+    /// <summary>Whether this frame holds a swapchain image. False when the acquire below failed - the caller must then
+    /// neither blit nor present, exactly as it must not when Submit never ran.</summary>
+    public bool HasSwapchainImage { get; private set; }
+
     public void EndDraw()
     {
+        // The image is taken HERE, not in BeginDraw. The frame renders to an OFFSCREEN target and the swapchain image is
+        // needed only for the blit below, so acquiring first meant BLOCKING BEFORE doing the work instead of after it.
+        // Measured on the Layout tab: acquire 0.71-0.79 ms, ~90% of BeginDraw and about a third of the frame, with the
+        // GPU fence wait at 0.00 - the frame was never waiting for the GPU, only for the present engine's schedule.
+        // A fourth swapchain image was tried first and changed nothing, which is what ruled out "not enough images".
+        // Everything fallible still runs before this point, so a frame that aborts earlier holds no image and leaks no
+        // semaphore - the reason the acquire was moved late in the first place.
+        HasSwapchainImage = false;
+        if (Presenter is SwapChainGraphicsPresenter)
+        {
+            var acquireStart = System.Diagnostics.Stopwatch.GetTimestamp();
+            HasSwapchainImage = Presenter.AcquireNextImage(null, ImageAvailableSemaphores[CurrentFrame]);
+            LastAcquireMs = System.Diagnostics.Stopwatch.GetElapsedTime(acquireStart).TotalMilliseconds;
+
+            if (!HasSwapchainImage)
+                LastFrameError = $"swapchain AcquireNextImage failed{DescribeRecentValidation()}";
+        }
+        else
+        {
+            HasSwapchainImage = true;   // a render-target presenter owns its image outright
+        }
+
         var commandBuffer = commandBuffers[CurrentFrame];
-            
+
         if (EnableDynamicRendering)
         {
             commandBuffer.EndRendering();
@@ -1175,6 +1211,12 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
     public void Submit()
     {
         if (!CommandBufferStarted) return;
+
+        // No image means the acquire in EndDraw failed (an out-of-date swapchain, i.e. a resize). The submit below WAITS
+        // on this frame's ImageAvailable semaphore, which nothing will ever signal - submitting would hang the device.
+        // Skipping is safe for the fence: it is reset inside the submit, so an un-submitted frame leaves it signalled and
+        // the next BeginDraw walks straight through. The presenter self-heals on the next frame (OutOfDate rebuild).
+        if (Presenter is SwapChainGraphicsPresenter && !HasSwapchainImage) return;
 
         _submissionSync?.Wait();
             

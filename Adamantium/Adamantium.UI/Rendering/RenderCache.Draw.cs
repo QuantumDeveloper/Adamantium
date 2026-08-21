@@ -226,6 +226,7 @@ public partial class RenderCache
         if (_rectBatch == null || device == null) return;
 
         _emptiedSegments.Clear();
+
         foreach (var group in _leftTheOrder)
         {
             if (group.InOrder || group.Tag == 0) continue;   // came back before anyone looked
@@ -690,7 +691,7 @@ public partial class RenderCache
                 // unpatchable says exactly that, and costs nothing else.
                 // (Refusing to replay instead was the first attempt, and it cost the whole window its fast path for as
                 // long as any skeleton was on screen: 600 fps -> 180.)
-                group.PatchableBatchedOnly = false;
+                group.NotBatchable("clones");
             }
 
             foreach (var unit in group.Units)
@@ -707,6 +708,7 @@ public partial class RenderCache
                 group.Runs.Clear();
                 group.Arena = null;
                 group.PatchableBatchedOnly = true;
+                group.NotBatchableBecause = null;   // a fresh walk describes this group from scratch
                 group.WalkVersion = _walkVersion;
             }
 
@@ -763,7 +765,7 @@ public partial class RenderCache
                 over |= CollectLivingHalo(device, unit, wt, scissor, inner: true);
                 if ((under || over) && _recording)
                 {
-                    group.PatchableBatchedOnly = false;   // a band is not a rect slot; the fast-path patch can't reproduce it
+                    group.NotBatchable("halo");   // a band is not a rect slot; the fast-path patch can't reproduce it
                 }
             }
 
@@ -849,7 +851,7 @@ public partial class RenderCache
                 {
                     if (_recording)
                     {
-                        group.PatchableBatchedOnly = false;   // non-rect-batch draw -> not rect-splice-patchable
+                        group.NotBatchable("polygonBatch");   // non-rect-batch draw -> not rect-splice-patchable
                         IndexUnitBrush(unit.Component, unit, pru2.PolygonPayload.LiveBrush);
                     }
                     _batchScissor = scissor;
@@ -872,7 +874,7 @@ public partial class RenderCache
                 {
                     if (_recording)
                     {
-                        group.PatchableBatchedOnly = false;
+                        group.NotBatchable("gradientPolygon");
                         IndexUnitBrush(unit.Component, unit, gpru.PolygonPayload.LiveBrush);
                     }
                     _batchScissor = scissor;
@@ -892,7 +894,7 @@ public partial class RenderCache
                 var patPolyBake = ResolveBake(device, unit.Component, wt, out var slot4PatPoly);
                 if (_patternBatch.TryAddPolygon(ppru.PolygonPayload, patPolyBake, ppru.FillOpacity, scissor, patPolyBounds, slot4PatPoly))
                 {
-                    if (_recording) group.PatchableBatchedOnly = false;
+                    if (_recording) group.NotBatchable("patternPolygon");
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -920,7 +922,7 @@ public partial class RenderCache
                 var texPolyBake = ResolveBake(device, unit.Component, wt, out var slot4TexPoly);
                 if (_texRectBatch.TryAddPolygon(tpru.PolygonPayload, texPolyBake, tpru.FillOpacity, scissor, texPolyBounds, texPolyTexture, slot4TexPoly))
                 {
-                    if (_recording) group.PatchableBatchedOnly = false;
+                    if (_recording) group.NotBatchable("texturedPolygon");
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -965,7 +967,7 @@ public partial class RenderCache
                 {
                     if (_recording)
                     {
-                        group.PatchableBatchedOnly = false;   // pattern: node-aware, not paint/splice-patchable in v1
+                        group.NotBatchable("patternEllipse");   // node-aware, not paint/splice-patchable in v1
                     }
                     _batchScissor = scissor;
                     _batchOpen = true;
@@ -990,7 +992,7 @@ public partial class RenderCache
                     // _sdfSlotByUnit entry, so a dirty pattern falls to a full walk (patterns are static backdrops).
                     if (_recording)
                     {
-                        group.PatchableBatchedOnly = false;
+                        group.NotBatchable("patternRect");
                     }
                     _batchScissor = scissor;
                     _batchOpen = true;
@@ -1014,7 +1016,7 @@ public partial class RenderCache
                 {
                     if (_recording)
                     {
-                        group.PatchableBatchedOnly = false;
+                        group.NotBatchable("fractal");
                     }
                     _batchScissor = scissor;
                     _batchOpen = true;
@@ -1052,7 +1054,7 @@ public partial class RenderCache
                 {
                     if (_recording)
                     {
-                        group.PatchableBatchedOnly = false;
+                        group.NotBatchable("texturedRect");
                     }
                     _batchScissor = scissor;
                     _batchOpen = true;
@@ -1086,7 +1088,7 @@ public partial class RenderCache
                 {
                     if (_recording)
                     {
-                        group.PatchableBatchedOnly = false;
+                        group.NotBatchable("texturedEllipse");
                     }
                     _batchScissor = scissor;
                     _batchOpen = true;
@@ -1169,7 +1171,7 @@ public partial class RenderCache
                     ggru.FillInstanced = true;
                     // The fill rides the slot now; a per-unit overlay (its fringe, still per-unit here, or a stroke)
                     // bakes its transform at record time and is re-pointed at the flush - see PrepareOverlay.
-                    if (_recording) group.PatchableBatchedOnly = false;
+                    if (_recording) group.NotBatchable("instancedGradientFill");
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -1187,7 +1189,7 @@ public partial class RenderCache
                 {
                     pgru.FillInstanced = true;
                     // As the gradient above: the fill rides the slot, the overlay is re-pointed at the flush.
-                    if (_recording) group.PatchableBatchedOnly = false;
+                    if (_recording) group.NotBatchable("instancedPatternFill");
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -1204,7 +1206,7 @@ public partial class RenderCache
                 if (_instancedFill.TryAddTextured(tgru, texBake, scissor, LogicalBounds(unit.Component, wt), slot4TexFill))
                 {
                     tgru.FillInstanced = true;
-                    if (_recording) group.PatchableBatchedOnly = false;
+                    if (_recording) group.NotBatchable("instancedTexturedFill");
                     _batchScissor = scissor;
                     _batchOpen = true;
                     continue;
@@ -1253,7 +1255,7 @@ public partial class RenderCache
 
             // A per-unit draw bakes its world into RenderData - but it is recorded as its own op, so a replay can re-point
             // it (see ExecuteOps). It costs the group its rect-only slot patch, not the node its move.
-            if (_recording) group.PatchableBatchedOnly = false;
+            if (_recording) group.NotBatchable($"perUnitDraw<{unit.GetType().Name}>");
             unit.Render();
             if (_recording) RecordOp(new RenderOp { Kind = RenderOpKind.Unit, Unit = unit, Order = _recordOrder });
             }
@@ -1645,7 +1647,9 @@ public partial class RenderCache
             // per-unit/text/instanced content whose recorded ops we can't excise (stale Unit ops would even replay
             // disposed units), or it is spread over two segments and there is no single one to repair.
             if (walked && !group.PatchableBatchedOnly)
-                return SpliceRefused($"notOneArena<{comp.GetType().Name}>{(group.Units.Count > 0 ? Says(group.Units[0]) : "")}");
+                return SpliceRefused($"notOneArena<{comp.GetType().Name}>"
+                                     + $" {group.NotBatchableBecause ?? "?"}"
+                                     + (group.Units.Count > 0 ? Says(group.Units[0]) : ""));
 
             // WHICH arena repairs it. A group the walk described says so itself; a group that drew nothing yet is placed
             // into the arena its units would go to, which is decided by asking them to bake.
@@ -1671,7 +1675,7 @@ public partial class RenderCache
                     if (cull) break;   // whole component off-clip: it contributes no items (units share the component)
                 }
                 var bakeWorld = ResolveBake(device, u.Component, wt, out var slot);
-                if (!arena.TryStage(u, bakeWorld, slot))
+                if (!arena.TryStage(u, bakeWorld, slot, TagOf(group)))
                     return SpliceRefused($"notStageable<{u.GetType().Name} in {comp.GetType().Name}>");
                 // How many INSTANCES it added, which is not how many units were asked: one rectangle is one instance, one
                 // text block is a whole run of glyphs. Counting units here left a repaired block drawing its first glyph
@@ -1912,7 +1916,7 @@ public partial class RenderCache
     private static void NoteBatched(ControlGroup group, BatchArena arena, int slot)
     {
         if (group.Arena == null) group.Arena = arena;
-        else if (!ReferenceEquals(group.Arena, arena)) group.PatchableBatchedOnly = false;
+        else if (!ReferenceEquals(group.Arena, arena)) group.NotBatchable("twoArenas");
 
         var runs = group.Runs;
         if (runs.Count > 0 && runs[^1].First + runs[^1].Count == slot) runs[^1] = (runs[^1].First, runs[^1].Count + 1);
@@ -2003,6 +2007,7 @@ public partial class RenderCache
             group.Runs.Add((newFirst + at, patch.StageCount));
             group.Arena = arena;
             group.PatchableBatchedOnly = true;
+            group.NotBatchableBecause = null;   // repaired into one arena: the old reason no longer describes it
         }
 
         ReslotUnits(group);
@@ -2045,6 +2050,7 @@ public partial class RenderCache
         group.Runs.Add((first, patch.StageCount));
         group.Arena = arena;
         group.PatchableBatchedOnly = true;
+        group.NotBatchableBecause = null;   // placed into one arena: the old reason no longer describes it
         group.WalkVersion = _walkVersion;
         ReslotUnits(group);
         return true;

@@ -53,6 +53,22 @@ public partial class RenderCache
         public readonly List<(int First, int Count)> Runs = new();
         public BatchArena Arena;
         public bool PatchableBatchedOnly;
+
+        /// <summary>WHY this group is not repairable from one arena, or null while it still is. A single boolean was the
+        /// design mistake: it is set from a dozen unrelated places - a band, a gradient polygon, a pattern fill, a
+        /// per-unit draw, text with no run - and every one of them needs a DIFFERENT fix, so "notOneArena" told a reader
+        /// that a frame was lost and nothing about what to do. Same lesson as "structural" for a full walk and as the
+        /// splice's refusal reasons: the cause has to survive to where somebody reads it.</summary>
+        public string NotBatchableBecause;
+
+        /// <summary>This group cannot be repaired from one arena, and here is why. The ONE way to say it - a bare
+        /// assignment to the flag loses the cause, which is how "notOneArena&lt;Path&gt;" came to mean twelve different
+        /// things. The FIRST reason wins: it is the one that actually took the group out of the fast path.</summary>
+        public void NotBatchable(string reason)
+        {
+            PatchableBatchedOnly = false;
+            NotBatchableBecause ??= reason;
+        }
         public int WalkVersion = -1;   // which recording walk last described this group (distinguishes NEW groups)
     }
 

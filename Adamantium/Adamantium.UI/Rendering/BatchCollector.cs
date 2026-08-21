@@ -440,7 +440,7 @@ internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
 
     /// <summary>A family that cannot bake a unit from a payload says so, and the patch refuses - which is what every
     /// family did before any of them could stage.</summary>
-    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot) => false;
+    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag) => false;
 
     public override bool ReplaceStagedInSegment(IGraphicsDevice device, int id, int at, int replaced, int stageFirst, int stageCount)
         => ReplaceInSegment(device, id, at, replaced, CollectionsMarshal.AsSpan(Stage).Slice(stageFirst, stageCount));

@@ -10,6 +10,7 @@
 	<ResourceContext.Resources>
 		<ResourceLink Source="{x:Type fluentDark:Brushes}"/>
 		<ResourceLink Source="{x:Type fluentDark:Icons}"/>
+		<ResourceLink Source="{x:Type fluentDark:Metrics}"/>
 	</ResourceContext.Resources>
 
 	<Theme.StyleIncludes>

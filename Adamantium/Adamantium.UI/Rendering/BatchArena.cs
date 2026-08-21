@@ -78,8 +78,13 @@ internal abstract class BatchArena
     public abstract int StagedCount { get; }
 
     /// <summary>Bake one unit into the stage. False = this family cannot hold it (wrong unit, rotated, gradient it does
-    /// not draw) and the patch must refuse - which is what a family with nothing to stage answers to everything.</summary>
-    public abstract bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot);
+    /// not draw) and the patch must refuse - which is what a family with nothing to stage answers to everything.
+    /// <para><paramref name="ownerTag"/> is the group these bytes belong to, and it travels INSIDE the instance so a slot
+    /// can name its owner however many times the arena has copied it. The walk has always stamped it; staging did not,
+    /// and that is a real hole rather than an omission of tidiness: anything a PATCH put on screen was invisible to the
+    /// orphan sweep, so when it stopped drawing its instances kept being issued inside a live segment's range. That is
+    /// the phantom scrollbar track - the track arrives and leaves by patch, which is why it reproduced every time.</para></summary>
+    public abstract bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag);
 
     /// <summary>Replace [at, at+replaced) inside a segment with a staged range, shifting only what follows. False when the
     /// result outgrows the room that segment owns; the caller then re-points it whole.</summary>

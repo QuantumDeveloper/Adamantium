@@ -135,10 +135,21 @@ public abstract class WindowRendererBase : IWindowRenderer
         {
             HInstanceHandle = Process.GetCurrentProcess().Handle,
             // A see-through window is a property of the WINDOW, so it travels from there to the surface that composes it.
-            TransparentComposition = Window.UseTransparentComposition
+            TransparentComposition = Window.UseTransparentComposition,
+            PresentPolicy = ResolvePresentPolicy()
         };
 
         Presenter = GraphicsPresenter.Create(GraphicsDevice, Parameters, "Window_presenter");
+    }
+
+    /// <summary>The window's own choice, or the application's when it made none. Resolved HERE, in the one place that
+    /// builds the parameters, so Inherit never reaches a presenter and no other code has to know the rule.</summary>
+    private PresentPolicy ResolvePresentPolicy()
+    {
+        if (Window.PresentPolicy != PresentPolicy.Inherit) return Window.PresentPolicy;
+
+        var app = UIApplication.Current?.PresentPolicy ?? PresentPolicy.Adaptive;
+        return app == PresentPolicy.Inherit ? PresentPolicy.Adaptive : app;
     }
 
     protected virtual void InitializeWindowResources()

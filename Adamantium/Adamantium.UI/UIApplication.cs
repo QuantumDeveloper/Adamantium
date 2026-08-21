@@ -164,6 +164,13 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         set => SetValue(EnableGraphicsDebugProperty, value);
     }
 
+    /// <summary>The presentation policy every window follows unless it states its own. Set once for the application -
+    /// tear-free and paced for a shipped app, unthrottled while measuring or for an engine viewport. A window overrides
+    /// it through <see cref="IWindow.PresentPolicy"/>; changing it here does not retroactively rebuild swapchains that
+    /// already exist, so set it at startup.</summary>
+    public Graphics.Core.Presentation.PresentPolicy PresentPolicy { get; set; } =
+        Graphics.Core.Presentation.PresentPolicy.Adaptive;
+
     public IWindow MainWindow
     {
         get => mainWindow;

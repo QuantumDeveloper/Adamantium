@@ -49,12 +49,16 @@
             <Setter.Value>
                 <ControlTemplate TargetType="ToggleButton">
                     <Grid Width="16" Height="16" Background="Transparent">
-                        <ContentPresenter x:Name="ChevronRight"
-                                Content="{ResourceReference IconChevronRight}"
+                        <Image x:Name="ChevronRight"
+                                Source="{ResourceReference ChevronRightIcon}"
+                                Width="{ResourceReference DropDownIconSize}"
+                                Height="{ResourceReference DropDownIconSize}"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"/>
-                        <ContentPresenter x:Name="ChevronDown"
-                                Content="{ResourceReference IconChevronDown}"
+                        <Image x:Name="ChevronDown"
+                                Source="{ResourceReference ChevronDownIcon}"
+                                Width="{ResourceReference DropDownIconSize}"
+                                Height="{ResourceReference DropDownIconSize}"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 Visibility="Collapsed"/>

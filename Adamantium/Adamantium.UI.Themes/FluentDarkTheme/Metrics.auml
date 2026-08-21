@@ -1,0 +1,14 @@
+<ResourceDictionary xmlns:x="http://adamantium/ui/xaml/extensions"
+        xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+        xmlns="http://adamantium/ui">
+
+    <!-- The theme's NUMBERS. Sizes, insets and radii that more than one template needs, in one place - a magic number
+         repeated across templates drifts, which is exactly how the drop-down's chevron and the tab strip's ended up two
+         different sizes. Colours live in Brushes, shapes in Icons, numbers here. -->
+
+    <!-- The chevron square shared by everything that OPENS a list: the drop-down's arrow, the tab strip's overflow
+         button, a tree expander, a submenu arrow. Named for what it is rather than "icon size" - icons in this theme are
+         not all one size, and a name that claims they are would be wrong the first time one is not. -->
+    <sys:Double x:Key="DropDownIconSize">8</sys:Double>
+
+</ResourceDictionary>

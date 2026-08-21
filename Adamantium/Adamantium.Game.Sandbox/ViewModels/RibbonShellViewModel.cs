@@ -22,6 +22,14 @@ public partial class RibbonShellViewModel : IWindowAware
     /// <summary>The demo's stand-in for a document.</summary>
     [Bindable] private string _status = "Ready.";
 
+    // This window has its OWN swapchain, so its presentation is its own setting - which is the point of comparing the
+    // two shells side by side: one can run unthrottled while the other stays tear-free, in one process.
+    public Adamantium.Graphics.Core.Presentation.PresentPolicy[] PresentPolicies { get; } =
+        Enum.GetValues<Adamantium.Graphics.Core.Presentation.PresentPolicy>();
+
+    [Bindable] private Adamantium.Graphics.Core.Presentation.PresentPolicy _presentPolicy =
+        Adamantium.Graphics.Core.Presentation.PresentPolicy.Inherit;
+
     /// <summary>Gates Cut/Copy/Delete/Duplicate - toggle it in the View tab and half the Home tab goes dim.</summary>
     [Bindable, Affects(nameof(CutCommand), nameof(CopyCommand), nameof(DeleteCommand), nameof(DuplicateCommand))]
     private bool _hasSelection = true;

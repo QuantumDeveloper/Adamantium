@@ -48,8 +48,10 @@
                                         Content="{TemplateBinding DisplayContent}"
                                         ContentTemplate="{TemplateBinding ItemTemplate}"
                                         ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"/>
-                                <ContentPresenter x:Name="Chevron" Grid.Column="1"
-                                        Content="{ResourceReference IconChevronDown}"
+                                <Image x:Name="Chevron" Grid.Column="1"
+                                        Source="{ResourceReference ChevronDownIcon}"
+                                        Width="{ResourceReference DropDownIconSize}"
+                                        Height="{ResourceReference DropDownIconSize}"
                                         Margin="8 0 0 0"
                                         VerticalAlignment="Center"/>
                             </Grid>

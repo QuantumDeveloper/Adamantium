@@ -536,10 +536,14 @@ public static partial class DragDrop
 
         // A real, themed control: its look is a ControlTemplate from the active theme (restyle the drop cue in the theme,
         // not here). Orientation drives the caret axis; IsFrame swaps the caret for a "drop into" outline.
-        var indicator = new DropInsertionIndicator { AdornedElement = list, Orientation = orientation, IsFrame = frame };
+        // The rect is TOLD to the cue rather than arranged onto it: the adorner stage lays every adorner out again on
+        // every frame (LayoutAdorner -> PlaceIn), so an Arrange from here lived exactly one frame before being replaced
+        // by the adorned element's whole box.
+        var indicator = new DropInsertionIndicator
+        {
+            AdornedElement = list, Orientation = orientation, IsFrame = frame, TargetRect = rect
+        };
         if (UIApplication.Current?.ThemeManager is { CurrentTheme: { } theme } manager) manager.ApplyTheme(theme, indicator);
-        ((IMeasurableComponent)indicator).Measure(rect.Size, true);
-        ((IMeasurableComponent)indicator).Arrange(rect, true);
         _indicator = indicator;
         _indicatorLayer.Add(_indicator);
     }

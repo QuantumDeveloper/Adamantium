@@ -84,7 +84,7 @@ internal sealed class InstancedKeyArena : BatchArena
 
     public override int StagedCount => _stage.Count;
 
-    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot)
+    public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag)
     {
         if (!_collector.TryStageSolid(_key, unit, world, transformSlot, _stage)) return false;
 

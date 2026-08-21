@@ -242,8 +242,12 @@
                                           Focusable="False"
                                           MinWidth="28" Padding="4 0" Visibility="Collapsed" BorderThickness="0"
                                           HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                          Background="{ResourceReference SolidBackgroundFillColorBase}"
-                                          Content="{ResourceReference IconChevronDown}"/>
+                                          Background="{ResourceReference SolidBackgroundFillColorBase}">
+                                <Image Source="{ResourceReference ChevronDownIcon}"
+                                       Width="{ResourceReference DropDownIconSize}"
+                                       Height="{ResourceReference DropDownIconSize}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </ToggleButton>
                             <!-- Flyout list of every tab (wired in code), opened below the ▾ (edge-aware via FlipToFit).
                                  The card + its ListBox build LAZILY on first open (ChildTemplate): a list carries a scroll
                                  host and two scrollbars, and most tab strips never overflow at all. The list is taken from
@@ -402,8 +406,12 @@
                                           Focusable="False"
                                           MinWidth="28" Padding="4 0" Visibility="Collapsed" BorderThickness="0"
                                           HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                          Background="{ResourceReference SolidBackgroundFillColorBase}"
-                                          Content="{ResourceReference IconChevronDown}"/>
+                                          Background="{ResourceReference SolidBackgroundFillColorBase}">
+                                <Image Source="{ResourceReference ChevronDownIcon}"
+                                       Width="{ResourceReference DropDownIconSize}"
+                                       Height="{ResourceReference DropDownIconSize}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </ToggleButton>
                             <Popup x:Name="PART_TabOverflowPopup" Grid.Row="1" Grid.Column="2" Placement="Bottom" FlipToFit="True" VerticalOffset="2">
                                 <Popup.ChildTemplate>
                                     <ControlTemplate TargetType="Popup">
@@ -498,8 +506,12 @@
                                           Focusable="False"
                                           MinHeight="24" Padding="0 4" Visibility="Collapsed" BorderThickness="0"
                                           HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                          Background="{ResourceReference SolidBackgroundFillColorBase}"
-                                          Content="{ResourceReference IconChevronDown}"/>
+                                          Background="{ResourceReference SolidBackgroundFillColorBase}">
+                                <Image Source="{ResourceReference ChevronDownIcon}"
+                                       Width="{ResourceReference DropDownIconSize}"
+                                       Height="{ResourceReference DropDownIconSize}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </ToggleButton>
                             <Popup x:Name="PART_TabOverflowPopup" Grid.Row="1" Placement="Bottom" FlipToFit="True" VerticalOffset="2">
                                 <Popup.ChildTemplate>
                                     <ControlTemplate TargetType="Popup">
@@ -625,8 +637,12 @@
                                           Focusable="False"
                                           MinHeight="24" Padding="0 4" Visibility="Collapsed" BorderThickness="0"
                                           HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                          Background="{ResourceReference SolidBackgroundFillColorBase}"
-                                          Content="{ResourceReference IconChevronDown}"/>
+                                          Background="{ResourceReference SolidBackgroundFillColorBase}">
+                                <Image Source="{ResourceReference ChevronDownIcon}"
+                                       Width="{ResourceReference DropDownIconSize}"
+                                       Height="{ResourceReference DropDownIconSize}"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </ToggleButton>
                             <Popup x:Name="PART_TabOverflowPopup" Grid.Row="1" Placement="Bottom" FlipToFit="True" VerticalOffset="2">
                                 <Popup.ChildTemplate>
                                     <ControlTemplate TargetType="Popup">

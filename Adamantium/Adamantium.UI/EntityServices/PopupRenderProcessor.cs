@@ -61,7 +61,8 @@ public class PopupRenderProcessor : EntityProcessor<WindowRenderService>
         // from a tree it does not draw and step over them - one symptom of a set with no owner (see RenderDirtyRouter).
         foreach (var root in window.PopupRoots) ClaimScope(root);
 
-        // Rebuild (component walk + rasterization) only when the open set / geometry / a popup's position changed.
+        // Rebuild (component walk + rasterization) only when the open set / geometry / a popup's position changed - or
+        // when letters landed since the last build (see OverlayRebuildGate).
         if (_gate.HasChanged(flat))
         {
             _cache.BuildFromComponents(flat, projection);

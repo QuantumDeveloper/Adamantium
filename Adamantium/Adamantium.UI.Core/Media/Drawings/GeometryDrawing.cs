@@ -38,6 +38,39 @@ public class GeometryDrawing : Drawing
         set => SetValue(PenProperty, value);
     }
 
+    /// <summary>The stroke brush, for markup. A <see cref="Media.Pen"/> is immutable by design - every field set once,
+    /// a new pen built on any change - so it cannot be authored property-by-property in AUML. A shape does not ask for
+    /// one either: <c>Path</c> takes Stroke + StrokeThickness and builds the pen itself, and a drawing does the same
+    /// here. Without this a vector icon could only ever be a FILL, which rules out half of any icon set - a cross, a
+    /// checkmark, an arrow are strokes.
+    /// <para>Setting <see cref="Pen"/> directly still wins: it is the explicit, full form.</para></summary>
+    public static readonly AdamantiumProperty StrokeProperty = AdamantiumProperty.Register(nameof(Stroke),
+        typeof(Brush), typeof(GeometryDrawing), new PropertyMetadata(null, StrokeChangedCallback));
+
+    public static readonly AdamantiumProperty StrokeThicknessProperty = AdamantiumProperty.Register(nameof(StrokeThickness),
+        typeof(double), typeof(GeometryDrawing), new PropertyMetadata(1.0, StrokeChangedCallback));
+
+    public Brush Stroke
+    {
+        get => GetValue<Brush>(StrokeProperty);
+        set => SetValue(StrokeProperty, value);
+    }
+
+    public double StrokeThickness
+    {
+        get => GetValue<double>(StrokeThicknessProperty);
+        set => SetValue(StrokeThicknessProperty, value);
+    }
+
+    // Either half arriving builds the pen. Both are ordinary property writes from markup and can land in any order, so
+    // this must not assume the brush comes first.
+    private static void StrokeChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is not GeometryDrawing drawing) return;
+
+        drawing.Pen = drawing.Stroke == null ? null : new Pen(drawing.Stroke, drawing.StrokeThickness);
+    }
+
     // A brush mutating INTERNALLY (a recoloured fill, an animated gradient stop) changes the picture just as much as
     // swapping the brush does, and the drawing is not an element, so nothing else is listening on its behalf.
     private static void BrushChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)

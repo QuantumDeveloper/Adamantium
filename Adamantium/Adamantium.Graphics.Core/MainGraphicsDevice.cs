@@ -160,6 +160,27 @@ namespace Adamantium.Graphics.Core
         // Optional (best-effort) extensions: enabled if the device supports them, never required. See CreateLogicalDevice.
         public static ReadOnlyCollection<string> OptionalDeviceExtensions { get; private set; }
 
+        /// <summary>Device extensions this device actually enabled - the required ones plus whichever optional ones the
+        /// driver turned out to support. Ask this, never the wish list.</summary>
+        public IReadOnlySet<string> EnabledDeviceExtensions { get; private set; } = new HashSet<string>();
+
+        public bool IsExtensionEnabled(string extension) => EnabledDeviceExtensions.Contains(extension);
+
+        /// <summary>A present fence per present, present-mode changes without recreating the swapchain, and defined
+        /// scaling on resize. Advertised as KHR after promotion, as EXT before it - either will do.</summary>
+        public bool SupportsSwapchainMaintenance =>
+            IsExtensionEnabled(Constants.VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME)
+            || IsExtensionEnabled(Constants.VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME);
+
+        /// <summary>Wait for a NAMED present instead of for an image to come free - explicit frame pacing.</summary>
+        public bool SupportsPresentWait =>
+            IsExtensionEnabled(Constants.VK_KHR_PRESENT_WAIT_EXTENSION_NAME)
+            && IsExtensionEnabled(Constants.VK_KHR_PRESENT_ID_EXTENSION_NAME);
+
+        /// <summary>Present only the rectangles that changed.</summary>
+        public bool SupportsIncrementalPresent =>
+            IsExtensionEnabled(Constants.VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME);
+
         internal Fence[] InFlightFences { get; private set; }
 
         public uint CurrentFrame { get; private set; }
@@ -200,6 +221,23 @@ namespace Adamantium.Graphics.Core
                 // After a device-lost (VK_ERROR_DEVICE_LOST), lets us query the REAL GPU fault (description + faulting
                 // address regions) instead of guessing - the diagnostic for the designer's render-time device loss.
                 Constants.VK_EXT_DEVICE_FAULT_EXTENSION_NAME,
+
+                // Presentation, asked for in the PROMOTED KHR form first and the original EXT form as the fallback - the
+                // pair was promoted, and a driver may advertise either. What they buy, measured on this engine: the frame
+                // loop blocks synchronously in AcquireNextImage (0.6-0.8 ms a frame, with the GPU fence wait at 0.00),
+                // and with update and render on one thread that back-pressure paces the WHOLE engine. swapchain
+                // maintenance gives a fence per present (know when an image is free instead of blocking to find out),
+                // present-mode changes WITHOUT recreating the swapchain (the vsync setting stops being a teardown), and
+                // defined scaling on resize. surface maintenance answers "how many images does THIS present mode need",
+                // which is currently a hardcoded 3.
+                Constants.VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
+                Constants.VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME,
+                // Explicit frame pacing: wait for a NAMED present to complete rather than for an image to come free.
+                Constants.VK_KHR_PRESENT_ID_EXTENSION_NAME,
+                Constants.VK_KHR_PRESENT_WAIT_EXTENSION_NAME,
+                // Present only the rectangles that changed - which this renderer already knows, since its whole cache is
+                // built around repainting just those.
+                Constants.VK_KHR_INCREMENTAL_PRESENT_EXTENSION_NAME,
             });
         }
 
@@ -333,6 +371,12 @@ namespace Adamantium.Graphics.Core
                     finalDeviceExtensions.Add(extension);
                 }
             }
+
+            // What was ACTUALLY enabled, asked of the device rather than assumed from a list. Everything built on an
+            // optional extension reads this: the same binary runs on a driver that has it and one that does not (a Mac
+            // on MoltenVK has none of the presentation set), and "works on my machine" is exactly the failure mode a
+            // hardcoded assumption produces here.
+            EnabledDeviceExtensions = new HashSet<string>(finalDeviceExtensions, StringComparer.Ordinal);
 
             var descriptorBufferFeature = new PhysicalDeviceDescriptorBufferFeaturesEXT
             {

@@ -20,9 +20,27 @@ internal sealed class OverlayRebuildGate
     private HashSet<Guid> _ids = new();   // swapped with _prevIds, so asking costs no allocation
     private readonly Dictionary<Guid, Vector3F> _prevPos = new();
 
+    /// <summary>The glyph-arrival version this stage has already redrawn for. Per GATE: each overlay stage decides its
+    /// own redraws, and the arrival is global.</summary>
+    private int _seenGlyphVersion;
+
     public bool HasChanged(IReadOnlyList<IUIComponent> flat)
     {
         var changed = false;
+
+        // LETTERS THAT LANDED are a change to what this stage draws, and until now the gate never asked. An overlay is
+        // built by BuildFromComponents, which fuses record and apply and so never runs the content path's late-glyph
+        // adoption - and the gate held the rebuild back because the open set, the geometry and the positions were all
+        // unchanged. So a glyph that finished rasterizing AFTER a popup first opened had nothing to put it on screen:
+        // a SlidePanel's close cross stayed blank until the panel was closed and opened again, which is what finally
+        // moved the gate. Asked here because this is the one place that decides whether the stage redraws at all.
+        var landed = Adamantium.Graphics.Fonts.FontAtlasStore.LandedVersion;
+        if (landed != _seenGlyphVersion)
+        {
+            _seenGlyphVersion = landed;
+            changed = true;
+        }
+
         _ids.Clear();
         foreach (var component in flat)
         {

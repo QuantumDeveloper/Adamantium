@@ -75,6 +75,16 @@ public partial class MainViewModel
     // of an edge artifact possible at all.
     [Bindable] private bool _analyticAa = true;
 
+    // How frames reach the screen, bound to the window's PresentPolicy. Sits next to Analytic AA for the same reason:
+    // it is a COMPARISON switch. Immediate takes the presentation back-pressure off the frame loop entirely (measured
+    // here: AcquireNextImage 0.6-0.8 ms a frame under Adaptive, 0.01 ms under Immediate), and the plate above shows the
+    // difference live. Inherit is offered too, so the application-wide default can be seen for what it is.
+    public Adamantium.Graphics.Core.Presentation.PresentPolicy[] PresentPolicies { get; } =
+        System.Enum.GetValues<Adamantium.Graphics.Core.Presentation.PresentPolicy>();
+
+    [Bindable] private Adamantium.Graphics.Core.Presentation.PresentPolicy _presentPolicy =
+        Adamantium.Graphics.Core.Presentation.PresentPolicy.Inherit;
+
     // Last dialog result - shown in the window content (written by ShowConfirm).
     [Bindable] private string _lastCommand = "(none)";
 

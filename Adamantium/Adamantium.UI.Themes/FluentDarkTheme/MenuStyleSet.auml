@@ -44,8 +44,10 @@
                                         Foreground="{ResourceReference TextFillColorSecondary}"
                                         FontSize="12" VerticalAlignment="Center" Margin="24 0 0 0"/>
                                 <!-- Vector chevron, not a glyph: it renders regardless of the UI font's coverage. -->
-                                <ContentPresenter x:Name="Chevron" Grid.Column="3"
-                                        Content="{ResourceReference IconChevronRight}"
+                                <Image x:Name="Chevron" Grid.Column="3"
+                                        Source="{ResourceReference ChevronRightIcon}"
+                                        Width="{ResourceReference DropDownIconSize}"
+                                        Height="{ResourceReference DropDownIconSize}"
                                         Visibility="Collapsed"
                                         VerticalAlignment="Center" Margin="16 0 0 0"/>
                             </Grid>
