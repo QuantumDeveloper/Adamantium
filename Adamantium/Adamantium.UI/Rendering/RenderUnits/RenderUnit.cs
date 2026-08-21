@@ -415,7 +415,7 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
         if (_frozenMesh is not { HasPoints: true } fm) return false;
         // Baked at the SAME box the shader maps its UVs from (localBounds below) - the geometry's own bounds are a
         // different box, and the picture then sampled at a shifted scale and spilled past the shape.
-        texture = TexRectCollector.BrushTexture(image, ResourceFactory, fm.Bounds.Size, DrawCommand.Component);
+        texture = TextureBatchCollector.BrushTexture(image, ResourceFactory, fm.Bounds.Size, DrawCommand.Component);
         if (texture == null) return false;
 
         key = fm.Key;
@@ -534,7 +534,7 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
     /// source is still decoding (in which case the next re-render picks it up, the way ImageRenderUnit does).
     /// <para>Lives here because the resource factory does: the textured batch needs the texture but has no business
     /// holding a factory.</para></summary>
-    internal ITexture BrushTexture() => TexRectCollector.BrushTexture(Payload.Brush, ResourceFactory,
+    internal ITexture BrushTexture() => TextureBatchCollector.BrushTexture(Payload.Brush, ResourceFactory,
         Payload.DestinationRect.Size, DrawCommand.Component);
 
     // Whether a batch will draw this rect - ASKED OF THE BATCH, never re-stated here. "The batch draws it" means this
@@ -718,7 +718,7 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
     public double FillOpacity => DrawCommand?.RenderData?.Opacity ?? 1.0;
 
     /// <summary>The GPU texture this ellipse's brush samples, or null - see the rect's twin; both defer to the batch.</summary>
-    internal ITexture BrushTexture() => TexRectCollector.BrushTexture(Payload.Brush, ResourceFactory,
+    internal ITexture BrushTexture() => TextureBatchCollector.BrushTexture(Payload.Brush, ResourceFactory,
         Payload.DestinationRect.Size, DrawCommand.Component);
 
     // An ellipse the SDF batch will draw (solid fill, no pen, FULL ellipse): the batch shader reconstructs it from an
@@ -736,8 +736,8 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
     private static bool IsPatternBatchable(EllipsePayload p) => PatternRectCollector.WantsBatchEllipse(p);
 
     // A full ellipse whose fill is SAMPLED from a texture routes into the textured SDF batch - again, ZERO per-unit
-    // machinery. Mirrors TexRectCollector.CanBatchEllipse.
-    private static bool IsTexBatchable(EllipsePayload p) => TexRectCollector.WantsBatchEllipse(p);
+    // machinery. Mirrors TextureBatchCollector.CanBatchEllipse.
+    private static bool IsTexBatchable(EllipsePayload p) => TextureBatchCollector.WantsBatchEllipse(p);
 
     public EllipseRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
@@ -1095,9 +1095,9 @@ public class RegularPolygonRenderUnit : RenderUnit<RegularPolygonPayload>
 
     private static bool IsSdfBatchable(RegularPolygonPayload p) =>
         RegularPolygonCollector.WantsBatch(p) || GradientRectCollector.WantsBatchPolygon(p) ||
-        PatternRectCollector.WantsBatchPolygon(p) || TexRectCollector.WantsBatchPolygon(p);
+        PatternRectCollector.WantsBatchPolygon(p) || TextureBatchCollector.WantsBatchPolygon(p);
 
-    internal ITexture BrushTexture() => TexRectCollector.BrushTexture(Payload.Brush, ResourceFactory,
+    internal ITexture BrushTexture() => TextureBatchCollector.BrushTexture(Payload.Brush, ResourceFactory,
         Payload.DestinationRect.Size, DrawCommand.Component);
 
     /// <summary>The distance field an AURA or a SHADOW on this polygon reads, baked once per shape and shared by every

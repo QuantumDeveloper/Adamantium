@@ -240,7 +240,7 @@ public class GeometryRenderComponent : UIRenderComponent
         }
 
         // The box first: it is what a vector source must be baked at, since this path maps the picture across it.
-        var texture = TexRectCollector.BrushTexture(image, _resourceFactory, box.Size, Owner);
+        var texture = TextureBatchCollector.BrushTexture(image, _resourceFactory, box.Size, Owner);
         if (texture == null)
         {
             return;

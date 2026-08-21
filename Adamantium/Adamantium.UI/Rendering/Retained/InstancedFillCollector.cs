@@ -848,7 +848,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             {
                 // NO texture, NO draw: the heap path passes a texture as an INDEX written into push data by whoever bound
                 // one last, so drawing without binding samples whatever descriptor sits there - in practice the glyph
-                // atlas, smeared across the frame. See TexRectCollector.DrawSegment.
+                // atlas, smeared across the frame. See TextureBatchCollector.DrawSegment.
                 if (texture == null) continue;
                 _effect.InstancesAddress.SetValue(seg.TexGpu.GetDeviceAddress() + (ulong)(first * TexInstanceStride));
                 _effect.SourceTexture.SetResource(texture);

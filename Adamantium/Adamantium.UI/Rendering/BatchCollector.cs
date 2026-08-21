@@ -28,6 +28,25 @@ internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
 
     protected TItem[] Items;
     protected int Count;               // items written this frame (across all segments, monotonic within a frame)
+
+    /// <summary>How far the RETAINED content reaches - the end of the furthest slot the segments still issue.
+    /// <para>Not <see cref="Count"/>: that is the write cursor of THIS frame and is reset by every
+    /// <see cref="BeginFrame"/>, so on a patch frame it names a dozen slots while the segments go on issuing thousands
+    /// that were recorded frames ago. Anything asking "which instances are on screen" has to ask the segments.</para></summary>
+    protected int RetainedExtent
+    {
+        get
+        {
+            var end = Count;
+            foreach (var segment in _segments)
+            {
+                var last = (int)(segment.First + segment.Count);
+                if (last > end) end = last;
+            }
+
+            return Math.Min(end, Items?.Length ?? 0);
+        }
+    }
     private int _segmentStart;         // start of the pending (not-yet-flushed) segment
     private Rect2D _scissor;           // the pending segment's clip
     private double _uL, _uT, _uR, _uB; // logical union of the pending segment (paint-order overlap test)
@@ -49,6 +68,7 @@ internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
     // scene converges to zero bytes within a lap of the ring, and a scroll sends the span that moved.
     private TItem[][] _mirror;
     private int[] _mirrorCount;
+    private int _highWater;   // see UploadRange: the furthest slot the array has ever been written at
 
     // Segments drawn THIS frame (each = a clip + a buffer range), retained for the clean-frame op replay. RenderCache
     // records an ordered op stream during the walk; on a fully-unchanged (Clean) frame it skips the walk entirely and
@@ -136,6 +156,7 @@ internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
         _ring = null;
         _mirror = null;
         _mirrorCount = null;
+        _highWater = 0;
         _gpuCapacity = 0;
         _segments.Clear();
         _freeBlocks.Clear();
@@ -215,7 +236,14 @@ internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
     {
         if (_ring == null || device.CurrentFrame == _writeFrame) return;
         SelectSlot(device);
-        UploadRange(0, Count);
+
+        // The catch-up has to cover everything the retained frame can still ISSUE, not where this frame's cursor stopped.
+        // Count is reset by every BeginFrame while the array keeps its contents, so after the scene shrinks the slots past
+        // the cursor are last time's - live bytes on every copy that has not been told otherwise. Catching up only over
+        // [0, Count) leaves them there, and a copy a lap behind goes on drawing them: the control that stopped drawing,
+        // back on screen at the size it had, on the frames that happen to land on that copy. It also silently undid every
+        // withdrawal made past the cursor - blanked in the array, never sent to the copies that still hold the old bytes.
+        UploadRange(0, Math.Max(Count, _highWater));
     }
 
     // Sends [first, first+count) to the current copy, but only the one contiguous span that copy is actually missing.
@@ -238,6 +266,10 @@ internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
         }
         var end = first + count;
         if (end > _mirrorCount[_current]) _mirrorCount[_current] = end;
+
+        // The furthest slot any write has ever reached. Maintained HERE because every write to the array passes through
+        // this method, so it cannot drift from what is actually in there.
+        if (end > _highWater) _highWater = end;
     }
 
     /// <summary>Per-frame hook for derived state (e.g. lazily creating the effect). Base does nothing.</summary>
@@ -549,6 +581,13 @@ internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
         if (delta != 0 && tailLen > 0) Array.Copy(Items, tailAt, Items, tailAt + delta, tailLen);
         items.CopyTo(Items.AsSpan(first + at));
 
+        // A SHRINKING segment leaves a copy of what moved in the slots the tail vacated - Array.Copy reads and writes the
+        // same array and does not clear behind itself, so those bytes stay whole, owner tag included. Nothing draws them
+        // while they sit past the segment's end; the moment it grows back over that ground they are issued again, and a
+        // control that stopped drawing is on screen at the size it had. Clearing here kills the duplicate where it is
+        // made - the upload below already spans this ground (see `touched`).
+        if (delta < 0) Array.Clear(Items, first + newCount, -delta);
+
         var touched = items.Length + (delta != 0 ? tailLen + Math.Max(0, -delta) : 0);
         UploadRange(first + at, touched);
         _segments[index] = s with { Count = (uint)newCount };
@@ -589,6 +628,19 @@ internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
         return id;   // its footprint comes from the caller (GrowSegmentBounds): only it knows the logical bounds it baked
     }
 
+    /// <summary>Hands a block back to the pool EMPTY. A freed block still holds its last tenant's instances - whole, with
+    /// their owner tags - and the block is handed out again by capacity, not by how much the new tenant writes: whatever
+    /// it does not cover keeps the previous occupant, ready to be issued the moment that segment grows over it. A
+    /// scrollbar the window outgrew came back this way, at the size it had. Freeing means empty, on both sides.</summary>
+    private void FreeBlock(IGraphicsDevice device, int first, int capacity)
+    {
+        if (capacity <= 0 || first < 0 || first + capacity > Items.Length) return;
+
+        Array.Clear(Items, first, capacity);
+        UploadRange(first, capacity);
+        _freeBlocks.Add((first, capacity));
+    }
+
     public bool RepointSegment(IGraphicsDevice device, int id, ReadOnlySpan<TItem> items, Rect2D scissor)
     {
         var index = IndexOf(id);
@@ -603,7 +655,13 @@ internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
         if (need <= (int)s.Capacity)
         {
             items.CopyTo(Items.AsSpan((int)s.First));
-            UploadRange((int)s.First, need);
+
+            // Same duplicate as the shrinking replace above: a segment that now holds FEWER items leaves the old ones in
+            // the slots beyond its new end, whole and owned. They wait there until the segment grows back over them.
+            var shrankBy = (int)s.Count - need;
+            if (shrankBy > 0) Array.Clear(Items, (int)s.First + need, shrankBy);
+
+            UploadRange((int)s.First, need + Math.Max(0, shrankBy));
             _segments[index] = s with { Scissor = scissor, Count = (uint)need };
             return true;
         }
@@ -629,7 +687,7 @@ internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
             Count = first + want;
         }
 
-        if (s.Capacity > 0) _freeBlocks.Add(((int)s.First, (int)s.Capacity));
+        if (s.Capacity > 0) FreeBlock(device, (int)s.First, (int)s.Capacity);
 
         items.CopyTo(Items.AsSpan(first));
         UploadRange(first, need);
@@ -653,6 +711,21 @@ internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
         if (first >= 0 && count > 0) BlankRun(device, (uint)first, (uint)count);
     }
 
+    /// <summary>Blanks a run WITHOUT the <see cref="Count"/> clamp - the array outlives the cursor.
+    /// <para><see cref="Count"/> is where THIS frame stopped writing, and <see cref="BeginFrame"/> resets it without
+    /// clearing the array. Everything past it is last time's bytes, still sitting there: when a later frame's segments
+    /// grow back over that ground without rewriting it, those instances are ISSUED again - a control that stopped
+    /// drawing, reappearing at the size it had, once the scene around it grows back. Withdrawing them has to be able to
+    /// reach past the cursor, which is exactly what the clamp forbids.</para></summary>
+    protected void BlankRunPastTheCursor(IGraphicsDevice device, uint first, uint count)
+    {
+        if (count == 0 || first + count > (uint)(Items?.Length ?? 0)) return;
+
+        PrepareRetainedWrite(device);
+        for (var i = 0u; i < count; i++) Items[first + i] = default;
+        UploadRange((int)first, (int)count);
+    }
+
     public void BlankRun(IGraphicsDevice device, uint first, uint count)
     {
         if (count == 0 || first + count > (uint)Count) return;
@@ -662,7 +735,7 @@ internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
         UploadRange((int)first, (int)count);
     }
 
-    public void UpdateSlot(IGraphicsDevice device, int slot, TItem item)
+    public virtual void UpdateSlot(IGraphicsDevice device, int slot, TItem item)
     {
         PrepareRetainedWrite(device);
         Items[slot] = item;

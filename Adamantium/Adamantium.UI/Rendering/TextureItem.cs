@@ -10,10 +10,10 @@ namespace Adamantium.UI.Rendering;
 /// corners analytically (self-AA).
 /// <para>The sibling of <see cref="PatternRectItem"/>: same SDF shape, but the fill comes from a sample instead of a
 /// formula. WHICH texture is not in the record - one texture is bound per SEGMENT (see
-/// <see cref="TexRectCollector"/>), the way the text batch binds one atlas per segment.</para>
+/// <see cref="TextureBatchCollector"/>), the way the text batch binds one atlas per segment.</para>
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
-public struct TexRectItem
+public struct TextureItem
 {
     /// <summary>World-space bounds: x, y, w, h.</summary>
     public Vector4F Bounds;

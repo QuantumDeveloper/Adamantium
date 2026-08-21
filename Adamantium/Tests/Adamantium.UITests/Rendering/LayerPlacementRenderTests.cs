@@ -363,6 +363,86 @@ public class LayerPlacementRenderTests
             "a collapsed parent must take what its children draw with it");
     }
 
+    // What the app does that none of the tests above do: the control goes on NOT being re-recorded while the arena around
+    // it is re-laid many times over. Measured live, its instances moved from slot 11 to 29 to 63 to 302 while the group
+    // itself was last written thousands of frames earlier - so by the time it stops drawing, everything the cache
+    // REMEMBERS about where its slots are (its runs) names somebody else's. A withdrawal that goes by those remembered
+    // addresses then blanks the wrong place and reports success, and the control keeps painting.
+    [Test]
+    public void AControlThatStoppedDrawing_IsGone_EvenAfterTheArenaMovedItsSlotsAround()
+    {
+        using var scene = NewScene();
+
+        // It draws, between cards - the track in the middle of a list, not at its end.
+        scene.Over[1].RenderAction = s => s.DrawRectangle(Brushes.Red, new Rect(0, 0, 6, CardHeight));
+        scene.Over[1].Invalidate();
+        scene.Draw();
+
+        // Laps of unrelated edits: neighbours start and stop drawing, which re-lays the arena underneath the bar and
+        // hands its old slots to other controls. The bar itself is untouched throughout - nothing re-records it.
+        for (var lap = 0; lap < 4; lap++)
+        {
+            scene.Far[lap % scene.Far.Length].RenderAction = s => s.DrawRectangle(Brushes.Green, new Rect(4, 0, 20, CardHeight));
+            scene.Far[lap % scene.Far.Length].Invalidate();
+            scene.Draw();
+
+            scene.Cards[lap % Cards].RenderAction = s => s.DrawRectangle(Brushes.Yellow, new Rect(2, 0, Dim - 4, CardHeight));
+            scene.Cards[lap % Cards].Invalidate();
+            scene.Draw();
+
+            scene.Far[lap % scene.Far.Length].RenderAction = null;
+            scene.Far[lap % scene.Far.Length].Invalidate();
+            scene.Draw();
+        }
+
+        // Only now does it stop drawing - the window grew and the bar is not needed.
+        scene.Over[1].Visibility = Visibility.Collapsed;
+        scene.Over[1].Invalidate();
+        scene.Draw();
+
+        // ...and the frames that follow are the idle ones the app spends its life in.
+        scene.Draw();
+        scene.Draw();
+        Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.True, "the frames after it goes have to be replays");
+
+        AssertMatchesAFullWalk(scene, Pixels(scene.Renderer),
+            "a control that stopped drawing must go, however far its slots have travelled since it last drew");
+    }
+
+    // The same, for a control that LEAVES THE TREE rather than collapsing - the tab switch - after the arena has moved
+    // on. Separate test because the two take different routes out of the paint order, and only one of them was ever
+    // covered against a stale run list.
+    [Test]
+    public void AControlRemovedFromTheTree_IsGone_EvenAfterTheArenaMovedItsSlotsAround()
+    {
+        using var scene = NewScene();
+
+        var view = Placed(new Rect(0, 20, Dim, CardHeight));
+        var part = Placed(new Rect(0, 0, 20, CardHeight));
+        part.RenderAction = s => s.DrawRectangle(Brushes.Red, new Rect(0, 0, 6, CardHeight));
+        view.Add(part);
+        scene.Stage.Add(view);
+        scene.Draw();
+
+        for (var lap = 0; lap < 4; lap++)
+        {
+            scene.Far[lap % scene.Far.Length].RenderAction = s => s.DrawRectangle(Brushes.Green, new Rect(4, 0, 20, CardHeight));
+            scene.Far[lap % scene.Far.Length].Invalidate();
+            scene.Draw();
+
+            scene.Far[lap % scene.Far.Length].RenderAction = null;
+            scene.Far[lap % scene.Far.Length].Invalidate();
+            scene.Draw();
+        }
+
+        scene.Stage.Remove(view);
+        scene.Draw();
+        scene.Draw();
+
+        AssertMatchesAFullWalk(scene, Pixels(scene.Renderer),
+            "a view that left must go, however far its slots have travelled since it last drew");
+    }
+
     // The layers are the structure of a recorded frame - which draws may be reordered among themselves and which may not
     // (§5a) - and the stream is what a replay walks. They have to stay the same sequence: a layer list that has drifted
     // from the stream would answer "your order here does not matter" about a set the frame does not actually draw

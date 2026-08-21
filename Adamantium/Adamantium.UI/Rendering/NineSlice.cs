@@ -26,7 +26,7 @@ internal static class NineSlice
     /// border is scaled DOWN proportionally rather than letting opposite corners overlap and draw each other's pixels;
     /// this is what CSS border-image does too, and it is the difference between a skin that degrades and one that
     /// smears.</para></summary>
-    public static TexRectItem[] Bake(NineSliceBrush brush, Rect bounds, double opacity, int transformSlot, double scaleX = 1.0, double scaleY = 1.0)
+    public static TextureItem[] Bake(NineSliceBrush brush, Rect bounds, double opacity, int transformSlot, double scaleX = 1.0, double scaleY = 1.0)
     {
         var source = brush.Source;
         if (source == null) return null;
@@ -76,7 +76,7 @@ internal static class NineSlice
 
         var round = brush.EdgeMode == NineSliceEdgeMode.Round;
         var repeat = round || brush.EdgeMode == NineSliceEdgeMode.Repeat;
-        var items = new List<TexRectItem>(9);
+        var items = new List<TextureItem>(9);
 
         for (var row = 0; row < 3; row++)
         {
@@ -104,7 +104,7 @@ internal static class NineSlice
                 var uv = Inset(us[column], dus[column], sourceWidth);
                 var vv = Inset(vs[row], dvs[row], sourceHeight);
 
-                items.Add(new TexRectItem
+                items.Add(new TextureItem
                 {
                     Bounds = new Vector4F((float)xs[column], (float)ys[row], (float)w, (float)h),
                     // No corner radius: the picture carries its own shape. A slice always REPEATS - a stretched one is
