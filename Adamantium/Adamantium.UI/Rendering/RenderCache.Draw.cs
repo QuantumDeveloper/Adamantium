@@ -57,7 +57,7 @@ public partial class RenderCache
     private GradientEllipseCollector _gradientEllipseBatch;   // SDF family: ellipses with a linear/radial GRADIENT fill
     private PatternRectCollector _patternBatch;   // SDF family: rounded rects with a PROCEDURAL pattern fill (checker/stripes/dots/grid)
     private FractalRectCollector _fractalBatch;   // SDF family: rounded rects with an escape-time FRACTAL fill (Julia/Mandelbrot)
-    private TexRectCollector _texRectBatch;   // SDF family: rounded rects whose fill is SAMPLED from a texture (ImageBrush / NineSliceBrush)
+    private TextureBatchCollector _texRectBatch;   // SDF family: rounded rects whose fill is SAMPLED from a texture (ImageBrush / NineSliceBrush)
     // The soft band (aura / shadow) in its TWO paint positions. An OUTER band goes under every fill; an INNER one over
     // them - drawn under, it would simply be covered by the shape's own fill. Both lazy: most windows have neither.
     private HaloRectCollector _haloUnder;
@@ -170,6 +170,17 @@ public partial class RenderCache
     // that shows up as exactly the thing a smooth window cannot have - some frames costing much more than their
     // neighbours for no visible reason.
     private readonly List<ControlGroup> _leftTheOrder = new();
+
+    // The departed groups' tags, as one set, so the arena is asked once instead of once per group.
+    private readonly HashSet<int> _departedTags = new();
+
+    /// <summary>Tags whose instances must not exist anywhere in the arena until their control draws again.
+    /// <para>A withdrawal cannot be a one-shot event, and measuring is what proved it: the sweep wiped the bar's
+    /// instances at slots 42, 50 and 95, and they turned up afterwards at 63 and 80 - with nothing re-recording the
+    /// group. The arena COPIES ranges when it re-issues a layer, and ownership rides in the instance precisely so it
+    /// survives that: the bytes are duplicated, tag and all, to ground the sweep had already cleaned. So the tag is kept
+    /// until a pass finds nothing carrying it, which no copying path can outrun.</para></summary>
+    private readonly HashSet<int> _tombstones = new();
     private readonly HashSet<int> _emptiedSegments = new();
 
     /// <summary>Takes a rect segment's op out of the recorded stream - the segment draws nothing any more - and tells the
@@ -221,11 +232,50 @@ public partial class RenderCache
         }
     }
 
+    /// <summary>Holds the departed to their departure. See <see cref="_tombstones"/>: one pass per frame while anything
+    /// is owed, and the tag is let go once a pass finds nothing carrying it - the copying that resurrects an instance
+    /// happens within a frame or two of the departure, so a short tail covers it without a standing cost.</summary>
+    private void KeepDepartedInstancesGone(IGraphicsDevice device)
+    {
+        if (_tombstones.Count == 0 || device == null || _rectBatch == null) return;
+
+        // A control that draws again owns its instances again - and a tag that is back in the paint order must not be
+        // hunted, or the control would be wiped the moment it returns.
+        foreach (var group in _groups)
+        {
+            if (group.InOrder && group.Tag != 0) _tombstones.Remove(group.Tag);
+        }
+
+        // No timer. A duplicate can appear at ANY later frame - the arena shifts a segment's tail with Array.Copy and
+        // leaves the source bytes where they were, tag and all - so a tag is held until its control draws again, which is
+        // the only moment its instances are legitimately somebody's. Letting go after a few quiet frames is what left the
+        // bar to come back thousands of frames later.
+        _rectBatch.BlankOwnedAnywhere(device, _tombstones);
+    }
+
     private void BlankOrphanInstances(IGraphicsDevice device)
     {
         if (_rectBatch == null || device == null) return;
 
         _emptiedSegments.Clear();
+
+        // WHOSE, before WHERE. The run list says where a group was when it was last recorded, and a group can leave the
+        // paint order many re-recordings later - by then its runs name other groups' slots and its own instances sit
+        // somewhere else entirely, still being issued. That is the scrollbar a grown window no longer needs, painting its
+        // track at the size it had, on every replayed frame. So blank by tag first, wherever they are; the run walk below
+        // is left to do what only it can - hand slots back at a segment edge.
+        _departedTags.Clear();
+        foreach (var group in _leftTheOrder)
+        {
+            if (group.InOrder || group.Tag == 0) continue;
+            _tombstones.Add(group.Tag);
+            // No arena check: the scan blanks only instances that CARRY this tag, and a tag belongs to one group by
+            // construction - so it can never reach anyone else's slots. A disposed group has already dropped its arena
+            // reference, and requiring one here is what left its instances painting.
+            _departedTags.Add(group.Tag);
+        }
+
+        _rectBatch.BlankOwnedAnywhere(device, _departedTags);
 
         foreach (var group in _leftTheOrder)
         {
@@ -472,6 +522,19 @@ public partial class RenderCache
         }
         finally
         {
+            // The sweep belongs HERE, not inside the recording path, for two reasons the measurements made plain. It has
+            // to see the arena as the FINISHED frame leaves it - mid-record the segment list describes only what has been
+            // flushed so far, so the sweep scanned a dozen slots and reported success having looked at nothing. And it
+            // has to run on REPLAYED frames too: RenderCore returns early on those, which is exactly when a departed
+            // control's instances go on being issued with their segment's range.
+            if (_leftTheOrder.Count > 0 && device != null)
+            {
+                BlankOrphanInstances(device);
+                _leftTheOrder.Clear();
+            }
+
+            KeepDepartedInstancesGone(device);
+
 
             if (Core.Diagnostics.FrameTrace.Enabled)
             {
@@ -677,6 +740,10 @@ public partial class RenderCache
         for (var groupIndex = 0; groupIndex < _groups.Count; groupIndex++)
         {
             var group = _groups[groupIndex];
+
+            // TEMP hunt: the walk drawing content that is no longer in the visual tree. The instances it bakes are as
+            // real as any other - they are issued with their segment's range every replayed frame - so if this fires,
+            // the withdrawal is not the sweep's problem at all: the paint order is being handed a departed subtree.
 
             if (cloneRun == null && group.Clones is { Count: > 0 } clones)
             {
@@ -902,7 +969,7 @@ public partial class RenderCache
                 ppru.EnsureMachinery();
                 unit.Update(wt, _projectionMatrix, _renderScale);
             }
-            else if (device != null && unit is RegularPolygonRenderUnit tpru && TexRectCollector.WantsBatchPolygon(tpru.PolygonPayload))
+            else if (device != null && unit is RegularPolygonRenderUnit tpru && TextureBatchCollector.WantsBatchPolygon(tpru.PolygonPayload))
             {
                 // A polygon whose fill is SAMPLED from a texture - a picture, a drawing, a live element. Same textured
                 // pass, same one-texture-per-segment rule.
@@ -910,7 +977,7 @@ public partial class RenderCache
                 if (texPolyTexture == null) continue;
                 if (_texRectBatch == null)
                 {
-                    _texRectBatch = new TexRectCollector { BatchId = 7, TransformsAddress = _transformTable?.DeviceAddress ?? 0 };
+                    _texRectBatch = new TextureBatchCollector { BatchId = 7, TransformsAddress = _transformTable?.DeviceAddress ?? 0 };
                     _texRectBatch.BeginFrame(device);
                 }
                 var texPolyBounds = LogicalBounds(unit.Component, wt);
@@ -1025,7 +1092,7 @@ public partial class RenderCache
                 fru.EnsureMachinery();
                 unit.Update(wt, _projectionMatrix, _renderScale);
             }
-            else if (device != null && unit is RectangleRenderUnit xru && TexRectCollector.WantsBatch(xru.RectPayload))
+            else if (device != null && unit is RectangleRenderUnit xru && TextureBatchCollector.WantsBatch(xru.RectPayload))
             {
                 // A rounded rect whose fill is SAMPLED from a texture (ImageBrush / NineSliceBrush). ONE texture per
                 // segment, so a different source flushes the batch - the same rule the text batch follows for its atlas.
@@ -1040,7 +1107,7 @@ public partial class RenderCache
                 // device out of memory.
                 if (_texRectBatch == null)
                 {
-                    _texRectBatch = new TexRectCollector { BatchId = 7, TransformsAddress = _transformTable?.DeviceAddress ?? 0 };
+                    _texRectBatch = new TextureBatchCollector { BatchId = 7, TransformsAddress = _transformTable?.DeviceAddress ?? 0 };
                     _texRectBatch.BeginFrame(device);
                 }
                 var texBounds = LogicalBounds(unit.Component, wt);
@@ -1063,7 +1130,7 @@ public partial class RenderCache
                 xru.EnsureMachinery();
                 unit.Update(wt, _projectionMatrix, _renderScale);
             }
-            else if (device != null && unit is EllipseRenderUnit xeru && TexRectCollector.WantsBatchEllipse(xeru.EllipsePayload))
+            else if (device != null && unit is EllipseRenderUnit xeru && TextureBatchCollector.WantsBatchEllipse(xeru.EllipsePayload))
             {
                 // A full ellipse whose fill is SAMPLED from a texture: the SAME textured batch and layer as the rect, the
                 // shader branching to the ellipse SDF on the negative baked corner radius. Same texture-per-segment rule.
@@ -1074,7 +1141,7 @@ public partial class RenderCache
                 }
                 if (_texRectBatch == null)
                 {
-                    _texRectBatch = new TexRectCollector { BatchId = 7, TransformsAddress = _transformTable?.DeviceAddress ?? 0 };
+                    _texRectBatch = new TextureBatchCollector { BatchId = 7, TransformsAddress = _transformTable?.DeviceAddress ?? 0 };
                     _texRectBatch.BeginFrame(device);
                 }
                 var texEllBounds = LogicalBounds(unit.Component, wt);
@@ -1293,13 +1360,6 @@ public partial class RenderCache
             _layoutChangedSinceRecord = false;
         }
 
-        // ONLY when something left the paint order this frame: an ordinary frame pays nothing, and the sweep is a pass
-        // over the arena that reads each instance own owner tag.
-        if (_leftTheOrder.Count > 0)
-        {
-            BlankOrphanInstances(device);
-            _leftTheOrder.Clear();
-        }
     }
 
     // The batches flush bottom-up (rect < ellipse < gradient-rect < gradient-ellipse < pattern < fractal < textured < instanced < text), so a
@@ -1558,6 +1618,14 @@ public partial class RenderCache
     // Re-bake one unit from its (live) payload straight into the slot it already occupies. Validated by IsSlotPatchable.
     private bool PatchSlot(IGraphicsDevice device, IRenderUnit u, Matrix4x4F bakeWorld, int transformSlot)
     {
+        // NOT IN THE PAINT ORDER = not drawing, so there is nothing here to repaint. Every caller has to obey this, which
+        // is why it lives in the one place they all pass through rather than in each of them: a repaint re-bakes the unit
+        // into the arena from a snapshot frozen when it last drew - nobody measures or arranges a control that is not
+        // drawing - so the bar the window outgrew comes back at the size and place it had, once per animation tick.
+        // Answering "done" rather than "cannot": the frame is correct, and refusing would cost it a full walk.
+        if (u.Component != null
+            && (!_groupById.TryGetValue(u.Component.RenderId, out var owner) || !owner.InOrder)) return true;
+
         if (u is RectangleRenderUnit rru)
         {
             if (_rectSlotByUnit.TryGetValue(u, out var rectSlot))
@@ -1633,6 +1701,11 @@ public partial class RenderCache
         foreach (var comp in _partialDirty)
         {
             if (!_groupById.TryGetValue(comp.RenderId, out var group)) continue;   // no drawn units - contributes nothing
+
+            // The same refusal the paint order makes on the way in: a splice re-appends a group's content into the arena
+            // and re-stamps its WalkVersion, so a departed subtree that reaches here is put BACK, frame after frame,
+            // however faithfully the sweep blanks it. Two entrances into the arena, one rule about who may use them.
+            if (LeftTheTree(group)) return SpliceRefused("departed");
 
             // A group's RectRuns are valid only against the arena the LAST recording walk (or a splice under it) built. A
             // stale WalkVersion means that walk did NOT visit it (recycled / scrolled off / re-appeared since) and its slots

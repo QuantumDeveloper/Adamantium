@@ -60,6 +60,7 @@ public class ScrollViewer : ContentControl
         if (d is not ScrollViewer sv || sv._presenter == null) return;
         sv._presenter.CanScrollHorizontally = sv.HorizontalScrollBarVisibility != ScrollBarVisibility.Disabled;
         sv._presenter.CanScrollVertically = sv.VerticalScrollBarVisibility != ScrollBarVisibility.Disabled;
+        sv.ApplyBarVisibility();
         sv._presenter.InvalidateMeasure();
     }
 
@@ -240,6 +241,8 @@ public class ScrollViewer : ContentControl
             _horizontalBar.Orientation = Orientation.Horizontal;
             _horizontalBar.ValueChanged += OnBarValueChanged;
         }
+
+        ApplyBarVisibility();
     }
 
     /// <summary>Let the template's parts go when the template does - see ScrollBar.OnRemoveTemplate.</summary>
@@ -298,7 +301,6 @@ public class ScrollViewer : ContentControl
             _verticalBar.LargeChange = viewport.Height;
             _verticalBar.SmallChange = LineStep;
             _verticalBar.Value = offset.Y;
-            _verticalBar.Visibility = ComputeVisibility(VerticalScrollBarVisibility, extent.Height, viewport.Height);
         }
         if (_horizontalBar != null)
         {
@@ -308,8 +310,8 @@ public class ScrollViewer : ContentControl
             _horizontalBar.LargeChange = viewport.Width;
             _horizontalBar.SmallChange = LineStep;
             _horizontalBar.Value = offset.X;
-            _horizontalBar.Visibility = ComputeVisibility(HorizontalScrollBarVisibility, extent.Width, viewport.Width);
         }
+        ApplyBarVisibility();
         _syncingBars = false;
         ScrollChanged?.Invoke(this, EventArgs.Empty);
     }
@@ -416,6 +418,21 @@ public class ScrollViewer : ContentControl
 
         _presenter.AnimateScrollBy(by);   // smooth (eased) wheel; instant if inertia is off
         e.Handled = true;
+    }
+
+    /// <summary>Puts both bars at the visibility the CURRENT metrics call for. Every entry into the question comes here -
+    /// a template being applied, the mode being set, new metrics arriving - because a bar's own default is
+    /// <see cref="Visibility.Visible"/>, and a decision made only when metrics happen to arrive leaves an Auto bar
+    /// standing over content it has nothing to scroll.</summary>
+    private void ApplyBarVisibility()
+    {
+        var extent = _presenter?.Extent ?? default;
+        var viewport = _presenter?.Viewport ?? default;
+
+        if (_verticalBar != null)
+            _verticalBar.Visibility = ComputeVisibility(VerticalScrollBarVisibility, extent.Height, viewport.Height);
+        if (_horizontalBar != null)
+            _horizontalBar.Visibility = ComputeVisibility(HorizontalScrollBarVisibility, extent.Width, viewport.Width);
     }
 
     private static Visibility ComputeVisibility(ScrollBarVisibility mode, double extent, double viewport) => mode switch

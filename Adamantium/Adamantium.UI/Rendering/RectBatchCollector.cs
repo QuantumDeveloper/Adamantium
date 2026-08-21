@@ -305,6 +305,44 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
         return true;
     }
 
+    /// <summary>Blanks every ISSUED instance owned by one of <paramref name="tags"/>, wherever it now sits. The
+    /// positional form below can only look where the group last remembered being, and by the time a sweep runs the arena
+    /// may have been re-recorded many times over - the group's runs then name slots that belong to somebody else, so the
+    /// instances that are actually still painting are never reached. Ownership rides in the instance precisely so it can
+    /// be found without trusting a remembered address; this asks the arena rather than the bookkeeping.
+    /// <para>One pass, and only on a frame where something left the paint order - which is rare (single digits over a
+    /// session), unlike the per-frame scan the positional form was introduced to avoid.</para></summary>
+    public int BlankOwnedAnywhere(IGraphicsDevice device, HashSet<int> tags)
+    {
+        if (tags.Count == 0) return 0;
+
+        var blanked = 0;
+        var runStart = -1;
+        // The WHOLE array, and no "is it issued right now" test. Both were wrong for the same reason, measured: the
+        // control's instances were written at one frame, the departure noticed hundreds of frames later, and by then the
+        // scene around it had shrunk - Count named a dozen slots and the segments covered none of its ground. The bytes
+        // sat there untouched until the scene grew back over them and issued them again. Ownership is what makes this
+        // safe: the tag belongs to one group by construction, so a slot carrying it is that group's whether anything
+        // draws it this instant or not.
+        var extent = Items?.Length ?? 0;
+        for (var slot = 0; slot <= extent; slot++)
+        {
+            var mine = slot < extent && Items[slot].OwnerTag != 0 && tags.Contains(Items[slot].OwnerTag);
+            if (mine)
+            {
+                if (runStart < 0) runStart = slot;
+                continue;
+            }
+
+            if (runStart < 0) continue;
+            BlankRunPastTheCursor(device, (uint)runStart, (uint)(slot - runStart));
+            blanked += slot - runStart;
+            runStart = -1;
+        }
+
+        return blanked;
+    }
+
     public void BlankOwned(IGraphicsDevice device, uint first, uint count, int ownerTag)
     {
         if (count == 0 || first + count > (uint)Count) return;
@@ -327,6 +365,16 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
             BlankRun(device, (uint)runStart, (uint)(slot - runStart));
             runStart = -1;
         }
+    }
+
+    /// <summary>A re-bake changes how a slot LOOKS, not whose it is. <see cref="BakeItem"/> answers with an UNOWNED
+    /// record - it is handed a payload, not a group - so writing it whole would erase the tag the orphan sweep asks for,
+    /// and the control could then leave the paint order without anyone able to blank its instances. A caller that does
+    /// know the owner (the patch stage) still wins.</summary>
+    public override void UpdateSlot(IGraphicsDevice device, int slot, RectItem item)
+    {
+        if (item.OwnerTag == 0 && slot >= 0 && slot < Count) item.OwnerTag = Items[slot].OwnerTag;
+        base.UpdateSlot(device, slot, item);
     }
 
     public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0,

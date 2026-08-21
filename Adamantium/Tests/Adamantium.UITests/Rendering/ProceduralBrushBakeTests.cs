@@ -51,7 +51,7 @@ public class ProceduralBrushBakeTests
     [Test]
     public void TexturedFills_CanBatch_ButProceduralOnesDoNot()
     {
-        var collector = new TexRectCollector();
+        var collector = new TextureBatchCollector();
         Assert.Multiple(() =>
         {
             Assert.That(collector.CanBatch(Payload(new ImageBrush())), Is.True, "an image fill batches into the textured pass");

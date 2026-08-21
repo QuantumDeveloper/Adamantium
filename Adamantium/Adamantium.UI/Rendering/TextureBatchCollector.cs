@@ -13,21 +13,21 @@ using Adamantium.Vulkan.Core;
 namespace Adamantium.UI.Rendering;
 
 // TEXTURED rounded-rect batch: draws many rounded-rect fills whose colour is SAMPLED from an image in ONE instanced draw
-// (each fill = one per-instance TexRectItem; the pixel shader reconstructs the rounded rect from an SDF and samples).
+// (each fill = one per-instance TextureItem; the pixel shader reconstructs the rounded rect from an SDF and samples).
 // The sibling of the solid/gradient/pattern SDF collectors - an ImageBrush or NineSliceBrush fill routes here.
 //
 // WHICH texture is not in the record: ONE texture is bound per SEGMENT, the way TextBatchCollector binds one atlas per
 // segment. Bindless would let a segment mix textures, but the engine has no bindless path (textures bind as effect
 // parameters) and this driver is documented to fall over on richer texture use - see docs/NINE_SLICE_PLAN.md. Cost: a
 // texture change breaks the batch, which for UI is a handful of times per frame.
-internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
+internal sealed class TextureBatchCollector : SdfBatchCollector<TextureItem>
 {
     public static bool Enabled = true;
 
     private ITexture _texture;                          // the pending segment's texture (one bind per draw)
     private readonly List<ITexture> _segState = new();  // parallel to the base segment list, for the clean-frame replay
 
-    public TexRectCollector() : base(256) { }
+    public TextureBatchCollector() : base(256) { }
 
     protected override IEffectPass DrawPass => Effect.BatchTexRectPass;
 
@@ -55,7 +55,7 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
     /// caller asks this before adding (mirrors TextBatchCollector.SameAtlas).</summary>
     public bool SameTexture(ITexture texture) => !Active || _texture == null || _texture == texture;
 
-    protected override void DrawSegment(IGraphicsDevice device, Buffer<TexRectItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
+    protected override void DrawSegment(IGraphicsDevice device, Buffer<TextureItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
     {
         // NO texture, NO draw. The heap path passes a texture as an INDEX into the device-wide descriptor heap, written
         // into push data by whoever bound it last; drawing this pass without binding one leaves a stale index in place and
@@ -213,7 +213,7 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
     // axis-aligned instance cannot hold it) so the caller falls back to the per-unit path. The four corner radii ride in
     // Radii, scaled with the world; Params.x carries the LARGEST of them, or -1 as the ELLIPSE shape flag.
     private static bool Bake(Brush brush, Rect destinationRect, ProceduralGeometry.CornerRadius corners, BrushShape shape, Matrix4x4F world, double opacity,
-        int transformSlot, out TexRectItem[] items)
+        int transformSlot, out TextureItem[] items)
     {
         items = null;
         const float eps = 1e-4f;
@@ -243,7 +243,7 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
 
     // One record for the plain textured fill. WHERE it is drawn and WHAT it samples come from the brush's tiling and
     // stretch (see ImageTiling) - stretched across the shape, fitted inside it, or repeated.
-    private static TexRectItem Single(TileBrush brush, Rect bounds, float radius, Vector4F radii, double opacity, int transformSlot,
+    private static TextureItem Single(TileBrush brush, Rect bounds, float radius, Vector4F radii, double opacity, int transformSlot,
         double scaleX, double scaleY)
     {
         var tint = brush.Tint.ToVector4();
@@ -253,7 +253,7 @@ internal sealed class TexRectCollector : SdfBatchCollector<TexRectItem>
 
         // The SHAPE stays the shape; only the content inside each tile is fitted. Handing the fitted rect over as the
         // bounds shrank the SDF itself, so a Uniform fill turned a circle into an oval.
-        return new TexRectItem
+        return new TextureItem
         {
             Bounds = new Vector4F((float)bounds.X, (float)bounds.Y, (float)bounds.Width, (float)bounds.Height),
             Params = new Vector4F(radius, transformSlot, layout.Repeats ? 1f : 0f, layout.Mirror),

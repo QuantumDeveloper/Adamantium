@@ -18,7 +18,7 @@ float4x4 Projection;
 // other pass ignores it. Unset (0) = no drift, so a static fractal renders fine before the loop starts feeding it.
 float Time;
 
-// The source of the TEXTURED pass - ONE texture per segment, bound by TexRectCollector before its draw (the text batch
+// The source of the TEXTURED pass - ONE texture per segment, bound by TextureBatchCollector before its draw (the text batch
 // binds its atlas the same way). Not an array and not bindless: this driver's shader-object compiler is documented to
 // fall over on richer texture use, and a segment break per texture costs a handful of draws per frame in UI.
 // t2/s2, NOT t1/s1: the glyph atlas of FontEffect.fx sits at t1, and the descriptor slots are shared across the frame -
@@ -2346,7 +2346,7 @@ float4 HaloLivingPS(HaloPSInput input) : SV_Target
 // texture - the textured sibling of GradientFill/PatternFill, so an ImageBrush works on ANY geometry (Path/Polygon) and
 // N such shapes cost ONE draw instead of N. A tessellated mesh carries neither an SDF nor a usable uv0, so the picture
 // is mapped across the shape's own LOCAL bounding box, with the same tiling arithmetic the SDF textured batch uses.
-// WHICH texture is not in the record: one texture is bound per DRAW, exactly as TexRectCollector does per segment.
+// WHICH texture is not in the record: one texture is bound per DRAW, exactly as TextureBatchCollector does per segment.
 struct TexGeomData
 {
     float4x4 Local;      // element local -> SLOT space (the slot's matrix is applied on top, from the transform table)

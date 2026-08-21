@@ -540,6 +540,14 @@ public partial class RenderCache
 
     private void ProcessRenderCommands(IUIComponent component, IReadOnlyList<IDrawCommand> drawCommands, Matrix4x4F projectionMatrix, bool wasGeometryValid, long order, IReadOnlyList<Matrix4x4F> clones = null)
     {
+        // A departed subtree takes no place in the paint order, whatever the packet still says about it. The packet
+        // describes the tree as it was WALKED, and a view can leave after that - a content transition finishing inside
+        // the animation tick removes the outgoing one - so its components arrive here already detached. Recorded, they
+        // bake real instances that are issued with their segment's RANGE on every replayed frame: the outgoing view's
+        // scrollbar painting over the incoming one, at the coordinates it had. Evicting them afterwards cannot win,
+        // because the next walk puts them straight back.
+        if (LeftTheTree(component)) return;
+
         // A CLONE HOST takes its place in the paint order even when it draws nothing of its own (§4o): the clone run
         // starts at its group and covers the subtree that follows. A prototype that is a bare container - the visual
         // carried by its children - would otherwise never be seen by the draw walk, and its subtree would draw once.
@@ -591,9 +599,25 @@ public partial class RenderCache
     // Out of the tree and not parked - whatever else is true of it, it does not draw. Read off the GROUP's own component:
     // a group can hold no units at all (a control whose draws are all instanced), and units[0] would then say nothing.
     private static bool LeftTheTree(ControlGroup group)
+        => LeftTheTree(group.Component ?? (group.Units.Count > 0 ? group.Units[0].Component : null));
+
+    /// <summary>Has this control left the visual tree for good? Parked visuals have left it ON PURPOSE and are kept, so
+    /// they are not departures. THE statement of it - the paint order refuses a departed subtree on the way in and
+    /// evicts one that leaves while it is there, and both have to mean the same thing.</summary>
+    private static bool LeftTheTree(IUIComponent component)
     {
-        var component = group.Component ?? (group.Units.Count > 0 ? group.Units[0].Component : null);
-        return component != null && !component.IsAttachedToVisualTree && !component.IsParked;
+        if (component == null) return false;
+
+        // An ADORNER is never in the visual tree - that is its design, not its departure. It draws in its target's
+        // space, so what decides whether it still has anywhere to draw is the target: a focus ring outlives everything
+        // except the control it rings. The chain, not one step of it - a ring built from the adorner's own TEMPLATE
+        // reaches the adorned control only through the adorner.
+        for (var c = component; c != null; c = c.RenderParent)
+        {
+            if (c.IsAttachedToVisualTree || c.IsParked) return false;
+        }
+
+        return true;
     }
 
     private int ReconcileDetachedControls()
@@ -610,9 +634,12 @@ public partial class RenderCache
         var removed = 0;
         for (var i = _groups.Count - 1; i >= 0; i--)
         {
-            if (!LeftTheTree(_groups[i])) continue;
-            _groups[i].InOrder = false;
-            _groups.RemoveAt(i);
+            var group = _groups[i];
+            if (!LeftTheTree(group)) continue;
+            // Through RemoveFromOrder, not by hand: leaving the order is not just a flag and a list entry, it is also the
+            // one moment the sweep can be told that this group's instances are now nobody's. Dropped here, they keep
+            // being issued with the range they sit in - a scrollbar the window outgrew, still painting at the size it had.
+            RemoveFromOrder(group);
             removed++;
         }
 
@@ -633,6 +660,11 @@ public partial class RenderCache
     {
         if (!_groupById.Remove(renderId, out var group)) return;
 
+        // The withdrawal has to be UNCONDITIONAL here, and RemoveFromOrder below only speaks for a group that was still
+        // in the order. A group can be dropped having already left it - the paint order now refuses departed subtrees on
+        // the way in, so a view removed mid-frame never gets back into _groups and its disposal is the LAST moment
+        // anyone can name its slots. Miss it and its instances keep being issued with their segment's range forever.
+        if (group.Tag != 0 && !_leftTheOrder.Contains(group)) _leftTheOrder.Add(group);
 
         foreach (var unit in group.Units)
             unit?.DeferDispose();
