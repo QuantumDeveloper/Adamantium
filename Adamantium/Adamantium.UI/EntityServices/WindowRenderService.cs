@@ -171,8 +171,31 @@ public class WindowRenderService : UiRenderService
         // trigger a rebuild (the drag already ended), so acquire keeps failing and - now that present is correctly gated
         // on a real acquire+submit - the picture freezes. Rebuilding whenever the presenter reports OutOfDate makes the
         // swapchain recover deterministically instead of "works most of the time".
+        // Suboptimal counts as much as OutOfDate. Once the swapchain declares what it does when its images no longer
+        // match the window, presenting a stale one stops being an ERROR and becomes merely SUBOPTIMAL - so the driver
+        // says suboptimal where it used to say out-of-date, and a rebuild driven only by the latter silently stopped
+        // happening mid-drag. It cannot loop: the surface dictates the extent, so one rebuild makes them agree and the
+        // driver stops saying it.
+        // Asked ONCE a frame: it is a surface query, and both the rebuild below and the loop's pacing want the answer.
+        var trailing = windowRenderer.Presenter?.NeedsRebuild ?? false;
+
+        // A swapchain that trails its window IS work owed, and the loop had no way to know it. It sleeps unless
+        // something is dirty or animating - and dragging a window dirties NOTHING: the tree is unchanged, only the
+        // window is a different size. So the only thing waking the loop was the size change itself, one frame per
+        // WM_SIZE (measured: 70 of 88 intervals were exactly one frame, against 178 000 frames on a still window).
+        // Asked for through the same pipe as layout and bindings. ASSIGNED unconditionally rather than only when set,
+        // or it would latch on the first drag and the loop would never be paced again.
+        UIApplication.SwapchainTrailing = trailing;
+
+        if (trailing)
+        {
+            Core.LoopSignal.Request();
+        }
+
         if (windowRenderer.Presenter != null &&
-            (!windowRenderer.IsRendererUpToDate || windowRenderer.Presenter.LastPresenterState == PresenterState.OutOfDate))
+            (!windowRenderer.IsRendererUpToDate
+             || windowRenderer.Presenter.LastPresenterState is PresenterState.OutOfDate or PresenterState.Suboptimal
+             || trailing))
         {
             windowRenderer.ResizePresenter((uint)(Window.ClientWidth * RenderScale), (uint)(Window.ClientHeight * RenderScale));
         }
@@ -186,32 +209,32 @@ public class WindowRenderService : UiRenderService
         var beginStart = Stopwatch.GetTimestamp();
         try
         {
-        return GraphicsDevice.BeginDraw(beforeRenderPass: _ =>
-        {
-            // Build the content render cache HERE - inside beforeRenderPass, which runs after BeginDraw's fence wait
-            // (the GPU is done with this slot, so buffer updates/frees can't race it) and after this frame's layout
-            // Update, but BEFORE PreRender and the render pass. So the cache the renderer draws this frame reflects
-            // THIS frame's visual tree. It used to be built in EndDraw - one frame AFTER it was drawn - so a container
-            // realized/collapsed this frame lagged the draw by a frame: an item entering the window had no unit yet (a
-            // one-frame hole) and one leaving still had a stale unit (a one-frame ghost overlapping with a foreign item).
-            // Default path records + applies inline here. The decoupled path applies the loop-level packet - UNLESS this
-            // window deferred to inline this frame (the resize/state-swap fallback in RecordFrame), in which case it records
-            // + applies inline here too.
-            //
-            // The RECORD may only ever run on the LOOP thread. BeginDraw runs on the render thread once one exists, and there
-            // the inline fallback would read the live visual tree AND race the loop's own record on the same cache: two
-            // threads inside RecordFrame, one nulling the packet it just published while the other still writes to it
-            // (a NullReferenceException in CaptureSnapshot - thrown INSIDE GraphicsDevice.BeginDraw's beforeRenderPass, which
-            // left the command buffer open and hung the device on the next frame's fence). The render thread therefore only
-            // ever APPLIES: with no packet published yet it simply finds an empty queue, classifies the frame Clean and
-            // replays - and the loop, which is the thread that defers to inline, still records inline on its own frames
-            // (the swap barrier parks the render thread first, so those never overlap).
-            var onRenderThread = Thread.CurrentThread == RenderThreadOptions.RenderThread;
-            if (RenderThreadOptions.SingleThreaded || (!_recordedAtLoopLevel && !onRenderThread)) windowRenderer.PrepareData();
-            else windowRenderer.ApplyData();
-            windowRenderer.PreRender();
-            PreRenderProcessors();   // adorner stage compute (stroke expander) before the render pass
-        });
+            return GraphicsDevice.BeginDraw(beforeRenderPass: _ =>
+            {
+                // Build the content render cache HERE - inside beforeRenderPass, which runs after BeginDraw's fence wait
+                // (the GPU is done with this slot, so buffer updates/frees can't race it) and after this frame's layout
+                // Update, but BEFORE PreRender and the render pass. So the cache the renderer draws this frame reflects
+                // THIS frame's visual tree. It used to be built in EndDraw - one frame AFTER it was drawn - so a container
+                // realized/collapsed this frame lagged the draw by a frame: an item entering the window had no unit yet (a
+                // one-frame hole) and one leaving still had a stale unit (a one-frame ghost overlapping with a foreign item).
+                // Default path records + applies inline here. The decoupled path applies the loop-level packet - UNLESS this
+                // window deferred to inline this frame (the resize/state-swap fallback in RecordFrame), in which case it records
+                // + applies inline here too.
+                //
+                // The RECORD may only ever run on the LOOP thread. BeginDraw runs on the render thread once one exists, and there
+                // the inline fallback would read the live visual tree AND race the loop's own record on the same cache: two
+                // threads inside RecordFrame, one nulling the packet it just published while the other still writes to it
+                // (a NullReferenceException in CaptureSnapshot - thrown INSIDE GraphicsDevice.BeginDraw's beforeRenderPass, which
+                // left the command buffer open and hung the device on the next frame's fence). The render thread therefore only
+                // ever APPLIES: with no packet published yet it simply finds an empty queue, classifies the frame Clean and
+                // replays - and the loop, which is the thread that defers to inline, still records inline on its own frames
+                // (the swap barrier parks the render thread first, so those never overlap).
+                var onRenderThread = Thread.CurrentThread == RenderThreadOptions.RenderThread;
+                if (RenderThreadOptions.SingleThreaded || (!_recordedAtLoopLevel && !onRenderThread)) windowRenderer.PrepareData();
+                else windowRenderer.ApplyData();
+                windowRenderer.PreRender();
+                PreRenderProcessors();   // adorner stage compute (stroke expander) before the render pass
+            });
         }
         finally
         {

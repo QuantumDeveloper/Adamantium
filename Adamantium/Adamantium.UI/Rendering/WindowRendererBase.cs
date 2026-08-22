@@ -170,13 +170,19 @@ public abstract class WindowRendererBase : IWindowRenderer
 
     public void ResizePresenter(uint width, uint height)
     {
-        // Re-read the window's transparency HERE rather than trusting the value captured when this renderer was built:
-        // composite-alpha is chosen while the swapchain is created, so a rebuild is the only moment a toggle can land -
-        // and this is the rebuild. Costs one field read on a path that is already tearing the swapchain down.
+        // Re-read the window's transparency and present policy HERE rather than trusting the values captured when this
+        // renderer was built: both are chosen while the swapchain is created, so a rebuild is the only moment a change
+        // can land - and this is the rebuild. Costs two field reads on a path that is already tearing the swapchain
+        // down. The policy was the one left out, so changing it invalidated the renderer, rebuilt the swapchain and
+        // then picked the present mode from the value the renderer started life with: V-Sync did nothing at all.
         if (Window != null && Presenter != null)
         {
             Presenter.Description.TransparentComposition = Window.UseTransparentComposition;
             Parameters.TransparentComposition = Window.UseTransparentComposition;
+
+            var policy = ResolvePresentPolicy();
+            Presenter.Description.PresentPolicy = policy;
+            Parameters.PresentPolicy = policy;
         }
 
         Presenter.Resize(width, height);

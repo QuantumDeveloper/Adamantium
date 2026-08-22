@@ -656,6 +656,13 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         return LogicalDevice.DeviceWaitIdle();
     }
 
+    public Result WaitForFramesInFlight(ulong timeout)
+    {
+        if (InFlightFences == null || InFlightFences.Length == 0) return Result.Success;
+
+        return LogicalDevice.WaitForFences((uint)InFlightFences.Length, InFlightFences, true, timeout);
+    }
+
     public Framebuffer CreateFramebuffer(FramebufferCreateInfo info)
     {
         return LogicalDevice.CreateFramebuffer(info);

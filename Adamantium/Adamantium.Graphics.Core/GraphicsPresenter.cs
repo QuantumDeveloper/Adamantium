@@ -145,6 +145,16 @@ namespace Adamantium.Graphics.Core
             return true;
         }
         
+        /// <summary>Whether the images this presenter draws into no longer match what they are presented to. Asked every
+        /// frame, because the only reliable answer comes from the surface itself: a swapchain that declares what it does
+        /// when the sizes differ is not doing anything WRONG by presenting a stale image, so the driver reports neither
+        /// an error nor a suboptimal - there is no complaint left to listen for. Presenters that own their images have
+        /// nothing to compare against and say no.</summary>
+        public virtual bool NeedsRebuild => false;
+
+        /// <summary>The size the surface says it is right now, or 0x0 when it has no opinion / there is no surface.</summary>
+        public virtual Extent2D SurfaceExtent => new Extent2D();
+
         public abstract ITexture GetImageByIndex(uint index);
 
         public abstract ITexture GetCurrentImage();
