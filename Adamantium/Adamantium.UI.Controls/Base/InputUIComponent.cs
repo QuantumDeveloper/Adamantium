@@ -257,9 +257,16 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
         AdamantiumProperty.RegisterReadOnly(nameof(IsInitialized),
             typeof(Boolean), typeof(InputUIComponent), new PropertyMetadata(false, OnIsInitializedChanged));
 
+    // Mirrored into a plain field, as ZIndex and Visibility are, and for the same reason: the WRITE happens once in a
+    // component's life while the READ happens once per node on every attach walk, and a property read cost 0.43 us -
+    // 2.1 ms of a 9.3 ms walk over 4857 nodes, the largest item in it. The property stays: it is public surface a
+    // trigger or a binding may name from markup, which no search of this repository could rule out.
+    private bool _isInitialized;
+
+    /// <summary>A one-way latch: false until the component first joins a visual tree, true for ever after.</summary>
     public bool IsInitialized
     {
-        get => GetValue<bool>(IsInitializedProperty);
+        get => _isInitialized;
         private set => SetValue(IsInitializedProperty, value);
     }
     
@@ -1030,12 +1037,16 @@ public class InputUIComponent : MeasurableUIComponent, IInputComponent
     
     private static void OnIsInitializedChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
-        if ((bool)e.NewValue)
-        {
-            var ui = a as InputUIComponent;
-            ui?.RaiseEvent(new RoutedEventArgs(InitializedEvent));
-            ui?.OnInitialized();
-        }
+        if (a is not InputUIComponent ui) return;
+
+        // Resolved value, not e.NewValue - the same rule the other mirrored properties follow (a trigger exit writes
+        // UnsetValue, which is not a bool).
+        ui._isInitialized = ui.GetValue<bool>(IsInitializedProperty);
+
+        if (!ui._isInitialized) return;
+
+        ui.RaiseEvent(new RoutedEventArgs(InitializedEvent));
+        ui.OnInitialized();
     }
 
     protected virtual void OnInitialized()

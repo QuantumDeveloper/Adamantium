@@ -84,6 +84,11 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
 
     private List<ITriggerActivator> _triggerActivators;
 
+    /// <summary>The activators the STYLES applied to this component, as opposed to <see cref="_triggerActivators"/>
+    /// which are its own element triggers. A plain field for the same reason that one is: the attach walk asks every
+    /// node for it, and for most of them the answer is null.</summary>
+    internal List<ITriggerActivator> StyleActivators;
+
     /// <summary>
     /// Triggers declared directly on this control - the logical, theme-independent layer (vs template/style triggers
     /// which belong to a theme). They act on the control itself (self scope), are applied when it joins a live logical
