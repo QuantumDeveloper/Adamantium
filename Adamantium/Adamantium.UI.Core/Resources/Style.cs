@@ -7,9 +7,6 @@ public class Style : AdamantiumComponent
 {
     private Dictionary<AdamantiumProperty, ISetter> settersDict;
 
-    private static readonly AdamantiumProperty ActiveActivatorsProperty =
-        AdamantiumProperty.RegisterAttached<List<ITriggerActivator>>("ActiveActivators", typeof(AdamantiumComponent));
-
     // The activators THIS style created on each component (a subset of the component's shared ActiveActivators list).
     // Kept so Attach/Detach are idempotent: re-applying a style (a theme swap re-themes WITHOUT a prior detach) must
     // undo its previous activators instead of piling up more - each carries a live PropertyChanged subscription.
@@ -231,20 +228,22 @@ public class Style : AdamantiumComponent
         foreach (var activator in activators) activator?.ResumeActions();
     }
 
+    // A PLAIN FIELD on the component, not an attached property, and the difference is measured: this is read once per
+    // node on every attach - ResumeActivators is called unconditionally for the whole subtree - and the answer is null
+    // for nearly all of them, because most controls carry no style triggers at all. A property read to be told "nothing
+    // here" was the largest remaining item of the attach walk after the IsInitialized latch. Element triggers were
+    // already a plain field next to this one (`_triggerActivators`); style triggers now live the same way.
     private static List<ITriggerActivator> GetActiveActivators(IFundamentalUIComponent component)
     {
-        return component.GetValue<List<ITriggerActivator>>(ActiveActivatorsProperty);
+        return (component as FundamentalUIComponent)?.StyleActivators;
     }
 
     private static List<ITriggerActivator> GetOrCreateActiveActivators(IFundamentalUIComponent component)
     {
-        var activators = GetActiveActivators(component);
-        if (activators == null)
-        {
-            activators = new List<ITriggerActivator>();
-            component.SetValue(ActiveActivatorsProperty, activators);
-        }
-        return activators;
+        if (component is not FundamentalUIComponent owner) 
+            return new List<ITriggerActivator>();
+
+        return owner.StyleActivators ??= new List<ITriggerActivator>();
     }
 
     public override string ToString()

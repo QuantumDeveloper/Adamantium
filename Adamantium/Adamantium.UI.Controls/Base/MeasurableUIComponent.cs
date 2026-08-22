@@ -899,17 +899,13 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         else if (!IsArrangeValid && _previousArrange != null)
             LayoutManager.For(this).InvalidateArrange(this);
 
-        // And make the PARENT re-read us. A size worked out while this subtree was DETACHED could not be published: the
-        // propagation of a changed DesiredSize travels through the dirty queue, the queue belongs to the visual root, and
-        // there was none - so the parent kept a size computed from the size we USED to have. Re-registering ourselves does
-        // not repair that: we re-measure to the same answer, nothing changed, and nothing propagates. The parent has to be
-        // told once, here, where re-attachment is known.
-        // A parked subtree is the exception: it comes back whole, carrying the layout it left, and ParkedSubtree.Unpark
-        // decides whether that layout still holds. Every node telling its parent to re-measure would undo that decision.
-        if (IsParked) return;
+        // A size worked out while DETACHED never reached the parent - the propagation travels the visual root's dirty
+        // queue, and there was no root - so it must be told here, once, by the subtree ROOT only: everyone else's parent
+        // is inside this same subtree and is being invalidated anyway (per node it cost 8.8 ms over 3351). Parked is
+        // excluded: it returns whole and ParkedSubtree.Unpark decides whether its layout still holds.
+        // e.Component is whoever the walk started from, so this is the "am I the root" test.
+        if (IsParked || !ReferenceEquals(this, e.Component)) return;
 
-        // Measured: a folded tab's label row reported the turned 17x55 while the tab above it kept the 78x29 it had when
-        // the label lay flat - through every later pass, because the row's size never changed AGAIN.
         (VisualParent as IMeasurableComponent)?.InvalidateMeasure();
     }
 }
