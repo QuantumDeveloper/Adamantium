@@ -175,11 +175,13 @@ public partial class RenderCache
     private readonly HashSet<int> _departedTags = new();
 
     /// <summary>Tags whose instances must not exist anywhere in the arena until their control draws again.
-    /// <para>A withdrawal cannot be a one-shot event, and measuring is what proved it: the sweep wiped the bar's
-    /// instances at slots 42, 50 and 95, and they turned up afterwards at 63 and 80 - with nothing re-recording the
-    /// group. The arena COPIES ranges when it re-issues a layer, and ownership rides in the instance precisely so it
-    /// survives that: the bytes are duplicated, tag and all, to ground the sweep had already cleaned. So the tag is kept
-    /// until a pass finds nothing carrying it, which no copying path can outrun.</para></summary>
+    /// <para>A withdrawal cannot be a one-shot event. The sweep wiped the bar's instances at slots 42, 50 and 95 and they
+    /// turned up afterwards at 63 and 80, with nothing re-recording the group: the arena COPIES ranges, and ownership
+    /// rides in the instance precisely so it survives being moved - so the copy carries the tag onto ground the sweep had
+    /// already cleaned. Three such copying paths are fixed at their source (a shrinking segment's vacated tail, a
+    /// repointed segment's, and a freed block handed back full), and taking this out brought the phantom straight back -
+    /// so at least one more path exists that has not been found. It stays until it is: the tag is held until its control
+    /// draws again, which no copying path can outrun.</para></summary>
     private readonly HashSet<int> _tombstones = new();
     private readonly HashSet<int> _emptiedSegments = new();
 
@@ -232,24 +234,19 @@ public partial class RenderCache
         }
     }
 
-    /// <summary>Holds the departed to their departure. See <see cref="_tombstones"/>: one pass per frame while anything
-    /// is owed, and the tag is let go once a pass finds nothing carrying it - the copying that resurrects an instance
-    /// happens within a frame or two of the departure, so a short tail covers it without a standing cost.</summary>
+    /// <summary>Holds the departed to their departure - see <see cref="_tombstones"/>. One pass while anything is owed,
+    /// and nothing at all while the set is empty, which is the ordinary case.</summary>
     private void KeepDepartedInstancesGone(IGraphicsDevice device)
     {
         if (_tombstones.Count == 0 || device == null || _rectBatch == null) return;
 
-        // A control that draws again owns its instances again - and a tag that is back in the paint order must not be
-        // hunted, or the control would be wiped the moment it returns.
+        // A control that draws again owns its instances again, so its tag must stop being hunted the moment it is back in
+        // the paint order - otherwise the control is wiped as it returns.
         foreach (var group in _groups)
         {
             if (group.InOrder && group.Tag != 0) _tombstones.Remove(group.Tag);
         }
 
-        // No timer. A duplicate can appear at ANY later frame - the arena shifts a segment's tail with Array.Copy and
-        // leaves the source bytes where they were, tag and all - so a tag is held until its control draws again, which is
-        // the only moment its instances are legitimately somebody's. Letting go after a few quiet frames is what left the
-        // bar to come back thousands of frames later.
         _rectBatch.BlankOwnedAnywhere(device, _tombstones);
     }
 
@@ -268,11 +265,11 @@ public partial class RenderCache
         foreach (var group in _leftTheOrder)
         {
             if (group.InOrder || group.Tag == 0) continue;
-            _tombstones.Add(group.Tag);
             // No arena check: the scan blanks only instances that CARRY this tag, and a tag belongs to one group by
             // construction - so it can never reach anyone else's slots. A disposed group has already dropped its arena
             // reference, and requiring one here is what left its instances painting.
             _departedTags.Add(group.Tag);
+            _tombstones.Add(group.Tag);
         }
 
         _rectBatch.BlankOwnedAnywhere(device, _departedTags);
@@ -534,7 +531,6 @@ public partial class RenderCache
             }
 
             KeepDepartedInstancesGone(device);
-
 
             if (Core.Diagnostics.FrameTrace.Enabled)
             {
