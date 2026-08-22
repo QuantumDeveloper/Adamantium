@@ -174,15 +174,6 @@ public partial class RenderCache
     // The departed groups' tags, as one set, so the arena is asked once instead of once per group.
     private readonly HashSet<int> _departedTags = new();
 
-    /// <summary>Tags whose instances must not exist anywhere in the arena until their control draws again.
-    /// <para>A withdrawal cannot be a one-shot event. The sweep wiped the bar's instances at slots 42, 50 and 95 and they
-    /// turned up afterwards at 63 and 80, with nothing re-recording the group: the arena COPIES ranges, and ownership
-    /// rides in the instance precisely so it survives being moved - so the copy carries the tag onto ground the sweep had
-    /// already cleaned. Three such copying paths are fixed at their source (a shrinking segment's vacated tail, a
-    /// repointed segment's, and a freed block handed back full), and taking this out brought the phantom straight back -
-    /// so at least one more path exists that has not been found. It stays until it is: the tag is held until its control
-    /// draws again, which no copying path can outrun.</para></summary>
-    private readonly HashSet<int> _tombstones = new();
     private readonly HashSet<int> _emptiedSegments = new();
 
     /// <summary>Takes a rect segment's op out of the recorded stream - the segment draws nothing any more - and tells the
@@ -234,22 +225,6 @@ public partial class RenderCache
         }
     }
 
-    /// <summary>Holds the departed to their departure - see <see cref="_tombstones"/>. One pass while anything is owed,
-    /// and nothing at all while the set is empty, which is the ordinary case.</summary>
-    private void KeepDepartedInstancesGone(IGraphicsDevice device)
-    {
-        if (_tombstones.Count == 0 || device == null || _rectBatch == null) return;
-
-        // A control that draws again owns its instances again, so its tag must stop being hunted the moment it is back in
-        // the paint order - otherwise the control is wiped as it returns.
-        foreach (var group in _groups)
-        {
-            if (group.InOrder && group.Tag != 0) _tombstones.Remove(group.Tag);
-        }
-
-        _rectBatch.BlankOwnedAnywhere(device, _tombstones);
-    }
-
     private void BlankOrphanInstances(IGraphicsDevice device)
     {
         if (_rectBatch == null || device == null) return;
@@ -269,7 +244,6 @@ public partial class RenderCache
             // construction - so it can never reach anyone else's slots. A disposed group has already dropped its arena
             // reference, and requiring one here is what left its instances painting.
             _departedTags.Add(group.Tag);
-            _tombstones.Add(group.Tag);
         }
 
         _rectBatch.BlankOwnedAnywhere(device, _departedTags);
@@ -529,8 +503,6 @@ public partial class RenderCache
                 BlankOrphanInstances(device);
                 _leftTheOrder.Clear();
             }
-
-            KeepDepartedInstancesGone(device);
 
             if (Core.Diagnostics.FrameTrace.Enabled)
             {
@@ -1702,6 +1674,14 @@ public partial class RenderCache
             // and re-stamps its WalkVersion, so a departed subtree that reaches here is put BACK, frame after frame,
             // however faithfully the sweep blanks it. Two entrances into the arena, one rule about who may use them.
             if (LeftTheTree(group)) return SpliceRefused("departed");
+
+            // ...and the OTHER way to stop drawing: still in the tree, but out of the paint order - hidden, or faded to
+            // nothing. The rule above only speaks for a subtree that left the tree, so such a group was re-baked and
+            // appended back into the arena however faithfully the sweep had just blanked it. Measured, not reasoned:
+            // the buried tag arrived through AllocateSegmentFromStage and UpdateSlotFromStage, both from here. It is
+            // skipped rather than refused - a group that is not drawing has nothing to contribute, and one hidden
+            // control must not cost the frame a walk of the window.
+            if (!group.InOrder) continue;
 
             // A group's RectRuns are valid only against the arena the LAST recording walk (or a splice under it) built. A
             // stale WalkVersion means that walk did NOT visit it (recycled / scrolled off / re-appeared since) and its slots
