@@ -88,7 +88,7 @@ public sealed class LayoutManager
         // Parallel-rebind window: a rebind's synchronous writes flip AffectsMeasure -> InvalidateMeasure off worker threads,
         // which would concurrently mutate this root's (non-thread-safe) DirtyQueue. Collect lock-free, replay when the pass
         // ends (see BeginDeferredInvalidation).
-        if (_deferInvalidations) { DeferredMeasure.Enqueue(node); return; }
+        if (_deferInvalidations || OffPassThread) { DeferredMeasure.Enqueue(node); return; }
         // A measure-invalid node also needs re-arranging: enqueue both so arrange re-runs after measure recomputes sizes.
         _toMeasure.Enqueue(node);
         _toArrange.Enqueue(node);
@@ -97,9 +97,19 @@ public sealed class LayoutManager
     public void InvalidateArrange(IUIComponent node)
     {
         LoopSignal.Request();
-        if (_deferInvalidations) { DeferredArrange.Enqueue(node); return; }
+        if (_deferInvalidations || OffPassThread) { DeferredArrange.Enqueue(node); return; }
         _toArrange.Enqueue(node);
     }
+
+    // The DirtyQueue is a plain HashSet + heap, and the parallel-rebind flag guarded only ONE way onto it. There is a
+    // second: a tab's content is built on a worker (ContentPresenter.StartDeferredBuild), styles apply as it is built,
+    // triggers fire, and a trigger's SetValue reaches here - resolving, for anything already parented to the live
+    // presenter, to the WINDOW's queue. Two threads in one HashSet.Add is an IndexOutOfRangeException, which is exactly
+    // what a tab entry threw. The code there states the opposite ("it reaches nothing that is not thread-safe"); it does.
+    // Judged by the thread rather than by a flag, because the second source has no fork/join window to wrap.
+    private static bool OffPassThread => _loopThreadId != 0 && Environment.CurrentManagedThreadId != _loopThreadId;
+
+    private static volatile int _loopThreadId;
 
     // ---- Parallel-rebind deferred invalidation ----
     // While a virtualizing panel rebinds+measures its (disjoint) tiles across cores, the only shared escape is the per-root
@@ -149,6 +159,15 @@ public sealed class LayoutManager
     /// </summary>
     public void ExecuteLayoutPass()
     {
+        // WHO owns these queues: whoever runs the pass. Stamped here rather than configured, because that is the one
+        // place the answer is a fact. Everything off this thread routes aside - see InvalidateMeasure.
+        _loopThreadId = Environment.CurrentManagedThreadId;
+
+        // ...and take in whatever arrived from another thread since the last pass. Same replay as the parallel-rebind
+        // window uses; the only difference is what put the nodes there.
+        while (DeferredMeasure.TryDequeue(out var deferred)) For(deferred).InvalidateMeasure(deferred);
+        while (DeferredArrange.TryDequeue(out var deferred)) For(deferred).InvalidateArrange(deferred);
+
         // Apply this frame's batched (coalesced) binding updates BEFORE laying out, so their target writes and the
         // invalidations they trigger drain in this same pass. The global queue flushes once/frame (first root empties it).
         BindingUpdateQueue.Flush();
