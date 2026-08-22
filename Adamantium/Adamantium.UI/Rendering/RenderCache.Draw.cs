@@ -1850,9 +1850,9 @@ public partial class RenderCache
 
     private static bool SpliceRefused(string reason)
     {
-        if (Core.Diagnostics.FrameTrace.Enabled) 
+        if (Core.Diagnostics.FrameTrace.Enabled)
             Core.Diagnostics.FrameTrace.Refuser = reason;
-        
+
         return false;
     }
 
