@@ -167,10 +167,13 @@ namespace Adamantium.Graphics.Core
         public bool IsExtensionEnabled(string extension) => EnabledDeviceExtensions.Contains(extension);
 
         /// <summary>A present fence per present, present-mode changes without recreating the swapchain, and defined
-        /// scaling on resize. Advertised as KHR after promotion, as EXT before it - either will do.</summary>
+        /// scaling on resize. Advertised as KHR after promotion, as EXT before it - either will do. The FEATURE has to
+        /// be supported too, and enabled at device creation: passing one of those structures with it off is invalid
+        /// use rather than a no-op, so both halves are asked here and callers get one answer.</summary>
         public bool SupportsSwapchainMaintenance =>
-            IsExtensionEnabled(Constants.VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME)
-            || IsExtensionEnabled(Constants.VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME);
+            GraphicsAdapter.SupportsSwapchainMaintenance1
+            && (IsExtensionEnabled(Constants.VK_KHR_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME)
+                || IsExtensionEnabled(Constants.VK_EXT_SWAPCHAIN_MAINTENANCE_1_EXTENSION_NAME));
 
         /// <summary>Wait for a NAMED present instead of for an image to come free - explicit frame pacing.</summary>
         public bool SupportsPresentWait =>
@@ -452,11 +455,31 @@ namespace Adamantium.Graphics.Core
 
             // VK_EXT_device_fault: turn on deviceFault so a later device-lost can be interrogated for its real cause.
             // heapFeatures is the current tail of the feature chain; extend it.
+            PhysicalDeviceFaultFeaturesEXT faultFeatures = null;
             if (finalDeviceExtensions.Contains(Constants.VK_EXT_DEVICE_FAULT_EXTENSION_NAME))
             {
-                var faultFeatures = new PhysicalDeviceFaultFeaturesEXT { DeviceFault = true };
+                faultFeatures = new PhysicalDeviceFaultFeaturesEXT { DeviceFault = true };
                 heapFeatures.PNext = faultFeatures;
                 DeviceFaultSupported = true;
+            }
+
+            // swapchain_maintenance1: a fence per present, scaling on resize, present-mode changes without a rebuild.
+            // Both this and the fault block are conditional, so the tail is whichever of them landed.
+            if (SupportsSwapchainMaintenance)
+            {
+                var maintenanceFeatures = new PhysicalDeviceSwapchainMaintenance1FeaturesKHR
+                {
+                    SwapchainMaintenance1 = true
+                };
+
+                if (faultFeatures != null)
+                {
+                    faultFeatures.PNext = maintenanceFeatures;
+                }
+                else
+                {
+                    heapFeatures.PNext = maintenanceFeatures;
+                }
             }
 
             deviceFeatures2.Features.SamplerAnisotropy = true;

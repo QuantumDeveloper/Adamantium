@@ -32,6 +32,11 @@ public interface IDrawableDevice
     /// <summary>Blocks until the device has completed all pending work (e.g. before reading a target back).</summary>
     Result DeviceWaitIdle();
 
+    /// <summary>Blocks until every frame THIS device still has in flight has retired. The VkDevice is shared by every
+    /// window and by the resource loader, so <see cref="DeviceWaitIdle"/> to rebuild one window's swapchain also stops
+    /// the other windows and any upload in progress; this waits on this device's own frame fences and nothing else.</summary>
+    Result WaitForFramesInFlight(ulong timeout);
+
     void Draw(ulong vertexCount, uint instanceCount, uint firstVertex = 0, uint firstInstance = 0);
     
     void DrawIndexed(IBuffer vertexBuffer, IBuffer indexBuffer, uint instanceCount = 1, uint indexCount = 0);

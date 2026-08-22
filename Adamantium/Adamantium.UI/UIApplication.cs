@@ -654,12 +654,25 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
     // or minimized window wakes for exactly nothing and the thread costs zero. Animations are the one thing that is TIME-driven
     // rather than event-driven - nothing "happens" to wake them, they simply need the next frame - so while one runs, the pace
     // above is what schedules the loop.
+    /// <summary>A window's swapchain is behind the size its surface reports - i.e. the window is being dragged right
+    /// now. ASSIGNED (never accumulated) once per frame by the render service from the same test that triggers the
+    /// rebuild, so it clears itself the moment the two agree.</summary>
+    public static bool SwapchainTrailing { get; set; }
+
     private void WaitForWork()
     {
-        var target = 1000.0 / Math.Max(1, UpdateRateHz);
-        var elapsed = Stopwatch.GetElapsedTime(_loopFrameStart).TotalMilliseconds;
-        var remaining = target - elapsed;
-        if (remaining >= 1.0) Thread.Sleep((int)remaining);
+        // The pace is what keeps an idle loop from spinning - but while a window is being dragged the pace is the whole
+        // problem. A frame shows the window as it was when the frame STARTED, so at 120 Hz a 2000 px/s drag is already
+        // 17 px stale before it is presented (measured: 18-24 px), and that lag is what the presentation engine then has
+        // to scale away. It cannot be removed - a frame is always a frame late - but it shrinks in exact proportion to
+        // the rate, so the cap comes off for exactly as long as the window is moving.
+        if (!SwapchainTrailing)
+        {
+            var target = 1000.0 / Math.Max(1, UpdateRateHz);
+            var elapsed = Stopwatch.GetElapsedTime(_loopFrameStart).TotalMilliseconds;
+            var remaining = target - elapsed;
+            if (remaining >= 1.0) Thread.Sleep((int)remaining);
+        }
 
         // EVERY stage, not just the content: the popups and the adorners keep their own marks now, and a frame owed to
         // one of them is owed by the loop all the same.
