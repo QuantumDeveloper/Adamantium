@@ -51,10 +51,14 @@ public partial class RenderCache
     // APPLIER-owned: the moved nodes of the packets drained for THIS draw (it rewrites their table matrices, then clears).
     // The recorder must not read it - it takes the frame's moved nodes off RenderDirty into packet.MovedNodes.
     private readonly List<IUIComponent> _movedNodesBuf = new();
-    // APPLIER-owned: this packet's moved nodes whose move the retained stream survives (nothing under them clips).
+    // APPLIER-owned: this packet's movers whose change of PLACE the retained stream survives.
     private readonly HashSet<IUIComponent> _forgivenMoves = new();
+    // ...and the subset whose change of SIZE it survives too - the ones with no clip under them to change shape.
+    private readonly HashSet<IUIComponent> _forgivenResize = new();
     // The nodes whose matrices THIS frame rewrote - the replay re-points the per-unit draws under them.
     private readonly HashSet<IUIComponent> _movedNodeOwners = new();
+    // Motion nodes that moved because a node ABOVE them did - they carry their own world, so they need writing too.
+    private readonly List<IUIComponent> _nestedMovedNodes = new();
     // APPLIER-owned: the ORDINARY movers of the packets drained for this draw (RefreshMovedComponents writes their
     // subtrees' slots, then clears). Filled only for movers the applier forgave.
     private readonly List<IUIComponent> _movedOwnersBuf = new();
@@ -522,6 +526,15 @@ public partial class RenderCache
         return rel;
     }
 
+    // Does writing this node's matrix move everything that rides it? A unit records the answer against its NEAREST node
+    // (see ResolveBakeCore), so a node with no answer at all has no unit of its own - every drawn thing under it belongs
+    // to a nested node, which is asked separately. That is the ordinary shape of a view that slides: the view is the
+    // node, and the list inside it is a node too. Answering "no" for it walked the whole scene for a subtree that was
+    // fully carried.
+    // Only reachable once the node has been WALKED as a node - an element that just became one differs in its frozen
+    // entry (LayoutSnapshot.IsMotionNode), which the applier refuses outright, so a fresh flag never reaches here.
+    private bool NodeCarriesItsContent(IUIComponent node) => _nodeAllAware.GetValueOrDefault(node.RenderId, true);
+
     // A unit under a motion node drew a path its slot matrix can't move (world-baked text, per-unit, gradient for now) ->
     // the node loses the slot-write fast path this frame (recorded per walk).
     private void MarkNodeNotAware(IUIComponent component)
@@ -541,9 +554,16 @@ public partial class RenderCache
             _movedNodeOwners.Clear();   // nothing moved this frame - the replay re-points nothing
             return true;
         }
-        foreach (var node in _movedNodesBuf)
-            if (!_nodeAllAware.GetValueOrDefault(node.RenderId, false))
-                return false;
+        // NESTED nodes: a node's slot holds its OWN world, so one that moved only because an ANCESTOR node did has to be
+        // written too - nothing else writes it, and its whole subtree would stay behind (a list inside a view that
+        // slides). Nodes are counted in ones per window, so this is a short list against an ancestor walk rather than a
+        // scan of anything.
+        _nestedMovedNodes.Clear();
+        foreach (var known in _nodeRefreshed.Keys)
+            if (!_movedNodesBuf.Contains(known) && IsUnder(known, _movedNodesBuf)) _nestedMovedNodes.Add(known);
+
+        foreach (var node in _movedNodesBuf) if (!NodeCarriesItsContent(node)) return false;
+        foreach (var node in _nestedMovedNodes) if (!NodeCarriesItsContent(node)) return false;
         // Positions moved -> drop the WORLD memos (rebuilt lazily from _snap). NOT _snap: the recorder already re-captured
         // the moved nodes' fresh LocalTransform this frame (CaptureSnapshot). NOT the clip memo either: a clip is the
         // ClipToBounds ancestors' viewport (a scroll viewport, a panel), which a node moving INSIDE it never changes, and
@@ -558,6 +578,12 @@ public partial class RenderCache
             if (_transformTable.TryGetSlot(node.RenderId, out var slot))
                 _transformTable.SetMatrix(device, slot, World(node));
             _movedNodeOwners.Add(node);   // the replay re-points the per-unit draws under them
+        }
+        foreach (var node in _nestedMovedNodes)
+        {
+            if (_transformTable.TryGetSlot(node.RenderId, out var slot))
+                _transformTable.SetMatrix(device, slot, World(node));
+            _movedNodeOwners.Add(node);
         }
         _movedNodesBuf.Clear();
         return true;

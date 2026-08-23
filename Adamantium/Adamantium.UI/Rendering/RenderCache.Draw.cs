@@ -69,6 +69,9 @@ public partial class RenderCache
     // belong together; anyone ELSE overlapping it still forces a flush, or a later sibling would be painted over.
     private IUIComponent _haloOverOwner;
     private Rect2D _batchScissor;
+    // WHOSE clip the pending batch sits under. A flush cycle ends the moment the scissor changes, so everything in it
+    // shares one clip - and naming it is what lets a segment's frozen rect be derived again when that viewport moves.
+    private IUIComponent _batchClip;
     private bool _batchOpen;
 
     // General instanced fills (arbitrary tessellated geometry sharing a mesh), flushed in PAINT ORDER via FlushBatches.
@@ -86,6 +89,11 @@ public partial class RenderCache
     {
         public RenderOpKind Kind;
         public Rect2D Scissor;    // Scissor
+        // Scissor: WHOSE clip this rect is - the component the rect was derived from (CumulativeClip). A scissor is the
+        // one thing in the stream that is a WORLD-SPACE rect, so it is also the one thing a move stales; naming its owner
+        // is what lets the rect be derived again instead of the whole frame being re-recorded. Null on the op that
+        // restores the full window scissor - that rect belongs to the window and no move touches it.
+        public IUIComponent Clip;
         public IRenderUnit Unit;  // Unit
         public byte Batch;        // Segment: which collector (0 rect, 1 ellipse, 2 text, 3 gradient-rect, 4 gradient-ellipse, 5 pattern, 6 fractal, 7 textured)
         // Segment: the collector's STABLE segment id (see BatchCollector.Segment.Id) - never an index, so a split that
@@ -395,7 +403,6 @@ public partial class RenderCache
     private static bool SubtreeClips(IUIComponent node)
     {
         if (node == null) return false;
-        Core.Diagnostics.FrameTrace.ClipProbeVisits++;   // TEMP
         if (node.ClipToBounds) return true;
 
         foreach (var child in node.VisualChildren)
@@ -592,6 +599,7 @@ public partial class RenderCache
             && RefreshMovedNodes(device)          // moved nodes first: write their matrices, or the replay draws them where they were
             && RefreshMovedComponents(device))    // ...and the ordinary movers' subtrees, for the same reason
         {
+            RefreshMovedScissors(fullScissor);    // the viewports they carried past are world-space rects - derive again
             AcceptPatchedTransforms();
             LastFrameReplayed = true;
             ExecuteOps(device, fullScissor);
@@ -833,6 +841,7 @@ public partial class RenderCache
                         NoteBatched(group, _rectBatch, slot);
                     }
                     _batchScissor = scissor;
+                    _batchClip = unit.Component;
                     _batchOpen = true;
                     continue;
                 }
@@ -859,6 +868,7 @@ public partial class RenderCache
                         IndexUnitBrush(unit.Component, unit, grru.RectPayload.LiveBrush);
                     }
                     _batchScissor = scissor;
+                    _batchClip = unit.Component;
                     _batchOpen = true;
                     continue;
                 }
@@ -881,6 +891,7 @@ public partial class RenderCache
                         IndexUnitBrush(unit.Component, unit, eru.EllipsePayload.LiveBrush);
                     }
                     _batchScissor = scissor;
+                    _batchClip = unit.Component;
                     _batchOpen = true;
                     continue;
                 }
@@ -902,6 +913,7 @@ public partial class RenderCache
                         IndexUnitBrush(unit.Component, unit, pru2.PolygonPayload.LiveBrush);
                     }
                     _batchScissor = scissor;
+                    _batchClip = unit.Component;
                     _batchOpen = true;
                     continue;
                 }
@@ -926,6 +938,7 @@ public partial class RenderCache
                         IndexUnitBrush(unit.Component, unit, gpru.PolygonPayload.LiveBrush);
                     }
                     _batchScissor = scissor;
+                    _batchClip = unit.Component;
                     _batchOpen = true;
                     continue;
                 }
@@ -944,6 +957,7 @@ public partial class RenderCache
                 {
                     if (_recording) group.NotBatchable("patternPolygon");
                     _batchScissor = scissor;
+                    _batchClip = unit.Component;
                     _batchOpen = true;
                     continue;
                 }
@@ -972,6 +986,7 @@ public partial class RenderCache
                 {
                     if (_recording) group.NotBatchable("texturedPolygon");
                     _batchScissor = scissor;
+                    _batchClip = unit.Component;
                     _batchOpen = true;
                     continue;
                 }
@@ -995,6 +1010,7 @@ public partial class RenderCache
                         IndexUnitBrush(unit.Component, unit, geru.EllipsePayload.LiveBrush);
                     }
                     _batchScissor = scissor;
+                    _batchClip = unit.Component;
                     _batchOpen = true;
                     continue;
                 }
@@ -1019,6 +1035,7 @@ public partial class RenderCache
                         group.NotBatchable("patternEllipse");   // node-aware, not paint/splice-patchable in v1
                     }
                     _batchScissor = scissor;
+                    _batchClip = unit.Component;
                     _batchOpen = true;
                     continue;
                 }
@@ -1044,6 +1061,7 @@ public partial class RenderCache
                         group.NotBatchable("patternRect");
                     }
                     _batchScissor = scissor;
+                    _batchClip = unit.Component;
                     _batchOpen = true;
                     continue;
                 }
@@ -1068,6 +1086,7 @@ public partial class RenderCache
                         group.NotBatchable("fractal");
                     }
                     _batchScissor = scissor;
+                    _batchClip = unit.Component;
                     _batchOpen = true;
                     continue;
                 }
@@ -1106,6 +1125,7 @@ public partial class RenderCache
                         group.NotBatchable("texturedRect");
                     }
                     _batchScissor = scissor;
+                    _batchClip = unit.Component;
                     _batchOpen = true;
                     continue;
                 }
@@ -1140,6 +1160,7 @@ public partial class RenderCache
                         group.NotBatchable("texturedEllipse");
                     }
                     _batchScissor = scissor;
+                    _batchClip = unit.Component;
                     _batchOpen = true;
                     continue;
                 }
@@ -1173,6 +1194,7 @@ public partial class RenderCache
                         for (var g = textFirst; g < _textBatch.RetainedCount; g++) NoteBatched(group, _textBatch, g);
                     }
                     _batchScissor = scissor;
+                    _batchClip = unit.Component;
                     _batchOpen = true;
                     continue;   // baked into the batch - drawn at the next flush (node-aware: no MarkNodeNotAware)
                 }
@@ -1214,6 +1236,7 @@ public partial class RenderCache
                     if (_recording && _instancedFill.LastArena is { } fillArena)
                         NoteBatched(group, fillArena, _instancedFill.LastSlot);
                     _batchScissor = scissor;
+                    _batchClip = unit.Component;
                     _batchOpen = true;
                     continue;   // fill batched; fringe/stroke drawn at the flush, over the fill
                 }
@@ -1234,6 +1257,7 @@ public partial class RenderCache
                     // bakes its transform at record time and is re-pointed at the flush - see PrepareOverlay.
                     if (_recording) group.NotBatchable("instancedGradientFill");
                     _batchScissor = scissor;
+                    _batchClip = unit.Component;
                     _batchOpen = true;
                     continue;
                 }
@@ -1252,6 +1276,7 @@ public partial class RenderCache
                     // As the gradient above: the fill rides the slot, the overlay is re-pointed at the flush.
                     if (_recording) group.NotBatchable("instancedPatternFill");
                     _batchScissor = scissor;
+                    _batchClip = unit.Component;
                     _batchOpen = true;
                     continue;
                 }
@@ -1269,6 +1294,7 @@ public partial class RenderCache
                     tgru.FillInstanced = true;
                     if (_recording) group.NotBatchable("instancedTexturedFill");
                     _batchScissor = scissor;
+                    _batchClip = unit.Component;
                     _batchOpen = true;
                     continue;
                 }
@@ -1303,7 +1329,7 @@ public partial class RenderCache
                 {
                     device.SetScissors(scissor);
                     scissorNarrowed = true;
-                    RecordScissor(scissor);
+                    RecordScissor(scissor, unit.Component);
                 }
                 else if (scissorNarrowed)
                 {
@@ -1523,10 +1549,45 @@ public partial class RenderCache
         }
     }
 
-    private void RecordScissor(Rect2D scissor)
+    private void RecordScissor(Rect2D scissor, IUIComponent clip = null)
     {
-        if (_recording) RecordOp(new RenderOp { Kind = RenderOpKind.Scissor, Scissor = scissor, Order = _recordOrder });
+        if (_recording) RecordOp(new RenderOp { Kind = RenderOpKind.Scissor, Scissor = scissor, Clip = clip, Order = _recordOrder });
     }
+
+    // A recorded Scissor is a rect in WORLD space, and nothing re-derived it - which is why a move under a clip used to
+    // cost the whole frame a re-record. Derive them again instead: each names the component its rect came from, and
+    // CumulativeClip answers from the (already updated) frozen snapshot. There are tens of these ops in a frame against
+    // tens of thousands of nodes in the scene, so this is the cheap end of the trade by three orders of magnitude.
+    private void RefreshMovedScissors(Rect2D fullScissor)
+    {
+        if (_movedNodeOwners.Count == 0) return;
+
+        _clipCache.Clear();   // the viewports themselves moved - that memo is what went stale
+
+        for (var i = 0; i < _ops.Count; i++)
+        {
+            if (_ops[i].Clip is not { } owner) continue;
+            var op = _ops[i];
+            var rect = CumulativeClip(owner) is { } logical ? ToFramebufferScissor(logical, fullScissor) : fullScissor;
+
+            // THREE things hold a clip, not one, and missing any of them draws half the frame through the old viewport:
+            // the Scissor op itself, the batch SEGMENT (which sets its own before drawing), and an instanced-fill FLUSH.
+            switch (op.Kind)
+            {
+                case RenderOpKind.Scissor:
+                    op.Scissor = rect;
+                    _ops[i] = op;
+                    break;
+                case RenderOpKind.Segment:
+                    ArenaOf(op.Batch)?.SetSegmentScissor(op.SegId, rect);
+                    break;
+                case RenderOpKind.InstancedFlush:
+                    _instancedFill?.SetFlushScissor(op.SegId, rect);
+                    break;
+            }
+        }
+    }
+
 
 
     // Draw a fast-path partial by patching only the dirty tiles' batch slots, then replaying last frame's op stream. False
@@ -1539,6 +1600,7 @@ public partial class RenderCache
         if (!RefreshMovedNodes(device)) return SpliceRefused("movedNode");
         // ...then the ordinary movers, so the re-bakes below compose from the new worlds.
         if (!RefreshMovedComponents(device)) return SpliceRefused("movedComponent");
+        RefreshMovedScissors(fullScissor);
 
         _opacityChain.Clear();   // a paint-only opacity change may have re-frozen the dirty subtree's snapshot; recompose it
         _opacitySlotCache.Clear();
@@ -1827,6 +1889,7 @@ public partial class RenderCache
         // Moved motion nodes first (same as TryPartialReplay): rewrite their matrices, bail on non-aware content.
         if (!RefreshMovedNodes(device)) return SpliceRefused("movedNode");
         if (!RefreshMovedComponents(device)) return SpliceRefused("movedComponent");
+        RefreshMovedScissors(fullScissor);
 
         // Op stream grown too long from accumulated splices -> recompact with a full walk before it mis-replays.
         if (_ops.Count > MaxRetainedOps) return SpliceRefused("opsTooLong");
@@ -2267,7 +2330,7 @@ public partial class RenderCache
         var at = OpIndexForRank(group.Order);
         _ops.Insert(at, new RenderOp
         {
-            Kind = arena.OpKind, Batch = arena.BatchId, SegId = seg, Order = group.Order
+            Kind = arena.OpKind, Batch = arena.BatchId, SegId = seg, Clip = group.Component, Order = group.Order
         });
         NoteOpInserted(at);
 
@@ -2368,7 +2431,8 @@ public partial class RenderCache
             _ops[i] = op;
             _ops.Insert(i + 1, new RenderOp
             {
-                Kind = RenderOpKind.Segment, Batch = op.Batch, SegId = second, Order = spanEnd, OrderFirst = order
+                Kind = RenderOpKind.Segment, Batch = op.Batch, SegId = second, Clip = op.Clip,
+                Order = spanEnd, OrderFirst = order
             });
             NoteOpInserted(i + 1);
             return;   // one rank cuts one segment: the halves no longer span it

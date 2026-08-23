@@ -55,6 +55,8 @@ internal sealed class InstancedKeyArena : BatchArena
 
     public override Rect2D GetSegmentScissor(int id) => _collector.FlushScissor(id);
 
+    public override void SetSegmentScissor(int id, Rect2D scissor) => _collector.SetFlushScissor(id, scissor);
+
     /// <summary>No footprint is kept per flush record, so a placement cannot prove it misses this one and cuts instead of
     /// joining. A cut is refused below anyway, so the honest answer is "unknown" rather than a guess in either direction.</summary>
     public override Rect SegmentBounds(int id) => Rect.Empty;

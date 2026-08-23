@@ -229,7 +229,7 @@ public partial class RenderCache
             var fi = _instancedFill.Flush(fullScissor, _projectionMatrix);
             if (_recording && fi >= 0)
             {
-                RecordOp(new RenderOp { Kind = RenderOpKind.InstancedFlush, SegId = fi, Order = _recordOrder });
+                RecordOp(new RenderOp { Kind = RenderOpKind.InstancedFlush, SegId = fi, Clip = _batchClip, Order = _recordOrder });
             }
         }
 
@@ -271,7 +271,7 @@ public partial class RenderCache
         // all their ops are compared by.
         RecordOp(new RenderOp
         {
-            Kind = RenderOpKind.Segment, Batch = batch, SegId = segId,
+            Kind = RenderOpKind.Segment, Batch = batch, SegId = segId, Clip = _batchClip,
             Order = _recordOrder, OrderFirst = batch == 0 ? _rectSegStart : _recordOrder
         });
     }
