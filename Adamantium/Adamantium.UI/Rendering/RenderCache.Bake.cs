@@ -622,7 +622,6 @@ public partial class RenderCache
         foreach (var mover in _movedOwnersBuf)
         {
             if (CollectMovedSubtree(mover)) continue;
-            Core.Diagnostics.FrameTrace.NoteMoved(_movedOwners.Count, 0, true);
             _movedOwners.Clear();
             _movedSubtree.Clear();
             return false;
@@ -633,22 +632,17 @@ public partial class RenderCache
         _worldCache.Clear();
         _relWorldCache.Clear();
 
-        var rebaked = 0;
         foreach (var c in _movedSubtree)
         {
             if (!_groupById.TryGetValue(c.RenderId, out var g)) continue;
             foreach (var u in g.Units)
             {
                 if (!HoldsInstances(u)) continue;   // a per-unit draw - the replay re-points it (RepointIfItMoved)
-                rebaked++;
                 var bakeWorld = ResolveBake(device, u.Component, World(u.Component), out var slot);
-                if (PatchSlot(device, u, bakeWorld, slot)) continue;
-                Core.Diagnostics.FrameTrace.NoteMoved(_movedOwners.Count, rebaked, true);
-                return false;
+                if (!PatchSlot(device, u, bakeWorld, slot)) return false;
             }
         }
 
-        Core.Diagnostics.FrameTrace.NoteMoved(_movedOwners.Count, rebaked, false);
         _movedOwnersBuf.Clear();
         return true;
     }

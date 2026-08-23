@@ -126,61 +126,6 @@ public class Program
                         (tabs == null ? "no TabControl found" : "survived tabs " + visited) + Environment.NewLine);
                 }
 
-                // TEMP (ADAM_TAB_PINGPONG=A,B): switch back and forth between TWO heavy tabs. Visiting every tab once
-                // measures the first BUILD of each; going back and forth measures the SWITCH, which is a different frame
-                // - the content on both sides already exists and is only being re-attached and re-laid-out.
-                if (Environment.GetEnvironmentVariable("ADAM_TAB_PINGPONG") is { } pair)
-                {
-                    var win = Adamantium.UI.UIApplication.Current?.MainWindow;
-                    var tabs = win?.Content is Adamantium.UI.Core.IUIComponent c ? Find<Adamantium.UI.Controls.TabControl>(c) : null;
-                    var names = pair.Split(',');
-                    if (tabs != null && names.Length == 2)
-                    {
-                        var report = new System.Text.StringBuilder();
-                        int IndexOf(string name)
-                        {
-                            for (var i = 0; i < tabs.Items.Count; i++)
-                                if (tabs.Items[i].GetType().Name.StartsWith(name, StringComparison.OrdinalIgnoreCase)) return i;
-                            return -1;
-                        }
-
-                        var a = IndexOf(names[0].Trim());
-                        var b = IndexOf(names[1].Trim());
-                        report.Append($"ping-pong {names[0]}({a}) <-> {names[1]}({b})").Append(Environment.NewLine);
-                        if (a >= 0 && b >= 0)
-                        {
-                            // The tile grid at its MINIMUM cell, which is the stand the drop is reported on - the default
-                            // 120x72 realizes a few hundred tiles and measures a scene nobody is complaining about.
-                            foreach (var item in tabs.Items)
-                                if (item is ViewModels.LayoutViewModel tileGrid) { tileGrid.CellWidth = 24; tileGrid.CellHeight = 24; }
-
-                            // Build BOTH sides once first: the first visit pays for creating the content, and that cost
-                            // is not what a switch costs.
-                            foreach (var warmIndex in new[] { a, b, a })
-                            {
-                                Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => tabs.SelectedIndex = warmIndex);
-                                System.Threading.Thread.Sleep(4000);
-                            }
-
-                            for (var lap = 0; lap < 8; lap++)
-                            {
-                                var to = lap % 2 == 0 ? b : a;
-                                var mark = Adamantium.UI.Core.Diagnostics.FrameTrace.IncidentCount;
-                                var before = Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames;
-                                var clock = System.Diagnostics.Stopwatch.StartNew();
-                                Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => tabs.SelectedIndex = to);
-                                System.Threading.Thread.Sleep(1500);
-                                var drawn = Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames - before;
-                                report.Append($"lap {lap} -> tab {to}: {drawn / clock.Elapsed.TotalSeconds:0} fps over {clock.ElapsedMilliseconds} ms")
-                                      .Append(Environment.NewLine)
-                                      .Append(Adamantium.UI.Core.Diagnostics.FrameTrace.DumpIncidentsSince(mark));
-                            }
-                        }
-
-                        System.IO.File.WriteAllText(log + ".pingpong.txt", report.ToString());
-                    }
-                }
-
                 // TEMP (ADAM_STRIP_SCROLL=1): pan the tab STRIP back and forth while a heavy tab is open - the reported
                 // drop from ~700 fps to ~100. Driven from here so the cost can be attributed without a hand on the mouse.
                 if (Environment.GetEnvironmentVariable("ADAM_STRIP_SCROLL") == "1")
@@ -396,16 +341,6 @@ public class Program
                     + "patch refusals by reason:" + System.Environment.NewLine
                     + string.Join(System.Environment.NewLine, System.Linq.Enumerable.Select(
                         System.Linq.Enumerable.OrderByDescending(Adamantium.UI.Core.Diagnostics.FrameTrace.Refusals, p => p.Value),
-                        p => $"  {p.Value,5}  {p.Key}")) + System.Environment.NewLine
-                    + $"carried MOVES: worst frame collected {Adamantium.UI.Core.Diagnostics.FrameTrace.MovedCollectedMax}"
-                    + $" components, re-baked {Adamantium.UI.Core.Diagnostics.FrameTrace.MovedRebakedMax} units;"
-                    + $" refused {Adamantium.UI.Core.Diagnostics.FrameTrace.MovedRefusals} times,"
-                    + $" worst throwing away {Adamantium.UI.Core.Diagnostics.FrameTrace.MovedWastedMax} re-bakes"
-                    + System.Environment.NewLine
-                    + "moves NOT carried, by reason:" + System.Environment.NewLine
-                    + string.Join(System.Environment.NewLine, System.Linq.Enumerable.Select(
-                        System.Linq.Enumerable.Take(
-                            System.Linq.Enumerable.OrderByDescending(Adamantium.UI.Core.Diagnostics.FrameTrace.NotCarried, p => p.Value), 10),
                         p => $"  {p.Value,5}  {p.Key}")) + System.Environment.NewLine
                     + "not node-aware:" + System.Environment.NewLine
                     + string.Join(System.Environment.NewLine, System.Linq.Enumerable.Select(

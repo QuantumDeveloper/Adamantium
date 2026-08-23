@@ -246,13 +246,11 @@ public partial class RenderCache
         foreach (var dirty in packet.PartialDirty) _rebakedThisPacket.Add(dirty);
 
         var moversCarried = !packet.TransformUnknown;
-        if (!moversCarried) Core.Diagnostics.FrameTrace.NoteNotCarried("transformUnknown");   // TEMP
         foreach (var mover in packet.Moved)
         {
             if (SubtreeClips(mover))
             {
                 StreamStaleBecause($"movedClips<{mover.GetType().Name}>");
-                if (moversCarried) Core.Diagnostics.FrameTrace.NoteNotCarried($"clips<{mover.GetType().Name}>");   // TEMP
                 moversCarried = false;
             }
             else { _forgivenMoves.Add(mover); _forgivenResize.Add(mover); }
