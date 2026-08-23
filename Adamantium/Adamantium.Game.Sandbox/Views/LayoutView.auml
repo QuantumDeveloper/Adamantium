@@ -35,9 +35,29 @@
             <TextBlock Text="{Binding CellHeight}" VerticalAlignment="Center" FontSize="16" Margin="8,0,0,0"/>
 
             <CheckBox Content="Ellipses" IsChecked="{Binding ShowEllipses, Mode=TwoWay}" VerticalAlignment="Center" Margin="24,0,0,0"/>
+
+            <!-- Fades the WHOLE tile grid by hand. Element Opacity composites down the tree, and the cost of that is the
+                 point of this control: the value goes into the subtree's opacity SLOT, so dragging this should not cost
+                 the frame anything however many tiles are on screen. Bound straight to the ListBox below by name - no
+                 view-model property, because what is being watched is the renderer, not the binding. -->
+            <TextBlock Text="Opacity:" VerticalAlignment="Center" Margin="24,0,0,0"/>
+            <Slider Width="180" Minimum="0" Maximum="1" Margin="8,0,0,0"
+                    Value="{Binding Opacity, ElementName=TileGrid, Mode=TwoWay}"/>
+            <!-- FIXED width on purpose. The text changes on every step of the drag ("0.55" -> "0.5" -> "0.475"), and a
+                 different string is a different desired size - which re-measures the row, then the Grid, then the tile
+                 grid under it. Measured at a 94 ms layout peak while dragging: the readout, not the opacity, was the
+                 cost. A fixed width keeps the desired size constant, so the change stops at this element. -->
+            <TextBlock Text="{Binding Opacity, ElementName=TileGrid}" Width="56"
+                       VerticalAlignment="Center" FontSize="16" Margin="8,0,0,0"/>
+
+            <!-- CONTROL for the opacity slider next to it: bound to NOTHING, so dragging it moves a thumb and changes
+                 not one pixel of the tile grid. If this one drops the frame rate too, the cost belongs to dragging (a
+                 moved element marks transforms dirty, which forbids the frame's patch outright) and not to opacity. -->
+            <TextBlock Text="Idle:" VerticalAlignment="Center" Margin="24,0,0,0"/>
+            <Slider Width="180" Minimum="0" Maximum="1" Margin="8,0,0,0"/>
         </StackPanel>
 
-        <ListBox Grid.Row="1"
+        <ListBox Grid.Row="1" x:Name="TileGrid"
                  Margin="0 14 0 0"
                  ItemsSource="{Binding Rectangles}"
                  SelectedItem="{Binding SelectedRect, Mode=TwoWay}">

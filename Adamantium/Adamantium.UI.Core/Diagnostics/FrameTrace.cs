@@ -57,6 +57,67 @@ public static class FrameTrace
     /// <summary>TEMP: how many frames each refusal reason cost, over the whole run.</summary>
     public static readonly Dictionary<string, int> Refusals = new();
 
+    /// <summary>TEMP: what the PATCH still re-bakes, counted by unit type over the whole run. "The patch is slow" is not
+    /// a finding - which family it is still walking is, because each one is unblocked by different means.</summary>
+    public static readonly Dictionary<string, int> Patched = new();
+
+    /// <summary>TEMP: full walks so far this run - read once a second to tell a drop caused by walking the scene from one
+    /// caused by anything else.</summary>
+    public static int Walks;
+
+    /// <summary>TEMP: how big a MOVE the patch tried to carry - components collected and instance-holding units re-baked,
+    /// worst frame of the run, and how much of that work a refusal then threw away. A move is meant to be O(moved); these
+    /// say whether some scenario makes it O(scene) and then walks anyway - paying twice.</summary>
+    public static int MovedCollectedMax, MovedRebakedMax, MovedWastedMax, MovedRefusals;
+
+    /// <summary>TEMP: nodes visited answering "does anything under this mover clip", per apply. Asked once per named
+    /// mover over its whole subtree, so a frame that moves a panel AND its children asks it about the same nodes over
+    /// and over - this counts whether that is a handful or a square.</summary>
+    public static int ClipProbeVisits, ClipProbeVisitsMax;
+
+    /// <summary>TEMP: why a frame's moves could NOT be carried, so why=3 stops saying only "something moved".</summary>
+    public static readonly Dictionary<string, int> NotCarried = new();
+
+    /// <summary>TEMP: the SETTLE - every geometry change of a clipping element that cost the frame its patch, in order,
+    /// said as "was -> now". A count says a tab switch re-lays-out its view ~34 times; only the sequence says whether
+    /// that is one size converging, two sizes alternating, or the same size published over and over.</summary>
+    public static readonly List<string> Settle = new();
+
+    public static void NoteSettle(string line)
+    {
+        if (!Enabled) return;
+        lock (Settle) { if (Settle.Count < 600) Settle.Add(line); }
+    }
+
+    public static void NoteNotCarried(string reason)
+    {
+        if (!Enabled) return;
+        lock (NotCarried) NotCarried[reason] = NotCarried.TryGetValue(reason, out var had) ? had + 1 : 1;
+    }
+
+    public static void NoteClipProbeDone()
+    {
+        if (!Enabled) return;
+        if (ClipProbeVisits > ClipProbeVisitsMax) ClipProbeVisitsMax = ClipProbeVisits;
+        ClipProbeVisits = 0;
+    }
+
+    public static void NoteMoved(int collected, int rebaked, bool refused)
+    {
+        if (!Enabled) return;
+        if (collected > MovedCollectedMax) MovedCollectedMax = collected;
+        if (rebaked > MovedRebakedMax) MovedRebakedMax = rebaked;
+        if (!refused) return;
+        MovedRefusals++;
+        if (rebaked > MovedWastedMax) MovedWastedMax = rebaked;
+    }
+
+    public static void NotePatched(string what)
+    {
+        if (!Enabled) return;
+        lock (Patched) Patched[what] = Patched.TryGetValue(what, out var had) ? had + 1 : 1;
+    }
+
     /// <summary>TEMP: why the RECORD fell back to a full walk of the tree. A full walk is the most expensive frame there
     /// is, and "structural" is not a reason - the splice refuses for half a dozen unrelated causes and each has its own
     /// fix. Set at every point that gives up; read on the next frame that is recorded Full.</summary>
@@ -79,6 +140,8 @@ public static class FrameTrace
         int ops, int unitOps)
     {
         if (!Enabled) return;
+
+        if (!replayed) Walks++;   // TEMP: counted per frame, read once a second by the sandbox timeline
 
         // A ring is the wrong shape for a RARE event: at 450 fps it holds a few seconds, so a hand-made incident (hover,
         // a dropdown) is pushed out while the tester is still typing "done". Frames that ran LONG are kept separately and

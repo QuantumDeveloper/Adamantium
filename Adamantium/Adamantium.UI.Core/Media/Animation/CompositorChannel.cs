@@ -15,5 +15,10 @@ public enum CompositorChannel
     Transform,
 
     /// <summary>A pure colour change: the render thread re-bakes the batch slots the element already owns.</summary>
-    Paint
+    Paint,
+
+    /// <summary>The ELEMENT's own opacity: the render thread writes one float into its opacity slot, and every instance
+    /// under it composes that at draw time. The twin of <see cref="Transform"/> - one write moves a whole subtree - and
+    /// possible for the same reason: the value lives in the transform table, not folded into what was recorded.</summary>
+    Opacity
 }

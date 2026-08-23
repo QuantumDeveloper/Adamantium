@@ -92,6 +92,10 @@ internal sealed class FakeRenderUnit : IRenderUnit
     public float EffectiveOpacity { get; private set; } = 1f;
     public void SetEffectiveOpacity(float opacity) => EffectiveOpacity = opacity;
 
+    public int FadeSlot { get; private set; } = -1;
+
+    public void SetFadeSlot(int slot) => FadeSlot = slot;
+
     public int UpdateCount { get; private set; }
     public int PreRenderCount { get; private set; }
     public int RenderCount { get; private set; }

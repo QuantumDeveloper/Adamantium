@@ -9,9 +9,16 @@ public interface IRenderUnit : IDisposable
     /// <summary>The per-command state captured at RECORD time (opacity, transform, clip, halo bands). The draw path
     /// reads VALUES from here; the live element is edited on another thread and must never be dereferenced there.</summary>
     RenderData RenderData { get; }
-    /// <summary>Set the effective alpha (element opacity composed down the tree) the unit's colours bake with, before a
-    /// bake/re-bake. The draw path composes it from the frozen snapshot, not the live property.</summary>
+    /// <summary>Set the alpha the unit's colours bake with - the element's OWN opacity, not the chain. The chain rides
+    /// <see cref="FadeSlot"/> and is applied at draw time; folding it in here would mean re-baking every instance under
+    /// a fading container.</summary>
     void SetEffectiveOpacity(float opacity);
+
+    /// <summary>The opacity slot this unit's instances read their fade from (-1 = nothing above it fades). Resolved by
+    /// the draw walk and carried into every instance it bakes.</summary>
+    int FadeSlot { get; }
+
+    void SetFadeSlot(int slot);
     void DeferDispose();
     void Update(Matrix4x4F transform, Matrix4x4F projection, double renderScale);
     /// <summary>Out-of-render-pass work recorded before BeginRendering (e.g. shared-surface latch copies).</summary>

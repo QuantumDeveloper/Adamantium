@@ -40,11 +40,11 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
 
     // Bake one gradient rounded-rect fill. False only if it can't be baked (rotated/sheared world or a GPU-buffer
     // overflow this frame) - the caller draws it per-unit.
-    public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0)
+    public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0, int fadeSlot = -1)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
-        if (!BakeItem(p, world, opacity, transformSlot, out var item)) return false;
+        if (!BakeItem(p, world, opacity, transformSlot, fadeSlot, out var item)) return false;
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
         return true;
@@ -52,11 +52,11 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
 
     // Bake one gradient rounded-rect WITHOUT appending it - the paint fast-path re-bakes an existing slot in place (a
     // sweeping shimmer moves its stops every tick and nothing else about the element changes). See RectBatchCollector.BakeItem.
-    public static bool BakeItem(RectanglePayload p, Matrix4x4F world, double opacity, int transformSlot, out GradientRectItem item)
+    public static bool BakeItem(RectanglePayload p, Matrix4x4F world, double opacity, int transformSlot, int fadeSlot, out GradientRectItem item)
     {
         item = default;
         if (p.Brush is not GradientBrush g) return false;
-        return BakeGradientItem(g, p.DestinationRect, p.CornerRadius, p.Pen, world, opacity, BrushShape.Rect, transformSlot, out item);
+        return BakeGradientItem(g, p.DestinationRect, p.CornerRadius, p.Pen, world, opacity, BrushShape.Rect, transformSlot, fadeSlot, out item);
     }
 
     // POLYGON variant: a regular polygon with a gradient fill batches into the SAME pass - the shape is still a field, so
@@ -73,29 +73,29 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
 
     public bool CanBatchPolygon(RegularPolygonPayload p) => WantsBatchPolygon(p);
 
-    public bool TryAddPolygon(RegularPolygonPayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0)
+    public bool TryAddPolygon(RegularPolygonPayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0, int fadeSlot = -1)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
-        if (!BakePolygonItem(p, world, opacity, transformSlot, out var item)) return false;
+        if (!BakePolygonItem(p, world, opacity, transformSlot, fadeSlot, out var item)) return false;
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
         return true;
     }
 
-    public static bool BakePolygonItem(RegularPolygonPayload p, Matrix4x4F world, double opacity, int transformSlot, out GradientRectItem item)
+    public static bool BakePolygonItem(RegularPolygonPayload p, Matrix4x4F world, double opacity, int transformSlot, int fadeSlot, out GradientRectItem item)
     {
         item = default;
         if (p.Brush is not GradientBrush g) return false;
         return BakeGradientItem(g, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, p.Pen, world, opacity,
-            BrushShape.Polygon(p, (float)world.M11), transformSlot, out item);
+            BrushShape.Polygon(p, (float)world.M11), transformSlot, fadeSlot, out item);
     }
 
     // Bake a gradient fill into an instance record (shared by the rect + ellipse gradient batches). Position -> world;
     // gradient geometry + stops are RELATIVE to the rect (0..1), so one brush paints any size. False on a rotated/sheared
     // world (the axis-aligned instance can't hold it). shape (Geom1.z) selects the shader SDF: 0 rounded-rect, 1 ellipse.
     internal static bool BakeGradientItem(GradientBrush g, Rect dest, ProceduralGeometry.CornerRadius corners, Pen pen, Matrix4x4F world,
-        double opacity, BrushShape shape, int transformSlot, out GradientRectItem item)
+        double opacity, BrushShape shape, int transformSlot, int fadeSlot, out GradientRectItem item)
     {
         item = default;
         const float eps = 1e-4f;
@@ -129,7 +129,11 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
         // spread + 8*mode. The shader unpacks (packed & 7) for spread and (packed >> 3) for the mode - no extra record field.
         var rectRadii = RectBatchCollector.BakeRadii(corners, dest, sx);
         item.Radii = shape.RadiiFor(rectRadii);
-        item.Params = new Vector4F(shape.RadiusFlag(rectRadii), type, count, (float)g.SpreadMethod + 8f * (float)g.ColorInterpolationMode);
+        // ...and the OPACITY SLOT rides above them (biased by 1, so 0 means nothing above this element fades). Packed
+        // rather than given a field of its own: growing this record aborts shader creation on this driver, measured
+        // seven starts out of seven. The vertex stage unpacks it and hands the alpha to the pixel stage.
+        item.Params = new Vector4F(shape.RadiusFlag(rectRadii), type, count,
+            (float)g.SpreadMethod + 8f * (float)g.ColorInterpolationMode + 16f * (fadeSlot + 1));
         return true;
     }
 
@@ -138,7 +142,7 @@ internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem
     public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag)
     {
         if (unit is not RenderUnits.RectangleRenderUnit u || !CanBatch(u.RectPayload)) return false;
-        if (!BakeItem(u.RectPayload, world, u.FillOpacity, transformSlot, out var item)) return false;
+        if (!BakeItem(u.RectPayload, world, u.FillOpacity, transformSlot, unit.FadeSlot, out var item)) return false;
 
         Stage.Add(item);
         return true;

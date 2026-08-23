@@ -247,13 +247,18 @@ public abstract class RenderUnit<TPayload> : DeferredDisposableObject, IRenderUn
 
     public IUIComponent Component => DrawCommand.Component;
 
-    // Overwrites the record-time opacity with the effective alpha composed from the frozen snapshot (RenderCache), so a
-    // paint-only opacity change re-bakes the same commands with a new alpha - every consumer (batch FillOpacity, the
-    // per-unit fill/stroke/fringe) reads RenderData.Opacity, so one write covers them all.
+    // Overwrites the record-time opacity with the element's OWN alpha from the frozen snapshot (RenderCache) - every
+    // consumer (batch FillOpacity, the per-unit fill/stroke/fringe) reads RenderData.Opacity, so one write covers them
+    // all. What an ANCESTOR contributes does not come through here: that is the fade chain, read from the slot table at
+    // draw time, so fading a container costs one float instead of a re-bake of its whole subtree.
     public void SetEffectiveOpacity(float opacity)
     {
         if (DrawCommand?.RenderData is { } rd) rd.Opacity = opacity;
     }
+
+    public int FadeSlot { get; private set; } = -1;
+
+    public void SetFadeSlot(int slot) => FadeSlot = slot;
 
     public virtual void Update(Matrix4x4F transform, Matrix4x4F projection, double renderScale)
     {

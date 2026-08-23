@@ -70,11 +70,11 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
     // Bake one solid ellipse fill (bounds -> world, colour straight with opacity folded in) into the pending segment.
     // False only if it can't be baked (rotated/sheared world or a GPU-buffer overflow this frame) - the caller then draws
     // that ellipse via the per-unit path.
-    public bool TryAdd(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0)
+    public bool TryAdd(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0, int fadeSlot = -1)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
-        if (!BakeItem(p, world, opacity, transformSlot, out var item)) return false;   // rotation/shear -> per-unit
+        if (!BakeItem(p, world, opacity, transformSlot, fadeSlot, out var item)) return false;   // rotation/shear -> per-unit
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
         return true;
@@ -83,7 +83,7 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
     // Bake one solid ellipse into an instance record, WITHOUT appending it. Shared by TryAdd (append) and the paint
     // fast-path (re-bake an existing slot in place - see RenderCache.TryPartialReplay), exactly as the rect batch does.
     // False = not bakeable this way (rotated/sheared world); the caller draws it per-unit.
-    public static bool BakeItem(EllipsePayload p, Matrix4x4F world, double opacity, int transformSlot, out EllipseItem item)
+    public static bool BakeItem(EllipsePayload p, Matrix4x4F world, double opacity, int transformSlot, int fadeSlot, out EllipseItem item)
     {
         item = default;
         const float eps = 1e-4f;
@@ -108,7 +108,7 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
             // NODE-local when transformSlot != 0 (world is then the transform RELATIVE to the motion node; the vertex
             // shader applies the node's table matrix on top - the O(1)-scroll path). Slot 0 = identity = world bake.
             Bounds = new Vector4F((float)(r.X * sx + tx), (float)(r.Y * sy + ty), (float)(r.Width * sx), (float)(r.Height * sy)),
-            Params = new Vector4F(transformSlot, 0, 0, 0),
+            Params = new Vector4F(transformSlot, fadeSlot, 0, 0),
             Color = color,
             StrokeColor = strokeColor,
             Stroke0 = stroke0,
@@ -156,7 +156,7 @@ internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
     public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag)
     {
         if (unit is not RenderUnits.EllipseRenderUnit u || !CanBatch(u.EllipsePayload)) return false;
-        if (!BakeItem(u.EllipsePayload, world, u.FillOpacity, transformSlot, out var item)) return false;
+        if (!BakeItem(u.EllipsePayload, world, u.FillOpacity, transformSlot, unit.FadeSlot, out var item)) return false;
 
         Stage.Add(item);
         return true;

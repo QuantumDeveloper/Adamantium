@@ -32,23 +32,23 @@ internal sealed class GradientEllipseCollector : SdfBatchCollector<GradientRectI
 
     public bool CanBatch(EllipsePayload p) => WantsBatch(p);
 
-    public bool TryAdd(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0)
+    public bool TryAdd(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0, int fadeSlot = -1)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
-        if (!BakeItem(p, world, opacity, transformSlot, out var item)) return false;
+        if (!BakeItem(p, world, opacity, transformSlot, fadeSlot, out var item)) return false;
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
         return true;
     }
 
     // Bake one gradient ellipse WITHOUT appending it - see GradientRectCollector.BakeItem (the paint fast-path).
-    public static bool BakeItem(EllipsePayload p, Matrix4x4F world, double opacity, int transformSlot, out GradientRectItem item)
+    public static bool BakeItem(EllipsePayload p, Matrix4x4F world, double opacity, int transformSlot, int fadeSlot, out GradientRectItem item)
     {
         item = default;
         if (p.Brush is not GradientBrush g) return false;
         // cornerRadius = 0 (unused by the ellipse branch); the shape selects the ellipse SDF in the shared gradient shader.
-        return GradientRectCollector.BakeGradientItem(g, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, p.Pen, world, opacity, BrushShape.Ellipse, transformSlot, out item);
+        return GradientRectCollector.BakeGradientItem(g, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, p.Pen, world, opacity, BrushShape.Ellipse, transformSlot, fadeSlot, out item);
     }
 
     /// <summary>Bake one unit into the patch stage - see BatchArena. Same bake TryAdd uses; it just lands in the stage
@@ -56,7 +56,7 @@ internal sealed class GradientEllipseCollector : SdfBatchCollector<GradientRectI
     public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag)
     {
         if (unit is not RenderUnits.EllipseRenderUnit u || !CanBatch(u.EllipsePayload)) return false;
-        if (!BakeItem(u.EllipsePayload, world, u.FillOpacity, transformSlot, out var item)) return false;
+        if (!BakeItem(u.EllipsePayload, world, u.FillOpacity, transformSlot, unit.FadeSlot, out var item)) return false;
 
         Stage.Add(item);
         return true;

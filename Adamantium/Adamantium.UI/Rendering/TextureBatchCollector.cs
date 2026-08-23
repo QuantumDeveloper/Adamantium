@@ -122,7 +122,7 @@ internal sealed class TextureBatchCollector : SdfBatchCollector<TextureItem>
     /// <see cref="NineSliceBrush"/> is NINE - the corners at their own size, the edges and centre stretched or tiled -
     /// which is the whole trick: one batch, one texture, nine records.</summary>
     public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds,
-        ITexture texture, int transformSlot = 0)
+        ITexture texture, int transformSlot = 0, int fadeSlot = -1)
     {
         var slices = NineSlice.Count(p.Brush);
         EnsureCpuCapacity(Count + slices);
@@ -130,7 +130,7 @@ internal sealed class TextureBatchCollector : SdfBatchCollector<TextureItem>
         {
             return false;
         }
-        if (!Bake(p.Brush, p.DestinationRect, p.CornerRadius, BrushShape.Rect, world, opacity, transformSlot, out var baked))
+        if (!Bake(p.Brush, p.DestinationRect, p.CornerRadius, BrushShape.Rect, world, opacity, transformSlot, fadeSlot, out var baked))
         {
             return false;
         }
@@ -159,14 +159,14 @@ internal sealed class TextureBatchCollector : SdfBatchCollector<TextureItem>
     public bool CanBatchEllipse(EllipsePayload p) => WantsBatchEllipse(p);
 
     public bool TryAddEllipse(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds,
-        ITexture texture, int transformSlot = 0)
+        ITexture texture, int transformSlot = 0, int fadeSlot = -1)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity)
         {
             return false;
         }
-        if (!Bake(p.Brush, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, BrushShape.Ellipse, world, opacity, transformSlot, out var baked))
+        if (!Bake(p.Brush, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, BrushShape.Ellipse, world, opacity, transformSlot, fadeSlot, out var baked))
         {
             return false;
         }
@@ -193,12 +193,12 @@ internal sealed class TextureBatchCollector : SdfBatchCollector<TextureItem>
     public bool CanBatchPolygon(RegularPolygonPayload p) => WantsBatchPolygon(p);
 
     public bool TryAddPolygon(RegularPolygonPayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds,
-        ITexture texture, int transformSlot = 0)
+        ITexture texture, int transformSlot = 0, int fadeSlot = -1)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
         if (!Bake(p.Brush, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, BrushShape.Polygon(p, (float)world.M11),
-                world, opacity, transformSlot, out var baked))
+                world, opacity, transformSlot, fadeSlot, out var baked))
         {
             return false;
         }
@@ -213,7 +213,7 @@ internal sealed class TextureBatchCollector : SdfBatchCollector<TextureItem>
     // axis-aligned instance cannot hold it) so the caller falls back to the per-unit path. The four corner radii ride in
     // Radii, scaled with the world; Params.x carries the LARGEST of them, or -1 as the ELLIPSE shape flag.
     private static bool Bake(Brush brush, Rect destinationRect, ProceduralGeometry.CornerRadius corners, BrushShape shape, Matrix4x4F world, double opacity,
-        int transformSlot, out TextureItem[] items)
+        int transformSlot, int fadeSlot, out TextureItem[] items)
     {
         items = null;
         const float eps = 1e-4f;
@@ -234,8 +234,8 @@ internal sealed class TextureBatchCollector : SdfBatchCollector<TextureItem>
 
         items = brush switch
         {
-            NineSliceBrush nine => NineSlice.Bake(nine, bounds, opacity, transformSlot, sx, sy),
-            TileBrush tile => [Single(tile, bounds, radius, radii, opacity, transformSlot, sx, sy)],
+            NineSliceBrush nine => NineSlice.Bake(nine, bounds, opacity, transformSlot, fadeSlot, sx, sy),
+            TileBrush tile => [Single(tile, bounds, radius, radii, opacity, transformSlot, fadeSlot, sx, sy)],
             _ => null
         };
         return items != null;
@@ -243,7 +243,7 @@ internal sealed class TextureBatchCollector : SdfBatchCollector<TextureItem>
 
     // One record for the plain textured fill. WHERE it is drawn and WHAT it samples come from the brush's tiling and
     // stretch (see ImageTiling) - stretched across the shape, fitted inside it, or repeated.
-    private static TextureItem Single(TileBrush brush, Rect bounds, float radius, Vector4F radii, double opacity, int transformSlot,
+    private static TextureItem Single(TileBrush brush, Rect bounds, float radius, Vector4F radii, double opacity, int transformSlot, int fadeSlot,
         double scaleX, double scaleY)
     {
         var tint = brush.Tint.ToVector4();

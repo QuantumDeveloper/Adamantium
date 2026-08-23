@@ -215,12 +215,15 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
     // False = not bakeable this way (rotated/sheared world). Shared by TryAdd (append) AND the partial-replay UpdateSlot
     // path, which re-bakes ONE dirty tile in place (a hover recolour) without re-walking the scene.
     public static bool BakeItem(RectanglePayload p, Matrix4x4F world, double opacity, out RectItem item)
-        => BakeItem(p, world, opacity, 0, out item);
+        => BakeItem(p, world, opacity, 0, -1, out item);
 
     /// <summary><paramref name="transformSlot"/> = the instance's transform-table slot (0 = identity for a world-space
     /// bake; a motion node's slot for a NODE-LOCAL bake - <paramref name="world"/> is then the transform RELATIVE to
-    /// that node and the vertex shader applies the node's matrix on top - the O(1)-scroll path).</summary>
-    public static bool BakeItem(RectanglePayload p, Matrix4x4F world, double opacity, int transformSlot, out RectItem item)
+    /// that node and the vertex shader applies the node's matrix on top - the O(1)-scroll path).
+    /// <para><paramref name="fadeSlot"/> = the opacity slot the element's alpha is read from at DRAW time (-1 = opaque).
+    /// Element Opacity is deliberately NOT folded into the colour here: it multiplies down the whole tree, so baking it
+    /// in means one fading container re-bakes every instance under it.</para></summary>
+    public static bool BakeItem(RectanglePayload p, Matrix4x4F world, double opacity, int transformSlot, int fadeSlot, out RectItem item)
     {
         item = default;
         const float eps = 1e-4f;
@@ -259,7 +262,7 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
             Bounds = new Vector4F((float)(r.X * sx + tx), (float)(r.Y * sy + ty), (float)(r.Width * sx), (float)(r.Height * sy)),
             // .x is the LARGEST of the four: it decides how far the quad has to reach, and one number is enough for that.
             // .z = 1 means "no fringe": the shader takes the edge hard instead of fading it over a pixel.
-            Params = new Vector4F(MaxOf(radii), transformSlot, p.AntiAlias ? 0 : 1, 0),
+            Params = new Vector4F(MaxOf(radii), transformSlot, p.AntiAlias ? 0 : 1, fadeSlot),
             Radii = radii,
             Color = color,
             StrokeColor = strokeColor,
@@ -378,11 +381,11 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
     }
 
     public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0,
-        int ownerTag = 0)
+        int fadeSlot = -1, int ownerTag = 0)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
-        if (!BakeItem(p, world, opacity, transformSlot, out var item)) return false;   // rotation/shear -> per-unit
+        if (!BakeItem(p, world, opacity, transformSlot, fadeSlot, out var item)) return false;   // rotation/shear -> per-unit
         item.OwnerTag = ownerTag;   // travels with the bytes through every copy the arena makes - see RectItem.OwnerTag
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
@@ -394,7 +397,7 @@ internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
     public override bool TryStage(IRenderUnit unit, Matrix4x4F world, int transformSlot, int ownerTag)
     {
         if (unit is not RenderUnits.RectangleRenderUnit u || !CanBatch(u.RectPayload)) return false;
-        if (!BakeItem(u.RectPayload, world, u.FillOpacity, transformSlot, out var item)) return false;
+        if (!BakeItem(u.RectPayload, world, u.FillOpacity, transformSlot, unit.FadeSlot, out var item)) return false;
 
         // The same stamp TryAdd makes. Without it a patched-in rectangle had no owner, and the orphan sweep - which asks
         // the INSTANCE whose it is - could never blank it once the control stopped drawing.

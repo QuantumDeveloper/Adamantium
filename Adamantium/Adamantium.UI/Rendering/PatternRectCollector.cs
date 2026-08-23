@@ -56,14 +56,14 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
 
     // Bake one pattern rounded-rect fill. False only if it can't be baked (rotated/sheared world or a GPU-buffer overflow
     // this frame) - the caller draws it per-unit (pattern per-unit not yet supported; the demo stays axis-aligned).
-    public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0)
+    public bool TryAdd(RectanglePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0, int fadeSlot = -1)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity)
         {
             return false;
         }
-        if (!BakeItem(p, world, opacity, transformSlot, out var item))
+        if (!BakeItem(p, world, opacity, transformSlot, fadeSlot, out var item))
         {
             return false;
         }
@@ -85,12 +85,12 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
 
     public bool CanBatchPolygon(RegularPolygonPayload p) => WantsBatchPolygon(p);
 
-    public bool TryAddPolygon(RegularPolygonPayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0)
+    public bool TryAddPolygon(RegularPolygonPayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0, int fadeSlot = -1)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
         if (!BakeItemCore(p.Brush, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty,
-                BrushShape.Polygon(p, (float)world.M11), p.Pen, world, opacity, transformSlot, out var item))
+                BrushShape.Polygon(p, (float)world.M11), p.Pen, world, opacity, transformSlot, fadeSlot, out var item))
         {
             return false;
         }
@@ -100,8 +100,8 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
     }
 
     // Bake a procedural rounded-rect fill (thin wrapper over the shared core).
-    public static bool BakeItem(RectanglePayload p, Matrix4x4F world, double opacity, int transformSlot, out PatternRectItem item)
-        => BakeItemCore(p.Brush, p.DestinationRect, p.CornerRadius, BrushShape.Rect, p.Pen, world, opacity, transformSlot, out item);
+    public static bool BakeItem(RectanglePayload p, Matrix4x4F world, double opacity, int transformSlot, int fadeSlot, out PatternRectItem item)
+        => BakeItemCore(p.Brush, p.DestinationRect, p.CornerRadius, BrushShape.Rect, p.Pen, world, opacity, transformSlot, fadeSlot, out item);
 
     // Ellipse variant: a full ellipse with a procedural fill batches into the SAME pattern pass (SDF self-AA, no jagged
     // tessellated edges) - the shader branches to the ellipse SDF on the NEGATIVE baked corner radius. Mirrors
@@ -117,14 +117,14 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
 
     public bool CanBatchEllipse(EllipsePayload p) => WantsBatchEllipse(p);
 
-    public bool TryAddEllipse(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0)
+    public bool TryAddEllipse(EllipsePayload p, Matrix4x4F world, double opacity, Rect2D scissor, Rect logicalBounds, int transformSlot = 0, int fadeSlot = -1)
     {
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity)
         {
             return false;
         }
-        if (!BakeItemCore(p.Brush, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, BrushShape.Ellipse, p.Pen, world, opacity, transformSlot, out var item))
+        if (!BakeItemCore(p.Brush, p.DestinationRect, ProceduralGeometry.CornerRadius.Empty, BrushShape.Ellipse, p.Pen, world, opacity, transformSlot, fadeSlot, out var item))
         {
             return false;
         }
@@ -138,7 +138,7 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
     // world (the axis-aligned instance can not hold it). Cell scales by the world device scale (sx). The four corner radii
     // ride in Radii; Params.x carries the LARGEST of them, or -1 as the ELLIPSE shape flag (PatternPS branches SdEllipse
     // for it).
-    public static bool BakeItemCore(Brush brush, Rect destinationRect, ProceduralGeometry.CornerRadius corners, BrushShape shape, Pen pen, Matrix4x4F world, double opacity, int transformSlot, out PatternRectItem item)
+    public static bool BakeItemCore(Brush brush, Rect destinationRect, ProceduralGeometry.CornerRadius corners, BrushShape shape, Pen pen, Matrix4x4F world, double opacity, int transformSlot, int fadeSlot, out PatternRectItem item)
     {
         item = default;
         const float eps = 1e-4f;
@@ -188,7 +188,9 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
             Dash = dash,
             Noise = noise,
             Color3 = c3,
-            Anim = new Vector4F((float)brushRecord.PhaseOffset, (float)brushRecord.FrozenPhase, 0, 0)
+            // .z = the opacity slot this instance reads its fade from (-1 = none); Anim's spare component rather than a
+            // field of its own, which the record has no room for.
+            Anim = new Vector4F((float)brushRecord.PhaseOffset, (float)brushRecord.FrozenPhase, fadeSlot, 0)
         };
         return true;
     }

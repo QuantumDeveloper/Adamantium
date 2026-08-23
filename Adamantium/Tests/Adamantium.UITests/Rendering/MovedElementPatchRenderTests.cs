@@ -1,0 +1,239 @@
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Fonts;
+using Adamantium.Imaging;
+using Adamantium.Mathematics;
+using Adamantium.UI.Core;
+using Adamantium.UI.Core.Graphics;
+using Adamantium.UI.Core.Media;
+using Adamantium.UI.Rendering;
+using Adamantium.Vulkan.Core;
+using NUnit.Framework;
+
+namespace Adamantium.UITests.Rendering;
+
+/// <summary>
+/// An element that MOVES and nothing else. Where a thing sits lives in its transform-table slot, so a move is a slot
+/// write - yet the frame carried a single frame-wide "transforms are dirty" flag, and one moved element spoke for the
+/// whole scene: dragging a slider thumb over a 22 064-node tab walked all of it, every frame, at 16 fps.
+/// <para>Both halves are asserted together, and they have to be: the move must cost a PATCH (or the drag is slow) and
+/// the patched picture must equal what a full walk draws (or the move was forgiven without being carried - which is
+/// what the earlier attempt at this did, leaving the drag-and-drop gap shut until a walk arrived and then jumping).</para>
+/// </summary>
+[TestFixture]
+[Category("Gpu")]
+public class MovedElementPatchRenderTests
+{
+    private const int Dim = 96;
+
+    private sealed class Scene : IDisposable
+    {
+        public OffscreenTestRenderer Renderer;
+        public VisualRoot Root;
+        public TestControl Mover;      // the thumb: moves, draws, clips nothing
+        public TestControl Rider;      // its child - it has its OWN slot holding its FULL world, so it only follows
+                                       // if the move is carried down the subtree
+
+        public void Draw()
+        {
+            Assert.That(Renderer.RenderFrame(Root), Is.True, "off-screen frame must render");
+            RenderDirty.Clear();
+        }
+
+        public void Dispose() => Renderer.Dispose();
+    }
+
+    private static TestControl Placed(Rect bounds) =>
+        new() { Bounds = bounds, RenderSize = new Size(bounds.Width, bounds.Height) };
+
+    // A still background plus a two-level mover. The background is what makes the assertion about the SCENE rather than
+    // about the mover: a walk would redraw it too, so "patched and identical" is the whole claim.
+    private static Scene NewScene()
+    {
+        var device = GpuTestDevice.Device;
+        var factory = new RenderUnitFactory(device, new StubResourceFactory());
+        var renderer = new OffscreenTestRenderer(device, factory, Dim, Dim) { ClearColor = Colors.Black };
+
+        var stage = Placed(new Rect(0, 0, Dim, Dim));
+        for (var i = 0; i < 4; i++)
+        {
+            var still = Placed(new Rect(0, i * 24, Dim, 20));
+            still.RenderAction = s => s.DrawRectangle(Brushes.Green, new Rect(0, 0, Dim, 20));
+            stage.Add(still);
+        }
+
+        var mover = Placed(new Rect(8, 8, 24, 24));
+        mover.RenderAction = s => s.DrawRectangle(Brushes.Blue, new Rect(0, 0, 24, 24));
+        stage.Add(mover);
+
+        var rider = Placed(new Rect(4, 4, 8, 8));
+        rider.RenderAction = s => s.DrawRectangle(Brushes.Red, new Rect(0, 0, 8, 8));
+        mover.Add(rider);
+
+        var scene = new Scene { Renderer = renderer, Root = new VisualRoot(stage, Dim, Dim), Mover = mover, Rider = rider };
+        scene.Draw();
+        return scene;
+    }
+
+    private static byte[] Pixels(OffscreenTestRenderer renderer)
+    {
+        using var img = renderer.RenderTarget.ResolveTexture.ReadbackToImage();
+        var bytes = new byte[(int)img.TotalSizeInBytes];
+        Marshal.Copy(img.DataPointer, bytes, 0, bytes.Length);
+        return bytes;
+    }
+
+    private static int DifferingPixels(byte[] a, byte[] b)
+    {
+        var count = 0;
+        for (var i = 0; i < a.Length; i += 4)
+        {
+            if (a[i] != b[i] || a[i + 1] != b[i + 1] || a[i + 2] != b[i + 2] || a[i + 3] != b[i + 3]) count++;
+        }
+
+        return count;
+    }
+
+    private static void AssertMatchesAFullWalk(Scene scene, byte[] patched, string because)
+    {
+        RenderDirty.MarkStructural();
+        scene.Draw();
+
+        Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.False, "the reference frame has to actually walk");
+        Assert.That(DifferingPixels(patched, Pixels(scene.Renderer)), Is.Zero, because);
+    }
+
+    // THE DRAG. One element changes place; nothing else about the scene changes.
+    [Test]
+    public void MovingOneElement_PatchesTheFrame_AndLandsWhereAWalkPutsIt()
+    {
+        using var scene = NewScene();
+
+        scene.Mover.Bounds = new Rect(48, 8, 24, 24);
+        scene.Draw();
+
+        var patched = Pixels(scene.Renderer);
+        Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.True,
+            "a move is a slot write - it must not cost the whole scene a walk");
+        AssertMatchesAFullWalk(scene, patched, "the moved element must be drawn where a full walk draws it");
+    }
+
+    // The subtree. A motion node moves its descendants by ONE matrix; an ordinary mover cannot - every element under it
+    // holds its own slot carrying its own full world, and each has to be written.
+    [Test]
+    public void MovingAContainer_CarriesItsChildrenWithIt()
+    {
+        using var scene = NewScene();
+
+        scene.Mover.Bounds = new Rect(8, 56, 24, 24);
+        scene.Draw();
+
+        var patched = Pixels(scene.Renderer);
+        Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.True, "the frame must still patch");
+        AssertMatchesAFullWalk(scene, patched, "the child must have moved with its parent, not stayed behind");
+    }
+
+    // Repeated steps, as a drag actually arrives - each frame patching on top of the one before it. A slot written from a
+    // STALE world memo would drift, and only a sequence shows that.
+    [Test]
+    public void DraggingItStepByStep_PatchesEveryFrame()
+    {
+        using var scene = NewScene();
+
+        for (var step = 1; step <= 6; step++)
+        {
+            scene.Mover.Bounds = new Rect(8 + step * 8, 8, 24, 24);
+            scene.Draw();
+            Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.True, $"drag step {step} must patch, not walk");
+        }
+
+        AssertMatchesAFullWalk(scene, Pixels(scene.Renderer), "six patched steps must end where one walk would put it");
+    }
+
+    // THE DROP GAP. A tile inside a scrolling panel is batched NODE-RELATIVE: its place is in the instance, not in a
+    // slot of its own, so writing slots moves everything EXCEPT it. That is exactly what the drag-and-drop demo showed -
+    // the labels (per-unit draws, re-pointed at replay) slid to the new slot and the tiles stayed behind. Re-baking the
+    // moved subtree answers both, and this is the test that tells them apart.
+    [Test]
+    public void MovingSomethingInsideAMotionNode_TakesItsBatchedTileWithIt()
+    {
+        var device = GpuTestDevice.Device;
+        var factory = new RenderUnitFactory(device, new StubResourceFactory());
+        using var renderer = new OffscreenTestRenderer(device, factory, Dim, Dim) { ClearColor = Colors.Black };
+
+        var stage = Placed(new Rect(0, 0, Dim, Dim));
+        var panel = Placed(new Rect(0, 0, Dim, Dim));
+        panel.IsRenderMotionNode = true;      // the scrolling host: its subtree rides ITS slot
+        stage.Add(panel);
+
+        var still = Placed(new Rect(0, 60, Dim, 20));
+        still.RenderAction = s => s.DrawRectangle(Brushes.Green, new Rect(0, 0, Dim, 20));
+        panel.Add(still);
+
+        var container = Placed(new Rect(8, 8, 24, 24));
+        var tile = Placed(new Rect(0, 0, 24, 24));
+        tile.RenderAction = s => s.DrawRectangle(Brushes.Blue, new Rect(0, 0, 24, 24));
+        container.Add(tile);
+        panel.Add(container);
+
+        var scene = new Scene { Renderer = renderer, Root = new VisualRoot(stage, Dim, Dim), Mover = container, Rider = tile };
+        scene.Draw();
+
+        container.Bounds = new Rect(48, 8, 24, 24);   // the gap opens: the container slides inside the node
+        scene.Draw();
+
+        var patched = Pixels(renderer);
+        Assert.That(renderer.Cache.LastFrameReplayed, Is.True, "a tile sliding inside a scrolling panel must still patch");
+        AssertMatchesAFullWalk(scene, patched, "the TILE must have moved, not only what is drawn per unit beside it");
+    }
+
+    // The one thing a move CAN stale is a recorded Scissor - a world-space rect nothing re-derives. A mover that clips
+    // still has to hand the frame to the walk, and this is the guard that says so out loud.
+    [Test]
+    public void AMoverThatClips_StillWalks()
+    {
+        using var scene = NewScene();
+        scene.Mover.ClipToBounds = true;
+        RenderDirty.MarkStructural();
+        scene.Draw();
+
+        scene.Mover.Bounds = new Rect(48, 8, 24, 24);
+        scene.Draw();
+
+        Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.False,
+            "a clipping mover's recorded scissor is baked in world space - the frame must be re-recorded");
+    }
+
+    // A drag is not only a move. The slider's accent fill and both halves of its track RESIZE on every step, and a size
+    // lives in the drawn payload rather than in the matrix - so this one is forgiven on a condition the move does not
+    // need: the element must be re-baked on the same frame. It always is (arrange marks a resized element
+    // geometry-invalid), and the assertion against the walk is what proves the new size actually reached the picture.
+    [Test]
+    public void ResizingOneElement_PatchesTheFrame_AndIsDrawnAtItsNewSize()
+    {
+        using var scene = NewScene();
+
+        scene.Mover.Bounds = new Rect(8, 8, 56, 24);
+        scene.Mover.RenderSize = new Size(56, 24);
+        scene.Mover.RenderAction = s => s.DrawRectangle(Brushes.Blue, new Rect(0, 0, 56, 24));
+        scene.Mover.Invalidate();
+        scene.Draw();
+
+        var patched = Pixels(scene.Renderer);
+        Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.True,
+            "a resize that the patch is already re-baking must not also cost the scene a walk");
+        AssertMatchesAFullWalk(scene, patched, "the element must be drawn at its NEW size, not its old one");
+    }
+
+    // The unit factory needs one, but nothing here draws a texture or text.
+    private sealed class StubResourceFactory : IResourceFactory
+    {
+        public ITexture CreateTexture(TextureDescription description, byte[] pixelData) => throw new NotSupportedException();
+        public ITexture CreateTextureArray(TextureDescription description, IReadOnlyList<byte[]> layers) => throw new NotSupportedException();
+        public ITexture ImportSharedSurface(SharedSurfaceDescriptor descriptor) => throw new NotSupportedException();
+        public IRenderTarget CreateRenderTarget(uint width, uint height, MSAALevel msaa, SurfaceFormat format, ImageLayout desiredLayout) => throw new NotSupportedException();
+        public FontRenderer GetFontRenderer(IGraphicsDevice graphicsDevice) => throw new NotSupportedException();
+    }
+}

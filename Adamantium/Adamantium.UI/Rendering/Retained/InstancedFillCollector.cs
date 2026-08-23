@@ -347,7 +347,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
         LastArena = _arenas.TryGetValue(key, out var known) ? known : _arenas[key] = new InstancedKeyArena(this, seg);
         LastSlot = seg.Count;   // ...and which slot of that arena it is, so the walk can note the group run
-        seg.Items[seg.Count++] = GeometryInstance.FromLocal(local, color, transformSlot);
+        seg.Items[seg.Count++] = GeometryInstance.FromLocal(local, color, transformSlot, unit.FadeSlot);
 
         _scissor = scissor;
         if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
@@ -1121,7 +1121,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         if (!gru.TryGetInstancedFill(out var unitKey, out var meshObj, out var color)) return false;
         if (meshObj is not FrozenMesh mesh || !ReferenceEquals(GetOrCreate(unitKey, mesh), seg)) return false;
 
-        stage.Add(GeometryInstance.FromLocal(gru.Place(world), color, transformSlot));
+        stage.Add(GeometryInstance.FromLocal(gru.Place(world), color, transformSlot, unit.FadeSlot));
         return true;
     }
 

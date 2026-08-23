@@ -32,6 +32,11 @@ public partial class RenderCache
     private RenderPacket _packet;                                        // the one being recorded right now
 
     private readonly Dictionary<IUIComponent, float> _opacityChain = new();   // memo of OpacityChain, like _worldCache
+    private readonly Dictionary<IUIComponent, int> _opacitySlotCache = new();   // memo of OpacitySlotOf, same lifetime
+
+    // Set when a fade slot is handed out for the first time - the instances beneath it still carry the old index, so the
+    // frame has to walk instead of patch. Cleared by the walk that acts on it.
+    private bool _fadeSlotJustCreated;
 
     // --- Motion-node memos (the O(1)-scroll path) ---
     // NodeOf: the nearest IsRenderMotionNode ancestor (or null). RelWorld: the transform RELATIVE to that node (identity
@@ -50,6 +55,12 @@ public partial class RenderCache
     private readonly HashSet<IUIComponent> _forgivenMoves = new();
     // The nodes whose matrices THIS frame rewrote - the replay re-points the per-unit draws under them.
     private readonly HashSet<IUIComponent> _movedNodeOwners = new();
+    // APPLIER-owned: the ORDINARY movers of the packets drained for this draw (RefreshMovedComponents writes their
+    // subtrees' slots, then clears). Filled only for movers the applier forgave.
+    private readonly List<IUIComponent> _movedOwnersBuf = new();
+    // The components THIS frame re-baked for a move - the replay re-points the per-unit draws among them.
+    private readonly HashSet<IUIComponent> _movedOwners = new();
+    private readonly List<IUIComponent> _movedSubtree = new();   // ...in visit order, so the re-bake is one flat pass
     // RECORDER-owned: the components that MOVED this frame - CaptureSnapshot re-freezes exactly their snapshot entries.
     private readonly List<IUIComponent> _movedBuf = new();
     private bool _snapFullCapture;   // adorner build only: re-capture the snapshot from the retained units
@@ -377,6 +388,58 @@ public partial class RenderCache
         return v;
     }
 
+    // WHERE this element's alpha comes from at draw time: the opacity slot of the nearest ancestor-or-self that fades,
+    // whose own record composes with the next one up. The instance carries this INDEX and nothing else about opacity, so
+    // a fade is a handful of float writes and the subtree under it is never re-baked.
+    //
+    // A slot already handed out is KEPT even while its element is fully opaque: dropping it at 1.0 would relink every
+    // descendant instance the moment an animation passed through opaque - a structural change, i.e. exactly the re-bake
+    // this exists to avoid - and animations pass through 1.0 constantly.
+    private int OpacitySlotOf(IGraphicsDevice device, IUIComponent c)
+    {
+        if (c == null || _transformTable == null) return -1;
+        if (_opacitySlotCache.TryGetValue(c, out var cached)) return cached;
+
+        var s = ApplySnap(c);
+        var parent = s.RenderParent != null ? OpacitySlotOf(device, s.RenderParent) : -1;
+
+        int slot;
+        var had = _transformTable.TryGetOpacitySlot(c.RenderId, out _);
+        if (!had && s.Opacity >= 1f)
+        {
+            slot = parent;   // draws at its parent's alpha - no link of its own
+        }
+        else
+        {
+            // A slot that did not exist a moment ago is a STRUCTURAL event: every instance under this element carries
+            // the index it read on the last walk, which said "nothing above me fades". They have to be re-baked once to
+            // pick the new index up, and the frame that creates the slot is the only one that knows it happened.
+            // Asked here rather than guessed on the UI side ("was it opaque before?"), which misses an element that was
+            // already translucent or an animation that does not start at 1.
+            if (!had) _fadeSlotJustCreated = true;
+
+            slot = _transformTable.AcquireOpacitySlot(c.RenderId);
+            _transformTable.SetAlpha(device, slot, s.Opacity);
+            _transformTable.SetOpacityParent(device, slot, parent);
+
+            // Just allocated, and the buffer this frame draws from was sized BEFORE that: an instance carrying this
+            // index would have the shader read past the allocation. Draw at the parent's alpha for one frame; the next
+            // walk finds the slot live.
+            if (!_transformTable.IsSlotLive(slot)) slot = parent;
+        }
+
+        _opacitySlotCache[c] = slot;
+        return slot;
+    }
+
+    // This unit's family READS the element's alpha from its opacity slot, so its colour must not carry the chain as
+    // well - or the fade lands twice and the element comes out too dark. Called by those branches only; everything else
+    // keeps the chain in its colour, because its shader pass cannot reach the table on this driver (see GlyphItem).
+    private void FadeBySlot(Core.Graphics.IRenderUnit u)
+    {
+        if (u.Component != null) u.SetEffectiveOpacity(ApplySnap(u.Component).SelfOpacity);
+    }
+
     private IUIComponent NodeOf(IUIComponent c)
     {
         if (c == null) return null;
@@ -497,6 +560,91 @@ public partial class RenderCache
             _movedNodeOwners.Add(node);   // the replay re-points the per-unit draws under them
         }
         _movedNodesBuf.Clear();
+        return true;
+    }
+
+    // The same thing for an ORDINARY mover - an element that changed place without being a motion node (a slider thumb,
+    // a drop gap opening, a re-arranged row). A node moves its whole subtree by rewriting ONE matrix; an ordinary mover
+    // cannot, because nothing about its subtree is expressed relative to it. So its move is carried the way a dirty
+    // element's change is carried: the subtree's drawn units are RE-BAKED, exactly as TryPartialReplay re-bakes the
+    // dirty ones, through the same ResolveBake + PatchSlot pair.
+    //
+    // That is the whole point: O(moved subtree), where forbidding the patch is O(scene). Dragging one thumb over a 22k
+    // node tab was a full 55 ms walk EVERY frame - 16 fps - because the transform-dirty flag is frame-wide and one
+    // element moving spoke for the whole frame.
+    //
+    // Re-baking rather than writing slots is what makes it work under a MOTION NODE, and that distinction is not
+    // academic: writing slots alone moved a drop gap's labels (per-unit draws, re-pointed at replay) while leaving its
+    // TILES behind, because a tile inside a scrolling panel is batched NODE-RELATIVE - its place is in the instance,
+    // not in a slot of its own. ResolveBake answers both cases; a slot write answers only one.
+    //
+    // Forgiveness is decided by the applier (nothing under the mover may clip: a recorded Scissor is a world-space rect
+    // and nothing re-derives it). False = something in a moved subtree cannot be re-baked in place, and the caller
+    // hands the frame to the walk.
+    private bool RefreshMovedComponents(IGraphicsDevice device)
+    {
+        if (_movedOwnersBuf.Count == 0)
+        {
+            _movedOwners.Clear();   // nothing moved this frame - the replay re-points nothing
+            return true;
+        }
+
+        // Validate the WHOLE set before touching anything, as the dirty loop does: a refusal must cost the frame
+        // nothing but the walk it was going to take anyway.
+        _movedOwners.Clear();
+        _movedSubtree.Clear();
+        foreach (var mover in _movedOwnersBuf)
+        {
+            if (CollectMovedSubtree(mover)) continue;
+            Core.Diagnostics.FrameTrace.NoteMoved(_movedOwners.Count, 0, true);
+            _movedOwners.Clear();
+            _movedSubtree.Clear();
+            return false;
+        }
+
+        // Positions moved -> the composed world memos are stale (same reasoning as RefreshMovedNodes; the clip memo is
+        // deliberately kept - a mover that changes a viewport is structural).
+        _worldCache.Clear();
+        _relWorldCache.Clear();
+
+        var rebaked = 0;
+        foreach (var c in _movedSubtree)
+        {
+            if (!_groupById.TryGetValue(c.RenderId, out var g)) continue;
+            foreach (var u in g.Units)
+            {
+                if (!HoldsInstances(u)) continue;   // a per-unit draw - the replay re-points it (RepointIfItMoved)
+                rebaked++;
+                var bakeWorld = ResolveBake(device, u.Component, World(u.Component), out var slot);
+                if (PatchSlot(device, u, bakeWorld, slot)) continue;
+                Core.Diagnostics.FrameTrace.NoteMoved(_movedOwners.Count, rebaked, true);
+                return false;
+            }
+        }
+
+        Core.Diagnostics.FrameTrace.NoteMoved(_movedOwners.Count, rebaked, false);
+        _movedOwnersBuf.Clear();
+        return true;
+    }
+
+    // Everything in a moved subtree, collected once. The visited set doubles as the guard against re-walking: a
+    // container and its children can BOTH be named movers (a panel re-arranging its rows), and without it overlapping
+    // subtrees would cost the frame O(n^2).
+    private bool CollectMovedSubtree(IUIComponent c)
+    {
+        if (c == null || !_movedOwners.Add(c)) return true;
+
+        if (_groupById.TryGetValue(c.RenderId, out var g))
+        {
+            foreach (var u in g.Units)
+                if (HoldsInstances(u) && !IsSlotPatchable(u))
+                    return false;
+        }
+
+        _movedSubtree.Add(c);
+        foreach (var child in c.VisualChildren)
+            if (!CollectMovedSubtree(child)) return false;
+
         return true;
     }
 

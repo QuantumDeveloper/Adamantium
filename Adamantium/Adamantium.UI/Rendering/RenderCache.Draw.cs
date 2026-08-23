@@ -395,6 +395,7 @@ public partial class RenderCache
     private static bool SubtreeClips(IUIComponent node)
     {
         if (node == null) return false;
+        Core.Diagnostics.FrameTrace.ClipProbeVisits++;   // TEMP
         if (node.ClipToBounds) return true;
 
         foreach (var child in node.VisualChildren)
@@ -588,7 +589,8 @@ public partial class RenderCache
         // Clean-frame replay: re-issue the last recorded walk's op stream and skip the per-unit loop (the retained buffers
         // still hold its bytes). Only a fully-Clean build qualifies; a Partial/Full re-walks and re-records.
         if (device != null && !ReplayDisabled && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Clean && OpsMatchTransforms
-            && RefreshMovedNodes(device))   // moved nodes first: write their matrices, or the replay draws them where they were
+            && RefreshMovedNodes(device)          // moved nodes first: write their matrices, or the replay draws them where they were
+            && RefreshMovedComponents(device))    // ...and the ordinary movers' subtrees, for the same reason
         {
             AcceptPatchedTransforms();
             LastFrameReplayed = true;
@@ -636,11 +638,15 @@ public partial class RenderCache
             _rectSlotByUnit.Clear();
             _sdfSlotByUnit.Clear();
             _textRunByUnit.Clear();
+            _fillSlotByUnit.Clear();
+            _slotBlindUnits.Clear();
             _unitsByBrush.Clear(); 
             _walkGroup = null; 
             _walkVersion++;
             _nodeAllAware.Clear();
             _movedNodesBuf.Clear();   // a full walk re-bakes fresh node matrices - pending node moves are subsumed
+            _movedOwnersBuf.Clear();  // ...and every mover's subtree along with them
+            _movedOwners.Clear();
             // ...but "subsumed" holds only if this walk composes CURRENT transforms. When the fast path BAILS on a moved
             // node (non-aware content - e.g. a tile that just face-swapped to an image) it bails BEFORE its own memo flush,
             // so this fall-through walk would re-bake the moving subtree at LAST frame's memoized position (a flip froze at
@@ -649,6 +655,8 @@ public partial class RenderCache
             _worldCache.Clear();
             _relWorldCache.Clear();
             _opacityChain.Clear();
+            _opacitySlotCache.Clear();
+            _fadeSlotJustCreated = false;   // THIS walk is the one that re-bakes the instances with the new slot index
         }
 
         // Text + item-background + instanced-fill batches: reset per frame. Device renders only - GPU-free tests skip batching.
@@ -776,6 +784,7 @@ public partial class RenderCache
             // while baking, the per-unit path reuses it). Culled units returned above. Compose the effective alpha from the
             // frozen snapshot first, so batches (rru.FillOpacity) and per-unit renderers bake with the current opacity.
             unit.SetEffectiveOpacity(EffectiveOpacity(unit.Component));
+            unit.SetFadeSlot(OpacitySlotOf(device, unit.Component));
             unit.Update(wt, _projectionMatrix, _renderScale);
 
             // The unit's soft bands (aura / shadow), if it wears any. NOT an alternative to its fill - an addition, so it
@@ -813,7 +822,8 @@ public partial class RenderCache
                 if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(0, rectBounds, unit.Component))   // 0 = rect layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var bakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Rect);
-                if (_rectBatch.TryAdd(rru.RectPayload, bakeWorld, rru.FillOpacity, scissor, rectBounds, slot4Rect, TagOf(group)))
+                FadeBySlot(unit);   // this pass reads the alpha from the slot - keep it out of the colour
+                if (_rectBatch.TryAdd(rru.RectPayload, bakeWorld, rru.FillOpacity, scissor, rectBounds, slot4Rect, rru.FadeSlot, TagOf(group)))
                 {
                     if (_recording)
                     {
@@ -839,7 +849,8 @@ public partial class RenderCache
                 if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(2, gradRectBounds, unit.Component))   // 2 = gradient-rect layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var gradBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Grad);
-                if (_gradientRectBatch.TryAdd(grru.RectPayload, gradBakeWorld, grru.FillOpacity, scissor, gradRectBounds, slot4Grad))
+                FadeBySlot(unit);
+                if (_gradientRectBatch.TryAdd(grru.RectPayload, gradBakeWorld, grru.FillOpacity, scissor, gradRectBounds, slot4Grad, grru.FadeSlot))
                 {
                     if (_recording)
                     {
@@ -860,7 +871,8 @@ public partial class RenderCache
                 if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(1, ellipseBounds, unit.Component))   // 1 = ellipse layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var bakeWorld = ResolveBake(device, unit.Component, wt, out var slot4El);
-                if (_ellipseBatch.TryAdd(eru.EllipsePayload, bakeWorld, eru.FillOpacity, scissor, ellipseBounds, slot4El))
+                FadeBySlot(unit);
+                if (_ellipseBatch.TryAdd(eru.EllipsePayload, bakeWorld, eru.FillOpacity, scissor, ellipseBounds, slot4El, eru.FadeSlot))
                 {
                     if (_recording)
                     {
@@ -905,7 +917,8 @@ public partial class RenderCache
                 if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(2, gradPolyBounds, unit.Component))   // 2 = gradient-rect layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var gradPolyBake = ResolveBake(device, unit.Component, wt, out var slot4GradPoly);
-                if (_gradientRectBatch.TryAddPolygon(gpru.PolygonPayload, gradPolyBake, gpru.FillOpacity, scissor, gradPolyBounds, slot4GradPoly))
+                FadeBySlot(unit);
+                if (_gradientRectBatch.TryAddPolygon(gpru.PolygonPayload, gradPolyBake, gpru.FillOpacity, scissor, gradPolyBounds, slot4GradPoly, gpru.FadeSlot))
                 {
                     if (_recording)
                     {
@@ -927,7 +940,7 @@ public partial class RenderCache
                 if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(4, patPolyBounds, unit.Component))   // 4 = pattern layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var patPolyBake = ResolveBake(device, unit.Component, wt, out var slot4PatPoly);
-                if (_patternBatch.TryAddPolygon(ppru.PolygonPayload, patPolyBake, ppru.FillOpacity, scissor, patPolyBounds, slot4PatPoly))
+                if (_patternBatch.TryAddPolygon(ppru.PolygonPayload, patPolyBake, ppru.FillOpacity, scissor, patPolyBounds, slot4PatPoly, ppru.FadeSlot))
                 {
                     if (_recording) group.NotBatchable("patternPolygon");
                     _batchScissor = scissor;
@@ -955,7 +968,7 @@ public partial class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }
                 var texPolyBake = ResolveBake(device, unit.Component, wt, out var slot4TexPoly);
-                if (_texRectBatch.TryAddPolygon(tpru.PolygonPayload, texPolyBake, tpru.FillOpacity, scissor, texPolyBounds, texPolyTexture, slot4TexPoly))
+                if (_texRectBatch.TryAddPolygon(tpru.PolygonPayload, texPolyBake, tpru.FillOpacity, scissor, texPolyBounds, texPolyTexture, slot4TexPoly, tpru.FadeSlot))
                 {
                     if (_recording) group.NotBatchable("texturedPolygon");
                     _batchScissor = scissor;
@@ -972,7 +985,8 @@ public partial class RenderCache
                 if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(3, gradElBounds, unit.Component))   // 3 = gradient-ellipse layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var gradElBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4GradEl);
-                if (_gradientEllipseBatch.TryAdd(geru.EllipsePayload, gradElBakeWorld, geru.FillOpacity, scissor, gradElBounds, slot4GradEl))
+                FadeBySlot(unit);
+                if (_gradientEllipseBatch.TryAdd(geru.EllipsePayload, gradElBakeWorld, geru.FillOpacity, scissor, gradElBounds, slot4GradEl, geru.FadeSlot))
                 {
                     if (_recording)
                     {
@@ -998,7 +1012,7 @@ public partial class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }
                 var patElBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4PatEl);
-                if (_patternBatch.TryAddEllipse(peru.EllipsePayload, patElBakeWorld, peru.FillOpacity, scissor, patElBounds, slot4PatEl))
+                if (_patternBatch.TryAddEllipse(peru.EllipsePayload, patElBakeWorld, peru.FillOpacity, scissor, patElBounds, slot4PatEl, peru.FadeSlot))
                 {
                     if (_recording)
                     {
@@ -1021,7 +1035,7 @@ public partial class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }
                 var patBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Pat);
-                if (_patternBatch.TryAdd(pru.RectPayload, patBakeWorld, pru.FillOpacity, scissor, patternBounds, slot4Pat))
+                if (_patternBatch.TryAdd(pru.RectPayload, patBakeWorld, pru.FillOpacity, scissor, patternBounds, slot4Pat, pru.FadeSlot))
                 {
                     // Pattern is node-aware (rides the transform table), but NOT paint/splice-patchable in v1: no
                     // _sdfSlotByUnit entry, so a dirty pattern falls to a full walk (patterns are static backdrops).
@@ -1085,7 +1099,7 @@ public partial class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }
                 var texBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Tex);
-                if (_texRectBatch.TryAdd(xru.RectPayload, texBakeWorld, xru.FillOpacity, scissor, texBounds, texture, slot4Tex))
+                if (_texRectBatch.TryAdd(xru.RectPayload, texBakeWorld, xru.FillOpacity, scissor, texBounds, texture, slot4Tex, xru.FadeSlot))
                 {
                     if (_recording)
                     {
@@ -1119,7 +1133,7 @@ public partial class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }
                 var texEllBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4TexEll);
-                if (_texRectBatch.TryAddEllipse(xeru.EllipsePayload, texEllBakeWorld, xeru.FillOpacity, scissor, texEllBounds, texEllTexture, slot4TexEll))
+                if (_texRectBatch.TryAddEllipse(xeru.EllipsePayload, texEllBakeWorld, xeru.FillOpacity, scissor, texEllBounds, texEllTexture, slot4TexEll, xeru.FadeSlot))
                 {
                     if (_recording)
                     {
@@ -1144,8 +1158,12 @@ public partial class RenderCache
                 // per-unit path composes the same value through Update.
                 var textBake = tru.Place(ResolveBake(device, unit.Component, wt, out var slot4Text));
                 var textFirst = _textBatch.RetainedCount;
-                if (_textBatch.TryAdd(tc, textBake, slot4Text, scissor, atlas, LogicalBounds(unit.Component, wt)))
+                if (_textBatch.TryAdd(tc, textBake, slot4Text, unit.FadeSlot, scissor, atlas, LogicalBounds(unit.Component, wt)))
                 {
+                    // Text bakes the opacity CHAIN into its glyph colours (its shader cannot read the slot), so an
+                    // ancestor's fade has to find it - noted on every walk, like the slot maps.
+                    _slotBlindUnits.Add(unit);
+
                     if (_recording)
                     {
                         // SLOT-patchable while the glyph count holds; and when it does NOT, the run is what the splice
@@ -1180,6 +1198,14 @@ public partial class RenderCache
                 if (_instancedFill.TryAdd(gru, fillBake, scissor, LogicalBounds(unit.Component, wt), slot4Fill))
                 {
                     gru.FillInstanced = true;
+                    // WHERE this fill sits is a fact about the arena as it stands, so it is remembered on EVERY walk -
+                    // the paint patch asks on frames that record nothing, which is exactly when it is asked. Without it
+                    // IsSlotPatchable answered "no" for every Path, and one of them cost the frame a walk of the whole
+                    // scene: measured at 200 refusals in 8 s on a faded subtree, 38 ms a frame against 0.5 patched.
+                    if (_instancedFill.LastArena is { } fillArenaSlot)
+                        _fillSlotByUnit[unit] = (fillArenaSlot, _instancedFill.LastSlot);
+                    _slotBlindUnits.Add(unit);   // an instanced fill bakes the chain into its colour - see the text above
+
                     // The fill AND its analytic-AA fringe both ride the slot (one shared ring per mesh, drawn from the same
                     // instance buffer). A unit that still draws a per-unit overlay - a stroke, or a fringe the instanced
                     // path doesn't cover - bakes THAT from RenderData at record time, and it is re-pointed at the flush
@@ -1420,8 +1446,29 @@ public partial class RenderCache
                 ApplyCompositedTransform(device, entry);
                 if (entry.Owner != null) _compositedOwners.Add(entry.Owner);
             }
+            else if (entry.Channel == CompositorChannel.Opacity) ApplyCompositedOpacity(device, entry);
             else ApplyCompositedPaint(device, entry);
         }
+    }
+
+    // OPACITY: the twin of the transform write below, four bytes instead of sixty-four. The element's alpha goes into its
+    // opacity slot and every instance under it composes it at draw time, so a fading subtree costs one write however large
+    // it is. The frozen SNAPSHOT is updated for the same reason the transform updates it: a walk that runs THIS frame must
+    // agree with the compositor rather than re-bake the element back at its old alpha.
+    private void ApplyCompositedOpacity(IGraphicsDevice device, Compositor.Entry entry)
+    {
+        if (entry.Owner is not { } owner || _transformTable == null) return;
+
+        var slot = OpacitySlotOf(device, owner);
+        if (slot < 0) return;   // not drawing, or its slot is not in this frame's buffer yet - the next walk links it
+
+        _transformTable.SetAlpha(device, slot, entry.Alpha);
+
+        // Keep the snapshot's own value in step, so EffectiveOpacity (which the slot-blind families still bake with)
+        // reads the alpha the compositor just applied.
+        if (_applySnap.TryGetValue(owner, out var snap))
+            _applySnap[owner] = new LayoutSnapshot(snap.LocalTransform, snap.RenderSize, snap.ClipToBounds,
+                snap.IsMotionNode, snap.RenderParent, entry.Alpha, snap.SelfOpacity);
     }
 
     // TRANSFORM: one 64-byte matrix write moves the whole node, and it lands in TWO places. The transform table is what the
@@ -1490,8 +1537,11 @@ public partial class RenderCache
         // Moved motion nodes first: rewrite their table matrices (64B each) so the replayed segments draw the scrolled
         // subtrees at their new position. A moved node with non-node-aware retained content bails to the full walk.
         if (!RefreshMovedNodes(device)) return SpliceRefused("movedNode");
+        // ...then the ordinary movers, so the re-bakes below compose from the new worlds.
+        if (!RefreshMovedComponents(device)) return SpliceRefused("movedComponent");
 
         _opacityChain.Clear();   // a paint-only opacity change may have re-frozen the dirty subtree's snapshot; recompose it
+        _opacitySlotCache.Clear();
 
         foreach (var comp in _partialDirty)
         {
@@ -1521,18 +1571,79 @@ public partial class RenderCache
         // (just-updated) payload into its retained slot. (No-units components patched nothing above.)
         foreach (var comp in _partialDirty)
         {
+            // THE FADE ITSELF, and it belongs to the COMPONENT, not to its units: this writes the element's alpha into
+            // its opacity slot, which is the one thing a fade changes. Done before - and independently of - the group
+            // lookup, because the element whose Opacity moved is usually a CONTAINER: it owns no units of its own, so
+            // hanging this off them wrote the alpha nowhere and the subtree only caught up when something else forced a
+            // walk (the tiles "gasnut odin raz v konce").
+            OpacitySlotOf(device, comp);
+
             if (!_groupById.TryGetValue(comp.RenderId, out var g)) continue;
             foreach (var u in g.Units)
             {
+                u.SetFadeSlot(OpacitySlotOf(device, u.Component));
+
+                // A unit whose shader READS that slot needs nothing else here. This path only runs when nothing MOVED
+                // (see the caller's !LastBuildTransformDirty), so its geometry and its baked colour are both still
+                // right - re-baking it would write back the same bytes. Skipping it is what makes fading a container
+                // cost O(fading elements) instead of O(subtree): 22k instances re-baked per frame was 42 ms.
+                // NOT skipped by family here. A dirty component reaches this loop for ANY paint change - a recolour as
+                // much as a fade - and skipping the slot readers left a re-brushed element painted in its old colour
+                // (measured: 882 pixels against a full walk, five tests). A FADE avoids this loop entirely instead, by
+                // riding the compositor's Opacity channel - see ApplyCompositedOpacity.
+
+                // TEMP: WHICH families the patch still re-bakes once the slot readers are skipped.
+                Core.Diagnostics.FrameTrace.NotePatched($"{u.GetType().Name}<{u.Component?.GetType().Name}>");
+
                 u.SetEffectiveOpacity(EffectiveOpacity(u.Component));   // a paint change may be an opacity change
                 var bakeWorld = ResolveBake(device, u.Component, World(u.Component), out var slot);
                 if (!PatchSlot(device, u, bakeWorld, slot))
                     return SpliceRefused($"notBakeable<{u.Component?.GetType().Name}>");   // rotated; the walk re-bakes anyway
             }
         }
+        if (!RefreshSlotBlindUnder(device)) return false;
+
+        // A fade that just STARTED handed out a slot, and the instances under it still carry the index they were baked
+        // with. Hand the frame to the walk so they pick it up - once, at the start of the fade; every step after it is
+        // one float in the table.
+        if (_fadeSlotJustCreated) return SpliceRefused("fadeSlotCreated");
+
         AcceptPatchedTransforms();
         ExecuteOps(device, fullScissor);
         return true;
+    }
+
+    // Element Opacity marks only the element it was set on - the slot carries it down to everyone whose shader reads it.
+    // The families that CANNOT read it (text, instanced fills) still hold the chain in their baked colour, so they are
+    // re-baked here: the handful that sit under a dirty element, found by walking the short list of them rather than the
+    // subtree. False = one of them could not be re-baked, and the caller falls back to the walk.
+    private bool RefreshSlotBlindUnder(IGraphicsDevice device)
+    {
+        if (_slotBlindUnits.Count == 0 || _partialDirty.Count == 0) return true;
+
+        foreach (var u in _slotBlindUnits)
+        {
+            if (u.Component == null || !IsUnder(u.Component, _partialDirty)) continue;
+
+            u.SetEffectiveOpacity(EffectiveOpacity(u.Component));
+            u.SetFadeSlot(OpacitySlotOf(device, u.Component));
+            if (!IsSlotPatchable(u)) return false;
+
+            var bakeWorld = ResolveBake(device, u.Component, World(u.Component), out var slot);
+            if (!PatchSlot(device, u, bakeWorld, slot)) return false;
+        }
+        return true;
+    }
+
+    // Is this element inside any of the dirty ones? Walks the RENDER parent chain of the frozen snapshot - the same
+    // chain the opacity composes along, so "affected by that fade" and "found here" are the same question.
+    private bool IsUnder(IUIComponent c, List<IUIComponent> roots)
+    {
+        for (var at = c; at != null; at = ApplySnap(at).RenderParent)
+            foreach (var root in roots)
+                if (ReferenceEquals(at, root)) return true;
+
+        return false;
     }
 
     // A patch WRITES node matrices - that is how a scrolled or re-baked element moves without re-recording. The op stream
@@ -1549,8 +1660,39 @@ public partial class RenderCache
 
     // Does this unit's GPU data live in ONE retained SDF-batch slot we can rewrite in place? The whole precondition for
     // repainting without re-walking. Anything else (text, per-unit geometry, an instanced fill) keeps its bytes elsewhere.
+    // Does this unit still occupy records in some arena? The slot maps are exactly that ledger.
+    private bool HoldsInstances(IRenderUnit u) =>
+        _rectSlotByUnit.ContainsKey(u) || _sdfSlotByUnit.ContainsKey(u)
+        || _textRunByUnit.ContainsKey(u) || _fillSlotByUnit.ContainsKey(u);
+
+    // Does THIS unit draw from a pass that reads the element's alpha from the opacity slot? The slot maps answer it:
+    // a rect holds a rect-batch slot, and the SDF map holds only the three families whose shaders read it too.
+    private bool ReadsSlotAlpha(IRenderUnit u) =>
+        _rectSlotByUnit.ContainsKey(u) || _sdfSlotByUnit.ContainsKey(u);
+
+    // Does this arena's shader pass read the element's alpha from the opacity slot? Only these four do; the rest could
+    // not take the extra work on this driver and still fold the opacity CHAIN into their colour (see GlyphItem).
+    private bool ReadsFadeSlot(BatchArena arena) =>
+        ReferenceEquals(arena, _rectBatch) || ReferenceEquals(arena, _ellipseBatch)
+        || ReferenceEquals(arena, _gradientRectBatch) || ReferenceEquals(arena, _gradientEllipseBatch);
+
+    // Is this unit in the paint order at all? A group that is not draws nothing, so the walk never visits it and no slot
+    // map holds its units - there is nothing to repaint and nothing to refuse over.
+    private bool Drawing(IRenderUnit u) =>
+        u.Component == null || (_groupById.TryGetValue(u.Component.RenderId, out var owner) && owner.InOrder);
+
     private bool IsSlotPatchable(IRenderUnit u)
     {
+        // NOT DRAWING and holding NO instances = nothing to repaint and nothing to erase, so the patch serves it by
+        // doing nothing. Asked here and not only in PatchSlot because this is the question put first: a dirty unit
+        // outside the paint order (an opacity change reaching a hidden subtree) answered "not patchable" and cost the
+        // frame a walk of the whole scene for a repaint with no pixels in it - ~170 walks in 8 s on a 22k-node tab.
+        //
+        // A unit that stopped drawing but is STILL IN THE ARENA is the opposite case: its instances have to be BLANKED,
+        // which only the splice (or a walk) does. Answering "done" for it leaves the departed subtree on screen -
+        // measured as 882 stale pixels against a full walk.
+        if (!Drawing(u)) return !HoldsInstances(u);
+
         // A CLONED unit fills one slot PER CLONE, and the maps below hold ONE slot per unit - the last the walk wrote.
         // Patching through it repaints a single card, and once the clone set shrinks (a list finishing its fill) the
         // walk renumbers the arena behind that run, so the remembered slot belongs to whatever moved into its place:
@@ -1575,6 +1717,15 @@ public partial class RenderCache
                 && atlas == run.Atlas
                 && tc.GlyphRun.Count == run.Count;
 
+        // A geometry unit whose FILL rides the instanced collector owns one record there, and that arena can re-bake a
+        // record in place. Only while the fill is still instanced: a unit that fell back to a per-unit draw this frame
+        // (rotated, or the buffer overflowed) has no record to patch, and its slot number belongs to whoever took it.
+        if (u is GeometryRenderUnit fgru)
+            return fgru.FillInstanced
+                   && _fillSlotByUnit.ContainsKey(u)
+                   && _instancedFill != null
+                   && _instancedFill.CanBatch(fgru);
+
         if (u is EllipseRenderUnit eru && _sdfSlotByUnit.TryGetValue(u, out var e))
             return e.Kind == SdfSlotKind.Ellipse
                 ? _ellipseBatch.CanBatch(eru.EllipsePayload)
@@ -1596,14 +1747,18 @@ public partial class RenderCache
 
         if (u is RectangleRenderUnit rru)
         {
+            // Only the SLOT-READING families are patched here (the maps below hold nothing else), so the colour is
+            // re-baked WITHOUT the chain - exactly as the walk bakes it.
+            FadeBySlot(u);
+
             if (_rectSlotByUnit.TryGetValue(u, out var rectSlot))
             {
-                if (!RectBatchCollector.BakeItem(rru.RectPayload, bakeWorld, rru.FillOpacity, transformSlot, out var item)) return false;
+                if (!RectBatchCollector.BakeItem(rru.RectPayload, bakeWorld, rru.FillOpacity, transformSlot, rru.FadeSlot, out var item)) return false;
                 _rectBatch.UpdateSlot(device, rectSlot, item);
                 return true;
             }
 
-            if (!GradientRectCollector.BakeItem(rru.RectPayload, bakeWorld, rru.FillOpacity, transformSlot, out var gradItem)) return false;
+            if (!GradientRectCollector.BakeItem(rru.RectPayload, bakeWorld, rru.FillOpacity, transformSlot, rru.FadeSlot, out var gradItem)) return false;
             _gradientRectBatch.UpdateSlot(device, _sdfSlotByUnit[u].Slot, gradItem);
             return true;
         }
@@ -1611,19 +1766,34 @@ public partial class RenderCache
         if (u is TextRenderUnit tru)
         {
             // The block's own placement rides on top of the bake, exactly as the recording walk composed it.
-            return _textBatch.UpdateRun(device, _textRunByUnit[u].First, tru.TextComponent, tru.Place(bakeWorld), transformSlot);
+            return _textBatch.UpdateRun(device, _textRunByUnit[u].First, tru.TextComponent, tru.Place(bakeWorld), transformSlot, tru.FadeSlot);
+        }
+
+        if (u is GeometryRenderUnit)
+        {
+            // Through the arena's own stage: it knows how to bake one record of its key, and the same two calls are what
+            // the splice uses to replace a record. Staged, written, and the stage dropped - a patch owns nothing between
+            // frames. The colour keeps the opacity CHAIN here: this family's shader does not read the slot.
+            var (fillArena, fillSlot) = _fillSlotByUnit[u];
+            fillArena.ClearStage();
+            if (!fillArena.TryStage(u, bakeWorld, transformSlot, 0)) return false;
+
+            fillArena.UpdateSlotFromStage(device, fillSlot, 0);
+            fillArena.ClearStage();
+            return true;
         }
 
         var eru = (EllipseRenderUnit)u;
         var entry = _sdfSlotByUnit[u];
+        FadeBySlot(u);   // both ellipse families read the alpha from the slot - see the rectangle above
         if (entry.Kind == SdfSlotKind.Ellipse)
         {
-            if (!EllipseBatchCollector.BakeItem(eru.EllipsePayload, bakeWorld, eru.FillOpacity, transformSlot, out var item)) return false;
+            if (!EllipseBatchCollector.BakeItem(eru.EllipsePayload, bakeWorld, eru.FillOpacity, transformSlot, eru.FadeSlot, out var item)) return false;
             _ellipseBatch.UpdateSlot(device, entry.Slot, item);
             return true;
         }
 
-        if (!GradientEllipseCollector.BakeItem(eru.EllipsePayload, bakeWorld, eru.FillOpacity, transformSlot, out var gradEllipse)) return false;
+        if (!GradientEllipseCollector.BakeItem(eru.EllipsePayload, bakeWorld, eru.FillOpacity, transformSlot, eru.FadeSlot, out var gradEllipse)) return false;
         _gradientEllipseBatch.UpdateSlot(device, entry.Slot, gradEllipse);
         return true;
     }
@@ -1656,11 +1826,13 @@ public partial class RenderCache
     {
         // Moved motion nodes first (same as TryPartialReplay): rewrite their matrices, bail on non-aware content.
         if (!RefreshMovedNodes(device)) return SpliceRefused("movedNode");
+        if (!RefreshMovedComponents(device)) return SpliceRefused("movedComponent");
 
         // Op stream grown too long from accumulated splices -> recompact with a full walk before it mis-replays.
         if (_ops.Count > MaxRetainedOps) return SpliceRefused("opsTooLong");
 
         _opacityChain.Clear();   // recompose from the (possibly re-frozen) snapshot, as in TryPartialReplay
+        _opacitySlotCache.Clear();
 
         // ---- Phase 1: validate + bake (no mutation) ----
         _patchBuf.Clear();
@@ -1668,6 +1840,8 @@ public partial class RenderCache
         var appendTotal = 0;
         foreach (var comp in _partialDirty)
         {
+            OpacitySlotOf(device, comp);   // the fade itself, on the component - see TryPartialReplay
+
             if (!_groupById.TryGetValue(comp.RenderId, out var group)) continue;   // no drawn units - contributes nothing
 
             // The same refusal the paint order makes on the way in: a splice re-appends a group's content into the arena
@@ -1716,6 +1890,7 @@ public partial class RenderCache
             foreach (var u in group.Units)
             {
                 u.SetEffectiveOpacity(EffectiveOpacity(u.Component));   // a splice may ride an opacity cascade too
+                u.SetFadeSlot(OpacitySlotOf(device, u.Component));
                 var wt = World(u.Component);
                 if (!haveScissor)
                 {
@@ -1724,6 +1899,9 @@ public partial class RenderCache
                     if (cull) break;   // whole component off-clip: it contributes no items (units share the component)
                 }
                 var bakeWorld = ResolveBake(device, u.Component, wt, out var slot);
+                // The families whose shaders read the opacity slot must be re-baked WITHOUT the chain in their colour,
+                // exactly as the walk bakes them; the rest keep it. Which arena repairs this group says which it is.
+                if (ReadsFadeSlot(arena)) FadeBySlot(u);
                 if (!arena.TryStage(u, bakeWorld, slot, TagOf(group)))
                     return SpliceRefused($"notStageable<{u.GetType().Name} in {comp.GetType().Name}>");
                 // How many INSTANCES it added, which is not how many units were asked: one rectangle is one instance, one
