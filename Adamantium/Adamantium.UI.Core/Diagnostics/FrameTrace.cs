@@ -65,31 +65,6 @@ public static class FrameTrace
     /// caused by anything else.</summary>
     public static int Walks;
 
-    /// <summary>TEMP: how big a MOVE the patch tried to carry - components collected and instance-holding units re-baked,
-    /// worst frame of the run, and how much of that work a refusal then threw away. A move is meant to be O(moved); these
-    /// say whether some scenario makes it O(scene) and then walks anyway - paying twice.</summary>
-    public static int MovedCollectedMax, MovedRebakedMax, MovedWastedMax, MovedRefusals;
-
-    /// <summary>TEMP: why a frame's moves could NOT be carried, so why=3 stops saying only "something moved". This is the
-    /// number that named the tab-switch drop: 261 frames of a 40 s run refused over one clip inside a sliding view.</summary>
-    public static readonly Dictionary<string, int> NotCarried = new();
-
-    public static void NoteNotCarried(string reason)
-    {
-        if (!Enabled) return;
-        lock (NotCarried) NotCarried[reason] = NotCarried.TryGetValue(reason, out var had) ? had + 1 : 1;
-    }
-
-    public static void NoteMoved(int collected, int rebaked, bool refused)
-    {
-        if (!Enabled) return;
-        if (collected > MovedCollectedMax) MovedCollectedMax = collected;
-        if (rebaked > MovedRebakedMax) MovedRebakedMax = rebaked;
-        if (!refused) return;
-        MovedRefusals++;
-        if (rebaked > MovedWastedMax) MovedWastedMax = rebaked;
-    }
-
     public static void NotePatched(string what)
     {
         if (!Enabled) return;
