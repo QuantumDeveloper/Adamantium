@@ -411,6 +411,17 @@ internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
         return index < 0 ? null : _segments[index].Scissor;
     }
 
+    /// <summary>Give a recorded segment a freshly derived clip. A segment's scissor is a WORLD-space rect frozen when it
+    /// flushed, so a viewport that moves afterwards leaves it describing the frame before - the one thing about a move
+    /// that a slot write does not carry. Deriving it again is what lets the move be carried instead of re-recorded (see
+    /// RenderCache.RefreshMovedScissors). A flush cycle ends whenever the scissor changes, so one segment is always one
+    /// clip, which is what makes a single rect the right answer here.</summary>
+    public override void SetSegmentScissor(int id, Rect2D scissor)
+    {
+        var index = IndexOf(id);
+        if (index >= 0) _segments[index] = _segments[index] with { Scissor = scissor };
+    }
+
     /// <summary>What this recorded segment covers, in logical coordinates - empty when it never had bounds (a stale id, or
     /// a segment re-issued to nothing).</summary>
     public override Rect SegmentBounds(int id)

@@ -70,36 +70,14 @@ public static class FrameTrace
     /// say whether some scenario makes it O(scene) and then walks anyway - paying twice.</summary>
     public static int MovedCollectedMax, MovedRebakedMax, MovedWastedMax, MovedRefusals;
 
-    /// <summary>TEMP: nodes visited answering "does anything under this mover clip", per apply. Asked once per named
-    /// mover over its whole subtree, so a frame that moves a panel AND its children asks it about the same nodes over
-    /// and over - this counts whether that is a handful or a square.</summary>
-    public static int ClipProbeVisits, ClipProbeVisitsMax;
-
-    /// <summary>TEMP: why a frame's moves could NOT be carried, so why=3 stops saying only "something moved".</summary>
+    /// <summary>TEMP: why a frame's moves could NOT be carried, so why=3 stops saying only "something moved". This is the
+    /// number that named the tab-switch drop: 261 frames of a 40 s run refused over one clip inside a sliding view.</summary>
     public static readonly Dictionary<string, int> NotCarried = new();
-
-    /// <summary>TEMP: the SETTLE - every geometry change of a clipping element that cost the frame its patch, in order,
-    /// said as "was -> now". A count says a tab switch re-lays-out its view ~34 times; only the sequence says whether
-    /// that is one size converging, two sizes alternating, or the same size published over and over.</summary>
-    public static readonly List<string> Settle = new();
-
-    public static void NoteSettle(string line)
-    {
-        if (!Enabled) return;
-        lock (Settle) { if (Settle.Count < 600) Settle.Add(line); }
-    }
 
     public static void NoteNotCarried(string reason)
     {
         if (!Enabled) return;
         lock (NotCarried) NotCarried[reason] = NotCarried.TryGetValue(reason, out var had) ? had + 1 : 1;
-    }
-
-    public static void NoteClipProbeDone()
-    {
-        if (!Enabled) return;
-        if (ClipProbeVisits > ClipProbeVisitsMax) ClipProbeVisitsMax = ClipProbeVisits;
-        ClipProbeVisits = 0;
     }
 
     public static void NoteMoved(int collected, int rebaked, bool refused)

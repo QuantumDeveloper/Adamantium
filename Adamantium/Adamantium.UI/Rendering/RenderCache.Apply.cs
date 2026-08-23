@@ -134,10 +134,12 @@ public partial class RenderCache
     // Its PLACE, always: where an element sits lives in its transform-table slot, and the draw writes that slot
     // (RefreshMovedNodes for a motion node, RefreshMovedComponents for anything else).
     //
-    // Its SIZE, but only while the element is being RE-BAKED on this same frame. A size is not in the matrix, it is in the
-    // drawn payload - so unless the patch is already rewriting that payload there is nothing to carry it and the stream
-    // would go on drawing the old size. Arrange marks a resized element geometry-invalid without exception
-    // (MeasurableUIComponent: "A size change must re-run OnRender"), so this is the ordinary case, not a lucky one.
+    // Its SIZE, but only while the element is being RE-BAKED on this same frame AND nothing under it clips. A size is not
+    // in the matrix, it is in the drawn payload - so unless the patch is already rewriting that payload there is nothing
+    // to carry it. Arrange marks a resized element geometry-invalid without exception (MeasurableUIComponent: "A size
+    // change must re-run OnRender"), so that half is the ordinary case, not a lucky one. The clip half is the harder
+    // one: a viewport that changes SHAPE changes which units fall outside it, and a unit culled at record time has no op
+    // in the stream to correct.
     //
     // Nothing else. It started clipping, became a motion node, changed parent - each of those changes what the stream
     // baked in a way no slot write reaches.
@@ -146,17 +148,10 @@ public partial class RenderCache
         && was.ClipToBounds == now.ClipToBounds
         && was.IsMotionNode == now.IsMotionNode
         && ReferenceEquals(was.RenderParent, now.RenderParent)
-        && (was.RenderSize == now.RenderSize || _rebakedThisPacket.Contains(c));
+        && (was.RenderSize == now.RenderSize || (_rebakedThisPacket.Contains(c) && _forgivenResize.Contains(c)));
 
     // The components this packet's patch will re-bake - packet.PartialDirty, as a set (StreamSurvives asks per entry).
     private readonly HashSet<IUIComponent> _rebakedThisPacket = new();
-
-    // TEMP: the movers this packet refused over a clip - so the settle trace can say what changed about them.
-    private readonly HashSet<IUIComponent> _clipRefused = new();
-
-    // TEMP: where a snapshot entry puts its element, for the settle trace.
-    private static string Place(LayoutSnapshot s) =>
-        $"@{s.LocalTransform.M41:0.#},{s.LocalTransform.M42:0.#}";
 
     /// <summary>Index of the first group ranked AFTER <paramref name="order"/>, by bisection - `_groups` is kept sorted by
     /// paint rank, so nothing needs to be scanned to find a place in it.</summary>
@@ -218,13 +213,22 @@ public partial class RenderCache
         // compare what the stream actually baked, instead of taking the entry's presence as proof of movement.
         // ...and a moved MOTION NODE is not a layout change either, for the same reason a composited move isn't: the
         // batches read the node's slot matrix live, and the draw re-points what rides it (RefreshMovedNodes, which also
-        // proves every drawn unit under the node is node-aware). The one thing the move CAN stale is a recorded SCISSOR -
-        // a world-space rect nothing re-derives - so a node whose subtree clips still forces the rebuild.
+        // proves every drawn unit under the node is node-aware).
+        //
+        // A recorded SCISSOR used to be the exception - a world-space rect nothing re-derived - so a node whose subtree
+        // clipped forced a rebuild. It is derived again now (RefreshMovedScissors), so the clip no longer decides. That
+        // matters most where it looked least important: a TAB TRANSITION slides a whole view rigidly, and every one of
+        // those frames re-recorded the window because there was a scroll viewer somewhere inside it.
+        //
+        // A RESIZE is different and still refuses when anything under it clips: a clip that changes SHAPE changes which
+        // units fall outside it, and a unit culled at record time has no op in the stream at all. Deriving the rect again
+        // cannot conjure a draw that was never recorded.
         _forgivenMoves.Clear();
+        _forgivenResize.Clear();
         foreach (var node in packet.MovedNodes)
         {
-            if (SubtreeClips(node)) StreamStaleBecause($"movedNodeClips<{node.GetType().Name}>");
-            else _forgivenMoves.Add(node);
+            _forgivenMoves.Add(node);
+            if (!SubtreeClips(node)) _forgivenResize.Add(node);
         }
 
         // An ORDINARY mover is forgiven on the same terms, and it is the same fact about the frame: where the element
@@ -243,20 +247,16 @@ public partial class RenderCache
 
         var moversCarried = !packet.TransformUnknown;
         if (!moversCarried) Core.Diagnostics.FrameTrace.NoteNotCarried("transformUnknown");   // TEMP
-        _clipRefused.Clear();   // TEMP
         foreach (var mover in packet.Moved)
         {
             if (SubtreeClips(mover))
             {
                 StreamStaleBecause($"movedClips<{mover.GetType().Name}>");
                 if (moversCarried) Core.Diagnostics.FrameTrace.NoteNotCarried($"clips<{mover.GetType().Name}>");   // TEMP
-                _clipRefused.Add(mover);   // TEMP
                 moversCarried = false;
             }
-            else _forgivenMoves.Add(mover);
+            else { _forgivenMoves.Add(mover); _forgivenResize.Add(mover); }
         }
-
-        Core.Diagnostics.FrameTrace.NoteClipProbeDone();   // TEMP
 
         foreach (var entry in packet.SnapDelta)
         {
@@ -264,14 +264,7 @@ public partial class RenderCache
             if (!known || !SameGeometry(previous, entry.Value))
             {
                 if (!known || !StreamSurvives(entry.Key, previous, entry.Value))
-                {
                     StreamStaleBecause(known ? $"moved<{entry.Key.GetType().Name}>" : $"new<{entry.Key.GetType().Name}>");
-
-                    // TEMP: the settle, said as was -> now for the movers that cost the frame its patch.
-                    if (known && _clipRefused.Contains(entry.Key))
-                        Core.Diagnostics.FrameTrace.NoteSettle(
-                            $"{entry.Key.GetType().Name}: {Place(previous)} {previous.RenderSize} -> {Place(entry.Value)} {entry.Value.RenderSize}");
-                }
             }
             _applySnap[entry.Key] = entry.Value;
         }

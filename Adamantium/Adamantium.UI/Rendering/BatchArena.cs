@@ -48,6 +48,9 @@ internal abstract class BatchArena
 
     public abstract Rect2D GetSegmentScissor(int id);
 
+    /// <summary>Replace a recorded segment's clip with one derived again from the current layout - see the override.</summary>
+    public abstract void SetSegmentScissor(int id, Rect2D scissor);
+
     public abstract Rect SegmentBounds(int id);
 
     public abstract void GrowSegmentBounds(int id, Rect bounds);

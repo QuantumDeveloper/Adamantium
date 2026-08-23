@@ -189,6 +189,76 @@ public class MovedElementPatchRenderTests
         AssertMatchesAFullWalk(scene, patched, "the TILE must have moved, not only what is drawn per unit beside it");
     }
 
+    // THE TAB TRANSITION. A slide moves a whole view rigidly, and every view worth sliding has a scroll area somewhere
+    // inside it - so "anything under the mover clips" refused every single frame of every switch. A recorded Scissor is
+    // the one world-space rect in the stream; it is derived again now instead of costing a re-record, and this asserts
+    // the derivation actually lands (a stale one leaves the clipped band behind while its content moves).
+    [Test]
+    public void MovingAMotionNodeThatClips_TakesItsViewportWithIt()
+    {
+        var device = GpuTestDevice.Device;
+        var factory = new RenderUnitFactory(device, new StubResourceFactory());
+        using var renderer = new OffscreenTestRenderer(device, factory, Dim, Dim) { ClearColor = Colors.Black };
+
+        var stage = Placed(new Rect(0, 0, Dim, Dim));
+        var node = Placed(new Rect(4, 4, 40, 40));
+        node.IsRenderMotionNode = true;          // the sliding view
+        stage.Add(node);
+
+        var viewport = Placed(new Rect(0, 0, 24, 24));
+        viewport.ClipToBounds = true;            // the scroll area inside it
+        node.Add(viewport);
+
+        var content = Placed(new Rect(0, 0, 80, 80));   // bigger than the viewport, so the clip is visible at all
+        content.RenderAction = s => s.DrawRectangle(Brushes.Blue, new Rect(0, 0, 80, 80));
+        viewport.Add(content);
+
+        var scene = new Scene { Renderer = renderer, Root = new VisualRoot(stage, Dim, Dim), Mover = node, Rider = content };
+        scene.Draw();
+
+        node.Bounds = new Rect(40, 40, 40, 40);
+        scene.Draw();
+
+        var patched = Pixels(renderer);
+        Assert.That(renderer.Cache.LastFrameReplayed, Is.True,
+            "a rigid slide is one matrix write - a clip inside it must not cost the window a re-record");
+        AssertMatchesAFullWalk(scene, patched, "the clipped band must have moved with its viewport");
+    }
+
+    // ...and a view that slides is a motion node with the scroll list's own motion node INSIDE it. A node's slot holds
+    // its OWN world, so the inner one has to be written too - nothing else writes it, and its whole subtree would sit
+    // still while everything around it moved.
+    [Test]
+    public void MovingAMotionNodeThatContainsAnother_CarriesTheInnerOne()
+    {
+        var device = GpuTestDevice.Device;
+        var factory = new RenderUnitFactory(device, new StubResourceFactory());
+        using var renderer = new OffscreenTestRenderer(device, factory, Dim, Dim) { ClearColor = Colors.Black };
+
+        var stage = Placed(new Rect(0, 0, Dim, Dim));
+        var outer = Placed(new Rect(4, 4, 60, 60));
+        outer.IsRenderMotionNode = true;
+        stage.Add(outer);
+
+        var inner = Placed(new Rect(2, 2, 40, 40));
+        inner.IsRenderMotionNode = true;
+        outer.Add(inner);
+
+        var tile = Placed(new Rect(0, 0, 20, 20));
+        tile.RenderAction = s => s.DrawRectangle(Brushes.Blue, new Rect(0, 0, 20, 20));
+        inner.Add(tile);
+
+        var scene = new Scene { Renderer = renderer, Root = new VisualRoot(stage, Dim, Dim), Mover = outer, Rider = tile };
+        scene.Draw();
+
+        outer.Bounds = new Rect(40, 40, 60, 60);
+        scene.Draw();
+
+        var patched = Pixels(renderer);
+        Assert.That(renderer.Cache.LastFrameReplayed, Is.True, "the frame must still patch");
+        AssertMatchesAFullWalk(scene, patched, "the inner node's subtree must have moved with the outer one");
+    }
+
     // The one thing a move CAN stale is a recorded Scissor - a world-space rect nothing re-derives. A mover that clips
     // still has to hand the frame to the walk, and this is the guard that says so out loud.
     [Test]

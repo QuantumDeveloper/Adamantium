@@ -162,9 +162,6 @@ public class Program
                                 System.Threading.Thread.Sleep(4000);
                             }
 
-                            Adamantium.UI.Core.Diagnostics.LayoutTrace.ResetCounts();
-                            Adamantium.UI.Core.Diagnostics.LayoutTrace.Counting = true;
-                            Adamantium.UI.Core.Diagnostics.LayoutTrace.CountCallers = true;
                             for (var lap = 0; lap < 8; lap++)
                             {
                                 var to = lap % 2 == 0 ? b : a;
@@ -180,14 +177,6 @@ public class Program
                             }
                         }
 
-                        Adamantium.UI.Core.Diagnostics.LayoutTrace.Counting = false;
-                        Adamantium.UI.Core.Diagnostics.LayoutTrace.CountCallers = false;
-                        report.Append(Environment.NewLine).Append("THE SETTLE - clipping elements re-published, in order:")
-                              .Append(Environment.NewLine)
-                              .Append(string.Join(Environment.NewLine, Adamantium.UI.Core.Diagnostics.FrameTrace.Settle))
-                              .Append(Environment.NewLine).Append(Environment.NewLine)
-                              .Append("WHO asked for layout:").Append(Environment.NewLine)
-                              .Append(Adamantium.UI.Core.Diagnostics.LayoutTrace.DumpCounts()).Append(Environment.NewLine);
                         System.IO.File.WriteAllText(log + ".pingpong.txt", report.ToString());
                     }
                 }
@@ -412,7 +401,6 @@ public class Program
                     + $" components, re-baked {Adamantium.UI.Core.Diagnostics.FrameTrace.MovedRebakedMax} units;"
                     + $" refused {Adamantium.UI.Core.Diagnostics.FrameTrace.MovedRefusals} times,"
                     + $" worst throwing away {Adamantium.UI.Core.Diagnostics.FrameTrace.MovedWastedMax} re-bakes"
-                    + $"; worst apply asked \"does it clip\" over {Adamantium.UI.Core.Diagnostics.FrameTrace.ClipProbeVisitsMax} nodes"
                     + System.Environment.NewLine
                     + "moves NOT carried, by reason:" + System.Environment.NewLine
                     + string.Join(System.Environment.NewLine, System.Linq.Enumerable.Select(

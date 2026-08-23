@@ -697,6 +697,13 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     public void ReplayFlush(int index, Rect2D fullScissor, Matrix4x4F projection)
         => DrawFlushRecord(_flushRecords[index], fullScissor, projection);
 
+    /// <summary>Give a recorded flush a freshly derived clip - its scissor is a world-space rect frozen when it flushed,
+    /// so a viewport that moved since describes a different frame (see RenderCache.RefreshMovedScissors).</summary>
+    public void SetFlushScissor(int index, Rect2D scissor)
+    {
+        if (index >= 0 && index < _flushRecords.Count) _flushRecords[index].Scissor = scissor;
+    }
+
     private FlushRecord AddFlushRecord() { var r = new FlushRecord(); _flushRecords.Add(r); return r; }
 
     // Asked BEFORE the state is set, not discovered inside the loop. A pipeline, five stencil writes and two scissor
