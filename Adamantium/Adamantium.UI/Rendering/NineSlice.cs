@@ -26,7 +26,7 @@ internal static class NineSlice
     /// border is scaled DOWN proportionally rather than letting opposite corners overlap and draw each other's pixels;
     /// this is what CSS border-image does too, and it is the difference between a skin that degrades and one that
     /// smears.</para></summary>
-    public static TextureItem[] Bake(NineSliceBrush brush, Rect bounds, double opacity, int transformSlot, double scaleX = 1.0, double scaleY = 1.0)
+    public static TextureItem[] Bake(NineSliceBrush brush, Rect bounds, double opacity, int transformSlot, int fadeSlot, double scaleX = 1.0, double scaleY = 1.0)
     {
         var source = brush.Source;
         if (source == null) return null;

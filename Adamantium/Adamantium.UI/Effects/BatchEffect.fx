@@ -37,12 +37,25 @@ uint64_t TransformsAddress;
 // adding one more global uint64_t to this effect stopped shader creation outright (measured - a declaration alone, used
 // by nothing, killed startup 3 times out of 3, while the same build without it started 3 of 3). The parameter block is
 // evidently at its limit, and one slot's matrix and alpha are one node's state anyway, so they belong together.
-// Params.x = alpha (1 = opaque); .yzw reserved. Padded to 16 bytes so the struct stays 16-byte aligned.
+// Params.x = alpha (1 = opaque); .y = PARENT opacity slot (-1 = none, composed on the CPU); .zw reserved. Padded to
+// 16 bytes so the struct stays 16-byte aligned.
 struct NodeSlot
 {
     float4x4 World;
     float4   Params;
 };
+
+// The alpha an instance draws at. Element Opacity multiplies down the tree, and folding that product into each
+// instance's COLOUR is what made fading a container cost a re-bake of everything under it. The slot carries the product
+// instead - composed on the CPU over the tree of FADE slots - so this is ONE fetch and a fade rewrites a few floats.
+//
+// Branch-free, and it reads a valid slot either way: a `?:` guarding work has device-lost form in this family (see the
+// mirror flags further down), and the guarded work here would be a pointer dereference. Slot 0 always exists.
+float NodeAlpha(NodeSlot* nodes, int slot)
+{
+    float alpha = nodes[max(slot, 0)].Params.x;
+    return lerp(1.0, alpha, step(0.0, float(slot)));
+}
 
 
 // GPU-resident FRACTAL REFERENCE ORBITS (perturbation deep-zoom): a flat float2[] holding every deep-zoom fractal
@@ -528,7 +541,7 @@ struct GeometryInstance
 {
     float4x4 Local;   // element local -> SLOT space. Matches Matrix4x4F Local.
     float4 Color;     // straight-alpha RGBA (element/brush opacity folded into .w by the producer)
-    float4 Params;    // .x = transform-table slot; .yzw spare
+    float4 Params;    // .x = transform-table slot; .y = OPACITY SLOT, sent but NOT YET READ (see GeometryInstance); .zw spare
 };
 
 // Per-instance data by BUFFER DEVICE ADDRESS (BDA), not a descriptor-heap StructuredBuffer: the SV_InstanceID-indexed
@@ -646,7 +659,7 @@ float4 InstancedFringePS(FringePSInput input) : SV_Target
 struct RectData
 {
     float4 Bounds;       // NODE-local x, y, w, h (world for slot-0 legacy bakes - identity matrix)
-    float4 Params;       // .x = LARGEST corner radius; .y = transform-table slot; .z = no-fringe flag; .w unused
+    float4 Params;       // .x = LARGEST corner radius; .y = transform-table slot; .z = no-fringe flag; .w = fade slot
     float4 Radii;        // corner radii: x = TL, y = TR, z = BR, w = BL
     float4 Color;        // straight RGBA, opacity folded in
     float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke); the BORDER's colour when Inset is non-zero
@@ -686,7 +699,12 @@ PSInput RectBatchInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_I
     o.Radii = item.Radii * iso;
     // The slot's alpha multiplies BOTH fill and stroke: fading a node fades what it draws, its outline included. Read
     // from the SAME record the matrix came from - no second buffer, no second address.
-    float slotAlpha = nodes[(uint)item.Params.y].Params.x;
+    // The element's fade, read from its opacity slot. Written INLINE, with an unsigned index and no helper taking the
+    // pointer: the same read wrapped in a function that took `NodeSlot*` and a signed index left the window blank -
+    // measured, and this driver is documented right below as going device-lost on shapes it dislikes.
+    // .w < 0 means nothing above this element fades, and the select keeps that branch-free.
+    float slotAlpha = nodes[(uint)max(item.Params.w, 0.0)].Params.x;
+    slotAlpha = lerp(1.0, slotAlpha, step(0.0, item.Params.w));
     o.Color  = float4(item.Color.rgb, item.Color.a * slotAlpha);
     o.StrokeColor = float4(item.StrokeColor.rgb, item.StrokeColor.a * slotAlpha);
     o.Stroke0 = float4(widthPx, item.Stroke0.y, item.Stroke0.z * iso, item.Stroke0.w * iso);
@@ -903,7 +921,7 @@ float4 EllipseBatchPS(EllipsePSInput input) : SV_Target
 struct EllipseData
 {
     float4 Bounds;       // NODE-local x, y, w, h (world for slot-0 legacy bakes - identity matrix)
-    float4 Params;       // .x = transform-table slot; .yzw reserved (mirrors the CPU EllipseItem)
+    float4 Params;       // .x = transform-table slot; .y = fade slot (-1 = none); .zw reserved (mirrors EllipseItem)
     float4 Color;        // straight RGBA, opacity folded in
     float4 StrokeColor;  // straight stroke RGBA (.w == 0 -> no stroke)
     float4 Stroke0;      // width_px, align, dashOn, dashGap
@@ -934,8 +952,11 @@ EllipsePSInput EllipseBatchInstancedVS(uint vertexId : SV_VertexID, uint instanc
     o.Position = mul(worldPos, Projection);
     o.Half   = item.Bounds.zw * 0.5 * px;
     o.Local  = (corner - 0.5) * item.Bounds.zw * px + (corner * 2.0 - 1.0) * outsetPx;
-    o.Color  = item.Color;
-    o.StrokeColor = item.StrokeColor;
+    // The element's fade, read inline with an unsigned index - see the rect pass for why this is not a helper.
+    float fade = nodes[(uint)max(item.Params.y, 0.0)].Params.x;
+    fade = lerp(1.0, fade, step(0.0, item.Params.y));
+    o.Color  = float4(item.Color.rgb, item.Color.a * fade);
+    o.StrokeColor = float4(item.StrokeColor.rgb, item.StrokeColor.a * fade);
     o.Stroke0 = float4(widthPx, item.Stroke0.y, item.Stroke0.z * iso, item.Stroke0.w * iso);
     o.Stroke1 = float4(item.Stroke1.x * iso, item.Stroke1.y, item.Stroke1.z, item.Stroke1.w);
     o.Dash = item.Dash * iso;
@@ -1184,6 +1205,8 @@ struct GradPSInput
     nointerpolation uint InstId : TEXCOORD3;   // instance -> re-read GradientRectData in the PS for its gradient
     nointerpolation float Scale : TEXCOORD4;   // slot unit -> device px: the PS re-reads the stroke record, which is
                                                // baked in slot units, and has to match a pixel-space SDF
+    nointerpolation float Fade  : TEXCOORD5;   // the element's alpha, fetched in the VERTEX stage: reaching the node
+                                               // table from the PIXEL stage blanks the window on this driver
 };
 
 [shader("vertex")]
@@ -1212,6 +1235,10 @@ GradPSInput GradientRectInstancedVS(uint vertexId : SV_VertexID, uint instanceId
     o.Radii = it.Radii * iso;
     o.InstId = instanceId;
     o.Scale  = iso;
+    // Params.w packs spread (low 3 bits), interp mode (bit 3) and the OPACITY SLOT above them, biased by 1 so 0 = none.
+    float fadeSlot = floor(it.Params.w / 16.0) - 1.0;
+    float fade = nodes[(uint)max(fadeSlot, 0.0)].Params.x;
+    o.Fade = lerp(1.0, fade, step(0.0, fadeSlot));
     return o;
 }
 
@@ -1232,12 +1259,14 @@ float4 GradientPS(GradPSInput input) : SV_Target
     float d = BrushShapeDistance(input.Local, input.Half, r4, joinType, shape);
 
     float2 uv = input.Local / max(input.Half * 2.0, float2(1e-4, 1e-4)) + 0.5;   // 0..1 across the bounds
-    int packedW = int(it.Params.w + 0.5);                       // Params.w packs spread (low 3 bits) + interp mode (>> 3)
+    // Params.w packs spread (low 3 bits), interp mode (bit 3) and the opacity slot above them - the slot is unpacked in
+    // the VERTEX stage (o.Fade), because reading the node table from here blanks the window on this driver.
+    int packedW = int(it.Params.w + 0.5);
     float gt = GradSpread(GradParam(it, uv), packedW & 7);
     // Wrap-aware AA width: at a conic/repeat seam gt jumps 1->0 so fwidth(gt) spikes to ~1 (the whole gradient collapses to
     // hard-stop ramps -> a coloured line). Shifting by half a turn moves the discontinuity to the far side, so min() picks
     // the TRUE small derivative everywhere. Harmless for linear/radial (min keeps the real value).
-    float4 grad = GradColor(it, gt, min(fwidth(gt), fwidth(frac(gt + 0.5))), packedW >> 3);
+    float4 grad = GradColor(it, gt, min(fwidth(gt), fwidth(frac(gt + 0.5))), (packedW >> 3) & 1);
     // MESH gradient (type 4): four CORNER colours blended bilinearly across the shape - no axis, no stops, so the
     // gradient maths above has nothing meaningful to chew on for it (GradientBake packs zero geometry). The corners ride
     // the stop slots. Selected BRANCH-FREE: this pass has a history of device-losing on a ?:, so both are computed.
@@ -1260,7 +1289,9 @@ float4 GradientPS(GradPSInput input) : SV_Target
         mask = DashTrimMask(s, s, perim, it.Stroke0.z * sc, it.Stroke0.w * sc, it.Stroke1.x * sc, it.Stroke1.y,
                             it.Stroke1.z, dPerp * capScl, halfW * capScl, it.Stroke1.w, it.Dash * sc);
     }
-    return CompositeFillStroke(d, fill, it.StrokeColor, widthPx, it.Stroke0.y, mask, 0.0);
+    // The element's fade came across from the vertex stage - fill and stroke both take it.
+    return CompositeFillStroke(d, float4(fill.rgb, fill.a * input.Fade),
+                               float4(it.StrokeColor.rgb, it.StrokeColor.a * input.Fade), widthPx, it.Stroke0.y, mask, 0.0);
 }
 
 // ---- GradientFill: general instanced geometry (a shared tessellated mesh drawn N times) whose FILL is a LINEAR/RADIAL
@@ -1954,6 +1985,8 @@ float4 TexRectPS(TexPSInput input) : SV_Target
     // Outside the content's rect there is nothing to paint - the gap a Uniform fit leaves around EVERY tile, and the
     // whole of the shape a single copy does not reach.
     float inside = step(0.0, inContent.x) * step(inContent.x, 1.0) * step(0.0, inContent.y) * step(inContent.y, 1.0);
+    // NOT faded through the slot: this pass aborted shader creation in every form tried, so the opacity CHAIN stays
+    // folded into the tint here (see TextureItem).
     fill.a *= inside;
     return fill;
 }
@@ -1983,6 +2016,8 @@ float4 PatternPS(PatternPSInput input) : SV_Target
 
     float2 p = input.Local + input.Half;   // fragment from the shape's TOP-LEFT (stable pattern origin at the corner)
     float4 fill = PatternFillColor(itPx, p, input.Local, input.Half.y);
+    // NOT faded through the slot: one more varying on this pass - the heaviest pixel shader of the family - aborted
+    // shader creation on this driver, before a single tab was drawn. The opacity CHAIN stays in the colour here.
 
     float widthPx = it.Stroke0.x * sc;
     float mask = 1.0;

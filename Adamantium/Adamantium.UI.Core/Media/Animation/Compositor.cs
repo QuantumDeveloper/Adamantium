@@ -83,10 +83,26 @@ public static class Compositor
             _startTimestamp = Stopwatch.GetTimestamp() - (long)(resumeElapsed * Stopwatch.Frequency);
         }
 
+        // Opacity: one element whose alpha the render thread writes into its opacity slot. No basis and no snapshot - the
+        // curve's value IS the applied state, and everything under the element composes it at draw time.
+        private Entry(IUIComponent owner, AnimationCurve curve, double resumeElapsed)
+        {
+            Target = (AdamantiumComponent)owner;
+            Channel = CompositorChannel.Opacity;
+            Owner = owner;
+            Curve = curve;
+            _startTimestamp = Stopwatch.GetTimestamp() - (long)(resumeElapsed * Stopwatch.Frequency);
+            Alpha = (float)curve.Evaluate(curve.Tracks[0], Elapsed);
+        }
+
         // resumeElapsed carries a re-templated animation's phase across the target swap, so a spinner picks up where the old
         // one was instead of snapping to the start (the theme-swap stutter). 0 for a fresh start.
         internal static Entry ForTransform(Transform t, IUIComponent owner, AnimationCurve curve, Basis basis, double resumeElapsed = 0) => new(t, owner, curve, basis, resumeElapsed);
         internal static Entry ForPaint(Brush b, AnimationCurve curve, Brush paintBase, double resumeElapsed = 0) => new(b, curve, paintBase, resumeElapsed);
+        internal static Entry ForOpacity(IUIComponent owner, AnimationCurve curve, double resumeElapsed = 0) => new(owner, curve, resumeElapsed);
+
+        /// <summary>The element's alpha at the last <see cref="Recompose"/> - what the render thread writes to its slot.</summary>
+        public float Alpha { get; private set; }
 
         public AdamantiumComponent Target { get; }
         public CompositorChannel Channel { get; }
@@ -154,6 +170,12 @@ public static class Compositor
             if (Channel == CompositorChannel.Transform)
             {
                 Local = ComposeLocal(_basis, Curve, Elapsed);
+                return;
+            }
+
+            if (Channel == CompositorChannel.Opacity)
+            {
+                Alpha = (float)Curve.Evaluate(Curve.Tracks[0], Elapsed);
                 return;
             }
 
@@ -240,6 +262,15 @@ public static class Compositor
                 // channel already required) guarantees a re-bake suffices.
                 if (target is not Brush brush) return null;
                 entry = Entry.ForPaint(brush, curve, brush.CaptureBase(), resumeElapsed);
+                break;
+            }
+            case CompositorChannel.Opacity:
+            {
+                // The element's own alpha. Nothing to promote and nothing to capture: the value goes into the element's
+                // opacity slot, and every instance beneath it already carries that slot's index - which is what makes
+                // this the twin of Transform, one write for a whole subtree.
+                if (target is not IUIComponent owner) return null;
+                entry = Entry.ForOpacity(owner, curve, resumeElapsed);
                 break;
             }
             default:

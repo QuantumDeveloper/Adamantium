@@ -149,6 +149,20 @@ public partial class RenderCache
     // re-baked in place. Without it ANY dirty text refused the frame's patch and cost a full walk of the scene.
     private readonly Dictionary<IRenderUnit, (int First, int Count, Graphics.Fonts.FontAtlas Atlas)> _textRunByUnit = new();
 
+    // ...and the same for a GEOMETRY unit whose fill rides the instanced collector: which key-arena holds it and at
+    // which slot. The arena could already re-bake one record in place (TryStage + UpdateSlotFromStage - the splice uses
+    // exactly that); what was missing was the paint path knowing WHERE a given unit sits, so IsSlotPatchable answered
+    // "no" for every Path and one of them cost the frame a walk of the whole scene. Measured on a faded subtree: 200
+    // refusals in 8 s, all GeometryRenderUnit<Path>, at 38 ms a frame against 0.5 for a patched one.
+    private readonly Dictionary<IRenderUnit, (BatchArena Arena, int Slot)> _fillSlotByUnit = new();
+
+    // The units whose shader CANNOT read the opacity slot (text above all, plus the instanced fills and the procedural
+    // families - see GlyphItem). Element Opacity is composed at draw time for everyone else, so a fade touches nothing;
+    // these still carry the chain in their baked colour and have to be re-baked when an ANCESTOR's Opacity moves.
+    // Kept as a list so that a fade costs "walk the handful of units that need it", not "walk the subtree": marking the
+    // subtree dirty instead is what cost a 22k-node fade 42 ms a frame, with 3 text blocks the only real work in it.
+    private readonly HashSet<IRenderUnit> _slotBlindUnits = new();
+
     // The units each LIVE brush paints, built on the recording walk; the render thread re-bakes them all when a
     // composited PAINT animation changes the brush snapshot. Keyed by live brush by REFERENCE; one brush is shared by
     // hundreds of elements (the skeleton pulse) - the reason paint fans out where transform does not.

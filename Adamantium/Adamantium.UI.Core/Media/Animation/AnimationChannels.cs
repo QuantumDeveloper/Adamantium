@@ -11,9 +11,10 @@ namespace Adamantium.UI.Core.Media.Animation;
 /// - the property is <see cref="PropertyMetadataOptions.AffectsPaint"/>: by its own declaration it changes only the colour
 ///   of what is already recorded (a brush's colour or opacity, a gradient stop, a gradient's geometry).
 ///
-/// Everything else stays on the loop thread. Notably the ELEMENT's own Opacity, which looks composable but is not yet: it is
-/// folded into RenderData at RECORD time (and into every descendant's), so the render thread has nowhere to write it. Moving
-/// it into the frozen snapshot is what earns it a channel - until then, saying it has one would be a lie the renderer pays for.
+/// - the target is an element and the property is its own Opacity: that value now lives in an opacity SLOT of the transform
+///   table, so the render thread writes one float and every instance under it composes it at draw time.
+///
+/// Everything else stays on the loop thread.
 /// </remarks>
 public static class AnimationChannels
 {
@@ -22,9 +23,36 @@ public static class AnimationChannels
     {
         if (target is Transform) return CompositorChannel.Transform;
 
+        // The element's OWN opacity, told apart from every other AffectsPaint property BEFORE they are considered: it is
+        // the one whose applied form is a slot write rather than a re-bake. Asked of the interface, because the property
+        // is registered a layer above this one - what identifies it here is the pair (an element, its Opacity).
+        // NOT handed to the compositor, deliberately. It COULD be - the machinery is here (CompositorChannel.Opacity,
+        // ApplyCompositedOpacity), and the slot makes it a one-float write. What stops it is that the compositor keeps
+        // the value to ITSELF: the element's Opacity property would stop advancing while the animation plays, the way a
+        // Transform's does. A Transform is read by the renderer; Opacity is read by bindings, triggers and app code, so
+        // that trade is the owner's call, not a silent one. And it is not needed for the cost: Opacity no longer marks
+        // its subtree (see UIComponent.OnOpacityChanged), so a fade already reaches the patch as ONE dirty element.
+        if (target is IUIComponent && ReferenceEquals(property, OpacityOf(target))) return CompositorChannel.None;
+
         var metadata = property.GetDefaultMetadata(target.GetType());
         return metadata is { AffectsPaint: true } ? CompositorChannel.Paint : CompositorChannel.None;
     }
+
+    // The Opacity property as REGISTERED for this target's type. Looked up by name once per type through the property
+    // system's own registry - the same lookup a binding does - rather than referencing UIComponent, which lives above.
+    private static AdamantiumProperty OpacityOf(AdamantiumComponent target)
+    {
+        if (OpacityByType.TryGetValue(target.GetType(), out var known)) return known;
+
+        AdamantiumProperty found = null;
+        foreach (var property in AdamantiumPropertyMap.GetRegistered(target.GetType()))
+            if (property.Name == "Opacity") { found = property; break; }
+
+        OpacityByType[target.GetType()] = found;
+        return found;
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<System.Type, AdamantiumProperty> OpacityByType = new();
 
     /// <summary>The channel a whole curve belongs to: every track must land in the SAME non-None channel, or the loop thread
     /// keeps the animation. A curve is one clock over several properties (a scale in X and Y, a wave across three stops) -

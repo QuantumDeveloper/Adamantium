@@ -66,7 +66,7 @@ public class ProceduralBrushBakeTests
     public void PatternBrush_Bakes_TypeCellAndZeroNoise()
     {
         var brush = new PatternBrush { Pattern = PatternType.Dots, CellSize = 20, HatchAngle = 60, Color1 = new Color(200, 100, 50, 255), Color2 = new Color(10, 20, 30, 255) };
-        var ok = PatternRectCollector.BakeItem(Payload(brush), Matrix4x4F.Identity, 1.0, 0, out var item);
+        var ok = PatternRectCollector.BakeItem(Payload(brush), Matrix4x4F.Identity, 1.0, 0, -1, out var item);
         Assert.Multiple(() =>
         {
             Assert.That(ok, Is.True);
@@ -86,7 +86,7 @@ public class ProceduralBrushBakeTests
     public void NoiseBrush_Bakes_TypeFourAndFbmParams()
     {
         var brush = new NoiseBrush { Scale = 40, Octaves = 5, Seed = 12, Lacunarity = 2.5, Gain = 0.6 };
-        var ok = PatternRectCollector.BakeItem(Payload(brush), Matrix4x4F.Identity, 1.0, 0, out var item);
+        var ok = PatternRectCollector.BakeItem(Payload(brush), Matrix4x4F.Identity, 1.0, 0, -1, out var item);
         Assert.Multiple(() =>
         {
             Assert.That(ok, Is.True);
@@ -106,7 +106,7 @@ public class ProceduralBrushBakeTests
         world.M11 = 2f;
         world.M22 = 2f;
         var brush = new PatternBrush { CellSize = 16 };
-        PatternRectCollector.BakeItem(Payload(brush), world, 1.0, 0, out var item);
+        PatternRectCollector.BakeItem(Payload(brush), world, 1.0, 0, -1, out var item);
         Assert.That(item.Params.Z, Is.EqualTo(32f).Within(1e-4f), "cell bakes to device px (16 * sx = 2)");
     }
 
@@ -115,7 +115,7 @@ public class ProceduralBrushBakeTests
     {
         var rotated = Matrix4x4F.Identity;
         rotated.M12 = 0.5f;   // shear/rotation term
-        var ok = PatternRectCollector.BakeItem(Payload(new PatternBrush()), rotated, 1.0, 0, out _);
+        var ok = PatternRectCollector.BakeItem(Payload(new PatternBrush()), rotated, 1.0, 0, -1, out _);
         Assert.That(ok, Is.False, "a rotated/sheared world can't hold an axis-aligned instance -> per-unit");
     }
 }

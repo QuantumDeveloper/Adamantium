@@ -43,6 +43,7 @@ public partial class RenderCache
         LastBuildTransformDirty = false;
         _partialDirty.Clear();
         _movedNodesBuf.Clear();
+        _movedOwnersBuf.Clear();
         _partialSpliced = false;
     }
 
@@ -127,13 +128,35 @@ public partial class RenderCache
         && a.IsMotionNode == b.IsMotionNode
         && ReferenceEquals(a.RenderParent, b.RenderParent);
 
-    // Everything SameGeometry looks at except WHERE the element is. A motion node that only moved differs here and
-    // nowhere else, and that difference is exactly the one its transform-table slot carries for the whole subtree.
-    private static bool SameGeometryApartFromPlace(LayoutSnapshot a, LayoutSnapshot b) =>
-        a.RenderSize == b.RenderSize
-        && a.ClipToBounds == b.ClipToBounds
-        && a.IsMotionNode == b.IsMotionNode
-        && ReferenceEquals(a.RenderParent, b.RenderParent);
+    // ...and what it can survive one entry CHANGING, which is the whole difference between a drag that patches and a drag
+    // that re-records the window every frame.
+    //
+    // Its PLACE, always: where an element sits lives in its transform-table slot, and the draw writes that slot
+    // (RefreshMovedNodes for a motion node, RefreshMovedComponents for anything else).
+    //
+    // Its SIZE, but only while the element is being RE-BAKED on this same frame. A size is not in the matrix, it is in the
+    // drawn payload - so unless the patch is already rewriting that payload there is nothing to carry it and the stream
+    // would go on drawing the old size. Arrange marks a resized element geometry-invalid without exception
+    // (MeasurableUIComponent: "A size change must re-run OnRender"), so this is the ordinary case, not a lucky one.
+    //
+    // Nothing else. It started clipping, became a motion node, changed parent - each of those changes what the stream
+    // baked in a way no slot write reaches.
+    private bool StreamSurvives(IUIComponent c, LayoutSnapshot was, LayoutSnapshot now) =>
+        _forgivenMoves.Contains(c)
+        && was.ClipToBounds == now.ClipToBounds
+        && was.IsMotionNode == now.IsMotionNode
+        && ReferenceEquals(was.RenderParent, now.RenderParent)
+        && (was.RenderSize == now.RenderSize || _rebakedThisPacket.Contains(c));
+
+    // The components this packet's patch will re-bake - packet.PartialDirty, as a set (StreamSurvives asks per entry).
+    private readonly HashSet<IUIComponent> _rebakedThisPacket = new();
+
+    // TEMP: the movers this packet refused over a clip - so the settle trace can say what changed about them.
+    private readonly HashSet<IUIComponent> _clipRefused = new();
+
+    // TEMP: where a snapshot entry puts its element, for the settle trace.
+    private static string Place(LayoutSnapshot s) =>
+        $"@{s.LocalTransform.M41:0.#},{s.LocalTransform.M42:0.#}";
 
     /// <summary>Index of the first group ranked AFTER <paramref name="order"/>, by bisection - `_groups` is kept sorted by
     /// paint rank, so nothing needs to be scanned to find a place in it.</summary>
@@ -204,27 +227,51 @@ public partial class RenderCache
             else _forgivenMoves.Add(node);
         }
 
-        // ORDINARY movers are NOT forgiven. They were, briefly: the argument was that a mover the patch touches is
-        // re-baked from its new world by the patch itself, so only a recorded SCISSOR under it could go stale. The
-        // argument is wrong somewhere it matters - drag-and-drop proved it on a live stand: the drop gap did not open,
-        // then everything jumped and overlapped when a walk finally came, which is a frame drawn from positions that
-        // moved. Turning the forgiveness off made the drag correct again, and that decides it: correctness is not traded
-        // for a saving. A saving, moreover, that could not be reproduced - the same scroll measured 279, 294, 289 and
-        // 413 fps across four runs, a spread wider than the difference being claimed.
+        // An ORDINARY mover is forgiven on the same terms, and it is the same fact about the frame: where the element
+        // sits lives in its transform-table slot, so a move is a slot write, not a re-record. The difference is only in
+        // HOW MANY slots - a node moves its whole subtree by one matrix, an ordinary mover has to have its subtree's
+        // written one by one (RefreshMovedComponents).
         //
-        // A MOTION NODE is a different thing and stays forgiven above: its matrix lives in the transform table, the
-        // batches read the slot live, and RefreshMovedNodes proves every unit under it is node-aware. That is where the
-        // scroll's measured win actually comes from.
+        // This was tried once WITHOUT that write and it was wrong: forgiving the move while nothing carried it left the
+        // drag-and-drop gap shut until a walk arrived, and then everything jumped at once. That is not an argument
+        // against forgiving a move; it is what forgiving one without doing its work looks like.
+        //
+        // An unnameable mover (a bare Transform with no owner) forgives nothing: then Moved is not the whole story and
+        // there is no subtree to carry.
+        _rebakedThisPacket.Clear();
+        foreach (var dirty in packet.PartialDirty) _rebakedThisPacket.Add(dirty);
+
+        var moversCarried = !packet.TransformUnknown;
+        if (!moversCarried) Core.Diagnostics.FrameTrace.NoteNotCarried("transformUnknown");   // TEMP
+        _clipRefused.Clear();   // TEMP
+        foreach (var mover in packet.Moved)
+        {
+            if (SubtreeClips(mover))
+            {
+                StreamStaleBecause($"movedClips<{mover.GetType().Name}>");
+                if (moversCarried) Core.Diagnostics.FrameTrace.NoteNotCarried($"clips<{mover.GetType().Name}>");   // TEMP
+                _clipRefused.Add(mover);   // TEMP
+                moversCarried = false;
+            }
+            else _forgivenMoves.Add(mover);
+        }
+
+        Core.Diagnostics.FrameTrace.NoteClipProbeDone();   // TEMP
 
         foreach (var entry in packet.SnapDelta)
         {
             var known = _applySnap.TryGetValue(entry.Key, out var previous);
             if (!known || !SameGeometry(previous, entry.Value))
             {
-                // A forgiven node's entry differs in its PLACE and nothing else - that is the move itself, and the slot
-                // write carries it. Anything more (it resized, gained a clip, changed parent) is a real layout change.
-                if (!known || !_forgivenMoves.Contains(entry.Key) || !SameGeometryApartFromPlace(previous, entry.Value))
+                if (!known || !StreamSurvives(entry.Key, previous, entry.Value))
+                {
                     StreamStaleBecause(known ? $"moved<{entry.Key.GetType().Name}>" : $"new<{entry.Key.GetType().Name}>");
+
+                    // TEMP: the settle, said as was -> now for the movers that cost the frame its patch.
+                    if (known && _clipRefused.Contains(entry.Key))
+                        Core.Diagnostics.FrameTrace.NoteSettle(
+                            $"{entry.Key.GetType().Name}: {Place(previous)} {previous.RenderSize} -> {Place(entry.Value)} {entry.Value.RenderSize}");
+                }
             }
             _applySnap[entry.Key] = entry.Value;
         }
@@ -263,7 +310,11 @@ public partial class RenderCache
                 _partialDirty.AddRange(packet.PartialDirty);
                 _movedNodesBuf.AddRange(packet.MovedNodes);
 
-                LastBuildTransformDirty |= packet.IsTransformDirty;
+                // A move only forbids the patch when nobody is going to carry it. When every mover is named and clip-free
+                // the draw writes their subtrees' slots instead, so the flag - which is frame-wide, and therefore speaks
+                // for 22k nodes when one thumb moved - stays down.
+                LastBuildTransformDirty |= packet.IsTransformDirty && !moversCarried;
+                if (moversCarried) _movedOwnersBuf.AddRange(packet.Moved);
                 break;
             }
 
@@ -308,6 +359,7 @@ public partial class RenderCache
                 LastBuildTransformDirty = true;
                 _partialDirty.Clear();
                 _movedNodesBuf.Clear();
+                _movedOwnersBuf.Clear();
                 _partialSpliced = false;
                 break;
         }

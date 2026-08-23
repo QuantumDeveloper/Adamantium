@@ -29,7 +29,7 @@ public class NineSliceTests
         Slice = new Thickness(slice)
     };
 
-    private static TextureItem[] Bake(NineSliceBrush brush, Rect bounds) => NineSlice.Bake(brush, bounds, 1.0, 0);
+    private static TextureItem[] Bake(NineSliceBrush brush, Rect bounds) => NineSlice.Bake(brush, bounds, 1.0, 0, -1);
 
     [Test]
     public void ItCutsIntoNinePieces()

@@ -82,11 +82,115 @@ public class Program
                     {
                         var thisSecond = Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames - secondFrames;
                         if (thisSecond < worstSecond) worstSecond = thisSecond;
+
+                        // TEMP: one line PER SECOND. A single "worst second" over a long window cannot say WHEN it
+                        // happened, so a drop while building the tab and a drop while dragging a slider read the same -
+                        // and three times in a row I explained the wrong moment. The timeline tells them apart: find the
+                        // seconds where the fps matches what the plate showed, and read what those seconds were doing.
+                        System.IO.File.AppendAllText(log + ".seconds.txt",
+                            $"t={sw.Elapsed.TotalSeconds:00} fps={thisSecond,5} " +
+                            $"walks={Adamantium.UI.Core.Diagnostics.FrameTrace.Walks} " +
+                            $"layoutMs={Adamantium.UI.Core.Diagnostics.RuntimeStats.LastLayoutPassMs:0.0} " +
+                            $"drawMs={Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRenderDrawMs:0.00}" + Environment.NewLine);
+
                         secondFrames = Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames;
                         secondStart = System.Diagnostics.Stopwatch.GetTimestamp();
                     }
                 }
                 var inv = samples > 0 ? 1.0 / samples : 0;
+
+                // TEMP (ADAM_VISIT_TABS=1): open every tab in turn, then report which ones the app survived.
+                // Shader objects are created LAZILY, at the first draw that needs a pass - so a run that never leaves the
+                // home tab never creates the gradient / pattern / fractal / image shaders at all, and "it started" proves
+                // nothing about them. Anything that only breaks on those passes needs the tab to be visited.
+                if (Environment.GetEnvironmentVariable("ADAM_VISIT_TABS") == "1")
+                {
+                    var win = Adamantium.UI.UIApplication.Current?.MainWindow;
+                    var tabs = win?.Content is Adamantium.UI.Core.IUIComponent c ? Find<Adamantium.UI.Controls.TabControl>(c) : null;
+                    var visited = new System.Text.StringBuilder();
+
+                    if (tabs != null)
+                    {
+                        for (var i = 0; i < tabs.Items.Count; i++)
+                        {
+                            var index = i;
+                            Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => tabs.SelectedIndex = index);
+                            System.Threading.Thread.Sleep(1500);   // let it build, lay out and DRAW at least once
+                            visited.Append(index).Append(':')
+                                   .Append(Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames).Append(' ');
+                            System.IO.File.WriteAllText(log + ".tabs.txt", visited.ToString());
+                        }
+                    }
+
+                    System.IO.File.WriteAllText(log + ".tabs.txt",
+                        (tabs == null ? "no TabControl found" : "survived tabs " + visited) + Environment.NewLine);
+                }
+
+                // TEMP (ADAM_TAB_PINGPONG=A,B): switch back and forth between TWO heavy tabs. Visiting every tab once
+                // measures the first BUILD of each; going back and forth measures the SWITCH, which is a different frame
+                // - the content on both sides already exists and is only being re-attached and re-laid-out.
+                if (Environment.GetEnvironmentVariable("ADAM_TAB_PINGPONG") is { } pair)
+                {
+                    var win = Adamantium.UI.UIApplication.Current?.MainWindow;
+                    var tabs = win?.Content is Adamantium.UI.Core.IUIComponent c ? Find<Adamantium.UI.Controls.TabControl>(c) : null;
+                    var names = pair.Split(',');
+                    if (tabs != null && names.Length == 2)
+                    {
+                        var report = new System.Text.StringBuilder();
+                        int IndexOf(string name)
+                        {
+                            for (var i = 0; i < tabs.Items.Count; i++)
+                                if (tabs.Items[i].GetType().Name.StartsWith(name, StringComparison.OrdinalIgnoreCase)) return i;
+                            return -1;
+                        }
+
+                        var a = IndexOf(names[0].Trim());
+                        var b = IndexOf(names[1].Trim());
+                        report.Append($"ping-pong {names[0]}({a}) <-> {names[1]}({b})").Append(Environment.NewLine);
+                        if (a >= 0 && b >= 0)
+                        {
+                            // The tile grid at its MINIMUM cell, which is the stand the drop is reported on - the default
+                            // 120x72 realizes a few hundred tiles and measures a scene nobody is complaining about.
+                            foreach (var item in tabs.Items)
+                                if (item is ViewModels.LayoutViewModel tileGrid) { tileGrid.CellWidth = 24; tileGrid.CellHeight = 24; }
+
+                            // Build BOTH sides once first: the first visit pays for creating the content, and that cost
+                            // is not what a switch costs.
+                            foreach (var warmIndex in new[] { a, b, a })
+                            {
+                                Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => tabs.SelectedIndex = warmIndex);
+                                System.Threading.Thread.Sleep(4000);
+                            }
+
+                            Adamantium.UI.Core.Diagnostics.LayoutTrace.ResetCounts();
+                            Adamantium.UI.Core.Diagnostics.LayoutTrace.Counting = true;
+                            Adamantium.UI.Core.Diagnostics.LayoutTrace.CountCallers = true;
+                            for (var lap = 0; lap < 8; lap++)
+                            {
+                                var to = lap % 2 == 0 ? b : a;
+                                var mark = Adamantium.UI.Core.Diagnostics.FrameTrace.IncidentCount;
+                                var before = Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames;
+                                var clock = System.Diagnostics.Stopwatch.StartNew();
+                                Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => tabs.SelectedIndex = to);
+                                System.Threading.Thread.Sleep(1500);
+                                var drawn = Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames - before;
+                                report.Append($"lap {lap} -> tab {to}: {drawn / clock.Elapsed.TotalSeconds:0} fps over {clock.ElapsedMilliseconds} ms")
+                                      .Append(Environment.NewLine)
+                                      .Append(Adamantium.UI.Core.Diagnostics.FrameTrace.DumpIncidentsSince(mark));
+                            }
+                        }
+
+                        Adamantium.UI.Core.Diagnostics.LayoutTrace.Counting = false;
+                        Adamantium.UI.Core.Diagnostics.LayoutTrace.CountCallers = false;
+                        report.Append(Environment.NewLine).Append("THE SETTLE - clipping elements re-published, in order:")
+                              .Append(Environment.NewLine)
+                              .Append(string.Join(Environment.NewLine, Adamantium.UI.Core.Diagnostics.FrameTrace.Settle))
+                              .Append(Environment.NewLine).Append(Environment.NewLine)
+                              .Append("WHO asked for layout:").Append(Environment.NewLine)
+                              .Append(Adamantium.UI.Core.Diagnostics.LayoutTrace.DumpCounts()).Append(Environment.NewLine);
+                        System.IO.File.WriteAllText(log + ".pingpong.txt", report.ToString());
+                    }
+                }
 
                 // TEMP (ADAM_STRIP_SCROLL=1): pan the tab STRIP back and forth while a heavy tab is open - the reported
                 // drop from ~700 fps to ~100. Driven from here so the cost can be attributed without a hand on the mouse.
@@ -183,6 +287,77 @@ public class Program
                     }
                 }
 
+                // TEMP (ADAM_SPINNER_KIND=Dots|Ripple|...): press "+25 of that kind" and report the frames it costs.
+                // The A/B the Animations tab was built for: equal counts of indicators that animate DIFFERENT things -
+                // Dots move transforms only (composited), Ripple also animates element Opacity (no channel yet). Driven
+                // from here so the two numbers are measured the same way rather than read off a plate by eye.
+                if (Environment.GetEnvironmentVariable("ADAM_SPINNER_KIND") is { } kind)
+                {
+                    // Reached through the BUTTON rather than the view-model: the button is what a hand would press, and
+                    // it needs nothing to be visible from here that the markup does not already expose.
+                    var win = Adamantium.UI.UIApplication.Current?.MainWindow;
+                    var button = win?.Content is Adamantium.UI.Core.IUIComponent root
+                        ? FindButton(root, "+25 " + kind)
+                        : null;
+
+                    if (button != null)
+                    {
+                        // 25 at a time is below the noise - two runs of the same kind differed more than the two kinds
+                        // did. Pressed repeatedly instead, because the difference between a composited channel and a
+                        // re-bake is a PER-INSTANCE cost and only shows once there are enough instances to see it.
+                        var presses = Environment.GetEnvironmentVariable("ADAM_SPINNER_PRESSES") is { } p ? int.Parse(p) : 10;
+                        var idle = Run(3, () => false);
+
+                        for (var i = 0; i < presses; i++)
+                        {
+                            Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => button.Command?.Execute(null));
+                            System.Threading.Thread.Sleep(400);
+                        }
+
+                        System.Threading.Thread.Sleep(3000);   // let them realize and settle before counting
+
+                        var busy = Run(8, () => false);
+                        System.IO.File.AppendAllText(log + ".spinner.txt",
+                            $"{kind} x{presses * 25}: idle {idle / 3.0:0} fps -> running {busy / 8.0:0} fps " +
+                            $"({1000.0 / Math.Max(1, idle / 3.0):0.00} -> {1000.0 / Math.Max(1, busy / 8.0):0.00} ms)" + Environment.NewLine);
+                    }
+                    else
+                    {
+                        System.IO.File.AppendAllText(log + ".spinner.txt",
+                            $"{kind}: button not found - is the Animations tab open?" + Environment.NewLine);
+                    }
+                }
+
+                // TEMP (ADAM_OPACITY_FADE=1): fade the DEEPEST-rooted container on this tab and report what one Opacity
+                // change costs against the size of the subtree under it. This is the case element Opacity is actually
+                // about: the value multiplies down the whole chain and is baked into every descendant's colour, so one
+                // write re-bakes N units. Measuring it on flat leaf spinners - as the first attempt did - measures the
+                // one shape where the cost cannot appear.
+                if (Environment.GetEnvironmentVariable("ADAM_OPACITY_FADE") == "1")
+                {
+                    var win = Adamantium.UI.UIApplication.Current?.MainWindow;
+                    var target = win?.Content is Adamantium.UI.Core.IUIComponent root ? Heaviest(root) : null;
+
+                    if (target != null)
+                    {
+                        var under = Descendants(target);
+                        var still = Run(4, () => false);
+
+                        var phase = 0.0;
+                        var fading = Run(8, () =>
+                        {
+                            phase += 0.08;
+                            target.Opacity = 0.55 + 0.45 * Math.Sin(phase);
+                            return true;
+                        });
+
+                        System.IO.File.AppendAllText(log + ".fade.txt",
+                            $"faded {target.GetType().Name} over {under} descendants: " +
+                            $"still {still / 4.0:0} fps ({1000.0 / Math.Max(1, still / 4.0):0.00} ms) -> " +
+                            $"fading {fading / 8.0:0} fps ({1000.0 / Math.Max(1, fading / 8.0):0.00} ms)" + Environment.NewLine);
+                    }
+                }
+
                 // TEMP self-check (ADAM_THEME_SWAP=1): swap the theme from here and report the tab strip's height after
                 // each swap. ~36 is a strip; anything larger is the "page inside a tab header" fault this hunt closed.
                 var stripReport = "(not asked)";
@@ -224,9 +399,25 @@ public class Program
                 // much of it was layout and record. A spike a hand reproduces is only worth anything if it names itself.
                 System.IO.File.WriteAllText(log + ".frames.txt",
                     "presentation extensions: " + DescribePresentationSupport() + System.Environment.NewLine
+                    + "patch STILL re-bakes (by unit type, whole run):" + System.Environment.NewLine
+                    + string.Join(System.Environment.NewLine, System.Linq.Enumerable.Select(
+                        System.Linq.Enumerable.Take(
+                            System.Linq.Enumerable.OrderByDescending(Adamantium.UI.Core.Diagnostics.FrameTrace.Patched, p => p.Value), 8),
+                        p => $"  {p.Value,7}  {p.Key}")) + System.Environment.NewLine
                     + "patch refusals by reason:" + System.Environment.NewLine
                     + string.Join(System.Environment.NewLine, System.Linq.Enumerable.Select(
                         System.Linq.Enumerable.OrderByDescending(Adamantium.UI.Core.Diagnostics.FrameTrace.Refusals, p => p.Value),
+                        p => $"  {p.Value,5}  {p.Key}")) + System.Environment.NewLine
+                    + $"carried MOVES: worst frame collected {Adamantium.UI.Core.Diagnostics.FrameTrace.MovedCollectedMax}"
+                    + $" components, re-baked {Adamantium.UI.Core.Diagnostics.FrameTrace.MovedRebakedMax} units;"
+                    + $" refused {Adamantium.UI.Core.Diagnostics.FrameTrace.MovedRefusals} times,"
+                    + $" worst throwing away {Adamantium.UI.Core.Diagnostics.FrameTrace.MovedWastedMax} re-bakes"
+                    + $"; worst apply asked \"does it clip\" over {Adamantium.UI.Core.Diagnostics.FrameTrace.ClipProbeVisitsMax} nodes"
+                    + System.Environment.NewLine
+                    + "moves NOT carried, by reason:" + System.Environment.NewLine
+                    + string.Join(System.Environment.NewLine, System.Linq.Enumerable.Select(
+                        System.Linq.Enumerable.Take(
+                            System.Linq.Enumerable.OrderByDescending(Adamantium.UI.Core.Diagnostics.FrameTrace.NotCarried, p => p.Value), 10),
                         p => $"  {p.Value,5}  {p.Key}")) + System.Environment.NewLine
                     + "not node-aware:" + System.Environment.NewLine
                     + string.Join(System.Environment.NewLine, System.Linq.Enumerable.Select(
@@ -246,6 +437,63 @@ public class Program
     private static double _sweep = 48;   // the end-to-end sweep's current direction (a wheel notch)
 
     // TEMP: post one pan per frame-ish for the given seconds, and report the frames presented while doing it.
+    // TEMP (ADAM_OPACITY_FADE): how many visual descendants a node carries, and the node carrying the most of them -
+    // the subtree whose fade is worth timing.
+    private static int Descendants(Adamantium.UI.Core.IUIComponent node)
+    {
+        var count = 0;
+        var stack = new System.Collections.Generic.Stack<Adamantium.UI.Core.IUIComponent>();
+        stack.Push(node);
+        while (stack.Count > 0)
+        {
+            var n = stack.Pop();
+            foreach (var child in n.VisualChildren) { count++; stack.Push(child); }
+        }
+
+        return count;
+    }
+
+    private static Adamantium.UI.Controls.Base.UIComponent Heaviest(Adamantium.UI.Core.IUIComponent root)
+    {
+        Adamantium.UI.Controls.Base.UIComponent best = null;
+        var bestCount = 0;
+        var stack = new System.Collections.Generic.Stack<Adamantium.UI.Core.IUIComponent>();
+        stack.Push(root);
+        while (stack.Count > 0)
+        {
+            var n = stack.Pop();
+            foreach (var child in n.VisualChildren) stack.Push(child);
+
+            // The tab's CONTENT, not the shell around it. Picking "whatever has the most descendants" picked a Grid of
+            // 379 - the tab's own frame - while the thing worth fading is the panel holding the items. An ItemsControl
+            // is that panel by construction, so the search is restricted to one.
+            if (n is not Adamantium.UI.Controls.ItemsControl ui || ReferenceEquals(n, root)) continue;
+
+            var under = Descendants(n);
+            if (under <= bestCount) continue;
+
+            best = ui;
+            bestCount = under;
+        }
+
+        return best;
+    }
+
+    // TEMP (ADAM_SPINNER_KIND): the button whose Content reads exactly this, anywhere under root.
+    private static Adamantium.UI.Controls.Primitives.ButtonBase FindButton(Adamantium.UI.Core.IUIComponent root, string content)
+    {
+        var stack = new System.Collections.Generic.Stack<Adamantium.UI.Core.IUIComponent>();
+        stack.Push(root);
+        while (stack.Count > 0)
+        {
+            var node = stack.Pop();
+            if (node is Adamantium.UI.Controls.Primitives.ButtonBase b && Equals(b.Content, content)) return b;
+            foreach (var child in node.VisualChildren) stack.Push(child);
+        }
+
+        return null;
+    }
+
     private static long Run(double seconds, Func<bool> pan)
     {
         var from = Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames;

@@ -160,18 +160,21 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         typeof(Double), typeof(UIComponent),
         new PropertyMetadata(1.0, PropertyMetadataOptions.AffectsPaint | PropertyMetadataOptions.BindsTwoWayByDefault, OnOpacityChanged));
 
-    // Opacity composites DOWN the visual tree (a descendant's effective opacity includes every ancestor's), so a change
-    // re-bakes this element AND its whole subtree. AffectsPaint (not AffectsRender): the shapes, draw commands and units are
-    // unchanged - only the alpha the slots bake with moved - so it is an O(dirty-slots) RE-BAKE, not a re-record. The
-    // effective value is composed from the frozen snapshot chain at bake time (RenderCache.EffectiveOpacity), which is what
-    // lets a paint-only change re-bake without re-recording.
+    // Opacity composites DOWN the visual tree, but it does NOT re-bake the subtree: the value rides an opacity SLOT in
+    // the transform table, and the shaders that read it compose it at draw time. So only THIS element is marked - the
+    // descendants' instances are untouched, which is what makes fading a 22k-node subtree cost one float instead of
+    // 22k re-bakes (measured: 42.55 ms a frame -> 3.78).
+    //
+    // The families whose shader cannot read that slot (text above all - see GlyphItem) still need a re-bake, and the
+    // render cache re-bakes exactly those, from the list it keeps of them. Marking the whole subtree here to cover them
+    // costs the walk over every descendant that this change exists to avoid.
     private static void OnOpacityChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
     {
         if (d is not UIComponent component) return;
         // Field mirror, read in the hot bake/snapshot-capture path instead of GetValue (a lock + a box - see
         // hot-paths-must-not-use-property-system). Resolved value, NOT e.NewValue: a trigger-exit writes UnsetValue.
         component._opacity = component.GetValue<Double>(OpacityProperty);
-        component.InvalidatePaintTree();
+        component.InvalidatePaint();
     }
 
     public static readonly AdamantiumProperty SelfOpacityProperty = AdamantiumProperty.Register(nameof(SelfOpacity),
@@ -229,19 +232,6 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
     private double _opacity = 1.0;       // hot-path mirror of Opacity (see OnOpacityChanged)
     private double _selfOpacity = 1.0;   // hot-path mirror of SelfOpacity
-
-    // Paint-invalidate this element and its whole subtree: Opacity composites down, so every descendant's baked alpha is
-    // stale. Mirrors InvalidateRender(true) but on the PAINT path - no IsGeometryValid touch, so nothing re-records.
-    private void InvalidatePaintTree()
-    {
-        InvalidatePaint();
-        if (VisualChildrenCollection == null) return;   // callback can fire during the base ctor, before the collection
-        foreach (var child in VisualChildrenCollection)
-        {
-            if (child is UIComponent uc) uc.InvalidatePaintTree();
-            else child.InvalidatePaint();
-        }
-    }
 
     // Font family is INHERITED (like DataContext): set it on any element (a window, a panel) and every descendant's text
     // picks it up unless it sets its own. Default null = "inherit"; at the root a null resolves to DefaultFontFamily.

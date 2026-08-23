@@ -73,15 +73,17 @@ public partial class RenderCache
         }
     }
 
-    // A draw that baked its transform at RECORD time, on a frame where its element is somewhere else: re-point it. Two
-    // kinds of mover qualify, and only those two - the compositor, which moved it on this thread, and a motion node whose
-    // matrix this frame has just rewritten (RefreshMovedNodes). Both mean the batched half and this half are being taken
-    // from one position in one frame; re-pointing anything else is what tears a frame in two.
+    // A draw that baked its transform at RECORD time, on a frame where its element is somewhere else: re-point it. Three
+    // kinds of mover qualify, and only those - the compositor, which moved it on this thread; a motion node whose matrix
+    // this frame has just rewritten (RefreshMovedNodes); and an element inside a subtree whose slots this frame has just
+    // rewritten (RefreshMovedComponents). All three mean the batched half and this half are being taken from one position
+    // in one frame; re-pointing anything else is what tears a frame in two.
     private void RepointIfItMoved(IRenderUnit unit)
     {
-        if (_compositedOwners.Count == 0 && _movedNodeOwners.Count == 0) return;
+        if (_compositedOwners.Count == 0 && _movedNodeOwners.Count == 0 && _movedOwners.Count == 0) return;
         if (unit.Component is not { } c) return;
-        if (!_compositedOwners.Contains(c) && !(_movedNodeOwners.Count > 0 && _movedNodeOwners.Contains(NodeOf(c)))) return;
+        if (!_compositedOwners.Contains(c) && !_movedOwners.Contains(c)
+            && !(_movedNodeOwners.Count > 0 && _movedNodeOwners.Contains(NodeOf(c)))) return;
 
         unit.Update(World(c), _projectionMatrix, _renderScale);
     }

@@ -58,6 +58,15 @@ internal sealed class TransformTable
     private int _count;
     private readonly Stack<int> _free = new();
     private readonly Dictionary<Guid, int> _slotByNode = new();   // motion node (component RenderId) -> slot
+    private readonly Dictionary<Guid, int> _opacitySlotByOwner = new();   // fade root (component RenderId) -> opacity slot
+
+    // The element's OWN opacity, kept apart from the composed value the shader reads: re-composing a subtree needs both,
+    // and the slot record has room for one.
+    private float[] _ownAlpha = NewOwnAlpha(InitialCapacity);
+
+    // Fade slot -> the fade slots that inherit from it. Only elements that actually fade own a slot, so this tree is
+    // tiny however large the element tree is - which is what makes composing on the CPU cheaper than a shader walk.
+    private readonly Dictionary<int, List<int>> _fadeChildren = new();
 
     /// <summary>Device address of THIS FRAME's copy for the shader's BDA fetch. Valid after <see cref="EnsureResources"/>;
     /// re-read every frame (the copy moves, and a reallocation moves the whole buffer). The batch collectors push it as a
@@ -98,7 +107,8 @@ internal sealed class TransformTable
         var was = _cpu.Length;
         Array.Resize(ref _cpu, length);
         Array.Resize(ref _version, length);
-        for (var slot = was; slot < length; slot++) _cpu[slot].Params.X = 1f;   // new slots are opaque
+        InitSlots(_cpu, was, length);
+        GrowOwnAlpha(length);
     }
 
     /// <summary>Picks this frame's copy, (re)creates the buffer when capacity outgrew it and catches that copy up with
@@ -155,27 +165,151 @@ internal sealed class TransformTable
         _uploaded[_current][slot] = _version[slot];
     }
 
-    /// <summary>Sets the alpha this slot multiplies its instances by. Fading a whole node - or one CLONE of a prototype -
-    /// is then ONE float write instead of re-baking every instance's colour.</summary>
+    /// <summary>Sets the element's OWN opacity on this slot and re-composes the effective alpha (own x every fade root
+    /// above it) here and on every fade slot below it. Fading a container is then a handful of float writes instead of a
+    /// re-bake of every instance under it.
+    /// <para>The product is folded HERE rather than walked in the shader on purpose: a chain walk costs a loop in every
+    /// pass that reads it, and this driver aborts <c>vkCreateShadersEXT</c> outright once a pass grows - measured, three
+    /// starts out of three, the moment the loop went into all ten passes. The tree walked here is the tree of FADE
+    /// slots, not of elements: a slot exists only for something that actually fades, so it is a handful of nodes even
+    /// under a 22k-element subtree.</para></summary>
     public void SetAlpha(IGraphicsDevice device, int slot, float alpha)
     {
-        if (_cpu[slot].Params.X != alpha)
+        if (_ownAlpha[slot] == alpha && _cpu[slot].Params.X == Compose(slot, alpha)) return;
+
+        _ownAlpha[slot] = alpha;
+        Recompose(device, slot);
+    }
+
+    private float Compose(int slot, float own)
+    {
+        var parent = (int)_cpu[slot].Params.Y;
+        return parent >= 0 ? own * _cpu[parent].Params.X : own;
+    }
+
+    // Write this slot's effective alpha, then every fade slot that inherits from it. Depth-first over the fade tree.
+    private void Recompose(IGraphicsDevice device, int slot)
+    {
+        var effective = Compose(slot, _ownAlpha[slot]);
+        if (_cpu[slot].Params.X != effective)
         {
-            _cpu[slot].Params.X = alpha;
+            _cpu[slot].Params.X = effective;
             _version[slot]++;
-            MatrixVersion++;
-            if (!CompositedWrite) LayoutMatrixVersion++;
+
+            // The MATRIX versions are deliberately NOT bumped. They exist to tell a recorded op stream that the
+            // transforms under it moved, and an alpha is not a transform: the instances are unchanged and the shader
+            // reads this value live. Counting it made every step of a fade declare the stream stale, so each one fell
+            // back to a full walk - the drag ran at 16 fps with `why=3` (transform-dirty) on every heavy frame.
+            if (_gpu != null && slot < _gpuCapacity && _uploaded[_current][slot] != _version[slot]) Upload(slot);
         }
 
-        if (_gpu == null || slot >= _gpuCapacity) return;
-        if (_uploaded[_current][slot] != _version[slot]) Upload(slot);
+        if (!_fadeChildren.TryGetValue(slot, out var children)) return;
+        foreach (var child in children) Recompose(device, child);
     }
 
     private static NodeSlot[] NewSlots(int length)
     {
         var slots = new NodeSlot[length];
-        for (var i = 0; i < length; i++) slots[i].Params.X = 1f;   // a slot nobody fades is opaque
+        InitSlots(slots, 0, length);
         return slots;
+    }
+
+    // The own-alpha array shadows the slot array one-for-one, so it grows with it - said here, next to the slot growth
+    // it mirrors, because the table grows from two places and a mirror that misses one of them reads a stale alpha.
+    private void GrowOwnAlpha(int to)
+    {
+        if (_ownAlpha.Length >= to) return;
+
+        var was = _ownAlpha.Length;
+        Array.Resize(ref _ownAlpha, to);
+        Array.Fill(_ownAlpha, 1f, was, to - was);
+    }
+
+    private static float[] NewOwnAlpha(int length)
+    {
+        var own = new float[length];
+        Array.Fill(own, 1f);
+        return own;
+    }
+
+    // What a slot MEANS before anyone writes it: opaque, and rooted (no parent to inherit alpha from). Said in one place
+    // because there are three that hand out fresh slots, and the first time this state lived in three copies one of them
+    // was missed - every slot past the initial capacity came out fully transparent while its element still answered the
+    // mouse. A second field in the same record would be the same bug again, three times over.
+    private static void InitSlots(NodeSlot[] slots, int from, int to)
+    {
+        for (var i = from; i < to; i++)
+        {
+            slots[i].Params.X = 1f;    // composed alpha (own x every fade root above)
+            slots[i].Params.Y = -1f;   // parent opacity slot: none
+        }
+    }
+
+    /// <summary>The OPACITY slot for <paramref name="ownerId"/>, allocating one if needed. Same pool, second purpose: this
+    /// record's <c>Params</c> carry an alpha and a link to the next opacity slot up, and its matrix is never read. Kept
+    /// apart from the transform slot on purpose - a transform slot is SHARED by a motion node's whole subtree, so writing
+    /// one element's alpha into it would fade the subtree, and giving the element its own transform slot instead would
+    /// cost the node the one-write move that slot exists for.</summary>
+    public int AcquireOpacitySlot(Guid ownerId)
+    {
+        if (_opacitySlotByOwner.TryGetValue(ownerId, out var slot)) return slot;
+
+        slot = AcquireFreeSlot();
+
+        // A slot off the FREE LIST still carries whatever its previous owner left in it. Taken as-is, the element
+        // inherits a stranger's alpha and comes out half-transparent for no reason traceable to itself - the thumbs.
+        // Fresh slots get this from InitSlots; a recycled one has to be told again, here, at the one door it comes in by.
+        _ownAlpha[slot] = 1f;
+        _cpu[slot].Params.X = 1f;
+        _cpu[slot].Params.Y = -1f;
+        _version[slot]++;
+
+        _opacitySlotByOwner[ownerId] = slot;
+        return slot;
+    }
+
+    public bool TryGetOpacitySlot(Guid ownerId, out int slot) => _opacitySlotByOwner.TryGetValue(ownerId, out slot);
+
+    /// <summary>Is this slot inside THIS FRAME's GPU buffer? A slot allocated after <see cref="EnsureResources"/> sized
+    /// the buffer is not uploaded until the next frame, and a shader that indexes by it reads past the allocation -
+    /// which this device answers with DEVICE LOST, not with a wrong pixel. Callers that hand a slot INDEX to a shader
+    /// have to ask; the ones that only write a value do not.</summary>
+    public bool IsSlotLive(int slot) => _gpu != null && slot >= 0 && slot < _gpuCapacity;
+
+    /// <summary>Releases an element's opacity slot (it stopped being a fade root, or left the tree).</summary>
+    public void ReleaseOpacitySlot(Guid ownerId)
+    {
+        if (!_opacitySlotByOwner.Remove(ownerId, out var slot)) return;
+
+        var parent = (int)_cpu[slot].Params.Y;
+        if (parent >= 0 && _fadeChildren.TryGetValue(parent, out var siblings)) siblings.Remove(slot);
+        _fadeChildren.Remove(slot);
+
+        _cpu[slot].Params.X = 1f;
+        _cpu[slot].Params.Y = -1f;
+        _ownAlpha[slot] = 1f;
+        _version[slot]++;
+        _free.Push(slot);
+    }
+
+    /// <summary>Points one opacity slot at the next one UP the chain (-1 = none). Structure, not value: this changes when
+    /// the TREE changes, never when a fade plays, which is what keeps an animation down to a few writes.</summary>
+    public void SetOpacityParent(IGraphicsDevice device, int slot, int parentSlot)
+    {
+        var was = (int)_cpu[slot].Params.Y;
+        if (was == parentSlot) return;
+
+        if (was >= 0 && _fadeChildren.TryGetValue(was, out var old)) old.Remove(slot);
+        _cpu[slot].Params.Y = parentSlot;
+        _version[slot]++;   // the record changed; the MATRIX versions do not - see Recompose
+        if (parentSlot >= 0)
+        {
+            if (!_fadeChildren.TryGetValue(parentSlot, out var kids)) _fadeChildren[parentSlot] = kids = [];
+            kids.Add(slot);
+        }
+
+        // The link decides what the alpha composes FROM, so the value it produces is no longer the one on record.
+        Recompose(device, slot);
     }
 
     /// <summary>The slot for <paramref name="nodeId"/>, allocating one if needed (from the free-list, else grown).</summary>
@@ -212,7 +346,8 @@ internal sealed class TransformTable
         var was = _cpu.Length;
         Array.Resize(ref _cpu, was * 2);   // the GPU side follows at the next EnsureResources
         Array.Resize(ref _version, _cpu.Length);
-        for (var slot = was; slot < _cpu.Length; slot++) _cpu[slot].Params.X = 1f;
+        InitSlots(_cpu, was, _cpu.Length);
+        GrowOwnAlpha(_cpu.Length);
     }
 
     /// <summary>Releases a promoted node's slot back to the pool (its instances re-point to an ancestor slot first).</summary>
