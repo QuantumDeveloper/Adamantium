@@ -9,11 +9,14 @@ namespace Adamantium.Engine.GraphicsTests
     [TestFixture]
     public class EffectTests
     {
+        [TearDown]
+        public void ReleaseDevices() => GpuFixture.ReleaseRenderDevices();
+
         [Test]
         public void EffectLoadingTest()
         {
-            var main = MainGraphicsDevice.Create(new GraphicsDeviceFactory(), 3, "TestApp", true);
-            var device = main.CreateRenderDevice();
+            var main = GpuFixture.Main;
+            var device = GpuFixture.CreateRenderDevice();
             var effect = Effect.CompileFromFile(Path.Combine("EffectsData", "FontEffect.fx"), device);
         }
 
@@ -24,8 +27,8 @@ namespace Adamantium.Engine.GraphicsTests
         [Test]
         public void ComputeShaderCompilesAndCreates()
         {
-            var main = MainGraphicsDevice.Create(new GraphicsDeviceFactory(), 3, "TestApp", true);
-            var device = main.CreateRenderDevice();
+            var main = GpuFixture.Main;
+            var device = GpuFixture.CreateRenderDevice();
             var effect = Effect.CompileFromFile(Path.Combine("EffectsData", "ComputeSmoke.fx"), device);
 
             Assert.That(effect, Is.Not.Null);

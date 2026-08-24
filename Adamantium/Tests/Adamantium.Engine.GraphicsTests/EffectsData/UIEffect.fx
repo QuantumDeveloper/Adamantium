@@ -117,7 +117,7 @@ float4 TexturedPixelShader(TexturedPixelInputType input) : SV_TARGET
 }
 
 
-technique10 Render
+technique Render
 {
 	
 

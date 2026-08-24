@@ -1819,15 +1819,20 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
             Log.Logger.Debug("Disposing render device");
             DefaultEffectPool?.Dispose();
 
-            for (int i = 0; i < commandBuffers.Length; i++)
-            {
-                //LogicalDevice?.DestroySemaphore(RenderFinishedSemaphores[i]);
-                LogicalDevice?.DestroySemaphore(ImageAvailableSemaphores[i]);
-                LogicalDevice?.DestroyFence(InFlightFences[i]);
-            }
+            // Counted by their OWN arrays, not by the command buffers': the three are created together but nothing keeps
+            // their lengths tied, and freeing a fence per command buffer is how a device came to be destroyed with its
+            // fences still alive.
+            if (ImageAvailableSemaphores != null)
+                foreach (var semaphore in ImageAvailableSemaphores) LogicalDevice?.DestroySemaphore(semaphore);
+
+            if (InFlightFences != null)
+                foreach (var fence in InFlightFences) LogicalDevice?.DestroyFence(fence);
 
             LogicalDevice?.FreeCommandBuffers(GraphicsCommandPool, (uint)commandBuffers.Length, commandBuffers);
             LogicalDevice?.DestroyCommandPool(GraphicsCommandPool);
+            // CreateCommandPool makes TWO pools for every device - graphics and transfer. The render path destroyed only
+            // the first, so every render device left a transfer pool behind on the logical device.
+            LogicalDevice?.DestroyCommandPool(TransferCommandPool);
 
             SamplerStates?.Dispose();
         }

@@ -9,7 +9,7 @@ namespace Adamantium.Graphics.Core;
 /// consumers use it through this interface. Only the heap path (<c>EffectPass.UseDescriptorHeap</c>) populates and
 /// binds it — in descriptor_buffer mode it allocates nothing.
 /// </summary>
-public interface IDescriptorHeapManager
+public interface IDescriptorHeapManager : System.IDisposable
 {
     PhysicalDeviceDescriptorHeapPropertiesEXT DeviceHeapProperties { get; }
 

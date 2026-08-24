@@ -10,28 +10,28 @@ namespace Adamantium.Engine.CompilerTests
     [TestFixture]
     public class EffectsCompilerTests
     {
+        /// <summary>A compile that FAILS must say so with the compiler's own messages. Dereferencing EffectData without
+        /// asking whether the compile succeeded turned every shader error into a bare NullReferenceException with the
+        /// reason thrown away - which is why this sat red without anyone being able to tell what it was complaining about.
+        /// </summary>
+        private static EffectData CompileOrFail(string path)
+        {
+            var result = EffectCompiler.CompileFromFile(path);
+            var messages = string.Join(Environment.NewLine, result.Logger.Messages);
+            Assert.That(result.HasErrors, Is.False, $"{path} failed to compile:{Environment.NewLine}{messages}");
+            Assert.That(result.EffectData, Is.Not.Null, $"{path} compiled without errors but produced no EffectData");
+            return result.EffectData;
+        }
+
         [Test]
         public void UIEffectParsingTest()
         {
-            try
-            {
-                var path = Path.Combine("EffectsData", "UIEffect.fx");
-                if (File.Exists(path))
-                {
-                    var text = File.ReadAllText(path);
-                    var result = EffectCompiler.Compile(text, path);
-            
-                    result.EffectData.Save("UIEffect.fx.compiled");
-                    var restored = EffectData.Load("UIEffect.fx.compiled");
-                }
-                
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e);
-                throw;
-            }
-            
+            var path = Path.Combine("CompilerEffects", "UIEffect.fx");
+            if (!File.Exists(path)) Assert.Ignore($"missing test asset: {path}");
+
+            var effectData = CompileOrFail(path);
+            effectData.Save("UIEffect.fx.compiled");
+            Assert.That(EffectData.Load("UIEffect.fx.compiled"), Is.Not.Null, "the saved effect did not load back");
         }
         
         [Test]
@@ -39,7 +39,7 @@ namespace Adamantium.Engine.CompilerTests
         {
             try
             {
-                var path = Path.Combine("EffectsData", "BasicEffect.fx");
+                var path = Path.Combine("CompilerEffects", "BasicEffect.fx");
                 if (File.Exists(path))
                 {
                     var text = File.ReadAllText(path);
@@ -89,7 +89,7 @@ namespace Adamantium.Engine.CompilerTests
         [Test]
         public void EffectSerializationTest()
         {
-            var path = Path.Combine("EffectsData", "UIEffect.fx");
+            var path = Path.Combine("CompilerEffects", "UIEffect.fx");
             if (File.Exists(path))
             {
                 var result = EffectCompiler.CompileFromFile(path);
@@ -106,7 +106,7 @@ namespace Adamantium.Engine.CompilerTests
         [Test]
         public void EffectDeserializationTest()
         {
-            var path = Path.Combine("EffectsData", "BasicEffect.fx");
+            var path = Path.Combine("CompilerEffects", "BasicEffect.fx");
             if (File.Exists(path))
             {
                 var result = EffectCompiler.CompileFromFile(path);

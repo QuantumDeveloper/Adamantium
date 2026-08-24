@@ -613,14 +613,28 @@ namespace Adamantium.Graphics.Core
 
             // The main device owns these now; dispose the resource-loader device before the logical device (it frees
             // the shared heap's buffers, which were allocated through it).
+            // The heap's buffers were allocated through the resource-loader device, so they go BEFORE it - and they have
+            // to actually go: this used to drop the reference without disposing, leaving two live buffers on a device
+            // about to be destroyed.
+            DescriptorHeapManager?.Dispose();
+            DescriptorHeapManager = null;
+
             ResourceLoaderDevice?.Dispose();
             ResourceLoaderDevice = null;
-            DescriptorHeapManager = null;
 
             // After every device's buffers have returned their sub-ranges, free the shared blocks (uses the still-alive
             // shared LogicalDevice). Before the logical device itself is destroyed.
             _memoryAllocator?.Dispose();
             _memoryAllocator = null;
+
+            // The main device creates its OWN per-frame fences alongside the logical device (see CreateLogicalDevice) and
+            // never destroyed them - so every logical device was torn down with three live fences on it. The render
+            // devices' fences are their own and are freed with them; these are the ones nobody owned.
+            if (InFlightFences != null)
+            {
+                foreach (var fence in InFlightFences) LogicalDevice?.DestroyFence(fence);
+                InFlightFences = null;
+            }
 
             LogicalDevice?.Dispose();
             LogicalDevice = null;
