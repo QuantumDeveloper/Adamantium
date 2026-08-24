@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
@@ -118,9 +119,41 @@ internal sealed class HaloRectCollector : SdfBatchCollector<HaloRectItem>
         EnsureCpuCapacity(Count + bands.Length);
         if (Count + bands.Length > GpuCapacity) return false;
 
-        // Slot units here, not device px - the band fields are in slot units too, and the vertex stage scales them all together.
-        var radii = RectBatchCollector.BakeRadii(corners, destinationRect, 1.0);
-        var added = false;
+        LastFirst = Count;
+        var added = BakeInto(Items.AsSpan(Count, bands.Length), bands, inner, destinationRect, corners, shape, world,
+            opacity, transformSlot, fieldRange);
+        if (added == 0) return false;
+
+        Count += added;
+        LastCount = added;
+        if (field != null) _field = field;
+        MarkPending(scissor, logicalBounds);
+        return true;
+    }
+
+    /// <summary>Where the last <see cref="TryAdd"/> put its bands, so a patch can re-bake them in place instead of
+    /// waiting for the next walk to write the arena again.</summary>
+    public int LastFirst { get; private set; }
+    public int LastCount { get; private set; }
+
+    /// <summary>Bake one command's bands into <paramref name="dst"/> and return how many were written. WHERE they land is
+    /// the caller's business - the retained arena while walking, the records they already occupy while patching - and the
+    /// bake is the same either way. That symmetry is the point: without it the band was written by the walk alone, so a
+    /// colour change repainted the shape at once and left its aura on the old colour until some unrelated frame walked.
+    /// </summary>
+    public static int BakeInto(Span<HaloRectItem> dst, HaloBand[] bands, bool inner, Rect destinationRect,
+        ProceduralGeometry.CornerRadius corners, HaloShape shape, Matrix4x4F world, double opacity,
+        int transformSlot, double fieldRange)
+    {
+        // The bake goes INTO the instance and the slot is applied on top - the same two-part address every fill family
+        // uses. It used to be dropped here, and the band's ONLY address was its slot: correct while that slot held the
+        // full world, wrong the moment it held a motion NODE's, because the shape's own place inside the node went
+        // nowhere. That is the aura landing in the top-left corner during a slide.
+        // Slot units, not device px: the band fields are in slot units too and the vertex stage scales them together.
+        var sx = world.M11; var sy = world.M22; var tx = world.M41; var ty = world.M42;
+        var iso = System.Math.Min(sx, sy);   // the shader reads radii and band isotropically - bake them the same way
+        var radii = RectBatchCollector.BakeRadii(corners, destinationRect, iso);
+        var written = 0;
         foreach (var band in bands)
         {
             if (band.IsEmpty || band.Inner != inner) continue;
@@ -128,23 +161,20 @@ internal sealed class HaloRectCollector : SdfBatchCollector<HaloRectItem>
             var color = band.Color;
             color.W *= (float)opacity;
             if (color.W <= 0f) continue;
+            if (written >= dst.Length) break;
 
-            Items[Count++] = new HaloRectItem
+            dst[written++] = new HaloRectItem
             {
-                Bounds = new Vector4F((float)destinationRect.X, (float)destinationRect.Y,
-                    (float)destinationRect.Width, (float)destinationRect.Height),
+                Bounds = new Vector4F((float)(destinationRect.X * sx + tx), (float)(destinationRect.Y * sy + ty),
+                    (float)(destinationRect.Width * sx), (float)(destinationRect.Height * sy)),
                 Params = new Vector4F(RectBatchCollector.MaxOf(radii), transformSlot, (float)shape, band.Inner ? 1f : 0f),
                 Radii = radii,
-                Band = new Vector4F(band.Offset.X, band.Offset.Y, band.Spread, band.Softness),
+                Band = new Vector4F(band.Offset.X * iso, band.Offset.Y * iso, band.Spread * iso, band.Softness * iso),
                 Color = color,
-                Field = new Vector4F((float)fieldRange, 0, 0, 0)
+                Field = new Vector4F((float)fieldRange * iso, 0, 0, 0)
             };
-            added = true;
         }
 
-        if (!added) return false;
-        if (field != null) _field = field;
-        MarkPending(scissor, logicalBounds);
-        return true;
+        return written;
     }
 }

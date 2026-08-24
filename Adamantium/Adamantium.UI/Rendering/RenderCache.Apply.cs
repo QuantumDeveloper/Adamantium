@@ -246,14 +246,25 @@ public partial class RenderCache
         foreach (var dirty in packet.PartialDirty) _rebakedThisPacket.Add(dirty);
 
         var moversCarried = !packet.TransformUnknown;
+
+        // A mover that CLIPS is forgiven now, and the reason it was not is gone. The old rule was "a recorded Scissor is
+        // a world-space rect and nothing re-derives it" - true when it was written, and RefreshMovedScissors has since
+        // derived them again, for all three carriers of a clip. What it cost meanwhile was the whole tab transition:
+        // measured on a maximized 3198x1762 window at 24x24 cells, EVERY switch spent one 105-129 ms frame walking an
+        // 8960-tile scene, named by the probe as movedClips<LayoutView> - a tab body moving into place, taking its own
+        // scroll area with it.
+        //
+        // Forgiving it is not the same as claiming it always works: what a patch genuinely cannot do is add a draw that
+        // was never recorded, and a unit CULLED by its clip has no op at all. That is refused where it can be seen -
+        // CollectMovedSubtree tests the cull and hands the frame to the walk - rather than here, where "something under
+        // it clips" condemns every mover that has a scroll area anywhere beneath it.
+        //
+        // A RESIZE is still not forgiven on the same terms (_forgivenResize below): a clip that changes SHAPE changes
+        // which units fall outside it, and that is a different question from one that only changes place.
         foreach (var mover in packet.Moved)
         {
-            if (SubtreeClips(mover))
-            {
-                StreamStaleBecause($"movedClips<{mover.GetType().Name}>");
-                moversCarried = false;
-            }
-            else { _forgivenMoves.Add(mover); _forgivenResize.Add(mover); }
+            _forgivenMoves.Add(mover);
+            if (!SubtreeClips(mover)) _forgivenResize.Add(mover);
         }
 
         foreach (var entry in packet.SnapDelta)
@@ -318,8 +329,15 @@ public partial class RenderCache
                 // reach the ops still drawing it, and a patched frame would keep painting a control that is gone. That is
                 // the phantom the removal tests pin - AControlThatStoppedDrawing_IsGoneFromAPlainREPLAY and its family.
                 // Ranks must also be untouched: a RENUMBER moves everyone, which is not a local change by any reading.
+                // A RENUMBER is not a reorder. It re-derives every rank with fresh gaps and changes no relative position,
+                // so the recorded stream already draws in that sequence and the applier only has to re-sort the groups
+                // it names - which is what RenumberOrder was written to be. Counting it as a reorder is what made a tab
+                // switch cost a full walk every few switches: inserting a 9000-component view divides the gap it goes
+                // into, so the third or fourth insert has no room and renumbers (measured: reranks x8982, 105-117 ms).
+                var reordered = packet.Reranks.Count > 0 && !packet.Renumbered;
                 var local = packet.Removed.Count == 0 && packet.Undrawn.Count == 0
-                            && packet.Reranks.Count == 0 && !packet.SnapReset && !_layoutChangedSinceRecord;
+                            && !reordered && !packet.SnapReset && !_layoutChangedSinceRecord;
+
 
                 ApplyStructural(packet);
                 if (LastBuildKind != RenderBuildKind.Full)
@@ -490,6 +508,10 @@ public partial class RenderCache
     // O(changed) plus one linear merge, instead of rebuilding every group from a full walk.
     private void ApplyStructural(RenderPacket packet)
     {
+        // Both departure loops leave the paint order in ONE pass - see RemoveFromOrder. A whole view leaving names its
+        // entire realized subtree in a single packet, and removing those one at a time is quadratic in the scene.
+        _batchOrderRemovals = true;
+
         // 1. DETACHED: gone for good - free its units.
         foreach (var component in packet.Removed)
         {
@@ -504,6 +526,8 @@ public partial class RenderCache
             if (_groupById.TryGetValue(component.RenderId, out var hidden)) RemoveFromOrder(hidden);
             _applySnap.Remove(component);
         }
+
+        FlushOrderRemovals();
 
         // 3. What ARRIVED (or re-recorded): build/refresh its units. Groups to place are collected for ONE merge below (a
         //    linear scan per insert would be O(new x scene) on a fill).
@@ -569,12 +593,30 @@ public partial class RenderCache
     }
 
     // Takes a group OUT of the paint order (it stops drawing) without touching its units.
+    //
+    // The list removal can be BATCHED, and on a whole view leaving it has to be: _groups is a list kept in paint order,
+    // so one removal is a scan plus a shift, and leaving a tab hides its whole realized subtree at once - measured at
+    // 21685 components in one packet. Twenty-one thousand scans of a twenty-one-thousand list is the shape of the thing,
+    // not a constant to shave: batched, the same work is one pass.
+    private readonly HashSet<ControlGroup> _orderBatch = new();
+    private bool _batchOrderRemovals;
+
     private void RemoveFromOrder(ControlGroup group)
     {
         if (!group.InOrder) return;
-        _groups.Remove(group);
         group.InOrder = false;
+        if (_batchOrderRemovals) _orderBatch.Add(group);
+        else _groups.Remove(group);
         _leftTheOrder.Add(group);   // its instances are still in the arena - see BlankOrphanInstances
+    }
+
+    /// <summary>Commit a batch of removals in ONE pass and go back to removing singly. Must run before anything reads
+    /// the paint order again - the inserts below do, which is why the batch spans only the two departure loops.</summary>
+    private void FlushOrderRemovals()
+    {
+        if (_orderBatch.Count > 0) _groups.RemoveAll(_orderBatch.Contains);
+        _orderBatch.Clear();
+        _batchOrderRemovals = false;
     }
 
     // Queue a group for this frame's ONE merge into the paint order. Deduped: the same group can be named twice in a packet

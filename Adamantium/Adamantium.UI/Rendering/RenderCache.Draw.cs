@@ -597,7 +597,7 @@ public partial class RenderCache
         // still hold its bytes). Only a fully-Clean build qualifies; a Partial/Full re-walks and re-records.
         if (device != null && !ReplayDisabled && _opsRecorded && _opsReplayable && LastBuildKind == RenderBuildKind.Clean && OpsMatchTransforms
             && RefreshMovedNodes(device)          // moved nodes first: write their matrices, or the replay draws them where they were
-            && RefreshMovedComponents(device))    // ...and the ordinary movers' subtrees, for the same reason
+            && RefreshMovedComponents(device, fullScissor))    // ...and the ordinary movers' subtrees, for the same reason
         {
             RefreshMovedScissors(fullScissor);    // the viewports they carried past are world-space rects - derive again
             AcceptPatchedTransforms();
@@ -647,11 +647,13 @@ public partial class RenderCache
             _sdfSlotByUnit.Clear();
             _textRunByUnit.Clear();
             _fillSlotByUnit.Clear();
+            _haloRunsByUnit.Clear();
             _slotBlindUnits.Clear();
             _unitsByBrush.Clear(); 
             _walkGroup = null; 
             _walkVersion++;
             _nodeAllAware.Clear();
+            _nodeStragglers.Clear();   // recorded per walk, exactly like the answers above it
             _movedNodesBuf.Clear();   // a full walk re-bakes fresh node matrices - pending node moves are subsumed
             _movedOwnersBuf.Clear();  // ...and every mover's subtree along with them
             _movedOwners.Clear();
@@ -907,6 +909,10 @@ public partial class RenderCache
                 var bakeWorldPoly = ResolveBake(device, unit.Component, wt, out var slot4Poly);
                 if (_polygonBatch.TryAdd(pru2.PolygonPayload, bakeWorldPoly, pru2.FillOpacity, scissor, polyBounds, slot4Poly))
                 {
+                    // A solid polygon holds the opacity CHAIN in its colour (its record has no room for a slot - see
+                    // the Polygon pass), so an ancestor's fade has to find it here, exactly as it finds text.
+                    _slotBlindUnits.Add(unit);
+
                     if (_recording)
                     {
                         group.NotBatchable("polygonBatch");   // non-rect-batch draw -> not rect-splice-patchable
@@ -1217,6 +1223,7 @@ public partial class RenderCache
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }
                 var fillBake = ResolveBake(device, unit.Component, wt, out var slot4Fill);
+                FadeBySlot(unit);
                 if (_instancedFill.TryAdd(gru, fillBake, scissor, LogicalBounds(unit.Component, wt), slot4Fill))
                 {
                     gru.FillInstanced = true;
@@ -1226,7 +1233,9 @@ public partial class RenderCache
                     // scene: measured at 200 refusals in 8 s on a faded subtree, 38 ms a frame against 0.5 patched.
                     if (_instancedFill.LastArena is { } fillArenaSlot)
                         _fillSlotByUnit[unit] = (fillArenaSlot, _instancedFill.LastSlot);
-                    _slotBlindUnits.Add(unit);   // an instanced fill bakes the chain into its colour - see the text above
+                    // Only the ones that KEEP the chain in their colour need an ancestor's fade to find them here; the
+                    // ones riding the slot are reached by the slot itself.
+                    if (!RidesFadeSlot(unit)) _slotBlindUnits.Add(unit);
 
                     // The fill AND its analytic-AA fringe both ride the slot (one shared ring per mesh, drawn from the same
                     // instance buffer). A unit that still draws a per-unit overlay - a stroke, or a fringe the instanced
@@ -1250,9 +1259,11 @@ public partial class RenderCache
                 if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var gradBake = ResolveBake(device, unit.Component, wt, out var slot4GradFill);
+                FadeBySlot(unit);
                 if (_instancedFill.TryAddGradient(ggru, gradBake, scissor, LogicalBounds(unit.Component, wt), slot4GradFill))
                 {
                     ggru.FillInstanced = true;
+                    if (!RidesFadeSlot(unit)) _slotBlindUnits.Add(unit);
                     // The fill rides the slot now; a per-unit overlay (its fringe, still per-unit here, or a stroke)
                     // bakes its transform at record time and is re-pointed at the flush - see PrepareOverlay.
                     if (_recording) group.NotBatchable("instancedGradientFill");
@@ -1270,9 +1281,11 @@ public partial class RenderCache
                 if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var patBake = ResolveBake(device, unit.Component, wt, out var slot4PatFill);
+                FadeBySlot(unit);
                 if (_instancedFill.TryAddPattern(pgru, patBake, scissor, LogicalBounds(unit.Component, wt), slot4PatFill))
                 {
                     pgru.FillInstanced = true;
+                    if (!RidesFadeSlot(unit)) _slotBlindUnits.Add(unit);
                     // As the gradient above: the fill rides the slot, the overlay is re-pointed at the flush.
                     if (_recording) group.NotBatchable("instancedPatternFill");
                     _batchScissor = scissor;
@@ -1289,9 +1302,11 @@ public partial class RenderCache
                 if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var texBake = ResolveBake(device, unit.Component, wt, out var slot4TexFill);
+                FadeBySlot(unit);
                 if (_instancedFill.TryAddTextured(tgru, texBake, scissor, LogicalBounds(unit.Component, wt), slot4TexFill))
                 {
                     tgru.FillInstanced = true;
+                    if (!RidesFadeSlot(unit)) _slotBlindUnits.Add(unit);
                     if (_recording) group.NotBatchable("instancedTexturedFill");
                     _batchScissor = scissor;
                     _batchClip = unit.Component;
@@ -1560,7 +1575,10 @@ public partial class RenderCache
     // tens of thousands of nodes in the scene, so this is the cheap end of the trade by three orders of magnitude.
     private void RefreshMovedScissors(Rect2D fullScissor)
     {
-        if (_movedNodeOwners.Count == 0) return;
+        // An ORDINARY mover carries viewports past too - a whole view sliding into place takes its scroll area with it -
+        // and this used to ask only about NODES, so the one case left out was the expensive one: a tab body moving into
+        // place clips, so its move was never forgiven and every switch cost a full walk of the scene.
+        if (_movedNodeOwners.Count == 0 && _movedOwners.Count == 0) return;
 
         _clipCache.Clear();   // the viewports themselves moved - that memo is what went stale
 
@@ -1599,7 +1617,7 @@ public partial class RenderCache
         // subtrees at their new position. A moved node with non-node-aware retained content bails to the full walk.
         if (!RefreshMovedNodes(device)) return SpliceRefused("movedNode");
         // ...then the ordinary movers, so the re-bakes below compose from the new worlds.
-        if (!RefreshMovedComponents(device)) return SpliceRefused("movedComponent");
+        if (!RefreshMovedComponents(device, fullScissor)) return SpliceRefused("movedComponent");
         RefreshMovedScissors(fullScissor);
 
         _opacityChain.Clear();   // a paint-only opacity change may have re-frozen the dirty subtree's snapshot; recompose it
@@ -1736,7 +1754,8 @@ public partial class RenderCache
     // not take the extra work on this driver and still fold the opacity CHAIN into their colour (see GlyphItem).
     private bool ReadsFadeSlot(BatchArena arena) =>
         ReferenceEquals(arena, _rectBatch) || ReferenceEquals(arena, _ellipseBatch)
-        || ReferenceEquals(arena, _gradientRectBatch) || ReferenceEquals(arena, _gradientEllipseBatch);
+        || ReferenceEquals(arena, _gradientRectBatch) || ReferenceEquals(arena, _gradientEllipseBatch)
+        || arena is Retained.InstancedKeyArena;
 
     // Is this unit in the paint order at all? A group that is not draws nothing, so the walk never visits it and no slot
     // map holds its units - there is nothing to repaint and nothing to refuse over.
@@ -1761,6 +1780,11 @@ public partial class RenderCache
         // the pulse was recolouring the first star in step with the last skeleton. A cloned unit is repainted by the
         // next walk, in full, rather than by one slot write that may not even be its own.
         if (u.Component?.RenderClones is { Count: > 0 }) return false;
+
+        // A band that APPEARED or went dark is a change of record count in the halo arena, and a patch can only rewrite
+        // records that are already there. Its own family may well still be patchable - the shape would repaint and the
+        // band would not - so the whole unit takes the walk.
+        if (!HaloRunStillDescribes(u)) return false;
 
         if (u is RectangleRenderUnit rru)
         {
@@ -1806,6 +1830,10 @@ public partial class RenderCache
         // Answering "done" rather than "cannot": the frame is correct, and refusing would cost it a full walk.
         if (u.Component != null
             && (!_groupById.TryGetValue(u.Component.RenderId, out var owner) || !owner.InOrder)) return true;
+
+        // The soft bands first: they are a SEPARATE record from the fill, so a repaint that touches only the fill left
+        // a shape recoloured and its aura on the old colour until an unrelated frame walked the scene.
+        PatchHalo(device, u, bakeWorld, transformSlot);
 
         if (u is RectangleRenderUnit rru)
         {
@@ -1860,6 +1888,99 @@ public partial class RenderCache
         return true;
     }
 
+    // Do the halo records the last walk gave this unit still describe it? Only the COUNT is asked - what the bands look
+    // like is exactly what a patch rewrites; how many there are is what it cannot change.
+    private bool HaloRunStillDescribes(IRenderUnit u)
+    {
+        if (_haloRunsByUnit.Count == 0 || !_haloRunsByUnit.TryGetValue(u, out var runs)) return true;
+
+        // The SAME opacity the bake folds in, because the bake drops a band whose alpha reaches zero through it. Asking
+        // without it, a faded shape counts bands the arena does not hold and the unit refuses the patch for good.
+        var bands = u.RenderData.Halo;
+        var opacity = u.RenderData.Opacity;
+        if (CountBands(bands, inner: false, opacity) != runs.UnderCount) return false;
+        if (CountBands(bands, inner: true, opacity) != runs.OverCount) return false;
+
+        // Same question for the living band, and asked the same way: a band the bake would drop is a band the arena does
+        // not hold, whatever the property still says.
+        var live = u.RenderData.LivingHalo;
+        var livingDraws = live is { } lb && lb.Color.W * (float)opacity > 0f;
+        if ((livingDraws && live is { Inner: false } ? 1 : 0) != (runs.LivingUnder >= 0 ? 1 : 0)) return false;
+        if ((livingDraws && live is { Inner: true } ? 1 : 0) != (runs.LivingOver >= 0 ? 1 : 0)) return false;
+
+        return true;
+    }
+
+    // How many records this side's bands would take - the same test the bake makes, so the two cannot disagree.
+    private static int CountBands(Core.Media.HaloBand[] bands, bool inner, double opacity)
+    {
+        if (bands == null) return 0;
+
+        var n = 0;
+        foreach (var band in bands)
+        {
+            if (band.IsEmpty || band.Inner != inner) continue;
+            if (band.Color.W * (float)opacity <= 0f) continue;
+            n++;
+        }
+        return n;
+    }
+
+    // Re-bake a unit's halo records in place, from the LIVE bands - the same bake the walk does, aimed at the records it
+    // already owns. Silent about a unit that wears none (the common case: the map holds only shapes with a band).
+    //
+    // A band that has appeared or gone is NOT patched here: that is a change of record COUNT, which only the splice or a
+    // walk can make - IsSlotPatchable refuses it, so this only ever rewrites what is already there.
+    private void PatchHalo(IGraphicsDevice device, IRenderUnit u, Matrix4x4F bakeWorld, int transformSlot)
+    {
+        if (_haloRunsByUnit.Count == 0 || !_haloRunsByUnit.TryGetValue(u, out var runs)) return;
+        if (!TryHaloShape(u, out var shape, out var corners, out var kind, out _, out var fieldRange)) return;
+
+        var opacity = u.RenderData.Opacity;
+        PatchStillHalo(device, _haloUnder, u.RenderData.Halo, inner: false, runs.UnderFirst, runs.UnderCount,
+            shape, corners, kind, bakeWorld, opacity, transformSlot, fieldRange);
+        PatchStillHalo(device, _haloOver, u.RenderData.Halo, inner: true, runs.OverFirst, runs.OverCount,
+            shape, corners, kind, bakeWorld, opacity, transformSlot, fieldRange);
+
+        PatchLivingHalo(device, _haloLivingUnder, u.RenderData.LivingHalo, inner: false, runs.LivingUnder,
+            shape, corners, kind, bakeWorld, opacity, transformSlot, fieldRange);
+        PatchLivingHalo(device, _haloLivingOver, u.RenderData.LivingHalo, inner: true, runs.LivingOver,
+            shape, corners, kind, bakeWorld, opacity, transformSlot, fieldRange);
+    }
+
+    private readonly HaloRectItem[] _haloPatchStage = new HaloRectItem[8];
+
+    private void PatchStillHalo(IGraphicsDevice device, HaloRectCollector batch, Core.Media.HaloBand[] bands, bool inner,
+        int first, int count, Rect shape, ProceduralGeometry.CornerRadius corners, HaloShape kind,
+        Matrix4x4F bakeWorld, double opacity, int transformSlot, double fieldRange)
+    {
+        if (batch == null || count <= 0 || bands == null) return;
+
+        var room = System.Math.Min(count, _haloPatchStage.Length);
+        var written = HaloRectCollector.BakeInto(_haloPatchStage.AsSpan(0, room), bands, inner, shape, corners, kind,
+            bakeWorld, opacity, transformSlot, fieldRange);
+
+        // Fewer bands than the walk recorded means one went dark; the splice owns that, and rewriting a PREFIX here
+        // would leave the rest painting the old colour. Left to the refusal above.
+        if (written != count) return;
+
+        for (var i = 0; i < written; i++) batch.UpdateSlot(device, first + i, _haloPatchStage[i]);
+    }
+
+    private void PatchLivingHalo(IGraphicsDevice device, HaloLivingCollector batch, Core.Media.LivingBand? band, bool inner,
+        int slot, Rect shape, ProceduralGeometry.CornerRadius corners, HaloShape kind,
+        Matrix4x4F bakeWorld, double opacity, int transformSlot, double fieldRange)
+    {
+        if (batch == null || slot < 0 || band is not { } live || live.Inner != inner) return;
+        if (!HaloLivingCollector.BakeItem(live, shape, corners, kind, bakeWorld, opacity, live.Color, transformSlot,
+                fieldRange, out var item))
+        {
+            return;
+        }
+
+        batch.UpdateSlot(device, slot, item);
+    }
+
     // One dirty group's staged patch (validated + baked BEFORE any mutation, so a bail leaves the retained frame intact).
     private struct GroupPatch
     {
@@ -1888,7 +2009,7 @@ public partial class RenderCache
     {
         // Moved motion nodes first (same as TryPartialReplay): rewrite their matrices, bail on non-aware content.
         if (!RefreshMovedNodes(device)) return SpliceRefused("movedNode");
-        if (!RefreshMovedComponents(device)) return SpliceRefused("movedComponent");
+        if (!RefreshMovedComponents(device, fullScissor)) return SpliceRefused("movedComponent");
         RefreshMovedScissors(fullScissor);
 
         // Op stream grown too long from accumulated splices -> recompact with a full walk before it mis-replays.

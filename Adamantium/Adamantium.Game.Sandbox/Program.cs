@@ -51,6 +51,18 @@ public class Program
                 var secondStart = System.Diagnostics.Stopwatch.GetTimestamp();
                 var secondFrames = Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames;
                 var worstSecond = long.MaxValue;
+
+                // LOOP responsiveness, measured from OUTSIDE the loop: post a no-op and time how long it takes to come
+                // back. Frames-per-second cannot see this - the RENDER thread goes on presenting a replayed stream while
+                // the loop is stuck, so a window that answers nothing for ten seconds still reports hundreds of frames a
+                // second. That is exactly the report "the colour picker hangs the app", and it is why the first probe
+                // found nothing: it was watching the wrong thread.
+                var loopDispatcher = Adamantium.UI.Threading.Dispatcher.CurrentDispatcher;
+                var loopSentAt = 0L;         // when the outstanding no-op was posted; 0 = none in flight
+                double loopWorstMs = 0;      // the longest the loop took to answer during this second
+                var loopBindings = Adamantium.UI.Core.Diagnostics.RuntimeStats.BindingUpdatesApplied;
+                var loopMeasures = Adamantium.UI.Controls.Base.MeasurableUIComponent.TotalMeasureCalls;
+                var loopArranges = Adamantium.UI.Controls.Base.MeasurableUIComponent.TotalArrangeCalls;
                 while (sw.Elapsed.TotalSeconds < limit)
                 {
                     var st = typeof(Adamantium.UI.Core.Diagnostics.RuntimeStats);
@@ -73,6 +85,32 @@ public class Program
                     if (Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyMs > maxApply) maxApply = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyMs;
                     if (Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordMs > maxRecord) maxRecord = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordMs;
                     samples++;
+
+                    // One no-op in flight at a time. While it is outstanding the loop has not answered, so the stall is
+                    // reported LIVE rather than only once it ends - a hang that outlasts the run would otherwise vanish.
+                    if (loopSentAt == 0)
+                    {
+                        var sentAt = System.Diagnostics.Stopwatch.GetTimestamp();
+                        loopSentAt = sentAt;
+                        loopDispatcher?.Post(() =>
+                        {
+                            var ms = System.Diagnostics.Stopwatch.GetElapsedTime(sentAt).TotalMilliseconds;
+                            if (ms > loopWorstMs) loopWorstMs = ms;
+                            loopSentAt = 0;
+                        });
+                    }
+                    else
+                    {
+                        // Read ONCE: the dispatcher clears this field from the other thread, and reading it twice let a
+                        // zero land in the elapsed call - which is how a stall came out as 994 560 350 ms.
+                        var outstanding = loopSentAt;
+                        if (outstanding != 0)
+                        {
+                            var waiting = System.Diagnostics.Stopwatch.GetElapsedTime(outstanding).TotalMilliseconds;
+                            if (waiting > loopWorstMs) loopWorstMs = waiting;
+                        }
+                    }
+
                     System.Threading.Thread.Sleep(15);
 
                     // The WORST SECOND, not the average: a drop that lasts a few seconds disappears into a 40-second
@@ -87,11 +125,23 @@ public class Program
                         // happened, so a drop while building the tab and a drop while dragging a slider read the same -
                         // and three times in a row I explained the wrong moment. The timeline tells them apart: find the
                         // seconds where the fps matches what the plate showed, and read what those seconds were doing.
+                        var bindsNow = Adamantium.UI.Core.Diagnostics.RuntimeStats.BindingUpdatesApplied;
+                        var measuresNow = Adamantium.UI.Controls.Base.MeasurableUIComponent.TotalMeasureCalls;
+                        var arrangesNow = Adamantium.UI.Controls.Base.MeasurableUIComponent.TotalArrangeCalls;
+
                         System.IO.File.AppendAllText(log + ".seconds.txt",
                             $"t={sw.Elapsed.TotalSeconds:00} fps={thisSecond,5} " +
+                            $"loopMs={loopWorstMs,7:0} " +
+                            $"binds={bindsNow - loopBindings,8} " +
+                            $"measure={measuresNow - loopMeasures,8} arrange={arrangesNow - loopArranges,8} " +
                             $"walks={Adamantium.UI.Core.Diagnostics.FrameTrace.Walks} " +
                             $"layoutMs={Adamantium.UI.Core.Diagnostics.RuntimeStats.LastLayoutPassMs:0.0} " +
                             $"drawMs={Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRenderDrawMs:0.00}" + Environment.NewLine);
+
+                        loopWorstMs = 0;
+                        loopBindings = bindsNow;
+                        loopMeasures = measuresNow;
+                        loopArranges = arrangesNow;
 
                         secondFrames = Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames;
                         secondStart = System.Diagnostics.Stopwatch.GetTimestamp();
@@ -125,6 +175,7 @@ public class Program
                     System.IO.File.WriteAllText(log + ".tabs.txt",
                         (tabs == null ? "no TabControl found" : "survived tabs " + visited) + Environment.NewLine);
                 }
+
 
                 // TEMP (ADAM_STRIP_SCROLL=1): pan the tab STRIP back and forth while a heavy tab is open - the reported
                 // drop from ~700 fps to ~100. Driven from here so the cost can be attributed without a hand on the mouse.

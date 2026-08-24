@@ -85,6 +85,7 @@ public partial class RenderCache
     private void RenumberOrder(IRootVisualComponent visualRoot, RenderPacket packet)
     {
         LayerProbe.Renumbers++;
+        packet.Renumbered = true;
         _orderByControl.Clear();
 
         var stack = _walkStack;

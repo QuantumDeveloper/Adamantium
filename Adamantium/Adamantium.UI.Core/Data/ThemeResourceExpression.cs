@@ -36,7 +36,7 @@ public class ThemeResourceExpression : BindingExpressionBase
         if (_sourceProperty == null) return;
 
         UpdateTarget();
-        _theme.PropertyChanged += OnThemePropertyChanged;
+        Subscribe(_theme, _sourceProperty, this);
         if (Target is IInputComponent input) input.Unloaded += OnTargetUnloaded;
     }
 
@@ -57,16 +57,76 @@ public class ThemeResourceExpression : BindingExpressionBase
     {
         if (_theme != null)
         {
-            _theme.PropertyChanged -= OnThemePropertyChanged;
+            Unsubscribe(_theme, _sourceProperty, this);
             _theme = null;
         }
         if (Target is IInputComponent input) input.Unloaded -= OnTargetUnloaded;
     }
 
-    private void OnThemePropertyChanged(object sender, AdamantiumPropertyChangedEventArgs e)
+    private void OnTargetUnloaded(object sender, RoutedEventArgs e) => CloseConnection();
+
+    // ---- Routing ---------------------------------------------------------------------------------------------------
+    // ONE subscription per theme, and each consumer woken only for the property it actually reads.
+    //
+    // Every consumer used to sit on the theme's PropertyChanged itself and decide inside the handler whether the change
+    // was its own. Since an accent edit assigns half a dozen theme properties, five of every six wake-ups did nothing at
+    // all - and there is a consumer for every {ThemeResource} in every LIVE view, parked tabs included. Measured while
+    // dragging the picker: 308 453 handler calls in one second, of which 61 723 applied, with the window frozen for
+    // 0.6-0.8 s at a time. No binding and no layout counter saw any of it: this is a plain event.
+    //
+    // Keyed by property, that same drag wakes exactly the consumers that read what changed.
+    private sealed class Router
     {
-        if (e.Property == _sourceProperty) UpdateTarget();
+        // A SET, not a list: a consumer leaves when its view does, and a tab holds thousands of them - removing each by
+        // scan would make leaving a tab quadratic, which is the trap this fix would otherwise walk straight into.
+        public readonly Dictionary<AdamantiumProperty, HashSet<ThemeResourceExpression>> ByProperty = new();
     }
 
-    private void OnTargetUnloaded(object sender, RoutedEventArgs e) => CloseConnection();
+    private static readonly Dictionary<AdamantiumComponent, Router> Routers = new();
+    private static readonly object RoutersLock = new();
+
+    private static void Subscribe(AdamantiumComponent theme, AdamantiumProperty property, ThemeResourceExpression e)
+    {
+        lock (RoutersLock)
+        {
+            if (!Routers.TryGetValue(theme, out var router))
+            {
+                Routers[theme] = router = new Router();
+                theme.PropertyChanged += OnThemeChanged;
+            }
+
+            if (!router.ByProperty.TryGetValue(property, out var consumers))
+                router.ByProperty[property] = consumers = new HashSet<ThemeResourceExpression>();
+
+            consumers.Add(e);
+        }
+    }
+
+    private static void Unsubscribe(AdamantiumComponent theme, AdamantiumProperty property, ThemeResourceExpression e)
+    {
+        lock (RoutersLock)
+        {
+            // The router itself STAYS, with the theme's subscription: a theme lives as long as the application, and
+            // dropping the one subscription only to take it again on the next consumer buys nothing.
+            if (Routers.TryGetValue(theme, out var router) && router.ByProperty.TryGetValue(property, out var consumers))
+                consumers.Remove(e);
+        }
+    }
+
+    private static void OnThemeChanged(object sender, AdamantiumPropertyChangedEventArgs e)
+    {
+        ThemeResourceExpression[] woken;
+        lock (RoutersLock)
+        {
+            if (sender is not AdamantiumComponent theme || !Routers.TryGetValue(theme, out var router)) return;
+            if (!router.ByProperty.TryGetValue(e.Property, out var consumers) || consumers.Count == 0) return;
+
+            // A SNAPSHOT: applying a value can re-establish a connection (a style re-applying under it), which would
+            // mutate the very set being walked.
+            woken = new ThemeResourceExpression[consumers.Count];
+            consumers.CopyTo(woken);
+        }
+
+        foreach (var expression in woken) expression.UpdateTarget();
+    }
 }

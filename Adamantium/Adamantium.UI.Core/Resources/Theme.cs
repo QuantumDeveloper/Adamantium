@@ -95,10 +95,31 @@ public class Theme : AdamantiumComponent, ITheme
     // for ANY accent. Disabled/focus stay theme-authored (they're neutral, not accent-derived).
     private void DeriveAccentPalette(Color seed)
     {
-        AccentFillColorDefault = new SolidColorBrush(seed);
-        AccentFillColorSecondary = new SolidColorBrush(Color.Lerp(seed, Black, (float)AccentHoverDarken));   // hover
-        AccentFillColorTertiary = new SolidColorBrush(Color.Lerp(seed, Black, (float)AccentPressedDarken));  // pressed
-        AccentForegroundColor = new SolidColorBrush(OnAccent(seed));
+        Recolour(AccentFillColorDefaultProperty, seed);
+        Recolour(AccentFillColorSecondaryProperty, Color.Lerp(seed, Black, (float)AccentHoverDarken));   // hover
+        Recolour(AccentFillColorTertiaryProperty, Color.Lerp(seed, Black, (float)AccentPressedDarken));  // pressed
+        Recolour(AccentForegroundColorProperty, OnAccent(seed));
+    }
+
+    // Change the brush's COLOUR, not the theme's brush. The two look alike and cost nothing alike: a theme property that
+    // changes IDENTITY has to be pushed onto every {ThemeResource} consumer, and a list realizes one container per row -
+    // each of which reads the accent for its selected and hovered states. Measured on a 9 000-tile grid: ~18 000 property
+    // writes per step of a colour drag, about a second of them, and the window dead for forty seconds while the steps
+    // piled up. Layout and rendering were idle throughout; it was all property writes.
+    //
+    // Keeping the identity, nobody has to be told: every consumer already holds this brush, and the paint change travels
+    // the path built for exactly that (Color is AffectsPaint), which repaints the units that actually paint with it - for
+    // an accent, the selected row and the one under the cursor.
+    private void Recolour(AdamantiumProperty property, Color color)
+    {
+        if (GetValue(property) is SolidColorBrush brush)
+        {
+            brush.Color = color;
+            return;
+        }
+
+        // First time, or a theme that put something other than a solid brush there: there is no identity to keep yet.
+        SetValue(property, new SolidColorBrush(color));
     }
 
     private static readonly Color Black = Color.FromRgba(0, 0, 0);

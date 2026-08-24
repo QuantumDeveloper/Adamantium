@@ -347,7 +347,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
         LastArena = _arenas.TryGetValue(key, out var known) ? known : _arenas[key] = new InstancedKeyArena(this, seg);
         LastSlot = seg.Count;   // ...and which slot of that arena it is, so the walk can note the group run
-        seg.Items[seg.Count++] = GeometryInstance.FromLocal(local, color, transformSlot, unit.FadeSlot);
+        seg.Items[seg.Count++] = GeometryInstance.FromLocal(local, color, transformSlot, FadeSlotFor(unit));
 
         _scissor = scissor;
         if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
@@ -395,7 +395,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         }
         if (seg.GradCount + 1 > seg.GradGpuCapacity) return false;
 
-        seg.GradItems[seg.GradCount++] = BuildGradientInstance(brush, local, localBounds, opacity, transformSlot);
+        seg.GradItems[seg.GradCount++] = BuildGradientInstance(brush, local, localBounds, opacity, transformSlot, FadeSlotFor(unit));
 
         _scissor = scissor;
         if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
@@ -415,7 +415,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     // Pack a gradient brush + world + local bounds into one gradient instance record (stops/geometry via the shared
     // GradientBake; Params = (type, spread, stopCount, _) to match the gradient-fill vertex shader).
     private static GradientGeometryInstance BuildGradientInstance(GradientBrush g, Matrix4x4F local, Rect localBounds,
-        double opacity, int transformSlot)
+        double opacity, int transformSlot, int fadeSlot)
     {
         var inst = new GradientGeometryInstance { Local = local };
         var alpha = (float)(g.Opacity * opacity);
@@ -429,9 +429,12 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         var type = GradientBake.PackGeometry(g, out var geom0, out var geom1);
         inst.Geom0 = geom0;
         geom1.W = transformSlot;   // .xy is the radial focal; .w carries the slot, as in the SDF gradient record
-        inst.Geom1 = geom1;
+        inst.Geom1 = geom1;        // .z stays the SHAPE FLAG the pixel shader branches on - not a spare
         inst.LocalBounds = new Vector4F((float)localBounds.X, (float)localBounds.Y, (float)localBounds.Width, (float)localBounds.Height);
-        inst.Params = new Vector4F(type, (float)g.SpreadMethod, count, (float)g.ColorInterpolationMode);   // .w = interp mode (0 sRGB/1 OKLab)
+        // .w packs the interp mode (0 sRGB / 1 OKLab) with the OPACITY slot above it - this record has no spare
+        // component, and the one that looked spare (Geom1.z) is the shape flag. Unpacked in GradGeomFadeSlot/Interp.
+        inst.Params = new Vector4F(type, (float)g.SpreadMethod, count,
+            (float)g.ColorInterpolationMode + 2f * (fadeSlot + 1));
         return inst;
     }
 
@@ -468,7 +471,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         }
         if (seg.TexCount + 1 > seg.TexGpuCapacity) return false;
 
-        seg.TexItems[seg.TexCount++] = BuildTexturedInstance(brush, local, localBounds, opacity, transformSlot);
+        seg.TexItems[seg.TexCount++] = BuildTexturedInstance(brush, local, localBounds, opacity, transformSlot, FadeSlotFor(unit));
         seg.PendingTexture = texture;
 
         _scissor = scissor;
@@ -490,7 +493,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     // SDF textured batch uses (ImageTiling), fed the shape's LOCAL box - the geometry PS works in local mesh coords, so
     // the drawn rect is expressed as a fraction of that box rather than in device pixels.
     private static TexGeometryInstance BuildTexturedInstance(TileBrush brush, Matrix4x4F local, Rect localBounds,
-        double opacity, int transformSlot)
+        double opacity, int transformSlot, int fadeSlot)
     {
         var box = localBounds.Width > 0 && localBounds.Height > 0 ? localBounds : new Rect(0, 0, 1, 1);
         var layout = ImageTiling.Layout(brush, box, local.M11, local.M22);
@@ -501,7 +504,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         return new TexGeometryInstance
         {
             Local = local,
-            Params = new Vector4F(layout.Repeats ? 1f : 0f, layout.Mirror, 0, transformSlot),
+            Params = new Vector4F(layout.Repeats ? 1f : 0f, layout.Mirror, fadeSlot, transformSlot),   // .z was unused
             LocalBounds = new Vector4F((float)box.X, (float)box.Y, (float)box.Width, (float)box.Height),
             Tile = layout.Tile,
             Rotation = layout.Rotation,
@@ -540,7 +543,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         }
         if (seg.PatCount + 1 > seg.PatGpuCapacity) return false;
 
-        seg.PatItems[seg.PatCount++] = BuildPatternInstance(brush, local, localBounds, opacity, transformSlot);
+        seg.PatItems[seg.PatCount++] = BuildPatternInstance(brush, local, localBounds, opacity, transformSlot, FadeSlotFor(unit));
 
         _scissor = scissor;
         if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
@@ -560,7 +563,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     // Pack a PatternBrush/NoiseBrush + world + local bounds into one pattern instance record. Cell stays in LOCAL units (the
     // geometry PS works in local mesh coords) - no device-scale, unlike the SDF rect bake. Mirrors PatternRectCollector.BakeItem.
     private static PatternGeometryInstance BuildPatternInstance(Brush brush, Matrix4x4F local, Rect localBounds,
-        double opacity, int transformSlot)
+        double opacity, int transformSlot, int fadeSlot)
     {
         var inst = new PatternGeometryInstance { Local = local };
         PatternBrushRecord.TryDescribe(brush, out var record);   // the caller already refused anything else
@@ -571,7 +574,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         var c3 = record.MidColor.ToVector4(); c3.W *= alpha;
         var noise = record.Noise;
 
-        inst.Params = new Vector4F(0, record.Type, (float)record.Cell, transformSlot);
+        inst.Params = new Vector4F(fadeSlot, record.Type, (float)record.Cell, transformSlot);   // .x was unused
         inst.LocalBounds = new Vector4F((float)localBounds.X, (float)localBounds.Y, (float)localBounds.Width, (float)localBounds.Height);
         inst.Color1 = c1;
         inst.Color2 = c2;
@@ -1128,9 +1131,15 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         if (!gru.TryGetInstancedFill(out var unitKey, out var meshObj, out var color)) return false;
         if (meshObj is not FrozenMesh mesh || !ReferenceEquals(GetOrCreate(unitKey, mesh), seg)) return false;
 
-        stage.Add(GeometryInstance.FromLocal(gru.Place(world), color, transformSlot, unit.FadeSlot));
+        stage.Add(GeometryInstance.FromLocal(gru.Place(world), color, transformSlot, FadeSlotFor(gru)));
         return true;
     }
+
+    /// <summary>The opacity slot this instance may read - or -1 when it may not. A unit that also draws a per-unit
+    /// overlay (a stroked Path) keeps the opacity CHAIN in its colour, because that overlay reads no table; letting the
+    /// instance read the slot as well would then fade it twice. The chain lives in exactly one place, and which place is
+    /// decided per UNIT (see RenderCache.RidesFadeSlot).</summary>
+    private static int FadeSlotFor(GeometryRenderUnit unit) => unit.HasPerUnitOverlay ? -1 : unit.FadeSlot;
 
     /// <summary>Replace [at, at+replaced) of this key's run in that flush with a staged range: the tail of the key's own
     /// array shifts, and every LATER run of the same key moves with it. Nothing else in the collector is touched, and the
