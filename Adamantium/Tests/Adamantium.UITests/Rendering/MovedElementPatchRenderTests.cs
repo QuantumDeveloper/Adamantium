@@ -228,6 +228,12 @@ public class MovedElementPatchRenderTests
     // ...and a view that slides is a motion node with the scroll list's own motion node INSIDE it. A node's slot holds
     // its OWN world, so the inner one has to be written too - nothing else writes it, and its whole subtree would sit
     // still while everything around it moved.
+    //
+    // This asserts the PICTURE, not the path. Whether such a frame may patch is a separate question and the answer is
+    // currently no: a node with no units of its own has nobody to vouch that writing its matrix carries everything
+    // under it, and both ways of assuming it could were wrong on a live stand - vector icons that never materialised,
+    // and an aura that left its shape for the corner. So the frame is allowed to walk; what it may not do is draw the
+    // inner subtree anywhere but where a walk draws it.
     [Test]
     public void MovingAMotionNodeThatContainsAnother_CarriesTheInnerOne()
     {
@@ -254,15 +260,61 @@ public class MovedElementPatchRenderTests
         outer.Bounds = new Rect(40, 40, 60, 60);
         scene.Draw();
 
-        var patched = Pixels(renderer);
-        Assert.That(renderer.Cache.LastFrameReplayed, Is.True, "the frame must still patch");
-        AssertMatchesAFullWalk(scene, patched, "the inner node's subtree must have moved with the outer one");
+        AssertMatchesAFullWalk(scene, Pixels(renderer), "the inner node's subtree must have moved with the outer one");
     }
 
-    // The one thing a move CAN stale is a recorded Scissor - a world-space rect nothing re-derives. A mover that clips
-    // still has to hand the frame to the walk, and this is the guard that says so out loud.
+    // THE TAB SLIDE, as the sandbox actually builds one. A view worth sliding contains a ROTATED thing somewhere - a
+    // turned label, a collapsed docking tab, a knob - and a rotated unit cannot ride the node's slot: an axis-aligned
+    // instance has nowhere to put the rotation, so it takes a slot of its own holding its FULL world and the node is
+    // recorded as not carrying all of its content. The frame was then refused WHOLESALE, and one turned label made
+    // every frame of every slide a full walk of the scene.
+    //
+    // Measured on the stand (30 switches, tab sweep): "not node-aware ViewboxView <- TextBlock 68, <- Border 17,
+    // RangesView <- Ellipse 24" against "patch refusals: movedNode 83". The straggler does not have to cost the frame -
+    // it only has to be carried, exactly as an ordinary mover's subtree is.
     [Test]
-    public void AMoverThatClips_StillWalks()
+    public void MovingAMotionNodeWithRotatedContent_CarriesItInstead_OfRefusingTheFrame()
+    {
+        var device = GpuTestDevice.Device;
+        var factory = new RenderUnitFactory(device, new StubResourceFactory());
+        using var renderer = new OffscreenTestRenderer(device, factory, Dim, Dim) { ClearColor = Colors.Black };
+
+        var stage = Placed(new Rect(0, 0, Dim, Dim));
+        var view = Placed(new Rect(0, 0, Dim, Dim));
+        view.IsRenderMotionNode = true;      // the sliding view
+        stage.Add(view);
+
+        var upright = Placed(new Rect(4, 4, 24, 24));
+        upright.RenderAction = s => s.DrawRectangle(Brushes.Green, new Rect(0, 0, 24, 24));
+        view.Add(upright);
+
+        // The turned label. Its world under the node is sheared, so it holds its own slot rather than the node's.
+        var turned = Placed(new Rect(40, 40, 24, 24));
+        turned.RenderTransform = new Transform { RotationAngle = 30 };
+        turned.RenderAction = s => s.DrawRectangle(Brushes.Red, new Rect(0, 0, 24, 24));
+        view.Add(turned);
+
+        var scene = new Scene { Renderer = renderer, Root = new VisualRoot(stage, Dim, Dim), Mover = view, Rider = turned };
+        scene.Draw();
+
+        view.Bounds = new Rect(20, 12, Dim, Dim);   // the slide
+        scene.Draw();
+
+        var patched = Pixels(renderer);
+        Assert.That(renderer.Cache.LastFrameReplayed, Is.True,
+            "one turned label must not cost the whole slide a walk of the scene");
+        AssertMatchesAFullWalk(scene, patched, "the turned label must have slid with the view, not stayed behind");
+    }
+
+    // A mover that CLIPS carries a viewport past, and a recorded Scissor is a world-space rect. This used to hand the
+    // frame to the walk for that reason, and the reason has since been answered: the scissors are derived again, for all
+    // three carriers of a clip (the Scissor op, the batch segment, the instanced flush).
+    //
+    // The rule it replaces was not free. Anything worth sliding has a scroll area somewhere inside it, so "something
+    // under the mover clips" condemned every one of them - measured on a tab switch into a maximized 3198x1762 window of
+    // 24x24 tiles, one 105-129 ms walk of an 8960-tile scene per switch, named by the probe as movedClips<LayoutView>.
+    [Test]
+    public void AMoverThatClips_PatchesAndTakesItsViewportWithIt()
     {
         using var scene = NewScene();
         scene.Mover.ClipToBounds = true;
@@ -272,8 +324,10 @@ public class MovedElementPatchRenderTests
         scene.Mover.Bounds = new Rect(48, 8, 24, 24);
         scene.Draw();
 
-        Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.False,
-            "a clipping mover's recorded scissor is baked in world space - the frame must be re-recorded");
+        var patched = Pixels(scene.Renderer);
+        Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.True,
+            "a clipping mover must not cost the frame a walk - its scissors are derived again");
+        AssertMatchesAFullWalk(scene, patched, "the moved viewport must clip where a full walk clips it");
     }
 
     // A drag is not only a move. The slider's accent fill and both halves of its track RESIZE on every step, and a size

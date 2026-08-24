@@ -151,6 +151,8 @@ public partial class RenderCache
             return false;
         }
 
+        if (_recording) NoteHaloRun(unit, inner, batch.LastSlot, 1, living: true);
+
         if (inner) _haloOverOwner = unit.Component;
         _batchScissor = scissor;
         _batchOpen = true;
@@ -192,10 +194,36 @@ public partial class RenderCache
             return false;
         }
 
+        // Note where they landed, so a repaint can re-bake them in place instead of waiting for the next walk.
+        if (_recording) NoteHaloRun(unit, inner, batch.LastFirst, batch.LastCount, living: false);
+
         if (inner) _haloOverOwner = unit.Component;
         _batchScissor = scissor;
         _batchOpen = true;
         return true;
+    }
+
+    // Remember which halo records this unit took. Four ranges per unit at most - a still band and a living one, each on
+    // either side of the fill - and a unit that wears none is never in the map at all.
+    private void NoteHaloRun(IRenderUnit unit, bool inner, int first, int count, bool living)
+    {
+        if (!_haloRunsByUnit.TryGetValue(unit, out var runs))
+            runs = new HaloRuns { LivingUnder = -1, LivingOver = -1 };
+
+        if (living)
+        {
+            if (inner) runs.LivingOver = first; else runs.LivingUnder = first;
+        }
+        else if (inner)
+        {
+            runs.OverFirst = first; runs.OverCount = count;
+        }
+        else
+        {
+            runs.UnderFirst = first; runs.UnderCount = count;
+        }
+
+        _haloRunsByUnit[unit] = runs;
     }
 
     // A unit's own viewport (local 0,0..RenderSize) in window-logical space - what ResolveScissor clips against, reused

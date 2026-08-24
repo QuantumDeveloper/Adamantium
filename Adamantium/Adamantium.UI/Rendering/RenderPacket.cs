@@ -81,6 +81,13 @@ internal sealed class RenderPacket
     /// its rank on its <see cref="ComponentDraw"/> instead; this list is for the ones with nothing new to draw.</summary>
     public readonly List<KeyValuePair<IUIComponent, long>> Reranks = new();
 
+    /// <summary>Structural only: the reranks above are a RENUMBER - the whole order re-derived with fresh gaps, which
+    /// changes every number and no relative position. Worth saying apart from an ordinary rerank, because a reorder is
+    /// a different frame: one re-sorts groups that already draw in that sequence, the other says the sequence changed.
+    /// <para>Inserting a big subtree exhausts the gap it goes into (each insert divides it), so a renumber arrives every
+    /// few tab switches - and counting it as a reorder cost a maximized 8960-tile scene a 105-117 ms walk each time.</para></summary>
+    public bool Renumbered;
+
     /// <summary>Reset for reuse (the packet is pooled per cache; a Clean frame produces an empty one).</summary>
     public void Reset(RenderBuildKind kind)
     {
@@ -92,6 +99,7 @@ internal sealed class RenderPacket
         Removed.Clear();
         Undrawn.Clear();
         Reranks.Clear();
+        Renumbered = false;
         SnapReset = false;
         IsTransformDirty = false;
         TransformUnknown = false;

@@ -48,6 +48,12 @@ public partial class RenderCache
     // moved node with ANY non-aware content (world-baked text, per-unit draws) can't take the slot-write fast path -> the
     // frame falls back to the full walk.
     private readonly Dictionary<Guid, bool> _nodeAllAware = new();
+    // ...and WHO they are. A "no" used to be a bare bool, so a node that could not move all of its content by writing
+    // one matrix surrendered the whole frame to the walk - and one turned label inside a sliding view is enough for
+    // that (measured on the stand: "ViewboxView <- Border", every frame of every slide involving that tab). Knowing
+    // the stragglers by name turns the refusal into a carry: the node moves its subtree by its slot, and the few units
+    // that hold their own full world are re-baked beside it, exactly as an ordinary mover's subtree is.
+    private readonly Dictionary<Guid, HashSet<IUIComponent>> _nodeStragglers = new();
     // APPLIER-owned: the moved nodes of the packets drained for THIS draw (it rewrites their table matrices, then clears).
     // The recorder must not read it - it takes the frame's moved nodes off RenderDirty into packet.MovedNodes.
     private readonly List<IUIComponent> _movedNodesBuf = new();
@@ -441,8 +447,20 @@ public partial class RenderCache
     // keeps the chain in its colour, because its shader pass cannot reach the table on this driver (see GlyphItem).
     private void FadeBySlot(Core.Graphics.IRenderUnit u)
     {
-        if (u.Component != null) u.SetEffectiveOpacity(ApplySnap(u.Component).SelfOpacity);
+        if (u.Component == null) return;
+
+        u.SetEffectiveOpacity(RidesFadeSlot(u)
+            ? ApplySnap(u.Component).SelfOpacity
+            : EffectiveOpacity(u.Component));
     }
+
+    // Does EVERYTHING this unit draws take its alpha from the opacity slot? Asked of the UNIT, not of its family: a
+    // tessellated shape's fill and fringe are instanced and read the slot, but the same unit can also draw a STROKE as a
+    // per-unit overlay, and that one bakes its colour from RenderData and reads no table. A stroked Path whose colour was
+    // stripped of the chain drew its stroke at full alpha - the window's hidden Restore glyph (Opacity=0) appeared on top
+    // of the Maximize one, which is the "square inside a square" the caption button turned into.
+    private static bool RidesFadeSlot(Core.Graphics.IRenderUnit u) =>
+        u is not RenderUnits.GeometryRenderUnit g || !g.HasPerUnitOverlay;
 
     private IUIComponent NodeOf(IUIComponent c)
     {
@@ -521,19 +539,27 @@ public partial class RenderCache
         {
             _nodeRefreshed[node] = _walkVersion;
             _transformTable.SetMatrix(device, slot, World(node));
+
+            // ...and every node ABOVE it carries this content too, through this one: an outer node's move takes this
+            // node's slot with it. Without saying so, a view whose children are all nodes (a sliding view around a
+            // scrolling list) has no unit of its own to vouch for it and refuses every move. TryAdd, never assignment:
+            // a "no" recorded by MarkNodeNotAware - which now travels up the same chain - outranks it.
+            for (var up = NodeOf(ApplySnap(node).RenderParent); up != null; up = NodeOf(ApplySnap(up).RenderParent))
+                _nodeAllAware.TryAdd(up.RenderId, true);
         }
         _nodeAllAware.TryAdd(node.RenderId, true);
         return rel;
     }
 
-    // Does writing this node's matrix move everything that rides it? A unit records the answer against its NEAREST node
-    // (see ResolveBakeCore), so a node with no answer at all has no unit of its own - every drawn thing under it belongs
-    // to a nested node, which is asked separately. That is the ordinary shape of a view that slides: the view is the
-    // node, and the list inside it is a node too. Answering "no" for it walked the whole scene for a subtree that was
-    // fully carried.
-    // Only reachable once the node has been WALKED as a node - an element that just became one differs in its frozen
-    // entry (LayoutSnapshot.IsMotionNode), which the applier refuses outright, so a fresh flag never reaches here.
-    private bool NodeCarriesItsContent(IUIComponent node) => _nodeAllAware.GetValueOrDefault(node.RenderId, true);
+    // Does writing this node's matrix move everything that rides it? A unit answers against its NEAREST node, and BOTH
+    // answers travel UP the chain of nodes: a yes because an outer node moves this one's slot with it, a no because
+    // whatever cannot follow cannot follow any of them. They must be symmetric - vouching upward while refusing only at
+    // the nearest node is what put a shape's aura in the top-left corner: its own node said no, the sliding view above
+    // it still said yes, and the frame patched with that one unit left behind.
+    //
+    // A node nobody answered for is a REFUSAL. Answering yes by default was tried and let a patch stand while content
+    // had not reached the arena yet - the vector-icon page came up with one icon.
+    private bool NodeCarriesItsContent(IUIComponent node) => _nodeAllAware.GetValueOrDefault(node.RenderId, false);
 
     // A unit under a motion node drew a path its slot matrix can't move (world-baked text, per-unit, gradient for now) ->
     // the node loses the slot-write fast path this frame (recorded per walk).
@@ -542,7 +568,62 @@ public partial class RenderCache
         var node = NodeOf(component);
         if (node == null) return;
         _nodeAllAware[node.RenderId] = false;
+        NoteStraggler(node, component);
+
+        // ...and every node ABOVE it: what this unit cannot follow, it cannot follow for any of them. Assignment, not
+        // TryAdd - a "no" outranks the yes an inner node vouched with (see NodeCarriesItsContent).
+        for (var up = NodeOf(ApplySnap(node).RenderParent); up != null; up = NodeOf(ApplySnap(up).RenderParent))
+        {
+            _nodeAllAware[up.RenderId] = false;
+            NoteStraggler(up, component);
+        }
+
         Core.Diagnostics.FrameTrace.NoteNotAware(node.GetType().Name + " <- " + component.GetType().Name);
+    }
+
+    private void NoteStraggler(IUIComponent node, IUIComponent component)
+    {
+        if (!_nodeStragglers.TryGetValue(node.RenderId, out var behind))
+            _nodeStragglers[node.RenderId] = behind = new HashSet<IUIComponent>();
+        behind.Add(component);
+    }
+
+    // Can this moved node be carried at all? Asked BEFORE anything is written, so a "no" costs the frame a walk and
+    // never a half-updated table. A node that carries everything needs nothing; one that does not has to know its
+    // stragglers by name (a node NOBODY answered for still refuses - see NodeCarriesItsContent) and every straggler's
+    // batched units have to be re-bakeable in place.
+    private bool CanCarryStragglers(IUIComponent node)
+    {
+        if (NodeCarriesItsContent(node)) return true;
+        if (!_nodeStragglers.TryGetValue(node.RenderId, out var behind)) return false;
+
+        foreach (var c in behind)
+        {
+            if (!_groupById.TryGetValue(c.RenderId, out var g)) continue;
+            foreach (var u in g.Units)
+                if (Drawing(u) && HoldsInstances(u) && !IsSlotPatchable(u)) return false;
+        }
+        return true;
+    }
+
+    // Carry them. A straggler holds its OWN slot with its FULL world (that is why it could not ride the node's), so
+    // ResolveBake rewriting that slot is what moves it - and for a per-unit draw that is the whole job, since the
+    // replay re-points those under a moved node (RepointIfItMoved). One that holds instances is re-baked too.
+    private bool CarryStragglers(IGraphicsDevice device, IUIComponent node)
+    {
+        if (NodeCarriesItsContent(node) || !_nodeStragglers.TryGetValue(node.RenderId, out var behind)) return true;
+
+        foreach (var c in behind)
+        {
+            if (!_groupById.TryGetValue(c.RenderId, out var g)) continue;
+            foreach (var u in g.Units)
+            {
+                if (!Drawing(u)) continue;
+                var bakeWorld = ResolveBake(device, u.Component, World(u.Component), out var slot);
+                if (HoldsInstances(u) && !PatchSlot(device, u, bakeWorld, slot)) return false;
+            }
+        }
+        return true;
     }
 
     // Apply the moved nodes' new matrices (64B each) before a replay-based draw; stale position memos drop and rebuild
@@ -562,8 +643,8 @@ public partial class RenderCache
         foreach (var known in _nodeRefreshed.Keys)
             if (!_movedNodesBuf.Contains(known) && IsUnder(known, _movedNodesBuf)) _nestedMovedNodes.Add(known);
 
-        foreach (var node in _movedNodesBuf) if (!NodeCarriesItsContent(node)) return false;
-        foreach (var node in _nestedMovedNodes) if (!NodeCarriesItsContent(node)) return false;
+        foreach (var node in _movedNodesBuf) if (!CanCarryStragglers(node)) return false;
+        foreach (var node in _nestedMovedNodes) if (!CanCarryStragglers(node)) return false;
         // Positions moved -> drop the WORLD memos (rebuilt lazily from _snap). NOT _snap: the recorder already re-captured
         // the moved nodes' fresh LocalTransform this frame (CaptureSnapshot). NOT the clip memo either: a clip is the
         // ClipToBounds ancestors' viewport (a scroll viewport, a panel), which a node moving INSIDE it never changes, and
@@ -585,6 +666,12 @@ public partial class RenderCache
                 _transformTable.SetMatrix(device, slot, World(node));
             _movedNodeOwners.Add(node);
         }
+
+        // ...and last, whatever could not ride those slots - AFTER the memo flush above, so every straggler is re-baked
+        // from the world the node has NOW and not the one it was memoized at.
+        foreach (var node in _movedNodesBuf) if (!CarryStragglers(device, node)) return false;
+        foreach (var node in _nestedMovedNodes) if (!CarryStragglers(device, node)) return false;
+
         _movedNodesBuf.Clear();
         return true;
     }
@@ -607,8 +694,14 @@ public partial class RenderCache
     // Forgiveness is decided by the applier (nothing under the mover may clip: a recorded Scissor is a world-space rect
     // and nothing re-derives it). False = something in a moved subtree cannot be re-baked in place, and the caller
     // hands the frame to the walk.
-    private bool RefreshMovedComponents(IGraphicsDevice device)
+    // The window scissor of the frame being drawn: the cull test in the collect needs it, and the collect sits a call
+    // below the paths that hold it.
+    private Adamantium.Vulkan.Core.Rect2D _cullScissor;
+
+    private bool RefreshMovedComponents(IGraphicsDevice device, Adamantium.Vulkan.Core.Rect2D fullScissor)
     {
+        _cullScissor = fullScissor;
+
         if (_movedOwnersBuf.Count == 0)
         {
             _movedOwners.Clear();   // nothing moved this frame - the replay re-points nothing
@@ -657,8 +750,20 @@ public partial class RenderCache
         if (_groupById.TryGetValue(c.RenderId, out var g))
         {
             foreach (var u in g.Units)
-                if (HoldsInstances(u) && !IsSlotPatchable(u))
-                    return false;
+            {
+                if (!Drawing(u)) continue;
+
+                // CULLED = no op in the stream at all: a unit entirely outside its clip is never recorded. Moving it can
+                // bring it back INSIDE, and a patch cannot add a draw that was never written. This is what emptied the
+                // vector-icon page - its ScrollViewer culls everything below the fold, and once a scroll patched instead
+                // of walking there was nothing left to bring those icons in. Measured: clip 54,168,1172,498 against
+                // icons at y=716..1164, and the page came right only when a 4K window made the viewport tall enough to
+                // cull nothing. Asked of the CURRENT world, so it catches both directions.
+                ResolveScissor(u.Component, World(u.Component), _cullScissor, out _, out var culled);
+                if (culled) return false;
+
+                if (HoldsInstances(u) && !IsSlotPatchable(u)) return false;
+            }
         }
 
         _movedSubtree.Add(c);

@@ -156,6 +156,19 @@ public partial class RenderCache
     // refusals in 8 s, all GeometryRenderUnit<Path>, at 38 ms a frame against 0.5 for a patched one.
     private readonly Dictionary<IRenderUnit, (BatchArena Arena, int Slot)> _fillSlotByUnit = new();
 
+    // Which halo records a unit occupies. A shape's soft bands used to be written by the WALK alone: a colour change
+    // patched the shape's own slot at once and left its aura on the old colour until some unrelated frame happened to
+    // walk - "the aura catches up eventually" was the bug, and this ledger is what a patch needs to answer it.
+    // FOUR ranges, because a shape can wear a still band and a living one, each on either side of its own fill.
+    private struct HaloRuns
+    {
+        public int UnderFirst, UnderCount;             // _haloUnder    - still bands drawn beneath the fill
+        public int OverFirst, OverCount;               // _haloOver     - ...and inside the outline, drawn over it
+        public int LivingUnder, LivingOver;            // _haloLivingUnder / _haloLivingOver, one record each; -1 = none
+    }
+
+    private readonly Dictionary<IRenderUnit, HaloRuns> _haloRunsByUnit = new();
+
     // The units whose shader CANNOT read the opacity slot (text above all, plus the instanced fills and the procedural
     // families - see GlyphItem). Element Opacity is composed at draw time for everyone else, so a fade touches nothing;
     // these still carry the chain in their baked colour and have to be re-baked when an ANCESTOR's Opacity moves.

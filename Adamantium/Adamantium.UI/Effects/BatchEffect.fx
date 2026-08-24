@@ -45,19 +45,6 @@ struct NodeSlot
     float4   Params;
 };
 
-// The alpha an instance draws at. Element Opacity multiplies down the tree, and folding that product into each
-// instance's COLOUR is what made fading a container cost a re-bake of everything under it. The slot carries the product
-// instead - composed on the CPU over the tree of FADE slots - so this is ONE fetch and a fade rewrites a few floats.
-//
-// Branch-free, and it reads a valid slot either way: a `?:` guarding work has device-lost form in this family (see the
-// mirror flags further down), and the guarded work here would be a pointer dereference. Slot 0 always exists.
-float NodeAlpha(NodeSlot* nodes, int slot)
-{
-    float alpha = nodes[max(slot, 0)].Params.x;
-    return lerp(1.0, alpha, step(0.0, float(slot)));
-}
-
-
 // GPU-resident FRACTAL REFERENCE ORBITS (perturbation deep-zoom): a flat float2[] holding every deep-zoom fractal
 // instance's reference orbit Z_n concatenated. Each FractalRectData.Ref.x is this instance's START INDEX into it and
 // .y the length. Zero (address 0) when no deep-zoom fractal is live - the shader only dereferences it on the deep path.
@@ -566,7 +553,9 @@ FillPSInput InstancedFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
     float4 world = mul(mul(float4(v.position.xyz, 1.0), inst.Local), nodes[(uint)inst.Params.x].World);
     FillPSInput o;
     o.Position = mul(world, Projection);
-    o.Color = inst.Color;
+    int fillFadeSlot = int(inst.Params.y);
+    float fillFade = lerp(1.0, nodes[max(fillFadeSlot, 0)].Params.x, step(0.0, float(fillFadeSlot)));
+    o.Color = float4(inst.Color.rgb, inst.Color.a * fillFade);
     return o;
 }
 
@@ -638,7 +627,9 @@ FringePSInput InstancedFringeVS(FringeVertex v, uint instanceId : SV_InstanceID)
     FringePSInput o;
     float coverage;
     o.Position = ExpandFringe(v, m, coverage);
-    o.Color = inst.Color;
+    int fillFadeSlot = int(inst.Params.y);
+    float fillFade = lerp(1.0, nodes[max(fillFadeSlot, 0)].Params.x, step(0.0, float(fillFadeSlot)));
+    o.Color = float4(inst.Color.rgb, inst.Color.a * fillFade);
     o.Coverage = coverage;
     return o;
 }
@@ -842,6 +833,15 @@ float SdEllipse(float2 p, float2 half)
 // A polygon carries no corner radii, so its own numbers ride in exactly that field: .x corners, .y start angle in
 // radians, .z ring thickness in device px. The shape selector is the pass's own (a negative baked radius for the pattern
 // and texture passes, Geom1.z for the gradient one), resolved to 0 rect / 1 ellipse / 2 polygon before the call.
+// The shape numbers, taken to device pixels. A rect's four are RADII and all scale; a POLYGON's are not radii at all -
+// .x is a corner COUNT, .y an ANGLE in radians, and only .z (the ring) is a length. Scaling the whole vector turned
+// three corners into four and a half and swung the start angle with the DPI, which is why a tiled brush drew nonsense
+// on a polygon while the very same shape with a solid fill was right: only the three brush passes share this field.
+float4 ScaleShapeNumbers(float4 radii, float iso, float isPolygon)
+{
+    return lerp(radii * iso, float4(radii.x, radii.y, radii.z * iso, radii.w), isPolygon);
+}
+
 float BrushShapeDistance(float2 p, float2 half, float4 radii, int joinType, float shape)
 {
     // Branch-FREE, and not as a matter of taste: a ?: in the textured pass has device-lost form on this driver (see
@@ -1013,9 +1013,10 @@ PolygonPSInput PolygonBatchInstancedVS(uint vertexId : SV_VertexID, uint instanc
     o.Half   = item.Bounds.zw * 0.5 * px;
     o.Local  = (corner - 0.5) * item.Bounds.zw * px + (corner * 2.0 - 1.0) * outsetPx;
 
-    float slotAlpha = nodes[(uint)item.Params.x].Params.x;
-    o.Color  = float4(item.Color.rgb, item.Color.a * slotAlpha);
-    o.StrokeColor = float4(item.StrokeColor.rgb, item.StrokeColor.a * slotAlpha);
+    // No slot alpha: Params is full (.x transform slot, .y corners, .z ring, .w angle), so a solid polygon takes the
+    // opacity CHAIN in its colour like text does. What stood here read the TRANSFORM slot, whose alpha is always 1.
+    o.Color  = item.Color;
+    o.StrokeColor = item.StrokeColor;
     o.Stroke0 = float4(widthPx, item.Stroke0.y, item.Stroke0.z * iso, item.Stroke0.w * iso);
     o.Stroke1 = float4(item.Stroke1.x * iso, item.Stroke1.y, item.Stroke1.z, item.Stroke1.w);
     o.Dash = item.Dash * iso;
@@ -1232,7 +1233,7 @@ GradPSInput GradientRectInstancedVS(uint vertexId : SV_VertexID, uint instanceId
     o.Position = mul(worldPos, Projection);
     o.Half   = it.Bounds.zw * 0.5 * px;
     o.Local  = (corner - 0.5) * it.Bounds.zw * px + (corner * 2.0 - 1.0) * outsetPx;
-    o.Radii = it.Radii * iso;
+    o.Radii = ScaleShapeNumbers(it.Radii, iso, step(1.5, it.Geom1.z));   // Geom1.z: 2 = regular polygon
     o.InstId = instanceId;
     o.Scale  = iso;
     // Params.w packs spread (low 3 bits), interp mode (bit 3) and the OPACITY SLOT above them, biased by 1 so 0 = none.
@@ -1312,11 +1313,21 @@ struct GradGeomData
     float4 Offsets0; float4 Offsets1;
 };
 
+// The opacity slot rides PACKED in Params.w next to the interpolation mode (0 sRGB / 1 OKLab): this record has no free
+// component - Geom1.z is the SHAPE FLAG the pixel shader branches on, and writing the slot there drew nothing at all.
+// Same trick the SDF gradient already uses for its own spread/interp/slot triple. Unpacked by hand at each site: a
+// helper that takes NodeSlot* blanks the window on this driver, so the fetch is never wrapped in one.
+int GradGeomFadeSlot(GradGeomData it) { return int(it.Params.w * 0.5) - 1; }
+int GradGeomInterp(GradGeomData it)   { return int(fmod(it.Params.w, 2.0)); }
+
 struct GradFillPSInput
 {
     float4 Position : SV_Position;
     float2 Local : TEXCOORD0;                   // varying: fragment's local mesh xy (for uv)
     nointerpolation uint InstId : TEXCOORD1;    // instance -> re-read GradGeomData in the PS (light signature)
+    // The opacity slot's alpha, fetched in the VERTEX stage and carried down: reading the node table from the PIXEL
+    // stage is what this driver answers with a device loss, so the fetch happens once per vertex and rides a varying.
+    nointerpolation float Fade : TEXCOORD2;
 };
 
 [shader("vertex")]
@@ -1333,6 +1344,8 @@ GradFillPSInput GradientFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
     o.Position = mul(world, Projection);
     o.Local = v.position.xy;
     o.InstId = instanceId;
+    int gradFadeSlot = GradGeomFadeSlot(it);
+    o.Fade = lerp(1.0, nodes[max(gradFadeSlot, 0)].Params.x, step(0.0, float(gradFadeSlot)));
     return o;
 }
 
@@ -1354,7 +1367,7 @@ float4 GradGeomColor(GradGeomData it, float2 local)
 
     float2 uv = (local - it.LocalBounds.xy) / max(it.LocalBounds.zw, float2(1e-4, 1e-4));
     float gt = GradSpread(GradParam(gd, uv), int(gd.Params.w));
-    float4 grad = GradColor(gd, gt, min(fwidth(gt), fwidth(frac(gt + 0.5))), int(it.Params.w));   // wrap-aware AA (conic/repeat seam)
+    float4 grad = GradColor(gd, gt, min(fwidth(gt), fwidth(frac(gt + 0.5))), GradGeomInterp(it));   // wrap-aware AA (conic/repeat seam)
     // MESH (type 4) here too: a mesh brush has NO axis geometry, so without this branch the maths above runs on zeros and
     // walks the stop table with a meaningless parameter. Same branch-free select as the rect pass.
     float4 mesh = lerp(lerp(gd.Stop0, gd.Stop1, uv.x), lerp(gd.Stop2, gd.Stop3, uv.x), uv.y);
@@ -1365,7 +1378,8 @@ float4 GradGeomColor(GradGeomData it, float2 local)
 float4 GradientFillPS(GradFillPSInput input) : SV_Target
 {
     GradGeomData* items = (GradGeomData*)InstancesAddress;
-    return GradGeomColor(items[input.InstId], input.Local);
+    float4 c = GradGeomColor(items[input.InstId], input.Local);
+    return float4(c.rgb, c.a * input.Fade);
 }
 
 // The analytic-AA fringe of those gradient instances: same shared ring, same instance buffer, one draw. Unlike the
@@ -1377,6 +1391,7 @@ struct GradFringePSInput
     float2 Local    : TEXCOORD0;   // LOCAL mesh position -> the gradient uv
     float  Coverage : TEXCOORD1;
     nointerpolation uint InstId : TEXCOORD2;
+    nointerpolation float Fade : TEXCOORD3;   // fetched in the VERTEX stage - see GradFillPSInput
 };
 
 [shader("vertex")]
@@ -1393,6 +1408,8 @@ GradFringePSInput InstancedGradientFringeVS(FringeVertex v, uint instanceId : SV
     o.Local = v.Position;
     o.Coverage = coverage;
     o.InstId = instanceId;
+    int gradFadeSlot = GradGeomFadeSlot(it);
+    o.Fade = lerp(1.0, nodes[max(gradFadeSlot, 0)].Params.x, step(0.0, float(gradFadeSlot)));
     return o;
 }
 
@@ -1401,7 +1418,7 @@ float4 InstancedGradientFringePS(GradFringePSInput input) : SV_Target
 {
     GradGeomData* items = (GradGeomData*)InstancesAddress;
     float4 c = GradGeomColor(items[input.InstId], input.Local);
-    c.a *= saturate(input.Coverage);   // 1 at the contour -> 0 at the outer edge
+    c.a *= saturate(input.Coverage) * input.Fade;   // 1 at the contour -> 0 at the outer edge
     return c;
 }
 
@@ -1458,7 +1475,7 @@ PatternPSInput PatternRectInstancedVS(uint vertexId : SV_VertexID, uint instance
     o.Position = mul(worldPos, Projection);
     o.Half   = it.Bounds.zw * 0.5 * px;
     o.Local  = (corner - 0.5) * it.Bounds.zw * px + (corner * 2.0 - 1.0) * outsetPx;
-    o.Radii = it.Radii * iso;
+    o.Radii = ScaleShapeNumbers(it.Radii, iso, step(it.Params.x, -1.5));   // Params.x: -2 = regular polygon
     o.InstId = instanceId;
     o.Scale  = iso;
     return o;
@@ -1928,7 +1945,7 @@ TexPSInput TexRectInstancedVS(uint vertexId : SV_VertexID, uint instanceId : SV_
     o.Position = mul(worldPos, Projection);
     o.Half   = it.Bounds.zw * 0.5 * px;
     o.Local  = (corner - 0.5) * it.Bounds.zw * px + (corner * 2.0 - 1.0);
-    o.Radii = it.Radii * iso;
+    o.Radii = ScaleShapeNumbers(it.Radii, iso, step(it.Params.x, -1.5));   // Params.x: -2 = regular polygon
     o.InstId = instanceId;
     return o;
 }
@@ -2056,6 +2073,7 @@ struct PatFillPSInput
     float4 Position : SV_Position;
     float2 Local : TEXCOORD0;                   // varying: fragment's local mesh xy
     nointerpolation uint InstId : TEXCOORD1;    // instance -> re-read PatGeomData in the PS (light signature)
+    nointerpolation float Fade : TEXCOORD2;     // fetched in the VERTEX stage - see GradFillPSInput
 };
 
 [shader("vertex")]
@@ -2071,6 +2089,8 @@ PatFillPSInput PatternFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
     o.Position = mul(world, Projection);
     o.Local = v.position.xy;
     o.InstId = instanceId;
+    int patFadeSlot = int(it.Params.x);
+    o.Fade = lerp(1.0, nodes[max(patFadeSlot, 0)].Params.x, step(0.0, float(patFadeSlot)));
     return o;
 }
 
@@ -2089,7 +2109,9 @@ FringePSInput InstancedPatternFringeVS(FringeVertex v, uint instanceId : SV_Inst
     FringePSInput o;
     float coverage;
     o.Position = ExpandFringe(v, m, coverage);
-    o.Color = it.Color1;
+    int patFringeSlot = int(it.Params.x);
+    float patFringeFade = lerp(1.0, nodes[max(patFringeSlot, 0)].Params.x, step(0.0, float(patFringeSlot)));
+    o.Color = float4(it.Color1.rgb, it.Color1.a * patFringeFade);
     o.Coverage = coverage;
     return o;
 }
@@ -2115,7 +2137,8 @@ float4 PatternFillPS(PatFillPSInput input) : SV_Target
 
     float2 pTopLeft = input.Local - it.LocalBounds.xy;                                   // fragment from the shape top-left
     float2 centerRel = input.Local - (it.LocalBounds.xy + it.LocalBounds.zw * 0.5);      // fragment from the shape centre
-    return PatternFillColor(pd, pTopLeft, centerRel, max(it.LocalBounds.w * 0.5, 1.0));
+    float4 c = PatternFillColor(pd, pTopLeft, centerRel, max(it.LocalBounds.w * 0.5, 1.0));
+    return float4(c.rgb, c.a * input.Fade);
 }
 
 // ---- Halo batch: the soft band UNDER a shape - an aura (no direction) or a shadow (offset), which are one arithmetic.
@@ -2399,6 +2422,7 @@ struct TexFillPSInput
     float4 Position : SV_Position;
     float2 Local : TEXCOORD0;                   // varying: fragment's local mesh xy
     nointerpolation uint InstId : TEXCOORD1;    // instance -> re-read TexGeomData in the PS (light signature)
+    nointerpolation float Fade : TEXCOORD2;     // fetched in the VERTEX stage - see GradFillPSInput
 };
 
 [shader("vertex")]
@@ -2413,6 +2437,8 @@ TexFillPSInput TexFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
     o.Position = mul(world, Projection);
     o.Local = v.position.xy;
     o.InstId = instanceId;
+    int texFadeSlot = int(it.Params.z);
+    o.Fade = lerp(1.0, nodes[max(texFadeSlot, 0)].Params.x, step(0.0, float(texFadeSlot)));
     return o;
 }
 
@@ -2440,7 +2466,7 @@ float4 TexFillPS(TexFillPSInput input) : SV_Target
 
     // Outside the content's rect inside its tile there is nothing to paint - the gap a Uniform fit leaves.
     float inside = step(0.0, n.x) * step(n.x, 1.0) * step(0.0, n.y) * step(n.y, 1.0);
-    color.a *= inside;
+    color.a *= inside * input.Fade;
 
     return color;
 }
@@ -2451,6 +2477,7 @@ struct TexFringePSInput
     float2 Local    : TEXCOORD0;
     float Coverage  : TEXCOORD1;
     nointerpolation uint InstId : TEXCOORD2;
+    nointerpolation float Fade : TEXCOORD3;   // fetched in the VERTEX stage - see GradFillPSInput
 };
 
 // The analytic-AA fringe of those textured instances: the SAME shared ring and the SAME instance buffer as the body, so
@@ -2471,6 +2498,8 @@ TexFringePSInput InstancedTexFringeVS(FringeVertex v, uint instanceId : SV_Insta
     o.Local = v.Position;
     o.Coverage = coverage;
     o.InstId = instanceId;
+    int texFadeSlot = int(it.Params.z);
+    o.Fade = lerp(1.0, nodes[max(texFadeSlot, 0)].Params.x, step(0.0, float(texFadeSlot)));
     return o;
 }
 
@@ -2494,7 +2523,7 @@ float4 TexFringePS(TexFringePSInput input) : SV_Target
 
     float4 color = SourceTexture.SampleLevel(SourceSampler, uv, 0.0) * it.Tint;
     float inside = step(0.0, n.x) * step(n.x, 1.0) * step(0.0, n.y) * step(n.y, 1.0);
-    color.a *= inside * input.Coverage;
+    color.a *= inside * input.Coverage * input.Fade;
 
     return color;
 }

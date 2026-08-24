@@ -400,4 +400,112 @@ public class HaloRenderTests
         Assert.That(above.G, Is.GreaterThan(40), $"the aura is missing: {above}");
         Assert.That(below.R, Is.GreaterThan(40), $"the shadow is missing: {below}");
     }
+
+    // WHERE a band is drawn is answered by TWO things, exactly as it is for every fill family: the bake folded into the
+    // instance, and the transform slot applied on top of it. The bake used to be dropped here and the slot was the
+    // band's ONLY address - right while that slot holds the full world, wrong the moment it holds a motion NODE's,
+    // because the shape's own place INSIDE the node then has nowhere to live and the band collapses onto the node's
+    // origin. Measured as a sliding view's aura jumping to the top-left corner while its shape moved correctly.
+    //
+    // The claim is deliberately "identical", not "roughly there": a node above a shape is a statement about how the
+    // frame is drawn, never about what it looks like.
+    [Test]
+    public void AnAuraInsideAMotionNode_StaysOnItsShape()
+    {
+        var plain = DrawNested(node: false);
+        var underNode = DrawNested(node: true);
+
+        Assert.That(DifferingPixels(plain, underNode), Is.Zero,
+            "a motion node above the shape moved its band away from it");
+    }
+
+    // The same shape, at the same world place, twice: once directly under the stage and once under a panel that rides
+    // its own slot. Only the shape's offset lives INSIDE the panel, which is the whole point - a node-relative bake of
+    // zero would prove nothing.
+    private static byte[] DrawNested(bool node)
+    {
+        var stage = new TestControl { Bounds = new Rect(0, 0, Dim, Dim), RenderSize = new Size(Dim, Dim) };
+
+        var host = stage;
+        if (node)
+        {
+            var panel = new TestControl { Bounds = new Rect(0, 0, Dim, Dim), RenderSize = new Size(Dim, Dim), IsRenderMotionNode = true };
+            stage.Add(panel);
+            host = panel;
+        }
+
+        var shape = new TestControl
+        {
+            Bounds = new Rect(At, At, Size, Size),
+            RenderSize = new Size(Size, Size),
+            RenderAction = s => s.DrawRectangle(new SolidColorBrush(Colors.White), new Rect(0, 0, Size, Size)),
+            Aura = new Aura { Radius = 24, Color = Colors.Red, Opacity = 1.0 }
+        };
+        host.Add(shape);
+
+        Assert.That(_renderer.RenderFrame(new VisualRoot(stage, Dim, Dim)), Is.True);
+
+        using var img = _renderer.RenderTarget.ResolveTexture.ReadbackToImage();
+        var pixels = new byte[(int)img.TotalSizeInBytes];
+        Marshal.Copy(img.DataPointer, pixels, 0, pixels.Length);
+        return pixels;
+    }
+
+    // A RECOLOUR, on the very next frame. The bands are their own records in their own arena, and only the recording
+    // walk ever wrote them - so a repaint rewrote the shape's fill and left its aura on the old colour until some
+    // unrelated frame happened to walk the scene. "It catches up eventually" is exactly the bug: the colour a hand just
+    // chose has to be on screen now, and it must not cost the frame a walk to get there.
+    // The same holds for a SHADOW: both sides ride this one collector, split only by which side of the fill they paint.
+    [Test]
+    public void RecolouringAnAura_ShowsOnTheNextFrame_WithoutAWalk()
+    {
+        var control = new TestControl
+        {
+            Bounds = new Rect(At, At, Size, Size),
+            RenderSize = new Size(Size, Size),
+            RenderAction = s => s.DrawRectangle(new SolidColorBrush(Colors.White), new Rect(0, 0, Size, Size)),
+            Aura = new Aura { Radius = 24, Color = Colors.Red, Opacity = 1.0 }
+        };
+
+        var stage = new TestControl { Bounds = new Rect(0, 0, Dim, Dim), RenderSize = new Size(Dim, Dim) };
+        stage.Add(control);
+        var root = new VisualRoot(stage, Dim, Dim);
+
+        Assert.That(_renderer.RenderFrame(root), Is.True);
+        RenderDirty.Clear();
+
+        control.Aura = new Aura { Radius = 24, Color = Colors.Lime, Opacity = 1.0 };
+        control.Invalidate();
+        Assert.That(_renderer.RenderFrame(root), Is.True);
+
+        var patched = Snapshot();
+        var beside = At_(patched, At + Size / 2, At - 5);   // in the band, just outside the shape
+        Assert.That(_renderer.Cache.LastFrameReplayed, Is.True,
+            "a recolour must not cost the frame a walk - the band is patched where it already sits");
+        Assert.That(beside.G, Is.GreaterThan(beside.R + 20),
+            $"the aura is still painting the old colour a frame later: {beside}");
+
+        RenderDirty.MarkStructural();
+        Assert.That(_renderer.RenderFrame(root), Is.True);
+        Assert.That(DifferingPixels(patched, Snapshot()), Is.Zero,
+            "the patched band must be exactly what a full walk paints");
+    }
+
+    private static byte[] Snapshot()
+    {
+        using var img = _renderer.RenderTarget.ResolveTexture.ReadbackToImage();
+        var pixels = new byte[(int)img.TotalSizeInBytes];
+        Marshal.Copy(img.DataPointer, pixels, 0, pixels.Length);
+        return pixels;
+    }
+
+    private static int DifferingPixels(byte[] a, byte[] b)
+    {
+        var count = 0;
+        for (var i = 0; i < a.Length; i += 4)
+        {
+            if (a[i] != b[i] || a[i + 1] != b[i + 1] || a[i + 2] != b[i + 2] || a[i + 3] != b[i + 3]) count++;
+        }
+        return count;
+    }
 }

@@ -83,22 +83,49 @@ internal sealed class HaloLivingCollector : SdfBatchCollector<HaloLivingItem>
             return false;   // rotation/shear -> the band would not follow the shape
         }
 
-        colour.W *= (float)opacity;
-        if (colour.W <= 0f) return false;
-
         EnsureCpuCapacity(Count + 1);
         if (Count + 1 > GpuCapacity) return false;
 
-        // Slot units here, not device px - the band fields are in slot units too, and the vertex stage scales them all together.
-        var radii = RectBatchCollector.BakeRadii(corners, destinationRect, 1.0);
-        var item = new HaloLivingItem
+        if (!BakeItem(band, destinationRect, corners, shape, world, opacity, colour, transformSlot, fieldRange, out var baked))
+            return false;
+
+        LastSlot = Count;
+        Items[Count++] = baked;
+        if (field != null) _field = field;
+        MarkPending(scissor, logicalBounds);
+        return true;
+    }
+
+    /// <summary>Which record the last <see cref="TryAdd"/> took, so a patch can re-bake it in place - see
+    /// <see cref="HaloRectCollector.BakeInto"/> for why the bake has to be reachable outside the walk.</summary>
+    public int LastSlot { get; private set; }
+
+    /// <summary>Bake one living band WITHOUT appending it. False = not bakeable this way (a rotated/sheared world, or a
+    /// band that has faded to nothing).</summary>
+    public static bool BakeItem(LivingBand band, Rect destinationRect, ProceduralGeometry.CornerRadius corners,
+        HaloShape shape, Matrix4x4F world, double opacity, Vector4F colour, int transformSlot, double fieldRange,
+        out HaloLivingItem item)
+    {
+        item = default;
+        const float eps = 1e-4f;
+        if (System.Math.Abs(world.M12) > eps || System.Math.Abs(world.M21) > eps) return false;
+
+        colour.W *= (float)opacity;
+        if (colour.W <= 0f) return false;
+
+        // The bake goes INTO the instance and the slot on top - see HaloRectCollector.TryAdd for why dropping it put a
+        // band in the top-left corner. Slot units, not device px: the vertex stage scales bounds and band together.
+        var sx = world.M11; var sy = world.M22; var tx = world.M41; var ty = world.M42;
+        var iso = System.Math.Min(sx, sy);
+        var radii = RectBatchCollector.BakeRadii(corners, destinationRect, iso);
+        item = new HaloLivingItem
         {
-            Bounds = new Vector4F((float)destinationRect.X, (float)destinationRect.Y,
-                (float)destinationRect.Width, (float)destinationRect.Height),
+            Bounds = new Vector4F((float)(destinationRect.X * sx + tx), (float)(destinationRect.Y * sy + ty),
+                (float)(destinationRect.Width * sx), (float)(destinationRect.Height * sy)),
             Params = new Vector4F(RectBatchCollector.MaxOf(radii), transformSlot, (float)shape, band.Inner ? 1f : 0f),
             Radii = radii,
-            Band = new Vector4F(0, 0, band.Spread, band.Softness),
-            Field = new Vector4F((float)fieldRange, band.Turbulence, band.Flow, band.Detail),
+            Band = new Vector4F(0, 0, band.Spread * iso, band.Softness * iso),
+            Field = new Vector4F((float)fieldRange * iso, band.Turbulence, band.Flow, band.Detail),
             Color = colour,
             Ramp = new Vector4F(band.StopCount, 0, 0, 0)
         };
@@ -111,9 +138,6 @@ internal sealed class HaloLivingCollector : SdfBatchCollector<HaloLivingItem>
             item.Offsets1 = new Vector4F(o[4], o[5], o[6], o[7]);
         }
 
-        Items[Count++] = item;
-        if (field != null) _field = field;
-        MarkPending(scissor, logicalBounds);
         return true;
     }
 }
