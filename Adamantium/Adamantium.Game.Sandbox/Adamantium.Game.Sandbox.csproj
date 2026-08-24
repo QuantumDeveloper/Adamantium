@@ -12,6 +12,13 @@
 		<Company>Adamantium</Company>
 		<Version>0.1.0</Version>
 		<Copyright>Copyright © 2026 Adamantium</Copyright>
+		<!-- MEASUREMENT (not yet a decision): a 4K tile grid takes the managed heap from 130MB to 936MB, and the workstation
+		     collector then stops every thread for 240-460ms of each second - a quarter to a half of the frame budget, spent
+		     where no profiler of ours was looking. Server GC collects per-core and in parallel, which is the shape this
+		     workload has. It is a MITIGATION: the real fix is to stop retaining three and a half million objects for sixty
+		     thousand components. Keep or drop it on the numbers. -->
+		<ServerGarbageCollection>true</ServerGarbageCollection>
+		<ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
 		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
 		<CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>
 	</PropertyGroup>

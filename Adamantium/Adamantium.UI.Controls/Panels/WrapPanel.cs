@@ -172,10 +172,25 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
    }
 
    // ---- Virtualized 2D state (items host) ----
-   private const int Buffer = 2;        // extra lead lines on each side of the viewport: a row must be realized BEFORE the
+   private const int MaxBuffer = 2;     // extra lead lines on each side of the viewport: a row must be realized BEFORE the
                                         // scroll reveals it. With 1 the lead was consumed by the reveal outpacing a
                                         // 1-frame realize (a row visibly "catching up" to the scroll, esp. scrolling UP
                                         // where the top lead is thinnest); 2 keeps a realized row ahead of the edge.
+
+   // ...but a LINE is not a fixed amount of screen. With small cells a line is a thin strip and two of them are nothing;
+   // with tall ones a line can be a fifth of the viewport, and two on each side nearly DOUBLE the realized set - four
+   // hundred tiles of lead for a screen that shows six hundred. So the lead is a fraction of the VIEWPORT, converted to
+   // whole lines: scale-invariant, which is what a fixed line count never was. Never zero (a row must still be realized
+   // before it is revealed) and never more than MaxBuffer, so the small-cell case is byte-for-byte what it was.
+   private const double LeadFraction = 0.10;
+
+   private int _bufferLines = MaxBuffer;   // resolved per measure from the live viewport + cell (see ResolveBufferLines)
+
+   private int ResolveBufferLines(double viewportScroll)
+   {
+      if (_cellScroll <= 0 || viewportScroll <= 0) return MaxBuffer;
+      return Math.Clamp((int)Math.Round(viewportScroll * LeadFraction / _cellScroll), 1, MaxBuffer);
+   }
    private const int MaxCellPasses = 4; // bound the in-pass convergence of the auto-sized cell
    // Per-frame (re)bind TIME budget. A rebind is cheap (~20 us) but CREATING a container (new item + template + bindings)
    // is ~50x that, so a fixed COUNT that is fine for scroll would spend >100 ms/frame building the initial window (or a
@@ -187,6 +202,7 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
    // to assert the slicing itself pins it to zero and gets the guaranteed MinBinds floor - a deterministic slice.
    internal static double BindBudgetMs = 6.0;   // frame-time slice for (re)binds WHILE SCROLLING (headroom under a 16 ms frame)
    private const int ParallelArrangeThreshold = 64;   // arrange tiles across cores only above this many realized (else thread overhead > win)
+
    internal static double FillBudgetMs = 30.0;  // slice when NOT scrolling (initial fill / a settled fling): drain the backlog fast
    internal const int MinBinds = 8;            // always (re)bind at least this many/frame so the window keeps filling
 
@@ -486,8 +502,8 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
       var horizontal = Orientation == Orientation.Horizontal;
       var fromScroll = horizontal ? from.Y : from.X;
       var toScroll = horizontal ? to.Y : to.X;
-      var fromLine = Math.Max(0, (int)Math.Floor(fromScroll / _cellScroll) - Buffer);
-      var toLine = Math.Max(0, (int)Math.Floor(toScroll / _cellScroll) - Buffer);
+      var fromLine = Math.Max(0, (int)Math.Floor(fromScroll / _cellScroll) - _bufferLines);
+      var toLine = Math.Max(0, (int)Math.Floor(toScroll / _cellScroll) - _bufferLines);
       return fromLine != toLine;
    }
 
@@ -568,9 +584,10 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
          // inertia) scroll oscillated the window by one row each frame - which broke donor reuse and churned a whole
          // row's Visibility every frame. A fixed spanRows slides cleanly: floor advances 1 => first++ AND last++, so
          // every leaving row's container is reused for the entering row. spanRows covers viewport + top/bottom buffer.
-         var spanRows = (int)Math.Ceiling(effectiveViewport / _cellScroll) + 1 + 2 * Buffer;
+         _bufferLines = ResolveBufferLines(effectiveViewport);
+         var spanRows = (int)Math.Ceiling(effectiveViewport / _cellScroll) + 1 + 2 * _bufferLines;
          var topLine = (int)Math.Floor(scrollOffset / _cellScroll);
-         var firstLine = Math.Max(0, topLine - Buffer);
+         var firstLine = Math.Max(0, topLine - _bufferLines);
          var lastLine = Math.Min(lines - 1, firstLine + spanRows);
          _lastFirstLine = firstLine;
          first = firstLine * _columns;
@@ -596,6 +613,8 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
 
          foreach (var c in Owner.ItemContainerGenerator.SetWindow(first, last, bindBudget, MinBinds, _onSlotBound))
             ParkContainer(c);   // hide + deactivate its bindings so an off-screen tile leaves any shared source's fan-out
+
+
          if (!_cellGrew) break;
       }
 

@@ -330,6 +330,7 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         return false;
     }
 
+
     protected static void ParkContainer(IUIComponent container)
     {
         container.Visibility = Visibility.Collapsed;

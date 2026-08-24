@@ -294,6 +294,7 @@ public partial class RenderCache
             }
         }
 
+
         switch (packet.Kind)
         {
             case RenderBuildKind.Clean:
@@ -529,6 +530,13 @@ public partial class RenderCache
 
         FlushOrderRemovals();
 
+        // ...and the batch is re-armed for the two loops BELOW, which take groups out of the order to put them back in a
+        // new place. Every one of those went through the unbatched path - a scan and a shift of a twenty-thousand-entry
+        // list, per group - so a frame that re-ranks a couple of thousand tiles did tens of millions of operations for
+        // work the merge at the end does in one pass. Exactly the shape the batch was written for; it just did not reach
+        // this far. Flushed again below, before anything reads the order.
+        _batchOrderRemovals = true;
+
         // 3. What ARRIVED (or re-recorded): build/refresh its units. Groups to place are collected for ONE merge below (a
         //    linear scan per insert would be O(new x scene) on a fill).
         _pendingInserts.Clear();
@@ -574,6 +582,8 @@ public partial class RenderCache
             group.Order = order;
             QueueInsert(group);
         }
+
+        FlushOrderRemovals();   // the merge below READS the order, so the batch has to be committed first
 
         if (_pendingInserts.Count == 0) return;
 

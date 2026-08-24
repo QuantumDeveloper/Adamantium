@@ -120,8 +120,11 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     /// is the displayed value before the set (a transition's "from"); <paramref name="newValue"/> is the value just set
     /// (the "to"). Used by <see cref="AnimatableUIComponent"/> to drive implicit property transitions.
     /// </summary>
-    protected virtual void OnValueSet(AdamantiumProperty property, object oldEffectiveValue, object newValue, ValuePriority priority)
+    /// <returns>True if it started a transition - i.e. it wrote another slot, so the effective value must be resolved
+    /// again. False means nothing moved and the value written a moment ago still stands.</returns>
+    protected virtual bool OnValueSet(AdamantiumProperty property, object oldEffectiveValue, object newValue, ValuePriority priority)
     {
+        return false;
     }
 
     protected virtual void OnComponentUpdated()
@@ -135,11 +138,30 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         ComponentUpdated?.Invoke(this, new ComponentUpdatedEventArgs(this));
     }
 
+    // Does this type override OnPropertyChanged? Resolved once per type by reflection and remembered - the alternative is
+    // to assume it does and keep building reports for the three types in the engine that actually care.
+    private static readonly ConcurrentDictionary<Type, bool> OverrideCache = new();
+
+    private static bool OverridesOnPropertyChanged(Type type) => OverrideCache.GetOrAdd(type, static t =>
+        t.GetMethod(nameof(OnPropertyChanged), System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+            ?.DeclaringType != typeof(AdamantiumComponent));
+
     protected void RaisePropertyChanged(AdamantiumProperty property, object oldValue, object newValue)
     {
         if (property == null)
         {
             throw new ArgumentNullException(nameof(property));
+        }
+
+        // Nobody to tell: no instance subscriber, no global hook on the property, nothing inherits it, and this type does
+        // not override OnPropertyChanged. Everything below would then build a report and hand it to four things that
+        // ignore it. On a 4K tile grid that report was allocated ~150 000 times per drag step for no reader at all.
+        if (PropertyChanged == null
+            && !property.HasChangedSubscribers
+            && !property.CanInherit
+            && !OverridesOnPropertyChanged(GetType()))
+        {
+            return;
         }
 
         var e = new AdamantiumPropertyChangedEventArgs(property, oldValue, newValue);
@@ -168,26 +190,47 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
     // The components that inherit values FROM this one. A plain list, walked only for a property that can inherit at all
     // (AdamantiumProperty.CanInherit), which is what keeps an ordinary write from touching the children at all.
-    private List<AdamantiumComponent> inheritanceChildren;
+    // A SET, not a list: membership is the only question ever asked of it, and it was asked with a linear scan. On a
+    // virtualizing panel this collection is every realized container - fifteen thousand of them on a 4K grid of small
+    // tiles - so attaching the k-th tile scanned k entries and filling the grid was quadratic: ~113 million reference
+    // comparisons, and the same again on the way out through Remove. Nothing here depends on order.
+    private HashSet<AdamantiumComponent> inheritanceChildren;
 
     private void AddInheritanceChild(AdamantiumComponent child)
     {
         inheritanceChildren ??= [];
-        if (!inheritanceChildren.Contains(child)) inheritanceChildren.Add(child);
+        inheritanceChildren.Add(child);   // the set IS the "already there?" check
     }
 
     private void RemoveInheritanceChild(AdamantiumComponent child) => inheritanceChildren?.Remove(child);
+
+    /// <summary>A snapshot of the inheritance children to walk. A snapshot because a child may re-parent from inside its
+    /// own notification (a DataContext change rebuilds bindings), which would otherwise mutate the set mid-walk. The
+    /// single-child case - overwhelmingly the common one - takes the one element out without allocating anything.</summary>
+    private bool TrySnapshotInheritanceChildren(out AdamantiumComponent single, out AdamantiumComponent[] many)
+    {
+        single = null;
+        many = null;
+        if (inheritanceChildren is not { Count: > 0 }) return false;
+
+        if (inheritanceChildren.Count == 1)
+        {
+            foreach (var only in inheritanceChildren) { single = only; break; }
+            return true;
+        }
+
+        many = new AdamantiumComponent[inheritanceChildren.Count];
+        inheritanceChildren.CopyTo(many);
+        return true;
+    }
 
     // A child may re-parent from inside its own push (a DataContext change rebuilds bindings), so walk a snapshot: the
     // list can be modified while this runs.
     private void NotifyInheritanceChildren(AdamantiumPropertyChangedEventArgs e)
     {
-        if (inheritanceChildren is not { Count: > 0 }) return;
+        if (!TrySnapshotInheritanceChildren(out var single, out var children)) return;
 
-        var children = inheritanceChildren.Count == 1
-            ? [inheritanceChildren[0]]
-            : inheritanceChildren.ToArray();
-
+        if (single != null) { single.InheritedValueChanged(e); return; }
         foreach (var child in children)
         {
             child.InheritedValueChanged(e);
@@ -199,13 +242,24 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     /// only for what a read cannot do by itself: run a changed-callback (a new DataContext has to re-resolve bindings)
     /// and tell whoever subscribed to THIS element's PropertyChanged (a binding or a trigger watching an inherited
     /// value). An element that needs neither is stepped over, and the walk carries on to its own children.</summary>
+    /// <summary>Does an inherited change of this property have to REACH this element, or may the walk step over it and
+    /// carry on to its children? Only the callback's own work can answer that, so the element that owns the callback
+    /// answers. Stepping over is safe for the VALUE by construction - the epoch bump staled every cached copy and the
+    /// next read resolves it from the ancestors; this is only about who has to be told.</summary>
+    protected virtual bool NeedsInheritedCallback(AdamantiumProperty property) => true;
+
     private void InheritedValueChanged(AdamantiumPropertyChangedEventArgs e)
     {
         var metadata = e.Property.GetDefaultMetadata(GetType());
         // An explicit value of its own outranks the inherited one - this element and everything under it keep theirs.
         if (metadata is not { Inherits: true } || HasExplicitValue(e.Property)) return;
 
-        if (metadata.PropertyChangedCallback != null || PropertyChanged != null)
+        // A callback on the PROPERTY is not the same question as "does this ELEMENT need telling". `DataContext` carries
+        // one for every element that ever inherits it, so the cheap step-over below was unreachable for the one property
+        // that needs it most: a list rebinding its containers re-resolved the bindings of every element under each of
+        // them, and three quarters of those elements have no binding at all. Measured on the Layout tab: 125 534 refreshes
+        // over 22 822 elements - 5.5 apiece, of which only 31 259 had anything to re-resolve.
+        if ((metadata.PropertyChangedCallback != null && NeedsInheritedCallback(e.Property)) || PropertyChanged != null)
         {
             // The old push, for the few that need telling: it writes, notifies, and cascades to ITS children itself.
             SetValue(e.Property, e.NewValue, ValuePriority.Inherited);
@@ -213,12 +267,9 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         }
 
 
-        if (inheritanceChildren is not { Count: > 0 }) return;
+        if (!TrySnapshotInheritanceChildren(out var single, out var children)) return;
 
-        var children = inheritanceChildren.Count == 1
-            ? [inheritanceChildren[0]]
-            : inheritanceChildren.ToArray();
-
+        if (single != null) { single.InheritedValueChanged(e); return; }
         foreach (var child in children)
         {
             child.InheritedValueChanged(e);
@@ -253,11 +304,16 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             // component hasn't set locally, raise a change from the old inherited value to the new one so the value AND
             // its callbacks (e.g. DataContext -> refresh bindings) apply. This makes inheritance order-independent: an
             // element attached AFTER its parent's value was assigned still picks it up here.
-            foreach (var property in AdamantiumPropertyMap.GetRegistered(GetType()))
+            // Only the INHERITING properties, resolved once per type - not all seventy a control registers, each asked for
+            // its merged metadata to be told "no". Re-parenting happens once per element realized, so a virtualized grid
+            // paid that whole scan per tile.
+            var type = GetType();
+            foreach (var property in AdamantiumPropertyMap.GetInheriting(type))
             {
-                var metadata = property.GetDefaultMetadata(GetType());
-                if (metadata is not { Inherits: true } || HasExplicitValue(property)) 
+                if (HasExplicitValue(property))
                     continue;
+
+                var metadata = property.GetDefaultMetadata(type);
 
                 // A plain inherited VALUE needs nothing here: the epoch bumped above, and the first read of it resolves
                 // from the new parent. Only a callback (DataContext -> refresh this element's bindings) or an observer
@@ -658,6 +714,7 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         return coerced;
     }
 
+
     private void RunSetValueSequence(AdamantiumProperty property, object value, ValuePriority priority, bool raiseValueChangedEvent)
     {
         var metadata = property.GetDefaultMetadata(GetType());
@@ -696,30 +753,39 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         var oldReadValue = oldEffectiveValue == AdamantiumProperty.UnsetValue
             ? GetDefaultValue(property)
             : oldEffectiveValue;
-        var args = new AdamantiumPropertyChangedEventArgs(property, oldReadValue, effectiveAfterWrite);
-
         // A write that leaves the value the property READS as where it was is not a change, so it must not run the
         // changed-callback. Running it anyway is how two properties that assign each other close a cycle with no exit:
         // a presenter whose Content is bound to its own DataContext writes back the object it already sits on, the
         // callback re-assigns the same DataContext, that refreshes the bindings, which writes Content again - the app
         // died of a stack overflow. The equal check below guards only invalidation and events, which is why the cycle
         // ran above it.
-        if (!Equals(oldReadValue, effectiveAfterWrite))
+        // The args are built INSIDE the branch: they are read by the callback and by nothing else, so a property with no
+        // callback (most of them - ActualWidth/ActualHeight among them) was allocating one object per write for nobody.
+        var slotsMayHaveMoved = false;
+        if (metadata.PropertyChangedCallback != null && !Equals(oldReadValue, effectiveAfterWrite))
         {
-            metadata.PropertyChangedCallback?.Invoke(this, args);
+            metadata.PropertyChangedCallback.Invoke(this,
+                new AdamantiumPropertyChangedEventArgs(property, oldReadValue, effectiveAfterWrite));
+            slotsMayHaveMoved = true;
         }
 
         // Implicit transitions: let an animatable element turn this base-value change into a smooth animation. Skipped
         // for animation-priority writes (those ARE the transition) so there is no recursion. May start an animation
         // re-entrantly (it writes the Animation slot) - that resolves cleanly via the equal-effective early-return below.
-        if (priority != ValuePriority.Animation)
+        // Skipped for a READ-ONLY property, by what read-only MEANS: a Transitions entry names a property for the element
+        // to animate, and only the declaring class writes a read-only one - so there is no transition to find, and an
+        // animation on it would be overwritten by its writer on the very next pass. The lookup is not free (it reads
+        // Transitions through the property system on every single write), so not doing it is the point.
+
+        if (priority != ValuePriority.Animation && !property.ReadOnly)
         {
-            OnValueSet(property, oldReadValue, value, priority);
+            slotsMayHaveMoved |= OnValueSet(property, oldReadValue, value, priority);
         }
 
-        // Re-read under the lock: a changed-callback or a started transition above may have written another slot.
-        object newEffectiveValue;
-        newEffectiveValue = GetOrCalculateEffectiveValue(property);
+        // The effective value is the field the locked write above just set, so re-reading it is only meaningful when
+        // something between then and now could have written ANOTHER slot - the changed-callback, or a started transition.
+        // Neither ran => what we wrote still stands, and the lookup is skipped rather than repeated.
+        var newEffectiveValue = slotsMayHaveMoved ? GetOrCalculateEffectiveValue(property) : effectiveAfterWrite;
 
         // What every descendant reading this property has cached is now stale: bump the epoch, and their next read
         // re-resolves. O(1) instead of writing the value into each of them.
@@ -729,20 +795,23 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         {
             return;
         }
-        
+
         var element = this as IUIComponent;
         if (element is IMeasurableComponent measurable)
         {
-            // TODO: think how to improve this code and get rid of type casting
             if (metadata.AffectsMeasure)
             {
-                if (Diagnostics.LayoutTrace.Counting) Diagnostics.LayoutTrace.Count(GetType(), property.Name);
+                if (Diagnostics.LayoutTrace.Counting) 
+                    Diagnostics.LayoutTrace.Count(GetType(), property.Name);
+                
                 measurable.InvalidateMeasure();
                 measurable.InvalidateArrange();
             }
             else if (metadata.AffectsArrange)
             {
-                if (Diagnostics.LayoutTrace.Counting) Diagnostics.LayoutTrace.Count(GetType(), property.Name);
+                if (Diagnostics.LayoutTrace.Counting) 
+                    Diagnostics.LayoutTrace.Count(GetType(), property.Name);
+                
                 measurable.InvalidateArrange();
             }
 
@@ -755,13 +824,17 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             {
                 if (metadata.AffectsParentMeasure)
                 {
-                    if (Diagnostics.LayoutTrace.Counting) Diagnostics.LayoutTrace.Count(GetType(), property.Name + " (parent)");
+                    if (Diagnostics.LayoutTrace.Counting) 
+                        Diagnostics.LayoutTrace.Count(GetType(), property.Name + " (parent)");
+                    
                     parent.InvalidateMeasure();
                     parent.InvalidateArrange();
                 }
                 else if (metadata.AffectsParentArrange)
                 {
-                    if (Diagnostics.LayoutTrace.Counting) Diagnostics.LayoutTrace.Count(GetType(), property.Name + " (parent)");
+                    if (Diagnostics.LayoutTrace.Counting) 
+                        Diagnostics.LayoutTrace.Count(GetType(), property.Name + " (parent)");
+                    
                     parent.InvalidateArrange();
                 }
             }
@@ -779,9 +852,13 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             element?.InvalidatePaint();
         }
 
+
+        // oldReadValue, NOT the raw slot: a container never written holds UnsetValue, and reporting THAT as OldValue told
+        // every listener the property "used to be unset" instead of naming the default it actually read as. The
+        // changed-callback above has always been given the resolved value; the notification now says the same thing.
         if (raiseValueChangedEvent)
         {
-            RaisePropertyChanged(property, oldEffectiveValue, newEffectiveValue);
+            RaisePropertyChanged(property, oldReadValue, newEffectiveValue);
         }
     }
 

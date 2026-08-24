@@ -55,6 +55,12 @@ public static class BindingEngine
     public static IReadOnlyCollection<BindingExpressionBase> GetBindings(IAdamantiumComponent target)
         => _bindings.TryGetValue(target, out var map) ? map.Values.ToArray() : [];
 
+    /// <summary>Has this element anything to re-resolve at all? Asked by the inheritance walk before it pays the full
+    /// write for a `DataContext` change: three quarters of the elements a container rebind reaches have no binding on
+    /// them, and telling them costs slots, priorities and a notification for nothing.</summary>
+    public static bool HasBindings(IAdamantiumComponent target)
+        => _bindings.TryGetValue(target, out var map) && map.Count > 0;
+
     /// <summary>Re-resolves and re-applies every binding on an element - e.g. after its DataContext changed.</summary>
     public static void RefreshBindings(IAdamantiumComponent target)
     {

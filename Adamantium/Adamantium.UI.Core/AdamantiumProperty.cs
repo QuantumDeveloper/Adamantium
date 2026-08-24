@@ -137,6 +137,9 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
       // takes it away for the type that had it.
       CanInherit |= metadata.Inherits;
       metadataCache.Clear();   // a previously-resolved (base-walked) entry may now resolve to this newer, more-derived one
+      // ...and an override can ADD inheritance for a derived type, so the per-type "which of my properties inherit" answer
+      // is stale too. Static-init only, so this never runs hot.
+      AdamantiumPropertyMap.InvalidateInheriting();
    }
 
    /// <summary>
@@ -205,6 +208,10 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
    {
       Changed?.Invoke(source, e);
    }
+
+   /// <summary>Whether anyone is subscribed to <see cref="Changed"/> - asked before a report is BUILT, so a property no
+   /// global hook watches does not pay for one.</summary>
+   internal bool HasChangedSubscribers => Changed != null;
 
    private AdamantiumProperty(String name, Type valueType, Type ownerType )
    {

@@ -24,6 +24,12 @@ public static class AdamantiumPropertyMap
    // The same flattened set keyed by NAME, built beside Flattened and dropped with it.
    private static readonly ConcurrentDictionary<Type, Dictionary<string, AdamantiumProperty>> FlattenedByName = new();
 
+   // Just the INHERITING properties of a type - a handful (DataContext, Foreground, FontSize) out of the seventy a
+   // control registers. Re-parenting has to revisit exactly these, and it used to find them by walking all seventy and
+   // asking each one's merged metadata: ~120us per attached element, which on a virtualized grid realizing thousands of
+   // tiles was the single most expensive thing about putting one on screen. Dropped with Flattened, for the same reason.
+   private static readonly ConcurrentDictionary<Type, AdamantiumProperty[]> Inheriting = new();
+
    /// <summary>
    /// Attached registered properties by type.
    /// </summary>
@@ -83,6 +89,23 @@ public static class AdamantiumPropertyMap
    /// <summary>The same set as <see cref="GetRegistered(Type)"/>, as the ARRAY it is stored as - so a caller that walks
    /// it per instance (the component constructor) neither goes through an interface nor asks its Count separately.</summary>
    internal static AdamantiumProperty[] GetRegisteredArray(Type type) => Flattened.GetOrAdd(type, FlattenRegistered);
+
+   /// <summary>Drops the cached inheriting sets - a metadata override can add inheritance for a derived type.</summary>
+   internal static void InvalidateInheriting() => Inheriting.Clear();
+
+   /// <summary>The properties of <paramref name="type"/> whose metadata FOR THAT TYPE declares inheritance. Resolved once
+   /// per type: which properties inherit is a fact about the type, not about the element or where it is being attached.</summary>
+   internal static AdamantiumProperty[] GetInheriting(Type type) => Inheriting.GetOrAdd(type, static t =>
+   {
+      var all = Flattened.GetOrAdd(t, FlattenRegistered);
+      var found = new List<AdamantiumProperty>();
+      foreach (var property in all)
+      {
+         if (property.GetDefaultMetadata(t) is { Inherits: true }) found.Add(property);
+      }
+
+      return found.ToArray();
+   });
 
    // Walks the type hierarchy ONCE (own + every base), running each level's static ctor so its properties are
    // registered, and returns the collected list. Cached by GetRegistered so this reflection walk runs once per type.
@@ -281,6 +304,7 @@ public static class AdamantiumPropertyMap
       // a new property changes the flattened list of this type AND any derived type
       Flattened.Clear();
       FlattenedByName.Clear();
+      Inheriting.Clear();
 
       if (!property.IsAttached) 
          return;

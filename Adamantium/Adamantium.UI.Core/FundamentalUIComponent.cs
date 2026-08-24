@@ -100,6 +100,14 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         private init => SetValue(TriggersProperty, value);
     }
 
+    /// <summary>What the `DataContext` callback actually does is raise <see cref="DataContextChanged"/> and re-resolve
+    /// this element's bindings. An element with neither has nothing to be told, and the walk goes straight to its
+    /// children - which is where the bindings usually are. Every other property answers as before.</summary>
+    protected override bool NeedsInheritedCallback(AdamantiumProperty property)
+        => property != DataContextProperty
+           || DataContextChanged != null
+           || BindingEngine.HasBindings(this);
+
     private void UpdateDataContext()
     {
         // Re-resolve this element's own bindings against the new context. Propagation to logical children is handled by

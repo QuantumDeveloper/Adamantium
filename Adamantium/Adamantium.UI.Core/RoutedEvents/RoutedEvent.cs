@@ -28,10 +28,15 @@ public sealed class RoutedEvent
       EventOwnerType = eventOwnerType;
    }
 
+   /// <summary>Whether ANY class handler is registered for this event. Read on every raise to answer "could this be heard
+   /// at all" without taking the lock below; only ever goes from false to true (there is no unregister).</summary>
+   public bool HasClassHandlers { get; private set; }
+
    public void RegisterClassHandler(Type classType, Delegate handler, Boolean handledEventsToo = false)
    {
       lock (classEventSubscriptions)
       {
+         HasClassHandlers = true;
          var subscription = new ClassEventSubsription
          {
             HandledEventsToo = handledEventsToo,
@@ -47,6 +52,7 @@ public sealed class RoutedEvent
    {
       lock (classEventSubscriptions)
       {
+         HasClassHandlers = true;
          var subscription = new ClassEventSubsription
          {
             HandledEventsToo = handledEventsToo,

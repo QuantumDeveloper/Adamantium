@@ -20,6 +20,7 @@ public class ItemContainerGenerator
     private readonly List<IUIComponent> _donorBuf = new();       // reused across SetWindow calls - zero per-scroll-frame alloc
     private readonly List<int> _outKeysBuf = new();
     private readonly List<IUIComponent> _surplusBuf = new();
+
     private readonly List<int> _pendingBuf = new();              // in-window slots deferred this pass (budget spent) - skeletons
     private int _lastWindowFirst;                                // previous window start - fallback direction on a far jump
     private readonly List<int> _bindOrderBuf = new();            // missing slots in nearest-to-realized-first bind order
@@ -98,8 +99,11 @@ public class ItemContainerGenerator
             _indexByContainer.Remove(container);
             if (_generated.Contains(container)) donors.Add(container);
         }
-        // Also draw on containers parked by a previous shrink (the window growing back).
-        while (_recyclePool.Count > 0) donors.Add(_recyclePool.Pop());
+        // Containers parked by a previous shrink are ALSO available - but they are taken one at a time, below, as slots
+        // actually need them. Draining the whole pool into `donors` here meant step 3 pushed every untaken one back and
+        // reported it as surplus AGAIN, so the panel re-parked a pool it had already parked - once per measure, forever.
+        // After a fill at the minimum cell that pool is twelve thousand tiles: ~53ms of re-parking on every single pass,
+        // which is what made the size slider stutter long after the tiles it was moving had stopped changing.
 
         // 2. Give every in-window index that lacks a container a donor (rebound in place) or a fresh one. A rebind (new
         //    DataContext -> re-resolve the item template's bindings + re-measure) is the real per-tile cost, so at most
@@ -171,10 +175,12 @@ public class ItemContainerGenerator
                 _pendingBuf.Add(i);
                 continue;
             }
-            else if (next < donors.Count)
+            else if (next < donors.Count || _recyclePool.Count > 0)
             {
                 Core.Diagnostics.LayoutTrace.Count(typeof(ItemContainerGenerator), "*rebound*");
-                container = donors[next++];
+                // A donor unmapped THIS pass first (it is warm and still holds a live subtree); only then a parked one
+                // from the pool, whose bindings PrepareContainer re-establishes via the DataContext change.
+                container = next < donors.Count ? donors[next++] : _recyclePool.Pop();
                 rebinds++;
                 _owner.PrepareContainer(container, item);   // rebind: DataContext/content -> the new item
             }
@@ -185,6 +191,7 @@ public class ItemContainerGenerator
                 rebinds++;
                 _owner.PrepareContainer(container, item);
             }
+
             _byIndex[i] = container;
             _indexByContainer[container] = i;
             // In-window => visible: a recycled donor parked as surplus was Collapsed and now holds a new item, so re-show
