@@ -8,6 +8,11 @@ public class ObservableUIComponent : UIComponent, IObservableComponent
     private readonly Dictionary<RoutedEvent, List<EventSubscription>> eventHandlers =
         new Dictionary<RoutedEvent, List<EventSubscription>>();
 
+    // How many handlers this element carries, across all events. Maintained by Add/RemoveHandler under the same lock the
+    // dictionary is written with, but READ without one - which is the whole point: nearly every element in a big scene has
+    // none at all, and answering "is anyone listening" must not cost a lock per element per raise.
+    private volatile int handlerCount;
+
     public IObservableComponent ObservableParent => ((IUIComponent)this).VisualParent as IObservableComponent;
 
     public void AddHandler(RoutedEvent routedEvent, Delegate handler, bool handledEventsToo = false)
@@ -34,6 +39,7 @@ public class ObservableUIComponent : UIComponent, IObservableComponent
                 HandledEventsToo = handledEventsToo,
             };
             subscriptions.Add(sub);
+            handlerCount++;
         }
     }
 
@@ -47,8 +53,13 @@ public class ObservableUIComponent : UIComponent, IObservableComponent
         ArgumentNullException.ThrowIfNull(e);
         ArgumentNullException.ThrowIfNull(e.RoutedEvent);
 
+        // Nothing on the route can hear this: the walk would take a lock and ask a dictionary at every level, and change
+        // nothing observable at any of them. Source/OriginalSource are assigned first so an args object the caller keeps
+        // still reads the same as it always did.
         e.Source ??= this;
         e.OriginalSource ??= this;
+
+        if (!WouldBeHeard(e.RoutedEvent)) return;
 
         if (e.RoutedEvent != null)
         {
@@ -155,11 +166,42 @@ public class ObservableUIComponent : UIComponent, IObservableComponent
 
         lock (eventHandlers)
         {
-            if (eventHandlers.ContainsKey(routedEvent))
+            if (eventHandlers.TryGetValue(routedEvent, out var list))
             {
-                var list = eventHandlers[routedEvent];
-                list.RemoveAll(x => x.Handler == handler);
+                handlerCount -= list.RemoveAll(x => x.Handler == handler);
             }
+        }
+    }
+
+    /// <summary>Would raising <paramref name="routedEvent"/> from here reach ANYONE - a class handler, a handler on this
+    /// element, or one on an ancestor it would bubble through?
+    /// <para>Allocation-free and lock-free in the common case: a per-element handler count answers most levels with a
+    /// field read. The caller uses it to decide whether to build the event args at all - and at 4K a resize storm raising
+    /// SizeChanged that nothing listens to was a third of the drag, entirely in args nobody read.</para></summary>
+    protected bool WouldBeHeard(RoutedEvent routedEvent)
+    {
+        if (routedEvent == null) return false;
+        if (routedEvent.HasClassHandlers) return true;   // a class handler hears it wherever it is raised
+
+        if (routedEvent.RoutingStrategy == RoutingStrategy.Direct) return HasOwnHandler(routedEvent);
+
+        // Bubble and Tunnel travel the SAME set of elements, in opposite directions - so for "is anyone on it", one walk
+        // answers both.
+        for (var element = (IObservableComponent)this; element != null; element = element.ObservableParent)
+        {
+            if (element is ObservableUIComponent component && component.HasOwnHandler(routedEvent)) return true;
+        }
+
+        return false;
+    }
+
+    private bool HasOwnHandler(RoutedEvent routedEvent)
+    {
+        if (handlerCount == 0) return false;
+
+        lock (eventHandlers)
+        {
+            return eventHandlers.TryGetValue(routedEvent, out var list) && list.Count > 0;
         }
     }
 }

@@ -61,21 +61,22 @@ public class AnimatableUIComponent : AdamantiumComponent, IAnimatableUIComponent
 
     /// <summary>Drives implicit transitions: a base-value change on a property with a matching transition becomes a
     /// smooth current-&gt;new animation instead of an instant set.</summary>
-    protected override void OnValueSet(AdamantiumProperty property, object oldEffectiveValue, object newValue, ValuePriority priority)
+    protected override bool OnValueSet(AdamantiumProperty property, object oldEffectiveValue, object newValue, ValuePriority priority)
     {
         // Raw read (not the lazy getter) so an element that never declared transitions allocates nothing on a value set.
         var transitions = GetValue<Media.Animation.Transitions>(TransitionsProperty);
         if (transitions == null || transitions.Count == 0)
-            return;
+            return false;
 
         foreach (var transition in transitions)
         {
             if (transition.Property == property.Name)
             {
-                transition.TryApply(this, property, oldEffectiveValue, newValue);
-                break;
+                return transition.TryApply(this, property, oldEffectiveValue, newValue);
             }
         }
+
+        return false;
     }
 
     /// <inheritdoc />

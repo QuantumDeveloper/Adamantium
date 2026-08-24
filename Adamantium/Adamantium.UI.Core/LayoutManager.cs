@@ -38,6 +38,8 @@ public sealed class LayoutManager
     private readonly List<IUIComponent> _promoteBuffer = new();   // reused scratch for promoting next-pass deferrals
     private readonly System.Diagnostics.Stopwatch _passStopwatch = new();   // reused per pass (RuntimeStats)
 
+
+
     public LayoutManager(IUIComponent root)
     {
         _root = root ?? throw new ArgumentNullException(nameof(root));
@@ -222,6 +224,7 @@ public sealed class LayoutManager
         }
 
         RuntimeStats.LastLayoutPassMs = _passStopwatch.Elapsed.TotalMilliseconds;
+
         if (didWork) Diagnostics.LayoutTrace.Count(typeof(LayoutManager), "*pass*");
         RuntimeStats.LastPassBudgetDeferred = !settled;
 

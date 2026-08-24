@@ -33,6 +33,17 @@ public class Program
                               + c.Visibility;
                     lock (churn) churn[key] = churn.TryGetValue(key, out var had) ? had + 1 : 1;
                 }
+
+                // TEMP: elements ENTERING and LEAVING the tree, per second. Answers "are containers recreated when the
+                // cell size changes" with a number instead of a reading of the recycler: a size change moves rectangles,
+                // and if the tree churns at the same time, something is rebuilding what it should be reusing.
+                long attachCount = 0, detachCount = 0;
+                Adamantium.UI.Core.VisualTreeNotifications.Attached += _ => System.Threading.Interlocked.Increment(ref attachCount);
+                Adamantium.UI.Core.VisualTreeNotifications.Detached += _ => System.Threading.Interlocked.Increment(ref detachCount);
+                long lastAttach = 0, lastDetach = 0;
+                double secRecord = 0, secApply = 0, secPre = 0, secProc = 0;
+                var lastGcPause = GC.GetTotalPauseDuration();
+                int lastG0 = 0, lastG1 = 0, lastG2 = 0;
                 Adamantium.UI.Core.VisualTreeNotifications.Attached += c => Note("attached", c);
                 Adamantium.UI.Core.VisualTreeNotifications.Detached += c => Note("detached", c);
                 Adamantium.UI.Core.VisualTreeNotifications.VisibilityChanged += c => Note("collapsed-flip", c);
@@ -61,8 +72,8 @@ public class Program
                 var loopSentAt = 0L;         // when the outstanding no-op was posted; 0 = none in flight
                 double loopWorstMs = 0;      // the longest the loop took to answer during this second
                 var loopBindings = Adamantium.UI.Core.Diagnostics.RuntimeStats.BindingUpdatesApplied;
-                var loopMeasures = Adamantium.UI.Controls.Base.MeasurableUIComponent.TotalMeasureCalls;
-                var loopArranges = Adamantium.UI.Controls.Base.MeasurableUIComponent.TotalArrangeCalls;
+                var loopMeasures = Adamantium.UI.Controls.Base.MeasurableUIComponent.TotalMeasureCores;
+                var loopArranges = Adamantium.UI.Controls.Base.MeasurableUIComponent.TotalArrangeCores;
                 while (sw.Elapsed.TotalSeconds < limit)
                 {
                     var st = typeof(Adamantium.UI.Core.Diagnostics.RuntimeStats);
@@ -85,6 +96,16 @@ public class Program
                     if (Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyMs > maxApply) maxApply = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyMs;
                     if (Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordMs > maxRecord) maxRecord = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordMs;
                     samples++;
+                    if (Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordMs > secRecord)
+                    {
+                        secRecord = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordMs;
+                    }
+                    if (Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyMs > secApply)
+                    {
+                        secApply = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyMs;
+                    }
+                    if (Adamantium.UI.Core.Diagnostics.RuntimeStats.LastPreRenderMs > secPre) secPre = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastPreRenderMs;
+                    if (Adamantium.UI.Core.Diagnostics.RuntimeStats.LastProcessorsMs > secProc) secProc = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastProcessorsMs;
 
                     // One no-op in flight at a time. While it is outstanding the loop has not answered, so the stall is
                     // reported LIVE rather than only once it ends - a hang that outlasts the run would otherwise vanish.
@@ -126,19 +147,29 @@ public class Program
                         // and three times in a row I explained the wrong moment. The timeline tells them apart: find the
                         // seconds where the fps matches what the plate showed, and read what those seconds were doing.
                         var bindsNow = Adamantium.UI.Core.Diagnostics.RuntimeStats.BindingUpdatesApplied;
-                        var measuresNow = Adamantium.UI.Controls.Base.MeasurableUIComponent.TotalMeasureCalls;
-                        var arrangesNow = Adamantium.UI.Controls.Base.MeasurableUIComponent.TotalArrangeCalls;
+                        var measuresNow = Adamantium.UI.Controls.Base.MeasurableUIComponent.TotalMeasureCores;
+                        var arrangesNow = Adamantium.UI.Controls.Base.MeasurableUIComponent.TotalArrangeCores;
 
                         System.IO.File.AppendAllText(log + ".seconds.txt",
                             $"t={sw.Elapsed.TotalSeconds:00} fps={thisSecond,5} " +
                             $"loopMs={loopWorstMs,7:0} " +
+                            $"att={attachCount - lastAttach,6} det={detachCount - lastDetach,6} " +
                             $"binds={bindsNow - loopBindings,8} " +
                             $"measure={measuresNow - loopMeasures,8} arrange={arrangesNow - loopArranges,8} " +
+                            $"recMs={secRecord,7:0.0} applyMs={secApply,7:0.0} preMs={secPre,7:0.0} procMs={secProc,7:0.0} " +
+                            $"gcPause={(GC.GetTotalPauseDuration() - lastGcPause).TotalMilliseconds,7:0.0} " +
+                            $"g0={GC.CollectionCount(0) - lastG0,5} g1={GC.CollectionCount(1) - lastG1,5} g2={GC.CollectionCount(2) - lastG2,4} " +
+                            $"heapMB={GC.GetTotalMemory(false) / 1048576,6} " +
                             $"walks={Adamantium.UI.Core.Diagnostics.FrameTrace.Walks} " +
                             $"layoutMs={Adamantium.UI.Core.Diagnostics.RuntimeStats.LastLayoutPassMs:0.0} " +
                             $"drawMs={Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRenderDrawMs:0.00}" + Environment.NewLine);
 
                         loopWorstMs = 0;
+                        lastAttach = attachCount;
+                        lastDetach = detachCount;
+                        secRecord = secApply = secPre = secProc = 0;
+                        lastGcPause = GC.GetTotalPauseDuration();
+                        lastG0 = GC.CollectionCount(0); lastG1 = GC.CollectionCount(1); lastG2 = GC.CollectionCount(2);
                         loopBindings = bindsNow;
                         loopMeasures = measuresNow;
                         loopArranges = arrangesNow;

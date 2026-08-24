@@ -730,14 +730,23 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
                 }
                 if (widthChanged || heightChanged)
                 {
-                    var args = new SizeChangedEventArgs(
-                        previousRenderSize, 
-                        Bounds.Size,
-                        widthChanged,
-                        heightChanged);
+                    var from = previousRenderSize;
+                    // The bookkeeping happens whether or not anyone listens - it is what the NEXT event will report as its
+                    // "from", and letting it drift while nobody was subscribed would hand the first late subscriber a size
+                    // the element had long ago.
                     previousRenderSize = Bounds.Size;
-                    args.RoutedEvent = SizeChangedEvent;
-                    RaiseEvent(args);
+
+                    // Only now, and only if the route can hear it, are the args built. RaiseEvent would reach the same
+                    // verdict a moment later - but by then the object exists, and at 4K one of these per element per step
+                    // for nobody was a third of the drag.
+                    if (WouldBeHeard(SizeChangedEvent))
+                    {
+                        var args = new SizeChangedEventArgs(from, Bounds.Size, widthChanged, heightChanged)
+                        {
+                            RoutedEvent = SizeChangedEvent
+                        };
+                        RaiseEvent(args);
+                    }
                 }
             }
         }
