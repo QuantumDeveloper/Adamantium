@@ -20,19 +20,24 @@ namespace Adamantium.Engine.GraphicsTests
     [TestFixture]
     public class ComputeTests
     {
+        [TearDown]
+        public void ReleaseDevices() => GpuFixture.ReleaseRenderDevices();
+
         [Test]
         public void ComputeDispatch_WritesPatternViaBda()
         {
             const int count = 256;
 
-            var main = MainGraphicsDevice.Create(new GraphicsDeviceFactory(), 3, "TestApp", true);
-            var device = main.CreateRenderDevice();
+            var main = GpuFixture.Main;
+            var device = GpuFixture.CreateRenderDevice();
 
             var gd = (GraphicsDevice)device;   // Dispatch/DrawIndirect/BufferBarrier live on the concrete device
-            var effect = Effect.CompileFromFile(Path.Combine("EffectsData", "ComputeSmoke.fx"), device);
+            // DISPOSED, both of them: a test that leaves its effect and its buffer behind leaves live objects on a device
+            // it is about to destroy, and the next test's device creation then dies in the same process.
+            using var effect = Effect.CompileFromFile(Path.Combine("EffectsData", "ComputeSmoke.fx"), device);
             var pass = effect.Techniques[0].Passes[0];
 
-            var output = Adamantium.Graphics.Buffer.New(gd, (ulong)(count * sizeof(uint)),
+            using var output = Adamantium.Graphics.Buffer.New(gd, (ulong)(count * sizeof(uint)),
                 BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress,
                 MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal);
 
@@ -69,7 +74,6 @@ namespace Adamantium.Engine.GraphicsTests
             for (int i = 0; i < count; i++)
                 Assert.That(data[i], Is.EqualTo(i + 1), $"output[{i}] (BDA compute write)");
 
-            main.Dispose();
         }
 
         // Line-rendering Phase B (step 1): the GPU stroke expander turns a polyline + half-thickness into per-segment
@@ -83,8 +87,8 @@ namespace Adamantium.Engine.GraphicsTests
             const float half = 4f;
             int outFloats = pointCount * 2 * 2;                // 2 verts/point * 2 floats (triangle strip)
 
-            var main = MainGraphicsDevice.Create(new GraphicsDeviceFactory(), 3, "TestApp", true);
-            var device = main.CreateRenderDevice();
+            var main = GpuFixture.Main;
+            var device = GpuFixture.CreateRenderDevice();
             var gd = (GraphicsDevice)device;
 
             var effect = Effect.CompileFromFile(Path.Combine("EffectsData", "StrokeExpand.fx"), device);
@@ -137,7 +141,6 @@ namespace Adamantium.Engine.GraphicsTests
             for (int i = 0; i < outFloats; i++)
                 Assert.That(got[i], Is.EqualTo(expected[i]).Within(0.01f), $"vertex float [{i}]");
 
-            main.Dispose();
         }
 
         // CPU mirror of StrokeExpand.fx's miter expansion: 2 offset vertices per point along the miter normal.
@@ -204,8 +207,8 @@ namespace Adamantium.Engine.GraphicsTests
             const float half = 4f;
             uint verts = (uint)pointCount * 2;                 // 2 verts/point, triangle strip
 
-            var main = MainGraphicsDevice.Create(new GraphicsDeviceFactory(), 3, "TestApp", true);
-            var device = main.CreateRenderDevice();
+            var main = GpuFixture.Main;
+            var device = GpuFixture.CreateRenderDevice();
             var gd = (GraphicsDevice)device;
 
             var expand = Effect.CompileFromFile(Path.Combine("EffectsData", "StrokeExpand.fx"), device);
@@ -272,7 +275,6 @@ namespace Adamantium.Engine.GraphicsTests
             device.FrameEnded();
             device.DeviceWaitIdle();
 
-            main.Dispose();
         }
 
         // De-risk for one-pass variable-output geometry (dashes / round joins / caps in a single dispatch): every
@@ -284,8 +286,8 @@ namespace Adamantium.Engine.GraphicsTests
         {
             const int count = 200;
 
-            var main = MainGraphicsDevice.Create(new GraphicsDeviceFactory(), 3, "TestApp", true);
-            var device = main.CreateRenderDevice();
+            var main = GpuFixture.Main;
+            var device = GpuFixture.CreateRenderDevice();
             var gd = (GraphicsDevice)device;
 
             var effect = Effect.CompileFromFile(Path.Combine("EffectsData", "AtomicAppend.fx"), device);
@@ -345,7 +347,6 @@ namespace Adamantium.Engine.GraphicsTests
             for (int i = 0; i < count; i++)
                 Assert.That(data[i], Is.EqualTo(i + 1), $"slot [{i}] - each thread must scatter tid+1 to a unique slot");
 
-            main.Dispose();
         }
 
         // De-risk DrawIndirect: a compute shader writes the draw arguments (VkDrawIndirectCommand) AND the vertices
@@ -355,8 +356,8 @@ namespace Adamantium.Engine.GraphicsTests
         [Test]
         public void DrawIndirect_RendersGpuProducedDraw()
         {
-            var main = MainGraphicsDevice.Create(new GraphicsDeviceFactory(), 3, "TestApp", true);
-            var device = main.CreateRenderDevice();
+            var main = GpuFixture.Main;
+            var device = GpuFixture.CreateRenderDevice();
             var gd = (GraphicsDevice)device;
 
             var fill = Effect.CompileFromFile(Path.Combine("EffectsData", "IndirectDraw.fx"), device);
@@ -413,7 +414,6 @@ namespace Adamantium.Engine.GraphicsTests
             device.FrameEnded();
             device.DeviceWaitIdle();
 
-            main.Dispose();
         }
 
         // One-pass GPU "cutting" (dashes + trim) prototype: a single compute thread walks a contour by arc length and
@@ -428,8 +428,8 @@ namespace Adamantium.Engine.GraphicsTests
             float[] pattern = { 20f, 10f };
             const float half = 5f;
 
-            var main = MainGraphicsDevice.Create(new GraphicsDeviceFactory(), 3, "TestApp", true);
-            var device = main.CreateRenderDevice();
+            var main = GpuFixture.Main;
+            var device = GpuFixture.CreateRenderDevice();
             var gd = (GraphicsDevice)device;
 
             var effect = Effect.CompileFromFile(Path.Combine("EffectsData", "DashCut.fx"), device);
@@ -495,7 +495,6 @@ namespace Adamantium.Engine.GraphicsTests
             for (int i = 0; i < 12; i++)
                 Assert.That(verts[i], Is.EqualTo(expected[i]).Within(0.01f), $"first piece float [{i}]");
 
-            main.Dispose();
         }
 
         private static Adamantium.Graphics.Buffer MakeBuffer(GraphicsDevice gd, float[] data)

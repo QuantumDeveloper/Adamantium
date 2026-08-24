@@ -12,8 +12,13 @@
         <LangVersion>latest</LangVersion>
     </PropertyGroup>
 
+    <!-- Copied under a name of OUR OWN. Every test project in this solution builds into the same output folder, and this
+         project and Adamantium.Engine.GraphicsTests both shipped a DIFFERENT EffectsData\UIEffect.fx to it - so which
+         shader these tests compiled depended on which project built last. That is what made this fixture pass or fail by
+         build order rather than by anything about the compiler. -->
     <ItemGroup>
       <Content Include="EffectsData\UIEffect.fx">
+        <Link>CompilerEffects\UIEffect.fx</Link>
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
     </ItemGroup>
@@ -32,18 +37,21 @@
 
     <ItemGroup>
       <Content Include="EffectsData\BasicEffect.fx">
+        <Link>CompilerEffects\BasicEffect.fx</Link>
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
     </ItemGroup>
 
     <ItemGroup>
       <Content Include="EffectsData\structs.hlsl">
+        <Link>CompilerEffects\structs.hlsl</Link>
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
     </ItemGroup>
 
     <ItemGroup>
       <Content Include="EffectsData\structs.ui.hlsl">
+        <Link>CompilerEffects\structs.ui.hlsl</Link>
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
     </ItemGroup>

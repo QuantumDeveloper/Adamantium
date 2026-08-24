@@ -16,6 +16,19 @@ namespace Adamantium.Engine.GraphicsTests
     [TestFixture]
     public class StrokeDashCutTests
     {
+        // Released by the fixture, not by the last line of each test: a failed assertion throws BEFORE any cleanup the
+        // test itself carries, and the device it was holding then outlives it. A failing test must report its own
+        // failure and nothing else's.
+        [TearDown]
+        public void ReleaseDevices() => GpuFixture.ReleaseRenderDevices();
+
+        /// <summary>Floats per emitted vertex, as StrokeEffect.fx's WriteVert lays them out:
+        /// (x, y | perp, uA, vA, arcA | caps, uB, vB, arcB | pieceId). This was hard-coded as 10 here, which was true
+        /// until pieceId was added to the vertex - after which the test read every field but the first two from the
+        /// wrong place and reported a geometry failure that was really an arithmetic one. Named, so the next field to
+        /// arrive breaks one line instead of silently shifting the whole comparison.</summary>
+        private const int VertexFloats = 11;
+
         // BUG 1: a dashed stroke crossing a SHARP corner used to emit BOTH corner triangles in EmitJoin - the inner one
         // has no adjacent dash quad to hide it, so it showed as an inward chevron. The wedge is now filled on BOTH sides
         // deliberately (the inner triangle lands inside the two quads' overlap, harmless for an opaque stroke) - which
@@ -31,8 +44,8 @@ namespace Adamantium.Engine.GraphicsTests
             float[] pattern = { 1000f, 1000f };   // one "on" run (1000) >> total length (200) -> covers both segments
             const float half = 5f;
 
-            var main = MainGraphicsDevice.Create(new GraphicsDeviceFactory(), 3, "TestApp", true);
-            var device = main.CreateRenderDevice();
+            var main = GpuFixture.Main;
+            var device = GpuFixture.CreateRenderDevice();
             var gd = (GraphicsDevice)device;
 
             var effect = Effect.CompileFromFile(Path.Combine("EffectsData", "StrokeEffect.fx"), device);
@@ -60,12 +73,13 @@ namespace Adamantium.Engine.GraphicsTests
             effect.Parameters["TrimStart"].SetValue(0f);
             effect.Parameters["TrimEnd"].SetValue(1f);
 
-            var (cmd4, verts) = RunCut(main, device, gd, pass, indirect, output, 18 * 10);
+            var (cmd4, verts) = RunCut(main, device, gd, pass, indirect, output, 18 * VertexFloats);
 
             Assert.That(cmd4[0], Is.EqualTo(18), "vertexCount: quad(6) + both-sided bevel wedge(6) + quad(6), no cap geometry");
 
-            // The join is the 6 verts right after seg0's quad, 10 floats each:
-            // (x, y | perp, uA, vA, arcA | caps, uB, vB, arcB).
+
+            // The join is the 6 verts right after seg0's quad, VertexFloats each:
+            // (x, y | perp, uA, vA, arcA | caps, uB, vB, arcB | pieceId).
             // Corner (100,0), h = 5: plus side (100,5) & (95,0), centre (100,0), then the mirrored minus side.
             float[] expectedWedge =
             {
@@ -74,7 +88,7 @@ namespace Adamantium.Engine.GraphicsTests
             };
             for (int v = 0; v < 6; v++)
             {
-                int o = 60 + v * 10;
+                int o = (6 + v) * VertexFloats;   // the wedge follows seg0's quad (6 verts)
                 float x = verts[o + 0], y = verts[o + 1];
                 Assert.That(x, Is.EqualTo(expectedWedge[v * 3 + 0]).Within(0.01f), $"wedge vert {v} x");
                 Assert.That(y, Is.EqualTo(expectedWedge[v * 3 + 1]).Within(0.01f), $"wedge vert {v} y");
@@ -95,7 +109,6 @@ namespace Adamantium.Engine.GraphicsTests
                 Assert.That(verts[o + 9], Is.EqualTo(100f).Within(0.01f), $"wedge vert {v} arcB");
             }
 
-            main.Dispose();
         }
 
         // BUG 1 follow-up: a dash toggle landing EXACTLY on a corner must NOT draw the join wedge. Open L
@@ -110,8 +123,8 @@ namespace Adamantium.Engine.GraphicsTests
             float[] pattern = { 50f, 50f };
             const float half = 5f;
 
-            var main = MainGraphicsDevice.Create(new GraphicsDeviceFactory(), 3, "TestApp", true);
-            var device = main.CreateRenderDevice();
+            var main = GpuFixture.Main;
+            var device = GpuFixture.CreateRenderDevice();
             var gd = (GraphicsDevice)device;
 
             var effect = Effect.CompileFromFile(Path.Combine("EffectsData", "StrokeEffect.fx"), device);
@@ -143,7 +156,6 @@ namespace Adamantium.Engine.GraphicsTests
 
             Assert.That(cmd4[0], Is.EqualTo(12), "dash toggles on exactly at the corner -> incoming side empty -> no wedge (quad+quad, no join)");
 
-            main.Dispose();
         }
 
         // BUG 2 (shader half): an EMPTY trim window (TrimStart == TrimEnd == 0) must expand to nothing. Confirms the
@@ -155,8 +167,8 @@ namespace Adamantium.Engine.GraphicsTests
             float[] pts = { 0f, 0f, 100f, 0f, 100f, 100f, 0f, 100f };   // closed square, contour starts at (0,0)
             float[] dummyPattern = { 1f };
 
-            var main = MainGraphicsDevice.Create(new GraphicsDeviceFactory(), 3, "TestApp", true);
-            var device = main.CreateRenderDevice();
+            var main = GpuFixture.Main;
+            var device = GpuFixture.CreateRenderDevice();
             var gd = (GraphicsDevice)device;
 
             var effect = Effect.CompileFromFile(Path.Combine("EffectsData", "StrokeEffect.fx"), device);
@@ -188,7 +200,6 @@ namespace Adamantium.Engine.GraphicsTests
 
             Assert.That(cmd4[0], Is.EqualTo(0), "empty trim window must emit zero vertices");
 
-            main.Dispose();
         }
 
         // BUG 2: the stray cap-dots at the trim EXTREMES ([0,0]/[1,1]/any start==end) are NOT a shader emit - the cut
@@ -199,7 +210,7 @@ namespace Adamantium.Engine.GraphicsTests
         [Test]
         public void Trim_ExactEqualWindow_RoundCaps_EmitsNothing()
         {
-            var (cmd4, _) = RunEllipseTrim(0.5f, 0.5f, 0f, out _);
+            var (cmd4, _) = RunEllipseTrim(0.5f, 0.5f, 0f);
             Assert.That(cmd4[0], Is.EqualTo(0), "exact empty trim window emits nothing even with round caps");
         }
 
@@ -208,14 +219,15 @@ namespace Adamantium.Engine.GraphicsTests
         {
             // window = 0.01 * ~440 ~= 4.4 device px -> a real capped piece is emitted. Exactly one quad and no more: the
             // round caps that used to add two 16-triangle disc fans here are a per-fragment mask now.
-            var (cmd4, _) = RunEllipseTrim(0.5f, 0.51f, 1f, out var main);
+            var (cmd4, _) = RunEllipseTrim(0.5f, 0.51f, 1f);
             Assert.That(cmd4[0], Is.GreaterThanOrEqualTo(6), "a non-empty trim window still renders");
-            main.Dispose();
         }
 
         // Dispatches the cut on a 48-point closed ellipse with ConvexRound caps everywhere, no dashes, the given trim +
-        // fringe. Returns the indirect command; leaves `main` for the caller to dispose (or discards it when unused).
-        private static (int[] cmd4, float[] verts) RunEllipseTrim(float trimStart, float trimEnd, float fringe, out MainGraphicsDevice main)
+        // fringe. Returns the indirect command; the caller MUST dispose `main`. Discarding it leaves a whole Vulkan
+        // instance and device alive for the rest of the run, and the next test's instance then fails to load its
+        // functions - which took the whole fixture down after the seventh test.
+        private static (int[] cmd4, float[] verts) RunEllipseTrim(float trimStart, float trimEnd, float fringe)
         {
             const int n = 48;
             var pts = new float[n * 2];
@@ -226,8 +238,8 @@ namespace Adamantium.Engine.GraphicsTests
                 pts[i * 2 + 1] = (float)(60.0 * Math.Sin(a));
             }
 
-            main = MainGraphicsDevice.Create(new GraphicsDeviceFactory(), 3, "TestApp", true);
-            var device = main.CreateRenderDevice();
+            var main = GpuFixture.Main;
+            var device = GpuFixture.CreateRenderDevice();
             var gd = (GraphicsDevice)device;
 
             var effect = Effect.CompileFromFile(Path.Combine("EffectsData", "StrokeEffect.fx"), device);

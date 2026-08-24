@@ -94,6 +94,19 @@ public class DescriptorHeapManager : DisposableObject, IDescriptorHeapManager
         SamplerHeapBuffer = Buffer.New(graphicsDevice, samplerHeapSize, flags, memFlags);
     }
 
+    /// <summary>The two heap buffers are created HERE, so they are destroyed here. Nothing did: the main device nulled
+    /// its reference to this manager without disposing it, so every logical device left its heaps behind - which the
+    /// validation layer reports at vkDestroyDevice as leaked objects, and which made a second device in one process a
+    /// fatal error (every GPU test after the first).</summary>
+    protected override void Dispose(bool disposeManagedResources)
+    {
+        ResourceHeapBuffer?.Dispose();
+        ResourceHeapBuffer = null;
+        SamplerHeapBuffer?.Dispose();
+        SamplerHeapBuffer = null;
+        base.Dispose(disposeManagedResources);
+    }
+
     /// <summary>
     /// Allocates an aligned byte offset in the global resource heap.
     /// </summary>
