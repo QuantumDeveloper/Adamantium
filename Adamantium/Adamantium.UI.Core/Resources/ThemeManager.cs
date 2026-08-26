@@ -151,6 +151,14 @@ public class ThemeManager : IThemeManager
     private void CompleteSwap()
     {
         LayoutManager.Quiescent -= OnLayoutQuiescent;
+
+        // The swap has drained: every template that was going to be rebuilt has been, and the elements it replaced are
+        // out of the tree for good. They are still held, though - a brush keeps every element painting with it
+        // subscribed, and it is only ever TOLD to let go when that element's property takes a different value, which is
+        // exactly what never happens to something discarded. Nothing else in the run knows that a whole application's
+        // worth of elements just died; this is the one moment that does. See Brush.SweepEveryBrush.
+        Media.Brush.SweepEveryBrush();
+
         var args = _swapArgs;
         _swapping = null;
         _swapArgs = null;
@@ -188,7 +196,7 @@ public class ThemeManager : IThemeManager
         ApplyTheme(theme, component);
     }
     
-    public void ApplyExternalStyles(IFundamentalUIComponent component, params Style[] styles)
+    public void ApplyExternalStyles(IFundamentalUIComponent component, params ReadOnlySpan<Style> styles)
     {
         if (styles.Length == 0) 
             return;
@@ -252,8 +260,10 @@ public class ThemeManager : IThemeManager
 
     public ITheme this[int index] => _themes[index];
     
+    /// <summary>Applies the theme that is in force AT <paramref name="control"/> - which is the application's only when
+    /// no ancestor declares a scope of its own. See <see cref="ThemeScope"/>.</summary>
     public void ApplyCurrentTheme(IFundamentalUIComponent control)
     {
-        ApplyTheme(CurrentTheme, control);
+        ApplyTheme(ThemeScope.For(control) ?? CurrentTheme, control);
     }
 }

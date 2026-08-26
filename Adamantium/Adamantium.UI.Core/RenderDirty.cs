@@ -253,6 +253,23 @@ public sealed class RenderDirtyScope
         _finalForcedBuild = true;
     }
 
+    /// <summary>TEMP (leak hunt): how many of the marks name a component the template teardown has DESTROYED. These sets
+    /// hold their components STRONGLY and a scope lives as long as the stage that owns it, so a mark left behind by a
+    /// discarded part is a permanent hold. Counted, not sized: the render cache's snapshot map held 39 dead controls a
+    /// swap while its SIZE never moved, and that is what hid it.</summary>
+    public (int Geometry, int Paint, int Moved, int Node, int Structural) DeadMarks()
+    {
+        return (Dead(GeometrySet), Dead(PaintSet), Dead(MovedSet), Dead(NodeSet), Dead(StructuralSet));
+
+        static int Dead(HashSet<IUIComponent> set)
+        {
+            var n = 0;
+            foreach (var component in set)
+                if (component is FundamentalUIComponent { IsDiscarded: true }) n++;
+            return n;
+        }
+    }
+
     /// <summary>Any dirty state at all (else the frame is fully clean).</summary>
     public bool HasWork => _structural || _transform || GeometrySet.Count > 0 || PaintSet.Count > 0
                                   || NodeSet.Count > 0 || _forceUntilSettled || _finalForcedBuild;

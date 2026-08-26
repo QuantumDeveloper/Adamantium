@@ -30,6 +30,57 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     /// capacity is anywhere near right. Diagnostics only.</summary>
     internal int ValueSlotCount => values?.Count ?? 0;
 
+    // ---- Render attachments (see IRenderAttachable) --------------------------------------------------------------
+    // A value that draws this element (a Brush) keeps the element in a map of its owners AND subscribed to its Changed
+    // event, so a later mutation OF the value repaints whoever paints with it. That link was taken when the property
+    // took the value and given up only when the property took a DIFFERENT one - which never happens to an element that
+    // is simply DISCARDED. A theme swap discards a whole template's worth of them, and both themes live as long as the
+    // application (ThemeManager keeps its map), so every element ever built stayed in a live theme brush's owner map:
+    // measured on the stand, +20.1 MB per swap, dead linear over eight swaps, ~6900 elements retained each time.
+    //
+    // So the link follows the TREE, like every other thing an element holds: given up when it leaves, taken again when
+    // it comes back. Symmetric with no special case for parking - a parked subtree leaves and returns through these
+    // very calls, and special-casing it would leave the eviction path holding.
+    private bool _renderAttachmentsReleased;
+
+    /// <summary>True while this component has given up its render attachments (it is out of the tree). The property
+    /// system asks, so a value written WHILE OUT does not re-take a link that leaving already gave up - that would
+    /// double the owner's hold count and leaving would only ever undo half of it.</summary>
+    public bool RenderAttachmentsReleased => _renderAttachmentsReleased;
+
+    internal void ReleaseRenderAttachments()
+    {
+        if (_renderAttachmentsReleased) return;
+        _renderAttachmentsReleased = true;
+        ForEachRenderAttachment(static (value, owner) => value.DetachFrom(owner));
+    }
+
+    internal void TakeRenderAttachments()
+    {
+        if (!_renderAttachmentsReleased) return;
+        _renderAttachmentsReleased = false;
+        ForEachRenderAttachment(static (value, owner) => value.AttachTo(owner));
+    }
+
+    // Driven by the value maps rather than by the type's registered properties: only a property that was actually GIVEN
+    // a value ever raised the change that took the link, so a declared DEFAULT brush was never attached and must not
+    // start being. Attached properties carry values too, hence both maps.
+    private void ForEachRenderAttachment(Action<IRenderAttachable, AdamantiumComponent> act)
+    {
+        Walk(values);
+        Walk(attachedValues);
+
+        void Walk(ConcurrentDictionary<AdamantiumProperty, ValueContainer> map)
+        {
+            if (map == null) return;
+            foreach (var property in map.Keys)
+            {
+                if (!property.CanAttachToOwner) continue;
+                if (GetValue(property) is IRenderAttachable attachable) act(attachable, this);
+            }
+        }
+    }
+
     // ATTACHED properties are the only ones that turn up later - they belong to another type and this one has no slot
     // for them until somebody sets one. Lazily created, so the components that never see an attached property (nearly
     // all of them) pay nothing for it.

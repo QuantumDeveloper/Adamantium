@@ -263,6 +263,12 @@ public partial class RenderCache
     {
         if (_applySnap.TryGetValue(c, out var s)) return s;
         s = new LayoutSnapshot(c.LocalTransform, c.RenderSize, c.ClipToBounds, c.IsRenderMotionNode, c.RenderParent, (float)c.Opacity, (float)c.SelfOpacity);
+
+        // ...but a part the teardown DESTROYED is not cached. This miss-fallback is the third way into the map and the
+        // one that kept re-adding what the sweep had just removed: 39 dead controls a swap survived both a sweep taking
+        // 762 out and a guard on the packet path. Answer the caller, hold nothing.
+        if (c is Core.FundamentalUIComponent { IsDiscarded: true }) return s;
+
         _applySnap[c] = s;
         return s;
     }

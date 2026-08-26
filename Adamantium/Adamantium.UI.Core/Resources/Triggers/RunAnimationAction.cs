@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Collections.Generic;
 
 namespace Adamantium.UI.Core.Resources.Triggers;
@@ -17,9 +18,15 @@ public class RunAnimationAction : IUndoableTriggerAction, ITargetedTriggerAction
 
     // A re-templated trigger (a theme swap rebuilds a BusyIndicator's parts) tears the OLD target's animation down and
     // starts a fresh one on the NEW part - which would snap a spinner back to its start. Carry the phase across, keyed by
-    // (host, this action) so distinct hosts and distinct animations on one host don't collide. Written in Undo, consumed by
-    // the Deactivate->Activate that immediately follows (see ReevaluateTriggersForTemplateChange).
-    private static readonly Dictionary<(IFundamentalUIComponent Host, RunAnimationAction Action), double> ResumePhase = new();
+    // the host and then by this action, so distinct hosts and distinct animations on one host don't collide.
+    //
+    // WEAK on the host, and that is the whole point rather than a detail. This used to be a static Dictionary keyed by a
+    // (host, action) tuple - a STRONG reference from a static field to a component. The entry is written in Undo and only
+    // removed when the SAME host re-invokes the SAME action, which is what a re-template does; a host that is DISCARDED
+    // instead (the ordinary case for a theme swap) left its entry behind forever, holding the component and, through its
+    // children, its whole subtree. Measured on the stand: every theme change retained ~15 MB that a forced full collection
+    // could not reclaim. A weak key means a host nobody else wants takes its phase with it.
+    private static readonly ConditionalWeakTable<IFundamentalUIComponent, Dictionary<RunAnimationAction, double>> ResumePhase = new();
 
     public void Invoke(ITriggerExecutionContext context)
     {
@@ -43,7 +50,11 @@ public class RunAnimationAction : IUndoableTriggerAction, ITargetedTriggerAction
 
     private void Start(ITriggerExecutionContext context, AdamantiumComponent animTarget)
     {
-        var resume = ResumePhase.Remove((context.HostComponent, this), out var phase) ? phase : 0;
+        var resume = 0.0;
+        if (ResumePhase.TryGetValue(context.HostComponent, out var phases) && phases.Remove(this, out var phase))
+        {
+            resume = phase;
+        }
 
         // Claim the target for this trigger's HOST before starting: a SHARED target (a keyed theme brush every loading
         // list pulses) must keep running until the last host stops it (see AnimationManager.Retain/Release).
@@ -63,7 +74,10 @@ public class RunAnimationAction : IUndoableTriggerAction, ITargetedTriggerAction
         // Remember where it was so the successor (a re-template re-Invokes right after) resumes the phase. Only when it was
         // actually running (GetElapsed non-null), so a not-running teardown leaves nothing stale behind.
         var elapsed = Media.Animation.AnimationManager.GetElapsed(animTarget);
-        if (elapsed.HasValue) ResumePhase[(context.HostComponent, this)] = elapsed.Value;
+        if (elapsed.HasValue)
+        {
+            ResumePhase.GetValue(context.HostComponent, static _ => new Dictionary<RunAnimationAction, double>())[this] = elapsed.Value;
+        }
 
         Media.Animation.AnimationManager.Release(animTarget, context.HostComponent);
     }

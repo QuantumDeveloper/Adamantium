@@ -71,6 +71,11 @@ public abstract class BindingExpressionBase
    public abstract void EstablishConnection();
    public abstract void CloseConnection();
 
+   // TEMP (leak hunt): source-side subscriptions taken and given up. The SOURCE is the long-lived end (a view model
+   // outlives every view built against it), so a hook that is never given up holds its expression - and through it the
+   // element the expression targets.
+   public static long SourceHooks, SourceUnhooks;
+
    // Lenient coercion: keeps the raw value when it can't be made to fit (used writing back to source).
    internal static object Coerce(object value, Type targetType)
       => TryCoerce(value, targetType, out var result) ? result : value;

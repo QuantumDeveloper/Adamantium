@@ -98,11 +98,43 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent, ITe
         }
     }
 
+    /// <summary>TEMP (leak hunt): templates built, and templated controls ever constructed, since start.</summary>
+    public static long TemplatesBuilt, TemplatedControlsMade, TemplatesRemoved;
+
+    public static readonly System.Collections.Concurrent.ConcurrentDictionary<string,
+        System.Runtime.CompilerServices.StrongBox<int>> RemovesByType = new();
+
+    // ...and WHICH types, counted here rather than through LayoutTrace: that one is behind a gate of its own and came
+    // back with 14 events for a window in which 723 templates were built.
+    public static readonly System.Collections.Concurrent.ConcurrentDictionary<string,
+        System.Runtime.CompilerServices.StrongBox<int>> BuildsByType = new();
+
+    public static string DumpBuilds() => Dump(BuildsByType);
+
+    public static string DumpRemoves() => Dump(RemovesByType);
+
+    private static string Dump(System.Collections.Concurrent.ConcurrentDictionary<string,
+        System.Runtime.CompilerServices.StrongBox<int>> counts)
+    {
+        var rows = new List<string>();
+        foreach (var pair in counts) rows.Add($"{pair.Value.Value,6}  {pair.Key}");
+        rows.Sort((a, b) => int.Parse(b.Trim().Split(' ')[0]).CompareTo(int.Parse(a.Trim().Split(' ')[0])));
+        return string.Join("\n", rows.GetRange(0, Math.Min(20, rows.Count)));
+    }
+
+    public TemplatedUIComponent() => System.Threading.Interlocked.Increment(ref TemplatedControlsMade);
+
     private void ApplyTemplate()
     {
         if (Template == null) return;
 
         Core.Diagnostics.LayoutTrace.Count(GetType(), "*template-build*");
+        // TEMP (leak hunt): how many templates a swap BUILDS, against how many templated controls there are. The hunt
+        // so far asked who holds what is left over; the better question is why a swap makes several times a whole
+        // application's worth of elements in the first place.
+        System.Threading.Interlocked.Increment(ref TemplatesBuilt);
+        System.Threading.Interlocked.Increment(ref BuildsByType.GetOrAdd(GetType().Name,
+            static _ => new System.Runtime.CompilerServices.StrongBox<int>()).Value);
         templateResult = Template.Build(this);
         if (templateResult != null)
         {
@@ -125,6 +157,13 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent, ITe
         // A prior ApplyTemplate whose Build returned null leaves templateResult null while appliedTemplate is set;
         // nothing to tear down then.
         if (templateResult == null) return;
+
+        // TEMP (leak hunt): a REBUILD, as against a first build. A swap builds 2.4x as many templates as the tree
+        // holds; this separates "the control was re-templated" from "a new part was made and templated once".
+        System.Threading.Interlocked.Increment(ref TemplatesRemoved);
+        System.Threading.Interlocked.Increment(ref RemovesByType.GetOrAdd(GetType().Name,
+            static _ => new System.Runtime.CompilerServices.StrongBox<int>()).Value);
+
         TraverseVisualTreeAndUnload(templateResult.RootComponent);
         // Undo the inheritance link set in AddTemplateChild so the detached old template root stops tracking this
         // control's inherited values (a stale parent would keep pushing DataContext/FontFamily changes into orphaned UI).
@@ -176,6 +215,30 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent, ITe
         if (component is ObservableUIComponent observableUiComponent)
         {
             observableUiComponent.RaiseEvent(new RoutedEventArgs(UnloadedEvent, component));
+        }
+
+        // MY OWN parts are going down with the template - say so, so a pass already holding them in its drain buffer
+        // skips them. Skipping matters: theming a control swaps its Template, which builds a whole template subtree, and
+        // one swap built 723 templates against 282 templated controls in the tree - every extra build a part that had
+        // just been destroyed.
+        //
+        // The TEMPLATE'S OWN ID says "mine", not the visual walk and not TemplatedParent. The walk reaches the CONTENT
+        // presented inside this template, which is not being destroyed at all - it moves into the new one; marking that
+        // left 791 of 894 elements in the tree with their style never applied, wearing the previous theme. And
+        // TemplatedParent is no better: an ItemsPanelTemplate stamps the same templated parent on the presenter's live
+        // items panel, so that got marked too. Only the id of the result that BUILT the part is exact.
+        if (component is FundamentalUIComponent part && templateResult != null &&
+            part.OwningTemplateId == templateResult.Id)
+        {
+            part.MarkDiscarded();
+
+            // A part that is ITSELF a templated control takes its own template down with it. Without this the nesting
+            // stopped here: a ScrollViewer part was marked, but the ScrollContentPresenter and Grid ITS template built
+            // carry a different template id, so nothing marked them - and every sweep that asks "was this discarded"
+            // then answered no for the whole inner tree. Tearing it down is also what it MEANS to destroy the control:
+            // its bindings close, its trigger activators deactivate, its parts are released, all through the path that
+            // already does that. The recursion terminates - each level tears down a strictly smaller tree.
+            if (part is TemplatedUIComponent nested) nested.RemoveTemplate();
         }
     }
 

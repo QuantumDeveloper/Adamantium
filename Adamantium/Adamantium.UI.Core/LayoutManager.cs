@@ -61,10 +61,95 @@ public sealed class LayoutManager
     public LayoutManager(IUIComponent root)
     {
         _root = root ?? throw new ArgumentNullException(nameof(root));
+        lock (AllManagers) AllManagers.Add(new WeakReference<LayoutManager>(this));
     }
 
     /// <summary>Gets (creating once) the manager that owns the given root (a window at runtime, a subtree root in tests).</summary>
     public static LayoutManager GetOrCreate(IUIComponent root) => Managers.GetValue(root, static r => new LayoutManager(r));
+
+    // TEMP (leak hunt): how many components ALL the dirty queues are holding right now, across every manager. A gauge
+    // rather than a per-manager read, because there is one manager per ROOT and a theme swap recreates the controls
+    // under it: a node enqueued and never drained is held for the life of the window, and the read has to cover the
+    // managers nobody happens to be holding a reference to.
+    public static long QueuedNow;
+
+    // WEAK, and that is the whole point: a REGISTRY of managers would keep alive exactly the managers whose retention is
+    // the question. A manager abandoned with a loaded queue is collected with it and holds nothing - which a counter of
+    // enqueues-minus-drains cannot tell apart from a manager that is alive and holding.
+    private static readonly List<WeakReference<LayoutManager>> AllManagers = new();
+
+    /// <summary>TEMP (leak hunt): a CENSUS, not a counter - how many components the queues of the managers that are
+    /// still ALIVE are holding right now, and how many managers there are.</summary>
+    public static (int Nodes, int Managers, int Deferred) LayoutHeld
+    {
+        get
+        {
+            int nodes = 0, live = 0;
+            lock (AllManagers)
+            {
+                for (var i = AllManagers.Count - 1; i >= 0; i--)
+                {
+                    if (!AllManagers[i].TryGetTarget(out var manager))
+                    {
+                        AllManagers.RemoveAt(i);
+                        continue;
+                    }
+
+                    live++;
+                    var counts = manager.QueuedCounts();
+                    nodes += counts.Style + counts.Measure + counts.Arrange + counts.NextPass;
+                }
+            }
+
+            return (nodes, live, DeferredMeasure.Count + DeferredArrange.Count);
+        }
+    }
+
+    /// <summary>TEMP (leak hunt): the root each LIVE manager was made for. A manager is made per ROOT and, for an element
+    /// with no root/owner/parent, per that ELEMENT - so after a theme swap this is a HANDLE on the retained orphans
+    /// themselves, which is what nothing else in-process gives. Sampling them says what they are and where their parent
+    /// chain leads; a dump can only say which single path gcroot happened to walk.</summary>
+    public static List<IUIComponent> LiveManagerRoots()
+    {
+        var roots = new List<IUIComponent>();
+        lock (AllManagers)
+        {
+            foreach (var handle in AllManagers)
+            {
+                if (handle.TryGetTarget(out var manager) && manager._root != null) roots.Add(manager._root);
+            }
+        }
+
+        return roots;
+    }
+
+    /// <summary>TEMP experiment, NOT a fix: empty every live manager's queues so a collection can tell whether those
+    /// queues are what HOLDS the departed controls, or merely list them while something else does.</summary>
+    public static void DropAllQueuesForTheExperiment()
+    {
+        lock (AllManagers)
+        {
+            foreach (var handle in AllManagers)
+            {
+                if (!handle.TryGetTarget(out var manager)) continue;
+                manager._toStyle = null;
+                manager._toMeasure = null;
+                manager._toArrange = null;
+                manager._toMeasureNextPass = null;
+                manager._passBuffer = null;
+                manager._promoteBuffer = null;
+            }
+        }
+
+        while (DeferredMeasure.TryDequeue(out _)) { }
+        while (DeferredArrange.TryDequeue(out _)) { }
+    }
+
+    // TEMP (leak hunt): what THIS manager's queues are holding. They hold components strongly and the manager lives with
+    // its root, so a node enqueued and never drained is retained for the life of the window.
+    public (int Style, int Measure, int Arrange, int NextPass, int Deferred) QueuedCounts()
+        => (_toStyle?.Count ?? 0, _toMeasure?.Count ?? 0, _toArrange?.Count ?? 0,
+            _toMeasureNextPass?.Count ?? 0, DeferredMeasure.Count + DeferredArrange.Count);
 
     /// <summary>Resolves the manager responsible for <paramref name="node"/> via its top-most visual ancestor.</summary>
     public static LayoutManager For(IUIComponent node)
@@ -281,6 +366,14 @@ public sealed class LayoutManager
 
     private static void ApplyTheme(IUIComponent node)
     {
+        // Judging "is this worth theming" by tree membership was tried and REVERTED: it took the toolbar and the tab
+        // strip out with the rest, because a node that merely MOVES from the old template into the new one is out of
+        // the tree at the moment the queue is drained and is not dead at all. The teardown says so instead.
+        if (node is FundamentalUIComponent { IsDiscarded: true })
+        {
+            return;
+        }
+
         if (node is FundamentalUIComponent { IsStyleApplied: false } themed)
         {
             themed.ApplyCurrentTheme();
@@ -395,9 +488,12 @@ public sealed class LayoutManager
 
         public bool IsEmpty => _members.Count == 0;
 
+        internal int Count => _members.Count;
+
         public void Enqueue(IUIComponent node)
         {
             if (!_members.Add(node)) return;
+            System.Threading.Interlocked.Increment(ref QueuedNow);
             _heap.Enqueue(node, Depth(node));
         }
 
@@ -409,7 +505,11 @@ public sealed class LayoutManager
             while (_heap.Count > 0)
             {
                 var node = _heap.Dequeue();
-                if (_members.Remove(node)) buffer.Add(node);
+                if (_members.Remove(node))
+                {
+                    System.Threading.Interlocked.Decrement(ref QueuedNow);
+                    buffer.Add(node);
+                }
             }
         }
 

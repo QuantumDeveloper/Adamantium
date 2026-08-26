@@ -81,6 +81,173 @@ public class Program
                 // changes width, is shoving its neighbours and cascading into the whole window.
                 var countLayout = Environment.GetEnvironmentVariable("ADAM_LAYOUT_COUNT") == "1";
                 if (countLayout) Adamantium.UI.Core.Diagnostics.LayoutTrace.Counting = true;
+                var secondIndex = 0; long lastRetained = 0;   // retainMB: forced-collection sample, taken every 8th second
+
+                // TEMP (ADAM_THEME_FLIP=N): swap the theme N times WHILE the measurement window runs - on its own thread,
+                // because the other drivers in this file start only after the window closes and a leak has to be watched
+                // as it grows, not counted once at the end.
+                if (Environment.GetEnvironmentVariable("ADAM_THEME_FLIP") is { } flipCount &&
+                    int.TryParse(flipCount, out var flips) && flips > 0)
+                {
+                    new System.Threading.Thread(() =>
+                    {
+                        var themes = Adamantium.UI.Core.UIAppContext.Current?.ThemeManager;
+                        // Written straight to a FILE, one line per swap. Redirected stdout is block-buffered, so a probe
+                        // line printed here is lost unless the process exits cleanly - which is exactly how the previous
+                        // run threw away its whole series. And BOTH halves of the memory on the same line: an earlier
+                        // hunt read only the managed one and concluded from it alone.
+                        var report = Environment.GetEnvironmentVariable("ADAM_THEME_FLIP_LOG") ?? "flips.csv";
+                        var self = System.Diagnostics.Process.GetCurrentProcess();
+
+                        void Sample(string tag)
+                        {
+                            GC.Collect();
+                            GC.WaitForPendingFinalizers();
+                            GC.Collect();
+                            self.Refresh();
+                            var taken = Adamantium.UI.Core.Media.Brush.LinksTaken;
+                            var given = Adamantium.UI.Core.Media.Brush.LinksGivenUp;
+                            var hooks = Adamantium.UI.Core.Data.BindingExpressionBase.SourceHooks;
+                            var unhooks = Adamantium.UI.Core.Data.BindingExpressionBase.SourceUnhooks;
+                            var before = GC.GetTotalMemory(true) / 1048576;
+
+                            // TEMP experiment, NOT a fix: the live census says the layout queues list thousands more
+                            // departed controls after every swap. Listing is not HOLDING - so empty them and collect. A
+                            // number that falls says the queues hold; a number that does not says they only list, and
+                            // the holder is elsewhere. (The same experiment on the static focus fields moved nothing,
+                            // which is why the root every gcroot path pointed at was NOT the root.)
+                            var layoutBefore = Adamantium.UI.Core.LayoutManager.LayoutHeld;
+                            Adamantium.UI.Core.LayoutManager.DropAllQueuesForTheExperiment();
+
+                            // ...and BOTH focus fields. The first run of this experiment cleared only FocusManager's and
+                            // concluded focus was innocent - while the keyboard device went on holding the very same
+                            // element, so the test could not have freed anything either way. Two holders, one question.
+                            Adamantium.UI.Core.Input.FocusManager.ResetFocus();
+                            Adamantium.UI.Core.Input.KeyboardDevice.CurrentDevice?.SetFocusedElement(null);
+
+                            GC.Collect();
+                            GC.WaitForPendingFinalizers();
+                            GC.Collect();
+                            var after = GC.GetTotalMemory(true) / 1048576;
+
+                            var layoutAfter = Adamantium.UI.Core.LayoutManager.LayoutHeld;
+
+                            // WHAT is retained, and where its parent chain ends. The top of a retained element's visual
+                            // chain is the subtree root somebody still holds - and the type of THAT is the question no
+                            // dump has answered, because gcroot only reports the one path it walked first.
+                            if (tag != "base")
+                            {
+                                var byTop = new System.Collections.Generic.Dictionary<string, int>();
+                                var attached = 0; var orphan = 0; var stillHolding = 0; var unstyled = 0;
+                                foreach (var node in Adamantium.UI.Core.LayoutManager.LiveManagerRoots())
+                                {
+                                    if (node.IsAttachedToVisualTree)
+                                    {
+                                        attached++;
+                                        // The check that would have caught the first attempt without anyone looking at
+                                        // the screen: an element STILL IN THE TREE whose style never got applied is an
+                                        // element wearing the previous theme.
+                                        if (node is Adamantium.UI.Core.FundamentalUIComponent { IsStyleApplied: false } bare)
+                                        {
+                                            unstyled++;
+                                            var uk = "UNSTYLED " + bare.GetType().Name + " under " +
+                                                     (node.VisualParent?.GetType().Name ?? "-");
+                                            byTop[uk] = byTop.TryGetValue(uk, out var seen) ? seen + 1 : 1;
+                                        }
+
+                                        // A contradiction in terms, measured AT REST: told it was destroyed, yet on
+                                        // screen. Everything hung on OnDiscarded is only as sound as this being zero.
+                                        if (node is Adamantium.UI.Core.FundamentalUIComponent { IsDiscarded: true } zombie)
+                                        {
+                                            var zk = "ZOMBIE " + zombie.GetType().Name;
+                                            byTop[zk] = byTop.TryGetValue(zk, out var z) ? z + 1 : 1;
+                                        }
+                                        continue;
+                                    }
+                                    orphan++;
+
+                                    // The question the whole hunt turns on: did this orphan ever GIVE UP its render
+                                    // attachments? One surviving link into the web keeps the whole web, so a partial
+                                    // release is worth nothing - only zero counts.
+                                    if (node is Adamantium.UI.Core.AdamantiumComponent { RenderAttachmentsReleased: false })
+                                        stillHolding++;
+
+                                    var top = node;
+                                    var guard = 0;
+                                    while (top.VisualParent != null && ++guard < 512) top = top.VisualParent;
+                                    var key = top.GetType().Name + (ReferenceEquals(top, node) ? " (alone)" : "") +
+                                              (top.IsAttachedToVisualTree ? " [IN TREE]" : "");
+                                    byTop[key] = byTop.TryGetValue(key, out var had) ? had + 1 : 1;
+                                }
+
+                                var lines = new System.Collections.Generic.List<string>();
+                                foreach (var pair in byTop) lines.Add($"{pair.Value} x {pair.Key}");
+                                lines.Sort((a, b) => int.Parse(b.Split(' ')[0]).CompareTo(int.Parse(a.Split(' ')[0])));
+                                System.IO.File.AppendAllText(report + ".tops.txt",
+                                    $"== {tag}: attached={attached} UNSTYLED-IN-TREE={unstyled} orphan={orphan} stillHoldingBrushes={stillHolding}\n" +
+                                    Adamantium.UI.Core.FundamentalUIComponent.SurvivingDiscarded() + "\n" +
+                                    DeadOutsideTheCache() + "\n  " +
+                                    string.Join("\n  ", lines.GetRange(0, Math.Min(40, lines.Count))) + "\n");
+                            }
+
+                            self.Refresh();
+                            System.IO.File.AppendAllText(report,
+                                $"{tag},{before},{after},{self.PrivateMemorySize64 / 1048576}," +
+                                $"{taken - given},{hooks - unhooks}," +
+                                $"{layoutBefore.Nodes},{layoutBefore.Managers}," +
+                                $"{Adamantium.UI.Controls.ParkedVisuals.Count}," +
+                                $"{Adamantium.UI.Controls.Base.TemplatedUIComponent.TemplatesBuilt}," +
+                                $"{Adamantium.UI.Controls.Base.TemplatedUIComponent.TemplatedControlsMade}," +
+                                $"{Adamantium.UI.Core.FundamentalUIComponent.ThemeApplications}," +
+                                $"{Adamantium.UI.Core.Resources.Triggers.TriggerActivatorBase.Made - Adamantium.UI.Core.Resources.Triggers.TriggerActivatorBase.TornDown}," +
+                                $"{themes?.CurrentTheme?.Name}\n");
+                        }
+
+                        System.Threading.Thread.Sleep(9000);
+                        Sample("base");
+
+                        for (var i = 0; i < flips && themes != null; i++)
+                        {
+                            var nextName = themes.CurrentTheme?.Name == "FluentLight" ? "FluentDark" : "FluentLight";
+                            var next = themes[nextName];
+                            if (next == null) break;
+
+                            // Count WHAT gets rebuilt, for this swap alone: reset immediately before it, dump once it
+                            // has settled. A swap builds 2.5x more templates than the whole tree contains, and only a
+                            // per-type breakdown says which control is rebuilt more than once.
+                            Adamantium.UI.Controls.Base.TemplatedUIComponent.BuildsByType.Clear();
+                            Adamantium.UI.Controls.Base.TemplatedUIComponent.RemovesByType.Clear();
+
+                            Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => themes.SetTheme(next));
+                            // Long enough for the swap to settle before it is read, so every step is a settled state
+                            // rather than a mid-cascade one.
+                            System.Threading.Thread.Sleep(9000);
+                            System.IO.File.AppendAllText(report + ".builds.txt",
+                                $"\n===== swap{i + 1} builds =====\n" + Adamantium.UI.Controls.Base.TemplatedUIComponent.DumpBuilds() +
+                                $"\n----- swap{i + 1} REBUILDS (existing controls re-templated) -----\n" +
+                                Adamantium.UI.Controls.Base.TemplatedUIComponent.DumpRemoves() + "\n");
+                            Sample($"swap{i + 1}");
+                        }
+                    }) { IsBackground = true, Name = "theme-flip" }.Start();
+                }
+                // TEMP (leak hunt): the containers OUTSIDE the render cache that key on a component. Same rule as the one
+                // that found _applySnap - count the DEAD keys, never the size.
+                static string DeadOutsideTheCache()
+                {
+                    int g = 0, p = 0, m = 0, n = 0, s = 0;
+                    foreach (var scope in Adamantium.UI.Core.RenderDirtyRouter.All())
+                    {
+                        var d = scope.DeadMarks();
+                        g += d.Geometry; p += d.Paint; m += d.Moved; n += d.Node; s += d.Structural;
+                    }
+
+                    var anim = Adamantium.UI.Core.Media.Animation.AnimationManager.DeadHolders();
+                    var brushes = Adamantium.UI.Core.Media.Brush.DeadOwnerCensus();
+                    return $"dead marks: geom={g} paint={p} moved={m} node={n} structural={s}" +
+                           $" | anim targets={anim.Targets} dead={anim.Dead} heldByDead={anim.Held}" +
+                           $" | brushes live={brushes.LiveBrushes} withDeadOwners={brushes.Brushes} deadOwners={brushes.DeadOwners}";
+                }
+
                 var busiestLayout = 0; var busiestLayoutDump = "";
                 double layout = 0;
                 double sumBegin = 0, sumEnd = 0, sumSubmit = 0, sumPresent = 0, sumFence = 0, sumAcquire = 0, sumSetup = 0;
@@ -215,6 +382,20 @@ public class Program
                         // Formatted UNDER THE LOCK the writers take: these two are Dictionaries filled from the record
                         // thread, and enumerating one while it is being written crashed the probe (a NullReferenceException
                         // inside the enumerator, on a tab switch). Snapshot to strings here, then log without holding it.
+                        // Finalizers run on their own thread AFTER a collection, so a live count read in the same breath
+                        // as the collection is still counting the dead. Give them the queue, then read.
+                        if (secondIndex % 8 == 0)
+                        {
+                            GC.Collect();
+                            GC.WaitForPendingFinalizers();
+                            GC.Collect();
+                        }
+
+                        var themeConsumers = Adamantium.UI.Core.Data.ThemeResourceExpression.RoutedConsumers;
+                        var mainWindow = Adamantium.UI.UIApplication.Current?.MainWindow as Adamantium.UI.Core.IUIComponent;
+                        var queued = mainWindow != null
+                            ? Adamantium.UI.Core.LayoutManager.For(mainWindow).QueuedCounts()
+                            : default;
                         string emptyText, recByText, layByText, uByText;
                         lock (Adamantium.UI.Core.Diagnostics.RuntimeStats.HistogramLock)
                         {
@@ -248,6 +429,18 @@ public class Program
                             $"gcPause={(GC.GetTotalPauseDuration() - lastGcPause).TotalMilliseconds,7:0.0} " +
                             $"g0={GC.CollectionCount(0) - lastG0,5} g1={GC.CollectionCount(1) - lastG1,5} g2={GC.CollectionCount(2) - lastG2,4} " +
                             $"heapMB={GC.GetTotalMemory(false) / 1048576,6} " +
+                            // RETAINED, not merely allocated: GetTotalMemory(true) forces a full collection first, so
+                            // this is what the heap still HOLDS. heapMB beside it counts uncollected garbage too, and the
+                            // process working set (what Task Manager shows) counts pages the runtime has not returned to
+                            // the OS - three different numbers that a "memory grew and never came back" report can mean.
+                            // Only a leak moves this one. Forced every 8th second: a gen2 collection is far too expensive
+                            // to do per second, and this whole line only exists under ADAM_PROBE_LOG anyway.
+                            $"retainMB={(secondIndex++ % 8 == 0 ? lastRetained = GC.GetTotalMemory(true) / 1048576 : lastRetained),6} " +
+                            $"consumers={themeConsumers.Entries,6}/{themeConsumers.Alive,6} holders={Adamantium.UI.Core.Media.Animation.AnimationManager.HolderTargets,7} parked={Adamantium.UI.Controls.ParkedVisuals.Count,4} " +
+                            // Sampled right after retainMB's forced collection, so finalizers have had their chance and
+                            // this counts what is genuinely still reachable rather than what is merely uncollected.
+                            $"live={Adamantium.UI.Controls.Base.UIComponent.LiveComponents,8} " +
+                            $"queued={queued.Style,5}/{queued.Measure,5}/{queued.Arrange,5}/{queued.NextPass,5}/{queued.Deferred,5} " +
                             $"allocMB={(GC.GetTotalAllocatedBytes() - secAllocStart) / 1048576.0,7:0.0} recKB={secRecBytes / 1024,7} aplKB={secApplyBytes / 1024,7} layMB={(Adamantium.UI.Core.Diagnostics.RuntimeStats.LayoutBytes - lastLayoutBytes) / 1048576.0,7:0.0} " +
                             $"preKB={(Adamantium.UI.Core.Diagnostics.RuntimeStats.PreRenderBytes - lastPreBytes) / 1024,8} drawKB={(Adamantium.UI.Core.Diagnostics.RuntimeStats.DrawBytes - lastDrawBytes) / 1024,8} " +
                             $"opsKB={(Adamantium.UI.Core.Diagnostics.RuntimeStats.ExecuteOpsBytes - lastOpsBytes) / 1024,8} setupKB={(Adamantium.UI.Core.Diagnostics.RuntimeStats.DrawSetupBytes - lastSetupBytes) / 1024,8} ops={Adamantium.UI.Core.Diagnostics.RuntimeStats.LastOpsExecuted,6} " +

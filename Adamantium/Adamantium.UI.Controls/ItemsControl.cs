@@ -138,6 +138,28 @@ public class ItemsControl : Control, IContainer
         _presenter?.Connect(this);
     }
 
+    /// <summary>Destroyed: give the ITEMS SOURCE up. The subscription to it is undone only when the source is REPLACED
+    /// (ItemCollection.SetSource), and nobody replaces the source of a control that has been thrown away - so a view
+    /// model's ObservableCollection, which lives as long as the application, went on holding this control and everything
+    /// under it. Found by walking the object graph from the strong handles: DragDropDemoViewModel -> its collection ->
+    /// CollectionChanged -> a discarded ListBox -> its whole subtree.</summary>
+    protected override void OnDiscarded()
+    {
+        base.OnDiscarded();
+        Items?.SetSource(null);
+    }
+
+    /// <summary>Let the template's parts go when the template does - see ScrollBar.OnRemoveTemplate.
+    /// <para>THIS control is not rebuilt by a theme swap; its TEMPLATE is. So it survives holding the presenter it was
+    /// given last time - and a presenter is not a leaf: it holds the items panel, every realized container, the
+    /// generator and its recycle pool. Measured on the stand, that one field was the whole of what a theme swap never
+    /// gave back: +14 MB and ~1450 elements a swap, retained for the life of the application.</para></summary>
+    public override void OnRemoveTemplate()
+    {
+        base.OnRemoveTemplate();
+        _presenter = null;
+    }
+
     /// <summary>Connect an items host that arrives AFTER OnApplyTemplate - e.g. a MenuItem whose PART_ItemsPresenter lives in
     /// its submenu Popup's lazily-built <see cref="Popup.ChildTemplate"/>, so GetTemplateChild couldn't find it up front.</summary>
     protected void ConnectPresenter(ItemsPresenter presenter)

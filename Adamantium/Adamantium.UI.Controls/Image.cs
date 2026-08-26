@@ -310,6 +310,21 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
       // Resume playback after a re-attach (tab switch, virtualization recycle): the ticker self-removed on detach. Post
       // runs inline when already on the loop thread (attach normally runs during the loop's layout pass).
       UIAppContext.Current.Dispatcher.Post(StartRuntimePlayback);
+
+      // ...and watch the drawing again. See OnDetachedFromVisualTree for why the watch does not simply stay.
+      WatchDrawing(null, Source);
+   }
+
+   /// <summary>Stop watching the drawing while this element is out of the tree.
+   /// <para>A DrawingImage is usually a THEME RESOURCE - it lives in the resource dictionary for as long as the
+   /// application does - and this element subscribes to it. The subscription is only ever undone when Source is
+   /// REASSIGNED, which never happens to an element that is simply discarded, so the resource went on holding it and,
+   /// through it, its whole subtree. Found by walking the object graph from the strong handles: ResourceManager ->
+   /// ResourceProvider -> the theme's dictionary -> DrawingImage -> its Changed list -> a discarded Image.</para></summary>
+   protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+   {
+      base.OnDetachedFromVisualTree(e);
+      WatchDrawing(Source, null);
    }
 
    // Runtime frame-based playback rides the per-frame loop heartbeat (AnimationManager, on the render-loop thread),

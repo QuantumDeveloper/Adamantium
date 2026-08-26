@@ -278,7 +278,150 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
     
     public bool IsStyleApplied { get; private set; }
 
-    public void AttachStyles(params Style[] styles)
+    /// <summary>Where this element stands between being built and being released - see <see cref="VisualLifecycle"/>.
+    /// Set by whoever performs the transition, which is the only place that knows: "out of the tree" cannot tell a
+    /// destroyed part from one merely moving into the new template, from one parked to come back, from a pooled item
+    /// container - and judging by that left the toolbar and the tab strip wearing the old theme.</summary>
+    public VisualLifecycle Lifecycle { get; private set; } = VisualLifecycle.Live;
+
+    /// <summary>Destroyed for good - the one state in which what holds this element may let go of it. DERIVED from
+    /// <see cref="Lifecycle"/> rather than stored: as a stored flag it was only ever set, so a parked keep-alive view
+    /// came back still answering "destroyed" and was released under the user.</summary>
+    public bool IsDiscarded => Lifecycle == VisualLifecycle.Discarded;
+
+    /// <summary>Deliberately out of the tree and coming back - parked, or waiting in a container pool. Not dead, and
+    /// nothing about it may be released.</summary>
+    public bool IsAwaitingReturn => Lifecycle is VisualLifecycle.Parked or VisualLifecycle.Recycled;
+
+    /// <summary>A teardown has STARTED on this element. It may still be taking part in the rebuild replacing it, so
+    /// nothing may be released yet - that is what separates this from <see cref="VisualLifecycle.Discarded"/>.</summary>
+    public void MarkDetaching()
+    {
+        if (Lifecycle == VisualLifecycle.Live) Lifecycle = VisualLifecycle.Detaching;
+    }
+
+    /// <summary>Parked: out of the tree on purpose, returning through the same host (<c>x:KeepAlive</c>).</summary>
+    public void MarkParked()
+    {
+        if (Lifecycle != VisualLifecycle.Discarded) Lifecycle = VisualLifecycle.Parked;
+    }
+
+    /// <summary>Pooled by an item container generator, to be re-bound to another item.</summary>
+    public void MarkRecycled()
+    {
+        if (Lifecycle != VisualLifecycle.Discarded) Lifecycle = VisualLifecycle.Recycled;
+    }
+
+    /// <summary>It came back. Called wherever an element (re)enters the visual tree, which is the one event that
+    /// settles the question for every way of leaving at once - a re-parent, an unpark, a recycled container taking a
+    /// new item. Without this the states that mean "coming back" would be indistinguishable from death the moment
+    /// anything asked a second time.
+    /// <para>Discarded is final and is NOT revived here: an element that really was destroyed and then somehow got
+    /// re-attached is a bug to find, not a state to paper over.</para></summary>
+    public void Revive()
+    {
+        if (Lifecycle != VisualLifecycle.Discarded) Lifecycle = VisualLifecycle.Live;
+    }
+
+    /// <summary>Which template BUILT this element, by that result's id. TemplatedParent cannot answer it: an
+    /// ItemsPanelTemplate stamps the same templated parent on the items panel it makes, so a control's teardown would
+    /// take the presenter's live panel for one of its own parts - and did, marking a live panel discarded.</summary>
+    public Guid OwningTemplateId { get; internal set; }
+
+    public void MarkDiscarded()
+    {
+        if (IsDiscarded || IsAwaitingReturn) return;
+
+        Lifecycle = VisualLifecycle.Discarded;
+        lock (Discarded) Discarded.Add(new WeakReference<FundamentalUIComponent>(this));
+
+        // The WORK is not done here. Releasing a subtree's subscriptions costs a walk per element, and doing it inside
+        // the frame that swaps the content is what made switching to a heavy tab stall for seconds. It is queued and
+        // drained in the idle time between frames, where the drain also gets to re-read the state: anything that has
+        // come back by then is no longer Discarded and is simply skipped. That is the second half of the fix - not only
+        // WHAT is released, but WHEN, and the queue is the only place that can answer the second one honestly.
+        DiscardedVisuals.Enqueue(this);
+    }
+
+    /// <summary>Run the release for this element, from the queue drain. Re-reads the state first: between being queued
+    /// and being reached it may have come back, and the whole point of draining late is to let it.</summary>
+    internal void ReleaseFromQueue()
+    {
+        if (Lifecycle != VisualLifecycle.Discarded) return;
+        OnDiscarded();
+    }
+
+    /// <summary>This element has been destroyed - let go of anything OUTSIDE it that would otherwise keep it. Overridden
+    /// by whoever subscribes to something longer-lived than itself: a control bound to a view model's collection is the
+    /// case that made this necessary - the subscription is undone only when the SOURCE is replaced, which never happens
+    /// to something discarded, so the collection went on holding the control for the life of the application.</summary>
+    protected virtual void OnDiscarded()
+    {
+        // Close this element's BINDINGS. An expression subscribes to its SOURCE, and a source is normally longer-lived
+        // than the target - an ancestor, a view model - so a binding left open on a destroyed element keeps that element
+        // alive from the live side of the tree. CloseConnection is called when a binding is REPLACED or when a template
+        // result is destroyed, and neither reaches a binding created outside a template (a behaviour's, an authored
+        // element's): measured, a live ListBox's PropertyChanged held an AncestorBindingExpression whose target was a
+        // discarded Border, and through it a whole subtree.
+        var bindings = Data.BindingEngine.GetBindings(this);
+        foreach (var binding in bindings) binding.CloseConnection();
+
+        // ...and the BEHAVIOURS, which carry bindings of their own. A binding is keyed by its TARGET, and a behaviour is
+        // not a component, so the sweep above cannot see one: a DragSourceBehavior's {Ancestor} binding stayed open, its
+        // source (a live ListBox) went on holding the expression, and the expression held the behaviour's element and
+        // everything under it. Clearing the collection detaches each one through the path that already exists.
+        var behaviours = GetValue<Collections.BehaviorCollection>(BehaviorsProperty);
+        if (behaviours == null || behaviours.Count == 0) return;
+
+        foreach (var behaviour in behaviours)
+            foreach (var binding in Data.BindingEngine.GetBindings(behaviour))
+                binding.CloseConnection();
+
+        behaviours.Clear();
+    }
+
+    // TEMP (leak hunt): every part the teardown has destroyed, held WEAKLY. After a forced collection the ones still
+    // alive are exactly the retained set - not inferred from a dump, not a path gcroot happened to walk, but the parts
+    // that are provably dead and provably still here.
+    private static readonly List<WeakReference<FundamentalUIComponent>> Discarded = new();
+
+    /// <summary>TEMP: of the parts that were destroyed, how many survive a collection - and WHO their visual parent is.
+    /// A survivor whose parent is NOT itself discarded is held by a live control, and that names the holder outright.</summary>
+    public static string SurvivingDiscarded()
+    {
+        var byParent = new Dictionary<string, int>();
+        var alive = 0;
+
+        lock (Discarded)
+        {
+            for (var i = Discarded.Count - 1; i >= 0; i--)
+            {
+                if (!Discarded[i].TryGetTarget(out var part))
+                {
+                    Discarded.RemoveAt(i);
+                    continue;
+                }
+
+                alive++;
+                var parent = (part as IUIComponent)?.VisualParent;
+                var key = parent == null
+                    // A survivor with no visual parent is the ROOT of a retained subtree - the thing actually being
+                    // held. Its own type names whose template leaked, which is what the next fix needs.
+                    ? "ROOT: " + part.GetType().Name
+                    : parent.GetType().Name +
+                      (parent is FundamentalUIComponent { IsDiscarded: true } ? " (also discarded)" : " *** LIVE ***");
+                byParent[key] = byParent.TryGetValue(key, out var had) ? had + 1 : 1;
+            }
+        }
+
+        var rows = new List<string>();
+        foreach (var pair in byParent) rows.Add($"{pair.Value,6}  {pair.Key}");
+        rows.Sort((a, b) => int.Parse(b.Trim().Split(' ')[0]).CompareTo(int.Parse(a.Trim().Split(' ')[0])));
+        return $"surviving discarded parts: {alive}\n  " + string.Join("\n  ", rows.GetRange(0, Math.Min(12, rows.Count)));
+    }
+
+
+    public void AttachStyles(params ReadOnlySpan<Style> styles)
     {
         foreach (var style in styles)
         {
@@ -307,7 +450,7 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         _attachedStyles.Clear();
     }
 
-    public void DetachStyles(params Style[] styles)
+    public void DetachStyles(params ReadOnlySpan<Style> styles)
     {
         foreach (var style in styles)
         {
@@ -461,10 +604,17 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         }
     }
 
+    /// <summary>TEMP (leak hunt): how many times a theme has been applied to an element. A swap builds 2.4x as many
+    /// templates as the whole application contains, and singletons - the one TitleBar, the one ResizeGripper - are
+    /// rebuilt exactly TWICE, so the question is whether the theme is applied to each element twice.</summary>
+    public static long ThemeApplications;
+
     public virtual void ApplyCurrentTheme()
     {
         if (UIAppContext.Current == null)
             return;
+
+        System.Threading.Interlocked.Increment(ref ThemeApplications);
 
         // Re-theming must undo what the PREVIOUS set left behind (a theme swap re-applies without a preceding detach, and
         // its activators carry live subscriptions) - but ONLY what is genuinely LEAVING. Detaching everything up front
@@ -480,16 +630,28 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         // alone, with no style key, so the outgoing theme's teardown would tear out the incoming theme's live link.
         var incoming = UIAppContext.Current.ThemeManager?.FindStylesForComponent(this);
         var own = StylesOrNull;   // not Styles: a component with no local styles must not grow one to be re-themed
-        foreach (var style in _attachedStyles?.ToArray() ?? Array.Empty<Style>())
+
+        // BACKWARDS by index rather than over a ToArray() copy: DetachStyles removes from this very collection, so a
+        // forward walk would skip entries - which is what the copy was there to avoid, at the price of an array per
+        // component per re-theme. Going backwards, a removal only shifts what has already been visited.
+        for (var i = (_attachedStyles?.Count ?? 0) - 1; i >= 0; i--)
         {
-            if (incoming != null && Array.IndexOf(incoming, style) >= 0) continue;
-            if (own != null && own.Contains(style)) continue;   // an author's own style stays; re-applied below either way
+            var style = _attachedStyles[i];
+            if (incoming != null && Array.IndexOf(incoming, style) >= 0)
+            {
+                continue;
+            }
+
+            if (own != null && own.Contains(style))
+            {
+                continue;   // an author's own style stays; re-applied below either way
+            }
 
             DetachStyles(style);
         }
 
         UIAppContext.Current.UIContext.ThemeContext.ApplyCurrentTheme(this);
-        UIAppContext.Current.UIContext.ThemeContext.ApplyExternalStyles(this, own?.ToArray() ?? Array.Empty<Style>());
+        UIAppContext.Current.UIContext.ThemeContext.ApplyExternalStyles(this, own == null ? default : own.AsSpan());
 
         IsStyleApplied = true;
     }

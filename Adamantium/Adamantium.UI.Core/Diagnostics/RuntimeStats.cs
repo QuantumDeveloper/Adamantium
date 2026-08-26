@@ -243,6 +243,10 @@ public static class RuntimeStats
     public static long ScansLastRank;     // TryLastRankOfSubtree - walks DOWN the previous sibling's subtree
     public static long ScansCollect;      // CollectSubtreeInPaintOrder - the placed subtree itself
     public static long ScansParent;       // the one list PlanNewChildren legitimately needs
+
+    /// <summary>TEMP: how often the layout-snapshot sweep ran, and how many entries it dropped. A sweep written but never
+    /// reached looks exactly like a sweep that finds nothing.</summary>
+    public static int SnapSweeps, SnapSwept;
     public static int LastRecordPlanRuns;
     public static int LastRecordPlanParents;
     public static double LastRecordRenumberMs;

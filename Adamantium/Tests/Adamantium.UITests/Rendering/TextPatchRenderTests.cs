@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.InteropServices;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Fonts;
@@ -214,7 +215,8 @@ public class TextPatchRenderTests
     [Test]
     public void ZZ_ProbeGlyphSplice()
     {
-        var dir = @"C:\Users\admin\AppData\Local\Temp\claude\c--AdamantiumEngine\59dccca2-1dca-4200-8d54-0ce21d208615\scratchpad\";
+        var dir = Path.Combine(Path.GetTempPath(), "AdamantiumTests") + Path.DirectorySeparatorChar;
+        Directory.CreateDirectory(dir);
         using var scene = NewScene("600 fps");
         Shot(scene, dir + "1-before.png");
 

@@ -19,9 +19,9 @@ public interface IFundamentalUIComponent : IAdamantiumComponent, IDispatcherComp
     public bool HasClassNames { get; }
 
     public StylesCollection Styles { get; }
-    public void AttachStyles(params Style[] styles);
+    public void AttachStyles(params ReadOnlySpan<Style> styles);
     public void DetachStyles();
-    public void DetachStyles(params Style[] styles);
+    public void DetachStyles(params ReadOnlySpan<Style> styles);
     public object DataContext { get; set; }
     public IFundamentalUIComponent LogicalParent { get; }
     public IAdamantiumComponent TemplatedParent { get; }

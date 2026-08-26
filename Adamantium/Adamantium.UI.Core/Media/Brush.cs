@@ -73,7 +73,7 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
    /// <summary>How many handlers are listening to <see cref="Changed"/>. This is what the owner counting exists to keep
    /// at one per owner, so it is what the test has to read - the hold count alone is satisfied by a broken attach that
    /// subscribes every time.</summary>
-   internal int SubscriberCount => Changed?.GetInvocationList().Length ?? 0;
+   internal int SubscriberCount => (Changed?.GetInvocationList().Length ?? 0) + (_owners?.Count ?? 0);
 
    protected void RaiseChanged()
    {
@@ -83,12 +83,119 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
       // this from its own initializer, and snapshotting THAT would recurse forever.
       if (_snapshot != null) _snapshot = CreateFrozenCore();
       _baseChanged = true;   // a real change to the brush's own values - the compositor re-captures its paint base on it
+
+      // A wholesale discard happened since this brush last looked (see SweepGeneration). This is the moment it is worth
+      // looking: a theme swap recolours every theme brush, so the ones that need sweeping are exactly the ones raising
+      // this. One comparison on the hot path when there is nothing to do.
+      if (_owners != null && _sweptGeneration != SweepGeneration) SweepOwnersOutOfTheTree();
+
       Changed?.Invoke(this, EventArgs.Empty);
+      NotifyOwners();
+   }
+
+   // The owners are told through the MAP, not through Changed. They were subscribed to it as well, which made the same
+   // fact live in two places and cost the difference between them: adding and removing a handler is O(subscribers) with
+   // an array copy each time, and a theme brush is drawn with by every element in the window. Detaching one heavy tab -
+   // 22251 nodes, each unsubscribing itself from lists tens of thousands long - measured at 3994 ms of a 4027 ms stall,
+   // and the same quadratic ran on the way IN and on every raise of an animated brush. Through the map it is a
+   // dictionary insert and remove, and the raise walks exactly the owners that exist.
+   // Changed itself stays: a few non-owner subscribers (a GeometryDrawing holding this brush) genuinely need an event.
+   private AdamantiumComponent[] _ownersSnapshot;
+
+   private void NotifyOwners()
+   {
+      if (_owners == null || _owners.Count == 0) return;
+
+      // Cached, because an animated brush raises this once a frame and an owner list must not be copied per raise.
+      // Invalidated wherever the map changes; a handler that attaches or detaches during the walk therefore mutates the
+      // map without disturbing the array being walked, which is what a snapshot is for.
+      var owners = _ownersSnapshot;
+      if (owners == null)
+      {
+         owners = new AdamantiumComponent[_owners.Count];
+         _owners.Keys.CopyTo(owners, 0);
+         _ownersSnapshot = owners;
+      }
+
+      foreach (var owner in owners) owner.OnRenderValueChanged(this, EventArgs.Empty);
+   }
+
+   // TEMP (leak hunt): how many owner LINKS have ever been taken and given up. Their difference is how many elements the
+   // live brushes are holding right now - the number that says whether a release path runs at all, which reasoning about
+   // the code cannot.
+   public static long LinksTaken, LinksGivenUp;
+
+   // The brushes that have ever been TAKEN by something - registered here the moment they take their first owner, and
+   // weakly, so the register never keeps a brush alive. Only these can hold anything, and they are a fraction of all the
+   // brushes there are, so nothing is paid for the many that are only ever drawn with once.
+   //
+   // A register is needed because the brushes that hold the discarded elements are the OLD theme's, and those raise
+   // nothing after the swap - the theme is still in ThemeManager's map, its brushes are simply idle. Reaching them
+   // through what CHANGES would reach exactly the wrong half.
+   private static readonly List<WeakReference<Brush>> BrushesWithOwners = new();
+
+   /// <summary>Everything that was discarded wholesale has now settled - look over every brush that holds owners and let
+   /// go of the ones no longer in a tree. Called once per theme swap, off the settle signal.</summary>
+   /// <summary>TEMP (leak hunt): brushes that still list a DESTROYED part as an owner, and how many such entries there
+   /// are. The taken-minus-given counter said the links were flat and was wrong: a stale entry in one brush is balanced
+   /// by a released one in another. Only counting the dead entries themselves says anything.</summary>
+   public static (int Brushes, int DeadOwners, int LiveBrushes) DeadOwnerCensus()
+   {
+      List<Brush> live;
+      lock (BrushesWithOwners)
+      {
+         live = new List<Brush>(BrushesWithOwners.Count);
+         foreach (var handle in BrushesWithOwners)
+            if (handle.TryGetTarget(out var brush)) live.Add(brush);
+      }
+
+      int brushes = 0, dead = 0;
+      foreach (var brush in live)
+      {
+         var here = 0;
+         if (brush._owners != null)
+            foreach (var owner in brush._owners.Keys)
+               if (owner is FundamentalUIComponent { IsDiscarded: true }) here++;
+
+         // ...and the SUBSCRIBER LIST, which is a different thing from the owner map and can disagree with it. The map
+         // came back clean while the graph showed this very event holding a destroyed part, so the map is not the
+         // answer - the invocation list is.
+         var handlers = brush.Changed?.GetInvocationList();
+         if (handlers != null)
+            foreach (var handler in handlers)
+               if (handler.Target is FundamentalUIComponent { IsDiscarded: true }) here++;
+
+         if (here > 0) { brushes++; dead += here; }
+      }
+
+      return (brushes, dead, live.Count);
+   }
+
+   public static void SweepEveryBrush()
+   {
+      System.Threading.Interlocked.Increment(ref SweepGeneration);
+
+      List<Brush> live;
+      lock (BrushesWithOwners)
+      {
+         live = new List<Brush>(BrushesWithOwners.Count);
+         for (var i = BrushesWithOwners.Count - 1; i >= 0; i--)
+         {
+            if (BrushesWithOwners[i].TryGetTarget(out var brush)) live.Add(brush);
+            else BrushesWithOwners.RemoveAt(i);
+         }
+      }
+
+      foreach (var brush in live) brush.SweepOwnersOutOfTheTree();
    }
 
    void IRenderAttachable.AttachTo(AdamantiumComponent owner)
    {
-      _owners ??= new Dictionary<AdamantiumComponent, int>();
+      if (_owners == null)
+      {
+         _owners = new Dictionary<AdamantiumComponent, int>();
+         lock (BrushesWithOwners) BrushesWithOwners.Add(new WeakReference<Brush>(this));
+      }
 
       if (_owners.TryGetValue(owner, out var held))
       {
@@ -97,12 +204,18 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
       else
       {
          _owners[owner] = 1;
-         // Keep the owner subscribed to THIS brush, so a later mutation OF the brush - an animated gradient stop, a
-         // recoloured fill - repaints it, and not only replacing the whole brush does.
-         Changed += owner.OnRenderValueChanged;
+         System.Threading.Interlocked.Increment(ref LinksTaken);
+         _ownersSnapshot = null;   // the map is what notifies them now - see RaiseChanged
       }
 
       Anchor(owner);
+
+      // The sweep runs AFTER the pair is complete, and never in the middle of making it. Run before the subscribe, it
+      // took out the very owner being attached - a template part is not in the tree yet while it is being built, so the
+      // sweep reads it as gone - and the subscribe below then went ahead anyway. That leaves a SUBSCRIBER WITH NO MAP
+      // ENTRY: invisible to every later sweep, and holding a whole discarded subtree through this brush. Measured at
+      // +20 such a swap, with the owner map reading perfectly clean.
+      if (_owners.Count > _sweepAt) SweepOwnersOutOfTheTree();
    }
 
    void IRenderAttachable.DetachFrom(AdamantiumComponent owner)
@@ -119,7 +232,76 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
       }
 
       _owners.Remove(owner);
-      Changed -= owner.OnRenderValueChanged;
+      System.Threading.Interlocked.Increment(ref LinksGivenUp);
+      _ownersSnapshot = null;
+   }
+
+   // A brush outlives its owners - a THEME brush outlives the application - and it can only be TOLD an owner is gone by
+   // that owner's property taking a different value. An element that is simply DISCARDED never does that, so its link
+   // stayed and the brush held it: measured, +2080 elements a theme swap that a full collection could not reclaim, and
+   // because they are all chained through the SAME shared brushes the retained set is one CONNECTED web - freeing a
+   // fraction of the links frees nothing at all.
+   //
+   // So the brush asks instead of waiting to be told, and it asks the only question that has an answer: is this owner in
+   // a live tree? Not weakly-referenced, deliberately: Changed is raised on every mutation of the brush and once a FRAME
+   // for an animated one, and a weak subscriber list would have to be walked and dereferenced on every raise.
+   //
+   // AMORTIZED - the walk runs when the map has doubled since the last one, so a brush with thousands of owners pays
+   // O(1) per attach. And it releases the owner WHOLE (every brush it holds, not just this one) rather than snipping one
+   // link, because that is the call that also arms the re-take: an element that is merely between trees - a template
+   // being built, a closed popup, a container waiting to be recycled - takes its brushes back when it is attached.
+   private int _sweepAt = 16;
+
+   /// <summary>Bumped when something discards elements WHOLESALE - a theme swap rebuilds every template in the
+   /// application at once. Growth alone is not a good enough trigger: a brush whose owner count happens to come out the
+   /// same after a swap as before it would never sweep, and ONE surviving link is enough to hold the whole web, because
+   /// the discarded elements are all chained to each other through these very brushes. Measured: a doubling trigger
+   /// alone left a quarter of the orphans holding, and freed no memory at all.</summary>
+   public static int SweepGeneration;
+
+   private int _sweptGeneration = -1;
+
+   private void SweepOwnersOutOfTheTree()
+   {
+      _sweptGeneration = SweepGeneration;
+      List<AdamantiumComponent> gone = null;
+      foreach (var owner in _owners.Keys)
+      {
+         // Only an ELEMENT can be judged: a non-visual owner (a drawing, a stop, another brush) has no tree to be out
+         // of, so it is left alone. PARKED is out of the tree ON PURPOSE and coming back - not gone.
+         // DISCARDED counts as gone even when the tree still says otherwise: a part destroyed with its template is not
+         // always DETACHED first, so RootVisual can still be set and "is it attached" answers yes for something that no
+         // longer exists. That answer kept these owners on the list through every sweep - and one live control holding
+         // this brush then held, through this very subscriber list, a whole discarded subtree.
+         if (owner is FundamentalUIComponent { IsDiscarded: true } ||
+             owner is IUIComponent { IsAttachedToVisualTree: false, IsParked: false })
+         {
+            (gone ??= new List<AdamantiumComponent>()).Add(owner);
+         }
+      }
+
+      // Collected first: releasing mutates the very map being walked.
+      _sweepAt = Math.Max(16, _owners.Count * 2);
+      if (gone == null) return;
+
+      foreach (var owner in gone)
+      {
+         // THIS brush lets go of THIS owner, by hand. Going through the owner's own release walk was wrong and hid the
+         // rest of the leak for hours: that walk detaches whatever the owner's properties hold NOW, and by the time a
+         // swap has settled they hold the NEW theme's brushes - so the detach landed on the wrong brush, and this one
+         // kept both its map entry and its Changed subscription. The link counter said nothing, because a stale entry
+         // here was balanced by a released one there.
+         if (_owners.Remove(owner))
+         {
+            System.Threading.Interlocked.Increment(ref LinksGivenUp);
+            _ownersSnapshot = null;
+         }
+
+         // ...and the owner still gives up the rest of what it holds, which also arms its re-take on attach.
+         owner.ReleaseRenderAttachments();
+      }
+
+      _sweepAt = Math.Max(16, _owners.Count * 2);
    }
 
    /// <summary>How many of <paramref name="owner"/>'s render properties currently hold this brush.</summary>
@@ -143,7 +325,7 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
 
       // TWO places to look: an EXPRESSION on one of the brush's properties, and a RESOURCE only a tree-scoped lookup can
       // answer. Asking about the first alone is how {ResourceReference} on a brush kept resolving to nothing.
-      var hasExpressions = Data.BindingEngine.GetBindings(this).Count > 0;
+      var hasExpressions = Data.BindingEngine.HasBindings(this);
       var hasResources = Resources.ResourceResolver.HasPending(this);
       if (!hasExpressions && !hasResources)
       {

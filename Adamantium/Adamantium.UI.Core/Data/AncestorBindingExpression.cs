@@ -172,7 +172,11 @@ public class AncestorBindingExpression : BindingExpressionBase
             return;
         }
 
-        if (_sourceProperty != null) _source.PropertyChanged += OnSourcePropertyChanged;
+        if (_sourceProperty != null)
+        {
+            _source.PropertyChanged += OnSourcePropertyChanged;
+            System.Threading.Interlocked.Increment(ref SourceHooks);
+        }
         HookLeafOwner();
 
         // TwoWay only for a single, directly-observable property hop - writing back through a reflected dotted chain has
@@ -282,7 +286,11 @@ public class AncestorBindingExpression : BindingExpressionBase
     private void DetachSource()
     {
         BindingUpdateQueue.Remove(this);   // a re-resolve must not be applied to the old source by a later flush
-        if (_source != null) _source.PropertyChanged -= OnSourcePropertyChanged;
+        if (_source != null)
+        {
+            _source.PropertyChanged -= OnSourcePropertyChanged;
+            System.Threading.Interlocked.Increment(ref SourceUnhooks);
+        }
         if (_targetHooked && Target != null) Target.PropertyChanged -= OnTargetPropertyChanged;
         UnhookLeafOwner();
         _source = null;
