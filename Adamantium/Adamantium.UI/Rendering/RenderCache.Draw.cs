@@ -2007,7 +2007,25 @@ public partial class RenderCache
     // Requirements per dirty group (checked BEFORE anything is mutated -> full walk): every unit rect-batchable NOW; a
     // group described by the last walk must have been rect-only; its clip must be the layer's. Re-baked runs are appended
     // and not reclaimed until a full walk resets Count, so a sustained burst still yields to the walk on a full arena.
+    /// <summary>Wraps the patch so its staging buffer is let go on EVERY exit, refusals included. The buffer is cleared
+    /// on the way in, which is all correctness needs; it is not all memory needs. A refusal returns early and leaves the
+    /// last set of patches sitting there, each naming a group and through it a component and everything below it - and
+    /// after a theme swap the frames that follow are refusals and full rebuilds, so nothing comes along to clear it.
+    /// Found by walking the object graph from the strong handles: RenderCache -> List&lt;GroupPatch&gt; -> a discarded
+    /// TextBlock -> its whole parent chain.</summary>
     private bool TrySplicedPatch(IGraphicsDevice device, Rect2D fullScissor)
+    {
+        try
+        {
+            return TrySplicedPatchCore(device, fullScissor);
+        }
+        finally
+        {
+            _patchBuf.Clear();
+        }
+    }
+
+    private bool TrySplicedPatchCore(IGraphicsDevice device, Rect2D fullScissor)
     {
         // Moved motion nodes first (same as TryPartialReplay): rewrite their matrices, bail on non-aware content.
         if (!RefreshMovedNodes(device)) return SpliceRefused("movedNode");
@@ -2186,6 +2204,13 @@ public partial class RenderCache
 
         AcceptPatchedTransforms();
         ExecuteOps(device, fullScissor);
+
+        // Let the staging buffer go. It is cleared on the way IN, which is enough for correctness and not enough for
+        // memory: the last patch set stays in it until the NEXT patch, and after a theme swap the frames that follow are
+        // full rebuilds rather than patches - so "the next patch" can be a long time coming. Each entry names a group
+        // and, through it, a component and everything below it. Found by walking the object graph from the strong
+        // handles: RenderCache -> List<GroupPatch> -> a discarded TextBlock -> its whole parent chain.
+        _patchBuf.Clear();
         return true;
     }
 

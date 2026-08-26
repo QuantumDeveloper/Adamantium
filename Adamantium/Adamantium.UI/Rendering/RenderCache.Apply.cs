@@ -290,6 +290,15 @@ public partial class RenderCache
 
         foreach (var entry in packet.SnapDelta)
         {
+            // A part the template teardown has DESTROYED gets no snapshot. Sweeping the map is not enough on its own:
+            // the sweep runs mid-swap and the applier then writes the delta straight back in, so 39 dead controls a swap
+            // survived a sweep that was removing 762. Nobody will ever draw these, and the key is the control itself.
+            if (entry.Key is Core.FundamentalUIComponent { IsDiscarded: true })
+            {
+                _applySnap.Remove(entry.Key);
+                continue;
+            }
+
             var known = _applySnap.TryGetValue(entry.Key, out var previous);
             if (!known || !SameGeometry(previous, entry.Value))
             {

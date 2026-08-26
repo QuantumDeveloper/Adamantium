@@ -340,6 +340,10 @@ namespace Adamantium.Core.Collections
         /// <filterpriority>2</filterpriority>
         public int Count => currentIndex;
 
+        /// <summary>The live contents as a span, so a caller that only READS them does not have to copy them out with
+        /// ToArray() first. It is a view over the backing array: do not add, remove or clear while holding it.</summary>
+        public ReadOnlySpan<T> AsSpan() => new(items, 0, currentIndex);
+
         /// <summary>
         /// Gets an object that can be used to synchronize access to the <see cref="T:System.Collections.ICollection"/>.
         /// </summary>

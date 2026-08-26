@@ -44,7 +44,7 @@ public static class ParkedSubtree
     {
         if (node is not UIComponent component) return;
 
-        component.IsParked = parked;
+        if (parked) component.MarkParked(); else component.Revive();
         foreach (var child in component.VisualChildren)
         {
             Mark(child, parked);

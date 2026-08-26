@@ -25,6 +25,16 @@ public class ContentPresenter : InputUIComponent
     // What the current visual was built for: the KEY it waits under in ParkedVisuals while it is away.
     private object _builtFor;
 
+    /// <summary>Who a parked view is remembered UNDER. The presenter itself cannot be it: a presenter is a TEMPLATE
+    /// PART, and a theme swap rebuilds every template in the application - the replacement then looks the view up under
+    /// its own identity, misses, and builds the whole tab again, while the entry filed under the presenter that no
+    /// longer exists stays in the park for the life of the process. Measured on the Layout tab: a rebuild of the tab on
+    /// every theme swap, ~200 MB a swap retained, and the abandoned subtree's render marks left the cache permanently
+    /// dirty - a full rebuild every frame (build 10.9 ms of an 8.9 ms frame) on a scene doing nothing.
+    /// <para>The templated parent is the control that OWNS the content - a TabItem, a ContentControl - and a theme swap
+    /// replaces its template, not the control. That is the identity a parked view has to be filed under.</para></summary>
+    private object ParkOwner => TemplatedParent ?? (object)this;
+
     // Set when the outgoing visual is one to keep: it still slides out, but is parked instead of destroyed at the end.
     private object _outgoingParkedKey;
 
@@ -90,6 +100,8 @@ public class ContentPresenter : InputUIComponent
             new PropertyMetadata(null, PropertyMetadataOptions.Inherits | PropertyMetadataOptions.AffectsRender, OnTextStyleChanged));
         FontSizeProperty.OverrideMetadata(typeof(ContentPresenter),
             new PropertyMetadata(14.0, PropertyMetadataOptions.Inherits | PropertyMetadataOptions.AffectsMeasure, OnTextStyleChanged));
+
+        SweepPresentersOnDiscard();
     }
 
     private static void OnContentPropertyChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
@@ -225,11 +237,13 @@ public class ContentPresenter : InputUIComponent
     {
         // Coming back to a view that was parked: put it back as it was. Not building it again IS the point - the rebuild
         // is the pause x:KeepAlive exists to avoid.
-        if (ParkedVisuals.TryTake(this, newContent, this, out var parkedRoot, out var parkedBuilt, out var parkedTemplate, out var parkedHostSize))
+        if (ParkedVisuals.TryTake(ParkOwner, newContent, this, out var parkedRoot, out var parkedBuilt, out var parkedTemplate, out var parkedHostSize))
         {
             // Came home to a different window or after a theme swap: drop the mark first, so the attach below revalidates
             // every node the ordinary way. Same world - the mark stays and the attach skips what it would recompute.
             if (!ParkedVisuals.IsUnchanged) ParkedSubtree.Revalidate(parkedRoot);
+
+            var reTheme = ParkedVisuals.ThemeChanged;
             _currentRoot = parkedRoot;
             _currentTemplateResult = parkedBuilt;
             _currentTemplate = parkedTemplate;
@@ -241,11 +255,24 @@ public class ContentPresenter : InputUIComponent
             // it kept is still the right one, and re-measuring a page of a thousand rows to arrive at what it already has
             // is the whole remaining cost of a return.
             ParkedSubtree.Unpark(_currentRoot, remeasure: parkedHostSize != _lastArrangeSize);
+
+            // Parked THROUGH a theme swap: the walk that re-themes the application runs over the TREE, and this subtree
+            // was not in it, so it comes back still wearing the theme it left under. Nothing else puts that right -
+            // dropping the parked mark above only restores the ordinary attach work, which does not touch styles.
+            // (Until the park survived a swap at all this never showed: the tab was rebuilt from scratch instead.)
+            // AFTER the attach, deliberately: invalidating styles registers the subtree for re-theming on the next
+            // layout pass, and a node with no tree to belong to has no queue to register WITH - done a few lines
+            // earlier, the request was simply lost and the tab came back in the old theme regardless.
+            if (reTheme) (_currentRoot as FundamentalUIComponent)?.InvalidateStyles();
+
             SetContentContext(newContent);
             return;
         }
 
         _builtFor = newContent;
+
+        // From here on this presenter NAMES content by field, so it has to be swept when that content is destroyed.
+        RegisterForDiscardSweep();
 
         if (newContent is IUIComponent iuiComponent)
         {
@@ -406,7 +433,7 @@ public class ContentPresenter : InputUIComponent
             // the return measures it once (it never was measured - it never was in a tree).
             if (built?.RootComponent is { } finished && ParkedVisuals.ShouldKeep(finished))
             {
-                ParkedVisuals.Keep(this, content, finished, built, template, new Size(Double.NaN, Double.NaN));
+                ParkedVisuals.Keep(ParkOwner, content, finished, built, template, new Size(Double.NaN, Double.NaN));
                 return;
             }
 
@@ -462,7 +489,7 @@ public class ContentPresenter : InputUIComponent
     /// taking it out of the tree is this presenter's job, because only it knows what removal means here.</summary>
     private void ParkCurrent(object key, IUIComponent root, TemplateResult built, DataTemplate template)
     {
-        ParkedVisuals.Keep(this, key, root, built, template, _lastArrangeSize);
+        ParkedVisuals.Keep(ParkOwner, key, root, built, template, _lastArrangeSize);
         RemoveVisualChild(root);
         RemoveLogicalChild(root);
     }
@@ -480,9 +507,99 @@ public class ContentPresenter : InputUIComponent
     {
         if (built == null && !ReferenceEquals(visual.VisualParent, this)) return;
 
+        // Say that this content is GONE, for the whole subtree, before anything is unpicked. Template teardown already
+        // announced its own parts; this is the other half, and the half that was missing - a view authored in markup is
+        // CONTENT, not a template part, so nothing marked it and every sweep that asks "was this discarded" answered no
+        // for an entire discarded view. Measured: a discarded ListBox left subscribed to a view model's collection,
+        // which outlives the application's whole UI. See DiscardedVisuals.
+        if (_discardBuf.Count > 0) _discardBuf.Clear();
+        CollectForDiscard(visual);
+        Core.DiscardedVisuals.Publish(System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_discardBuf));
+        _discardBuf.Clear();
+
         RemoveVisualChild(visual);
         RemoveLogicalChild(visual);
         built?.Destroy();
+    }
+
+    /// <summary>Destroyed: let the CONTENT go. These fields are the presenter's own handle on what it built, and they
+    /// are cleared on the paths that replace content - not on the path where the presenter itself is thrown away, which
+    /// is what a theme swap does to every presenter in a rebuilt template. A root held here has no visual parent to give
+    /// it away, so nothing else can reach it to release it.</summary>
+    protected override void OnDiscarded()
+    {
+        base.OnDiscarded();
+        DropContentHandles();
+    }
+
+    private void DropContentHandles()
+    {
+        _currentRoot = null;
+        _outgoingRoot = null;
+        _currentTemplateResult = null;
+        _outgoingTemplateResult = null;
+        _currentTemplate = null;
+    }
+
+    // Every presenter that has ever built content, held WEAKLY - the register must not be the thing that keeps one
+    // alive. Registered on first build rather than in the constructor: a presenter that never presents anything holds
+    // nothing and has no reason to be walked.
+    private static readonly List<WeakReference<ContentPresenter>> Presenters = new();
+    private bool _registered;
+
+    private void RegisterForDiscardSweep()
+    {
+        if (_registered) return;
+        _registered = true;
+        lock (Presenters) Presenters.Add(new WeakReference<ContentPresenter>(this));
+    }
+
+    // The other half of the story in OnDiscarded. THERE the presenter is the one destroyed; HERE it survives and its
+    // CONTENT is destroyed - a root built from a template that has just been torn down, while the presenter itself sits
+    // in a part of the tree that was not. The root has no visual parent by then, so this field is the only thing still
+    // naming it, and nothing else can reach it to let go. One handler for every presenter, walking a few hundred weak
+    // references once per teardown - not a lookup per discarded element.
+    private static void SweepPresentersOnDiscard()
+    {
+        Core.DiscardedVisuals.Discarded += gone =>
+        {
+            List<ContentPresenter> live = null;
+            lock (Presenters)
+            {
+                for (var i = Presenters.Count - 1; i >= 0; i--)
+                {
+                    if (Presenters[i].TryGetTarget(out var presenter)) (live ??= new List<ContentPresenter>()).Add(presenter);
+                    else Presenters.RemoveAt(i);
+                }
+            }
+
+            if (live == null) return;
+
+            foreach (var presenter in live)
+            {
+                if (IsGone(presenter._currentRoot, gone) || IsGone(presenter._outgoingRoot, gone))
+                    presenter.DropContentHandles();
+            }
+        };
+    }
+
+    private static bool IsGone(IUIComponent root, ReadOnlySpan<IFundamentalUIComponent> gone)
+    {
+        if (root == null) return false;
+
+        foreach (var component in gone)
+            if (ReferenceEquals(component, root)) return true;
+
+        return root is Core.FundamentalUIComponent { IsDiscarded: true };
+    }
+
+    // Reused: a content swap is a per-frame-ish event on a tab strip, and this runs on the loop thread.
+    private readonly List<IFundamentalUIComponent> _discardBuf = new();
+
+    private void CollectForDiscard(IUIComponent node)
+    {
+        if (node is IFundamentalUIComponent fundamental) _discardBuf.Add(fundamental);
+        foreach (var child in node.VisualChildren) CollectForDiscard(child);
     }
 
     // Starts the slide once the children have been arranged at the full presenter rect (same origin), so the only

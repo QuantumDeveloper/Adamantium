@@ -51,6 +51,9 @@ public class ItemContainerGenerator
         if (_pooledSet.Add(container))
         {
             _recyclePool.Push(container);
+            // Out of the tree, but waiting to be re-bound to another item - not dead. Saying so is what keeps a
+            // teardown from releasing a container that is about to be handed straight back out.
+            (container as Core.FundamentalUIComponent)?.MarkRecycled();
         }
     }
 
@@ -58,6 +61,7 @@ public class ItemContainerGenerator
     {
         var container = _recyclePool.Pop();
         _pooledSet.Remove(container);
+        (container as Core.FundamentalUIComponent)?.Revive();
         return container;
     }
 

@@ -945,8 +945,21 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         // actually presented. The sliver (not zero) keeps it progressing under a genuinely sustained low frame rate.
         var animationStep = frameTime.FrameTime < StallFrameSeconds ? frameTime.FrameTime : StallAnimationStep;
         AnimationManager.Tick(animationStep);
+
         EntityWorld.ServiceManager.Update(frameTime);
+
+        // Pay for teardowns HERE - after the frame's real work, a bounded number at a time - instead of inside the frame
+        // that caused them. Releasing a destroyed subtree costs a walk per element (its bindings, its behaviours, then
+        // every subsystem sweeping its own maps), and doing that while swapping a heavy tab's content stalled the swap
+        // for seconds. The teardown itself is now O(1) per element: it records what died and queues it.
+        // Not on a STALL frame, by the same argument that governs the animation step above: the frame that tore a tab
+        // down is precisely the one that must not also be charged for it. See DiscardedVisuals.
+        if (frameTime.FrameTime < StallFrameSeconds) DiscardedVisuals.Drain(DiscardReleasesPerFrame);
     }
+
+    /// <summary>How many destroyed elements are released per healthy frame. Big enough that a theme swap's thousand-odd
+    /// parts are gone within a second of idling, small enough that the pass is never the reason a frame is late.</summary>
+    private const int DiscardReleasesPerFrame = 128;
 
     protected void Draw(AppTime frameTime)
     {

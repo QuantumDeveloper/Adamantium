@@ -70,7 +70,10 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
          }
 
          (e.OldValue as IRenderAttachable)?.DetachFrom(owner);
-         (e.NewValue as IRenderAttachable)?.AttachTo(owner);
+         // Not while the owner is OUT of the tree: leaving gave every link up, and taking one here would leave the
+         // value holding an element that the next leave can no longer release. Coming back re-takes whatever the
+         // properties hold by then (AdamantiumComponent.TakeRenderAttachments).
+         if (!owner.RenderAttachmentsReleased) (e.NewValue as IRenderAttachable)?.AttachTo(owner);
       };
    }
 

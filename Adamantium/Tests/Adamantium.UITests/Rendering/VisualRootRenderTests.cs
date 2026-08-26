@@ -44,7 +44,9 @@ public class VisualRootRenderTests
         var root = new VisualRoot(content, 120, 80);
         Assert.That(renderer.RenderFrame(root), Is.True, "off-screen frame must render");
 
-        var path = @"C:\Users\admin\AppData\Local\Temp\claude\c--AdamantiumEngine\f4c8121d-0937-4264-942f-d3066549043f\scratchpad\visualroot.png";
+        var dir = Path.Combine(Path.GetTempPath(), "AdamantiumTests");
+        Directory.CreateDirectory(dir);
+        var path = Path.Combine(dir, "visualroot.png");
         renderer.Save(path, ImageFileType.Png);
         Assert.That(File.Exists(path), Is.True, "the rendered frame must be saved");
     }

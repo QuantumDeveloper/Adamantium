@@ -392,8 +392,16 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         set => _defaultFontFamilyOverride = value;
     }
 
+    // TEMP (leak hunt): how many components exist RIGHT NOW. Constructed minus finalized, so a theme swap that retains
+    // its old tree shows up as a live count that steps up and never comes down - and one that does NOT is proof the
+    // retained megabytes are something other than components, which no container census can tell apart.
+    public static long LiveComponents;
+
+    ~UIComponent() => System.Threading.Interlocked.Decrement(ref LiveComponents);
+
     public UIComponent()
     {
+        System.Threading.Interlocked.Increment(ref LiveComponents);
         RenderId = Guid.NewGuid();
         // A visual root (e.g. a window) has no parent, so SetVisualParent never attaches it. Seed RootVisual to
         // itself here so the root reports IsAttachedToVisualTree = true.
@@ -847,10 +855,13 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     /// </summary>
     public bool IsAttachedToVisualTree => RootVisual != null;
 
-    /// <summary>Parked: out of the tree on purpose and coming back, so nothing cached for it may be thrown away. A plain
-    /// field, not a registered property - the render cache reads it while deciding what to free, and that is a hot path
-    /// (same rule as Visibility). Set through <see cref="ParkedSubtree"/>, which is what parks and unparks a subtree.</summary>
-    public bool IsParked { get; internal set; }
+    /// <summary>Parked: out of the tree on purpose and coming back, so nothing cached for it may be thrown away. Read
+    /// off <see cref="FundamentalUIComponent.Lifecycle"/> rather than kept as a second flag beside it - "parked" and
+    /// "destroyed" are answers to the SAME question and two independent booleans could say yes to both, which is how a
+    /// keep-alive view came back marked dead. Still a plain field read, no property system: the render cache reads this
+    /// while deciding what to free, and that is a hot path (same rule as Visibility). Set through
+    /// <see cref="ParkedSubtree"/>, which is what parks and unparks a subtree.</summary>
+    public bool IsParked => Lifecycle == Core.VisualLifecycle.Parked;
 
     /// <summary>Draw this subtree once per matrix instead of once at its own place - see <see cref="IUIComponent.RenderClones"/>.
     /// A plain field, deliberately not a registered property: the draw walk reads it per group, per frame.</summary>
@@ -930,6 +941,15 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
     private void AttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
+        // It came back, so it is alive again - whatever it was on the way out. Here rather than in each of the ways of
+        // leaving, because as long as leaving was recorded and returning was not, the record could only get staler, and
+        // a queued release then reached an element that was already back on screen.
+        // NOT for a parked subtree: it stays parked until ParkedSubtree.Unpark says otherwise, and clearing that here
+        // would defeat the return path a few lines below - a parked root skips InvalidateRender precisely because it
+        // kept what was recorded for it (measured on the Layout tab: 5997 components dirtied, 25 ms, all of it that).
+        // Discarded is never revived - see FundamentalUIComponent.Revive.
+        if (!IsParked) Revive();
+
         RootVisual = e.Root;
         // Inherited down the subtree, so every node inside overlay content answers with the same owner. Null in the main
         // tree, where the visual root owns layout as it always did.
@@ -950,6 +970,10 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         // return marked 5997 components dirty and cost 25 ms, all of it this line. The mark is cleared only for a subtree
         // that comes home to the SAME window and theme (ParkedVisuals.IsUnchanged); anything else takes the full path above.
         if (!IsParked) InvalidateRender(false);
+
+        // ...and the values that DRAW it: a brush keeps every element painting with it subscribed, and leaving gave
+        // that up (see AdamantiumComponent.ReleaseRenderAttachments). Take it back before anything asks to be painted.
+        TakeRenderAttachments();
 
         // Back on screen: whatever its triggers had running before it left starts again, at the phase it stopped on.
         ResumeTriggerActions();
@@ -989,6 +1013,12 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         // Off screen: nothing it drives should keep costing a frame. A looping loading pulse is the case that made this
         // necessary - see FundamentalUIComponent.SuspendTriggerActions.
         SuspendTriggerActions();
+
+        // ...and nothing should keep HOLDING it. A brush this element drew with owns a map of its owners, and a theme
+        // brush outlives every element that ever used it - so an element that leaves without giving the link up is
+        // retained for the life of the application. This is the seam that gave up the leak; see
+        // AdamantiumComponent.ReleaseRenderAttachments.
+        ReleaseRenderAttachments();
 
         OnDetachedFromVisualTree(e);
         DetachedFromVisualTreeEvent?.Invoke(this, e);

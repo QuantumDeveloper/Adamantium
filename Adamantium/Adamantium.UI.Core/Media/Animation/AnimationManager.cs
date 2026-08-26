@@ -257,6 +257,27 @@ public static class AnimationManager
     // goes {host} -> {} -> cancel, exactly as before.
     private static readonly Dictionary<AdamantiumComponent, HashSet<object>> Holders = new();
 
+    // TEMP (leak hunt): a strong map keyed by component - and, because a size that never moves says nothing about what
+    // the keys point at, how many of those keys are parts the template teardown DESTROYED.
+    public static int HolderTargets => Holders.Count;
+
+    public static (int Targets, int Dead, int Held) DeadHolders()
+    {
+        lock (Holders)
+        {
+            var dead = 0;
+            foreach (var target in Holders.Keys)
+                if (target is FundamentalUIComponent { IsDiscarded: true }) dead++;
+
+            var heldByDead = 0;
+            foreach (var pair in Holders)
+                foreach (var holder in pair.Value)
+                    if (holder is FundamentalUIComponent { IsDiscarded: true }) { heldByDead++; break; }
+
+            return (Holders.Count, dead, heldByDead);
+        }
+    }
+
     /// <summary>Records that <paramref name="holder"/> wants an animation running on <paramref name="target"/>.</summary>
     public static void Retain(AdamantiumComponent target, object holder)
     {

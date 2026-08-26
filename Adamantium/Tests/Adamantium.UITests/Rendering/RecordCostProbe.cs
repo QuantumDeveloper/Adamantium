@@ -360,6 +360,74 @@ public class RecordCostProbe
             TestContext.Out.WriteLine($"  capacity(4) holds {probe.Count} entries -> capacity is a starting size, not a cap");
         }
 
+        // `params ReadOnlySpan<T>` is NOT "an array of spans" - the ELEMENTS are T, and C# 13 collects them into an
+        // inline array on the STACK instead of a heap array. That is the whole reason the style path was moved to it, so
+        // it is asserted rather than believed: the same call shape through `params T[]` allocates, through the span does
+        // not. If a future language/runtime change breaks it, this fails instead of quietly costing an array per call.
+        {
+            static void ViaSpan(params ReadOnlySpan<object> items) { _ = items.Length; }
+            static void ViaArray(params object[] items) { _ = items.Length; }
+
+            var one = new object();
+            for (var w = 0; w < 200; w++) { ViaSpan(one, one); ViaArray(one, one); }
+
+            var a0 = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < 1000; i++) ViaSpan(one, one);
+            var spanBytes = GC.GetAllocatedBytesForCurrentThread() - a0;
+
+            a0 = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < 1000; i++) ViaArray(one, one);
+            var arrayBytes = GC.GetAllocatedBytesForCurrentThread() - a0;
+
+            TestContext.Out.WriteLine($"  params span {spanBytes / 1000.0:F1} B/call vs params array {arrayBytes / 1000.0:F1} B/call");
+            Assert.That(spanBytes, Is.Zero, "params ReadOnlySpan must not allocate - the elements live in a stack inline array");
+            Assert.That(arrayBytes, Is.GreaterThan(0), "params T[] allocates one array per call - the thing being avoided");
+        }
+
+        // The style path for real, not a synthetic params call: attaching and detaching is what every component goes
+        // through when it is built and again when the theme changes, so this is bytes PER COMPONENT on a path that runs
+        // thousands of times per tab. The array-based shape is measured beside it - same work, arrays instead of spans -
+        // so the difference is the change itself rather than a claim about it.
+        TestContext.Out.WriteLine("  -- attaching/detaching styles, per component --");
+        {
+            var s1 = new Adamantium.UI.Core.Resources.Style();
+            var s2 = new Adamantium.UI.Core.Resources.Style();
+            var pair = new[] { s1, s2 };
+
+            static void Cycle(Border b, Adamantium.UI.Core.Resources.Style a, Adamantium.UI.Core.Resources.Style c)
+            {
+                b.AttachStyles(a, c);   // params ReadOnlySpan - the elements live on the stack
+                b.DetachStyles(a);
+                b.DetachStyles(c);
+            }
+
+            static void CycleViaArray(Border b, Adamantium.UI.Core.Resources.Style[] both,
+                Adamantium.UI.Core.Resources.Style a, Adamantium.UI.Core.Resources.Style c)
+            {
+                b.AttachStyles(both);                                        // a ready-made array: no params array built
+                b.DetachStyles(new[] { a });                                 // ...but a single-style call used to build one
+                b.DetachStyles(new[] { c });
+            }
+
+            const int N = 500;
+            var warm = new Border();
+            for (var w = 0; w < 50; w++) { Cycle(warm, s1, s2); CycleViaArray(warm, pair, s1, s2); }
+
+            var borders = new Border[N];
+            for (var i = 0; i < N; i++) borders[i] = new Border();
+            var a0 = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < N; i++) Cycle(borders[i], s1, s2);
+            var spanPath = (GC.GetAllocatedBytesForCurrentThread() - a0) / (double)N;
+
+            for (var i = 0; i < N; i++) borders[i] = new Border();
+            a0 = GC.GetAllocatedBytesForCurrentThread();
+            for (var i = 0; i < N; i++) CycleViaArray(borders[i], pair, s1, s2);
+            var arrayPath = (GC.GetAllocatedBytesForCurrentThread() - a0) / (double)N;
+
+            TestContext.Out.WriteLine(
+                $"  attach+detach x2: spans {spanPath,6:F1} B/component   arrays {arrayPath,6:F1} B/component   saved {arrayPath - spanPath,6:F1}");
+        }
+
         TestContext.Out.WriteLine($"  processors: {Environment.ProcessorCount}");
     }
 

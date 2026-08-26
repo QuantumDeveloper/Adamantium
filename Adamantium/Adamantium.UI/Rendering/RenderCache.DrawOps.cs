@@ -679,6 +679,12 @@ public partial class RenderCache
     {
         if (component == null) return false;
 
+        // A part the template teardown DESTROYED has left, whatever the chain below says. It still carries a RenderParent
+        // that reaches a live ancestor - the teardown does not unpick those links - so the walk kept answering "still
+        // here" and this cache went on holding its group, its units and its draw commands. Nothing else in the process
+        // knows the part is dead; the mark does.
+        if (component is Core.FundamentalUIComponent { IsDiscarded: true }) return true;
+
         // An ADORNER is never in the visual tree - that is its design, not its departure. It draws in its target's
         // space, so what decides whether it still has anywhere to draw is the target: a focus ring outlives everything
         // except the control it rings. The chain, not one step of it - a ring built from the adorner's own TEMPLATE
@@ -721,6 +727,45 @@ public partial class RenderCache
                 RemoveAndDeferDispose(id);
         }
 
+        // ...and the LAYOUT SNAPSHOTS, which this sweep never looked at. They are dropped on the two DEPARTURE loops in
+        // the applier (packet.Removed / packet.Undrawn), and a template part destroyed by a re-template appears in
+        // neither: it leaves the tree through the teardown, not through anything the record pass names. The map then
+        // keeps its key - the control itself - for the life of the window. Measured on a theme swap: 39 destroyed
+        // controls held here per swap, dead linear, while every other count in this cache stayed flat and so looked
+        // innocent. The size of a map says nothing about what its entries point at.
+        // DISCARDED, not LeftTheTree: a destroyed part still carries a RenderParent chain that reaches a live ancestor,
+        // so the departure test says it is still here. The teardown's own mark is the one thing that cannot be wrong.
+        List<IUIComponent> stale = null;
+        foreach (var component in _applySnap.Keys)
+        {
+            if (component is Core.FundamentalUIComponent { IsDiscarded: true } || LeftTheTree(component))
+                (stale ??= new List<IUIComponent>()).Add(component);
+        }
+
+        Core.Diagnostics.RuntimeStats.SnapSweeps++;   // TEMP: did this sweep run at all, and on which cache instance
+        if (stale != null)
+        {
+            foreach (var component in stale) _applySnap.Remove(component);
+            removed += stale.Count;
+            Core.Diagnostics.RuntimeStats.SnapSwept += stale.Count;
+        }
+
+        // ...and the per-node walk memo, which nothing has ever removed from either. It is small by design - motion
+        // nodes are counted in ones per window - but it is keyed by the NODE, so a departed one stays, and through it
+        // its whole subtree. Found by walking the object graph from the strong handles: RenderCache ->
+        // Dictionary<IUIComponent, int> -> a TabStripScroller's grid -> a whole discarded view.
+        List<IUIComponent> staleNodes = null;
+        foreach (var node in _nodeRefreshed.Keys)
+        {
+            if (LeftTheTree(node)) (staleNodes ??= new List<IUIComponent>()).Add(node);
+        }
+
+        if (staleNodes != null)
+        {
+            foreach (var node in staleNodes) _nodeRefreshed.Remove(node);
+            removed += staleNodes.Count;
+        }
+
         return removed;
     }
 
@@ -740,6 +785,19 @@ public partial class RenderCache
         foreach (var unit in group.Units)
             unit?.DeferDispose();
         RemoveFromOrder(group);
+
+        // ...and the TAG map, which nothing has ever removed from. _groupByTag exists so an arena slot can name its owner
+        // however far its bytes have been copied, and it is written once per group and left. Every other map here is
+        // swept - _groupById by name just above, the paint order by RemoveFromOrder - so the cache LOOKED clean while
+        // this one held every group it had ever tagged, and through the group its control and all its units.
+        //
+        // Found by walking the object graph from the strong handles rather than by guessing: the path to a retained
+        // Border ran MainWindow -> ForwardWindowRenderer -> RenderCache -> Dictionary<int, ControlGroup> -> the Border.
+        // Two mentions in the whole codebase, the declaration and one write.
+        //
+        // AFTER _leftTheOrder has been told (above): that list is what blanks the instances still being issued, and it
+        // reads the tag to do it.
+        if (group.Tag != 0) _groupByTag.Remove(group.Tag);
         // Return its transform slot to the pool. Every drawn element holds one now (ResolveBake stopped world-baking), so
         // without this a list that recycles rows would consume slots forever. Safe here: this runs in the build phase of a
         // walk that re-records the whole arena, so no still-drawn instance references the slot by the time it is reused.

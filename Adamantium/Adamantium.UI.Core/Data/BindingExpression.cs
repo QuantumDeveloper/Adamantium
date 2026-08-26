@@ -136,6 +136,7 @@ public class BindingExpression : BindingExpressionBase
       {
          _observedComponent = component;
          component.PropertyChanged += OnSourceComponentChanged;
+         System.Threading.Interlocked.Increment(ref SourceHooks);
       }
       if (Mode == BindingMode.TwoWay && !IsProducer && Target != null)
          Target.PropertyChanged += OnTargetPropertyChanged;
@@ -152,6 +153,7 @@ public class BindingExpression : BindingExpressionBase
       if (_observedComponent != null)
       {
          _observedComponent.PropertyChanged -= OnSourceComponentChanged;
+         System.Threading.Interlocked.Increment(ref SourceUnhooks);
          _observedComponent = null;
       }
       if ((Mode == BindingMode.TwoWay || Mode == BindingMode.OneWayToSource) && !IsProducer && Target != null)

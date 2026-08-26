@@ -32,6 +32,9 @@ public class ControlTemplate : UiTemplate
             {
                 var fundamental = (FundamentalUIComponent)component;
                 fundamental.TemplatedParent = templatedParent;
+                // Stamped HERE, while the template holds nothing but the parts it just made - content is presented into
+                // it later and must never be mistaken for one of them. See FundamentalUIComponent.OwningTemplateId.
+                fundamental.OwningTemplateId = result.Id;
             });
 
             foreach (var binding in result.TemplateBindings)

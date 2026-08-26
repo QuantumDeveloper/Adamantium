@@ -67,6 +67,12 @@ public class TemplateResult
         {
             var fundamental = (FundamentalUIComponent)component;
             fundamental.TemplatedParent = null;
+
+            // ...and let go of the values that DRAW it. Leaving the tree gives those up (UIComponent's detach), but a
+            // template part that was never IN the tree never gets that call - popup content is built eagerly and lives
+            // detached - so its brush keeps it, and a theme brush outlives the application. Idempotent: a part that DID
+            // leave the tree already released, and releasing again is a no-op.
+            fundamental.ReleaseRenderAttachments();
         });
 
         foreach (var binding in TemplateBindings)

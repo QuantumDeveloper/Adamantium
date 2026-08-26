@@ -30,6 +30,7 @@ public class DataTemplate : UiTemplate
             {
                 var fundamental = (FundamentalUIComponent)component;
                 fundamental.TemplatedParent = templatedParent;
+                fundamental.OwningTemplateId = result.Id;
             });
 
             // Register through the engine (not a bare EstablishConnection): a DataTemplate's {Binding}s are built before

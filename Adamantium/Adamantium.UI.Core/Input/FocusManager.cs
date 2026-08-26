@@ -70,12 +70,43 @@ public static class FocusManager
    /// through the page that had just been replaced).</summary>
    public static void Release(IInputComponent element)
    {
-      if (element == null || !ReferenceEquals(Focused, element))
+      if (element == null)
+         return;
+
+      // THREE places remember the focus, and this used to clear one. The keyboard device keeps a pointer of its own,
+      // assigned in SetFocusedElement and never once assigned null, on a SINGLETON that lives as long as the
+      // application - so an element that left the tree stayed reachable for good, and with it every element its subtree
+      // could reach through shared theme brushes and view models. Measured on the stand: one such DropDown retained
+      // 128 MB of a 150 MB heap, which is the whole of the +20 MB a theme swap never gave back.
+      var keyboard = KeyboardDevice.CurrentDevice;
+      if (keyboard != null && ReferenceEquals(keyboard.FocusedComponent, element))
+      {
+         keyboard.SetFocusedElement(null);
+      }
+
+      // ...and the scope map, which is written on every focus move and was never read back out. Strong on BOTH sides,
+      // so a departed element sat there as a key AND as somebody else's remembered element.
+      DropFromScopes(element);
+
+      if (!ReferenceEquals(Focused, element))
          return;
 
       var previous = Focused;
       Focused = null;
       AnnounceFocusMove(previous, null, NavigationMethod.Unspecified);
+   }
+
+   private static void DropFromScopes(IInputComponent element)
+   {
+      List<IInputComponent> stale = null;
+      foreach (var pair in focusScopes)
+      {
+         if (ReferenceEquals(pair.Key, element) || ReferenceEquals(pair.Value, element))
+            (stale ??= new List<IInputComponent>()).Add(pair.Key);
+      }
+
+      if (stale == null) return;
+      foreach (var scope in stale) focusScopes.Remove(scope);
    }
 
    public static bool Focus(IInputComponent component, NavigationMethod navigationMethod = NavigationMethod.Unspecified,

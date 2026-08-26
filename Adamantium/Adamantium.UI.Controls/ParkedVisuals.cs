@@ -27,6 +27,9 @@ public static class ParkedVisuals
 
     private static readonly Dictionary<Slot, Entry> _kept = new();
 
+    // TEMP (leak hunt): parked subtrees held across swaps.
+    public static int Count => _kept.Count;
+
     // Insertion order of the evictable ones, oldest first - what "the oldest is let go" means without a timestamp.
     private static readonly List<Slot> _evictable = [];
 
@@ -104,13 +107,25 @@ public static class ParkedVisuals
         // holds the right value - the return may skip it. A different window or a theme swap in between means it may not.
         // Against the HOST's window, not the parked root's: a parked root is out of the tree, so its own RootVisual is
         // null and comparing it always answered "changed" - the cheap path could never be taken at all.
-        IsUnchanged = entry.World == new World(host?.RootVisual, Core.Resources.ThemeManager.Version);
+        var now = new World(host?.RootVisual, Core.Resources.ThemeManager.Version);
+        IsUnchanged = entry.World == now;
+
+        // Asked SEPARATELY from the above, because the two answers cost different things. A theme swap invalidates what
+        // every node in the subtree WEARS, and that is only put right by re-applying styles - a parked subtree is out of
+        // the tree when the swap happens, so the walk that re-themes the application never reaches it. Coming home to a
+        // different WINDOW needs no such thing. Conflating them would either re-theme a subtree that has nothing wrong
+        // with it or, as it did, hand back a whole tab still wearing the theme it was parked under.
+        ThemeChanged = entry.World.ThemeVersion != now.ThemeVersion;
         return true;
     }
 
     /// <summary>Whether the visual the last <see cref="TryTake"/> handed back comes home to the same window and theme it
     /// left. Read straight after taking it, before it is attached.</summary>
     public static bool IsUnchanged { get; private set; }
+
+    /// <summary>Whether the theme changed while the visual the last <see cref="TryTake"/> handed back was parked - so it
+    /// is still wearing the previous one and has to be re-styled. Read straight after taking it.</summary>
+    public static bool ThemeChanged { get; private set; }
 
     /// <summary>Drops everything kept, destroying what was built from a template. For app shutdown and for tests, which
     /// must not inherit another test's cache.</summary>

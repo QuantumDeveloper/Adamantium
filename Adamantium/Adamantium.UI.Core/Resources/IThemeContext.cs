@@ -4,5 +4,5 @@ public interface IThemeContext
 {
     void ApplyCurrentTheme(IFundamentalUIComponent control);
     void ApplyStyles(IFundamentalUIComponent component);
-    void ApplyExternalStyles(IFundamentalUIComponent control, params Style[] styles);
+    void ApplyExternalStyles(IFundamentalUIComponent control, params ReadOnlySpan<Style> styles);
 }
