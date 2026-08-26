@@ -173,7 +173,23 @@ namespace Adamantium.Fonts
                 {
                     Typeface.GetGlyphByIndex(0U, out glyph);
                 }
-                glyph.RelatedCharacters.Add(character);
+                // ONCE per character, not once per translation. The glyph comes out of the font's own map - it is SHARED
+                // and lives as long as the font - so this list did too: every measure of every string appended another
+                // copy of the same character to it, for the lifetime of the process. Measuring "Hello" a million times
+                // left a million 'l's on one glyph. That is both the heap that never comes back and the ~117KB a single
+                // text measure allocated (the list re-doubling its backing array, the old one becoming garbage).
+                // Every consumer reads RelatedCharacters.FirstOrDefault() - one representative character for the glyph's
+                // texture - so a character already recorded adds nothing at all.
+                if (!glyph.RelatedCharacters.Contains(character))
+                {
+                    // Locked only on the rare first sight of a character: text is laid out from the layout thread AND
+                    // from parallel arrange, and an unguarded Add on a shared List is a torn list, not a wrong number.
+                    lock (glyph.RelatedCharacters)
+                    {
+                        if (!glyph.RelatedCharacters.Contains(character)) glyph.RelatedCharacters.Add(character);
+                    }
+                }
+
                 translatedGlyphs.Add(glyph);
             }
 

@@ -587,9 +587,18 @@ public class ContentPresenter : InputUIComponent
         if (Foreground != null) textBlock.Foreground = Foreground;
     }
 
+    /// <summary>TEMP: this type's OWN measure costs 214us a call - forty times a Border - and is 45% of the whole measure
+    /// phase. Its body is three things; only a split says which. Content construction was the obvious answer and does not
+    /// fit the data: a second with 136 attaches still spent 118ms here over 553 calls.</summary>
+    public static double UpdateContentMs, CacheHitMs, BaseMeasureMs;
+    public static int CacheHits, FullMeasures;
+
     protected override Size MeasureOverride(Size availableSize)
     {
+        var t0 = System.Diagnostics.Stopwatch.GetTimestamp();
         _lastContentRebuilt = UpdateVisualContent(Content);
+        var t1 = System.Diagnostics.Stopwatch.GetTimestamp();
+        UpdateContentMs += System.Diagnostics.Stopwatch.GetElapsedTime(t0, t1).TotalMilliseconds;
 
         var sizeBefore = DesiredSize;
         // Data-only reuse (a virtualized list rebinding a recycled container): the visual is kept and only its bound data
@@ -609,9 +618,17 @@ public class ContentPresenter : InputUIComponent
             && PreviousMeasureConstraint == availableSize
             && LayoutTransform == null
             && measured.DesiredSize == _lastContentDesired)
+        {
+            CacheHitMs += System.Diagnostics.Stopwatch.GetElapsedTime(t1).TotalMilliseconds;
+            CacheHits++;
             return _lastMeasuredInner;
+        }
 
+        var t2 = System.Diagnostics.Stopwatch.GetTimestamp();
+        CacheHitMs += System.Diagnostics.Stopwatch.GetElapsedTime(t1, t2).TotalMilliseconds;
         var size = base.MeasureOverride(availableSize);
+        BaseMeasureMs += System.Diagnostics.Stopwatch.GetElapsedTime(t2).TotalMilliseconds;
+        FullMeasures++;
         _lastMeasuredInner = size;
         _lastContentDesired = _currentRoot is IMeasurableComponent content ? content.DesiredSize : default;
 

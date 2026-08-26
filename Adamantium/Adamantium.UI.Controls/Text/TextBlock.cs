@@ -110,13 +110,17 @@ public class TextBlock : InputUIComponent
     {
         // Resolve the inherited font (falling back to the single shared default), and (re)build the layout when it
         // changes - the typeface is fixed per TextLayout, so a font change means a new TextLayout for that face.
+        var eb0 = System.GC.GetAllocatedBytesForCurrentThread();
         var font = FontFamily ?? DefaultFontFamily;
         if (_textLayout == null || !ReferenceEquals(_layoutFont, font))
         {
             _textLayout = new TextLayout(font.Typeface, font.Fonts[0]);
             _layoutFont = font;
             _hasLayout = false;
+            LayoutRebuilds++;
         }
+        var eb1 = System.GC.GetAllocatedBytesForCurrentThread();
+        FontResolveBytes += eb1 - eb0;
 
         // Wrap boundary: an explicit Width wins; otherwise, for a WRAPPING block, fall back to the width the container
         // gave this measure (WPF-style reflow to the parent) so wrapping needs no hardcoded Width. A NoWrap block keeps
@@ -134,11 +138,17 @@ public class TextBlock : InputUIComponent
             && _lastHAlign == HorizontalTextAlignment && _lastVAlign == VerticalTextAlignment
             && _lastJustify == JustifyLastLine)
         {
+            GuardBytes += System.GC.GetAllocatedBytesForCurrentThread() - eb1;
+            GuardHits++;
             return _cachedSize;
         }
+        GuardBytes += System.GC.GetAllocatedBytesForCurrentThread() - eb1;
 
+        var eb2 = System.GC.GetAllocatedBytesForCurrentThread();
         _cachedSize = _textLayout.ProcessText(Text, FontSize, new Size(width, height), TextWrapping, TextTrimming,
             HorizontalTextAlignment, VerticalTextAlignment, JustifyLastLine);
+        ShapeBytes += System.GC.GetAllocatedBytesForCurrentThread() - eb2;
+        ShapeCalls++;
 
         _hasLayout = true;
         _lastText = Text; _lastFontSize = FontSize; _lastWidth = width; _lastHeight = height;
@@ -278,13 +288,40 @@ public class TextBlock : InputUIComponent
         return _inlineSize;
     }
 
+    /// <summary>TEMP: what the block's OWN measure/arrange allocates, against what the layout histogram charges the type
+    /// (116KB a call). ProcessText accounts for 2.7KB of that, so the rest is either here or in the measure protocol
+    /// around it - and this session has been wrong six times about which.</summary>
+    public static long OverrideBytes;
+    public static int OverrideCount;
+
+    /// <summary>EnsureLayout split three ways: resolving the font (and rebuilding TextLayout when it changed), the
+    /// cache guard's own property reads, and the shaping call. ProcessText's internals account for 1% of what the type
+    /// is charged, so the other 99% is in one of these twenty lines.</summary>
+    public static long FontResolveBytes;
+    public static long GuardBytes;
+    public static long ShapeBytes;
+    public static int LayoutRebuilds;
+    public static int GuardHits;
+    public static int ShapeCalls;
+
     protected override Size MeasureOverride(Size availableSize)
     {
         _lastConstraint = availableSize;   // a wrapping block reflows to this (its container's width) when it has no explicit Width
-        return HasInlines ? EnsureInlineLayout() : EnsureLayout();
+        var b0 = System.GC.GetAllocatedBytesForCurrentThread();
+        var size = HasInlines ? EnsureInlineLayout() : EnsureLayout();
+        OverrideBytes += System.GC.GetAllocatedBytesForCurrentThread() - b0;
+        OverrideCount++;
+        return size;
     }
 
-    protected override Size ArrangeOverride(Size finalSize) => HasInlines ? EnsureInlineLayout() : EnsureLayout();
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        var b0 = System.GC.GetAllocatedBytesForCurrentThread();
+        var size = HasInlines ? EnsureInlineLayout() : EnsureLayout();
+        OverrideBytes += System.GC.GetAllocatedBytesForCurrentThread() - b0;
+        OverrideCount++;
+        return size;
+    }
 
     TextRenderingParameters GetTextRenderingParameters()
     {

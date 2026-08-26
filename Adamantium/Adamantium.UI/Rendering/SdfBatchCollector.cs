@@ -69,7 +69,12 @@ internal abstract class SdfBatchCollector<TItem> : BatchCollector<TItem> where T
         Effect.InstancesAddress.SetValue(buffer.GetDeviceAddress() + firstInstance * (ulong)Stride);
         Effect.TransformsAddress.SetValue(TransformsAddress);
 
+        var applyBytes0 = System.GC.GetAllocatedBytesForCurrentThread();
         DrawPass.Apply();
+        var afterApply = System.GC.GetAllocatedBytesForCurrentThread();
         device.Draw(4, count, 0, 0);
+        Adamantium.UI.Core.Diagnostics.RuntimeStats.PassApplyBytes += afterApply - applyBytes0;
+        Adamantium.UI.Core.Diagnostics.RuntimeStats.DeviceDrawBytes += System.GC.GetAllocatedBytesForCurrentThread() - afterApply;
+        Adamantium.UI.Core.Diagnostics.RuntimeStats.PassApplyCount++;
     }
 }

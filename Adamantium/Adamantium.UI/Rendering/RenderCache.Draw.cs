@@ -584,6 +584,7 @@ public partial class RenderCache
     {
         // This frame's transform-table copy, picked BEFORE anything writes a matrix or draws - the composited animations
         // below write matrices, and the replay paths below draw without ever reaching the walk's setup block.
+        var setupBytes0 = System.GC.GetAllocatedBytesForCurrentThread();
         BeginTransformFrame(device);
 
         // The animations this thread plays by itself. BEFORE the clean-frame early-out on purpose: a composited animation
@@ -602,6 +603,7 @@ public partial class RenderCache
             RefreshMovedScissors(fullScissor);    // the viewports they carried past are world-space rects - derive again
             AcceptPatchedTransforms();
             LastFrameReplayed = true;
+            Core.Diagnostics.RuntimeStats.DrawSetupBytes += System.GC.GetAllocatedBytesForCurrentThread() - setupBytes0;
             ExecuteOps(device, fullScissor);
             return;
         }

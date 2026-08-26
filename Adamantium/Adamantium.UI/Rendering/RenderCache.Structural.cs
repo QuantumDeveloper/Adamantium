@@ -21,6 +21,9 @@ public partial class RenderCache
     private readonly List<IUIComponent> _localChildBuf = new();  // CollectSubtreeInPaintOrder scratch
     private readonly Stack<IUIComponent> _collectStack = new();
 
+    // The pre-validated record decision for each entry of _geometryDirtyBuffer, by INDEX (see RecordStructuralFrame).
+    private readonly List<PartialRecord> _dirtyDecisions = new();
+
     // PLAN, then COMMIT: a refusal must leave the recorder EXACTLY as it found it. The full-walk fallback re-derives the
     // scene from the components' dirty flags, so anything this pass half-rendered would look CLEAN to it and a new tile
     // would never be drawn again. Nothing is rendered/ranked/mirrored until the whole frame is known to be placeable.
@@ -31,6 +34,12 @@ public partial class RenderCache
         {
             return GaveUp("otherRoot");
         }
+        var planStart = System.Diagnostics.Stopwatch.GetTimestamp();
+        Core.Diagnostics.RuntimeStats.LastRecordStructuralMarks = 0;
+        Core.Diagnostics.RuntimeStats.LastRecordPlanScans = 0;
+        Core.Diagnostics.RuntimeStats.LastRecordPlanRuns = 0;
+        Core.Diagnostics.RuntimeStats.LastRecordPlanParents = 0;
+        Core.Diagnostics.RuntimeStats.LastRecordRenumberMs = 0;
         if (!PlanStructuralChange())
         {
             // Ran out of rank SPACE, not information (each insert into a gap halves it). Renumbering is cheap - an
@@ -43,12 +52,27 @@ public partial class RenderCache
 
         // The geometry-dirty components ride along (as in a Partial). Pre-validate against the PLAN before anything
         // renders - a dirty component the partial path cannot place is a refusal, and it must be found first.
+        Core.Diagnostics.RuntimeStats.LastRecordPlanOnlyMs = System.Diagnostics.Stopwatch.GetElapsedTime(planStart).TotalMilliseconds;
+
         Dirty.SnapshotGeometryInto(_geometryDirtyBuffer);
+        Core.Diagnostics.RuntimeStats.LastRecordDirty = _geometryDirtyBuffer.Count;
+        // KEPT, positionally: the commit loop below walks this very buffer again and would otherwise re-derive every one
+        // of these decisions - the same ancestor walk, twice per component per frame. Skip is the placeholder for the
+        // entries this loop steps over; the commit loop steps over exactly the same ones.
+        _dirtyDecisions.Clear();
         foreach (var component in _geometryDirtyBuffer)
         {
-            if (_plannedSet.Contains(component) || _removedSet.Contains(component)) continue;
-            if (ClassifyReRender(component) == PartialRecord.Fallback) return GaveUp($"dirtyNotPlaceable<{component.GetType().Name}>");
+            if (_plannedSet.Contains(component) || _removedSet.Contains(component))
+            {
+                _dirtyDecisions.Add(PartialRecord.Skip);
+                continue;
+            }
+
+            var decision = ClassifyReRender(component);
+            if (decision == PartialRecord.Fallback) return GaveUp($"dirtyNotPlaceable<{component.GetType().Name}>");
+            _dirtyDecisions.Add(decision);
         }
+        Core.Diagnostics.RuntimeStats.LastRecordPlanMs = System.Diagnostics.Stopwatch.GetElapsedTime(planStart).TotalMilliseconds;
 
         // ---- COMMIT: from here nothing can refuse. ----
         _structRecorded.Clear();
@@ -56,10 +80,11 @@ public partial class RenderCache
         foreach (var component in _removedList) FreeComponent(component, packet, detached: true);
         foreach (var component in _undrawnList) FreeComponent(component, packet, detached: false);
 
-        foreach (var component in _geometryDirtyBuffer)
+        for (var i = 0; i < _geometryDirtyBuffer.Count; i++)
         {
+            var component = _geometryDirtyBuffer[i];
             if (_structRecorded.Contains(component) || _removedSet.Contains(component)) continue;
-            RecordReRender(component, packet);   // pre-validated above: it cannot fall back now
+            RecordReRender(component, packet, _dirtyDecisions[i]);   // pre-validated above: it cannot fall back now
         }
 
         // A component's Render can mark MORE geometry dirty (an image decode). Those marks clear with the rest, so a
@@ -85,6 +110,7 @@ public partial class RenderCache
     private void RenumberOrder(IRootVisualComponent visualRoot, RenderPacket packet)
     {
         LayerProbe.Renumbers++;
+        var renumberStart = System.Diagnostics.Stopwatch.GetTimestamp();
         packet.Renumbered = true;
         _orderByControl.Clear();
 
@@ -103,7 +129,7 @@ public partial class RenderCache
             if (component.Visibility == Visibility.Collapsed) continue;
             if (!visited.Add(component)) continue;
 
-            _orderByControl[component.RenderId] = order;
+            _orderByControl[component] = order;
             // Only a component that actually DRAWS has a group to move; the rest just need the number.
             if (HoldsUnits(component)) packet.Reranks.Add(new KeyValuePair<IUIComponent, long>(component, order));
             order += OrderGap;
@@ -112,6 +138,7 @@ public partial class RenderCache
         }
 
         _needRenumber = false;
+        Core.Diagnostics.RuntimeStats.LastRecordRenumberMs += System.Diagnostics.Stopwatch.GetElapsedTime(renumberStart).TotalMilliseconds;
     }
 
     // TEMP: name the give-up so a full walk in the trace says WHY it is one.
@@ -124,7 +151,12 @@ public partial class RenderCache
     private bool PlanStructuralChange()
     {
         _needRenumber = false;
+        // The sibling index describes the tree as it stands NOW. A plan only reads the tree, so it is good for the whole
+        // of one - but a renumber runs a SECOND plan, and between frames the tree really does change.
+        _nextSibling.Clear();
+        _siblingsIndexed.Clear();
         Dirty.SnapshotStructuralInto(_structuralBuf);
+        Core.Diagnostics.RuntimeStats.LastRecordStructuralMarks += _structuralBuf.Count;
         _placeRoots.Clear();
         _addsByParent.Clear();
         _plannedList.Clear();
@@ -184,7 +216,8 @@ public partial class RenderCache
     // sibling re-scan: recycled skeleton cards split the adds into many runs, so that re-scan was O(children x runs).
     private bool PlanNewChildren(IUIComponent parent)
     {
-        ChildrenInPaintOrder(parent, _childBuf);
+        Core.Diagnostics.RuntimeStats.LastRecordPlanParents++;
+        ChildrenInPaintOrder(parent, _childBuf); Core.Diagnostics.RuntimeStats.ScansParent += _childBuf.Count;
         BuildNeighbourMaps(parent);
 
         for (var i = 0; i < _childBuf.Count; i++)
@@ -194,6 +227,8 @@ public partial class RenderCache
             // The contiguous RUN of new children starting here: one gap serves them all.
             var j = i;
             while (j + 1 < _childBuf.Count && _placeRoots.Contains(_childBuf[j + 1])) j++;
+
+            Core.Diagnostics.RuntimeStats.LastRecordPlanRuns++;
 
             // The rank immediately BEFORE the run: walk back over hidden siblings to the nearest visible one that HAS a
             // rank (incl. a tile an earlier run of this plan just placed), take the last rank in its subtree; none -> the parent.
@@ -249,18 +284,25 @@ public partial class RenderCache
         _nextAnchor.Clear();
         for (var i = 0; i < count; i++) { _prevVisible.Add(-1); _nextAnchor.Add(-1); }
 
+        // SPANS over the three lists. These two loops walk EVERY child of the parent - up to 21 000 on the tile panel,
+        // twice - and a List<T> indexer is a call plus a bounds check on each of those. The spans are taken after the
+        // fills above and nothing here resizes a list, so they stay valid for the walk.
+        var children = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_childBuf);
+        var prev = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_prevVisible);
+        var next = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_nextAnchor);
+
         var lastVisible = -1;
         for (var i = 0; i < count; i++)
         {
-            _prevVisible[i] = lastVisible;
-            if (_childBuf[i].Visibility == Visibility.Visible) lastVisible = i;
+            prev[i] = lastVisible;
+            if (children[i].Visibility == Visibility.Visible) lastVisible = i;
         }
 
         var nextAnchored = -1;
         for (var i = count - 1; i >= 0; i--)
         {
-            _nextAnchor[i] = nextAnchored;
-            var child = _childBuf[i];
+            next[i] = nextAnchored;
+            var child = children[i];
             if (child.Visibility == Visibility.Visible && !_placeRoots.Contains(child) && HasRank(child)) nextAnchored = i;
         }
     }
@@ -278,8 +320,9 @@ public partial class RenderCache
             return true;
         }
 
-        if (!HasPlannedRank(_childBuf[at])) return false;   // painted, but unnamed - not locally decidable
-        return TryLastRankOfSubtree(_childBuf[at], out rank);
+        var before = _childBuf[at];
+        if (!HasPlannedRank(before)) return false;   // painted, but unnamed - not locally decidable
+        return TryLastRankOfSubtree(before, out rank);
     }
 
     // Everything under a component that left the DRAWN set - two very different fates:
@@ -318,19 +361,33 @@ public partial class RenderCache
     // when it kept its units and only moved in the order (a recycled container re-added at another index).
     private void RankAndRecord(IUIComponent component, long rank, RenderPacket packet)
     {
-        _orderByControl[component.RenderId] = rank;
+        _orderByControl[component] = rank;
         _structRecorded.Add(component);
 
         if (component.IsGeometryValid && HoldsUnits(component))
         {
+            Core.Diagnostics.RuntimeStats.LastRecordReranks++;
             packet.Reranks.Add(new KeyValuePair<IUIComponent, long>(component, rank));
             return;
         }
 
         var wasGeometryValid = component.IsGeometryValid;
+        var renderStart = System.Diagnostics.Stopwatch.GetTimestamp();
         _drawingContextInternal.Clear();
         component.Render(_drawingContext);
+        Core.Diagnostics.RuntimeStats.LastRecordRenderMs += System.Diagnostics.Stopwatch.GetElapsedTime(renderStart).TotalMilliseconds;
+        var copyStart = System.Diagnostics.Stopwatch.GetTimestamp();
         var commands = CopyCommands(_drawingContextInternal.GetDrawCommands());
+        Core.Diagnostics.RuntimeStats.LastRecordCopyMs += System.Diagnostics.Stopwatch.GetElapsedTime(copyStart).TotalMilliseconds;
+        // Only when it really re-recorded: a component that was already geometry-VALID no-ops inside Render, so its empty
+        // command list says "nothing was re-recorded", not "it draws nothing".
+        if (!wasGeometryValid) component.DrawsNothing = commands.Count == 0;
+        if (commands.Count == 0)
+        {
+            Core.Diagnostics.RuntimeStats.LastRecordEmptyDraws++;
+            Core.Diagnostics.RuntimeStats.NoteEmptyDraw(component.GetType());
+        }
+
         packet.Draws.Add(new ComponentDraw(component, commands, wasGeometryValid, rank, component.RenderClones));
         MirrorUnits(component, commands.Count, wasGeometryValid);
     }
@@ -339,12 +396,12 @@ public partial class RenderCache
     // units - a DETACHED component's are freed, a HIDDEN one's are kept (and so is its mirror entry, for a re-show).
     private void FreeComponent(IUIComponent component, RenderPacket packet, bool detached)
     {
-        _orderByControl.Remove(component.RenderId);
+        _orderByControl.Remove(component);
         _snap.Remove(component);
 
         if (detached)
         {
-            _recordedUnits.Remove(component.RenderId);
+            _recordedUnits.Remove(component);
             packet.Removed.Add(component);
         }
         else
@@ -362,10 +419,13 @@ public partial class RenderCache
         var last = component;
         while (true)
         {
-            ChildrenInPaintOrder(last, _childBuf2);
+            ChildrenInPaintOrder(last, _childBuf2); Core.Diagnostics.RuntimeStats.ScansLastRank += _childBuf2.Count;
             IUIComponent tail = null;
             for (var i = _childBuf2.Count - 1; i >= 0; i--)
-                if (_childBuf2[i].Visibility == Visibility.Visible && HasPlannedRank(_childBuf2[i])) { tail = _childBuf2[i]; break; }
+            {
+                var candidate = _childBuf2[i];   // read ONCE - this ran three indexer calls on the same element
+                if (candidate.Visibility == Visibility.Visible && HasPlannedRank(candidate)) { tail = candidate; break; }
+            }
             if (tail == null) break;
             last = tail;
         }
@@ -378,16 +438,38 @@ public partial class RenderCache
     {
         for (var c = component; c?.VisualParent != null; c = c.VisualParent)
         {
-            ChildrenInPaintOrder(c.VisualParent, _childBuf2);
-            var found = false;
-            foreach (var sibling in _childBuf2)
-            {
-                if (found && sibling.Visibility == Visibility.Visible && TryPlannedRank(sibling, out var rank)) return rank;
-                if (ReferenceEquals(sibling, c)) found = true;
-            }
+            IndexSiblings(c.VisualParent);
+            for (var s = NextSibling(c); s != null; s = NextSibling(s))
+                if (s.Visibility == Visibility.Visible && TryPlannedRank(s, out var rank)) return rank;
         }
         return long.MaxValue;
     }
+
+    // WHO comes next among a parent's painted children - built ONCE per parent per plan. This used to be answered by
+    // copying the whole child list and scanning it for `c`, per call, and the call is made once per parent being placed:
+    // a tab arriving into a container of 5000 siblings placed 228 marks and re-read 1.14 MILLION children to do it, all
+    // of it in here (ScansSuccessor was 99.98% of the total). The same "re-scan the siblings per placement" shape
+    // BuildNeighbourMaps was already written to avoid - it just was not applied to this one.
+    //
+    // The forward scan below is still O(siblings) in the worst case (nothing after `c` holds a rank at all); what it is
+    // not any more is O(siblings) PER PLACEMENT, which is the part that made a tab switch stutter.
+    private readonly Dictionary<IUIComponent, IUIComponent> _nextSibling = new();
+    private readonly HashSet<IUIComponent> _siblingsIndexed = new();
+
+    private void IndexSiblings(IUIComponent parent)
+    {
+        if (!_siblingsIndexed.Add(parent)) return;
+
+        ChildrenInPaintOrder(parent, _childBuf2);
+        Core.Diagnostics.RuntimeStats.ScansSuccessor += _childBuf2.Count;
+        // Span + carry the NEXT element into the following iteration: the list was indexed twice per step (i and i+1) for
+        // the same elements, and this runs over the whole child list of every parent a plan touches.
+        var siblings = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_childBuf2);
+        for (var i = 0; i + 1 < siblings.Length; i++) _nextSibling[siblings[i]] = siblings[i + 1];
+    }
+
+    private IUIComponent NextSibling(IUIComponent component) =>
+        _nextSibling.TryGetValue(component, out var next) ? next : null;
 
     // A component's visible subtree, in paint order. Iterative with a reused stack (the recursive version allocated an
     // array per node per structural frame, and a fill collects thousands of subtrees).
@@ -404,7 +486,7 @@ public partial class RenderCache
             into.Add(component);
 
             // Push reversed, so they pop in paint order.
-            ChildrenInPaintOrder(component, _localChildBuf);
+            ChildrenInPaintOrder(component, _localChildBuf); Core.Diagnostics.RuntimeStats.ScansCollect += _localChildBuf.Count;
             for (var i = _localChildBuf.Count - 1; i >= 0; i--) _collectStack.Push(_localChildBuf[i]);
         }
     }
@@ -414,6 +496,7 @@ public partial class RenderCache
     {
         into.Clear();
         foreach (var child in parent.VisualChildren) into.Add(child);
+        Core.Diagnostics.RuntimeStats.LastRecordPlanScans += into.Count;
 
         var anyZ = false;
         foreach (var child in into)

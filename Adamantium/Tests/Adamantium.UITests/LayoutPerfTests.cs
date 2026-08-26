@@ -165,24 +165,18 @@ public class LayoutPerfTests
         // ring then reads short by exactly the deferred slots, and the test fails on how busy the box was rather than on
         // anything the panel did wrong. Bind the whole window every pass so what is asserted below is the ring itself; the
         // budget's own slicing behaviour is covered by VirtualizingWrapPanel_HugeWindow_RealizesInCappedSlices...
-        var savedBind = WrapPanel.BindBudgetMs;
-        var savedFill = WrapPanel.FillBudgetMs;
-        WrapPanel.BindBudgetMs = double.MaxValue;
-        WrapPanel.FillBudgetMs = double.MaxValue;
-        try
-        {
-            RunRecyclingRingInvariants();
-        }
-        finally
-        {
-            WrapPanel.BindBudgetMs = savedBind;
-            WrapPanel.FillBudgetMs = savedFill;
-        }
+        // "No budget" is spelled 0 now (ScrollBindBudget / FillBindBudget on the panel), not double.MaxValue on a static.
+        RunRecyclingRingInvariants(noBindBudget: true);
     }
 
-    private void RunRecyclingRingInvariants()
+    private void RunRecyclingRingInvariants(bool noBindBudget = false)
     {
         var (root, ic, panel) = BuildTiles(6000, 24);
+        if (noBindBudget)
+        {
+            panel.ScrollBindBudget = 0;
+            panel.FillBindBudget = 0;
+        }
         Settle(root, ic);
         // Warm up with FRACTIONAL (sub-cell) scroll steps: real inertia scrolls by fractional pixels, so the offset sits
         // mid-cell where floor(top)/ceil(bottom) diverge - the exact condition my earlier whole-cell (y+=24) steps land ON
@@ -235,6 +229,64 @@ public class LayoutPerfTests
     // panel (tiles at ABSOLUTE slots), a staying tile's rect is constant -> Arrange short-circuits, and only the rebound
     // row runs ArrangeCore. Steady-state ArrangeCore work is O(one row), NOT O(whole window). Asserted via TotalArrangeCores
     // (real ArrangeCore runs, not short-circuited calls).
+    /// <summary>The invariant a steady scroll must keep: a container that stays on screen is REBOUND in place, never
+    /// hidden and fetched again. Breaking it is invisible and expensive - `ParkContainer` collapses the container AND
+    /// walks its whole subtree deactivating bindings, so a churning scroll pays that per tile per frame while looking
+    /// exactly like a working one (the regression that already happened once, in ee90ab3).
+    ///
+    /// Asserted on `ParkCalls` because that is where the cost actually is, and with NO bind budget: a budget legitimately
+    /// leaves the window under-filled and refilling, which parks and unparks by design. The invariant is about the STEADY
+    /// state, so the setup has to reach one - hence the warm-up that runs until the realized count stops moving.</summary>
+    [Test]
+    public void Scroll_SteadyState_DoesNotChurnVisibility()
+    {
+        var (root, ic, panel) = BuildTiles(6000, 24);
+        panel.ScrollBindBudget = 0;   // 0 = no budget: bind the whole window, so the ring is genuinely steady
+        panel.FillBindBudget = 0;
+        Settle(root, ic);
+
+        // Fractional steps, and warm up until the ring stops growing: a mid-cell offset reveals one more partial row, so
+        // the working set legitimately expands ONCE before it settles. Asserting during that expansion would flag the
+        // expansion itself.
+        double y = 500;
+        var stable = 0;
+        var previous = -1;
+        for (var i = 0; i < 40 && stable < 3; i++)
+        {
+            y += 7;
+            panel.SetOffset(new Vector2(0, (float)y));
+            WindowExtension.UpdateTree(root);
+            var count = ic.ItemContainerGenerator.RealizedCount;
+            stable = count == previous ? stable + 1 : 0;
+            previous = count;
+        }
+
+        var realized = ic.ItemContainerGenerator.RealizedCount;
+        TestContext.WriteLine($"=== Steady-scroll visibility churn (6000 @24, ring={realized}) ===");
+
+        var failures = new System.Collections.Generic.List<string>();
+        for (var step = 0; step < 20; step++)
+        {
+            var parks0 = VirtualizingPanel.ParkCalls;
+            var ring0 = ic.ItemContainerGenerator.RealizedCount;
+
+            y += 7;
+            panel.SetOffset(new Vector2(0, (float)y));
+            WindowExtension.UpdateTree(root);
+
+            var parks = VirtualizingPanel.ParkCalls - parks0;
+            var ring = ic.ItemContainerGenerator.RealizedCount;
+            TestContext.WriteLine($"step {step,2}: parks={parks} ring={ring0}->{ring}");
+
+            // A park is only legitimate when the window genuinely SHRANK; the ring is steady here, so it never did.
+            if (parks > 0 && ring >= ring0)
+                failures.Add($"step {step}: {parks} container(s) parked while the ring held at {ring} - a staying tile was hidden and re-shown");
+        }
+
+        Assert.That(failures, Is.Empty,
+            "steady scroll churned visibility:\n" + string.Join("\n", failures.Take(8)));
+    }
+
     [Test]
     public void Scroll_StableTilesDoNotReArrange()
     {

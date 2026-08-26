@@ -68,6 +68,52 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         set => SetValue(IsVirtualizingProperty, value);
     }
 
+    /// <summary>Milliseconds a single pass may spend (re)binding containers WHILE SCROLLING; whatever does not fit is
+    /// deferred to the next pass and shows a skeleton. <b>0 means no budget</b> - bind the whole window in one pass.
+    /// <para>A budget is legitimate HERE, unlike the general layout budget that was banned: the intake is bounded at the
+    /// source (a pass can never want more than one window) and a deferred slot draws a skeleton, which is an honest
+    /// placeholder rather than a stale rect. It is a dial rather than a constant because there is no right value for all
+    /// windows: measured, 6 ms binds ~357 slots a pass and defers ~4487 on a big one, while a small one is better off
+    /// binding everything at once.</para></summary>
+    public static readonly AdamantiumProperty ScrollBindBudgetProperty = AdamantiumProperty.Register(nameof(ScrollBindBudget),
+        typeof(double), typeof(VirtualizingPanel), new PropertyMetadata(6.0));
+
+    public double ScrollBindBudget
+    {
+        get => GetValue<double>(ScrollBindBudgetProperty);
+        set => SetValue(ScrollBindBudgetProperty, value);
+    }
+
+    /// <summary>Milliseconds a single pass may spend (re)binding when NOT scrolling - the initial fill or a settled
+    /// fling, where the backlog should drain fast. **0 means no budget.** Larger than <see cref="ScrollBindBudget"/> by
+    /// default because a still window can afford a longer pass without anyone seeing it.</summary>
+    public static readonly AdamantiumProperty FillBindBudgetProperty = AdamantiumProperty.Register(nameof(FillBindBudget),
+        typeof(double), typeof(VirtualizingPanel), new PropertyMetadata(30.0));
+
+    public double FillBindBudget
+    {
+        get => GetValue<double>(FillBindBudgetProperty);
+        set => SetValue(FillBindBudgetProperty, value);
+    }
+
+    /// <summary>The default floor, named so a caller can express "one guaranteed slice" without hard-coding the number.</summary>
+    public const int MinBindsPerPassDefault = 8;
+
+    /// <summary>The floor: however small the budget, a pass always (re)binds at least this many slots, so the window
+    /// keeps filling instead of stalling on a machine where the very first bind already overruns.</summary>
+    public static readonly AdamantiumProperty MinBindsPerPassProperty = AdamantiumProperty.Register(nameof(MinBindsPerPass),
+        typeof(int), typeof(VirtualizingPanel), new PropertyMetadata(MinBindsPerPassDefault));
+
+    public int MinBindsPerPass
+    {
+        get => GetValue<int>(MinBindsPerPassProperty);
+        set => SetValue(MinBindsPerPassProperty, value);
+    }
+
+    /// <summary>The budget to hand <c>SetWindow</c>: the caller's milliseconds, with 0 meaning "no budget" spelled the
+    /// way the generator understands it.</summary>
+    protected static double BudgetOrUnlimited(double ms) => ms <= 0 ? double.MaxValue : ms;
+
     /// <summary>Index a dropped item would land at, or -1 (the default) for no drop in progress. A panel that honours it
     /// leaves a REAL empty slot there - items from that index on move along by one, so a wrapped line genuinely reflows
     /// instead of tiles sliding over each other - and fills the freed slot with the same skeleton card a not-yet-bound
@@ -330,9 +376,14 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         return false;
     }
 
+    /// <summary>How many containers virtualization has parked. A park is a Visibility write plus a binding walk over the
+    /// container-s subtree, and a window that shrinks a lot does thousands at once - which is a render-cache structural
+    /// frame, not a layout one. Counting them is what told a slider stutter apart from a layout cost.</summary>
+    public static long ParkCalls;
 
     protected static void ParkContainer(IUIComponent container)
     {
+        ParkCalls++;
         container.Visibility = Visibility.Collapsed;
         DeactivateSubtreeBindings(container);
     }
@@ -352,12 +403,31 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
     /// </summary>
     private void HideUnmappedContainers()
     {
+        // This used to read EVERY child on EVERY arrange pass - measured at 130-205 thousand reads a second, finding
+        // nothing across a 43-second run. A container only becomes a ghost when its index mapping is dropped, and the
+        // generator knows exactly when that happens, so it records them and this drains the record: O(what changed).
+        // The candidate set is a SUPERSET of the ghosts (every path that drops a mapping records it, every path that
+        // takes one back removes it), so the three tests below still decide - the drain only says where to look.
         var generator = Owner.ItemContainerGenerator;
-        foreach (var child in VisualChildren)
+        var candidates = generator.DrainUnmapped();
+        for (var i = 0; i < candidates.Count; i++)
         {
-            if (child.Visibility != Visibility.Visible) continue;
-            if (_skeletonSet.Contains(child)) continue;   // panel-owned loading card, not a generator container
-            if (generator.IndexFromContainer(child) >= 0) continue;   // in the realized window - keep
+            var child = candidates[i];
+            if (child.Visibility != Visibility.Visible)
+            {
+                continue;
+            }
+
+            if (_skeletonSet.Contains(child))
+            {
+                continue;   // panel-owned loading card, not a generator container
+            }
+
+            if (generator.IndexFromContainer(child) >= 0)
+            {
+                continue;   // back in the realized window - keep
+            }
+
             ParkContainer(child);
             generator.ReclaimDetached(child);
         }
@@ -382,8 +452,6 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
     /// <summary>How many skeleton cards are on screen right now - clones of the one prototype.</summary>
     protected int ActiveSkeletonCount => _skeletonClones?.Count ?? 0;
     private readonly HashSet<IUIComponent> _skeletonSet = new();             // panel-owned visuals (skip in HideUnmappedContainers)
-    private int _pendingFrames;
-    private const int SkeletonDelayFrames = 6;   // ~100 ms at 60 fps before cards appear - no flash on a fill that clears fast
 
     /// <summary>Shows a loading placeholder at each of the generator's budget-deferred slots. ONE themed
     /// <c>ItemSkeletonTemplate</c> card is built, measured and arranged - every slot is a CLONE of it
@@ -396,15 +464,15 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
 
         if (pending.Count == 0)
         {
-            _pendingFrames = 0;
             HideSkeletons();
             return;
         }
 
-        _pendingFrames++;
-        // Don't flash cards on a fill that clears within a few frames (small list / warm cache).
-        if (ActiveSkeletonCount == 0 && _pendingFrames < SkeletonDelayFrames) return;
-
+        // NO delay. There used to be one - six FRAMES, on the reasoning that at 60 fps it is ~100ms and stops cards
+        // flashing on a fill that clears immediately. But a fill is exactly when frames are slow, so those six frames
+        // ran to half a second on a heavy tab and the window looked hung: the heuristic held the placeholder back
+        // hardest in the case it exists for. A deferred slot is a hole on screen; showing it at once is the honest
+        // answer, and the cheap one (every card is a CLONE of one prototype - see below).
         var template = Owner?.ItemSkeletonTemplate;
         if (template == null) return;   // unthemed ItemsControl - no skeletons
 
@@ -624,7 +692,6 @@ public abstract class VirtualizingPanel : Panel, IScrollableContent
         _skeletonPrototype = null;
         _prototypeSize = default;
         _skeletonSet.Clear();
-        _pendingFrames = 0;
         _itemMarginKnown = false;
     }
 

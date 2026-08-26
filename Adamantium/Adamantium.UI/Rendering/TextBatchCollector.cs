@@ -203,7 +203,9 @@ internal sealed class TextBatchCollector : BatchCollector<GlyphItem>
 
     protected override void DrawSegment(IGraphicsDevice device, Buffer<GlyphItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
     {
+        var b0 = System.GC.GetAllocatedBytesForCurrentThread();
         var stride = (ulong)Marshal.SizeOf<GlyphItem>();
+        Adamantium.UI.Core.Diagnostics.RuntimeStats.TextStrideBytes += System.GC.GetAllocatedBytesForCurrentThread() - b0;
         _fontRenderer.DrawBatch(device.SamplerStates.LinearFont, _atlas,
             buffer.GetDeviceAddress() + firstInstance * stride, TransformsAddress, count, projection);
     }

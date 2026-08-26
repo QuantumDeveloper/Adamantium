@@ -82,7 +82,7 @@ public partial class RenderCache
     // Paint rank of each drawn component (sort key of _groups). SPARSE (0, GAP, 2*GAP...) so an added tile takes a rank
     // strictly BETWEEN its neighbours' with nobody renumbered -> a structural change is O(changed), not O(scene).
     // RECORDER-owned; the applier never reads it (a changed rank travels ON the packet).
-    private readonly Dictionary<Guid, long> _orderByControl = new();
+    private readonly Dictionary<IUIComponent, long> _orderByControl = new();
 
     // ~30 inserts into one gap before it is used up (each halves it); an exhausted gap costs a full-walk renumber. The
     // 63-bit space is ample, so be generous.
@@ -98,18 +98,18 @@ public partial class RenderCache
     // Recorder-side mirror of which components hold units - from the recorder's OWN decisions, NOT the applier's
     // _groupById (which the render thread mutates while the loop records -> reading it here is a data race). Lets the
     // recorder decide Skip vs Fallback for a no-longer-drawn component.
-    private readonly Dictionary<Guid, (IUIComponent Component, int Units)> _recordedUnits = new();
-    private readonly List<Guid> _staleUnitIds = new();   // scratch: detached controls to drop from the mirror
+    private readonly Dictionary<IUIComponent, (IUIComponent Component, int Units)> _recordedUnits = new();
+    private readonly List<IUIComponent> _staleUnitIds = new();   // scratch: detached controls to drop from the mirror
 
     // Mirror one recorded draw: >0 commands -> cache these units; 0 from a DIRTY control -> it now draws nothing, drop it.
     private void MirrorUnits(IUIComponent component, int commandCount, bool wasGeometryValid)
     {
-        if (commandCount > 0) _recordedUnits[component.RenderId] = (component, commandCount);
-        else if (!wasGeometryValid) _recordedUnits.Remove(component.RenderId);
+        if (commandCount > 0) _recordedUnits[component] = (component, commandCount);
+        else if (!wasGeometryValid) _recordedUnits.Remove(component);
     }
 
     private bool HoldsUnits(IUIComponent component) =>
-        _recordedUnits.TryGetValue(component.RenderId, out var entry) && entry.Units > 0;
+        _recordedUnits.TryGetValue(component, out var entry) && entry.Units > 0;
 
     /// <summary>The dirty marks THIS cache builds from. A cache draws one surface - a window's content, a popup layer, an
     /// adorner layer - and each of those has its own marks (see RenderDirtyRouter), so "is there work?" is a question
@@ -253,7 +253,11 @@ public partial class RenderCache
         RecordFrameCore(visualRoot);
         // Freeze the snapshot at the END of the device-free record so the applier reads only the frozen packet, never a
         // live component.
+        var snapBytes0 = System.GC.GetAllocatedBytesForCurrentThread();
+        var snapStart = System.Diagnostics.Stopwatch.GetTimestamp();
         CaptureSnapshot();
+        Core.Diagnostics.RuntimeStats.LastRecordSnapMs = System.Diagnostics.Stopwatch.GetElapsedTime(snapStart).TotalMilliseconds;
+        Core.Diagnostics.RuntimeStats.LastSnapBytes = System.GC.GetAllocatedBytesForCurrentThread() - snapBytes0;
         _published.Enqueue(_packet);   // hand it over; the applier drains the queue (see ApplyFrame)
         _packet = null;
 
@@ -267,6 +271,25 @@ public partial class RenderCache
 
     private void RecordFrameCore(IRootVisualComponent visualRoot)
     {
+        // Per FRAME, like the apply-side counters: the sum of the parts against LastRecordMs is what proves the whole is
+        // accounted for, and this session has twice been misled by a figure that described only a piece of one.
+        Core.Diagnostics.RuntimeStats.LastRecordRenderMs = 0;
+        Core.Diagnostics.RuntimeStats.LastRecordEmptyDraws = 0;
+        Core.Diagnostics.RuntimeStats.LastRecordReranks = 0;
+        Core.Diagnostics.RuntimeStats.LastRecordPlanMs = 0;
+        Core.Diagnostics.RuntimeStats.LastRecordCopyMs = 0;
+        Core.Diagnostics.RuntimeStats.LastRecordSnapMs = 0;
+        Core.Diagnostics.RuntimeStats.LastRecordDirty = 0;
+        Core.Diagnostics.RuntimeStats.LastRecordClassifySkips = 0;
+        Core.Diagnostics.RuntimeStats.LastSnapDrawsMs = 0;
+        Core.Diagnostics.RuntimeStats.LastSnapDirtyMs = 0;
+        Core.Diagnostics.RuntimeStats.LastSnapPublished = 0;
+        Core.Diagnostics.RuntimeStats.LastRecordRenderBytes = 0;
+        Core.Diagnostics.RuntimeStats.LastRecordCopyBytes = 0;
+        Core.Diagnostics.RuntimeStats.LastSnapBytes = 0;
+
+        _drawingContextInternal.BeginRecordFrame();   // drop last frame's world memo - the tree has moved since
+
         _movedBuf.Clear();   // filled only by a PARTIAL (a Full re-freezes everything from its packet anyway)
         _packet.Reset(RenderBuildKind.Clean);
         // LIVE read of the root - taken here (recorder thread), travels ON the packet.
@@ -292,6 +315,7 @@ public partial class RenderCache
             // Snapshot the dirty set under RenderDirty's write lock: Render can mark MORE geometry mid-loop, and marks
             // also arrive from other threads (parallel arrange, a Dispatcher-thread Image invalidation).
             Dirty.SnapshotGeometryInto(_geometryDirtyBuffer);
+            Core.Diagnostics.RuntimeStats.LastRecordDirty = _geometryDirtyBuffer.Count;
 
             // Record each dirty component; a Fallback stops the pass.
             var fellBack = false;
@@ -384,14 +408,14 @@ public partial class RenderCache
         RecordFullWalk(visualRoot, _packet);   // device-free: walk + component.Render + copy commands into the packet
     }
 
-    private bool HasRank(IUIComponent component) => _orderByControl.ContainsKey(component.RenderId);
-    private long RankOf(IUIComponent component) => _orderByControl[component.RenderId];
+    private bool HasRank(IUIComponent component) => _orderByControl.ContainsKey(component);
+    private long RankOf(IUIComponent component) => _orderByControl[component];
 
     // The rank a component has, OR the one THIS plan is about to give it: a panel's later run of new tiles must rank
     // against tiles an EARLIER run of the same plan just planned (not yet in _orderByControl). Without this the frame
     // falls back to re-recording the whole tree.
     private bool TryPlannedRank(IUIComponent component, out long rank) =>
-        _plannedRanks.TryGetValue(component, out rank) || _orderByControl.TryGetValue(component.RenderId, out rank);
+        _plannedRanks.TryGetValue(component, out rank) || _orderByControl.TryGetValue(component, out rank);
 
     private bool HasPlannedRank(IUIComponent component) => TryPlannedRank(component, out _);
 

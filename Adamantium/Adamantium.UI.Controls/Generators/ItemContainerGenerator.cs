@@ -16,6 +16,19 @@ public class ItemContainerGenerator
     private readonly Dictionary<int, IUIComponent> _byIndex = new();
     private readonly Dictionary<IUIComponent, int> _indexByContainer = new();
     private readonly Stack<IUIComponent> _recyclePool = new();
+
+    // Membership mirror of _recyclePool: Stack<T>.Contains is a linear re-read, and the pool is unbounded, so the
+    // duplicate guard in ReclaimDetached was quadratic in the pool depth. Written only through PoolPush/PoolPop/PoolClear.
+    private readonly HashSet<IUIComponent> _pooledSet = new();
+
+    // Containers whose index mapping was dropped and not re-taken, and those that took one. HideUnmappedContainers and
+    // the panel's arrange loop used to look for these by reading EVERY child on EVERY pass (measured at 130-205 thousand
+    // reads a second, finding nothing); recording them where the mapping changes makes both O(what changed).
+    private readonly HashSet<IUIComponent> _unmapped = new();
+    private readonly List<IUIComponent> _unmappedDrainBuf = new();
+    private readonly HashSet<IUIComponent> _newlyMapped = new();
+    private readonly List<IUIComponent> _newlyMappedDrainBuf = new();
+
     private readonly HashSet<IUIComponent> _generated = new();   // containers we created (recyclable); item-is-own are not
     private readonly List<IUIComponent> _donorBuf = new();       // reused across SetWindow calls - zero per-scroll-frame alloc
     private readonly List<int> _outKeysBuf = new();
@@ -31,6 +44,79 @@ public class ItemContainerGenerator
     public ItemContainerGenerator(ItemsControl owner)
     {
         _owner = owner;
+    }
+
+    private void PoolPush(IUIComponent container)
+    {
+        if (_pooledSet.Add(container))
+        {
+            _recyclePool.Push(container);
+        }
+    }
+
+    private IUIComponent PoolPop()
+    {
+        var container = _recyclePool.Pop();
+        _pooledSet.Remove(container);
+        return container;
+    }
+
+    private void PoolClear()
+    {
+        _recyclePool.Clear();
+        _pooledSet.Clear();
+    }
+
+    private void NoteUnmapped(IUIComponent container)
+    {
+        if (container != null)
+        {
+            _unmapped.Add(container);
+        }
+    }
+
+    // Recorded HERE rather than in the panel's onBound callback: RealizeInWindow can bind through Realize() without that
+    // callback ever firing, and a missed binding is a tile left at its old position.
+    private void NoteMapped(IUIComponent container)
+    {
+        if (container == null)
+        {
+            return;
+        }
+
+        _unmapped.Remove(container);
+        _newlyMapped.Add(container);
+    }
+
+    /// <summary>The containers that lost their index mapping since the last drain - the panel's candidates for parking.
+    /// Returns them and forgets them: the caller parks every one it is given, so anything still wrong afterwards was
+    /// unmapped AGAIN, and that re-records itself.</summary>
+    public IReadOnlyList<IUIComponent> DrainUnmapped()
+    {
+        if (_unmapped.Count == 0)
+        {
+            return System.Array.Empty<IUIComponent>();
+        }
+
+        _unmappedDrainBuf.Clear();
+        _unmappedDrainBuf.AddRange(_unmapped);
+        _unmapped.Clear();
+        return _unmappedDrainBuf;
+    }
+
+    /// <summary>The containers that took an index mapping since the last drain - the panel's incremental arrange set. An
+    /// arrange that follows no rebinding gets an empty list, which is the correct answer: nothing moved.</summary>
+    public IReadOnlyList<IUIComponent> DrainNewlyMapped()
+    {
+        if (_newlyMapped.Count == 0)
+        {
+            return System.Array.Empty<IUIComponent>();
+        }
+
+        _newlyMappedDrainBuf.Clear();
+        _newlyMappedDrainBuf.AddRange(_newlyMapped);
+        _newlyMapped.Clear();
+        return _newlyMappedDrainBuf;
     }
 
     /// <summary>The indices currently realized (for a virtualizing panel: only the visible window).</summary>
@@ -65,6 +151,7 @@ public class ItemContainerGenerator
         var item = _owner.Items[index];
         var container = ProduceContainer(item);
         _byIndex[index] = container;
+        NoteMapped(container);
         _indexByContainer[container] = index;
         return container;
     }
@@ -96,6 +183,7 @@ public class ItemContainerGenerator
             Core.Diagnostics.LayoutTrace.Count(typeof(ItemContainerGenerator), "*unmapped*");
             var container = _byIndex[idx];
             _byIndex.Remove(idx);
+            NoteUnmapped(container);
             _indexByContainer.Remove(container);
             if (_generated.Contains(container)) donors.Add(container);
         }
@@ -175,12 +263,12 @@ public class ItemContainerGenerator
                 _pendingBuf.Add(i);
                 continue;
             }
-            else if (next < donors.Count || _recyclePool.Count > 0)
+            else if (next < donors.Count || _pooledSet.Count > 0)
             {
                 Core.Diagnostics.LayoutTrace.Count(typeof(ItemContainerGenerator), "*rebound*");
                 // A donor unmapped THIS pass first (it is warm and still holds a live subtree); only then a parked one
                 // from the pool, whose bindings PrepareContainer re-establishes via the DataContext change.
-                container = next < donors.Count ? donors[next++] : _recyclePool.Pop();
+                container = next < donors.Count ? donors[next++] : PoolPop();
                 rebinds++;
                 _owner.PrepareContainer(container, item);   // rebind: DataContext/content -> the new item
             }
@@ -193,6 +281,7 @@ public class ItemContainerGenerator
             }
 
             _byIndex[i] = container;
+            NoteMapped(container);
             _indexByContainer[container] = i;
             // In-window => visible: a recycled donor parked as surplus was Collapsed and now holds a new item, so re-show
             // it (keeps the panel's IsMeasureValid-only skip correct + stops a rebound tile silently going missing). Guard
@@ -209,11 +298,12 @@ public class ItemContainerGenerator
         //    (and deactivates the bindings of) ONLY these. During steady scroll donors == orphans, so this is empty and
         //    nothing is ever parked. A parked container stays attached + pooled for cheap reuse; the panel's ParkContainer
         //    deactivates its bindings so it also leaves any shared source's fan-out (no storm on a shared-property change).
+
         if (next >= donors.Count) return System.Array.Empty<IUIComponent>();
         _surplusBuf.Clear();   // reused; the caller iterates it synchronously before the next SetWindow
         for (; next < donors.Count; next++)
         {
-            _recyclePool.Push(donors[next]);
+            PoolPush(donors[next]);
             _surplusBuf.Add(donors[next]);
         }
         return _surplusBuf;
@@ -231,7 +321,7 @@ public class ItemContainerGenerator
             return own;
         }
 
-        var container = _recyclePool.Count > 0 ? _recyclePool.Pop() : _owner.GetContainerForItem(item);
+        var container = _pooledSet.Count > 0 ? PoolPop() : _owner.GetContainerForItem(item);
         _generated.Add(container);
         _owner.PrepareContainer(container, item);
         return container;
@@ -245,7 +335,7 @@ public class ItemContainerGenerator
         if (container == null) return;
         if (_indexByContainer.ContainsKey(container)) return;   // still realized -> keep
         if (!_generated.Contains(container)) return;            // item-is-own-container -> not ours to pool
-        if (!_recyclePool.Contains(container)) _recyclePool.Push(container);
+        PoolPush(container);   // the duplicate guard is the set's own Add now, not a linear re-read of the stack
     }
 
     /// <summary>Releases the container at <paramref name="index"/> back to the pool (generated containers) so it can be reused.</summary>
@@ -253,10 +343,11 @@ public class ItemContainerGenerator
     {
         if (!_byIndex.Remove(index, out var container)) return;
         _indexByContainer.Remove(container);
+        NoteUnmapped(container);
         if (_generated.Contains(container))
         {
             _owner.ClearContainer(container);
-            _recyclePool.Push(container);
+            PoolPush(container);
         }
     }
 
@@ -265,8 +356,12 @@ public class ItemContainerGenerator
     {
         _byIndex.Clear();
         _indexByContainer.Clear();
-        _recyclePool.Clear();
+        PoolClear();
         _generated.Clear();
+        // Not NoteUnmapped for each: a Reset tears the containers out of the tree entirely, so there is nothing left for
+        // the panel to park - handing it a list of dead containers would be worse than handing it none.
+        _unmapped.Clear();
+        _newlyMapped.Clear();
     }
 
     /// <summary>Shifts realized indices to account for <paramref name="count"/> items inserted at <paramref name="index"/>.</summary>

@@ -62,6 +62,13 @@ public sealed class EffectPass : DisposableObject, IEffectPass
 
     private readonly List<StageBlock> stages = new List<StageBlock>();
 
+    // The push-data wrappers, made ONCE. Both are generated as CLASSES, not structs, so `new` here allocated two objects
+    // on EVERY Apply - i.e. on every draw call, tens of thousands a second. They are marshalled to a pointer inside
+    // PushDataEXT and nothing keeps a reference past the call, so one instance per pass can be refilled and re-sent.
+    // Same lesson as the delegate this method already avoids (see WriteHeapOffsets): per-draw garbage in the draw path.
+    private readonly HostAddressRangeConstEXT _pushRange = new();
+    private readonly PushDataInfoEXT _pushDataInfo = new();
+
     // The transient per-frame constant-buffer arena lives on the render device (not the shared heap manager).
     private DynamicBufferPool CurrentBufferPool => ((GraphicsDevice)graphicsDevice).CurrentBufferPool;
 
@@ -202,19 +209,12 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         // after bind pipeline). Otherwise binding a shader resets push data before the draw.
         if (totalPushDataSize > 0)
         {
-            var hostAddressRange = new HostAddressRangeConstEXT
-            {
-                Address = (nuint)pushDataBytes,
-                Size = totalPushDataSize
-            };
+            _pushRange.Address = (nuint)pushDataBytes;
+            _pushRange.Size = totalPushDataSize;
+            _pushDataInfo.Offset = 0;
+            _pushDataInfo.Data = _pushRange;
 
-            var pushDataInfo = new PushDataInfoEXT
-            {
-                Offset = 0,
-                Data = hostAddressRange
-            };
-
-            graphicsDevice.CurrentCommandBuffer.PushDataEXT(pushDataInfo);
+            graphicsDevice.CurrentCommandBuffer.PushDataEXT(_pushDataInfo);
         }
 
         appliesCounter++;

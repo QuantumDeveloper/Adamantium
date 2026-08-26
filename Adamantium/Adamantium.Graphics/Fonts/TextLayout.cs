@@ -75,7 +75,21 @@ public class TextLayout : DisposableObject
         dotGlyph = font.GetGlyphByCharacter('.');
 
         layoutContainer = new GlyphLayoutContainer(typeface, font);
-        fontItems = new FontItem[MaxItemsCount];
+        // GROWN to fit, NOT preallocated at the cap. There is one TextLayout per TextBlock, and a 4096-slot FontItem
+        // array is 256KB - so a five-character label reserved a quarter of a megabyte for glyphs it will never have.
+        // Measured on a tab build: 288KB per TextLayout x 289 built a second = two thirds of everything the whole layout
+        // pass allocated, and about 40% of what the tab switch allocated in total. Only ElementsCount is ever read back
+        // (the vertex upload and SnapshotGlyphs both take it), so the rest was never anything but reserved emptiness.
+        fontItems = Array.Empty<FontItem>();
+    }
+
+    private void EnsureItemCapacity(int needed)
+    {
+        if (needed <= fontItems.Length) return;
+
+        var size = Math.Max(16, fontItems.Length);
+        while (size < needed) size *= 2;
+        Array.Resize(ref fontItems, (int)Math.Min(size, MaxItemsCount));
     }
 
     public GlyphWordData[] GetTextData()
@@ -139,6 +153,15 @@ public class TextLayout : DisposableObject
         return ProcessText(text, fontSize, @params);
     }
 
+    /// <summary>What laying out one string ALLOCATES, by stage. A text measure costs ~117KB and text is two thirds of
+    /// everything the layout pass allocates on a tab build; the shared-glyph list that looked like the cause turned out
+    /// to be a separate defect, so this is measured rather than reasoned about. Cumulative.</summary>
+    public static long TranslateBytes;
+    public static long FeatureBytes;
+    public static long WordLoopBytes;
+    public static long TailBytes;
+    public static int ProcessCount;
+
     public Size ProcessText(string text, double fontSize, TextRenderingParameters renderingParameters)
     {
         if (string.IsNullOrEmpty(text))
@@ -146,12 +169,19 @@ public class TextLayout : DisposableObject
 
         RenderingParameters = renderingParameters;
 
+        var _b0 = System.GC.GetAllocatedBytesForCurrentThread();
+
+
         var glyphs = Font.TranslateIntoGlyphs(text);
         layoutContainer.SetText(text);
+        var _b1 = System.GC.GetAllocatedBytesForCurrentThread();
 
         // try to apply GPOS kern
         var kernApplied = Font.FeatureService.ApplyFeature(Features.kern, layoutContainer, 0, (uint)glyphs.Count);
         // var subApp = font.FeatureService.ApplyFeature(Features.aalt, layoutContainer, 0, (uint)glyphs.Length);
+
+        var _b2 = System.GC.GetAllocatedBytesForCurrentThread();
+
 
         var scale = fontSize / Font.UnitsPerEm;
 
@@ -228,6 +258,9 @@ public class TextLayout : DisposableObject
         var lastBaseline = height + baseLine;
         height = lastBaseline;
 
+        var _b3 = System.GC.GetAllocatedBytesForCurrentThread();
+
+
         CalculateRealTextDimensions(glyphsData);
 
         var maxX = glyphsData.Max(x => x.Rect.Right);
@@ -246,6 +279,10 @@ public class TextLayout : DisposableObject
 
         // Finished: hand the whole list over in one reference write. A reader either sees the previous layout or this
         // one, never a half-aligned mixture.
+        var _b4 = System.GC.GetAllocatedBytesForCurrentThread();
+
+        TranslateBytes += _b1 - _b0; FeatureBytes += _b2 - _b1; WordLoopBytes += _b3 - _b2; TailBytes += _b4 - _b3; ProcessCount++;
+
         _wordData = glyphsData;
 
         CalculatedLayoutSize = finalRect;
@@ -700,6 +737,8 @@ public class TextLayout : DisposableObject
                 // letter should be - which is worse than the letter arriving a frame later.
                 continue;
             }
+            if (ElementsCount >= MaxItemsCount) break;   // the cap the vertex buffer is sized for
+            EnsureItemCapacity((int)ElementsCount + 1);
             fontItems[ElementsCount] = item;
             ElementsCount++;
         }

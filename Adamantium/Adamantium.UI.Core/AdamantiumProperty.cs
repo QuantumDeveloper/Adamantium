@@ -154,6 +154,11 @@ public sealed class AdamantiumProperty:IEquatable<AdamantiumProperty>
          throw new ArgumentNullException(nameof(ownerType));
       }
 
+      // TryGetValue first: GetOrAdd takes a delegate, and ResolveDefaultMetadata is an INSTANCE method - so the method
+      // group allocates a fresh delegate on every call, hit or miss. Measured at 60ns and one allocation per read of an
+      // unset property, which since containers became lazy is most reads in the engine.
+      if (metadataCache.TryGetValue(ownerType, out var cached)) return cached;
+
       return metadataCache.GetOrAdd(ownerType, ResolveDefaultMetadata);
    }
 

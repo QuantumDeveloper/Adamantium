@@ -455,9 +455,11 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         }
     }
 
-    public Viewport[] Viewports => viewports.ToArray();
+    // A COPY, from the array the setter fills. The tracking collections these came from were written on every
+    // SetViewports/SetScissors and read by nobody.
+    public Viewport[] Viewports => viewportsArray.ToArray();
 
-    public Rect2D[] Scissors => scissors.ToArray();
+    public Rect2D[] Scissors => scissorsArray.ToArray();
 
     public bool CommandBufferStarted { get; private set; }
 
@@ -1371,31 +1373,37 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         ResultHelper.CheckResult(result, nameof(SetObjectDebugName));
     }
 
-    public void SetViewports(params Viewport[] viewports)
+    // A SPAN, not `params Viewport[]`. The generated binding underneath already takes a ReadOnlySpan - the whole binding
+    // layer is written for zero allocation - and taking an array here allocated a one-element one at every call site,
+    // undoing that at the last step. The tracking collections went with it: nothing reads them (Viewports/Scissors below
+    // answer from the arrays), so re-filling one per call was work done for nobody on the hottest path in the renderer.
+    public void SetViewports(params ReadOnlySpan<Viewport> viewports)
     {
-        if (viewports == null || viewports.Length == 0) return;
+        if (viewports.IsEmpty) return;
 
-        // Unchanged means nothing to say: this used to rewrite the tracking collection (which locks) and marshal the
-        // viewport to the command buffer on every call, and the draw that follows sends it AGAIN through SetDrawingState.
+        // Unchanged means nothing to say: this used to marshal the viewport to the command buffer on every call, and the
+        // draw that follows sends it AGAIN through SetDrawingState.
         if (viewports.Length == 1 && viewportsArray.Length == 1 && SameViewport(viewports[0], viewportsArray[0])) return;
 
-        this.viewports.Clear();
-        this.viewports.AddRange(viewports);
-        viewportsArray = viewports;
+        // Kept in an array WE own, refilled in place: a span cannot be stored, and re-allocating one per change would put
+        // back the allocation this exists to remove. See CurrentViewports - it is a live view, not a snapshot.
+        if (viewportsArray.Length != viewports.Length) viewportsArray = new Viewport[viewports.Length];
+        viewports.CopyTo(viewportsArray);
 
         CurrentCommandBuffer.SetViewport(0, (uint)viewports.Length, viewports);
     }
-        
-    public void SetScissors(params Rect2D[] scissors)
-    {
-        if (scissors == null || scissors.Length == 0) return;
 
-        // Same as SetViewports: a run of draws under one clip asked for the same rect over and over.
+    public void SetScissors(params ReadOnlySpan<Rect2D> scissors)
+    {
+        if (scissors.IsEmpty) return;
+
+        // Same as SetViewports: a run of draws under one clip asked for the same rect over and over. Measured at 166
+        // bytes a call before the span, and a replayed batch segment makes TWO of them - its own clip, then the full one
+        // back - which was 53% of everything a replayed segment allocated.
         if (scissors.Length == 1 && scissorsArray.Length == 1 && SameScissor(scissors[0], scissorsArray[0])) return;
 
-        this.scissors.Clear();
-        this.scissors.AddRange(scissors);
-        scissorsArray = scissors;
+        if (scissorsArray.Length != scissors.Length) scissorsArray = new Rect2D[scissors.Length];
+        scissors.CopyTo(scissorsArray);
 
         CurrentCommandBuffer.SetScissor(0, (uint)scissors.Length, scissors);
     }
