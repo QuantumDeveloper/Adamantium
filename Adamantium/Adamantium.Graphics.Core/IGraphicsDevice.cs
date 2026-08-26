@@ -109,9 +109,9 @@ public interface IDynamicStateDevice
         
     LogicOp LogicOperation { get; set; }
     
-    public void SetViewports(params Viewport[] viewports);
+    public void SetViewports(params System.ReadOnlySpan<Viewport> viewports);
     
-    public void SetScissors(params Rect2D[] scissors);
+    public void SetScissors(params System.ReadOnlySpan<Rect2D> scissors);
 
     void SetRenderTargets(params IRenderTarget[] renderTargets);
 

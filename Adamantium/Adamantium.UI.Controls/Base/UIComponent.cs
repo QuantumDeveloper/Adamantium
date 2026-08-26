@@ -32,6 +32,8 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         if (a is not UIComponent owner) return;
         if (e.OldValue is Transform old && ReferenceEquals(old.Owner, owner)) old.Owner = null;
         if (e.NewValue is Transform t) t.Owner = owner;
+        // Resolved value, not e.NewValue (a trigger exit writes UnsetValue) - same rule as OnZIndexChanged.
+        owner._renderTransform = owner.GetValue<Transform>(RenderTransformProperty);
     }
 
     // Same wiring for a LayoutTransform, PLUS mark it as one: a value change on it must re-run the owner's layout (it
@@ -41,6 +43,7 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         if (a is not UIComponent owner) return;
         if (e.OldValue is Transform old && ReferenceEquals(old.Owner, owner)) { old.Owner = null; old.IsLayoutTransform = false; }
         if (e.NewValue is Transform t) { t.Owner = owner; t.IsLayoutTransform = true; }
+        owner._layoutTransform = owner.GetValue<Transform>(LayoutTransformProperty);
     }
 
     public static readonly AdamantiumProperty LayoutTransformProperty =
@@ -149,7 +152,10 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     // The clip belongs to the whole subtree, so it is announced as its own fact and the renderer treats it as structural.
     private static void OnClipToBoundsChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
     {
-        if (d is UIComponent component) VisualTreeNotifications.RaiseClipChanged(component);
+        if (d is not UIComponent component) return;
+        // Resolved value, not e.NewValue (a trigger exit writes UnsetValue) - same rule as OnZIndexChanged.
+        component._clipToBounds = component.GetValue<bool>(ClipToBoundsProperty);
+        VisualTreeNotifications.RaiseClipChanged(component);
     }
 
     public static readonly AdamantiumProperty IsEnabledProperty = AdamantiumProperty.Register(nameof(IsEnabled),
@@ -200,15 +206,21 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         typeof(Shadow), typeof(UIComponent),
         new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender, OnShadowChanged));
 
+    private Aura _aura;
+    private Shadow _shadow;
+
+    /// <summary>Field mirrors (see <see cref="ZIndex"/>): both are read by EVERY draw command the record produces - the
+    /// aura twice, for the still band and the living one - and both are null on almost every element. Kept current by
+    /// the properties' own changed callbacks, so bindings, styles and triggers go through SetValue as before.</summary>
     public Aura Aura
     {
-        get => GetValue<Aura>(AuraProperty);
+        get => _aura;
         set => SetValue(AuraProperty, value);
     }
 
     public Shadow Shadow
     {
-        get => GetValue<Shadow>(ShadowProperty);
+        get => _shadow;
         set => SetValue(ShadowProperty, value);
     }
 
@@ -219,6 +231,7 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         if (d is not UIComponent component) return;
         if (e.OldValue is Aura old) old.Changed -= component.OnHaloChanged;
         if (e.NewValue is Aura aura) aura.Changed += component.OnHaloChanged;
+        component._aura = component.GetValue<Aura>(AuraProperty);
     }
 
     private static void OnShadowChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
@@ -226,6 +239,7 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         if (d is not UIComponent component) return;
         if (e.OldValue is Shadow old) old.Changed -= component.OnHaloChanged;
         if (e.NewValue is Shadow shadow) shadow.Changed += component.OnHaloChanged;
+        component._shadow = component.GetValue<Shadow>(ShadowProperty);
     }
 
     private void OnHaloChanged(object sender, EventArgs e) => InvalidateRender(false);
@@ -318,9 +332,13 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
     public Guid RenderId { get; }
 
+    private bool _clipToBounds;
+
+    /// <summary>Field mirror (see <see cref="ZIndex"/>): read by every layout SNAPSHOT and every draw command - ~10000 of
+    /// each per frame on a tile grid.</summary>
     public Boolean ClipToBounds
     {
-        get => GetValue<Boolean>(ClipToBoundsProperty);
+        get => _clipToBounds;
         set => SetValue(ClipToBoundsProperty, value);
     }
 
@@ -377,8 +395,6 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     public UIComponent()
     {
         RenderId = Guid.NewGuid();
-        VisualChildrenCollection = new TrackingCollection<IUIComponent>();
-        VisualChildrenCollection.CollectionChanged += VisualChildrenCollectionChanged;
         // A visual root (e.g. a window) has no parent, so SetVisualParent never attaches it. Seed RootVisual to
         // itself here so the root reports IsAttachedToVisualTree = true.
         if (this is IRootVisualComponent root) RootVisual = root;
@@ -419,14 +435,29 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     /// units are the same, and the GPU data they bake from the brush is all that is stale.</summary>
     public void InvalidatePaint() => VisualTreeNotifications.RaisePaintInvalidated(this);
 
+    public bool DrawsNothing { get; set; }
+
+    public bool GeometryStaleByContent { get; private set; }
+
+    // A re-layout invalidates a component's recorded geometry ONLY through what it draws: same commands, new size. So a
+    // component that draws NOTHING has nothing for a resize to invalidate - and it still gets marked, because the mark is
+    // also what re-freezes its layout snapshot (a container that clips must clip at its new size). What it does not get
+    // is a re-record. Its children are untouched: they carry their own flags and are marked in their own right.
+    protected void InvalidateGeometryFromLayout() => IsGeometryValid = false;
+
     public void InvalidateRender(bool invalidateChildren)
     {
+        GeometryStaleByContent = true;
         IsGeometryValid = false;
         // The child collection is null until the UIComponent ctor runs; a property-changed callback (e.g. Opacity's)
         // can fire earlier, while the base ctor applies defaults - guard so an early invalidate is a harmless no-op.
-        if (!invalidateChildren || VisualChildrenCollection == null) return;
+        // Reading VisualChildrenCollection here would BUILD one; a component with no children has nothing to cascade into.
+        if (!invalidateChildren || _visualChildren == null)
+        {
+            return;
+        }
 
-        foreach (var uiComponent in VisualChildrenCollection)
+        foreach (var uiComponent in _visualChildren)
         {
             uiComponent.InvalidateRender(true);
         }
@@ -448,6 +479,7 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
         OnRender(context);
         IsGeometryValid = true;
+        GeometryStaleByContent = false;
         OnRenderCompleted();
     }
 
@@ -536,7 +568,7 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
     /// control merely moving to another parent would have deleted the item or the content it was showing.</para></summary>
     protected internal virtual void DisownVisualChild(IUIComponent child)
     {
-        VisualChildrenCollection.Remove(child);
+        _visualChildren?.Remove(child);
     }
 
     private static void Detach(System.Collections.IList visuals)
@@ -630,15 +662,23 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         set => SetValue(ZIndexProperty, value);
     }
 
+    private Transform _renderTransform;
+    private Transform _layoutTransform;
+
+    /// <summary>Field mirrors, for the same reason as <see cref="ZIndex"/>: both are read by every
+    /// <see cref="LocalTransform"/>, which is asked for by every layout snapshot and every world composition - and both
+    /// are NULL on almost every element. Measured at 60ns a read against 242ns for the whole of LocalTransform, so half
+    /// its cost was asking the property store twice whether there was a transform at all. Kept current by the properties'
+    /// own changed callbacks, so bindings, styles, triggers and animations all still go through SetValue as before.</summary>
     public Transform RenderTransform
     {
-        get => GetValue<Transform>(RenderTransformProperty);
+        get => _renderTransform;
         set => SetValue(RenderTransformProperty, value);
     }
-    
+
     public Transform LayoutTransform
     {
-        get => GetValue<Transform>(LayoutTransformProperty);
+        get => _layoutTransform;
         set => SetValue(LayoutTransformProperty, value);
     }
     
@@ -747,15 +787,42 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         get => RenderParent != null ? LocalTransform * RenderParent.WorldTransform : LocalTransform;
     }
 
-
     public IReadOnlyCollection<IUIComponent> GetVisualDescendants()
     {
         return VisualChildren;
     }
 
-    public IReadOnlyCollection<IUIComponent> VisualChildren => VisualChildrenCollection.AsReadOnly();
+    private IReadOnlyCollection<IUIComponent> _visualChildrenView;
 
-    protected TrackingCollection<IUIComponent> VisualChildrenCollection { get; private set; }
+    /// <summary>The children as a read-only VIEW - made once, not per call. AsReadOnly takes a lock and allocates a fresh
+    /// ReadOnlyCollection every time, and this property is read by every tree walk there is: the record's paint-order
+    /// walk, layout, hit-testing, the subtree marks. The wrapper is a live view over the same collection, so one instance
+    /// stays correct for the life of the element - there was never a reason to build a new one per read.</summary>
+    public IReadOnlyCollection<IUIComponent> VisualChildren =>
+        _visualChildren == null
+            ? System.Array.Empty<IUIComponent>()
+            : _visualChildrenView ??= _visualChildren.AsReadOnly();
+
+    /// <summary>The children, BUILT on first access - so every existing writer keeps working unchanged. Built on demand
+    /// because a LEAF never has any, and measured on a laid-out scene a third of all components are leaves. Code that only
+    /// wants to KNOW whether there are children must read <see cref="VisualChildren"/> or the field: asking for this
+    /// property is asking for a collection to exist.</summary>
+    protected TrackingCollection<IUIComponent> VisualChildrenCollection
+    {
+        get
+        {
+            if (_visualChildren != null)
+            {
+                return _visualChildren;
+            }
+
+            _visualChildren = new TrackingCollection<IUIComponent>();
+            _visualChildren.CollectionChanged += VisualChildrenCollectionChanged;
+            return _visualChildren;
+        }
+    }
+
+    private TrackingCollection<IUIComponent> _visualChildren;
 
     // Add/Remove need no mark of their own: the collection names every component that enters or leaves it
     // (VisualChildrenCollectionChanged), so no caller - here or anywhere else - can forget to.
@@ -766,12 +833,12 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
 
     protected void RemoveVisualChild(IUIComponent child)
     {
-        VisualChildrenCollection.Remove(child);
+        _visualChildren?.Remove(child);
     }
 
     protected void RemoveVisualChildren()
     {
-        VisualChildrenCollection.Clear();
+        _visualChildren?.Clear();
     }
 
     /// <summary>

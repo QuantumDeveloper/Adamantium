@@ -136,6 +136,42 @@ public class LayerPatchRenderTests
         Assert.That(DifferingPixels(patched, Pixels(scene.Renderer)), Is.Zero, because);
     }
 
+    /// <summary>The cheapest invariant of the whole retained path, and the one with no guard until now: a frame in which
+    /// NOTHING changed must REPLAY the recorded op stream, not walk the scene again. It needs a device (the replay branch
+    /// is gated on one), which is why it lives here rather than in a headless fixture, and it needs the idle frame to be
+    /// genuinely idle - so the scene is drawn once to settle, then drawn again with nothing touched at all.
+    ///
+    /// Without this, "the fast path quietly switched itself off" is a regression that only shows up as a slow app: every
+    /// pixel stays correct, and only a hand-held measurement notices. The neighbouring assertions in this fixture all
+    /// cover PARTIAL patches - a control that changed - and none of them would fail if the CLEAN case stopped replaying.</summary>
+    [Test]
+    public void AnIdleFrame_Replays_InsteadOfWalkingTheSceneAgain()
+    {
+        using var scene = NewScene();
+
+        Show(scene.Backdrops[2], Brushes.Red);
+        scene.Draw();                       // settle: this frame legitimately patches
+        var settled = Pixels(scene.Renderer);
+
+        for (var frame = 0; frame < 3; frame++)
+        {
+            scene.Draw();                   // nothing touched between draws
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(scene.Renderer.Cache.LastBuildKind, Is.EqualTo(RenderBuildKind.Clean),
+                    $"idle frame {frame}: nothing changed, so the build has to classify as Clean");
+                Assert.That(scene.Renderer.Cache.LastFrameReplayed, Is.True,
+                    $"idle frame {frame}: a clean frame must replay the recorded ops, not walk the scene again");
+            });
+        }
+
+        // A replay that draws something else is worse than a walk, so the picture is checked too - the flag alone would
+        // pass just as happily on an op stream that lost half its draws.
+        Assert.That(DifferingPixels(settled, Pixels(scene.Renderer)), Is.Zero,
+            "three replayed idle frames must be pixel-identical to the frame they replay");
+    }
+
     [Test]
     public void ABackdropAppearing_IsPatched_AndMatchesAFullWalk()
     {

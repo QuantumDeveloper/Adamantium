@@ -38,6 +38,27 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
       drawCommands.Clear();
    }
 
+   // Frame-scoped world-transform memo. IUIComponent.WorldTransform composes up the render-parent chain LIVE on every
+   // call - O(depth), and each step builds a translation matrix, reads RenderTransform/RenderTransformOrigin and does a
+   // 4x4 multiply. Measured at ~1us for a component ONE level below the root, and the record asks for it once per draw
+   // command: 8000 commands x depth 10 on a tile grid. Composed here exactly as the property does (same formula, same
+   // RenderParent - which an Adorner overrides, and this follows it), so the value is identical; it is only computed
+   // once per component per frame instead of once per command from scratch. The render cache memoises the same walk over
+   // its FROZEN snapshot for the same reason (RenderCache.Bake.World).
+   private readonly Dictionary<IUIComponent, Matrix4x4F> _worldMemo = new();
+
+   public void BeginRecordFrame() => _worldMemo.Clear();
+
+   private Matrix4x4F World(IUIComponent c)
+   {
+      if (_worldMemo.TryGetValue(c, out var world)) return world;
+
+      var parent = c.RenderParent;
+      world = parent != null ? c.LocalTransform * World(parent) : c.LocalTransform;
+      _worldMemo[c] = world;
+      return world;
+   }
+
    public IReadOnlyList<IDrawCommand> GetDrawCommands()
    {
       return drawCommands;
@@ -212,13 +233,14 @@ public class DrawingContext : IDrawingContext, IDrawingContextInternal, IDrawing
    private RenderData GetRenderDataFromComponent()
    {
       var renderData = new RenderData(GetEffectiveOpacity(),
-         _currentComponent.WorldTransform,
+         World(_currentComponent),
          _currentComponent.ClipToBounds,
          _currentComponent.ClipRectangle);
       // Baked HERE, on the record thread: the aura/shadow objects are edited from the loop thread, so the renderer gets
-      // values, never the live objects.
-      renderData.Halo = HaloBake.From(_currentComponent.Aura, _currentComponent.Shadow);
-      renderData.LivingHalo = HaloBake.Living(_currentComponent.Aura, GradientBake.PackPalette);
+      // values, never the live objects. Read ONCE - both bakes want the aura, and a property read is not free.
+      var aura = _currentComponent.Aura;
+      renderData.Halo = HaloBake.From(aura, _currentComponent.Shadow);
+      renderData.LivingHalo = HaloBake.Living(aura, GradientBake.PackPalette);
       //renderData.CustomEffect = _currentComponent.Effect TODO: implement custom effects for controls
       return renderData;
    }

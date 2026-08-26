@@ -36,6 +36,14 @@
 
             <CheckBox Content="Ellipses" IsChecked="{Binding ShowEllipses, Mode=TwoWay}" VerticalAlignment="Center" Margin="24,0,0,0"/>
 
+            <!-- The bind budget, live. 0 = no budget at all (one honest pass), higher = smaller slices. Fixed-width
+                 readout for the same reason as the opacity one below: a changing string re-measures the row. -->
+            <TextBlock Text="Bind ms:" VerticalAlignment="Center" Margin="24,0,0,0"/>
+            <Slider Width="140" Minimum="0" Maximum="32" Margin="8,0,0,0"
+                    Value="{Binding BindBudgetMs, Mode=TwoWay}"
+                    TickFrequency="1" IsSnapToTickEnabled="true"/>
+            <TextBlock Text="{Binding BindBudgetMs}" Width="36" VerticalAlignment="Center" FontSize="16" Margin="8,0,0,0"/>
+
             <!-- Fades the WHOLE tile grid by hand. Element Opacity composites down the tree, and the cost of that is the
                  point of this control: the value goes into the subtree's opacity SLOT, so dragging this should not cost
                  the frame anything however many tiles are on screen. Bound straight to the ListBox below by name - no
@@ -76,9 +84,17 @@
             </ListBox.ItemContainerStyle>
             <ListBox.ItemsPanel>
                 <ItemsPanelTemplate>
+                    <!-- ScrollBindBudget is how many milliseconds ONE pass may spend (re)binding containers while the
+                         list is scrolling; whatever does not fit is deferred and shows a skeleton. 0 means no budget -
+                         bind the whole window in one pass. It is a dial here on purpose: measured on this very tab, 6 ms
+                         binds ~357 slots a pass and defers ~4487, so on a big window the panel never catches up, while on
+                         a small one binding everything at once is simply better. Drag the slider above to the minimum
+                         cell, then move this one, and the difference between a smooth dribble and one honest pass is
+                         visible without any instrument. -->
                     <WrapPanel Orientation="Horizontal"
                                ItemWidth="{Binding CellWidth}"
-                               ItemHeight="{Binding CellHeight}"/>
+                               ItemHeight="{Binding CellHeight}"
+                               ScrollBindBudget="{Binding BindBudgetMs}"/>
                 </ItemsPanelTemplate>
             </ListBox.ItemsPanel>
         </ListBox>

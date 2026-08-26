@@ -17,6 +17,8 @@ public partial class RenderCache
     // baked transform (nothing moved on a Clean frame).
     private void ExecuteOps(IGraphicsDevice device, Rect2D fullScissor)
     {
+        var opsBytes0 = System.GC.GetAllocatedBytesForCurrentThread();
+        var executed = 0;
         // LAYER by layer, and inside a layer in the order it was recorded. The two are the same sequence - a layer owns a
         // contiguous range of the stream - and saying it this way is what makes the structure of a recorded frame legible:
         // the stream is a flat list, the layers are what it MEANS.
@@ -24,6 +26,10 @@ public partial class RenderCache
         for (var i = layer.OpFirst; i < layer.OpFirst + layer.OpCount; i++)
         {
             var op = _ops[i];
+            executed++;
+            var kind = (int)op.Kind;
+            if (kind >= 0 && kind < 4) Core.Diagnostics.RuntimeStats.OpCountByKind[kind]++;
+            var opBytes0 = System.GC.GetAllocatedBytesForCurrentThread();
             switch (op.Kind)
             {
                 case RenderOpKind.Scissor:
@@ -70,7 +76,12 @@ public partial class RenderCache
                     _instancedFill.ReplayFlush(op.SegId, fullScissor, _projectionMatrix);
                     break;
             }
+            if (kind >= 0 && kind < 4)
+                Core.Diagnostics.RuntimeStats.OpBytesByKind[kind] += System.GC.GetAllocatedBytesForCurrentThread() - opBytes0;
         }
+
+        Core.Diagnostics.RuntimeStats.ExecuteOpsBytes += System.GC.GetAllocatedBytesForCurrentThread() - opsBytes0;
+        Core.Diagnostics.RuntimeStats.LastOpsExecuted = executed;
     }
 
     // A draw that baked its transform at RECORD time, on a frame where its element is somewhere else: re-point it. Three
@@ -413,7 +424,7 @@ public partial class RenderCache
             // referenced from two places), it would join the paint order twice -> drawn TWICE (overdraw). Guard here.
             if (!visited.Add(component)) continue;
 
-            _orderByControl[component.RenderId] = order;   // paint-order rank, SPARSE (see OrderGap)
+            _orderByControl[component] = order;   // paint-order rank, SPARSE (see OrderGap)
 
             // Capture dirtiness BEFORE Render: a clean control's Render() is a no-op, so an empty command list means
             // "reuse the cached units"; a dirty one re-records, so an empty list then means "now draws nothing" -> clear
@@ -429,6 +440,9 @@ public partial class RenderCache
                 : CopyCommands(_drawingContextInternal.GetDrawCommands());
             packet.Draws.Add(new ComponentDraw(component, commands, hidden ? false : wasGeometryValid, order, component.RenderClones));
             MirrorUnits(component, commands.Count, hidden ? false : wasGeometryValid);
+            // Same rule as the other two record paths: believe the command count only when this walk actually re-recorded
+            // it (a clean component's Render is a no-op, and a hidden one's commands were dropped on purpose).
+            if (!hidden && !wasGeometryValid) component.DrawsNothing = commands.Count == 0;
             order += OrderGap;
 
             PushChildrenInPaintOrder(stack, component.VisualChildren, hidden);
@@ -438,9 +452,9 @@ public partial class RenderCache
         // recorder's own "who holds units" view must drop them too (this walk never visits them). Parked controls are
         // kept for the same reason the applier keeps them - they are coming back.
         _staleUnitIds.Clear();
-        foreach (var (id, entry) in _recordedUnits)
-            if (!entry.Component.IsAttachedToVisualTree && !entry.Component.IsParked) _staleUnitIds.Add(id);
-        foreach (var id in _staleUnitIds) _recordedUnits.Remove(id);
+        foreach (var (component, entry) in _recordedUnits)
+            if (!entry.Component.IsAttachedToVisualTree && !entry.Component.IsParked) _staleUnitIds.Add(component);
+        foreach (var component in _staleUnitIds) _recordedUnits.Remove(component);
 
     }
 
@@ -531,6 +545,7 @@ public partial class RenderCache
         }
 
         var units = group.Units;
+        var unitStart = System.Diagnostics.Stopwatch.GetTimestamp();
         for (int i = 0; i < drawCommands.Count; i++)
         {
             var command = drawCommands[i];
@@ -539,7 +554,14 @@ public partial class RenderCache
             if (i >= units.Count)
             {
                 Core.Diagnostics.RuntimeStats.UnitsCreated++;
-                units.Add(_renderUnitFactory.CreateRenderUnitFromCommand(command));
+                Core.Diagnostics.RuntimeStats.UnitsCreatedGrow++;
+                var growStart = System.Diagnostics.Stopwatch.GetTimestamp();
+                var madeUnit = _renderUnitFactory.CreateRenderUnitFromCommand(command);
+                units.Add(madeUnit);
+                var growMs = System.Diagnostics.Stopwatch.GetElapsedTime(growStart).TotalMilliseconds;
+                Core.Diagnostics.RuntimeStats.UnitCreateMs += growMs;
+                Core.Diagnostics.RuntimeStats.NoteUnitCreated(
+                    madeUnit == null ? "null" : madeUnit.GetType().Name + "<" + component.GetType().Name + ">", growMs);
             }
             else
             {
@@ -547,16 +569,35 @@ public partial class RenderCache
                 if (unit.Match(command))
                 {
                     Core.Diagnostics.RuntimeStats.UnitsUpdated++;
+                    var oneStart = System.Diagnostics.Stopwatch.GetTimestamp();
                     unit.UpdateWithDrawCommand(command);
+                    var oneMs = System.Diagnostics.Stopwatch.GetElapsedTime(oneStart).TotalMilliseconds;
+                    Core.Diagnostics.RuntimeStats.UnitUpdateMs += oneMs;
+                    if (oneMs > Core.Diagnostics.RuntimeStats.LastApplySlowestUnitMs)
+                    {
+                        Core.Diagnostics.RuntimeStats.LastApplySlowestUnitMs = oneMs;
+                        // The OWNER as well as the unit kind: "a RectangleRenderUnit" is a shape, "on a ScrollViewer
+                        // 1200x800" is an element somebody can go and look at. The size matters too - a re-tessellation
+                        // that costs 36ms is not costing it for a 24px tile.
+                        Core.Diagnostics.RuntimeStats.LastApplySlowestUnit =
+                            $"{unit.GetType().Name}<{component.GetType().Name}>{component.RenderSize.Width:0}x{component.RenderSize.Height:0}";
+                    }
                 }
                 else
                 {
                     Core.Diagnostics.RuntimeStats.UnitsCreated++;
+                    Core.Diagnostics.RuntimeStats.UnitsCreatedMismatch++;
+                    var swapStart = System.Diagnostics.Stopwatch.GetTimestamp();
                     unit.DeferDispose();
                     units[i] = _renderUnitFactory.CreateRenderUnitFromCommand(command);
+                    Core.Diagnostics.RuntimeStats.UnitCreateMs += System.Diagnostics.Stopwatch.GetElapsedTime(swapStart).TotalMilliseconds;
                 }
             }
         }
+
+        // Everything above happens INSIDE a render unit; the build loop's own work (group lookup, order bookkeeping,
+        // the empty-commands path) is what is left when this is subtracted from LastApplyBuildMs.
+        Core.Diagnostics.RuntimeStats.LastApplyUnitMs += System.Diagnostics.Stopwatch.GetElapsedTime(unitStart).TotalMilliseconds;
 
         if (units.Count > drawCommands.Count)
         {

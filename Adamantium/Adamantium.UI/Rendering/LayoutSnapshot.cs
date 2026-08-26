@@ -22,7 +22,9 @@ internal readonly struct LayoutSnapshot(
     float opacity = 1f,
     float selfOpacity = 1f) : System.IEquatable<LayoutSnapshot>
 {
-    public Matrix4x4F LocalTransform { get; } = localTransform;
+    // A FIELD, not a get-only property: 64 bytes that Equals wants to compare by reference, and a property cannot be
+    // passed as `in` (it is not addressable, so the compiler copies it first - the very copy this avoids).
+    public readonly Matrix4x4F LocalTransform = localTransform;
     public Size RenderSize { get; } = renderSize;
     public bool ClipToBounds { get; } = clipToBounds;
     public bool IsMotionNode { get; } = isMotionNode;
@@ -47,7 +49,7 @@ internal readonly struct LayoutSnapshot(
     /// moves would drift without ever announcing themselves. Compared EXACTLY, on every field there is.</summary>
     public bool Equals(LayoutSnapshot other)
     {
-        return ExactlySame(LocalTransform, other.LocalTransform)
+        return ExactlySame(in LocalTransform, in other.LocalTransform)
                && RenderSize.Width == other.RenderSize.Width
                && RenderSize.Height == other.RenderSize.Height
                && ClipToBounds == other.ClipToBounds
@@ -57,7 +59,9 @@ internal readonly struct LayoutSnapshot(
                && ReferenceEquals(RenderParent, other.RenderParent);
     }
 
-    private static bool ExactlySame(Matrix4x4F a, Matrix4x4F b)
+    // BY REFERENCE: a Matrix4x4F is 64 bytes, and this is asked once per re-frozen component per frame - passing two of
+    // them by value copied 128 bytes to compare sixteen floats that usually differ in the first one.
+    private static bool ExactlySame(in Matrix4x4F a, in Matrix4x4F b)
     {
         return a.M11 == b.M11 && a.M12 == b.M12 && a.M13 == b.M13 && a.M14 == b.M14
                && a.M21 == b.M21 && a.M22 == b.M22 && a.M23 == b.M23 && a.M24 == b.M24

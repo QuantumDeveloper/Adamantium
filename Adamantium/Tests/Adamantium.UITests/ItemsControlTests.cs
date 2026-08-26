@@ -278,24 +278,26 @@ public class ItemsControlTests
         // instead SLICE the fill across passes - while reporting the FULL extent immediately (so the scrollbar is correct
         // and the not-yet-realized tail fills in).
         //
-        // The slice is a TIME budget, NOT a count (WrapPanel.BindBudgetMs / FillBudgetMs): a fixed count is fine for cheap
+        // The slice is a TIME budget, NOT a count (ScrollBindBudget / FillBindBudget): a fixed count is fine for cheap
         // scroll rebinds but spends >100 ms in one frame when every slot has to CREATE a container. So "at most N per pass"
-        // is not a contract the panel makes, and asserting it would only measure how fast this machine is. Pin the budget to
-        // ZERO instead: the bind loop then binds exactly its guaranteed MinBinds floor per pass, and the slicing is exact.
-        var savedFill = WrapPanel.FillBudgetMs;
-        var savedBind = WrapPanel.BindBudgetMs;
-        WrapPanel.FillBudgetMs = 0;
-        WrapPanel.BindBudgetMs = 0;
-        try
+        // is not a contract the panel makes, and asserting it would only measure how fast this machine is. Pin the budget
+        // to the smallest POSITIVE value instead: it is spent before the first bind returns, so the loop binds exactly its
+        // guaranteed MinBindsPerPass floor and the slicing is exact. Not zero - zero now means "no budget at all", which
+        // is the opposite of what this test needs.
+        const double TinySlice = 1e-6;
         {
-            var slice = WrapPanel.MinBinds;
+            var slice = VirtualizingPanel.MinBindsPerPassDefault;
             var items = Enumerable.Range(0, 600).Cast<object>().ToList();
             var ic = new ItemsControl
             {
                 ItemsSource = items,
                 ItemsPanel = new ItemsPanelTemplate(() => new TemplateResult
                 {
-                    RootComponent = new WrapPanel { Orientation = Orientation.Horizontal, ItemWidth = 10, ItemHeight = 10 }
+                    RootComponent = new WrapPanel
+                    {
+                        Orientation = Orientation.Horizontal, ItemWidth = 10, ItemHeight = 10,
+                        ScrollBindBudget = TinySlice, FillBindBudget = TinySlice
+                    }
                 })
             };
             ic.Template = ItemsPresenterTemplate();
@@ -332,11 +334,6 @@ public class ItemsControlTests
                 Assert.That(gen.RealizedCount, Is.EqualTo(600), "the full on-screen set is realized after enough passes");
                 Assert.That(passes, Is.GreaterThanOrEqualTo(600 / slice - 1), "600 tiles at one slice per pass => actually spread over passes");
             });
-        }
-        finally
-        {
-            WrapPanel.FillBudgetMs = savedFill;
-            WrapPanel.BindBudgetMs = savedBind;
         }
     }
 
@@ -858,12 +855,19 @@ public class ItemsControlTests
         var panel = (WrapPanel)ic.ItemsHostPanel;
         var gen = ic.ItemContainerGenerator;
 
+        // The WINDOW, not a stopwatch. 800x400 with a 64px cell is 12 columns and eleven realized lines (the visible
+        // 6.25 rounded up, the partially-visible one, and a line of lead each side) = 132. The bound was 120, which this
+        // only ever cleared because the per-pass bind budget had managed just MinBinds=8 of them by the time it was
+        // asked - so the assertion was measuring how fast the machine was, and any speed-up in binding "broke" it. What
+        // the test is actually for is the collapsed-cell hang, where a zero-sized cell realizes ALL 600.
+        var window = panel.Columns * 11;
+
         Assert.Multiple(() =>
         {
             Assert.That(panel.ItemWidth, Is.EqualTo(64).Within(0.5),
                 "items-host {Binding RectSize} must resolve against the ItemsControl DataContext, not stay NaN");
-            Assert.That(gen.RealizedCount, Is.LessThan(120),
-                "a 64px cell realizes only the visible window; a collapsed cell would realize all 600 (the hang)");
+            Assert.That(gen.RealizedCount, Is.LessThanOrEqualTo(window),
+                $"a 64px cell realizes at most its window ({window}); a collapsed cell would realize all {items.Count}");
         });
     }
 

@@ -11,7 +11,8 @@ namespace Adamantium.UI.Core;
 
 public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundamentalUIComponent
 {
-    private readonly StylesCollection _attachedStyles;
+    private StylesCollection _attachedStyles;
+    private Classes _classNames;
     private IFundamentalUIComponent parent;
     private TrackingCollection<IFundamentalUIComponent> logicalChildren;
     
@@ -66,20 +67,26 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         o.SyncClassNames();
     }
 
-    public FundamentalUIComponent()
-    {
-        ClassNames = new Classes();
-        Styles = new StylesCollection();
-        Styles.CollectionChanged += StylesOnCollectionChanged;
-        _attachedStyles = new StylesCollection();
-        Behaviors = new BehaviorCollection(this);
-        Triggers = new TriggerCollection();
-    }
+    // ClassNames, Styles, _attachedStyles, Behaviors and Triggers used to be built in the constructor for EVERY
+    // component - 784 of a bare Border's 2824 bytes, spent on collections a template-stamped element never fills.
+    //
+    // The GETTERS materialise, not just the setters, and that is load-bearing: markup writes
+    // <Button.Behaviors><local:X/></Button.Behaviors>, which the generator emits as `element.Behaviors.Add(x)` - a READ,
+    // and returning null there would crash the app on ordinary markup. Engine code that only needs to know WHETHER
+    // anything is there must use the Has* members or the raw field; every such site is marked.
 
     public BehaviorCollection Behaviors
     {
-        get => GetValue<BehaviorCollection>(BehaviorsProperty);
-        private init => SetValue(BehaviorsProperty, value);
+        get
+        {
+            var behaviors = GetValue<BehaviorCollection>(BehaviorsProperty);
+            if (behaviors == null)
+            {
+                SetValue(BehaviorsProperty, behaviors = new BehaviorCollection(this));
+            }
+
+            return behaviors;
+        }
     }
 
     private List<ITriggerActivator> _triggerActivators;
@@ -96,9 +103,22 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
     /// </summary>
     public TriggerCollection Triggers
     {
-        get => GetValue<TriggerCollection>(TriggersProperty);
-        private init => SetValue(TriggersProperty, value);
+        get
+        {
+            var triggers = GetValue<TriggerCollection>(TriggersProperty);
+            if (triggers == null)
+            {
+                SetValue(TriggersProperty, triggers = new TriggerCollection());
+            }
+
+            return triggers;
+        }
     }
+
+    /// <summary>The triggers WITHOUT materialising them - null when this component never declared any. `ApplyTriggers`
+    /// runs on every attach for every node, so reading it through <see cref="Triggers"/> would build a collection for
+    /// each one just to find it empty, which is the whole cost this laziness exists to avoid.</summary>
+    private TriggerCollection TriggersOrNull => GetValue<TriggerCollection>(TriggersProperty);
 
     /// <summary>What the `DataContext` callback actually does is raise <see cref="DataContextChanged"/> and re-resolve
     /// this element's bindings. An element with neither has nothing to be told, and the walk goes straight to its
@@ -151,9 +171,13 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
     // actually activates the ".Ring" styles. Without this the two collections drift and class selectors never match.
     private void SyncClassNames()
     {
-        // The default-value callback can fire from the base ctor before our ctor initialises ClassNames; the default
-        // Classes set is empty, so there is nothing to mirror yet.
-        if (ClassNames == null) return;
+        // Nothing to mirror INTO and nothing to mirror FROM: don't build the collection just to discover that. The guard
+        // used to be `ClassNames == null` (the default-value callback can fire from the base ctor); a materialising
+        // getter would have made that dead code AND allocated on every component that never names a class.
+        if (_classNames == null && Classes.Count == 0)
+        {
+            return;
+        }
 
         ClassNames.Clear();
         foreach (var name in Classes)
@@ -228,13 +252,29 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         set => SetValue(UidProperty, value);
     }
 
-    public Classes ClassNames { get; }
+    public Classes ClassNames => _classNames ??= new Classes();
+
+    /// <summary>Whether this component has any class names, WITHOUT materialising the collection. Style matching and the
+    /// theme cache ask this per component, and for most of them the answer is no.</summary>
+    public bool HasClassNames => _classNames is { Count: > 0 };
 
     public StylesCollection Styles
     {
-        get => GetValue<StylesCollection>(StylesProperty);
-        private init => SetValue(StylesProperty, value);
+        get
+        {
+            var styles = GetValue<StylesCollection>(StylesProperty);
+            if (styles == null)
+            {
+                styles = new StylesCollection();
+                styles.CollectionChanged += StylesOnCollectionChanged;
+                SetValue(StylesProperty, styles);
+            }
+            return styles;
+        }
     }
+
+    /// <summary>The local styles WITHOUT materialising them - null when none were ever added.</summary>
+    private StylesCollection StylesOrNull => GetValue<StylesCollection>(StylesProperty);
     
     public bool IsStyleApplied { get; private set; }
 
@@ -245,25 +285,34 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
             style.Attach(this);
             // Track so DetachStyles can undo them (re-theming detaches the previously-applied set first - see
             // ApplyCurrentTheme). Guard against duplicates so a re-attach doesn't record the same style twice.
-            if (!_attachedStyles.Contains(style)) _attachedStyles.Add(style);
+            _attachedStyles ??= new StylesCollection();
+            if (!_attachedStyles.Contains(style))
+            {
+                _attachedStyles.Add(style);
+            }
         }
     }
 
     public void DetachStyles()
     {
+        if (_attachedStyles == null)
+        {
+            return;   // nothing was ever attached
+        }
+
         foreach (var style in _attachedStyles)
         {
             style.Detach(this);
         }
         _attachedStyles.Clear();
     }
-    
+
     public void DetachStyles(params Style[] styles)
     {
         foreach (var style in styles)
         {
             style.Detach(this);
-            _attachedStyles.Remove(style);
+            _attachedStyles?.Remove(style);
         }
     }
 
@@ -430,16 +479,17 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         // tidier and is wrong: a marker setter ({Binding}, {ThemeResource}, {Ancestor}, {Self}) is undone by property
         // alone, with no style key, so the outgoing theme's teardown would tear out the incoming theme's live link.
         var incoming = UIAppContext.Current.ThemeManager?.FindStylesForComponent(this);
-        foreach (var style in _attachedStyles.ToArray())
+        var own = StylesOrNull;   // not Styles: a component with no local styles must not grow one to be re-themed
+        foreach (var style in _attachedStyles?.ToArray() ?? Array.Empty<Style>())
         {
             if (incoming != null && Array.IndexOf(incoming, style) >= 0) continue;
-            if (Styles.Contains(style)) continue;   // an author's own style stays; it is re-applied below either way
+            if (own != null && own.Contains(style)) continue;   // an author's own style stays; re-applied below either way
 
             DetachStyles(style);
         }
 
         UIAppContext.Current.UIContext.ThemeContext.ApplyCurrentTheme(this);
-        UIAppContext.Current.UIContext.ThemeContext.ApplyExternalStyles(this, Styles.ToArray());
+        UIAppContext.Current.UIContext.ThemeContext.ApplyExternalStyles(this, own?.ToArray() ?? Array.Empty<Style>());
 
         IsStyleApplied = true;
     }
@@ -532,12 +582,14 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
     // not template parts. Idempotent - skipped if already applied (e.g. a re-attach without an intervening detach).
     private void ApplyTriggers()
     {
-        if (_triggerActivators != null || Triggers == null || Triggers.Count == 0)
+        // TriggersOrNull, not Triggers: this runs on every attach for every node, and the property MATERIALISES.
+        var triggers = TriggersOrNull;
+        if (_triggerActivators != null || triggers == null || triggers.Count == 0)
             return;
 
         var theme = UIAppContext.Current?.ThemeManager?.CurrentTheme;
         _triggerActivators = new List<ITriggerActivator>();
-        foreach (var trigger in Triggers)
+        foreach (var trigger in triggers)
         {
             _triggerActivators.Add(trigger.Apply(new StyleTriggerExecutionContext(this, theme)));
         }

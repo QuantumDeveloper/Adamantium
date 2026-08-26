@@ -242,6 +242,7 @@ public partial class RenderCache
     private void PublishSnapshot(IUIComponent component, LayoutSnapshot snapshot)
     {
         SnapshotEntriesPublished++;
+        Core.Diagnostics.RuntimeStats.LastSnapPublished++;
         _packet.SnapDelta.Add(new KeyValuePair<IUIComponent, LayoutSnapshot>(component, snapshot));
     }
 
@@ -275,6 +276,8 @@ public partial class RenderCache
     // survives only for the flat adorner build (no packet, recorder + applier inline on the loop thread).
     private void CaptureSnapshot()
     {
+        _refreshedThisCapture.Clear();
+
         if (_snapFullCapture)
         {
             foreach (var group in _groups)
@@ -287,10 +290,12 @@ public partial class RenderCache
         // Element opacity lives IN the snapshot (unlike a brush recolour, which re-bakes from the brush BY REFERENCE), so a
         // paint-dirty component whose opacity ACTUALLY changed must re-publish its entry - on any build kind. Gated on a
         // real change so the common brush pulse (~470 cards/frame) re-freezes nothing.
+        var opacityStart = System.Diagnostics.Stopwatch.GetTimestamp();
         Dirty.SnapshotPaintInto(_opacityCheckBuf);
         foreach (var c in _opacityCheckBuf)
             if (IsDrawn(c) && (!_snap.TryGetValue(c, out var f) || f.Opacity != (float)c.Opacity || f.SelfOpacity != (float)c.SelfOpacity))
                 RefreshSnapshot(c);
+        Core.Diagnostics.RuntimeStats.LastSnapOpacityMs = System.Diagnostics.Stopwatch.GetElapsedTime(opacityStart).TotalMilliseconds;
 
         if (_packet.Kind == RenderBuildKind.Full)
         {
@@ -309,7 +314,10 @@ public partial class RenderCache
         }
 
         // Re-recorded this frame (the dirty/newly-spliced components of a Partial or a Structural).
+        var drawsStart = System.Diagnostics.Stopwatch.GetTimestamp();
         foreach (var draw in _packet.Draws) RefreshSnapshot(draw.Component);
+        Core.Diagnostics.RuntimeStats.LastSnapDrawsMs = System.Diagnostics.Stopwatch.GetElapsedTime(drawsStart).TotalMilliseconds;
+        var dirtyStart = System.Diagnostics.Stopwatch.GetTimestamp();
 
         // EVERY geometry-dirty component, not just re-recorded ones: a component can change SIZE without its recorded
         // geometry going stale (RenderSize marks it dirty but leaves IsGeometryValid true -> the record SKIPS it), and a
@@ -317,7 +325,15 @@ public partial class RenderCache
         // actually DRAWN: a component that left the drawn set had its entry dropped on purpose (re-frozen when it returns);
         // re-adding it would resurrect it and publish a delta for something the applier just freed.
         foreach (var component in _geometryDirtyBuffer)
+        {
+            // Cheapest question first: IsDrawn walks the ancestor chain, and most of this set was already re-frozen by
+            // the packet's draws just above.
+            if (_refreshedThisCapture.Contains(component)) continue;
             if (IsDrawn(component)) RefreshSnapshot(component);
+        }
+        Core.Diagnostics.RuntimeStats.LastSnapDirtyMs = System.Diagnostics.Stopwatch.GetElapsedTime(dirtyStart).TotalMilliseconds;
+
+        var tailStart = System.Diagnostics.Stopwatch.GetTimestamp();
 
         // A component that kept its units but MOVED (VisualParent changed) - nothing else would re-freeze it.
         foreach (var rerank in _packet.Reranks) RefreshSnapshot(rerank.Key);
@@ -326,13 +342,20 @@ public partial class RenderCache
         // only here). Read off THIS frame's packet: _movedNodesBuf is the APPLIER's copy.
         foreach (var node in _packet.MovedNodes) RefreshSnapshot(node);
         foreach (var moved in _movedBuf) RefreshSnapshot(moved);
+        Core.Diagnostics.RuntimeStats.LastSnapTailMs = System.Diagnostics.Stopwatch.GetElapsedTime(tailStart).TotalMilliseconds;
     }
 
     // Re-freeze ONE component's entry (it changed this frame, so the ContainsKey early-out must NOT keep the old one), then
     // walk its ancestor chain lazily - those didn't change unless they are themselves in a changed set.
+    // The sets CaptureSnapshot re-freezes from OVERLAP heavily - a resized tile is in the packet's draws, in the
+    // geometry-dirty set AND in the moved set, so it was re-frozen three times. The repeats are pure waste: nothing
+    // between them can change the component (CaptureSnapshot only reads), so the second computation always produced the
+    // value the first one stored and published nothing. Measured at 10ms of a 26ms freeze on a 4K tile drag.
+    private readonly HashSet<IUIComponent> _refreshedThisCapture = new();
+
     private void RefreshSnapshot(IUIComponent component)
     {
-        if (component == null) return;
+        if (component == null || !_refreshedThisCapture.Add(component)) return;
         var snapshot = new LayoutSnapshot(component.LocalTransform, component.RenderSize, component.ClipToBounds,
             component.IsRenderMotionNode, component.RenderParent, (float)component.Opacity, (float)component.SelfOpacity);
 

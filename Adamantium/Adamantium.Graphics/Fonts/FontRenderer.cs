@@ -127,8 +127,11 @@ public class FontRenderer : GraphicsResource
 
         // Snapshot the viewport + scissor active in the pass we're about to interrupt, so RestoreState can put back the
         // exact clip (e.g. a virtualized list item's narrowed scissor) instead of resetting to the full attachment.
-        _savedScissors = ((GraphicsDevice)GraphicsDevice).CurrentScissors;
-        _savedViewports = ((GraphicsDevice)GraphicsDevice).CurrentViewports;
+        // COPIES. CurrentScissors/CurrentViewports are the device's own arrays, refilled IN PLACE by the setters (they
+        // take a span now and cannot keep the caller's array), so holding the reference across the interrupted pass
+        // would "restore" whatever the clip happens to be by then - which is not a restore at all.
+        _savedScissors = (Rect2D[])((GraphicsDevice)GraphicsDevice).CurrentScissors.Clone();
+        _savedViewports = (Viewport[])((GraphicsDevice)GraphicsDevice).CurrentViewports.Clone();
 
         // Inline (called mid main pass): end it so we can render into the text target. Pre-pass (called from PreRender,
         // before the main pass begins): there's no outer pass to end - skip it.
@@ -272,11 +275,21 @@ public class FontRenderer : GraphicsResource
     // buffer, no CPU per-glyph world bake, and a scrolling block moves by one table matrix write instead of re-baking N
     // glyphs. Foreground is per-instance, so blocks of different colours share one draw. instancesAddress is pre-offset
     // to THIS segment's slice (drawn at base instance 0). State/depth/blend match DrawLayoutDirect (main pass).
+    /// <summary>What one batched glyph draw ALLOCATES, split between binding its parameters/resources and applying the
+    /// pass + issuing the draw. Lives here rather than in RuntimeStats: Adamantium.Graphics does not (and should not)
+    /// reference the UI layer. Cumulative; the probe samples by per-second delta.</summary>
+    public static long BatchStateBytes;
+    public static long BatchResourceBytes;
+    public static long BatchSetupBytes;
+    public static long BatchApplyDrawBytes;
+    public static int BatchDrawCount;
+
     public void DrawBatch(SamplerState samplerState, FontAtlas atlas, ulong instancesAddress, ulong transformsAddress,
         uint glyphCount, Matrix4x4F projection)
     {
         if (glyphCount == 0) return;
 
+        var b0 = GC.GetAllocatedBytesForCurrentThread();
         GraphicsDevice.ColorBlendEnabled = true;
         GraphicsDevice.ColorBlendEquation = ColorBlendEquations.Premultiplied;
         GraphicsDevice.PrimitiveRestartEnable = true;
@@ -284,8 +297,10 @@ public class FontRenderer : GraphicsResource
         GraphicsDevice.DepthWriteEnable = true;
         GraphicsDevice.DepthCompareFunction = CompareOp.Always;
 
+        var bState = GC.GetAllocatedBytesForCurrentThread();
         effectSampler.SetResource(samplerState);
         effectTexture.SetResource(atlas.Atlas);
+        var bRes = GC.GetAllocatedBytesForCurrentThread();
         effectMatrixTransform.SetValue(projection);
         effectUVCornerCoords.SetValue(UVCornerCoords);
         effectFontWeight.SetValue(FontWeight);
@@ -297,8 +312,15 @@ public class FontRenderer : GraphicsResource
         effectTransforms.SetValue(transformsAddress);
         GraphicsDevice.VertexType = null;
         GraphicsDevice.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
+        var b1 = GC.GetAllocatedBytesForCurrentThread();
         fontEffect.FontBatchRenderMsdfBatchInstancedPass.Apply();
         GraphicsDevice.Draw(4, glyphCount, 0, 0);   // 4 strip verts x glyphCount instances; address already at this segment
+        var b2 = GC.GetAllocatedBytesForCurrentThread();
+        BatchStateBytes += bState - b0;      // the six device property assignments
+        BatchResourceBytes += bRes - bState; // the sampler + atlas binds
+        BatchSetupBytes += b1 - bRes;        // the nine SetValue calls
+        BatchApplyDrawBytes += b2 - b1;
+        BatchDrawCount++;
     }
 
     public void RestoreState(bool outerPassActive = true)

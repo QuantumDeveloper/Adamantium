@@ -11,7 +11,13 @@ public interface IFundamentalUIComponent : IAdamantiumComponent, IDispatcherComp
     public NavigationCacheMode KeepAlive { get; }
 
     public String Id { get; set; }
+    /// <summary>Reading this BUILDS the collection if the component never had one - it has to, because markup adds to it
+    /// through the getter. Ask <see cref="HasClassNames"/> first when all you want to know is whether it is empty.</summary>
     public Classes ClassNames { get; }
+
+    /// <summary>Whether any class name is set, without building the collection to find out.</summary>
+    public bool HasClassNames { get; }
+
     public StylesCollection Styles { get; }
     public void AttachStyles(params Style[] styles);
     public void DetachStyles();

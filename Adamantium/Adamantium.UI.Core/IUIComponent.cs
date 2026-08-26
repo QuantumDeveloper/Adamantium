@@ -17,6 +17,20 @@ public interface IUIComponent : IFundamentalUIComponent
     Boolean AllowDrop { get; set; }
     Boolean IsHitTestVisible { get; set; }
     bool IsGeometryValid { get; }
+
+    /// <summary>Its last record produced NO draw commands - a layout-only container (a tile's Border with no brush, a
+    /// presenter, a panel with no Background). RECORDER-owned: the only thing that can know it is the record that just
+    /// counted the commands. False until it has been recorded once, so a component nobody has seen yet is never skipped.
+    /// <para>Its SUBTREE is untouched by this - children are separate components with flags of their own, and a container
+    /// that draws nothing is routinely full of things that do.</para></summary>
+    bool DrawsNothing { get; set; }
+
+    /// <summary>The geometry went stale because what it DRAWS changed (<see cref="InvalidateRender"/>, an AffectsRender
+    /// property - a hover brush arriving), as opposed to because it was re-laid-out. The two used to be one flag, which
+    /// is why resizing 2000 tiles re-recorded 21000 components and 16000 of them rendered to nothing: a resize
+    /// invalidates only what a component draws, and a container that draws nothing has no geometry for it to invalidate.
+    /// Cleared by <see cref="Render"/>.</summary>
+    bool GeometryStaleByContent { get; }
     Size RenderSize { get; set; }
     //Vector2 Location { get; }
     Visibility Visibility { get; set; }

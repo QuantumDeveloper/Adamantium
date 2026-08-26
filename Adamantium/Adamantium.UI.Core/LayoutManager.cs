@@ -28,17 +28,35 @@ public sealed class LayoutManager
     // viewport+margin, slicing big realizes over frames via InvalidateMeasureNextPass). See docs/TECH_DEBT.md.
 
     private readonly IUIComponent _root;
-    private readonly DirtyQueue _toStyle = new();
-    private readonly DirtyQueue _toMeasure = new();
-    private readonly DirtyQueue _toArrange = new();
+
+    // Every one of these is built ON DEMAND, because most managers never use most of them - and a surprising number of
+    // managers are never used at all. `LayoutManager.For` MAKES one keyed on the element itself for a component that has
+    // no root, no layout owner and no parent, which is precisely what an element being built from a template is: measured
+    // on a bare Border, writing one AffectsMeasure property cost 1745 bytes against 592 for an AffectsRender one, and the
+    // ~1100 of difference was a manager - three queues, a set, two lists and a stopwatch - allocated per element and dead
+    // the moment that element was attached to a real tree.
+    //
+    // Skipping the invalidation instead was tried and REVERTED: it dropped a request that a hosted DataTemplate needed
+    // (PanelRenderTests.HostedInDataTemplate_PanelChild_IsLaidOutAndVisible arranged its border to 0x0). Making the
+    // manager cheap changes no behaviour at all - every request is still recorded, it just stops paying for six objects
+    // to record nothing in five of them.
+    private DirtyQueue _toStyle;
+    private DirtyQueue _toMeasure;
+    private DirtyQueue _toArrange;
     // Nodes asking to be re-measured NEXT pass, not this one (a virtualizing panel slicing a large realize over frames).
-    // Enqueuing into _toMeasure would drain it THIS pass - the very burst we spread. Promoted at the start of each pass.
-    private readonly HashSet<IUIComponent> _toMeasureNextPass = new();
-    private readonly List<IUIComponent> _passBuffer = new();   // reused snapshot buffer for one phase's drain
-    private readonly List<IUIComponent> _promoteBuffer = new();   // reused scratch for promoting next-pass deferrals
-    private readonly System.Diagnostics.Stopwatch _passStopwatch = new();   // reused per pass (RuntimeStats)
+    // Enqueuing into ToMeasure would drain it THIS pass - the very burst we spread. Promoted at the start of each pass.
+    private HashSet<IUIComponent> _toMeasureNextPass;
+    private List<IUIComponent> _passBuffer;      // reused snapshot buffer for one phase's drain
+    private List<IUIComponent> _promoteBuffer;   // reused scratch for promoting next-pass deferrals
+    private System.Diagnostics.Stopwatch _passStopwatch;   // reused per pass (RuntimeStats)
 
-
+    private DirtyQueue ToStyle => _toStyle ??= new DirtyQueue();
+    private DirtyQueue ToMeasure => _toMeasure ??= new DirtyQueue();
+    private DirtyQueue ToArrange => _toArrange ??= new DirtyQueue();
+    private HashSet<IUIComponent> ToMeasureNextPass => _toMeasureNextPass ??= new HashSet<IUIComponent>();
+    private List<IUIComponent> PassBuffer => _passBuffer ??= new List<IUIComponent>();
+    private List<IUIComponent> PromoteBuffer => _promoteBuffer ??= new List<IUIComponent>();
+    private System.Diagnostics.Stopwatch PassStopwatch => _passStopwatch ??= new System.Diagnostics.Stopwatch();
 
     public LayoutManager(IUIComponent root)
     {
@@ -80,7 +98,7 @@ public sealed class LayoutManager
     // this the loop only woke on its 250 ms safety timeout and a tab's content crawled in at ~4 passes/sec. See LoopSignal.
     public void InvalidateStyle(IUIComponent node)
     {
-        _toStyle.Enqueue(node);
+        ToStyle.Enqueue(node);
         LoopSignal.Request();
     }
 
@@ -92,15 +110,15 @@ public sealed class LayoutManager
         // ends (see BeginDeferredInvalidation).
         if (_deferInvalidations || OffPassThread) { DeferredMeasure.Enqueue(node); return; }
         // A measure-invalid node also needs re-arranging: enqueue both so arrange re-runs after measure recomputes sizes.
-        _toMeasure.Enqueue(node);
-        _toArrange.Enqueue(node);
+        ToMeasure.Enqueue(node);
+        ToArrange.Enqueue(node);
     }
 
     public void InvalidateArrange(IUIComponent node)
     {
         LoopSignal.Request();
         if (_deferInvalidations || OffPassThread) { DeferredArrange.Enqueue(node); return; }
-        _toArrange.Enqueue(node);
+        ToArrange.Enqueue(node);
     }
 
     // The DirtyQueue is a plain HashSet + heap, and the parallel-rebind flag guarded only ONE way onto it. There is a
@@ -135,7 +153,7 @@ public sealed class LayoutManager
     // Nothing else will wake the loop for this (the work is already known), so signal here or the fill stalls until the timeout.
     public void InvalidateMeasureNextPass(IUIComponent node)
     {
-        _toMeasureNextPass.Add(node);
+        ToMeasureNextPass.Add(node);
         LoopSignal.Request();
     }
 
@@ -152,8 +170,7 @@ public sealed class LayoutManager
     public static event Action<LayoutManager> Quiescent;
 
     /// <summary>True when this root owes no layout work at all (nothing queued, nothing deferred to the next pass).</summary>
-    public bool IsSettled => _toStyle.IsEmpty && _toMeasure.IsEmpty && _toArrange.IsEmpty && _toMeasureNextPass.Count == 0;
-
+    public bool IsSettled => ToStyle.IsEmpty && ToMeasure.IsEmpty && ToArrange.IsEmpty && ToMeasureNextPass.Count == 0;
 
     /// <summary>
     /// Runs one layout pass: drain style (themes can change templates, so it precedes measure), then measure, then arrange,
@@ -176,12 +193,12 @@ public sealed class LayoutManager
 
         // Promote nodes that deferred to this pass. Snapshot+clear first: a promoted node may re-defer for the NEXT pass,
         // which must land in the now-empty set. InvalidateMeasure (not a bare enqueue) so the validity flag is cleared.
-        if (_toMeasureNextPass.Count > 0)
+        if (ToMeasureNextPass.Count > 0)
         {
-            _promoteBuffer.Clear();
-            foreach (var node in _toMeasureNextPass) _promoteBuffer.Add(node);   // struct enumerator, no alloc
-            _toMeasureNextPass.Clear();
-            foreach (var node in _promoteBuffer)
+            PromoteBuffer.Clear();
+            foreach (var node in ToMeasureNextPass) PromoteBuffer.Add(node);   // struct enumerator, no alloc
+            ToMeasureNextPass.Clear();
+            foreach (var node in PromoteBuffer)
                 if (node is IMeasurableComponent measurable) measurable.InvalidateMeasure();
         }
 
@@ -190,14 +207,18 @@ public sealed class LayoutManager
         if (_root is IMeasurableComponent rootMeasurable)
         {
             if (!rootMeasurable.IsMeasureValid) InvalidateMeasure(_root);
-            else if (!rootMeasurable.IsArrangeValid) _toArrange.Enqueue(_root);
+            else if (!rootMeasurable.IsArrangeValid) ToArrange.Enqueue(_root);
         }
 
-        _passStopwatch.Restart();   // time the pass for RuntimeStats
+        PassStopwatch.Restart();   // time the pass for RuntimeStats
+        // ...and what it ALLOCATES. A tab switch allocates ~190MB in one second and pays 180-200ms of GC pause for it,
+        // while the record and apply together account for a couple of MB - so the question is which half of the build
+        // (laying it out, or constructing it) that is.
+        var passBytes = GC.GetAllocatedBytesForCurrentThread();
 
         var didWork = false;
         var iterations = 0;
-        while (!_toStyle.IsEmpty || !_toMeasure.IsEmpty || !_toArrange.IsEmpty)
+        while (!ToStyle.IsEmpty || !ToMeasure.IsEmpty || !ToArrange.IsEmpty)
         {
             if (++iterations > MaxPassIterations)
             {
@@ -208,12 +229,23 @@ public sealed class LayoutManager
 
             // Drain each queue as a SNAPSHOT (only what's queued now), ordered style -> measure -> arrange. Work re-dirtied
             // DURING a phase lands back in the queues and is handled on the NEXT iteration, letting re-entrancy converge.
-            DrainPhase(_toStyle, ApplyTheme);
-            DrainPhase(_toMeasure, MeasureDirty);
-            DrainPhase(_toArrange, ArrangeDirty);
+            // Timed apart. The pass costs 300-490ms on a tab switch and the loop IS that pass; MeasureCore's own body is
+            // ~17 property reads (under a microsecond), so 46-91us per call has to be coming from somewhere else - and
+            // the STYLE phase is the one nobody has ever looked at.
+            var phase = System.Diagnostics.Stopwatch.GetTimestamp();
+            DrainPhase(ToStyle, ApplyTheme);
+            var afterStyle = System.Diagnostics.Stopwatch.GetTimestamp();
+            DrainPhase(ToMeasure, MeasureDirty);
+            var afterMeasure = System.Diagnostics.Stopwatch.GetTimestamp();
+            DrainPhase(ToArrange, ArrangeDirty);
+
+            RuntimeStats.LayoutStyleMs += System.Diagnostics.Stopwatch.GetElapsedTime(phase, afterStyle).TotalMilliseconds;
+            RuntimeStats.LayoutMeasureMs += System.Diagnostics.Stopwatch.GetElapsedTime(afterStyle, afterMeasure).TotalMilliseconds;
+            RuntimeStats.LayoutArrangeMs += System.Diagnostics.Stopwatch.GetElapsedTime(afterMeasure).TotalMilliseconds;
+            RuntimeStats.LayoutIterations++;
         }
 
-        var settled = _toStyle.IsEmpty && _toMeasure.IsEmpty && _toArrange.IsEmpty;
+        var settled = ToStyle.IsEmpty && ToMeasure.IsEmpty && ToArrange.IsEmpty;
 
         // A pass that found NOTHING to do is the "swap has settled" signal for RenderDirty.ForceStructuralUntilSettled
         // (theme/DPI): every settle write flows through this pass, so a workless pass means the cascade is done.
@@ -223,7 +255,9 @@ public sealed class LayoutManager
             Quiescent?.Invoke(this);
         }
 
-        RuntimeStats.LastLayoutPassMs = _passStopwatch.Elapsed.TotalMilliseconds;
+        RuntimeStats.LastLayoutPassMs = PassStopwatch.Elapsed.TotalMilliseconds;
+        RuntimeStats.LayoutPasses++;
+        RuntimeStats.LayoutBytes += GC.GetAllocatedBytesForCurrentThread() - passBytes;
 
         if (didWork) Diagnostics.LayoutTrace.Count(typeof(LayoutManager), "*pass*");
         RuntimeStats.LastPassBudgetDeferred = !settled;
@@ -240,9 +274,9 @@ public sealed class LayoutManager
     // Drains one queue FULLY as a snapshot (work re-dirtied during the phase waits for the next iteration), ancestors-first.
     private void DrainPhase(DirtyQueue queue, Action<IUIComponent> process)
     {
-        queue.DrainInto(_passBuffer);
-        for (var i = 0; i < _passBuffer.Count; i++)
-            process(_passBuffer[i]);
+        queue.DrainInto(PassBuffer);
+        for (var i = 0; i < PassBuffer.Count; i++)
+            process(PassBuffer[i]);
     }
 
     private static void ApplyTheme(IUIComponent node)
@@ -308,7 +342,7 @@ public sealed class LayoutManager
             // owns it now, so this manager can never make it measure-valid: re-queueing it spins the pass to its iteration
             // cap every frame and the root NEVER settles. Whoever re-attaches it re-registers it (see
             // MeasurableUIComponent.OnAttachedToVisualTree), so dropping it here loses nothing.
-            if (ReferenceEquals(For(node), this)) _toArrange.Enqueue(node);
+            if (ReferenceEquals(For(node), this)) ToArrange.Enqueue(node);
             return;
         }
 

@@ -83,6 +83,9 @@ public class StyleSelector
 
     private bool HasAllClasses(IFundamentalUIComponent control)
     {
+        // A component with no classes cannot have all of a non-empty set - answer without building its collection.
+        if (!control.HasClassNames) return Classes.Count == 0;
+
         foreach (var @class in Classes)
         {
             if (!control.ClassNames.Contains(@class)) return false;
@@ -93,6 +96,12 @@ public class StyleSelector
 
     private bool ContainsClassGroup(IFundamentalUIComponent control)
     {
+        // Answer without building the collection - and answer EXACTLY what the loop below answers for an empty one:
+        // `All` over an empty sequence is true, so a class-less component matches the first group there is. That reads
+        // like a bug (a group selector matching everything that names no class at all), but changing it is not this
+        // change's business, so the shortcut reproduces it rather than quietly fixing it.
+        if (!control.HasClassNames) return ClassGroups.Count > 0;
+
         var classes = control.ClassNames;
         foreach (var group in ClassGroups)
         {

@@ -113,7 +113,10 @@ internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
     // segment's index.
     private void Reindex(int from)
     {
-        for (var i = from; i < _segments.Count; i++) _indexById[_segments[i].Id] = i;
+        // Span: Segment is a STRUCT of ~80 bytes, so the list indexer copies the whole of it to read one int. This runs
+        // over the segment tail after every insert.
+        var segments = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_segments);
+        for (var i = from; i < segments.Length; i++) _indexById[segments[i].Id] = i;
     }
 
     // Ranges vacated by a re-issued layer, handed back so the next re-issue reuses them instead of growing the arena.
@@ -330,10 +333,19 @@ internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
 
         var s = _segments[index];
         if (s.Count == 0) return;   // re-issued to nothing - nothing left to draw
+        var b0 = System.GC.GetAllocatedBytesForCurrentThread();
         device.SetScissors(s.Scissor);
+        var b1 = System.GC.GetAllocatedBytesForCurrentThread();
         BindSegment(index);
+        var b2 = System.GC.GetAllocatedBytesForCurrentThread();
         DrawSegment(device, _ring[_current], s.Count, s.First, projection);
+        var b3 = System.GC.GetAllocatedBytesForCurrentThread();
         device.SetScissors(fullScissor);
+        var b4 = System.GC.GetAllocatedBytesForCurrentThread();
+        Core.Diagnostics.RuntimeStats.SegScissorBytes += (b1 - b0) + (b4 - b3);
+        Core.Diagnostics.RuntimeStats.SegBindBytes += b2 - b1;
+        Core.Diagnostics.RuntimeStats.SegDrawBytes += b3 - b2;
+        Core.Diagnostics.RuntimeStats.SegCount++;
     }
 
     // --- Spliced-patch surgery (per-control render-cache patching) -------------------------------------------------
@@ -347,9 +359,11 @@ internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
     /// excluded) segments never match.</summary>
     public override int FindSegmentContaining(int slot)
     {
-        for (var i = 0; i < _segments.Count; i++)
+        // Span + BY REFERENCE: the indexer copies an ~80-byte struct per iteration to test three fields.
+        var segments = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_segments);
+        for (var i = 0; i < segments.Length; i++)
         {
-            var s = _segments[i];
+            ref var s = ref segments[i];
             if (s.Count > 0 && slot >= s.First && slot < s.First + s.Count) return s.Id;
         }
         return -1;
@@ -419,7 +433,9 @@ internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
     public override void SetSegmentScissor(int id, Rect2D scissor)
     {
         var index = IndexOf(id);
-        if (index >= 0) _segments[index] = _segments[index] with { Scissor = scissor };
+        // Mutated IN PLACE: this read the struct, copied it, and wrote the copy back - two indexer passes over 80 bytes
+        // to change one field.
+        if (index >= 0) System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_segments)[index].Scissor = scissor;
     }
 
     /// <summary>What this recorded segment covers, in logical coordinates - empty when it never had bounds (a stale id, or

@@ -8,87 +8,147 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 {
     public UInt128 Uid { get; set; }
 
-    // Every property REGISTERED on this type, filled once in the constructor and never added to again - so it is safe to
-    // read from any thread without synchronising, which is what lets GetValue take no lock at all. It also doubles as
-    // the monitor WRITERS take (see SetValue): readers never wait on it, so no read can ever be caught in a lock cycle.
-    private readonly Dictionary<AdamantiumProperty, ValueContainer> values;
+    // The properties this component has actually been GIVEN a value for - created on first write, not one per registered
+    // property. A control registers ~65 and is given about five, so seeding a container for each cost ~172 bytes per
+    // DECLARED property per instance: a bare Border was 12.7 KB before anything was put in it, and a 4K tile grid of
+    // 60 000 components carried 533 MB of them. The collector then had to walk that graph, which is where a quarter to a
+    // half of every second went (see the server-GC note in the sandbox csproj).
+    //
+    // CONCURRENT, because it grows: growing a plain Dictionary while another thread reads it is a torn read, and reads
+    // happen on worker threads (the parallel arrange). Reads stay lock-free at any concurrency level, so ONE lock rather
+    // than one per processor cannot regress them - and the default's 16-core striping cost 1016 bytes per component to
+    // guard contention that cannot occur: this map belongs to ONE component.
+    //
+    // Keyed by the property OBJECT. Re-keying by the globally unique PropertyId to dodge the comparer's virtual calls was
+    // tried and MEASURED SLOWER (58ns a read against 46), so it stays.
+    //
+    // LAZY: a component never given an explicit value reads everything from declared defaults and needs no map at all.
+    // Built like attachedValues (one CompareExchange), so two threads racing to write the first property share one map.
+    private ConcurrentDictionary<AdamantiumProperty, ValueContainer> values;
+
+    /// <summary>How many properties this component actually has slots for - the number that says whether the map's
+    /// capacity is anywhere near right. Diagnostics only.</summary>
+    internal int ValueSlotCount => values?.Count ?? 0;
 
     // ATTACHED properties are the only ones that turn up later - they belong to another type and this one has no slot
     // for them until somebody sets one. Lazily created, so the components that never see an attached property (nearly
     // all of them) pay nothing for it.
     private ConcurrentDictionary<AdamantiumProperty, ValueContainer> attachedValues;
 
-    private readonly Dictionary<string, StyleValueContainer> styleValues = new();
+    // LAZY. Most elements never receive a style or a trigger value, and an empty Dictionary is 80 bytes each - 160 of
+    // the 2976 a Border costs to construct. Created by the first writer; every reader treats null as "nothing here",
+    // which is the same answer an empty map gave.
+    private Dictionary<string, StyleValueContainer> styleValues;
 
     // Per-property stack of trigger contributions (token -> value), so several triggers can target one property without
     // clobbering each other - leaving the top one restores the one beneath. The single Trigger slot in `values` holds
     // only the stack's current top. See SetTriggerValue/ClearTriggerValue.
-    private readonly Dictionary<string, TriggerValueContainer> triggerValues = new();
+    private Dictionary<string, TriggerValueContainer> triggerValues;
 
     private AdamantiumComponent inheritanceParent;
 
+    // Types whose declared defaults have already been checked. The check is about the TYPE - a registration's default
+    // against that registration's validator - and its answer cannot differ between two instances, so it belongs once per
+    // type rather than ~65 delegate invocations per component built.
+    private static readonly ConcurrentDictionary<Type, bool> ValidatedDefaults = new();
+
     protected AdamantiumComponent()
     {
-        var list = AdamantiumPropertyMap.GetRegisteredArray(GetType());
-        // Sized for what is about to go in: the map grows by rehashing, and a control with ~58 properties made the
-        // dictionary rebuild itself six times while it was being seeded.
-        values = new Dictionary<AdamantiumProperty, ValueContainer>(list.Length);
-
-        foreach (var property in list)
+        // NOTHING is allocated per property here any more. A container is what holds a VALUE, and a component that has
+        // not been given one has nothing to hold: its properties read as their declared defaults, which is precisely what
+        // GetValue's cold path already returns when no container exists (see GetValue/GetDefaultValue). The defaults were
+        // also PUBLISHED into every container as the effective value - re-stating, sixty-five times per element, what the
+        // metadata already says.
+        //
+        // The default is still never COERCED at construction: coercion answers "given this object's current state, what
+        // does that request become", and asking a half-built object was how one instance's state came to decide the
+        // default for every other instance of its type. A default stands as authored until something is actually set.
+        ValidatedDefaults.GetOrAdd(GetType(), static type =>
         {
-            var metadata = property.GetDefaultMetadata(GetType());
-            if (property.ValidateValueCallBack?.Invoke(metadata.DefaultValue) == false)
+            foreach (var property in AdamantiumPropertyMap.GetRegisteredArray(type))
             {
-                throw new ArgumentException($"Value {metadata} is incorrect!");
+                var metadata = property.GetDefaultMetadata(type);
+                if (property.ValidateValueCallBack?.Invoke(metadata.DefaultValue) == false)
+                {
+                    throw new ArgumentException($"Value {metadata} is incorrect!");
+                }
             }
 
-            // The default is NOT coerced here. Coercion answers "given this object's current state, what does that
-            // request become", so running it during construction asks a half-built object - and the result used to be
-            // written back into metadata.DefaultValue, which belongs to the TYPE: one instance's state would have
-            // decided the default for every other instance of it, for the life of the process. A default stands as
-            // authored until something is actually set, and from then on the coercion runs on every write.
-
-            // ONE dictionary operation, not four: this loop runs for every registered property of the type - about 58
-            // for a plain control - so a ContainsKey, an indexer set and two indexer gets per property added up to some
-            // 250 lookups per element built.
-            if (values.TryGetValue(property, out var container)) continue;
-
-            container = new ValueContainer();
-            values[property] = container;
-
-            // Seed the slot AND publish it as the effective value. Publishing is a separate step now that the container
-            // keeps the request and the coerced result apart - and it matters from the very first read: a property whose
-            // effective value is still "unset" hands callbacks that sentinel instead of its default, and code comparing
-            // the old value against it sees a type it cannot use (an implicit transition, for one, refuses to animate
-            // from it). The default is published as authored; the first write is what runs the coercion.
-            container.SetEffective(container.SetValue(metadata.DefaultValue, ValuePriority.Default));
-        }
+            return true;
+        });
     }
 
-    // The slots of a property, or null when this component has none. Lock-free: the registered map is immutable after
-    // construction, and the attached map is concurrent.
+    // The slots of a property, or null when this component has never been given a value for it. Null is an ANSWER, not a
+    // gap: the caller resolves the declared default (GetValue's cold path), which is what the seeded container used to
+    // hold anyway. Lock-free on both maps.
     private ValueContainer Slots(AdamantiumProperty property)
     {
-        if (values.TryGetValue(property, out var container)) return container;
+        var own = values;
+        if (own != null && own.TryGetValue(property, out var container))
+        {
+            return container;
+        }
 
         var attached = attachedValues;
         return attached != null && attached.TryGetValue(property, out var slot) ? slot : null;
     }
 
-    // The slots of a property, creating them for an ATTACHED one that has never been set on this component.
+    // ...and the slots to WRITE into, brought into being on demand. A registered property earns its container the first
+    // time it is given a value; an attached one belongs to another type and lives in its own lazy map.
     private ValueContainer EnsureSlots(AdamantiumProperty property)
     {
-        if (values.TryGetValue(property, out var container)) return container;
-        if (!property.IsAttached) return null;
+        var own = values;
+        if (own != null && own.TryGetValue(property, out var container))
+        {
+            return container;
+        }
+
+        if (!property.IsAttached)
+        {
+            // Registered on this type? Then it may be written, and this is where its container starts existing. Anything
+            // else is not ours and must stay null - SetValue's ValidateProperty has already refused it, and returning a
+            // container for it would silently accept a write nobody could ever read back.
+            if (!AdamantiumPropertyMap.IsRegistered(this, property)) return null;
+
+            if (own == null)
+            {
+                // Capacity 16, not 31: measured on a real laid-out scene, a component ends up with 4-8 slots
+                // (ContentPresenter 7, Border 6, Rectangle 6, ItemsControl 8, WrapPanel 8) - 31 buckets were four times
+                // the need and cost 480 bytes against 320. Sixteen still leaves headroom over the observed maximum, and
+                // exceeding it costs one doubling rather than a wrong answer.
+                Interlocked.CompareExchange(ref values,
+                    new ConcurrentDictionary<AdamantiumProperty, ValueContainer>(concurrencyLevel: 1, capacity: 16), null);
+                own = values;
+            }
+
+            return own.GetOrAdd(property, SeedFactory, this);
+        }
 
         var map = attachedValues;
         if (map == null)
         {
-            Interlocked.CompareExchange(ref attachedValues, new ConcurrentDictionary<AdamantiumProperty, ValueContainer>(), null);
+            Interlocked.CompareExchange(ref attachedValues, new ConcurrentDictionary<AdamantiumProperty, ValueContainer>(concurrencyLevel: 1, capacity: 4), null);
             map = attachedValues;
         }
 
-        return map.GetOrAdd(property, static _ => new ValueContainer());
+        return map.GetOrAdd(property, SeedFactory, this);
+    }
+
+    /// <summary>A new container starts life holding the property's DECLARED DEFAULT in its Default slot, published as the
+    /// effective value - exactly as the constructor used to seed every one of them. That slot is what everything above
+    /// Default falls back TO: clearing the last real value must report the default, not the Unset sentinel, and a
+    /// changed-callback must be handed a value it can use rather than a sentinel it cannot.</summary>
+    /// <summary>Static, and taking its state as the GetOrAdd ARGUMENT: a method group over an instance method allocates a
+    /// fresh delegate on every call - and this one is on the write path of every property in the engine.</summary>
+    private static readonly Func<AdamantiumProperty, AdamantiumComponent, ValueContainer> SeedFactory =
+        static (property, self) => self.SeedContainer(property);
+
+    private ValueContainer SeedContainer(AdamantiumProperty property)
+    {
+        var container = new ValueContainer();
+        var metadata = property.GetDefaultMetadata(GetType());
+        container.SetEffective(container.SetValue(metadata.DefaultValue, ValuePriority.Default));
+        return container;
     }
 
     /// <summary>
@@ -266,7 +326,6 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             return;
         }
 
-
         if (!TrySnapshotInheritanceChildren(out var single, out var children)) return;
 
         if (single != null) { single.InheritedValueChanged(e); return; }
@@ -404,14 +463,24 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
         if (result == AdamantiumProperty.UnsetValue)
         {
-            // COLD path only: the property has no value at any source priority. Validate registration HERE (not on every
-            // read) - a set property short-circuits above, so measure/arrange reading Margin/alignment/min-max skips the
-            // per-read map lookup + HasExplicitValue scan that used to sit on the hottest path in the engine.
-            if (!AdamantiumPropertyMap.IsRegistered(this, property))
+            // No value at any source priority - read the default. The metadata answers BOTH questions in ONE cached
+            // lookup: a property declared nowhere in this type's chain is the only case that still has to ask the
+            // registry (which runs the static constructors and throws). Asking the registry first cost 64ns on top of
+            // the 60ns for the metadata, on EVERY read of an unset property - which, since containers became lazy
+            // (nothing is seeded at construction any more), is most reads in the engine rather than a cold path.
+            var metadata = property.GetDefaultMetadata(GetType());
+            if (metadata == null)
             {
-                ThrowNotRegistered(property);
+                if (!AdamantiumPropertyMap.IsRegistered(this, property))
+                {
+                    ThrowNotRegistered(property);
+                }
+                metadata = property.GetDefaultMetadata(GetType());   // the registry check runs static ctors, which can declare it
             }
-            result = GetDefaultValue(property);
+
+            result = metadata.Inherits && inheritanceParent != null
+                ? inheritanceParent.GetValue(property)
+                : metadata.DefaultValue;
         }
         // Inherited values are resolved by ResolveInherited above and CACHED in the Inherited slot, so the scan sees
         // them like any other value and a second read of the same epoch costs one stamp comparison.
@@ -425,7 +494,12 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     // already read as this value, it just had not been written down yet.
     private void ResolveInherited(AdamantiumProperty property)
     {
-        if (Slots(property) is not { } container) return;
+        // ENSURE, not merely look up: this cache is the whole reason an inherited read is one stamp comparison instead of
+        // a walk to the root, and it lives in the container. With containers created only on write, an element that
+        // never SETS its DataContext would have had nowhere to remember what it inherits and would have walked the chain
+        // on every read - which is exactly the O(depth)-per-read this was written to replace. Only the handful of
+        // properties that can inherit reach here, so it is three containers per element, not sixty-five.
+        if (EnsureSlots(property) is not { } container) return;
         if (container.InheritedStamp == AdamantiumProperty.InheritanceEpoch) return;
         if (!container.IsDefaultOnly && container.GetValue(ValuePriority.Inherited) == AdamantiumProperty.UnsetValue)
         {
@@ -540,7 +614,6 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     public Data.BindingExpressionBase SetBinding(AdamantiumProperty property, Data.BindingBase bindingBase)
         => Data.BindingEngine.SetBinding(this, property, bindingBase);
 
-
     public void SetTriggerValue(string propertyName, object value, object token)
     {
         var property = AdamantiumPropertyMap.ResolveProperty(GetType(), propertyName);
@@ -551,6 +624,7 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     // of overwriting one slot. The Trigger priority slot just mirrors the stack's current top.
     public void SetTriggerValue(AdamantiumProperty property, object value, object token)
     {
+        triggerValues ??= new Dictionary<string, TriggerValueContainer>();
         if (!triggerValues.TryGetValue(property.Name, out var container))
             triggerValues[property.Name] = container = new TriggerValueContainer();
         container.Set(token, value);
@@ -560,7 +634,7 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
     // Drops one trigger's contribution; the slot falls back to the next trigger underneath (or UnsetValue -> Style/Local).
     public void ClearTriggerValue(AdamantiumProperty property, object token)
     {
-        if (!triggerValues.TryGetValue(property.Name, out var container)) return;
+        if (triggerValues == null || !triggerValues.TryGetValue(property.Name, out var container)) return;
         container.Remove(token);
         SetValue(property, container.EffectiveValue, ValuePriority.Trigger);
     }
@@ -585,21 +659,22 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
 
     private void AddStyleEntry(string propertyName, object value, Style style)
     {
-        if (!styleValues.ContainsKey(propertyName))
+        styleValues ??= new Dictionary<string, StyleValueContainer>();
+        if (!styleValues.TryGetValue(propertyName, out var entry))
         {
-            styleValues[propertyName] = new StyleValueContainer();
+            styleValues[propertyName] = entry = new StyleValueContainer();
         }
-        styleValues[propertyName].AddValue(style, value);
+        entry.AddValue(style, value);
     }
     
     private object RemoveStyleEntry(string propertyName, Style style)
     {
-        if (!styleValues.ContainsKey(propertyName))
+        if (styleValues == null || !styleValues.TryGetValue(propertyName, out var entry))
         {
             return AdamantiumProperty.UnsetValue;
         }
-        
-        return styleValues[propertyName].RemoveAndGetEffectiveValue(style);
+
+        return entry.RemoveAndGetEffectiveValue(style);
     }
 
     /// <summary>
@@ -714,7 +789,6 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         return coerced;
     }
 
-
     private void RunSetValueSequence(AdamantiumProperty property, object value, ValuePriority priority, bool raiseValueChangedEvent)
     {
         var metadata = property.GetDefaultMetadata(GetType());
@@ -801,18 +875,24 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         {
             if (metadata.AffectsMeasure)
             {
-                if (Diagnostics.LayoutTrace.Counting) 
+                if (Diagnostics.LayoutTrace.Counting)
                     Diagnostics.LayoutTrace.Count(GetType(), property.Name);
-                
+
                 measurable.InvalidateMeasure();
                 measurable.InvalidateArrange();
+                // ...and what it DRAWS may depend on the value too (a TextBlock's Text is AffectsMeasure alone, and a
+                // changed word of the same width would otherwise keep its old glyphs). Nearly 200 properties declare
+                // AffectsMeasure without AffectsRender and have always relied on this - said HERE, on the one element
+                // whose value changed, instead of by the layout invalidation, which fires for every node a pass touches.
+                element.InvalidateRender(false);
             }
             else if (metadata.AffectsArrange)
             {
-                if (Diagnostics.LayoutTrace.Counting) 
+                if (Diagnostics.LayoutTrace.Counting)
                     Diagnostics.LayoutTrace.Count(GetType(), property.Name);
-                
+
                 measurable.InvalidateArrange();
+                element.InvalidateRender(false);
             }
 
             // The value belongs to the PARENT's layout, not to this element's own size: a Grid cell index, a figure's
@@ -851,7 +931,6 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         {
             element?.InvalidatePaint();
         }
-
 
         // oldReadValue, NOT the raw slot: a container never written holds UnsetValue, and reporting THAT as OldValue told
         // every listener the property "used to be unset" instead of naming the default it actually read as. The

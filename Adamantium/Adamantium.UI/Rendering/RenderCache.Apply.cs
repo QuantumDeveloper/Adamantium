@@ -20,14 +20,35 @@ public partial class RenderCache
     /// every window has recorded - see below - not here.)</summary>
     public void ApplyFrame()
     {
+        var applyBytes0 = System.GC.GetAllocatedBytesForCurrentThread();
         BeginApplyFrame();
+
+        // Counted for the WHOLE frame: this loop drains every packet published since the last apply, so per-packet
+        // figures describe whichever one happened to be last and say nothing about the frame's cost.
+        Core.Diagnostics.RuntimeStats.LastApplyPackets = 0;
+        Core.Diagnostics.RuntimeStats.LastApplyDraws = 0;
+        Core.Diagnostics.RuntimeStats.LastApplyStructuralMs = 0;
+        Core.Diagnostics.RuntimeStats.LastApplyReRenderMs = 0;
+        Core.Diagnostics.RuntimeStats.LastApplyBuildMs = 0;
+        Core.Diagnostics.RuntimeStats.LastApplyMergeMs = 0;
+        Core.Diagnostics.RuntimeStats.LastApplyUnitMs = 0;
+        Core.Diagnostics.RuntimeStats.LastApplySlowestUnitMs = 0;
+        Core.Diagnostics.RuntimeStats.LastApplySlowestUnit = "-";
+        Core.Diagnostics.RuntimeStats.LastApplyInserts = 0;
+        Core.Diagnostics.RuntimeStats.LastApplyKind = "-";
+
+        var glyphStart = System.Diagnostics.Stopwatch.GetTimestamp();
         AdoptReadyGlyphs();   // glyphs that finished rasterizing since the last frame land here
+        Core.Diagnostics.RuntimeStats.LastApplyGlyphMs = System.Diagnostics.Stopwatch.GetElapsedTime(glyphStart).TotalMilliseconds;
+
         while (_published.TryDequeue(out var packet))
         {
             ApplyPacket(packet);
             packet.Reset(RenderBuildKind.Clean);
             _spare.Add(packet);   // back to the pool for the recorder
         }
+
+        Core.Diagnostics.RuntimeStats.LastApplyBytes = System.GC.GetAllocatedBytesForCurrentThread() - applyBytes0;
 
         // RenderDirty (a GLOBAL set shared by every window) is NOT cleared per-window here: with two windows the first to
         // apply would wipe the set before the second records, so the second never re-records its content. Both the
@@ -295,6 +316,16 @@ public partial class RenderCache
         }
 
 
+        // Accumulated into the frame's totals (reset in ApplyFrame). The KIND keeps the heaviest one seen this frame, so
+        // "Structural" is not lost behind a Clean packet that happened to arrive after it.
+        Core.Diagnostics.RuntimeStats.LastApplyPackets++;
+        Core.Diagnostics.RuntimeStats.LastApplyDraws += packet.Draws.Count;
+        if (packet.Kind > RenderBuildKind.Clean &&
+            (Core.Diagnostics.RuntimeStats.LastApplyKind == "-" || packet.Kind == RenderBuildKind.Full))
+        {
+            Core.Diagnostics.RuntimeStats.LastApplyKind = packet.Kind.ToString();
+        }
+
         switch (packet.Kind)
         {
             case RenderBuildKind.Clean:
@@ -306,8 +337,10 @@ public partial class RenderCache
             case RenderBuildKind.Partial:
             {
                 // APPLY pass (GPU): realize the recorded draws - update the units in place / splice a count change.
+                var reRenderStart = System.Diagnostics.Stopwatch.GetTimestamp();
                 foreach (var draw in packet.Draws)
                     ApplyReRender(draw.Component, draw.Commands, draw.Order, draw.Clones);
+                Core.Diagnostics.RuntimeStats.LastApplyReRenderMs += System.Diagnostics.Stopwatch.GetElapsedTime(reRenderStart).TotalMilliseconds;
 
                 if (LastBuildKind != RenderBuildKind.Full) LastBuildKind = RenderBuildKind.Partial;
                 _partialDirty.AddRange(packet.PartialDirty);
@@ -340,7 +373,9 @@ public partial class RenderCache
                             && !reordered && !packet.SnapReset && !_layoutChangedSinceRecord;
 
 
+                var structuralStart = System.Diagnostics.Stopwatch.GetTimestamp();
                 ApplyStructural(packet);
+                Core.Diagnostics.RuntimeStats.LastApplyStructuralMs += System.Diagnostics.Stopwatch.GetElapsedTime(structuralStart).TotalMilliseconds;
                 if (LastBuildKind != RenderBuildKind.Full)
                     LastBuildKind = local ? RenderBuildKind.Partial : RenderBuildKind.Structural;
                 LastBuildTransformDirty = !local;
@@ -419,6 +454,16 @@ public partial class RenderCache
         // Its recorded geometry is unchanged - keep the units as-is.
         if (component.IsGeometryValid) return PartialRecord.Skip;
 
+        // It was RE-LAID-OUT, and it draws nothing: a tile's Border with no brush, a presenter, a panel with no
+        // Background. There is no recorded geometry for a new size to invalidate, so rendering it again only produces the
+        // same zero commands - measured at 16000 of the 21000 records a tile-grid resize made, three quarters of the
+        // record half of the frame. It is only the ELEMENT that is stepped over: its children are separate components,
+        // marked in their own right, and a container that draws nothing is routinely full of things that do. Its layout
+        // snapshot is still re-frozen (CaptureSnapshot reads the DIRTY SET, not the packet), so a container that clips
+        // still clips at its new size. Any change to what it draws - a hover brush arriving - comes in as a CONTENT
+        // invalidation and is recorded here as before.
+        if (component.DrawsNothing && !component.GeometryStaleByContent) return PartialRecord.Skip;
+
         // No paint rank: invisible/absent when the order was last derived, now appearing with no structural mark to place
         // it (an auto-hide ScrollBar fading in). Hand to a full walk. A component that DRAWS always has a rank, so this is
         // the appearing-content case only.
@@ -429,21 +474,48 @@ public partial class RenderCache
 
     // RECORD half of a partial re-render for ONE component (DEVICE-FREE): decide, then component.Render and copy the
     // commands into the packet. No GPU - the applier (ApplyReRender) realizes them.
-    private PartialRecord RecordReRender(IUIComponent component, RenderPacket packet)
+    private PartialRecord RecordReRender(IUIComponent component, RenderPacket packet) =>
+        RecordReRender(component, packet, ClassifyReRender(component));
+
+    /// <summary>...with the decision already taken. The structural pass PRE-VALIDATES the whole dirty set before it
+    /// commits to anything, so classifying each component again here was the same ancestor walk done twice per frame -
+    /// 10000 components' worth on a tile drag.</summary>
+    private PartialRecord RecordReRender(IUIComponent component, RenderPacket packet, PartialRecord decision)
     {
-        var decision = ClassifyReRender(component);
-        if (decision is PartialRecord.Skip or PartialRecord.Fallback) return decision;
+        if (decision is PartialRecord.Skip or PartialRecord.Fallback)
+        {
+            Core.Diagnostics.RuntimeStats.LastRecordClassifySkips++;
+            return decision;
+        }
 
         var rank = RankOf(component);
         _drawingContextInternal.Clear();
+        var renderBytes0 = System.GC.GetAllocatedBytesForCurrentThread();
+        var renderStart = System.Diagnostics.Stopwatch.GetTimestamp();
         component.Render(_drawingContext);   // NB: consumes the dirty flag (Render sets IsGeometryValid back to true)
+        var renderMs = System.Diagnostics.Stopwatch.GetElapsedTime(renderStart).TotalMilliseconds;
+        Core.Diagnostics.RuntimeStats.LastRecordRenderMs += renderMs;
+        Core.Diagnostics.RuntimeStats.NoteRecordMs(component.GetType(), renderMs);
         // A HIDDEN element is rendered and its commands DROPPED, rather than not rendered at all: rendering is what
         // consumes the dirty flag, and an element that stays dirty is re-recorded every frame forever. What it says it
         // would draw is simply not what it draws while hidden.
+        Core.Diagnostics.RuntimeStats.LastRecordRenderBytes += System.GC.GetAllocatedBytesForCurrentThread() - renderBytes0;
+        var copyBytes0 = System.GC.GetAllocatedBytesForCurrentThread();
+        var copyStart = System.Diagnostics.Stopwatch.GetTimestamp();
         var commands = decision == PartialRecord.Undrawn
             ? CopyCommands(System.Array.Empty<IDrawCommand>())
             : CopyCommands(_drawingContextInternal.GetDrawCommands());
         packet.Draws.Add(new ComponentDraw(component, commands, false, rank, component.RenderClones));
+        Core.Diagnostics.RuntimeStats.LastRecordCopyMs += System.Diagnostics.Stopwatch.GetElapsedTime(copyStart).TotalMilliseconds;
+        Core.Diagnostics.RuntimeStats.LastRecordCopyBytes += System.GC.GetAllocatedBytesForCurrentThread() - copyBytes0;
+        // The one place that can know it: the record that just counted the commands. NOT on the Undrawn path - those
+        // commands were dropped because it is hidden, which says nothing about what it draws when shown.
+        if (decision != PartialRecord.Undrawn) component.DrawsNothing = commands.Count == 0;   // it was geometry-INVALID, so Render really ran
+        if (commands.Count == 0)
+        {
+            Core.Diagnostics.RuntimeStats.LastRecordEmptyDraws++;
+            Core.Diagnostics.RuntimeStats.NoteEmptyDraw(component.GetType());
+        }
         MirrorUnits(component, commands.Count, false);   // it WAS dirty: no commands now means "draws nothing" -> units freed
         return PartialRecord.Recorded;
     }
@@ -541,6 +613,7 @@ public partial class RenderCache
         //    linear scan per insert would be O(new x scene) on a fill).
         _pendingInserts.Clear();
         _pendingSet.Clear();
+        var buildStart = System.Diagnostics.Stopwatch.GetTimestamp();
         foreach (var draw in packet.Draws)
         {
             if (draw.Commands.Count == 0)
@@ -583,10 +656,13 @@ public partial class RenderCache
             QueueInsert(group);
         }
 
+        Core.Diagnostics.RuntimeStats.LastApplyBuildMs += System.Diagnostics.Stopwatch.GetElapsedTime(buildStart).TotalMilliseconds;
+
         FlushOrderRemovals();   // the merge below READS the order, so the batch has to be committed first
 
         if (_pendingInserts.Count == 0) return;
 
+        var mergeStart = System.Diagnostics.Stopwatch.GetTimestamp();
         // One merge of two sorted sequences - the retained paint order and this frame's arrivals.
         _pendingInserts.Sort(static (a, b) => a.Order.CompareTo(b.Order));
         _mergedGroups.Clear();
@@ -600,6 +676,9 @@ public partial class RenderCache
         _groups.Clear();
         _groups.AddRange(_mergedGroups);
         foreach (var group in _pendingInserts) group.InOrder = true;
+        Core.Diagnostics.RuntimeStats.LastApplyMergeMs += System.Diagnostics.Stopwatch.GetElapsedTime(mergeStart).TotalMilliseconds;
+        Core.Diagnostics.RuntimeStats.LastApplyInserts += _pendingInserts.Count;
+        Core.Diagnostics.RuntimeStats.LastApplyGroups = _groups.Count;
     }
 
     // Takes a group OUT of the paint order (it stops drawing) without touching its units.

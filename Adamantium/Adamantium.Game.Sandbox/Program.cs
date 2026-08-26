@@ -42,6 +42,29 @@ public class Program
                 Adamantium.UI.Core.VisualTreeNotifications.Detached += _ => System.Threading.Interlocked.Increment(ref detachCount);
                 long lastAttach = 0, lastDetach = 0;
                 double secRecord = 0, secApply = 0, secPre = 0, secProc = 0;
+                double secStructural = 0, secReRender = 0, secGlyph = 0, secBuild = 0, secMerge = 0, secUnit = 0;
+                var worstInserts = 0; var worstGroups = 0;
+                var worstUnit = "-"; double worstUnitMs = 0;
+                double secRecRender = 0; var worstEmptyDraws = 0; var worstReranks = 0;
+                double secRecPlan = 0, secRecCopy = 0, secRecSnap = 0; var worstDirty = 0; var worstSkips = 0;
+                double secSnapDraws = 0, secSnapDirty = 0; var worstPublished = 0;
+                double secLayoutMs = 0;
+                double lastLaySty = 0, lastLayMea = 0, lastLayArr = 0; var lastLayIter = 0; var lastLayPass = 0;
+                double lastCpUpd = 0, lastCpCache = 0, lastCpBase = 0; var lastCpHits = 0; var lastCpFull = 0;
+                double secRecPlace = 0, secRenumber = 0; var worstMarks = 0; long worstScans = 0; var worstRuns = 0; var worstParents = 0;
+                long secAllocStart = GC.GetTotalAllocatedBytes(); long secRecBytes = 0, secApplyBytes = 0;
+                long lastPreBytes = 0, lastDrawBytes = 0, lastOpsBytes = 0, lastSetupBytes = 0, lastLayoutBytes = 0;
+                var lastOpBytes = new long[4]; var lastOpCounts = new int[4];
+                long lastApplyB = 0, lastDrawB = 0; var lastApplyN = 0;
+                long lastSegSc = 0, lastSegBind = 0, lastSegDraw = 0; var lastSegN = 0;
+                long lastTxtStride = 0, lastTxtSetup = 0, lastTxtAD = 0, lastTxtState = 0, lastTxtRes = 0; var lastTxtN = 0;
+                long lastXlate = 0, lastFeat = 0, lastWords = 0, lastTail = 0, lastTbOvr = 0, lastFont = 0, lastGuard = 0, lastShape = 0; var lastProcN = 0; var lastTbN = 0; var lastRebuild = 0; var lastGuardN = 0; var lastShapeN = 0;
+                string[] opNames = { "scis", "unit", "seg", "flush" };
+                long lastUnitsCreated = 0, lastUnitsUpdated = 0, lastUGrow = 0, lastUMism = 0;
+                double lastUCreMs = 0, lastUUpdMs = 0;
+                var worstPackets = 0;
+                var worstKind = "-"; var worstDraws = 0;
+                long lastPark = 0;
                 var lastGcPause = GC.GetTotalPauseDuration();
                 int lastG0 = 0, lastG1 = 0, lastG2 = 0;
                 Adamantium.UI.Core.VisualTreeNotifications.Attached += c => Note("attached", c);
@@ -53,6 +76,12 @@ public class Program
                 var startFrames = Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames;
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 var limit = Environment.GetEnvironmentVariable("ADAM_PROBE_SECONDS") is { } sec ? double.Parse(sec) : 20;
+                // WHO marks layout dirty, by type + the property that changed. The per-second columns say how MUCH layout
+                // there is; only this says whose it is - e.g. whether a label beside the slider, re-measuring as its text
+                // changes width, is shoving its neighbours and cascading into the whole window.
+                var countLayout = Environment.GetEnvironmentVariable("ADAM_LAYOUT_COUNT") == "1";
+                if (countLayout) Adamantium.UI.Core.Diagnostics.LayoutTrace.Counting = true;
+                var busiestLayout = 0; var busiestLayoutDump = "";
                 double layout = 0;
                 double sumBegin = 0, sumEnd = 0, sumSubmit = 0, sumPresent = 0, sumFence = 0, sumAcquire = 0, sumSetup = 0;
                 double sumPre = 0;
@@ -78,6 +107,7 @@ public class Program
                 {
                     var st = typeof(Adamantium.UI.Core.Diagnostics.RuntimeStats);
                     if (Adamantium.UI.Core.Diagnostics.RuntimeStats.LastLayoutPassMs > layout) layout = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastLayoutPassMs;
+                    if (Adamantium.UI.Core.Diagnostics.RuntimeStats.LastLayoutPassMs > secLayoutMs) secLayoutMs = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastLayoutPassMs;
                     sumPre += Adamantium.UI.Core.Diagnostics.RuntimeStats.LastPreRenderMs;
                     sumBegin += Adamantium.UI.Core.Diagnostics.RuntimeStats.LastBeginDrawMs;
                     sumEnd += Adamantium.UI.Core.Diagnostics.RuntimeStats.LastEndDrawMs;
@@ -99,10 +129,42 @@ public class Program
                     if (Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordMs > secRecord)
                     {
                         secRecord = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordMs;
+                        secRecRender = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordRenderMs;
+                        worstEmptyDraws = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordEmptyDraws;
+                        worstReranks = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordReranks;
+                        secRecPlan = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordPlanMs;
+                        secRecPlace = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordPlanOnlyMs;
+                        worstMarks = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordStructuralMarks;
+                        worstScans = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordPlanScans;
+                        worstRuns = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordPlanRuns;
+                        worstParents = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordPlanParents;
+                        secRenumber = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordRenumberMs;
+                        secRecBytes = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordRenderBytes + Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordCopyBytes + Adamantium.UI.Core.Diagnostics.RuntimeStats.LastSnapBytes;
+                        secApplyBytes = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyBytes;
+                        secRecCopy = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordCopyMs;
+                        secRecSnap = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordSnapMs;
+                        worstDirty = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordDirty;
+                        worstSkips = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRecordClassifySkips;
+                        secSnapDraws = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastSnapDrawsMs;
+                        secSnapDirty = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastSnapDirtyMs;
+                        worstPublished = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastSnapPublished;
                     }
                     if (Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyMs > secApply)
                     {
                         secApply = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyMs;
+                        secStructural = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyStructuralMs;
+                        secReRender = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyReRenderMs;
+                        worstKind = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyKind;
+                        worstDraws = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyDraws;
+                        worstPackets = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyPackets;
+                        secGlyph = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyGlyphMs;
+                        secBuild = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyBuildMs;
+                        secUnit = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyUnitMs;
+                        worstUnit = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplySlowestUnit;
+                        worstUnitMs = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplySlowestUnitMs;
+                        secMerge = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyMergeMs;
+                        worstInserts = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyInserts;
+                        worstGroups = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastApplyGroups;
                     }
                     if (Adamantium.UI.Core.Diagnostics.RuntimeStats.LastPreRenderMs > secPre) secPre = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastPreRenderMs;
                     if (Adamantium.UI.Core.Diagnostics.RuntimeStats.LastProcessorsMs > secProc) secProc = Adamantium.UI.Core.Diagnostics.RuntimeStats.LastProcessorsMs;
@@ -150,6 +212,18 @@ public class Program
                         var measuresNow = Adamantium.UI.Controls.Base.MeasurableUIComponent.TotalMeasureCores;
                         var arrangesNow = Adamantium.UI.Controls.Base.MeasurableUIComponent.TotalArrangeCores;
 
+                        // Formatted UNDER THE LOCK the writers take: these two are Dictionaries filled from the record
+                        // thread, and enumerating one while it is being written crashed the probe (a NullReferenceException
+                        // inside the enumerator, on a tab switch). Snapshot to strings here, then log without holding it.
+                        string emptyText, recByText, layByText, uByText;
+                        lock (Adamantium.UI.Core.Diagnostics.RuntimeStats.HistogramLock)
+                        {
+                            emptyText = string.Join(" ", System.Linq.Enumerable.Select(System.Linq.Enumerable.Take(System.Linq.Enumerable.OrderByDescending(Adamantium.UI.Core.Diagnostics.RuntimeStats.EmptyDrawsByType, kv => kv.Value), 4), kv => $"{kv.Key.Name}:{kv.Value}"));
+                            recByText = string.Join(" ", System.Linq.Enumerable.Select(System.Linq.Enumerable.Take(System.Linq.Enumerable.OrderByDescending(Adamantium.UI.Core.Diagnostics.RuntimeStats.RecordMsByType, kv => kv.Value), 6), kv => $"{kv.Key.Name}:{kv.Value:0}"));
+                            layByText = string.Join(" ", System.Linq.Enumerable.Select(System.Linq.Enumerable.Take(System.Linq.Enumerable.OrderByDescending(Adamantium.UI.Core.Diagnostics.RuntimeStats.LayoutMsByType, kv => kv.Value), 6), kv => $"{kv.Key.Name}:{kv.Value:0.0}ms/{Adamantium.UI.Core.Diagnostics.RuntimeStats.LayoutCountByType[kv.Key]}"));
+                            uByText = string.Join(" ", System.Linq.Enumerable.Select(System.Linq.Enumerable.Take(System.Linq.Enumerable.OrderByDescending(Adamantium.UI.Core.Diagnostics.RuntimeStats.UnitsCreatedByKind, kv => kv.Value.Ms), 5), kv => $"{kv.Key}:{kv.Value.Count}/{kv.Value.Ms:0.0}ms"));
+                        }
+
                         System.IO.File.AppendAllText(log + ".seconds.txt",
                             $"t={sw.Elapsed.TotalSeconds:00} fps={thisSecond,5} " +
                             $"loopMs={loopWorstMs,7:0} " +
@@ -157,17 +231,122 @@ public class Program
                             $"binds={bindsNow - loopBindings,8} " +
                             $"measure={measuresNow - loopMeasures,8} arrange={arrangesNow - loopArranges,8} " +
                             $"recMs={secRecord,7:0.0} applyMs={secApply,7:0.0} preMs={secPre,7:0.0} procMs={secProc,7:0.0} " +
+                            $"aStruct={secStructural,7:0.0} aRe={secReRender,7:0.0} aGlyph={secGlyph,7:0.0} " +
+                            $"aBuild={secBuild,7:0.0} aUnit={secUnit,7:0.0} aMerge={secMerge,7:0.0} ins={worstInserts,7} grp={worstGroups,7} " +
+                            $"slowest={worstUnit,-52} slowMs={worstUnitMs,6:0.00} " +
+                            $"rRender={secRecRender,7:0.0} rCopy={secRecCopy,7:0.0} rPlan={secRecPlan,7:0.0} rPlace={secRecPlace,7:0.0} rRenum={secRenumber,6:0.0} rMarks={worstMarks,6} rScans={worstScans,9} rRuns={worstRuns,6} rPar={worstParents,5} rSnap={secRecSnap,7:0.0} " +
+                            $"sDraws={secSnapDraws,7:0.0} sDirty={secSnapDirty,7:0.0} sPub={worstPublished,7} " +
+                            $"rDirty={worstDirty,7} rSkip={worstSkips,7} rEmpty={worstEmptyDraws,7} rRerank={worstReranks,7} " +
+                            $"kind={worstKind,-10} pkts={worstPackets,4} draws={worstDraws,6} " +
+                            // CREATED versus UPDATED units: building a unit from scratch allocates GPU buffers, updating
+                            // one writes into buffers that already exist. Same loop, an order of magnitude apart - which
+                            // is exactly the spread aBuild shows per draw (1.5us to 16us), so this is the column that
+                            // tells the two apart.
+                            $"uCre={Adamantium.UI.Core.Diagnostics.RuntimeStats.UnitsCreated - lastUnitsCreated,7} uGrow={Adamantium.UI.Core.Diagnostics.RuntimeStats.UnitsCreatedGrow - lastUGrow,7} uMism={Adamantium.UI.Core.Diagnostics.RuntimeStats.UnitsCreatedMismatch - lastUMism,7} uCreMs={Adamantium.UI.Core.Diagnostics.RuntimeStats.UnitCreateMs - lastUCreMs,7:0.0} uUpdMs={Adamantium.UI.Core.Diagnostics.RuntimeStats.UnitUpdateMs - lastUUpdMs,7:0.0} " +
+                            $"uUpd={Adamantium.UI.Core.Diagnostics.RuntimeStats.UnitsUpdated - lastUnitsUpdated,8} " +
+                            $"park={Adamantium.UI.Controls.Panels.VirtualizingPanel.ParkCalls - lastPark,7} " +
                             $"gcPause={(GC.GetTotalPauseDuration() - lastGcPause).TotalMilliseconds,7:0.0} " +
                             $"g0={GC.CollectionCount(0) - lastG0,5} g1={GC.CollectionCount(1) - lastG1,5} g2={GC.CollectionCount(2) - lastG2,4} " +
                             $"heapMB={GC.GetTotalMemory(false) / 1048576,6} " +
+                            $"allocMB={(GC.GetTotalAllocatedBytes() - secAllocStart) / 1048576.0,7:0.0} recKB={secRecBytes / 1024,7} aplKB={secApplyBytes / 1024,7} layMB={(Adamantium.UI.Core.Diagnostics.RuntimeStats.LayoutBytes - lastLayoutBytes) / 1048576.0,7:0.0} " +
+                            $"preKB={(Adamantium.UI.Core.Diagnostics.RuntimeStats.PreRenderBytes - lastPreBytes) / 1024,8} drawKB={(Adamantium.UI.Core.Diagnostics.RuntimeStats.DrawBytes - lastDrawBytes) / 1024,8} " +
+                            $"opsKB={(Adamantium.UI.Core.Diagnostics.RuntimeStats.ExecuteOpsBytes - lastOpsBytes) / 1024,8} setupKB={(Adamantium.UI.Core.Diagnostics.RuntimeStats.DrawSetupBytes - lastSetupBytes) / 1024,8} ops={Adamantium.UI.Core.Diagnostics.RuntimeStats.LastOpsExecuted,6} " +
+                            $"txt=[state:{(Adamantium.Graphics.Fonts.FontRenderer.BatchStateBytes - lastTxtState) / 1024}KB res:{(Adamantium.Graphics.Fonts.FontRenderer.BatchResourceBytes - lastTxtRes) / 1024}KB setv:{(Adamantium.Graphics.Fonts.FontRenderer.BatchSetupBytes - lastTxtSetup) / 1024}KB applyDraw:{(Adamantium.Graphics.Fonts.FontRenderer.BatchApplyDrawBytes - lastTxtAD) / 1024}KB n:{Adamantium.Graphics.Fonts.FontRenderer.BatchDrawCount - lastTxtN}] " +
+                            $"inSeg=[scis:{(Adamantium.UI.Core.Diagnostics.RuntimeStats.SegScissorBytes - lastSegSc) / 1024}KB bind:{(Adamantium.UI.Core.Diagnostics.RuntimeStats.SegBindBytes - lastSegBind) / 1024}KB draw:{(Adamantium.UI.Core.Diagnostics.RuntimeStats.SegDrawBytes - lastSegDraw) / 1024}KB n:{Adamantium.UI.Core.Diagnostics.RuntimeStats.SegCount - lastSegN}] " +
+                            $"inDraw=[apply:{(Adamantium.UI.Core.Diagnostics.RuntimeStats.PassApplyBytes - lastApplyB) / 1024}KB draw:{(Adamantium.UI.Core.Diagnostics.RuntimeStats.DeviceDrawBytes - lastDrawB) / 1024}KB n:{Adamantium.UI.Core.Diagnostics.RuntimeStats.PassApplyCount - lastApplyN}] " +
+                            $"byKind=[{string.Join(" ", System.Linq.Enumerable.Select(System.Linq.Enumerable.Range(0, 4), k => $"{opNames[k]}:{(Adamantium.UI.Core.Diagnostics.RuntimeStats.OpBytesByKind[k] - lastOpBytes[k]) / 1024}KB/{Adamantium.UI.Core.Diagnostics.RuntimeStats.OpCountByKind[k] - lastOpCounts[k]}"))}] " +
+                            $"uBy=[{uByText}] " +
+                            $"tbOvr=[{(Adamantium.UI.Controls.Text.TextBlock.OverrideBytes - lastTbOvr) / 1024}KB n:{Adamantium.UI.Controls.Text.TextBlock.OverrideCount - lastTbN}] " +
+                            $"tbIn=[font:{(Adamantium.UI.Controls.Text.TextBlock.FontResolveBytes - lastFont) / 1024}KB/{Adamantium.UI.Controls.Text.TextBlock.LayoutRebuilds - lastRebuild} guard:{(Adamantium.UI.Controls.Text.TextBlock.GuardBytes - lastGuard) / 1024}KB/{Adamantium.UI.Controls.Text.TextBlock.GuardHits - lastGuardN} shape:{(Adamantium.UI.Controls.Text.TextBlock.ShapeBytes - lastShape) / 1024}KB/{Adamantium.UI.Controls.Text.TextBlock.ShapeCalls - lastShapeN}] " +
+                            $"txtLay=[xlate:{(Adamantium.Graphics.Fonts.TextLayout.TranslateBytes - lastXlate) / 1024}KB feat:{(Adamantium.Graphics.Fonts.TextLayout.FeatureBytes - lastFeat) / 1024}KB words:{(Adamantium.Graphics.Fonts.TextLayout.WordLoopBytes - lastWords) / 1024}KB tail:{(Adamantium.Graphics.Fonts.TextLayout.TailBytes - lastTail) / 1024}KB n:{Adamantium.Graphics.Fonts.TextLayout.ProcessCount - lastProcN}] " +
+                            $"cp=[upd:{(Adamantium.UI.Controls.ContentPresenter.UpdateContentMs - lastCpUpd),6:0.0}ms cache:{(Adamantium.UI.Controls.ContentPresenter.CacheHitMs - lastCpCache),6:0.0}ms/{Adamantium.UI.Controls.ContentPresenter.CacheHits - lastCpHits} base:{(Adamantium.UI.Controls.ContentPresenter.BaseMeasureMs - lastCpBase),6:0.0}ms/{Adamantium.UI.Controls.ContentPresenter.FullMeasures - lastCpFull}] " +
+                            $"layBy=[{layByText}] " +
+                            $"empty=[{emptyText}] " +
+                            $"recBy=[{recByText}] " +
                             $"walks={Adamantium.UI.Core.Diagnostics.FrameTrace.Walks} " +
-                            $"layoutMs={Adamantium.UI.Core.Diagnostics.RuntimeStats.LastLayoutPassMs:0.0} " +
                             $"drawMs={Adamantium.UI.Core.Diagnostics.RuntimeStats.LastRenderDrawMs:0.00}" + Environment.NewLine);
+
+                        // Keep the BUSIEST second, not whichever one the run happened to end on - the interesting second
+                        // is rarely the last (see LayoutTrace.TotalCount).
+                        if (countLayout)
+                        {
+                            var thisCount = Adamantium.UI.Core.Diagnostics.LayoutTrace.TotalCount();
+                            if (thisCount > busiestLayout)
+                            {
+                                busiestLayout = thisCount;
+                                busiestLayoutDump = Adamantium.UI.Core.Diagnostics.LayoutTrace.DumpCounts();
+                            }
+                            Adamantium.UI.Core.Diagnostics.LayoutTrace.ResetCounts();
+                        }
 
                         loopWorstMs = 0;
                         lastAttach = attachCount;
                         lastDetach = detachCount;
-                        secRecord = secApply = secPre = secProc = 0;
+                        secRecord = secApply = secPre = secProc = secLayoutMs = 0;
+                        secStructural = secReRender = secGlyph = secBuild = secMerge = secUnit = 0;
+                        worstKind = "-"; worstDraws = 0; worstPackets = 0; worstInserts = 0; worstGroups = 0;
+                        worstUnit = "-"; worstUnitMs = 0;
+                        secRecRender = 0; worstEmptyDraws = 0; worstReranks = 0;
+                        secRecPlan = secRecCopy = secRecSnap = secRecPlace = secRenumber = 0; worstDirty = 0; worstSkips = 0; worstMarks = 0; worstScans = 0; worstRuns = 0; worstParents = 0;
+                        lock (Adamantium.UI.Core.Diagnostics.RuntimeStats.HistogramLock)
+                        {
+                            Adamantium.UI.Core.Diagnostics.RuntimeStats.EmptyDrawsByType.Clear();
+                            Adamantium.UI.Core.Diagnostics.RuntimeStats.RecordMsByType.Clear();
+                            Adamantium.UI.Core.Diagnostics.RuntimeStats.LayoutBytesByType.Clear();
+                            Adamantium.UI.Core.Diagnostics.RuntimeStats.LayoutMsByType.Clear();
+                            Adamantium.UI.Core.Diagnostics.RuntimeStats.LayoutCountByType.Clear();
+                            Adamantium.UI.Core.Diagnostics.RuntimeStats.UnitsCreatedByKind.Clear();
+                        }
+                        secSnapDraws = secSnapDirty = 0; worstPublished = 0;
+                        lastPark = Adamantium.UI.Controls.Panels.VirtualizingPanel.ParkCalls;
+                        lastUnitsCreated = Adamantium.UI.Core.Diagnostics.RuntimeStats.UnitsCreated;
+                        lastUGrow = Adamantium.UI.Core.Diagnostics.RuntimeStats.UnitsCreatedGrow;
+                        lastUMism = Adamantium.UI.Core.Diagnostics.RuntimeStats.UnitsCreatedMismatch;
+                        lastUCreMs = Adamantium.UI.Core.Diagnostics.RuntimeStats.UnitCreateMs;
+                        lastUUpdMs = Adamantium.UI.Core.Diagnostics.RuntimeStats.UnitUpdateMs;
+                        lastUnitsUpdated = Adamantium.UI.Core.Diagnostics.RuntimeStats.UnitsUpdated;
+                        secAllocStart = GC.GetTotalAllocatedBytes(); secRecBytes = 0; secApplyBytes = 0;
+                        lastLayoutBytes = Adamantium.UI.Core.Diagnostics.RuntimeStats.LayoutBytes;
+                        lastLaySty = Adamantium.UI.Core.Diagnostics.RuntimeStats.LayoutStyleMs;
+                        lastLayMea = Adamantium.UI.Core.Diagnostics.RuntimeStats.LayoutMeasureMs;
+                        lastLayArr = Adamantium.UI.Core.Diagnostics.RuntimeStats.LayoutArrangeMs;
+                        lastLayIter = Adamantium.UI.Core.Diagnostics.RuntimeStats.LayoutIterations;
+                        lastLayPass = Adamantium.UI.Core.Diagnostics.RuntimeStats.LayoutPasses;
+                        lastCpUpd = Adamantium.UI.Controls.ContentPresenter.UpdateContentMs;
+                        lastCpCache = Adamantium.UI.Controls.ContentPresenter.CacheHitMs;
+                        lastCpBase = Adamantium.UI.Controls.ContentPresenter.BaseMeasureMs;
+                        lastCpHits = Adamantium.UI.Controls.ContentPresenter.CacheHits;
+                        lastCpFull = Adamantium.UI.Controls.ContentPresenter.FullMeasures;
+                        lastPreBytes = Adamantium.UI.Core.Diagnostics.RuntimeStats.PreRenderBytes;
+                        lastDrawBytes = Adamantium.UI.Core.Diagnostics.RuntimeStats.DrawBytes;
+                        lastOpsBytes = Adamantium.UI.Core.Diagnostics.RuntimeStats.ExecuteOpsBytes;
+                        lastSetupBytes = Adamantium.UI.Core.Diagnostics.RuntimeStats.DrawSetupBytes;
+                        lastApplyB = Adamantium.UI.Core.Diagnostics.RuntimeStats.PassApplyBytes;
+                        lastDrawB = Adamantium.UI.Core.Diagnostics.RuntimeStats.DeviceDrawBytes;
+                        lastApplyN = Adamantium.UI.Core.Diagnostics.RuntimeStats.PassApplyCount;
+                        lastSegSc = Adamantium.UI.Core.Diagnostics.RuntimeStats.SegScissorBytes;
+                        lastSegBind = Adamantium.UI.Core.Diagnostics.RuntimeStats.SegBindBytes;
+                        lastSegDraw = Adamantium.UI.Core.Diagnostics.RuntimeStats.SegDrawBytes;
+                        lastSegN = Adamantium.UI.Core.Diagnostics.RuntimeStats.SegCount;
+                        lastTbOvr = Adamantium.UI.Controls.Text.TextBlock.OverrideBytes;
+                        lastFont = Adamantium.UI.Controls.Text.TextBlock.FontResolveBytes;
+                        lastGuard = Adamantium.UI.Controls.Text.TextBlock.GuardBytes;
+                        lastShape = Adamantium.UI.Controls.Text.TextBlock.ShapeBytes;
+                        lastRebuild = Adamantium.UI.Controls.Text.TextBlock.LayoutRebuilds;
+                        lastGuardN = Adamantium.UI.Controls.Text.TextBlock.GuardHits;
+                        lastShapeN = Adamantium.UI.Controls.Text.TextBlock.ShapeCalls;
+                        lastTbN = Adamantium.UI.Controls.Text.TextBlock.OverrideCount;
+                        lastXlate = Adamantium.Graphics.Fonts.TextLayout.TranslateBytes;
+                        lastFeat = Adamantium.Graphics.Fonts.TextLayout.FeatureBytes;
+                        lastWords = Adamantium.Graphics.Fonts.TextLayout.WordLoopBytes;
+                        lastTail = Adamantium.Graphics.Fonts.TextLayout.TailBytes;
+                        lastProcN = Adamantium.Graphics.Fonts.TextLayout.ProcessCount;
+                        lastTxtState = Adamantium.Graphics.Fonts.FontRenderer.BatchStateBytes;
+                        lastTxtRes = Adamantium.Graphics.Fonts.FontRenderer.BatchResourceBytes;
+                        lastTxtSetup = Adamantium.Graphics.Fonts.FontRenderer.BatchSetupBytes;
+                        lastTxtAD = Adamantium.Graphics.Fonts.FontRenderer.BatchApplyDrawBytes;
+                        lastTxtN = Adamantium.Graphics.Fonts.FontRenderer.BatchDrawCount;
+                        for (var k = 0; k < 4; k++) { lastOpBytes[k] = Adamantium.UI.Core.Diagnostics.RuntimeStats.OpBytesByKind[k]; lastOpCounts[k] = Adamantium.UI.Core.Diagnostics.RuntimeStats.OpCountByKind[k]; }
                         lastGcPause = GC.GetTotalPauseDuration();
                         lastG0 = GC.CollectionCount(0); lastG1 = GC.CollectionCount(1); lastG2 = GC.CollectionCount(2);
                         loopBindings = bindsNow;
@@ -177,6 +356,12 @@ public class Program
                         secondFrames = Adamantium.UI.Core.Diagnostics.RuntimeStats.PresentedFrames;
                         secondStart = System.Diagnostics.Stopwatch.GetTimestamp();
                     }
+                }
+                if (countLayout)
+                {
+                    Adamantium.UI.Core.Diagnostics.LayoutTrace.Counting = false;
+                    System.IO.File.WriteAllText(log + ".layout.txt",
+                        $"busiest second: {busiestLayout} layout invalidations" + Environment.NewLine + busiestLayoutDump);
                 }
                 var inv = samples > 0 ? 1.0 / samples : 0;
 

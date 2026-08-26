@@ -35,4 +35,10 @@ public partial class LayoutViewModel : TabPageViewModel
     // False = rounded rectangles (RectBatch SDF), true = ellipses (EllipseBatch SDF). A DataTrigger in LayoutView.auml
     // swaps ItemTemplate between the two AUML templates (LayoutResources) off this flag.
     [Bindable] private bool _showEllipses;
+
+    // Milliseconds one layout pass may spend (re)binding tile containers while scrolling; the rest is deferred to the
+    // next pass and shows a skeleton. 0 = no budget, bind the whole window in one pass. Live on this tab because it is a
+    // genuine trade with no universally right answer: measured here, 6 ms binds ~357 slots a pass and defers ~4487, so a
+    // big window at the minimum cell never catches up - while a small window is better off binding everything at once.
+    [Bindable] private double _bindBudgetMs = 6;
 }

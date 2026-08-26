@@ -17,7 +17,11 @@
 		     where no profiler of ours was looking. Server GC collects per-core and in parallel, which is the shape this
 		     workload has. It is a MITIGATION: the real fix is to stop retaining three and a half million objects for sixty
 		     thousand components. Keep or drop it on the numbers. -->
-		<ServerGarbageCollection>true</ServerGarbageCollection>
+		<!-- DROPPED on the numbers, as the note above said to. The retention that made it necessary is much reduced (the
+		     record no longer re-records what draws nothing, and the frozen layout is no longer re-published three times a
+		     frame), so the workstation collector is what we measure against now. NB on net10.0 the server collector is
+		     DATAS-adaptive by default (.NET 9+), so "server" here was never the classic per-core-heap shape anyway. -->
+		<ServerGarbageCollection>false</ServerGarbageCollection>
 		<ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
 		<EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
 		<CompilerGeneratedFilesOutputPath>$(BaseIntermediateOutputPath)Generated</CompilerGeneratedFilesOutputPath>

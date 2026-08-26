@@ -198,13 +198,11 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
    // defers the rest to skeletons + the next pass. Time-based self-tunes INSTANTLY to per-op cost: few EXPENSIVE
    // creates/frame (UI stays live, skeletons show progress) but many CHEAP rebinds/frame (fast scroll) - with no
    // count-estimate to mis-size on a cheap->expensive regime change (the multi-monitor DPI-resize freeze).
-   // Settable (not const) so a test can PIN the slice: a time budget is by nature machine-dependent, so a test that wants
-   // to assert the slicing itself pins it to zero and gets the guaranteed MinBinds floor - a deterministic slice.
-   internal static double BindBudgetMs = 6.0;   // frame-time slice for (re)binds WHILE SCROLLING (headroom under a 16 ms frame)
+   // The slice is the USER's now: VirtualizingPanel.ScrollBindBudget / FillBindBudget / MinBindsPerPass, with 0 meaning
+   // no budget at all. It used to be two static fields, which made it un-tunable from markup and turned a machine- and
+   // window-dependent number into a constant - measured on the stand, 6 ms binds ~357 slots a pass while ~4487 are
+   // deferred, so on some windows it is exactly the wrong value and there was no way to say so.
    private const int ParallelArrangeThreshold = 64;   // arrange tiles across cores only above this many realized (else thread overhead > win)
-
-   internal static double FillBudgetMs = 30.0;  // slice when NOT scrolling (initial fill / a settled fling): drain the backlog fast
-   internal const int MinBinds = 8;            // always (re)bind at least this many/frame so the window keeps filling
 
    // The offset the previous measure ran against - tells an ACTIVE scroll (offset moving frame-to-frame) from a static fill.
    // A REALIZE budget must be a GUARANTEED slice, never "whatever the frame has left": the per-frame O(window) overhead
@@ -239,6 +237,16 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
       if (!m.IsMeasureValid) m.Measure(CellConstraint(_measuringHorizontal));
       _cellGrew |= GrowCell(_measuringHorizontal, m.DesiredSize);
    }
+
+   // What every tile's rect is a function of. While these hold still, a tile that kept its index kept its rect, so
+   // visiting it can only produce a short-circuit inside Arrange - which is what 20-178 thousand visits a second were
+   // buying (10-95 ms/s of it). Any change here forces one full pass, and a full pass re-stamps.
+   private int _stampColumns = -1;
+   private double _stampCellFlow = double.NaN, _stampCellScroll = double.NaN;
+   private Orientation _stampOrientation;
+   private int _stampGap = -2;
+   private int _stampItemCount = -1;
+   private bool _stampValid;
    private double _cellFlow = 1;        // cell size along the flow axis
    private double _cellScroll = 1;      // cell size along the scroll (wrap) axis
    private int _columns = 1;            // items per line
@@ -265,7 +273,6 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
 
    public static readonly AdamantiumProperty ItemHeightProperty = AdamantiumProperty.Register(nameof(ItemHeight),
       typeof(Double), typeof(WrapPanel), new PropertyMetadata(Double.NaN, PropertyMetadataOptions.AffectsMeasure|PropertyMetadataOptions.AffectsArrange));
-
 
    public Orientation Orientation
    {
@@ -446,7 +453,6 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
             controlsInLine);
       }
 
-
       return finalSize;
 
    }
@@ -548,7 +554,8 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
       // starve the fill to ~10 tiles/frame.
       var scrolling = offset != _lastMeasuredOffset;
       _lastMeasuredOffset = offset;
-      var bindBudget = scrolling ? BindBudgetMs : FillBudgetMs;
+      // The user's dial now (ScrollBindBudget / FillBindBudget on VirtualizingPanel), not a constant. 0 = no budget.
+      var bindBudget = BudgetOrUnlimited(scrolling ? ScrollBindBudget : FillBindBudget);
 
       // Resolve columns + the realized window and measure it; if a realized item is bigger than the assumed uniform
       // cell, grow the cell (only along axes the user didn't pin) and resolve again. This converges in a couple of passes
@@ -611,9 +618,8 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
          _cellGrew = false;
          _onSlotBound ??= OnSlotBound;
 
-         foreach (var c in Owner.ItemContainerGenerator.SetWindow(first, last, bindBudget, MinBinds, _onSlotBound))
+         foreach (var c in Owner.ItemContainerGenerator.SetWindow(first, last, bindBudget, MinBindsPerPass, _onSlotBound))
             ParkContainer(c);   // hide + deactivate its bindings so an off-screen tile leaves any shared source's fan-out
-
 
          if (!_cellGrew) break;
       }
@@ -645,8 +651,44 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
       // Arrange short-circuits for tiles that kept their index; only the rebound row re-runs ArrangeCore (O(one row)).
       // Snapshot indices into a REUSED buffer (not a fresh ToList): the window scan runs every scroll frame, so the
       // per-frame list alloc over ~800 realized indices was steady gen0 churn.
+      // Nothing a rect depends on moved => a tile that kept its index kept its rect, and only the slots (re)bound since
+      // the last arrange can need anything. A tile invalidated on its OWN is not stranded: LayoutManager.ArrangeDirty
+      // arranges it into PreviousArrangeSlot, the very rect this loop would hand it. Anything that moves a rect without
+      // rebinding a slot - cell, columns, drop gap, items inserted or removed - forces one full pass, which re-stamps.
+      var gapNow = DropGapIndex;
+      var itemsNow = Owner?.Items?.Count ?? 0;
+      var full = !_stampValid
+                 || _columns != _stampColumns
+                 || _cellFlow != _stampCellFlow
+                 || _cellScroll != _stampCellScroll
+                 || Orientation != _stampOrientation
+                 || gapNow != _stampGap
+                 || itemsNow != _stampItemCount;
+
       _arrangeIndexBuf.Clear();
-      _arrangeIndexBuf.AddRange(Owner.ItemContainerGenerator.RealizedIndices);
+      if (full)
+      {
+         _arrangeIndexBuf.AddRange(Owner.ItemContainerGenerator.RealizedIndices);
+         _stampValid = true;
+         _stampColumns = _columns;
+         _stampCellFlow = _cellFlow;
+         _stampCellScroll = _cellScroll;
+         _stampOrientation = Orientation;
+         _stampGap = gapNow;
+         _stampItemCount = itemsNow;
+      }
+      else
+      {
+         var bound = Owner.ItemContainerGenerator.DrainNewlyMapped();
+         for (var i = 0; i < bound.Count; i++)
+         {
+            var index = Owner.ItemContainerGenerator.IndexFromContainer(bound[i]);
+            if (index >= 0)
+            {
+               _arrangeIndexBuf.Add(index);
+            }
+         }
+      }
 
       void ArrangeAt(int index)
       {
@@ -668,11 +710,18 @@ public class WrapPanel : VirtualizingPanel, IHitTestChildren
       // arranges thousands at once; a range Partitioner keeps per-tile overhead low). Small windows stay sequential.
       // The only shared write a tile arrange makes is RenderDirty.MarkGeometry (locked); diagnostic counters race harmlessly.
       if (_arrangeIndexBuf.Count >= ParallelArrangeThreshold)
+      {
          System.Threading.Tasks.Parallel.ForEach(
             System.Collections.Concurrent.Partitioner.Create(0, _arrangeIndexBuf.Count),
             range => { for (var i = range.Item1; i < range.Item2; i++) ArrangeAt(_arrangeIndexBuf[i]); });
+      }
       else
-         foreach (var index in _arrangeIndexBuf) ArrangeAt(index);
+      {
+         foreach (var index in _arrangeIndexBuf)
+         {
+            ArrangeAt(index);
+         }
+      }
 
       // Budget-deferred slots (generator.PendingIndices): show a pooled per-slot loading skeleton card at each (a fast
       // fling / cold fill shows pulsing placeholders instead of holes). Reconciled here (after the real tiles) since this

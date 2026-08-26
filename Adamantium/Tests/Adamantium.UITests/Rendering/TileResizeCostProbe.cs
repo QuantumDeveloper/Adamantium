@@ -187,4 +187,99 @@ public class TileResizeCostProbe
 
     private static int Realized(WrapPanel panel) =>
         panel.Owner?.ItemContainerGenerator.RealizedCount ?? 0;
+
+    /// <summary>WHERE the managed heap goes on a tile grid. A 4K fill takes it from 130MB to 936MB and the collector then
+    /// stops every thread for a quarter to a half of each second - so the question "how many bytes and objects does ONE
+    /// realized tile cost, and which part of building it spends them" is the one that decides what to fix. Allocation
+    /// counters, unlike the per-element stopwatch profiler, do not distort what they measure.</summary>
+    [Test]
+    public void AllocationPerRealizedTile()
+    {
+        // A bare component, with nothing built into it: this is what the property system charges per element before any
+        // template, binding or child exists.
+        TestContext.Out.WriteLine("--- one component, constructed and nothing else");
+        ReportCtor("Border", () => new Border());
+        ReportCtor("Rectangle", () => new Adamantium.UI.Controls.Shapes.Rectangle());
+        ReportCtor("ContentPresenter", () => new ContentPresenter());
+        ReportCtor("ListBoxItem", () => new ListBoxItem());
+        ReportCtor("TextBlock", () => new Adamantium.UI.Controls.Text.TextBlock());
+
+        // ...and what a whole realized tile costs, measured across a real fill.
+        var root = BuildScene(60000, BigViewportW, BigViewportH, out var panel);
+        panel.ItemWidth = panel.ItemHeight = 24;
+
+        var settled = LiveHeapBytes();
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var realizedBefore = Realized(panel);
+
+        var passes = 0;
+        var last = -1;
+        while (passes < 600 && Realized(panel) != last)
+        {
+            last = Realized(panel);
+            for (var p = 0; p < 10; p++) { WindowExtension.UpdateTree(root); RenderDirty.Clear(); passes++; }
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
+        var realized = Realized(panel) - realizedBefore;
+        var live = LiveHeapBytes() - settled;
+
+        TestContext.Out.WriteLine($"--- fill at the minimum cell: {realized} containers over {passes} passes");
+        TestContext.Out.WriteLine($"allocated total : {allocated / 1048576.0,8:F1} MB   = {allocated / Math.Max(1, realized),8} B per container");
+        TestContext.Out.WriteLine($"still LIVE after: {live / 1048576.0,8:F1} MB   = {live / Math.Max(1, realized),8} B per container");
+        TestContext.Out.WriteLine($"(live is what the collector must keep walking; allocated-minus-live is per-pass garbage)");
+    }
+
+    private static void ReportCtor(string name, Func<object> make)
+    {
+        make();   // first one pays for JIT + statics; measure the steady state
+        const int n = 200;
+        var before = GC.GetAllocatedBytesForCurrentThread();
+        var kept = new object[n];
+        for (var i = 0; i < n; i++) kept[i] = make();
+        var bytes = (GC.GetAllocatedBytesForCurrentThread() - before) / n;
+        GC.KeepAlive(kept);
+
+        var registered = AdamantiumPropertyMap.GetRegistered(kept[0].GetType()).Count();
+        TestContext.Out.WriteLine($"{name,-18} {bytes,7} B   {registered,4} registered properties   " +
+                                  $"~{bytes / Math.Max(1, registered),4} B per property");
+    }
+
+    /// <summary>Does dragging the slider RETAIN memory, or merely churn it? Reported on the live stand: the managed heap
+    /// climbed to 1.3 GB while nothing was happening but the height slider moving back and forth, on a window holding
+    /// only ~1700 tiles. Churn is collected; a climb after a forced full collection is something being held. This walks
+    /// the same gesture and prints the live heap after every step, so the two are told apart by a number.</summary>
+    [Test]
+    public void SliderDragRetention()
+    {
+        var root = BuildScene(60000, BigViewportW, BigViewportH, out var panel);
+
+        void Settle(double w, double h)
+        {
+            panel.ItemWidth = w;
+            panel.ItemHeight = h;
+            for (var p = 0; p < 8; p++) { WindowExtension.UpdateTree(root); RenderDirty.Clear(); }
+        }
+
+        Settle(24, 240);   // the reported scenario: minimum width, maximum height
+        var baseline = LiveHeapBytes();
+        TestContext.Out.WriteLine($"settled at 24x240: realized {Realized(panel)}, live {baseline / 1048576.0:F1} MB");
+
+        for (var step = 0; step < 12; step++)
+        {
+            var h = 240 - step % 4 * 20;   // 240, 220, 200, 180, back to 240 - the slider going to and fro
+            Settle(24, h);
+            var live = LiveHeapBytes();
+            TestContext.Out.WriteLine($"step {step,2} -> 24x{h,3}: realized {Realized(panel),5}, " +
+                                      $"live {live / 1048576.0,7:F1} MB, grown {(live - baseline) / 1048576.0,7:F1} MB");
+        }
+    }
+
+    private static long LiveHeapBytes()
+    {
+        GC.Collect(2, GCCollectionMode.Forced, blocking: true);
+        GC.WaitForPendingFinalizers();
+        GC.Collect(2, GCCollectionMode.Forced, blocking: true);
+        return GC.GetTotalMemory(false);
+    }
 }

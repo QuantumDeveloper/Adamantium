@@ -638,38 +638,81 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
     // The item-background batch reads the fill opacity here: a batchable rect has no GeometryRenderer to carry RenderData.
     public double FillOpacity => DrawCommand?.RenderData?.Opacity ?? 1.0;
 
+    /// <summary>The body exists but no longer describes the payload, because the rect went back to being batchable and
+    /// its updates stopped maintaining it. Not disposed - the retained op stream may still name it, and freeing a
+    /// renderer out from under a frame in flight is a class of bug we have paid for before - just left behind until
+    /// something actually needs to draw it again.</summary>
+    private bool _machineryStale;
+
     // A batchable rect the batch REJECTED this frame (rotated/sheared world, or the instance buffer overflowed) must draw
     // itself, so build its BODY on demand. No fringe: it would need a PreRender we've already passed this frame; the body
-    // self-fills its buffer in Render. Idempotent (a persistently-rejected rect keeps the body across frames).
+    // self-fills its buffer in Render.
     public void EnsureMachinery()
     {
-        if (GeometryRenderer != null) return;
+        if (GeometryRenderer != null && !_machineryStale) return;
+
         var fillRect = Payload.HasFrame ? Payload.FrameInnerRect : Payload.DestinationRect;
         var fillCorners = Payload.HasFrame ? Payload.FrameInnerCorners : Payload.CornerRadius;
         var g = new RectangleGeometry(fillRect, fillCorners);
         g.ProcessGeometry(GeometryType.Both);
-        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, Payload.Brush, BufferManager, ResourceFactory);
+
+        // Refresh in place when a body is already there: the same mesh update the non-batchable path does, so a rect that
+        // comes back to this path after a spell in the batch draws its CURRENT shape rather than the one it wore when it
+        // was last rejected.
+        if (GeometryRenderer is GeometryRenderComponent existing)
+        {
+            existing.UpdateGeometry(g.Mesh);
+            existing.Background = Payload.LiveBrush;
+        }
+        else
+        {
+            GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, Payload.Brush, BufferManager, ResourceFactory);
+        }
+
         GeometryRenderer.RenderData = DrawCommand.RenderData;
         GeometryRenderer.Owner = DrawCommand.Component;
         BuildFrame(Payload);
+        _machineryStale = false;
     }
 
     public override void UpdateWithDrawCommand(IDrawCommand drawCommand)
     {
         if (drawCommand.Payload is not RectanglePayload inputPayload) return;
 
-        // Fast path: no machinery (a batchable tile, the common case). Just repoint payload/command - NO tessellation, NO
-        // buffers - so resizing a virtualized grid stays cheap. Build machinery only if the rect is now non-batchable
-        // (e.g. it gained a pen or a gradient fill).
+        // Fast path: the rect is one the SDF batch draws. Just repoint payload/command - NO tessellation, NO buffers - so
+        // resizing a virtualized grid stays cheap.
+        //
+        // Taken whether or not a body exists. A body is NOT a verdict about the rect: the batch also rejects on a full
+        // instance buffer, which says nothing about the rect and everything about how many were on screen that frame -
+        // and one such frame used to hand the rect a body for the rest of the session, after which every size change
+        // re-tessellated and re-uploaded it. Measured on the tile grid's size slider: single updates of 14-36ms, tens of
+        // them per second, while the thousands of tiles beside them cost microseconds. The body is kept (the retained op
+        // stream may still name it) but marked stale, so EnsureMachinery refreshes it if the batch ever turns the rect
+        // away again.
+        if (IsSdfBatchable(inputPayload) || IsGradientBatchable(inputPayload))
+        {
+            DrawCommand = drawCommand;
+            Payload = inputPayload;
+            if (GeometryRenderer != null) _machineryStale = true;
+
+            // The fringe is the batch's job now (it self-AAs), and a per-tile fringe rebuilt on every resize was the OOM.
+            FillFringeRenderer?.DeferDispose();
+            FillFringeRenderer = null;
+            return;
+        }
+
+        // Not batchable and no body yet: build one.
         if (GeometryRenderer == null)
         {
             DrawCommand = drawCommand;
             Payload = inputPayload;
-            if (!IsSdfBatchable(inputPayload) && !IsGradientBatchable(inputPayload)) BuildMachinery(inputPayload);
+            BuildMachinery(inputPayload);
             return;
         }
 
-        // Machinery exists (a non-batchable rect, or a kept fallback body): update it incrementally.
+        // Machinery exists and the rect genuinely needs it: update it incrementally. Whatever staleness it carried from a
+        // spell in the batch is settled here, since everything below is written from the CURRENT payload.
+        _machineryStale = false;
         var oldPen = Payload.Pen;
         var oldBrush = Payload.Brush;
         var rebuild = Payload.RequiresBufferRebuild(inputPayload);

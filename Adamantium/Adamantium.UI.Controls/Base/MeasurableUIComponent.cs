@@ -382,12 +382,14 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             TotalMeasureCores++;
             IsMeasureValid = true;
             IsArrangeValid = false;
-            IsGeometryValid = false;
+            InvalidateGeometryFromLayout();
 
             var previousDesired = DesiredSize;
 
             _measuring = true;
+            var measureFrame = Core.Diagnostics.RuntimeStats.BeginLayoutFrame();
             var desiredSize = MeasureCore(availableSize).Constrain(availableSize);
+            Core.Diagnostics.RuntimeStats.EndLayoutFrame(GetType(), measureFrame);
             _measuring = false;
 
             if (IsInvalidSize(desiredSize))
@@ -484,7 +486,9 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         {
             IsArrangeValid = true;
             TotalArrangeCores++;
+            var arrangeFrame = Core.Diagnostics.RuntimeStats.BeginLayoutFrame();
             ArrangeCore(rect);
+            Core.Diagnostics.RuntimeStats.EndLayoutFrame(GetType(), arrangeFrame);
             _previousArrange = rect;
             if (LayoutTrace.Enabled) LayoutTrace.Log($"  ARRANGE {LayoutName}: rect={rect} -> bounds={Bounds} render={RenderSize}");
         }
@@ -659,7 +663,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             RenderSize = innerUsed;
             size = outerUsed;   // the rest of arrange (alignment, clip, bounds) works in the FOOTPRINT (outer) space
 
-            if (renderSizeChanged) IsGeometryValid = false;
+            if (renderSizeChanged) InvalidateGeometryFromLayout();
 
             switch (HorizontalAlignment)
             {
@@ -823,7 +827,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         // pass - its measure count simply stopped growing - while its own header presenter reported the turned size.
         IsMeasureValid = false;
         IsArrangeValid = false;
-        IsGeometryValid = false;
+        InvalidateGeometryFromLayout();
         // KEEP _previousMeasure (cached constraint) and _previousArrange (slot): the manager re-measures/re-arranges this
         // node into them. The IsMeasureValid/IsArrangeValid=false flags, not nulled caches, are what force the re-run.
 
@@ -847,7 +851,6 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
             LayoutManager.For(this).InvalidateMeasure(this);
         }
     }
-
     public virtual void InvalidateArrange()
     {
         if (Core.Diagnostics.LayoutTrace.Counting) Core.Diagnostics.LayoutTrace.Count(GetType(), "*any-arrange*");
@@ -857,7 +860,7 @@ public class MeasurableUIComponent : ObservableUIComponent, IName, IMeasurableCo
         // detached) would otherwise keep the flag forever and never be arranged again, because every later request sees
         // "already invalid" and drops itself. Re-stating the request is cheap - the manager's queue is a set.
         IsArrangeValid = false;
-        IsGeometryValid = false;
+        InvalidateGeometryFromLayout();
         // _previousArrange is KEPT (the last correct slot) - see InvalidateMeasure. IsArrangeValid=false forces re-arrange.
 
         if (_previousArrange != null)
