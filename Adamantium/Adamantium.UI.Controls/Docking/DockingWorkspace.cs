@@ -69,8 +69,16 @@ public class DockingWorkspace
         // A workspace serves ONE area. A view rebuilt on re-entry hands over a new one, and the outgoing area is still
         // holding the floating windows it opened - nobody detaches it, because leaving the tree is not a detach. Let it
         // go of them here, or every visit stacks another set of windows on top of the last (three visits, six windows).
+        // The ARRANGEMENT belongs to the workspace, not to whichever control happened to be showing it. A view rebuilt
+        // on re-entry hands over a brand-new area with an empty tree, and the outgoing one takes the zones with it - so
+        // the arrangement is carried across the handover here, or every return from another tab (and every theme swap,
+        // which rebuilds the same way) started from the authored markup again and the region adapter re-opened every
+        // pane in the DEFAULT zone: two document areas came back as one holding all the tabs. Measured on the stand -
+        // the incoming area reported roots=0, and every pane arrived at Center with the model not knowing it.
+        string carried = null;
         if (_area != null && !ReferenceEquals(_area, area))
         {
+            carried = _area.SaveLayout();
             _area.PaneClosing -= OnPaneClosing;
             _area.PaneClosed -= OnPaneClosed;
             _area.ReleaseFloatingWindows();
@@ -79,6 +87,11 @@ public class DockingWorkspace
         _area = area;
         area.PaneClosing += OnPaneClosing;
         area.PaneClosed += OnPaneClosed;
+
+        // AFTER the wiring, so a pane the saved tree names and this area has not got is asked for through the events
+        // the new area is now subscribed to (DockingArea.LoadLayout raises PaneRestoreRequested for exactly those).
+        if (!string.IsNullOrEmpty(carried)) area.LoadLayout(carried);
+
         Ready?.Invoke(this, EventArgs.Empty);
     }
 

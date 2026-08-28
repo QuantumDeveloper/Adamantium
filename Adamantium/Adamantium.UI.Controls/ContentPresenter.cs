@@ -492,6 +492,17 @@ public class ContentPresenter : InputUIComponent
 
     /// <summary>Puts a visual aside instead of destroying it. The store parks it (so the renderer keeps what it built);
     /// taking it out of the tree is this presenter's job, because only it knows what removal means here.</summary>
+    /// <summary>Whether this presenter still holds the visual - the only question <see cref="Release"/> may ask about
+    /// ownership, because a child's parent pointer belongs to whoever adopted it last.</summary>
+    private bool IsVisualChild(IUIComponent visual)
+    {
+        foreach (var child in VisualChildren)
+        {
+            if (ReferenceEquals(child, visual)) return true;
+        }
+        return false;
+    }
+
     private void ParkCurrent(object key, IUIComponent root, TemplateResult built, DataTemplate template)
     {
         ParkedVisuals.Keep(ParkOwner, key, root, built, template, _lastArrangeSize);
@@ -510,7 +521,14 @@ public class ContentPresenter : InputUIComponent
     /// </summary>
     private void Release(IUIComponent visual, TemplateResult built)
     {
-        if (built == null && !ReferenceEquals(visual.VisualParent, this)) return;
+        // Ask our OWN children, not the visual's parent pointer. Adoption sets the child's VisualParent and does not
+        // empty the previous presenter's collection, so a guard reading that pointer concluded the element was no longer
+        // ours and left it where it was - in our children, still laid out and still drawn. Measured on docking: a pane's
+        // authored body (a StackPanel handed in as content, so nothing built it) stayed under the view that replaced it,
+        // and the two drew on top of each other for the rest of the session.
+        // Removing it is safe either way: RemoveVisualChild drops only this collection's reference and never clears the
+        // child's parent, so an element that really was adopted keeps its new home.
+        if (built == null && !IsVisualChild(visual)) return;
 
         // Say that this content is GONE, for the whole subtree, before anything is unpicked. Template teardown already
         // announced its own parts; this is the other half, and the half that was missing - a view authored in markup is
@@ -539,11 +557,29 @@ public class ContentPresenter : InputUIComponent
 
     private void DropContentHandles()
     {
+        // LET GO of them, not merely forget them. The note above assumes a discarded root has no visual parent left, so
+        // that the field is the only thing still naming it - true when the PRESENTER is the one being destroyed, and
+        // false the other way round: a root discarded while this presenter goes on living is still one of our children.
+        // Forgetting it without removing it leaves it in the tree - laid out, drawn, and now untracked, so no later
+        // content swap can ever release it. Measured on docking: a pane's authored body stayed under the view that
+        // replaced it and the two drew on top of each other for the rest of the session.
+        // Only what is still OURS: removing touches this collection alone (RemoveVisualChild never clears the child's
+        // parent), so an element some other presenter has adopted keeps its new home.
+        LetGo(_currentRoot);
+        LetGo(_outgoingRoot);
+
         _currentRoot = null;
         _outgoingRoot = null;
         _currentTemplateResult = null;
         _outgoingTemplateResult = null;
         _currentTemplate = null;
+    }
+
+    private void LetGo(IUIComponent root)
+    {
+        if (root == null || !IsVisualChild(root)) return;
+        RemoveVisualChild(root);
+        RemoveLogicalChild(root);
     }
 
     // Every presenter that has ever built content, held WEAKLY - the register must not be the thing that keeps one

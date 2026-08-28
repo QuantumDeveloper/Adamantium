@@ -488,6 +488,7 @@ public class DockingArea : Panel
         }
 
         Layout.RemovePane(id);
+        HandOffActive(id, group);
         RebuildFamily();
 
         // On the OWNER: a pane can be closed in any window of the layout, and listeners attached to the area.
@@ -692,11 +693,39 @@ public class DockingArea : Panel
     /// <summary>Takes a pane out of the layout entirely, by id. What a region removing a view model means.</summary>
     public bool RemovePane(string paneId)
     {
-        if (paneId == null || !Layout.RemovePane(paneId)) return false;
+        if (paneId == null) return false;
+
+        // WHERE it lived, asked BEFORE the model forgets: if the accent is on this pane, the panel holding it is still
+        // the one being worked in and has to keep it.
+        var wasActive = paneId == Owner._activePane;
+        var home = wasActive ? Layout.FindGroup(paneId) : null;
+
+        if (!Layout.RemovePane(paneId)) return false;
 
         _panesById.Remove(paneId);
+        if (wasActive) HandOffActive(paneId, home);
         RebuildFamily();
         return true;
+    }
+
+    /// <summary>Passes the accent on when the pane carrying it goes away. Called from BOTH ways a pane can leave -
+    /// this one and the close path, which removes from the layout itself - because a rule about what closing means has
+    /// to hold whichever door was used.
+    /// <para>The pane being worked in is remembered as an ID, since the id outlives its group. A CLOSED pane leaves
+    /// that id naming nothing at all: no group contains it, so every accent goes out at once while the panel underneath
+    /// is plainly still the one in use - its strip has already moved to the next tab, so the tab looks selected inside
+    /// a panel that looks inactive, and only a click brings the frame back.</para></summary>
+    private void HandOffActive(string paneId, PaneGroupNode home)
+    {
+        if (paneId == null || paneId != Owner._activePane) return;
+
+        Owner._activePane = null;
+        var next = home is { IsEmpty: false } ? ActivePaneOf(home) : null;
+
+        // Its last pane went with it: there is no panel left to be working in, so the accent stays out rather than
+        // jumping to some unrelated panel the user never touched.
+        if (next != null) Activate(next);
+        else Owner.SyncActive();
     }
 
     // The one place a pane becomes known by id, and where the layout starts listening to it: Allowed is an ordinary
@@ -1979,15 +2008,35 @@ public class DockingArea : Panel
     {
         _groupsByNode[node] = control;
 
-        control.SelectionChanged += (_, _) =>
-        {
-            if (control.SelectedIndex >= 0)
-            {
-                node.ActiveIndex = control.SelectedIndex;
-            }
+        // A NAMED handler that closes over nothing, subscribed with a remove first so it can never stack. Every rebuild
+        // that touches a group calls this again; an anonymous lambda would add one more subscription each time and there
+        // would be no way to take any of them off.
+        // It carries no node either: which node a control stands for is looked up when the event FIRES. A handler closed
+        // over the node kept writing into the node its control used to show, so choosing a tab moved the selection of a
+        // panel nobody had touched - two zones' indicators sliding together.
+        control.SelectionChanged -= OnGroupSelectionChanged;
+        control.SelectionChanged += OnGroupSelectionChanged;
+    }
 
-            Owner.RaiseActivePaneChanged();
-        };
+    private void OnGroupSelectionChanged(object sender, EventArgs e)
+    {
+        if (sender is PaneGroup control && control.SelectedIndex >= 0 && NodeOfControl(control) is { } node)
+        {
+            node.ActiveIndex = control.SelectedIndex;
+        }
+
+        Owner.RaiseActivePaneChanged();
+    }
+
+    /// <summary>Which node a group control currently stands for - asked at the moment it matters, never remembered in a
+    /// closure that a rebuild can leave pointing at the wrong one. A handful of groups, so the walk is nothing.</summary>
+    private PaneGroupNode NodeOfControl(PaneGroup control)
+    {
+        foreach (var pair in _groupsByNode)
+        {
+            if (ReferenceEquals(pair.Value, control)) return pair.Key;
+        }
+        return null;
     }
 
     private void FillPanes(PaneGroup control, PaneGroupNode node)
