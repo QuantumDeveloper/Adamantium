@@ -365,7 +365,7 @@
                             <!-- The bar turns with the strip: a stripe along the column, on the side facing the body. Its
                                  template geometry is the horizontal one, so the turned case states its own. -->
                             <Setter TargetName="PART_SelectionIndicator" Property="Width" Value="{TemplateBinding SelectionIndicatorThickness}"/>
-                            <Setter TargetName="PART_SelectionIndicator" Property="Height" Value="1"/>
+                            <Setter TargetName="PART_SelectionIndicator" Property="Height" Value="{ResourceReference StrokeThinValue}"/>
                             <Setter TargetName="PART_SelectionIndicator" Property="HorizontalAlignment" Value="Right"/>
                             <Setter TargetName="PART_SelectionIndicator" Property="VerticalAlignment" Value="Top"/>
                             <Setter Property="ItemsPanel">
@@ -383,7 +383,7 @@
                             <Setter TargetName="PART_TabStrip" Property="Grid.Row" Value="1"/>
                             <Setter TargetName="PART_TabStrip" Property="Grid.Column" Value="2"/>
                             <Setter TargetName="PART_SelectionIndicator" Property="Width" Value="{TemplateBinding SelectionIndicatorThickness}"/>
-                            <Setter TargetName="PART_SelectionIndicator" Property="Height" Value="1"/>
+                            <Setter TargetName="PART_SelectionIndicator" Property="Height" Value="{ResourceReference StrokeThinValue}"/>
                             <Setter TargetName="PART_SelectionIndicator" Property="HorizontalAlignment" Value="Left"/>
                             <Setter TargetName="PART_SelectionIndicator" Property="VerticalAlignment" Value="Top"/>
                             <Setter Property="ItemsPanel">

@@ -10,8 +10,8 @@
         <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
         <!-- How long the minimized band takes to slide out and back. -->
         <Setter Property="FlyoutTransitionDuration" Value="0:0:0.16"/>
-        <Setter Property="BorderThickness" Value="0 0 0 1"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference RibbonRule}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeChrome}"/>
         <!-- Three rows of small commands plus the caption. Constant, so switching tabs never reflows the window. -->
         <Setter Property="GroupsAreaHeight" Value="106"/>
     </Style>
@@ -44,8 +44,8 @@
     <!-- The ledge over a contextual run: the group's colour carrying its title (docs/RIBBON_PLAN.md §4). -->
     <Style Selector="RibbonContextualLedge">
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
-        <Setter Property="FontSize" Value="11"/>
-        <Setter Property="Padding" Value="8 0"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeMicro}"/>
+        <Setter Property="Padding" Value="{ResourceReference RibbonLedgePadding}"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <Setter Property="Template">
@@ -165,9 +165,9 @@
         <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
         <Setter Property="BackgroundPressed" Value="{ResourceReference SubtleFillColorTertiary}"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="CornerRadius" Value="4"/>
-        <Setter Property="Width" Value="28"/>
-        <Setter Property="Height" Value="26"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="Width" Value="{ResourceReference RibbonChipWidth}"/>
+        <Setter Property="Height" Value="{ResourceReference RibbonChipHeight}"/>
         <Setter Property="MinWidth" Value="0"/>
         <Setter Property="MinHeight" Value="0"/>
         <Setter Property="Margin" Value="0 2 6 0"/>
@@ -212,8 +212,8 @@
         <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
         <Setter Property="BackgroundSelected" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
         <Setter Property="ForegroundSelected" Value="{ResourceReference TextFillColorPrimary}"/>
-        <Setter Property="Padding" Value="16 7"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Padding" Value="{ResourceReference RibbonTabPadding}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeChrome}"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
@@ -391,7 +391,7 @@
 
     <!-- A group: its commands in columns, its caption underneath, a rule down its right edge. -->
     <Style Selector="RibbonGroup">
-        <Setter Property="Padding" Value="6 6 6 3"/>
+        <Setter Property="Padding" Value="{ResourceReference RibbonGroupPadding}"/>
         <!-- The mark on the button a collapsed group becomes. Without it the icon - path data, like a command's - is
              handed to a presenter with nothing to draw it, and comes out as the path TEXT: a strip of dashes. -->
         <Setter Property="IconTemplate">
@@ -432,7 +432,7 @@
                                             Content="{TemplateBinding Header}"
                                             ContentTemplate="{TemplateBinding HeaderTemplate}"
                                             HorizontalAlignment="Center" VerticalAlignment="Bottom"
-                                            Margin="0 4 0 0" FontSize="11"
+                                            Margin="0 4 0 0" FontSize="{ResourceReference FontSizeMicro}"
                                             Foreground="{ObservableResource TextFillColorSecondary}"/>
                                 </Grid>
                             </Border>
@@ -452,7 +452,7 @@
                                                 ContentTemplate="{TemplateBinding IconTemplate}"
                                                 Foreground="{ObservableResource TextFillColorPrimary}"/>
                                     </Viewbox>
-                                    <ContentPresenter Grid.Row="1" Margin="0 4 0 0" FontSize="11"
+                                    <ContentPresenter Grid.Row="1" Margin="0 4 0 0" FontSize="{ResourceReference FontSizeMicro}"
                                             Content="{TemplateBinding Header}"
                                             ContentTemplate="{TemplateBinding HeaderTemplate}"
                                             HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -514,8 +514,8 @@
     <Style Selector="RibbonGallery">
         <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
         <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeThin}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
         <Setter Property="Margin" Value="2"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
         <Setter Property="ItemsPanel">
@@ -640,10 +640,10 @@
         <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
         <Setter Property="BackgroundSelected" Value="{ResourceReference ControlFillColorSecondary}"/>
         <Setter Property="BorderBrushSelected" Value="{ThemeResource AccentFillColorDefault}"/>
-        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeThin}"/>
         <Setter Property="BorderBrush" Value="Transparent"/>
-        <Setter Property="CornerRadius" Value="3"/>
-        <Setter Property="Padding" Value="2"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference RibbonGalleryItemRadius}"/>
+        <Setter Property="Padding" Value="{ResourceReference RibbonGalleryItemPadding}"/>
         <Setter Property="Margin" Value="1"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
@@ -687,7 +687,7 @@
         <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
         <Setter Property="BackgroundPressed" Value="{ResourceReference SubtleFillColorTertiary}"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
         <Setter Property="MinHeight" Value="0"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="VerticalAlignment" Value="Stretch"/>
@@ -698,7 +698,7 @@
     <Style Selector="RibbonButton">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
         <!-- Large centres (nothing to line up with); the smaller sizes go LEFT - in a column they stand under one
              another, and a ragged left edge is the first thing the eye catches. -->
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
@@ -707,11 +707,11 @@
         <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
         <Setter Property="BackgroundPressed" Value="{ResourceReference SubtleFillColorTertiary}"/>
         <Setter Property="ForegroundDisabled" Value="{ResourceReference TextFillColorDisabled}"/>
-        <Setter Property="Padding" Value="8 6"/>
+        <Setter Property="Padding" Value="{ResourceReference RibbonButtonPadding}"/>
         <Setter Property="Margin" Value="1"/>
-        <Setter Property="MinWidth" Value="56"/>
+        <Setter Property="MinWidth" Value="{ResourceReference RibbonButtonMinWidth}"/>
         <Setter Property="MinHeight" Value="0"/>
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeCaption}"/>
         <!-- Default icon drawing: path data stroked in whatever colour the icon slot carries. `{Binding}` is the icon
              itself - a string converts to a Geometry on the way in, as it does when written as an attribute. -->
         <Setter Property="IconTemplate">
@@ -784,8 +784,8 @@
         </PropertyTrigger>
         <!-- Medium: small icon, label beside it. The label moves CELL, so one presenter serves every size. -->
         <PropertyTrigger Property="Ribbon.Size" Value="Medium">
-            <Setter TargetName="IconBox" Property="Width" Value="16"/>
-            <Setter TargetName="IconBox" Property="Height" Value="16"/>
+            <Setter TargetName="IconBox" Property="Width" Value="{ResourceReference IconSize}"/>
+            <Setter TargetName="IconBox" Property="Height" Value="{ResourceReference IconSize}"/>
             <Setter TargetName="PART_ContentPresenter" Property="Grid.Row" Value="0"/>
             <Setter TargetName="PART_ContentPresenter" Property="Grid.Column" Value="1"/>
             <Setter TargetName="PART_ContentPresenter" Property="Margin" Value="6 0 0 0"/>
@@ -795,8 +795,8 @@
         </PropertyTrigger>
         <!-- Small: the icon alone. -->
         <PropertyTrigger Property="Ribbon.Size" Value="Small">
-            <Setter TargetName="IconBox" Property="Width" Value="16"/>
-            <Setter TargetName="IconBox" Property="Height" Value="16"/>
+            <Setter TargetName="IconBox" Property="Width" Value="{ResourceReference IconSize}"/>
+            <Setter TargetName="IconBox" Property="Height" Value="{ResourceReference IconSize}"/>
             <Setter TargetName="PART_ContentPresenter" Property="Visibility" Value="Collapsed"/>
             <Setter Property="HorizontalContentAlignment" Value="Left"/>
         </PropertyTrigger>
@@ -806,11 +806,11 @@
     <Style Selector="RibbonButton">
         <PropertyTrigger Property="Ribbon.Size" Value="Medium">
             <Setter Property="MinWidth" Value="0"/>
-            <Setter Property="Padding" Value="4 2"/>
+            <Setter Property="Padding" Value="{ResourceReference RibbonButtonPaddingSmall}"/>
         </PropertyTrigger>
         <PropertyTrigger Property="Ribbon.Size" Value="Small">
             <Setter Property="MinWidth" Value="0"/>
-            <Setter Property="Padding" Value="4 2"/>
+            <Setter Property="Padding" Value="{ResourceReference RibbonButtonPaddingSmall}"/>
         </PropertyTrigger>
     </Style>
 
@@ -999,8 +999,8 @@
         <Setter Property="Foreground" Value="{ThemeResource AccentForegroundColor}"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="CornerRadius" Value="0"/>
-        <Setter Property="Padding" Value="16 7"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Padding" Value="{ResourceReference RibbonTabPadding}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeChrome}"/>
         <Setter Property="MinWidth" Value="0"/>
         <Setter Property="MinHeight" Value="0"/>
         <!-- A DESTINATION, unlike the minimize chevron beside the strip: it opens the backstage, so the keyboard has to
@@ -1050,12 +1050,12 @@
         <Setter Property="BackgroundPressed" Value="{ResourceReference OnAccentOverlayPressed}"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="CornerRadius" Value="0"/>
-        <Setter Property="Height" Value="56"/>
+        <Setter Property="Height" Value="{ResourceReference RibbonButtonLargeHeight}"/>
         <Setter Property="MinWidth" Value="0"/>
         <Setter Property="MinHeight" Value="0"/>
         <!-- A ROW of the rail, not a button sitting in one: the whole width answers to the pointer, as it does in Word.
              The glyph keeps the rows' own left offset so it lines up with their icons. -->
-        <Setter Property="Padding" Value="20 0"/>
+        <Setter Property="Padding" Value="{ResourceReference RibbonBackstagePadding}"/>
         <Setter Property="HorizontalAlignment" Value="Stretch"/>
         <Setter Property="HorizontalContentAlignment" Value="Left"/>
         <Setter Property="Template">
@@ -1097,11 +1097,11 @@
         <Setter Property="Foreground" Value="{ThemeResource AccentForegroundColor}"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="CornerRadius" Value="0"/>
-        <Setter Property="Padding" Value="20 0"/>
-        <Setter Property="Height" Value="48"/>
+        <Setter Property="Padding" Value="{ResourceReference RibbonBackstagePadding}"/>
+        <Setter Property="Height" Value="{ResourceReference RibbonMenuItemHeight}"/>
         <Setter Property="MinWidth" Value="0"/>
         <Setter Property="MinHeight" Value="0"/>
-        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
         <Setter Property="HorizontalContentAlignment" Value="Left"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
         <!-- Without this the icon is DATA with nothing to draw it, and the presenter shows the path text itself. -->
@@ -1381,24 +1381,24 @@
          Small drops the dividing rule as well - a 24px command cannot afford the furniture the large one wears. -->
     <Style Selector="RibbonSplitButton">
         <PropertyTrigger Property="Ribbon.Size" Value="Medium">
-            <Setter TargetName="ActionArea" Property="CornerRadius" Value="4 0 0 4"/>
+            <Setter TargetName="ActionArea" Property="CornerRadius" Value="{ResourceReference RibbonSplitLeadingRadius}"/>
             <Setter TargetName="SplitRule" Property="Grid.Row" Value="0"/>
             <Setter TargetName="SplitRule" Property="Grid.Column" Value="1"/>
-            <Setter TargetName="SplitRule" Property="Width" Value="1"/>
+            <Setter TargetName="SplitRule" Property="Width" Value="{ResourceReference StrokeThinValue}"/>
             <Setter TargetName="SplitRule" Property="Height" Value="NaN"/>
             <Setter TargetName="SplitRule" Property="Margin" Value="0 5"/>
             <Setter TargetName="PART_DropDownArea" Property="Grid.Row" Value="0"/>
             <Setter TargetName="PART_DropDownArea" Property="Grid.Column" Value="2"/>
-            <Setter TargetName="PART_DropDownArea" Property="Padding" Value="3 2"/>
-            <Setter TargetName="PART_DropDownArea" Property="CornerRadius" Value="0 4 4 0"/>
+            <Setter TargetName="PART_DropDownArea" Property="Padding" Value="{ResourceReference RibbonSplitDropDownPadding}"/>
+            <Setter TargetName="PART_DropDownArea" Property="CornerRadius" Value="{ResourceReference RibbonSplitTrailingRadius}"/>
         </PropertyTrigger>
         <PropertyTrigger Property="Ribbon.Size" Value="Small">
-            <Setter TargetName="ActionArea" Property="CornerRadius" Value="4 0 0 4"/>
+            <Setter TargetName="ActionArea" Property="CornerRadius" Value="{ResourceReference RibbonSplitLeadingRadius}"/>
             <Setter TargetName="SplitRule" Property="Visibility" Value="Collapsed"/>
             <Setter TargetName="PART_DropDownArea" Property="Grid.Row" Value="0"/>
             <Setter TargetName="PART_DropDownArea" Property="Grid.Column" Value="2"/>
-            <Setter TargetName="PART_DropDownArea" Property="Padding" Value="1 2"/>
-            <Setter TargetName="PART_DropDownArea" Property="CornerRadius" Value="0 4 4 0"/>
+            <Setter TargetName="PART_DropDownArea" Property="Padding" Value="{ResourceReference RibbonSplitDropDownPaddingSmall}"/>
+            <Setter TargetName="PART_DropDownArea" Property="CornerRadius" Value="{ResourceReference RibbonSplitTrailingRadius}"/>
         </PropertyTrigger>
     </Style>
 
@@ -1536,11 +1536,11 @@
         <Setter Property="BackgroundPointerOver" Value="{ResourceReference OnAccentShadePointerOver}"/>
         <Setter Property="BackgroundPressed" Value="{ResourceReference OnAccentShadePressed}"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="CornerRadius" Value="4"/>
-        <Setter Property="MinWidth" Value="28"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="MinWidth" Value="{ResourceReference RibbonChipWidth}"/>
         <Setter Property="MinHeight" Value="0"/>
-        <Setter Property="Width" Value="28"/>
-        <Setter Property="Height" Value="26"/>
+        <Setter Property="Width" Value="{ResourceReference RibbonChipWidth}"/>
+        <Setter Property="Height" Value="{ResourceReference RibbonChipHeight}"/>
         <Setter Property="Padding" Value="0"/>
     </Style>
 
@@ -1558,11 +1558,11 @@
         <Setter Property="BackgroundPointerOver" Value="{ResourceReference OnAccentShadePointerOver}"/>
         <Setter Property="BackgroundPressed" Value="{ResourceReference OnAccentShadePressed}"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="CornerRadius" Value="4"/>
-        <Setter Property="MinWidth" Value="28"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="MinWidth" Value="{ResourceReference RibbonChipWidth}"/>
         <Setter Property="MinHeight" Value="0"/>
-        <Setter Property="Width" Value="28"/>
-        <Setter Property="Height" Value="26"/>
+        <Setter Property="Width" Value="{ResourceReference RibbonChipWidth}"/>
+        <Setter Property="Height" Value="{ResourceReference RibbonChipHeight}"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="Focusable" Value="False"/>
         <!-- The row it sits in claims the caption's FULL height, so centring the bar centres nothing - the button is what

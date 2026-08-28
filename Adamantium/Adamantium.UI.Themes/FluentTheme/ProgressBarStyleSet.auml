@@ -7,8 +7,8 @@
          convention each concern is its own <Style>. -->
 
     <Style Selector="ProgressBar">
-        <Setter Property="MinWidth" Value="120"/>
-        <Setter Property="MinHeight" Value="6"/>
+        <Setter Property="MinWidth" Value="{ResourceReference ControlMinWidth}"/>
+        <Setter Property="MinHeight" Value="{ResourceReference ProgressBarThickness}"/>
     </Style>
 
     <Style Selector="ProgressBar">
@@ -38,11 +38,11 @@
          Height like it drives Width for horizontal). -->
     <Style Selector="ProgressBar">
         <PropertyTrigger Property="Orientation" Value="Vertical">
-            <Setter TargetName="PART_Track" Property="Width" Value="6"/>
+            <Setter TargetName="PART_Track" Property="Width" Value="{ResourceReference ProgressBarThickness}"/>
             <Setter TargetName="PART_Track" Property="Height" Value="Auto"/>
             <Setter TargetName="PART_Track" Property="HorizontalAlignment" Value="Center"/>
             <Setter TargetName="PART_Track" Property="VerticalAlignment" Value="Stretch"/>
-            <Setter TargetName="PART_Indicator" Property="Width" Value="6"/>
+            <Setter TargetName="PART_Indicator" Property="Width" Value="{ResourceReference ProgressBarThickness}"/>
             <Setter TargetName="PART_Indicator" Property="Height" Value="0"/>
             <Setter TargetName="PART_Indicator" Property="HorizontalAlignment" Value="Center"/>
             <Setter TargetName="PART_Indicator" Property="VerticalAlignment" Value="Bottom"/>

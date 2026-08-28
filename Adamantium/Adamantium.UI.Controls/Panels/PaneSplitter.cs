@@ -3,6 +3,7 @@ using Adamantium.UI.Controls.Base;
 using Adamantium.UI.Controls.Primitives;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
+using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Controls.Panels;
 
@@ -23,18 +24,34 @@ public class PaneSplitter : Thumb
     private double _extent;
 
     /// <summary>Which way this splitter resizes - set by the host from its own orientation. Setting it also picks the
-    /// cursor: without the resize arrows there is nothing telling the user this thin strip can be dragged at all.</summary>
-    public Orientation Orientation
+    /// cursor: without the resize arrows there is nothing telling the user this thin strip can be dragged at all.
+    /// <para>A REAL property rather than a field, because a THEME has to be able to answer it: the grip a splitter
+    /// draws runs across the gap, so which way it runs is decided by this. As a plain CLR property the setter announced
+    /// nothing, a <c>PropertyTrigger</c> keyed on it never fired, and a horizontal splitter went on drawing the
+    /// vertical grip - a sliver as tall as the gap instead of a line along it.</para></summary>
+    public static readonly AdamantiumProperty OrientationProperty = AdamantiumProperty.Register(nameof(Orientation),
+        typeof(Orientation), typeof(PaneSplitter),
+        new PropertyMetadata(Orientation.Horizontal, PropertyMetadataOptions.AffectsRender, OnOrientationChanged));
+
+    /// <summary>The cursor for the DEFAULT orientation, stated here because the callback below cannot state it: the
+    /// host writes every splitter's orientation, and writing the value it already has is not a change - so a splitter
+    /// left at the default was the one case that never ran the callback and never got its arrows. This side effect
+    /// used to live in a plain setter, which ran on every write and hid that.</summary>
+    public PaneSplitter() => ApplyCursor();
+
+    private static void OnOrientationChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
-        get => _orientation;
-        internal set
-        {
-            _orientation = value;
-            Cursor = value == Orientation.Horizontal ? CursorType.SizeEWE : CursorType.SizeNS;
-        }
+        if (a is PaneSplitter splitter) splitter.ApplyCursor();
     }
 
-    private Orientation _orientation = Orientation.Horizontal;
+    private void ApplyCursor()
+        => Cursor = Orientation == Orientation.Horizontal ? CursorType.SizeEWE : CursorType.SizeNS;
+
+    public Orientation Orientation
+    {
+        get => GetValue<Orientation>(OrientationProperty);
+        internal set => SetValue(OrientationProperty, value);
+    }
 
     protected override void OnDragStarted(DragStartedEventArgs e)
     {

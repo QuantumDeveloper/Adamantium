@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<!-- Editor Pro in daylight. The SAME skin - same rows, same type, same hairlines - lit from the other side.
+
+     Not an inversion of the dark variant, and that is the whole craft of a light editor theme: dark chrome hides its
+     seams in shadow, light chrome has nowhere to hide them, so the strokes carry MORE weight here and the grounds
+     carry less. A ground stepped down as far as the dark one is stepped up would read as dirty grey.
+
+     Every key the dark variant declares is declared here, in the same order. Theme.ValidateVariants enforces that: a
+     key one variant answers and another does not makes the appearance depend on which variant it was switched FROM,
+     which is not a thing anyone can reason about. -->
+
+<ThemeVariantDefinition xmlns="http://adamantium/ui"
+                        Key="Light">
+
+  <ThemeVariantDefinition.Values>
+    <!-- A step darker than the dark variant's accent: the same blue on white is glare, and an editor's accent is on
+         screen constantly (selection bars, focus, the current tab). -->
+    <ThemeValue Property="AccentColor" Value="#1F6FEB"/>
+    <ThemeValue Property="AccentFillColorDisabled" Value="#D8DDE3"/>
+    <ThemeValue Property="FocusStrokeColorOuter" Value="#1F2933"/>
+    <ThemeValue Property="FocusStrokeColorInner" Value="#FFFFFF"/>
+  </ThemeVariantDefinition.Values>
+
+  <ThemeVariantDefinition.Colors>
+    <!-- Grounds: three steps, all faintly blue so the theme keeps its cast. The card is the BRIGHTEST here and the
+         darkest in the dark variant - a raised surface moves toward the light in both. -->
+    <PaletteColor Key="SolidBackgroundFillColorBase" Color="#F2F4F7"/>
+    <PaletteColor Key="SolidBackgroundFillColorSecondary" Color="#E9ECF1"/>
+    <PaletteColor Key="SolidBackgroundFillColorTertiary" Color="#F7F9FB"/>
+    <PaletteColor Key="CardBackgroundFillColorDefault" Color="#FFFFFF"/>
+    <PaletteColor Key="SmokeFillColorDefault" Color="#59000000"/>
+    <PaletteColor Key="LayerFillColorDefault" Color="#80FFFFFF"/>
+    <PaletteColor Key="TileFillColorDefault" Color="#0D000000"/>
+
+    <!-- Controls: the fill is nearly the ground and the STROKE says where the control is - the same rule as the dark
+         variant, but the overlays are black instead of white. -->
+    <PaletteColor Key="ControlFillColorDefault" Color="#0A000000"/>
+    <PaletteColor Key="ControlFillColorSecondary" Color="#12000000"/>
+    <PaletteColor Key="ControlFillColorTertiary" Color="#06000000"/>
+    <PaletteColor Key="ControlFillColorDisabled" Color="#08000000"/>
+    <PaletteColor Key="SubtleFillColorSecondary" Color="#0D000000"/>
+    <PaletteColor Key="SubtleFillColorTertiary" Color="#08000000"/>
+    <!-- Heavier than the dark variant's strokes on purpose: on a light ground a hairline at the same alpha disappears,
+         and this theme spends its depth on lines. -->
+    <PaletteColor Key="ControlStrokeColorDefault" Color="#2E000000"/>
+    <PaletteColor Key="ControlStrokeColorSecondary" Color="#47000000"/>
+
+    <PaletteColor Key="OnAccentOverlayPointerOver" Color="#33FFFFFF"/>
+    <PaletteColor Key="OnAccentOverlayPressed" Color="#5CFFFFFF"/>
+    <PaletteColor Key="OnAccentShadePointerOver" Color="#33000000"/>
+    <PaletteColor Key="OnAccentShadePressed" Color="#59000000"/>
+
+    <PaletteColor Key="DockFoldedStripFill" Color="#12000000"/>
+    <PaletteColor Key="DockCompassFillColor" Color="#F2FFFFFF"/>
+    <PaletteColor Key="DockCompassStrokeColor" Color="#4D000000"/>
+    <PaletteColor Key="DockCompassPreviewColor" Color="#591F6FEB"/>
+
+    <!-- Text: not pure black. A dense grid of 12-point text in #000 on white vibrates; a very dark blue-grey reads as
+         black and sits still. -->
+    <PaletteColor Key="TextFillColorPrimary" Color="#141A21"/>
+    <PaletteColor Key="TextFillColorSecondary" Color="#3D4854"/>
+    <PaletteColor Key="TextFillColorTertiary" Color="#6B7683"/>
+    <PaletteColor Key="TextFillColorDisabled" Color="#9AA3AD"/>
+
+    <!-- Darker than the dark variant's signals, for the same reason as the accent: these are read ON white. -->
+    <PaletteColor Key="SystemFillColorSuccess" Color="#1A7F37"/>
+    <PaletteColor Key="SystemFillColorCaution" Color="#9A6700"/>
+    <PaletteColor Key="SystemFillColorCritical" Color="#C4351C"/>
+
+    <!-- Same red both ways, unlike the signal colours above: this one is a GROUND with white on it, so it is not being
+         read against the page and does not need the light variant's extra darkening. -->
+    <PaletteColor Key="CloseButtonFillPointerOver" Color="#C42B1C"/>
+    <PaletteColor Key="CloseButtonFillPressed" Color="#8E2018"/>
+
+    <PaletteColor Key="SkeletonPulseFill" Color="#000000"/>
+    <PaletteColor Key="ShimmerTrackFill" Color="#12000000"/>
+    <PaletteColor Key="KeyTipPlateFill" Color="#2B333B"/>
+    <PaletteColor Key="KeyTipPlateStroke" Color="#141A21"/>
+    <PaletteColor Key="KeyTipForeground" Color="#F7F9FB"/>
+
+    <!-- Served as raw COLOURS, not brushes: a gradient stop takes a colour. -->
+    <PaletteColor Key="ShimmerPeakColor" Color="#59000000" As="Color"/>
+    <PaletteColor Key="ShimmerTrackColor" Color="#12000000" As="Color"/>
+    <PaletteColor Key="EdgeFadeColor" Color="#E6F2F4F7" As="Color"/>
+    <PaletteColor Key="EdgeFadeColorTransparent" Color="#00F2F4F7" As="Color"/>
+  </ThemeVariantDefinition.Colors>
+
+</ThemeVariantDefinition>

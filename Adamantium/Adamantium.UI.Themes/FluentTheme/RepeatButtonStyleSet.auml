@@ -18,10 +18,10 @@
         <Setter Property="ForegroundPressed" Value="{ResourceReference TextFillColorSecondary}"/>
         <Setter Property="ForegroundDisabled" Value="{ResourceReference TextFillColorDisabled}"/>
 
-        <Setter Property="BorderThickness" Value="2"/>
-        <Setter Property="CornerRadius" Value="4"/>
-        <Setter Property="Padding" Value="8 4 8 5"/>
-        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeControl}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingControlCompact}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>

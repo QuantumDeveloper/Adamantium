@@ -11,8 +11,8 @@
         <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="Padding" Value="16"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeThin}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingPanel}"/>
     </Style>
 
     <Style Selector="SlidePanel">
@@ -36,7 +36,7 @@
                                     <ContentPresenter Grid.Column="0"
                                             Content="{TemplateBinding Header}"
                                             Foreground="{TemplateBinding Foreground}"
-                                            FontSize="18"
+                                            FontSize="{ResourceReference FontSizeTitle}"
                                             VerticalAlignment="Center"/>
                                     <Button x:Name="PART_CloseButton" Grid.Column="1"
                                             Width="28" Height="28"

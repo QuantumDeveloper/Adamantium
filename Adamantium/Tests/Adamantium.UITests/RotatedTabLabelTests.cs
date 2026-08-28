@@ -1,153 +1,159 @@
-using Adamantium.Mathematics;
 using Adamantium.UI.Controls;
 using Adamantium.UI.Controls.Decorators;
-using Adamantium.UI.Controls.Buttons;
 using Adamantium.UI.Controls.Panels;
+using Adamantium.UI.Controls.Text;
 using Adamantium.UI.Core;
-using Adamantium.UI.Core.Data;
 using Adamantium.UI.Core.Media;
-using Adamantium.UI.Core.Templates;
+using Adamantium.Mathematics;
 using NUnit.Framework;
 
 namespace Adamantium.UITests;
 
-// Where a TURNED tab label actually lands inside its tab. The label of a tool panel folded against a side edge is the
-// FluentDark TabItem chrome with a quarter-turned header template inside it, and it must sit in the middle of the tab
-// both ways - it read as pushed against the tab's top edge on screen.
+/// <summary>
+/// A pane folded against a SIDE turns its tab labels ninety degrees, and the narrow column they end up in has to be as
+/// wide as the turned text is tall. On the stand the labels came out clipped along their own height, which can only
+/// mean something in that chain reported a size for text lying flat. These measure the chain one link at a time so the
+/// answer is a number rather than a guess: the transform itself, then the strip that has to make room for it.
+/// </summary>
 [TestFixture]
 public class RotatedTabLabelTests
 {
-    private const double LabelWidth = 60;    // the "text" - a fixed box, so the numbers do not depend on font metrics
-    private const double LabelHeight = 16;
+    private static readonly Size Unbounded = new(double.PositiveInfinity, double.PositiveInfinity);
 
-    // Mirrors FluentDark's TabItem chrome: Border(Padding) -> StackPanel(Horizontal, centred) -> [icon, header, close].
-    private static ControlTemplate TabChrome() => new(() =>
+    private static TextBlock Label()
     {
-        var border = new Border();
-        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        var text = new TextBlock { Text = "Inspector", FontSize = 12 };
+        text.Measure(Unbounded);
+        return text;
+    }
 
-        // Collapsed exactly as the theme leaves it with no icon - its 6px margin would otherwise be reserved anyway.
-        var icon = new ContentPresenter
-        {
-            VerticalAlignment = VerticalAlignment.Center,
-            Visibility = Visibility.Collapsed,
-            Margin = new Thickness(0, 0, 6, 0)
-        };
-        var header = new ContentPresenter
-        {
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center
-        };
-        var close = new Button { Visibility = Visibility.Collapsed };
-
-        row.Children.Add(icon);
-        row.Children.Add(header);
-        row.Children.Add(close);
-        border.Child = row;
-
-        var result = new TemplateResult { RootComponent = border };
-        result.RegisterName("TabBorder", border);
-        result.RegisterName("PART_Icon", icon);
-        result.RegisterName("PART_ContentPresenter", header);
-        result.RegisterName("PART_CloseButton", close);
-        result.AddTemplateBinding(border, "Padding", new TemplateBinding { Path = "Padding" });
-        result.AddTemplateBinding(header, "Content", new TemplateBinding { Path = "Header" });
-        result.AddTemplateBinding(header, "ContentTemplate", new TemplateBinding { Path = "HeaderTemplate" });
-        return result;
-    });
-
-    // The header template the Pane[LabelRotation=Left] style installs: a presenter turned a quarter turn.
-    private static DataTemplate TurnedLabel() => new(() => new TemplateResult
+    /// <summary>The link everything else rests on: a turned element must report the BOUNDING BOX of the turned content,
+    /// so its width becomes the flat text's height and its height the flat text's width.</summary>
+    [Test]
+    public void ALayoutTransform_SwapsTheReportedSize()
     {
-        RootComponent = new ContentPresenter
+        var flat = Label().DesiredSize;
+
+        var turned = Label();
+        turned.LayoutTransform = new Transform { RotationAngle = 90 };
+        turned.Measure(Unbounded);
+
+        Assert.Multiple(() =>
         {
-            HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            LayoutTransform = new Transform { RotationAngle = -90 },
-            Content = new Border { Width = LabelWidth, Height = LabelHeight }
+            Assert.That(turned.DesiredSize.Width, Is.EqualTo(flat.Height).Within(0.5),
+                "the turned label is as WIDE as the flat one was tall");
+            Assert.That(turned.DesiredSize.Height, Is.EqualTo(flat.Width).Within(0.5),
+                "...and as TALL as it was wide");
+        });
+    }
+
+    /// <summary>And the strip that holds them has to pass that width on. The scroller CLIPS to its own bounds, so a
+    /// cross size measured one pixel short is text with its ascenders cut off - which is exactly what a folded pane
+    /// showed.</summary>
+    [Test]
+    public void AVerticalStrip_IsAsWideAsItsTurnedLabels()
+    {
+        var probe = Label();
+        probe.LayoutTransform = new Transform { RotationAngle = 90 };
+        probe.Measure(Unbounded);
+        var turnedWidth = probe.DesiredSize.Width;
+
+        var panel = new TabPanel { Orientation = Orientation.Vertical };
+        for (var i = 0; i < 3; i++)
+        {
+            var label = Label();
+            label.LayoutTransform = new Transform { RotationAngle = 90 };
+            panel.Children.Add(label);
         }
-    });
 
-    private static (TabItem tab, ContentPresenter header) TurnedTab(Thickness padding)
-    {
-        var tab = new TabItem
-        {
-            Padding = padding,
-            HorizontalContentAlignment = HorizontalAlignment.Center,
-            VerticalContentAlignment = VerticalAlignment.Center,
-            Header = new object(),
-            HeaderTemplate = TurnedLabel(),
-            Template = TabChrome()
-        };
+        var scroller = new TabStripScroller { Orientation = Orientation.Vertical, Child = panel };
+        scroller.Measure(Unbounded);
 
-        var strip = new TabPanel { Orientation = Orientation.Vertical };
-        strip.Children.Add(tab);
-        strip.Measure(new Size(400, 400));
-        strip.Arrange(new Rect(0, 0, 400, 400));
-
-        var header = (ContentPresenter)tab.GetTemplateChild("PART_ContentPresenter");
-        return (tab, header);
+        Assert.That(scroller.DesiredSize.Width, Is.GreaterThanOrEqualTo(turnedWidth - 0.5),
+            "the column must be at least as wide as a turned label, or the scroller's clip cuts it");
     }
 
-    /// <summary>Where a part sits in the TAB's own space - Bounds are parent-relative, and the label is two levels down
-    /// (border padding, then the centred row), so the offsets have to be summed to compare with the tab at all.</summary>
-    private static Rect InTabSpace(TabItem tab, IUIComponent part)
+    /// <summary>The link in the middle: the tab template puts its label in the STARRED track of a four-column grid, so
+    /// that a lone stretched document tab keeps its close button against the right edge. A folded strip measures with
+    /// no width limit at all, and a star track has no share of an unbounded width to take - so this asks whether the
+    /// track still gives its child the room the child asked for.</summary>
+    [Test]
+    public void AStarredTrack_StillGivesItsChildRoom_WhenTheWidthIsUnbounded()
     {
-        var x = 0.0;
-        var y = 0.0;
-        for (var c = part; c != null && !ReferenceEquals(c, tab); c = c.VisualParent as IUIComponent)
+        var label = Label();
+        label.LayoutTransform = new Transform { RotationAngle = 90 };
+        label.Measure(Unbounded);
+        var turnedWidth = label.DesiredSize.Width;
+
+        // The tab template's inner grid, in miniature: icon, label, pin, close.
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var content = Label();
+        content.LayoutTransform = new Transform { RotationAngle = 90 };
+        Grid.SetColumn(content, 1);
+        grid.Children.Add(content);
+
+        grid.Measure(Unbounded);
+
+        Assert.That(grid.DesiredSize.Width, Is.GreaterThanOrEqualTo(turnedWidth - 0.5),
+            "a star track measured with no bound must still report its content's width");
+    }
+
+    /// <summary>The pass that actually decides the folded column's width. PaneHost measures an Auto pane TWICE: once
+    /// unbounded, to ask how much it needs, and once at exactly the answer. So the second measurement has no slack at
+    /// all - if anything in the strip asks for a pixel more the second time round, the scroller's clip takes it out of
+    /// the label, and the turned text loses its ascenders down one side.</summary>
+    [Test]
+    public void MeasuringAgainAtTheAnswer_DoesNotCostTheStripAnyWidth()
+    {
+        var panel = new TabPanel { Orientation = Orientation.Vertical };
+        for (var i = 0; i < 3; i++)
         {
-            x += c.Bounds.X;
-            y += c.Bounds.Y;
+            var label = Label();
+            label.LayoutTransform = new Transform { RotationAngle = 90 };
+            panel.Children.Add(label);
         }
-        return new Rect(new Vector2((float)x, (float)y), part.Bounds.Size);
+        var scroller = new TabStripScroller { Orientation = Orientation.Vertical, Child = panel };
+
+        // Pass one: how much do you need?
+        scroller.Measure(Unbounded);
+        var asked = scroller.DesiredSize.Width;
+
+        // Pass two: here is exactly that, and nothing more.
+        scroller.Measure(new Size(asked, 400));
+
+        Assert.That(scroller.DesiredSize.Width, Is.EqualTo(asked).Within(0.5),
+            "the strip must still fit in the width it asked for");
     }
 
-    // With a SYMMETRIC padding the turned label must sit dead centre in the tab, both ways.
+    /// <summary>The last link, and the one the stand points at: measured off the screenshots, a folded strip comes out
+    /// about as wide as the turned TEXT, with none of the tab's padding in it - and a tab that is 12 either side should
+    /// be 24 wider than its label. This is the tab template's actual shape: a padded Border around the grid that holds
+    /// the turned header.</summary>
     [Test]
-    public void TurnedLabel_SitsInTheMiddleOfItsTab()
+    public void ATabsPadding_CountsTowardsItsTurnedWidth()
     {
-        var (tab, header) = TurnedTab(new Thickness(6));
-        var label = InTabSpace(tab, header);
+        var probe = Label();
+        probe.LayoutTransform = new Transform { RotationAngle = 90 };
+        probe.Measure(Unbounded);
+        var turnedWidth = probe.DesiredSize.Width;
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(label.Y + label.Height / 2, Is.EqualTo(tab.Bounds.Height / 2).Within(0.5),
-                $"centred DOWN the tab (tab {tab.Bounds.Size}, label {label})");
-            Assert.That(label.X + label.Width / 2, Is.EqualTo(tab.Bounds.Width / 2).Within(0.5),
-                $"centred ACROSS the tab (tab {tab.Bounds.Size}, label {label})");
-        });
-    }
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var content = Label();
+        content.LayoutTransform = new Transform { RotationAngle = 90 };
+        Grid.SetColumn(content, 1);
+        grid.Children.Add(content);
 
-    // The padding FluentDark gives a tab: wider than tall, and stated on all four sides. Written as the two-value
-    // `12 6` it meant Thickness(leftTop, rightBottom) - 12 on the left AND top against 6 on the right and bottom - which
-    // put a turned label 3px off centre each way.
-    [Test]
-    public void TurnedLabel_WithTheThemesPadding_IsStillCentred()
-    {
-        var (tab, header) = TurnedTab(new Thickness(12, 6, 12, 6));
-        var label = InTabSpace(tab, header);
+        var tab = new Border { Padding = new Thickness(12, 6, 12, 6), Child = grid };
+        tab.Measure(Unbounded);
 
-        Assert.Multiple(() =>
-        {
-            Assert.That(label.Y + label.Height / 2, Is.EqualTo(tab.Bounds.Height / 2).Within(0.5),
-                $"centred DOWN the tab (tab {tab.Bounds.Size}, label {label})");
-            Assert.That(label.X + label.Width / 2, Is.EqualTo(tab.Bounds.Width / 2).Within(0.5),
-                $"centred ACROSS the tab (tab {tab.Bounds.Size}, label {label})");
-        });
-    }
-
-    // The turned footprint: as WIDE as the label is tall, as TALL as the label is long - plus the padding, and nothing
-    // else. A tab with no icon must reserve nothing for one, or the column is 6px wider than it needs to be.
-    [Test]
-    public void TurnedLabel_TurnsTheTabsFootprint()
-    {
-        var (tab, _) = TurnedTab(new Thickness(6));
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(tab.Bounds.Width, Is.EqualTo(LabelHeight + 12).Within(0.5), "a narrow column - no dead space where the icon is not");
-            Assert.That(tab.Bounds.Height, Is.EqualTo(LabelWidth + 12).Within(0.5), "as tall as the label is long");
-        });
+        Assert.That(tab.DesiredSize.Width, Is.EqualTo(turnedWidth + 24).Within(0.5),
+            "the padding either side of a turned label is part of how wide the tab is");
     }
 }

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<!-- Editor Pro's only variant so far: a muted blue-grey, darker and flatter than Fluent's neutral dark. An editor is
+     looked at for eight hours, so the chrome recedes and the accent is the only thing that carries saturation.
+
+     The KEY NAMES are Fluent's on purpose. A theme has to answer for every control in the application, and the style
+     sets Editor Pro has not redesigned yet are INCLUDED from Fluent (see EditorPro.auml) - they ask for these names.
+     The colours behind them are this theme's own. -->
+
+<ThemeVariantDefinition xmlns="http://adamantium/ui"
+                        Key="Dark">
+
+  <ThemeVariantDefinition.Values>
+    <ThemeValue Property="AccentColor" Value="#4C8DFF"/>
+    <ThemeValue Property="AccentFillColorDisabled" Value="#33383F"/>
+    <ThemeValue Property="FocusStrokeColorOuter" Value="#8FB8FF"/>
+    <ThemeValue Property="FocusStrokeColorInner" Value="#0E1116"/>
+  </ThemeVariantDefinition.Values>
+
+  <ThemeVariantDefinition.Colors>
+    <!-- Grounds: three steps, all blue-grey, all close together - depth comes from the hairlines, not from contrast. -->
+    <PaletteColor Key="SolidBackgroundFillColorBase" Color="#14181D"/>
+    <PaletteColor Key="SolidBackgroundFillColorSecondary" Color="#11151A"/>
+    <PaletteColor Key="SolidBackgroundFillColorTertiary" Color="#1A1F26"/>
+    <PaletteColor Key="CardBackgroundFillColorDefault" Color="#1E242B"/>
+    <PaletteColor Key="SmokeFillColorDefault" Color="#A6000000"/>
+    <PaletteColor Key="LayerFillColorDefault" Color="#4C222831"/>
+    <PaletteColor Key="TileFillColorDefault" Color="#0DFFFFFF"/>
+
+    <!-- Controls: a filled input in an editor reads as noise, so the fill is nearly the ground and the STROKE says
+         where the control is. -->
+    <PaletteColor Key="ControlFillColorDefault" Color="#0AFFFFFF"/>
+    <PaletteColor Key="ControlFillColorSecondary" Color="#12FFFFFF"/>
+    <PaletteColor Key="ControlFillColorTertiary" Color="#06FFFFFF"/>
+    <PaletteColor Key="ControlFillColorDisabled" Color="#08FFFFFF"/>
+    <PaletteColor Key="SubtleFillColorSecondary" Color="#0DFFFFFF"/>
+    <PaletteColor Key="SubtleFillColorTertiary" Color="#08FFFFFF"/>
+    <PaletteColor Key="ControlStrokeColorDefault" Color="#1FFFFFFF"/>
+    <PaletteColor Key="ControlStrokeColorSecondary" Color="#2EFFFFFF"/>
+
+    <PaletteColor Key="OnAccentOverlayPointerOver" Color="#33FFFFFF"/>
+    <PaletteColor Key="OnAccentOverlayPressed" Color="#5CFFFFFF"/>
+    <PaletteColor Key="OnAccentShadePointerOver" Color="#33000000"/>
+    <PaletteColor Key="OnAccentShadePressed" Color="#59000000"/>
+
+    <PaletteColor Key="DockFoldedStripFill" Color="#12FFFFFF"/>
+    <PaletteColor Key="DockCompassFillColor" Color="#E61E242B"/>
+    <PaletteColor Key="DockCompassStrokeColor" Color="#4DFFFFFF"/>
+    <PaletteColor Key="DockCompassPreviewColor" Color="#594C8DFF"/>
+
+    <!-- Text: one step brighter than Fluent's at every level. Dense rows put more glyphs on screen, and thin text on a
+         near-black ground loses weight. -->
+    <PaletteColor Key="TextFillColorPrimary" Color="#EDF1F5"/>
+    <PaletteColor Key="TextFillColorSecondary" Color="#C2CBD4"/>
+    <PaletteColor Key="TextFillColorTertiary" Color="#8B97A3"/>
+    <PaletteColor Key="TextFillColorDisabled" Color="#5A646E"/>
+
+    <PaletteColor Key="SystemFillColorSuccess" Color="#5FD07A"/>
+    <PaletteColor Key="SystemFillColorCaution" Color="#E8C15C"/>
+    <PaletteColor Key="SystemFillColorCritical" Color="#FF8A93"/>
+
+    <!-- The close button's own fills. Its hover has to be a SATURATED ground - the one place in the chrome that shouts,
+         because the cost of the click is losing the session. The signal colour above is text on a dark ground and is
+         far too pale to be a fill; these are separate for that reason, not a duplicate. -->
+    <PaletteColor Key="CloseButtonFillPointerOver" Color="#C42B1C"/>
+    <PaletteColor Key="CloseButtonFillPressed" Color="#8E2018"/>
+
+    <PaletteColor Key="SkeletonPulseFill" Color="#FFFFFF"/>
+    <PaletteColor Key="ShimmerTrackFill" Color="#12FFFFFF"/>
+    <PaletteColor Key="KeyTipPlateFill" Color="#E8EDF2"/>
+    <PaletteColor Key="KeyTipPlateStroke" Color="#4A525B"/>
+    <PaletteColor Key="KeyTipForeground" Color="#0E1116"/>
+
+    <!-- Served as raw COLOURS, not brushes: a gradient stop takes a colour. -->
+    <PaletteColor Key="ShimmerPeakColor" Color="#80FFFFFF" As="Color"/>
+    <PaletteColor Key="ShimmerTrackColor" Color="#12FFFFFF" As="Color"/>
+    <PaletteColor Key="EdgeFadeColor" Color="#E614181D" As="Color"/>
+    <PaletteColor Key="EdgeFadeColorTransparent" Color="#0014181D" As="Color"/>
+  </ThemeVariantDefinition.Colors>
+
+</ThemeVariantDefinition>

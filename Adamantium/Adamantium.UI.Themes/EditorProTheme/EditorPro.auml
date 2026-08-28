@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Theme xmlns="http://adamantium/ui"
+       xmlns:x="http://adamantium/ui/xaml/extensions"
+       xmlns:editor="clr-namespace:Adamantium.UI.Themes.EditorProTheme"
+       xmlns:fluent="clr-namespace:Adamantium.UI.Themes.FluentTheme"
+       Name="EditorPro"
+       SystemLightVariant="Light"
+       SystemDarkVariant="Dark"
+       ResourceContext.Scope="Theme">
+
+  <!-- The skin the engine's own editor wears: dense rows, small type, tight radii, hairline separators, a muted
+       blue-grey ground. Not a recolour of Fluent - an editor is defined by how much of the project fits on screen, so
+       the numbers ARE the design. They all live in this theme's Metrics; nothing here or in its style sets states a
+       size inline.
+
+       It is also the instrument the theme system is measured with: a second theme that changes METRICS across every
+       control is what proves the sizes are not baked into the controls themselves.
+
+       TWO variants, and adding the second one touched no template at all - which was the point of writing them the way
+       they are written. No template in this theme states a colour: every brush comes from the palette by key, and the
+       only literal is Transparent, an unpainted hit-testable surface rather than a colour choice. The light variant is
+       therefore one more file and nothing else.
+       It is not an INVERSION of the dark one: dark chrome hides its seams in shadow and light chrome cannot, so the
+       strokes carry more weight there and the grounds carry less. Both answer the same key set - Theme.ValidateVariants
+       enforces that, and a key one variant answers and another does not would make the look depend on which variant it
+       was switched FROM. -->
+
+  <!-- Dark first: it is what an editor is usually set to, and order is what says which one it opens on. -->
+
+  <ResourceContext.Resources>
+    <!-- Its own numbers, and - for now - Fluent's SHAPES. An icon is geometry; its colour comes from the palette by
+         key, and this theme answers the same key names. Editor Pro will want sharper, smaller icons of its own, and
+         that is a separate piece of work from the skin. -->
+    <ResourceLink Source="{x:Type editor:Metrics}"/>
+    <ResourceLink Source="{x:Type fluent:Icons}"/>
+  </ResourceContext.Resources>
+
+  <Theme.Variants>
+    <editor:EditorProDark/>
+    <editor:EditorProLight/>
+  </Theme.Variants>
+
+  <!-- A theme answers for EVERY control in the application: styles come only from the current theme, and a control
+       with no styled ancestor gets no template and draws nothing. So the sets Editor Pro has not redesigned yet are
+       included FROM FLUENT by name. They are not a permanent part of this theme - they are the ones still to be
+       written, and each moves up into the block above as it is. -->
+  <Theme.StyleIncludes>
+    <StyleInclude Source="{x:Type fluent:TextBlockStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:BorderStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:ContentControlStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:ScrollBarStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:ScrollViewerStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:ZoomBoxStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:NumericUpDownStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:RingProgressBarStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:BusyIndicatorStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:ItemsControlStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:ListBoxStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:ListBoxItemStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:SelectionAdornerStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:HoverAdornerStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:KeyTipAdornerStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:TilesHostStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:FlipTileStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:DropDownItemStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:TabControlStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:TabItemStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:RibbonStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:SlidePanelStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:OverlayWindowStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:MenuStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:TreeViewStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:ColorPickerStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:ColorPickerButtonStyleSet}"/>
+    <StyleInclude Source="{x:Type fluent:ColorWheelStyleSet}"/>
+
+    <!-- This theme's OWN sets, last so they win. There are FEW of them, and that is the point: this theme's DENSITY
+         does not live here at all - it lives in its Metrics, and the shared templates read it from there. Nine sets
+         that once restated a padding and a font size for a control whose shape is unchanged were deleted the day
+         Fluent's numbers moved into its own Metrics, because they had become a way of saying the same thing twice.
+         What is left is only where the SHAPE differs, plus two rows the shared templates give no height to. -->
+    <StyleInclude Source="{x:Type editor:ButtonStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:ToggleButtonStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:RepeatButtonStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:TextBoxStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:CheckBoxStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:RadioButtonStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:ToggleSwitchStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:DropDownStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:NumericUpDownStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:ProgressBarStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:SliderStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:RangeSliderStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:GridSplitterStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:SelectionAdornerStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:HoverAdornerStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:ListBoxStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:ListBoxItemStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:DropDownItemStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:TabControlStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:TabItemStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:ThumbStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:ToolTipStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:FocusAdornerStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:DropInsertionIndicatorStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:DragHandleStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:TitleBarStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:ResizeGripperStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:WindowStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:DockingStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:ScrollBarStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:TreeViewStyleSet}"/>
+    <StyleInclude Source="{x:Type editor:MenuStyleSet}"/>
+  </Theme.StyleIncludes>
+</Theme>

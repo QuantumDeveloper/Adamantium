@@ -235,4 +235,26 @@ public class Track : Panel
         var offset = IsDirectionReversed ? _remaining - along : along;
         return Minimum + offset * _density;
     }
+
+    /// <summary>How far a PAGE step may go before the thumb reaches <paramref name="point"/>: the Value at which the
+    /// thumb EDGE facing that point arrives exactly on it. <paramref name="increasing"/> says which way the step moves.
+    /// <para>This is the position paging would have stopped at on its own, had the page button noticed the thumb sliding
+    /// under the pointer. It cannot: the pointer does not move, the AREA moves out from under it, and enter/leave are
+    /// raised from pointer movement - so the button never hears it left and repeats all the way to the end. The caller
+    /// clamps to this instead.</para>
+    /// The EDGE, not the centre: the thumb must come up to the cursor, not swallow it, which for a long thumb is half
+    /// its length of overshoot. Computed here rather than by shifting <see cref="ValueFromPoint"/> by half a thumb -
+    /// that one CLAMPS its own travel first, so at either end the clamp had already thrown away the distance the shift
+    /// needed and the thumb stopped half a thumb short of both stops, on both axes.</summary>
+    public double PageLimitFromPoint(Vector2 point, bool increasing)
+    {
+        if (_remaining <= 0) return increasing ? Maximum : Minimum;
+        var pos = Orientation == Orientation.Vertical ? point.Y : point.X;
+        // Which edge faces the cursor depends on where the thumb is HEADING, and reversal flips that: the leading edge
+        // lands on the point, so travel toward the end is measured from the far side of the thumb.
+        var towardEnd = increasing != IsDirectionReversed;
+        var along = Math.Clamp(towardEnd ? pos - _thumbAlong : pos, 0, _remaining);
+        var offset = IsDirectionReversed ? _remaining - along : along;
+        return Minimum + offset * _density;
+    }
 }

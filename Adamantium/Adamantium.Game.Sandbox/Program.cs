@@ -206,6 +206,36 @@ public class Program
                         System.Threading.Thread.Sleep(9000);
                         Sample("base");
 
+                        // TEMP (ADAM_SWAP_TO=Name): drive a real theme SWAP from here, which is a different path from
+                        // starting ON a theme - a theme whose template cannot finish building stalls the swap's layout
+                        // cascade, and the application then sits with the overlay up rather than failing. Sampled after,
+                        // so a stalled swap shows as a sample that never arrives.
+                        if (Environment.GetEnvironmentVariable("ADAM_SWAP_TO") is { Length: > 0 } wantedTheme
+                            && themes?[wantedTheme] is { } target)
+                        {
+                            // TIMED, not slept-through: a swap that takes seconds and one that never finishes look the
+                            // same from a fixed sleep, and that is exactly the difference worth knowing. ThemeChanged
+                            // fires when the cascade has SETTLED (every window's layout drained), so it is the honest
+                            // end of the swap - SetTheme returning is not.
+                            var swapWatch = System.Diagnostics.Stopwatch.StartNew();
+                            var settled = new System.Threading.ManualResetEventSlim(false);
+                            void OnSettled(object s, Adamantium.UI.Core.Resources.ThemeChangedEventArgs e) => settled.Set();
+                            themes.ThemeChanged += OnSettled;
+
+                            System.IO.File.AppendAllText(report, $"-- swapping to {wantedTheme}\n");
+                            Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => themes.SetTheme(target));
+
+                            var arrived = settled.Wait(TimeSpan.FromSeconds(60));
+                            themes.ThemeChanged -= OnSettled;
+                            System.IO.File.AppendAllText(report,
+                                arrived
+                                    ? $"-- swap to {wantedTheme} SETTLED in {swapWatch.ElapsedMilliseconds} ms\n"
+                                    : $"-- swap to {wantedTheme} DID NOT SETTLE within 60 s (still {themes.CurrentTheme?.Name})\n");
+
+                            System.Threading.Thread.Sleep(2000);
+                            Sample($"swapped-to-{wantedTheme}");
+                        }
+
                         for (var i = 0; i < flips && themes != null; i++)
                         {
                             // TEMP: reproduce the merged-theme swap under the probe instead of by hand. First step goes

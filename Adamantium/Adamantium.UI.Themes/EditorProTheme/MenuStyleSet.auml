@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's menu rows: the theme's row height, square, with a narrower icon gutter to match the smaller glyph.
+
+         This one had to be a full template rather than a set of overrides, and the reason is worth stating: Fluent's
+         menu template writes its numbers INSIDE itself (MinHeight, Padding and CornerRadius sit on the Root part, not
+         on the MenuItem), so there is no property for a theme to set. That is the duplication the coming sweep of
+         Fluent's inline numbers into its own Metrics is meant to end - a template whose sizes come through
+         {TemplateBinding} can be re-densified by a second theme without being copied at all, which is how the button,
+         the field and the row already work here.
+
+         Everything this file states comes from Metrics. -->
+
+    <Style Selector="MenuItem" BasedOn="ItemsControl">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <!-- Not virtualized: a small mixed-height host, so a separator takes its own height instead of a
+                         full row cell. -->
+                    <StackPanel Orientation="Vertical" IsVirtualizing="False"/>
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="MenuItem">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Grid>
+                        <!-- The height is on Root, a PART, not on the MenuItem: a separator collapses Root, and it has
+                             to shrink to its rule rather than hold a full-height empty band. -->
+                        <Border x:Name="Root" Background="{TemplateBinding Background}"
+                                CornerRadius="{ResourceReference CornerRadiusSmall}"
+                                Padding="{ResourceReference PaddingRow}"
+                                MinHeight="{ResourceReference RowHeight}">
+                            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                <!-- The gutter is always reserved, with or without an icon, so every label in the menu
+                                     starts on the same vertical line. -->
+                                <ContentPresenter Grid.Column="0" Content="{TemplateBinding Icon}"
+                                        Width="{ResourceReference MenuIconGutter}"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <ContentPresenter x:Name="PART_ContentPresenter" Grid.Column="1"
+                                        Content="{TemplateBinding Header}"
+                                        ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                        Foreground="{TemplateBinding Foreground}"
+                                        FontSize="{TemplateBinding FontSize}"
+                                        HorizontalAlignment="Left" VerticalAlignment="Center"/>
+                                <!-- The shortcut, a step down in size and colour: it is a reminder, not a label. -->
+                                <TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}"
+                                        Foreground="{ObservableResource TextFillColorTertiary}"
+                                        FontSize="{ResourceReference FontSizeCaption}"
+                                        VerticalAlignment="Center"
+                                        Margin="{ResourceReference MenuGestureInset}"/>
+                                <!-- A vector chevron rather than a font glyph: it draws whatever the UI font covers. -->
+                                <Image x:Name="Chevron" Grid.Column="3"
+                                        Source="{ResourceReference ChevronRightIcon}"
+                                        Width="{ResourceReference DropDownIconSize}"
+                                        Height="{ResourceReference DropDownIconSize}"
+                                        Visibility="Collapsed"
+                                        VerticalAlignment="Center"
+                                        Margin="{ResourceReference MenuChevronInset}"/>
+                            </Grid>
+                        </Border>
+                        <!-- No PlacementTarget: the popup falls back to its visual parent - this template's root grid,
+                             which overlaps the row - so Placement=Right opens just past the row's right edge. -->
+                        <Popup x:Name="PART_SubmenuPopup" Placement="Right" FlipToFit="True"
+                                IsOpen="{TemplateBinding IsSubmenuOpen}">
+                            <!-- Built LAZILY on first open, so a leaf that never opens a submenu never pays to build
+                                 and theme one. -->
+                            <Popup.ChildTemplate>
+                                <ControlTemplate TargetType="Popup">
+                                    <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                            BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                            BorderThickness="{ResourceReference StrokeThin}"
+                                            CornerRadius="{ResourceReference CornerRadiusDefault}"
+                                            Padding="{ResourceReference MenuCardPadding}"
+                                            MinWidth="{ResourceReference MenuMinWidth}">
+                                        <MenuScrollViewer x:Name="PART_MenuScroll">
+                                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                        </MenuScrollViewer>
+                                    </Border>
+                                </ControlTemplate>
+                            </Popup.ChildTemplate>
+                        </Popup>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="MenuItem">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="Root" Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground"
+                    Value="{ResourceReference TextFillColorDisabled}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="HasItems" Value="true">
+            <Setter TargetName="Chevron" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

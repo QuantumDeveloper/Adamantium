@@ -381,9 +381,18 @@ public class CodeGenerationContext
                                 // Theme/Global now and upgrade to a tree-scoped Local hit once the element attaches (see
                                 // ResourceResolver.SetDeferred). Keeps Local resources out of reach of an eager,
                                 // context-free resolve.
+                                // The PRIORITY is decided the same way a literal's is a few hundred lines below: inside a
+                                // ControlTemplate a part's value is the TEMPLATE's, so a trigger targeting that part can
+                                // still override it; written straight onto an element it is that element's own value.
+                                // Without this a metric and a number in the SAME attribute behaved differently - the
+                                // metric landed at Local and silently outranked every trigger on that property, which is
+                                // what a theme gets for following the "no inline numbers" rule.
                                 var target = isRoot ? "this" : CurrentParent;
+                                var deferredPriority = CurrentTemplate != null
+                                    ? "Adamantium.UI.Core.ValuePriority.Template"
+                                    : "Adamantium.UI.Core.ValuePriority.Local";
                                 TextGenerator.WriteLine(
-                                    $"{Metadata.DefaultTypeContainer.ResourceResolver.FullName}.SetDeferred({target}, \"{propRef.Name}\", \"{key}\");");
+                                    $"{Metadata.DefaultTypeContainer.ResourceResolver.FullName}.SetDeferred({target}, \"{propRef.Name}\", \"{key}\", {deferredPriority});");
                             }
 
                             break;

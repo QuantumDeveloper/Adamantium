@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- THE FOCUS RING for the whole application: what the keyboard leaves around the control it reached. One style is
+         the focus visual of every control; a control wanting its own sets FocusVisualStyle, which is applied after this
+         and wins.
+
+         Two things differ from Fluent, and both are decisions rather than sizes.
+
+         SQUARE ALWAYS. Fluent's ring traces the adorned control's own rounding (AdornedCornerRadius) so it stays
+         parallel to the edge it follows. Here the ring does NOT follow the control: every control in this theme is
+         square already, and a ring that adapts its geometry to whatever it lands on is a ring whose shape carries no
+         information. It is the same mark everywhere, which is what makes it read as one thing.
+
+         THE DARK LINE GOES OUTSIDE. Fluent puts a thin dark line INSIDE the accent one, to keep the ring legible on an
+         accent-filled button. That works, but it eats a pixel of the control it surrounds - at this theme's weights the
+         control is small enough for that pixel to matter. Outside, the dark line does the same separating job against
+         the accent fill and instead spends its pixel on the panel, where there is nothing to lose. -->
+
+    <Style Selector="FocusAdorner">
+        <!-- Room for the outer separator, which is the only part standing off the control's own outline. -->
+        <Setter Property="Outset" Value="{ResourceReference FocusRingOutset}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="FocusAdorner">
+                    <!-- Siblings in a Grid rather than nested borders: each line is placed by its own margin instead of
+                         by whatever inset the other gives a child. -->
+                    <Grid IsHitTestVisible="False">
+                        <Border BorderThickness="{ResourceReference StrokeThin}"
+                                BorderBrush="{ThemeResource FocusStrokeColorInner}"
+                                CornerRadius="0"/>
+                        <Border Margin="{ResourceReference StrokeThin}"
+                                BorderThickness="{ResourceReference StrokeThin}"
+                                BorderBrush="{ThemeResource AccentFillColorDefault}"
+                                CornerRadius="0"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

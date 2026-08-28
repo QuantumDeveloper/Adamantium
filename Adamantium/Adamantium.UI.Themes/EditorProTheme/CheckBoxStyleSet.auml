@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's checkbox. The box is SQUARE and smaller, and it is the only accent-filled thing in a settings
+         column - which is the whole reason the rest of this theme's controls gave up their fills.
+
+         Fluent overlays two markers, a check and a square, and cross-fades their opacity. This theme shows the same two
+         states but draws the indeterminate one as a RULE across the box rather than a filled square: at this size a
+         square inside a square is two nested boxes and reads as a rendering artefact, while a bar reads as "partly".
+
+         Per the small-styles convention: properties, template, triggers. -->
+
+    <Style Selector="CheckBox">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorSecondary}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+    </Style>
+
+    <Style Selector="CheckBox">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border x:Name="Box"
+                                Width="{ResourceReference CheckBoxSize}"
+                                Height="{ResourceReference CheckBoxSize}"
+                                CornerRadius="{ResourceReference CornerRadiusSmall}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{ResourceReference StrokeThin}"
+                                VerticalAlignment="Center">
+                            <Grid>
+                                <!-- Geometry starting at (0,0): a Path's box is its geometry bounds, so leading empty
+                                     space pushes the centred glyph off its own centre. -->
+                                <Path x:Name="CheckGlyph"
+                                        Data="M0,3.5 L2.5,6 L7.5,0"
+                                        Stroke="{ThemeResource AccentForegroundColor}"
+                                        StrokeThickness="{ResourceReference StrokeAccentValue}"
+                                        StrokeLineJoin="Round"
+                                        Opacity="0"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"/>
+                                <!-- "Partly": a bar, not a box inside a box. -->
+                                <Border x:Name="IndeterminateGlyph"
+                                        Width="{ResourceReference CheckMarkWidth}"
+                                        Height="{ResourceReference StrokeAccentValue}"
+                                        Background="{ThemeResource AccentForegroundColor}"
+                                        Opacity="0"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"/>
+                            </Grid>
+                        </Border>
+                        <ContentPresenter x:Name="PART_ContentPresenter"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                VerticalAlignment="Center"
+                                Margin="{ResourceReference CheckLabelInset}"/>
+                    </StackPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="CheckBox">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="Box" Property="BorderBrush" Value="{ObservableResource TextFillColorTertiary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsChecked" Value="true">
+            <Setter TargetName="Box" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="Box" Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="CheckGlyph" Property="Opacity" Value="1"/>
+            <!-- The label sits on the PANEL, not on the accent - only the box is filled. -->
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground"
+                    Value="{ObservableResource TextFillColorPrimary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsChecked" Value="null">
+            <Setter TargetName="Box" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="Box" Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="IndeterminateGlyph" Property="Opacity" Value="1"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground"
+                    Value="{ObservableResource TextFillColorPrimary}"/>
+        </PropertyTrigger>
+        <!-- Checked and hovered: dim the accent a notch. Declared after the state triggers so it lands on top of the
+             value stack while active, and pops back to the flat accent when the pointer leaves. -->
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="IsChecked" Value="true"/>
+                <Condition Property="IsMouseOver" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="Box" Property="Background" Value="{ThemeResource AccentFillColorSecondary}"/>
+            <Setter TargetName="Box" Property="BorderBrush" Value="{ThemeResource AccentFillColorSecondary}"/>
+        </MultiTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="IsChecked" Value="null"/>
+                <Condition Property="IsMouseOver" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="Box" Property="Background" Value="{ThemeResource AccentFillColorSecondary}"/>
+            <Setter TargetName="Box" Property="BorderBrush" Value="{ThemeResource AccentFillColorSecondary}"/>
+        </MultiTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground"
+                    Value="{ObservableResource TextFillColorDisabled}"/>
+            <Setter TargetName="Box" Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

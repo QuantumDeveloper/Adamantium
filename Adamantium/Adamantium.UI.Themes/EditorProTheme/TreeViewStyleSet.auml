@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's tree - the control the whole skin exists for. A project tree is what an editor is mostly looking
+         at, so its row is the theme's row: 22 pixels, square, and marked rather than filled.
+
+         Selection is a BAR down the left edge plus a faint wash, not a solid accent row. An editor selects constantly,
+         and a solid fill per selection turns a file list into a stripe pattern; the bar says "here" without repainting
+         the text it is pointing at, so the file name keeps its own colour and stays readable.
+
+         The triggers are restated here rather than reused. Fluent's set paints the selected row from a THEME RESOURCE
+         directly, not through a control property, so there is nothing to turn off from this side - unlike the tab,
+         whose card fill could simply be made transparent. Three triggers is a cheap thing to restate; fifteen would
+         not have been. -->
+
+    <Style Selector="TreeViewItem" BasedOn="ItemsControl">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorSecondary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+    </Style>
+
+    <!-- The expander arrow, in a box small enough to live inside a 22-pixel row. -->
+    <Style Selector="TreeViewItem">
+        <Setter Property="ExpanderTemplate">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Grid Width="{ResourceReference ExpanderBoxSize}"
+                          Height="{ResourceReference ExpanderBoxSize}"
+                          Background="Transparent">
+                        <Image x:Name="ChevronRight"
+                                Source="{ResourceReference ChevronRightIcon}"
+                                Width="{ResourceReference DropDownIconSize}"
+                                Height="{ResourceReference DropDownIconSize}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"/>
+                        <Image x:Name="ChevronDown"
+                                Source="{ResourceReference ChevronDownIcon}"
+                                Width="{ResourceReference DropDownIconSize}"
+                                Height="{ResourceReference DropDownIconSize}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Visibility="Collapsed"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="IsChecked" Value="true">
+                            <Setter TargetName="ChevronRight" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="ChevronDown" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="TreeViewItem">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TreeViewItem">
+                    <!-- Square, full-width: the whole row is clickable at any depth and the wash runs edge to edge. -->
+                    <Border x:Name="Root" Background="Transparent" CornerRadius="0"
+                            MinHeight="{ResourceReference RowHeight}">
+                        <Grid ColumnDefinitions="Auto,Auto,Auto,*">
+                            <!-- The selection mark, in its own track so it never moves the row's content. Hidden rather
+                                 than collapsed for exactly that reason: a collapsed track would let the label shift by
+                                 two pixels every time selection landed on it. -->
+                            <Border x:Name="SelectionBar" Grid.Column="0"
+                                    Width="{ResourceReference SelectionBarWidth}"
+                                    Background="{ThemeResource AccentFillColorDefault}"
+                                    Visibility="Hidden"/>
+                            <!-- Depth: a zero-width spacer at depth 0, one step further in per level. -->
+                            <Border Grid.Column="1" Width="{TemplateBinding Indent}"/>
+                            <!-- Pinned to its own box: the base ToggleButton style reaches this button through the IS-A
+                                 selector and would otherwise lend it a button's height and padding, which at this row
+                                 height pushes the arrow off centre. -->
+                            <ToggleButton x:Name="PART_Expander" Grid.Column="2"
+                                    Template="{TemplateBinding ExpanderTemplate}"
+                                    Width="{ResourceReference ExpanderBoxSize}"
+                                    Height="{ResourceReference ExpanderBoxSize}"
+                                    MinWidth="0" MinHeight="0" Padding="0"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <ContentPresenter x:Name="PART_ContentPresenter" Grid.Column="3"
+                                    Content="{TemplateBinding Header}"
+                                    ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                    Foreground="{TemplateBinding Foreground}"
+                                    FontSize="{TemplateBinding FontSize}"
+                                    VerticalAlignment="Center"
+                                    Margin="{ResourceReference PaddingTight}"/>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="TreeViewItem">
+        <PropertyTrigger Property="IsPointerOverHeader" Value="true">
+            <Setter TargetName="Root" Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="HasItems" Value="false">
+            <Setter TargetName="PART_Expander" Property="Visibility" Value="Hidden"/>
+        </PropertyTrigger>
+        <!-- Selection last, so it wins the row's ground over hover. The label brightens to primary instead of flipping
+             to the on-accent colour: nothing accent-coloured is behind it. -->
+        <PropertyTrigger Property="IsSelected" Value="true">
+            <Setter TargetName="Root" Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+            <Setter TargetName="SelectionBar" Property="Visibility" Value="Visible"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground"
+                    Value="{ObservableResource TextFillColorPrimary}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

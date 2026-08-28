@@ -7,9 +7,9 @@
          convention each concern is its own <Style>. -->
 
     <Style Selector="RingProgressBar">
-        <Setter Property="MinWidth" Value="48"/>
-        <Setter Property="MinHeight" Value="48"/>
-        <Setter Property="RingThickness" Value="5"/>
+        <Setter Property="MinWidth" Value="{ResourceReference RingSize}"/>
+        <Setter Property="MinHeight" Value="{ResourceReference RingSize}"/>
+        <Setter Property="RingThickness" Value="{ResourceReference RingThickness}"/>
         <Setter Property="HorizontalAlignment" Value="Center"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
@@ -40,7 +40,7 @@
                         <TextBlock x:Name="PART_ValueText"
                                 Text="{TemplateBinding ValueText}"
                                 Visibility="Collapsed"
-                                FontSize="15"
+                                FontSize="{ResourceReference FontSizeSubtitle}"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Center"
                                 VerticalTextAlignment="Center"

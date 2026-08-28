@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The frame around the element under the POINTER. It follows the mouse, so it appears and disappears constantly -
+         and a frame that thick enough to notice is a frame that flickers across the whole surface as the hand moves.
+
+         Square and a hairline, and deliberately THINNER-looking than the selection: the two are on screen at once and
+         have to be told apart at a glance. Fluent gives hover 1.5 and selection 2, which at a glance is the same
+         frame; here hover is a plain line and selection adds the corner handles, so the difference is a KIND rather
+         than a weight. -->
+
+    <Style Selector="HoverAdorner">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="HoverAdorner">
+                    <Border BorderThickness="{ResourceReference AdornerHoverThickness}"
+                            CornerRadius="0"
+                            BorderBrush="{ResourceReference ControlStrokeColorSecondary}"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

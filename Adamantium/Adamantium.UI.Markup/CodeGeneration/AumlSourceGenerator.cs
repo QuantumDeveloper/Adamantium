@@ -17,7 +17,10 @@ public class AumlSourceGenerator : IAumlSourceGenerator
     public void GenerateSourceCode(AumlMetadataContainer container, ICodeOutputSink output, IDiagnosticSink diagnostics)
     {
         container.SourceText = GenerateSources(container, diagnostics);
-        output.Emit(container.ClassName, container.SourceText);
+        // Named by the FULL type name, not the bare class name: the hint has to be unique across the whole generator,
+        // and two files of the same name in different folders are the normal case the moment a project holds more than
+        // one theme - both want a Metrics.auml. Under the short name the second one aborted generation for BOTH.
+        output.Emit(container.FullClassName, container.SourceText);
         container.TypeResolver.RegisterGeneratedType(new MetadataResolvedType(container));
     }
     

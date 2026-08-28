@@ -604,11 +604,26 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         set
         {
             if (_bounds == value) return;
+            var sameSize = _bounds.Size == value.Size;
             _bounds = value;
             // A MOTION NODE moving is the granular case: its subtree's instances reference its transform-table slot, so
             // the render rewrites ONE matrix and replays - no global transform invalidation, no O(N) re-bake (the
             // transform-only scroll). Everything else keeps the conservative global mark.
-            if (IsRenderMotionNode) VisualTreeNotifications.RaiseSubtreeMoved(this);
+            // Only a MOVE, though - the slot rewrite replays a recording made in this node's OWN space, and that is the
+            // same picture only while the space is. Resizing one re-lays-out everything inside it, so replaying draws
+            // the old shape at the new place: a tab strip folding against a side (wide and short -> narrow and tall)
+            // stood above its own panel with the turned labels clipped, and came right the moment anything forced a
+            // fresh walk. Right layout, stale recording.
+            if (IsRenderMotionNode)
+            {
+                // Its slot is rewritten either way - the subtree beneath it is baked RELATIVE to this node, so without
+                // the slot the whole subtree keeps drawing wherever the node used to be.
+                VisualTreeNotifications.RaiseSubtreeMoved(this);
+                // ...but a RESHAPE is not a move. The slot alone replays a recording made in this node's own space,
+                // which is the same picture only while the space is: resizing one re-lays-out everything inside it, so
+                // the subtree has to be baked again as well.
+                if (!sameSize) VisualTreeNotifications.RaiseMoved(this);
+            }
             else VisualTreeNotifications.RaiseMoved(this);   // a move: same content, new place
         }
     }

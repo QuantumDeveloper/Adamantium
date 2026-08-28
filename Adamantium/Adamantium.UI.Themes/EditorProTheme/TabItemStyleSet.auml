@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's tab is a LINE, not a card: no fill, no corners, and the current one is marked by an accent rule
+         under it. That is a shape difference, so this theme writes its own template rather than overriding numbers.
+
+         The PART NAMES are Fluent's on purpose. Its trigger style still applies to this control (both sets are in the
+         theme), and those triggers carry a lot of behaviour that has nothing to do with the look: when the close and
+         pin buttons are reserved, revealed or pinned open, when the icon slot exists. Keeping the names means all of
+         that keeps working and this file states only what actually differs. The card fill it would paint is turned off
+         by making the selected background transparent, not by re-declaring the triggers.
+
+         Per the small-styles convention: properties, then the template, then the triggers. -->
+
+    <Style Selector="TabItem">
+        <Setter Property="MinHeight" Value="{ResourceReference TabStripHeight}"/>
+        <!-- A tab's own padding, not a row's: the two differ in the vertical pair, and on a folded strip that pair is
+             what keeps one turned label off the next. -->
+        <Setter Property="Padding" Value="{ResourceReference PaddingTab}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <!-- A line tab has no card behind it. Fluent's IsSelected trigger still runs and still writes this brush onto
+             the border - it just has nothing to paint. -->
+        <Setter Property="BackgroundSelected" Value="Transparent"/>
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorTertiary}"/>
+        <Setter Property="ForegroundSelected" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="TabItem">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabItem">
+                    <!-- No rule of its own here. The accent rule under the current tab belongs to the STRIP, not to the
+                         item: the tab control owns PART_SelectionIndicator and SLIDES it as the selection moves, and a
+                         second static line drawn per item meant two accent marks for one selection - plainly visible in
+                         a docked layout, where the strip's own indicator sat under the group while the item's sat under
+                         the label. One selection, one mark, and it is the one the control drives.
+                         Weight and colour still come from this theme: SelectionIndicatorThickness resolves against
+                         Editor Pro's own metrics. -->
+                    <Grid>
+                        <Border x:Name="TabBorder"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <!-- Same shape as Fluent's inner grid, and for the same reason: the starred middle track
+                                 keeps the close button against the right edge when a lone tab is stretched. -->
+                            <Grid ColumnDefinitions="Auto,*,Auto,Auto" VerticalAlignment="Center">
+                                <ContentPresenter x:Name="PART_Icon" Grid.Column="0"
+                                        VerticalAlignment="Center"
+                                        Visibility="Collapsed"
+                                        Margin="0 0 4 0"
+                                        Content="{TemplateBinding Icon}"
+                                        ContentTemplate="{TemplateBinding IconTemplate}"/>
+                                <ContentPresenter
+                                        x:Name="PART_ContentPresenter" Grid.Column="1"
+                                        HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                        VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                        Foreground="{TemplateBinding Foreground}"
+                                        FontSize="{TemplateBinding FontSize}"
+                                        Content="{TemplateBinding Header}"
+                                        ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                        ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}"/>
+                                <ToggleButton x:Name="PART_PinButton" Grid.Column="2"
+                                        Template="{TemplateBinding PinButtonTemplate}"
+                                        Margin="4 0 0 0"
+                                        MinWidth="0" MinHeight="0" Padding="0"
+                                        VerticalAlignment="Center"
+                                        Visibility="Collapsed"/>
+                                <Button x:Name="PART_CloseButton" Grid.Column="3"
+                                        Template="{TemplateBinding CloseButtonTemplate}"
+                                        Margin="4 0 0 0"
+                                        MinWidth="0" MinHeight="0" Padding="0"
+                                        VerticalAlignment="Center"
+                                        Visibility="Collapsed"/>
+                            </Grid>
+                        </Border>
+
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+
+</StyleSet>

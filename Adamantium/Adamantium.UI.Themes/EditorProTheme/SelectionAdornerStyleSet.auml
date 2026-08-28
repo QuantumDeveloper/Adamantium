@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The frame around a SELECTED element on the design surface. This is the one adorner an editor shows constantly,
+         so what it costs the eye matters more than what it announces.
+
+         Square, hairline, and the handles sit INSIDE the corners rather than straddling them. Fluent's two-pixel
+         rounded frame with six-pixel handles reads as a control in its own right, and around a small element - a
+         checkbox, an icon - the frame is bigger than the thing it selects. What this needs to say is "this one", not
+         "look at me", and the corner handles are the part that says it: the outline alone could be mistaken for a
+         border the element actually has.
+
+         Straddling matters too: a handle centred on the corner covers a pixel of the element itself, which at this
+         size is a pixel of the thing being judged. -->
+
+    <Style Selector="SelectionAdorner">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="SelectionAdorner">
+                    <Grid>
+                        <Border BorderThickness="{ResourceReference AdornerSelectionThickness}"
+                                CornerRadius="0"
+                                BorderBrush="{ThemeResource AccentFillColorDefault}"/>
+                        <Border Width="{ResourceReference AdornerHandleSize}"
+                                Height="{ResourceReference AdornerHandleSize}"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                HorizontalAlignment="Left" VerticalAlignment="Top"/>
+                        <Border Width="{ResourceReference AdornerHandleSize}"
+                                Height="{ResourceReference AdornerHandleSize}"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                HorizontalAlignment="Right" VerticalAlignment="Top"/>
+                        <Border Width="{ResourceReference AdornerHandleSize}"
+                                Height="{ResourceReference AdornerHandleSize}"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                HorizontalAlignment="Left" VerticalAlignment="Bottom"/>
+                        <Border Width="{ResourceReference AdornerHandleSize}"
+                                Height="{ResourceReference AdornerHandleSize}"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

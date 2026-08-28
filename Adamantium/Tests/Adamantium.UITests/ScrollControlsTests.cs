@@ -149,6 +149,42 @@ public class ScrollControlsTests
         });
     }
 
+    /// <summary>Paging must stop with the thumb's EDGE at the cursor, not its centre - otherwise it swallows the click
+    /// point and overshoots by half a thumb, which on a long thumb is the difference between "went where I pointed" and
+    /// "went past it".</summary>
+    [Test]
+    public void Track_PageLimitFromPoint_StopsWithTheThumbEdgeAtTheCursor()
+    {
+        // Horizontal, 200px track, 12px thumb -> 188px travel, so a value unit is 188/100 px and half a thumb is
+        // 6px = 3.19 value units. Centred on x=100 is 50 (above), so the edges sit 3.19 either side of it.
+        var track = ArrangedTrack(Orientation.Horizontal, 0, 100, 0, 0, 200, 12);
+        Assert.Multiple(() =>
+        {
+            Assert.That(track.PageLimitFromPoint(new Vector2(100, 6), increasing: true), Is.EqualTo(46.81).Within(0.05),
+                "paging right stops when the thumb's RIGHT edge reaches the cursor");
+            Assert.That(track.PageLimitFromPoint(new Vector2(100, 6), increasing: false), Is.EqualTo(53.19).Within(0.05),
+                "paging left stops when its LEFT edge does");
+        });
+    }
+
+    /// <summary>The ENDS are the case a middle-of-the-track check cannot see. Deriving the limit by shifting the
+    /// centred mapping by half a thumb looked right at x=100 and was wrong at both stops: that mapping clamps its own
+    /// travel first, so the shift came off an already-clamped number and the thumb halted half a thumb short.</summary>
+    [Test]
+    public void Track_PageLimitFromPoint_ReachesBothStops()
+    {
+        var track = ArrangedTrack(Orientation.Horizontal, 0, 100, 0, 0, 200, 12);
+        Assert.Multiple(() =>
+        {
+            Assert.That(track.PageLimitFromPoint(new Vector2(200, 6), increasing: true), Is.EqualTo(100).Within(0.05),
+                "a click at the far end still pages all the way to Maximum");
+            Assert.That(track.PageLimitFromPoint(new Vector2(0, 6), increasing: false), Is.EqualTo(0).Within(0.05),
+                "and at the near end, all the way to Minimum");
+            Assert.That(track.PageLimitFromPoint(new Vector2(400, 6), increasing: true), Is.EqualTo(100).Within(0.05),
+                "past the end clamps rather than overruns");
+        });
+    }
+
     [Test]
     public void Track_ValueFromPoint_ReversedVertical_TopIsMaximum()
     {

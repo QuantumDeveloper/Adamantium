@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The grip that makes a row draggable by it alone.
+
+         TWO VERTICAL RULES, not Fluent's 2x3 dot cluster. The cluster is the touch idiom - it is deliberately large
+         because a finger has to find it - and this theme's rows are half that height, so the dots either shrink until
+         they read as dirt or crowd the row. Rules take the row's full height at a hairline's width, which is the grip
+         an editor has always used on a toolbar or a docked panel, and they say "drag along this axis" while a dot
+         cluster only says "drag".
+
+         The Transparent background is load-bearing: it makes the WHOLE box the grab area, so a press in the gap between
+         the rules still counts (the drag engine tests the control's bounds, not the glyph). -->
+
+    <Style Selector="DragHandle">
+        <Setter Property="Width" Value="{ResourceReference DragHandleWidth}"/>
+        <Setter Property="Height" Value="{ResourceReference DragHandleHeight}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorTertiary}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DragHandle">
+                    <Border Background="Transparent">
+                        <Path HorizontalAlignment="Center" VerticalAlignment="Center"
+                              Fill="{TemplateBinding Foreground}"
+                              Data="M0,0 L2,0 L2,12 L0,12 Z M4,0 L6,0 L6,12 L4,12 Z"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="DragHandle">
+        <!-- Resting it is tertiary - present, but not competing with the row's own text. Under the pointer it comes up
+             to primary, which is the whole announcement that this row can be moved. -->
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

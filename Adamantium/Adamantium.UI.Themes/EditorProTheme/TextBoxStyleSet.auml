@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's field. A settings panel is a column of these, and Fluent's answer - an outlined filled box that
+         turns accent all round when focused - puts a lit frame in the middle of a quiet column every time the caret
+         moves.
+
+         So this field is a LINE, not a box: a rule under the text, which thickens and takes the accent on focus. The
+         ground stays the panel's until focus, when it lifts by one step - enough to say "typing happens here" without
+         the field becoming an object. The structure differs too: the rule is its own element under the text rather
+         than the border of the box, because a border cannot be one-sided AND change weight without moving the text
+         inside it. -->
+
+    <Style Selector="TextBox">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeight}"/>
+        <Setter Property="MinWidth" Value="{ResourceReference ControlMinWidth}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingFieldFlat}"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <!-- What the field paints ITSELF with, none of it reachable from the template: the caret and the placeholder are
+             drawn by the control onto its own surface. Saying nothing here does not mean "inherit" - it means the
+             property-system defaults, which are the literals Brushes.Gray and Brushes.White, so the label ignored the
+             palette and the caret was white on the light variant's ground. Every theme must answer these.
+             The label going accent as it floats is the same statement this theme's rule makes on focus: it marks the
+             field being typed into. Resting, it is tertiary text - a name, not a value. -->
+        <Setter Property="PlaceholderForeground" Value="{ResourceReference TextFillColorTertiary}"/>
+        <Setter Property="FloatingPlaceholderForeground" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="CaretBrush" Value="{ResourceReference TextFillColorPrimary}"/>
+    </Style>
+
+    <Style Selector="TextBox">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <!-- Two rows: the text, and the rule under it. The rule is a row rather than a border so it can
+                         thicken on focus without the text shifting - a border that grows eats its own padding. -->
+                    <Grid RowDefinitions="*,Auto">
+                        <Border x:Name="PART_Border" Grid.Row="0"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                ClipToBounds="True">
+                            <ScrollViewer x:Name="PART_ContentHost"
+                                    HorizontalScrollBarVisibility="{TemplateBinding HorizontalScrollBarVisibility}"
+                                    VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}">
+                                <TextPresenter x:Name="PART_TextPresenter"
+                                        HorizontalAlignment="Stretch"
+                                        VerticalAlignment="Stretch"/>
+                            </ScrollViewer>
+                        </Border>
+
+                        <Border x:Name="Rule" Grid.Row="1"
+                                Height="{ResourceReference StrokeThinValue}"
+                                Background="{TemplateBinding BorderBrush}"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="TextBox">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="Rule" Property="Background" Value="{ResourceReference ControlStrokeColorSecondary}"/>
+        </PropertyTrigger>
+        <!-- Focus last, so it wins the rule over hover. -->
+        <PropertyTrigger Property="IsFocused" Value="true">
+            <Setter TargetName="Rule" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="Rule" Property="Height" Value="{ResourceReference StrokeAccentValue}"/>
+            <Setter TargetName="PART_Border" Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="PART_TextPresenter" Property="Foreground"
+                    Value="{ObservableResource TextFillColorDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

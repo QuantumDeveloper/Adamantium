@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's spin box, built to match this theme's FIELD: a rule under the value, not a box around it. A
+         properties panel puts a spin box directly under a text field, and two different frames for the same job -
+         "type a value here" - is what makes a panel look assembled rather than designed.
+
+         The PART NAMES and the five-seat grid are Fluent's on purpose. Its six placement multi-triggers decide which
+         seat each button takes for every combination of ButtonsPlacement and AreButtonsSwapped - pure behaviour with
+         nothing to do with the look - and keeping the names means all of it keeps working while this file states only
+         the shape. Its style set stays included for exactly that reason. -->
+
+    <Style Selector="NumericUpDown">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeight}"/>
+        <Setter Property="MinWidth" Value="{ResourceReference ControlMinWidth}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingFieldFlat}"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+    </Style>
+
+    <Style Selector="NumericUpDown">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="NumericUpDown">
+                    <!-- Two rows, as the field: the rule thickens on focus without moving the value above it. -->
+                    <Grid RowDefinitions="*,Auto">
+                        <Border x:Name="PART_Border" Grid.Row="0"
+                                Background="{TemplateBinding Background}"
+                                ClipToBounds="True">
+                            <!-- Seats 0 and 1 are the left pair, 3 and 4 the right pair; the default is the two
+                                 outermost. The columns are Fluent's, because its placement triggers address them. -->
+                            <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto">
+                                <RepeatButton x:Name="PART_Decrease" Grid.Column="0"
+                                        Width="{TemplateBinding ButtonsWidth}"
+                                        Content="{TemplateBinding DecreaseButtonContent}"
+                                        Delay="{TemplateBinding Delay}"
+                                        Interval="{TemplateBinding RepeatInterval}"
+                                        Focusable="{TemplateBinding AreButtonsFocusable}"
+                                        FontSize="{TemplateBinding FontSize}"
+                                        BorderThickness="0" CornerRadius="0" Padding="0"
+                                        MinWidth="0" MinHeight="0"
+                                        VerticalAlignment="Stretch"/>
+                                <TextBox x:Name="PART_TextBox" Grid.Column="2"
+                                        Foreground="{TemplateBinding Foreground}"
+                                        FontSize="{TemplateBinding FontSize}"
+                                        Margin="{TemplateBinding Padding}"
+                                        MinWidth="0" MinHeight="0"
+                                        VerticalAlignment="Center">
+                                    <!-- The editor is EMBEDDED and must bring no chrome of its own - the rule below is
+                                         already this control's. Stripping its properties is not enough: the TextBox
+                                         theme's state triggers write to ITS parts, and a trigger outranks what a
+                                         template sets. A template with none of those parts leaves those setters with
+                                         nothing to find, and a setter whose target is missing does nothing. -->
+                                    <TextBox.Template>
+                                        <ControlTemplate TargetType="TextBox">
+                                            <ScrollViewer x:Name="PART_ContentHost"
+                                                    HorizontalScrollBarVisibility="{TemplateBinding HorizontalScrollBarVisibility}"
+                                                    VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}">
+                                                <TextPresenter x:Name="PART_TextPresenter"
+                                                        HorizontalAlignment="Stretch"
+                                                        VerticalAlignment="Stretch"/>
+                                            </ScrollViewer>
+                                        </ControlTemplate>
+                                    </TextBox.Template>
+                                </TextBox>
+                                <RepeatButton x:Name="PART_Increase" Grid.Column="4"
+                                        Width="{TemplateBinding ButtonsWidth}"
+                                        Content="{TemplateBinding IncreaseButtonContent}"
+                                        Delay="{TemplateBinding Delay}"
+                                        Interval="{TemplateBinding RepeatInterval}"
+                                        Focusable="{TemplateBinding AreButtonsFocusable}"
+                                        FontSize="{TemplateBinding FontSize}"
+                                        BorderThickness="0" CornerRadius="0" Padding="0"
+                                        MinWidth="0" MinHeight="0"
+                                        VerticalAlignment="Stretch"/>
+                            </Grid>
+                        </Border>
+
+                        <Border x:Name="Rule" Grid.Row="1"
+                                Height="{ResourceReference StrokeThinValue}"
+                                Background="{TemplateBinding BorderBrush}"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="NumericUpDown">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="Rule" Property="Background" Value="{ResourceReference ControlStrokeColorSecondary}"/>
+        </PropertyTrigger>
+        <!-- Focus WITHIN, not IsFocused: clicking a spin box puts the caret in its embedded editor, so the control
+             itself never becomes the focused element and a rule watching its own IsFocused would never light. -->
+        <PropertyTrigger Property="IsKeyboardFocusWithin" Value="true">
+            <Setter TargetName="Rule" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="Rule" Property="Height" Value="{ResourceReference StrokeAccentValue}"/>
+            <Setter TargetName="PART_Border" Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

@@ -256,7 +256,13 @@ public class TextLayout : DisposableObject
         // same size, and same-size text changed height as its content changed. Descenders hang below the box, which
         // is exactly how ArrangeText centres the block (an ascent-to-baseline reference, no descent reserve).
         var lastBaseline = height + baseLine;
-        height = lastBaseline;
+        // ...plus the DESCENT below it. Still a font metric, so it is the same for every string of this size and the
+        // stability above is untouched - "Output" and "Errors" still measure alike. What changes is that the box now
+        // CONTAINS the glyphs instead of ending at their baseline. A box that stops at the baseline works only while
+        // something else happens to leave room below it: turn the text ninety degrees, as a pane folded against a side
+        // does with its tab labels, and the overhang becomes SIDEWAYS - into a strip sized to exactly this box, which
+        // clips it. The tails were cut off every turned label in both themes.
+        height = lastBaseline + System.Math.Abs(Font.Descender) * scale;
 
         var _b3 = System.GC.GetAllocatedBytesForCurrentThread();
 

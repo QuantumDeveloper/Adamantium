@@ -184,6 +184,13 @@ public class DockingArea : Panel
 
             group.RevealLength = vertical ? zone.Height : zone.Width;
 
+            // ...and the flyout's own thickness, from the SAME number the offset above is derived from. It used to be
+            // written on the fold and on a layout build instead, so the two halves of one geometry were computed in
+            // different places at different moments: the flyout opens at "the strip's edge MINUS extent" and is then
+            // drawn "RevealExtent" wide, so the moment those disagree it stops reaching the strip and a strip-width gap
+            // opens between the panel and the edge - which reads as the strip sitting outside the docking area.
+            group.RevealExtent = extent;
+
             // Placed from the strip's own corner, both axes stated outright (see PaneGroup.RevealOffsetX): ALONG the
             // edge it lines up with the zone, and ACROSS it opens away from the edge - past the strip on a Left/Top,
             // back by its own size on a Right/Bottom.

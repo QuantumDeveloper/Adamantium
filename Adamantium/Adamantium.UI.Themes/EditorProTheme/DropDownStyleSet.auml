@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's drop-down, built to match this theme's FIELD: a rule under the value, not a box around it. A
+         settings column mixes fields and drop-downs, and two different shapes for "a value you can change" is what
+         makes such a column look assembled rather than designed. Fluent draws it as a bordered box, which is right
+         there, because its text field is a bordered box too.
+
+         The list card keeps its border - it FLOATS, and a floating surface with no edge has nothing to separate it
+         from what it covers. That is the one place this theme still draws a full outline. -->
+
+    <Style Selector="DropDown" BasedOn="ItemsControl">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeight}"/>
+        <Setter Property="MinWidth" Value="{ResourceReference ControlMinWidth}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingFieldFlat}"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Vertical"/>
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="DropDown">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DropDown">
+                    <Grid>
+                        <!-- Same two rows as the text field, and for the same reason: a rule that thickens must not
+                             move the value above it. -->
+                        <Grid RowDefinitions="*,Auto">
+                            <Border x:Name="PART_Header" Grid.Row="0"
+                                    Background="{TemplateBinding Background}"
+                                    Padding="{TemplateBinding Padding}">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <ContentPresenter
+                                            x:Name="PART_ContentPresenter"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Center"
+                                            Foreground="{TemplateBinding Foreground}"
+                                            FontSize="{TemplateBinding FontSize}"
+                                            Content="{TemplateBinding DisplayContent}"
+                                            ContentTemplate="{TemplateBinding ItemTemplate}"
+                                            ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"/>
+                                    <Image x:Name="Chevron" Grid.Column="1"
+                                            Source="{ResourceReference ChevronDownIcon}"
+                                            Width="{ResourceReference DropDownIconSize}"
+                                            Height="{ResourceReference DropDownIconSize}"
+                                            Margin="{ResourceReference CheckLabelInset}"
+                                            VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+
+                            <Border x:Name="Rule" Grid.Row="1"
+                                    Height="{ResourceReference StrokeThinValue}"
+                                    Background="{TemplateBinding BorderBrush}"/>
+                        </Grid>
+
+                        <Popup x:Name="PART_Popup"
+                                Placement="Bottom" FlipToFit="True" VerticalOffset="2">
+                            <!-- Built LAZILY on first open: a closed list would otherwise cost a card, a scroll host and
+                                 a container per item, and most lists are never opened. Plain {Binding}s reach the
+                                 DropDown because the popup's DataContext is set to it in code - {TemplateBinding} cannot,
+                                 since a ChildTemplate is built against the POPUP. -->
+                            <Popup.ChildTemplate>
+                                <ControlTemplate TargetType="Popup">
+                                    <Border Background="{ResourceReference CardBackgroundFillColorDefault}"
+                                            BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                            BorderThickness="{ResourceReference StrokeThin}"
+                                            CornerRadius="{ResourceReference CornerRadiusSmall}"
+                                            Padding="{ResourceReference MenuCardPadding}"
+                                            MinWidth="{Binding ActualWidth}">
+                                        <ScrollViewer MaxHeight="{Binding MaxDropDownHeight}"
+                                                HorizontalScrollBarVisibility="Disabled"
+                                                VerticalScrollBarVisibility="Auto">
+                                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                                        </ScrollViewer>
+                                    </Border>
+                                </ControlTemplate>
+                            </Popup.ChildTemplate>
+                        </Popup>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="DropDown">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="Rule" Property="Background" Value="{ResourceReference ControlStrokeColorSecondary}"/>
+        </PropertyTrigger>
+        <!-- OPEN, not focused: a drop-down is answered by picking, so the state worth marking is that the list is
+             showing. -->
+        <PropertyTrigger Property="IsDropDownOpen" Value="true">
+            <Setter TargetName="Rule" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="Rule" Property="Height" Value="{ResourceReference StrokeAccentValue}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground"
+                    Value="{ObservableResource TextFillColorDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

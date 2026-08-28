@@ -13,8 +13,8 @@
 
     <!-- ============================== Ring (default): a sweeping arc, spinning ============================== -->
     <Style Selector="BusyIndicator">
-        <Setter Property="Width" Value="40"/>
-        <Setter Property="Height" Value="40"/>
+        <Setter Property="Width" Value="{ResourceReference BusySize}"/>
+        <Setter Property="Height" Value="{ResourceReference BusySize}"/>
         <Setter Property="HorizontalAlignment" Value="Center"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
         <Setter Property="Template">
@@ -23,14 +23,14 @@
                     <Grid>
                         <!-- The dim full ring the arc travels over. -->
                         <Ellipse Stroke="{ResourceReference ControlFillColorTertiary}"
-                                          StrokeThickness="4"
+                                          StrokeThickness="{ResourceReference BusyArcThickness}"
                                           Fill="Transparent"
                                           EllipseType="EdgeToEdge"/>
                         <!-- The accent arc; it is the ARC that spins. RenderTransformOrigin is a FRACTION of the element's
                              own size, so the arc turns about its centre at ANY size the control is given - an absolute
                              pixel centre would be correct only at the one size this template happened to be written for. -->
                         <Ellipse Stroke="{ThemeResource AccentFillColorDefault}"
-                                          StrokeThickness="4"
+                                          StrokeThickness="{ResourceReference BusyArcThickness}"
                                           Fill="Transparent"
                                           EllipseType="EdgeToEdge"
                                           StartAngle="0"
@@ -70,7 +70,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="BusyIndicator">
                     <StackPanel Orientation="Horizontal">
-                        <Ellipse Width="10" Height="10" Margin="3,0"
+                        <Ellipse Width="{ResourceReference BusyDotSize}" Height="{ResourceReference BusyDotSize}" Margin="{ResourceReference BusyDotGap}"
                                           Fill="{ThemeResource AccentFillColorDefault}"
                                           EllipseType="EdgeToEdge"
                                           RenderTransformOrigin="0.5,0.5">
@@ -78,7 +78,7 @@
                                 <Transform x:Name="Dot1"/>
                             </Ellipse.RenderTransform>
                         </Ellipse>
-                        <Ellipse Width="10" Height="10" Margin="3,0"
+                        <Ellipse Width="{ResourceReference BusyDotSize}" Height="{ResourceReference BusyDotSize}" Margin="{ResourceReference BusyDotGap}"
                                           Fill="{ThemeResource AccentFillColorDefault}"
                                           EllipseType="EdgeToEdge"
                                           RenderTransformOrigin="0.5,0.5">
@@ -86,7 +86,7 @@
                                 <Transform x:Name="Dot2"/>
                             </Ellipse.RenderTransform>
                         </Ellipse>
-                        <Ellipse Width="10" Height="10" Margin="3,0"
+                        <Ellipse Width="{ResourceReference BusyDotSize}" Height="{ResourceReference BusyDotSize}" Margin="{ResourceReference BusyDotGap}"
                                           Fill="{ThemeResource AccentFillColorDefault}"
                                           EllipseType="EdgeToEdge"
                                           RenderTransformOrigin="0.5,0.5">
@@ -135,18 +135,18 @@
 
     <!-- ============================== Bar: an indeterminate sweep along a track ============================== -->
     <Style Selector="BusyIndicator.Bar">
-        <Setter Property="Width" Value="160"/>
-        <Setter Property="Height" Value="4"/>
+        <Setter Property="Width" Value="{ResourceReference BusyBarWidth}"/>
+        <Setter Property="Height" Value="{ResourceReference BusyBarHeight}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="BusyIndicator">
                     <!-- ClipToBounds is what makes it a SWEEP and not a stripe wandering across the page: the pill runs
                          from off the left edge to off the right one and the track hides it outside itself. -->
                     <Border Background="{ResourceReference ControlFillColorTertiary}"
-                                     CornerRadius="2"
+                                     CornerRadius="{ResourceReference BusyPieceRadius}"
                                      ClipToBounds="True">
                         <Border x:Name="BarPill"
-                                         Width="56" Height="4" CornerRadius="2"
+                                         Width="{ResourceReference BusyBarSegmentWidth}" Height="{ResourceReference BusyBarHeight}" CornerRadius="{ResourceReference BusyPieceRadius}"
                                          HorizontalAlignment="Left"
                                          Background="{ThemeResource AccentFillColorDefault}">
                             <Border.RenderTransform>
@@ -177,15 +177,15 @@
 
     <!-- ============================== Ripple: two rings expanding out of the centre ============================== -->
     <Style Selector="BusyIndicator.Ripple">
-        <Setter Property="Width" Value="40"/>
-        <Setter Property="Height" Value="40"/>
+        <Setter Property="Width" Value="{ResourceReference BusySize}"/>
+        <Setter Property="Height" Value="{ResourceReference BusySize}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="BusyIndicator">
                     <Grid>
                         <Ellipse x:Name="Ripple1"
                                           Stroke="{ThemeResource AccentFillColorDefault}"
-                                          StrokeThickness="3"
+                                          StrokeThickness="{ResourceReference BusyRippleThickness}"
                                           Fill="Transparent"
                                           EllipseType="EdgeToEdge"
                                           RenderTransformOrigin="0.5,0.5">
@@ -195,7 +195,7 @@
                         </Ellipse>
                         <Ellipse x:Name="Ripple2"
                                           Stroke="{ThemeResource AccentFillColorDefault}"
-                                          StrokeThickness="3"
+                                          StrokeThickness="{ResourceReference BusyRippleThickness}"
                                           Fill="Transparent"
                                           EllipseType="EdgeToEdge"
                                           RenderTransformOrigin="0.5,0.5">
@@ -250,14 +250,14 @@
 
     <!-- ============================== Arc: the arc itself grows and shrinks while it spins ============================== -->
     <Style Selector="BusyIndicator.Arc">
-        <Setter Property="Width" Value="40"/>
-        <Setter Property="Height" Value="40"/>
+        <Setter Property="Width" Value="{ResourceReference BusySize}"/>
+        <Setter Property="Height" Value="{ResourceReference BusySize}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="BusyIndicator">
                     <Ellipse x:Name="ArcStroke"
                                       Stroke="{ThemeResource AccentFillColorDefault}"
-                                      StrokeThickness="4"
+                                      StrokeThickness="{ResourceReference BusyArcThickness}"
                                       StartLineCap="ConvexRound"
                                       EndLineCap="ConvexRound"
                                       Fill="Transparent"
@@ -303,8 +303,8 @@
 
     <!-- ============================== Ants: a dashed ring whose dashes march ============================== -->
     <Style Selector="BusyIndicator.Ants">
-        <Setter Property="Width" Value="40"/>
-        <Setter Property="Height" Value="40"/>
+        <Setter Property="Width" Value="{ResourceReference BusySize}"/>
+        <Setter Property="Height" Value="{ResourceReference BusySize}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="BusyIndicator">
@@ -319,9 +319,9 @@
                          stroke is thick or it reads as a dot, and a ROUND dash cap adds half the thickness at each end,
                          fattening the dash and eating the gap. Flat caps, dash a little shorter than the gap. -->
                     <Rectangle x:Name="AntsRing"
-                                        CornerRadius="2"
+                                        CornerRadius="{ResourceReference BusyPieceRadius}"
                                         Stroke="{ThemeResource AccentFillColorDefault}"
-                                        StrokeThickness="3"
+                                        StrokeThickness="{ResourceReference BusyRippleThickness}"
                                         StrokeDashArray="5 7"
                                         StrokeDashStartCap="Flat"
                                         StrokeDashEndCap="Flat"
@@ -355,8 +355,8 @@
 
     <!-- ============================== Shimmer: a light band sweeping across a card ============================== -->
     <Style Selector="BusyIndicator.Shimmer">
-        <Setter Property="Width" Value="180"/>
-        <Setter Property="Height" Value="56"/>
+        <Setter Property="Width" Value="{ResourceReference BusyShimmerWidth}"/>
+        <Setter Property="Height" Value="{ResourceReference BusyShimmerHeight}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="BusyIndicator">
@@ -367,7 +367,7 @@
                          cannot come back. See docs/TECH_DEBT.md for the clip gap itself, which is still open.
                          The colours are themed resources (a white glare on dark, a dark sweep on light); a gradient STOP
                          takes a resource reference just like an element property. -->
-                    <Rectangle CornerRadius="6" Stroke="Transparent">
+                    <Rectangle CornerRadius="{ResourceReference BusyShimmerRadius}" Stroke="Transparent">
                         <Rectangle.Fill>
                             <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
                                 <GradientStop x:Name="ShimmerLead" Color="{ResourceReference ShimmerTrackColor}" Offset="0"/>
@@ -426,21 +426,21 @@
                         <!-- Perspective is what makes this a FLIP and not a horizontal squash: without the depth
                              foreshortening a Y-rotation is just a width scale. Origin at the centre so each card turns
                              about its own middle. -->
-                        <Border Width="18" Height="26" Margin="4,0" CornerRadius="3"
+                        <Border Width="{ResourceReference BusyFlipWidth}" Height="{ResourceReference BusyFlipHeight}" Margin="{ResourceReference BusyFlipGap}" CornerRadius="{ResourceReference BusyPieceRadiusLarge}"
                                          Background="{ThemeResource AccentFillColorDefault}"
                                          RenderTransformOrigin="0.5,0.5">
                             <Border.RenderTransform>
                                 <Transform x:Name="Flip1" Perspective="240"/>
                             </Border.RenderTransform>
                         </Border>
-                        <Border Width="18" Height="26" Margin="4,0" CornerRadius="3"
+                        <Border Width="{ResourceReference BusyFlipWidth}" Height="{ResourceReference BusyFlipHeight}" Margin="{ResourceReference BusyFlipGap}" CornerRadius="{ResourceReference BusyPieceRadiusLarge}"
                                          Background="{ThemeResource AccentFillColorDefault}"
                                          RenderTransformOrigin="0.5,0.5">
                             <Border.RenderTransform>
                                 <Transform x:Name="Flip2" Perspective="240"/>
                             </Border.RenderTransform>
                         </Border>
-                        <Border Width="18" Height="26" Margin="4,0" CornerRadius="3"
+                        <Border Width="{ResourceReference BusyFlipWidth}" Height="{ResourceReference BusyFlipHeight}" Margin="{ResourceReference BusyFlipGap}" CornerRadius="{ResourceReference BusyPieceRadiusLarge}"
                                          Background="{ThemeResource AccentFillColorDefault}"
                                          RenderTransformOrigin="0.5,0.5">
                             <Border.RenderTransform>
@@ -493,27 +493,27 @@
                     <!-- Origin at the BOTTOM centre (0.5,1): a bar must grow UPWARD out of the floor, not out of its own
                          middle - with a centred origin it would stretch both ways and the row would have no baseline. -->
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
-                        <Border Width="5" Height="28" Margin="2,0" CornerRadius="2"
+                        <Border Width="{ResourceReference BusyEqualizerBarWidth}" Height="{ResourceReference BusyEqualizerBarHeight}" Margin="{ResourceReference BusyEqualizerGap}" CornerRadius="{ResourceReference BusyPieceRadius}"
                                          Background="{ThemeResource AccentFillColorDefault}"
                                          RenderTransformOrigin="0.5,1">
                             <Border.RenderTransform><Transform x:Name="Eq1" ScaleY="0.3"/></Border.RenderTransform>
                         </Border>
-                        <Border Width="5" Height="28" Margin="2,0" CornerRadius="2"
+                        <Border Width="{ResourceReference BusyEqualizerBarWidth}" Height="{ResourceReference BusyEqualizerBarHeight}" Margin="{ResourceReference BusyEqualizerGap}" CornerRadius="{ResourceReference BusyPieceRadius}"
                                          Background="{ThemeResource AccentFillColorDefault}"
                                          RenderTransformOrigin="0.5,1">
                             <Border.RenderTransform><Transform x:Name="Eq2" ScaleY="0.3"/></Border.RenderTransform>
                         </Border>
-                        <Border Width="5" Height="28" Margin="2,0" CornerRadius="2"
+                        <Border Width="{ResourceReference BusyEqualizerBarWidth}" Height="{ResourceReference BusyEqualizerBarHeight}" Margin="{ResourceReference BusyEqualizerGap}" CornerRadius="{ResourceReference BusyPieceRadius}"
                                          Background="{ThemeResource AccentFillColorDefault}"
                                          RenderTransformOrigin="0.5,1">
                             <Border.RenderTransform><Transform x:Name="Eq3" ScaleY="0.3"/></Border.RenderTransform>
                         </Border>
-                        <Border Width="5" Height="28" Margin="2,0" CornerRadius="2"
+                        <Border Width="{ResourceReference BusyEqualizerBarWidth}" Height="{ResourceReference BusyEqualizerBarHeight}" Margin="{ResourceReference BusyEqualizerGap}" CornerRadius="{ResourceReference BusyPieceRadius}"
                                          Background="{ThemeResource AccentFillColorDefault}"
                                          RenderTransformOrigin="0.5,1">
                             <Border.RenderTransform><Transform x:Name="Eq4" ScaleY="0.3"/></Border.RenderTransform>
                         </Border>
-                        <Border Width="5" Height="28" Margin="2,0" CornerRadius="2"
+                        <Border Width="{ResourceReference BusyEqualizerBarWidth}" Height="{ResourceReference BusyEqualizerBarHeight}" Margin="{ResourceReference BusyEqualizerGap}" CornerRadius="{ResourceReference BusyPieceRadius}"
                                          Background="{ThemeResource AccentFillColorDefault}"
                                          RenderTransformOrigin="0.5,1">
                             <Border.RenderTransform><Transform x:Name="Eq5" ScaleY="0.3"/></Border.RenderTransform>
@@ -572,8 +572,8 @@
 
     <!-- ============================== Heartbeat: a double beat, then rest ============================== -->
     <Style Selector="BusyIndicator.Heartbeat">
-        <Setter Property="Width" Value="40"/>
-        <Setter Property="Height" Value="40"/>
+        <Setter Property="Width" Value="{ResourceReference BusySize}"/>
+        <Setter Property="Height" Value="{ResourceReference BusySize}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="BusyIndicator">
@@ -587,7 +587,7 @@
                                 <Transform x:Name="BeatHaloScale" ScaleX="0.6" ScaleY="0.6"/>
                             </Ellipse.RenderTransform>
                         </Ellipse>
-                        <Ellipse Width="20" Height="20"
+                        <Ellipse Width="{ResourceReference BusyHeartSize}" Height="{ResourceReference BusyHeartSize}"
                                           Fill="{ThemeResource AccentFillColorDefault}"
                                           EllipseType="EdgeToEdge"
                                           HorizontalAlignment="Center" VerticalAlignment="Center"

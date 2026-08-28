@@ -9,7 +9,7 @@
     <Style Selector="MenuItem" BasedOn="ItemsControl">
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
-        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
         <Setter Property="ItemsPanel">
             <Setter.Value>
                 <ItemsPanelTemplate>
@@ -42,7 +42,7 @@
                                         HorizontalAlignment="Left" VerticalAlignment="Center"/>
                                 <TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}"
                                         Foreground="{ObservableResource TextFillColorSecondary}"
-                                        FontSize="12" VerticalAlignment="Center" Margin="24 0 0 0"/>
+                                        FontSize="{ResourceReference FontSizeCaption}" VerticalAlignment="Center" Margin="24 0 0 0"/>
                                 <!-- Vector chevron, not a glyph: it renders regardless of the UI font's coverage. -->
                                 <Image x:Name="Chevron" Grid.Column="3"
                                         Source="{ResourceReference ChevronRightIcon}"

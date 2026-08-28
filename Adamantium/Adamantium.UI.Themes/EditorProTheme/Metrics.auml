@@ -1,0 +1,243 @@
+<ResourceDictionary xmlns:x="http://adamantium/ui/xaml/extensions"
+        xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+        xmlns="http://adamantium/ui">
+
+    <!-- Editor Pro's NUMBERS - all of them. Colours live in the variant, shapes in Icons, numbers here, and nothing in
+         this theme's style sets states a size, a radius, an inset or a font size inline.
+
+         That is the whole shape of the theme: an editor skin is defined by its DENSITY, so the numbers are the design.
+         Written as named keys, "make the rows one pixel tighter" is one edit here instead of a hunt through fifty
+         templates - which is exactly what Fluent still is (measured: 461 inline numbers across its 49 style sets), and
+         what it is to be brought to next. -->
+
+    <!-- ── Density ─────────────────────────────────────────────────────────────────────────────────────────────────
+         The row is the unit of an editor. 22 against Fluent's 34: a tree, a list and a tab strip all measure
+         themselves against it, so one number sets how much of the project fits on screen. -->
+    <sys:Double x:Key="RowHeight">22</sys:Double>
+    <sys:Double x:Key="RowHeightCompact">18</sys:Double>
+    <sys:Double x:Key="ControlHeight">24</sys:Double>
+    <!-- A slider has no chrome to stand up, so it needs less room than a field even here. -->
+    <sys:Double x:Key="ControlHeightCompact">18</sys:Double>
+
+    <!-- ── Type ───────────────────────────────────────────────────────────────────────────────────────────────────
+         The SAME SIX ROLES every theme answers - a template asks for "chrome text", and each theme says how big that
+         is. The roles are a contract, like the palette's keys: a template that asks for one is included by other
+         themes too.
+
+         This theme's answer is a FLAT scale. An editor with six type sizes reads as a web page, so the middle four
+         collapse onto the body size and only the two titles step up - the density comes from the rows, not from
+         shrinking every fourth label. -->
+    <sys:Double x:Key="FontSizeTitle">15</sys:Double>
+    <sys:Double x:Key="FontSizeSubtitle">13</sys:Double>
+    <sys:Double x:Key="FontSizeBody">12</sys:Double>
+    <sys:Double x:Key="FontSizeChrome">12</sys:Double>
+    <sys:Double x:Key="FontSizeCaption">11</sys:Double>
+    <sys:Double x:Key="FontSizeMicro">11</sys:Double>
+
+    <!-- ── Shape ──────────────────────────────────────────────────────────────────────────────────────────────────
+         3, not Fluent's 4-10. A dense row with a large radius wastes its corners on nothing, and at 22 pixels tall the
+         curve is most of the edge. Declared as the TYPE the property takes, so a template binds the metric straight
+         onto CornerRadius instead of a number being re-typed at every use. -->
+    <CornerRadius x:Key="CornerRadiusDefault">3</CornerRadius>
+    <CornerRadius x:Key="CornerRadiusSmall">2</CornerRadius>
+    <!-- A floating surface is allowed a little more, but nothing like Fluent's 8: a panel that reads as a rounded card
+         in an editor looks like it is about to be dragged somewhere. -->
+    <CornerRadius x:Key="CornerRadiusSurface">4</CornerRadius>
+    <!-- SQUARE. A line tab is not a card, so it has no top corners to round - see TabItemStyleSet. -->
+    <CornerRadius x:Key="CornerRadiusTabTop">0</CornerRadius>
+
+    <!-- ── Strokes ────────────────────────────────────────────────────────────────────────────────────────────────
+         One hairline everywhere. Depth in this theme comes from the lines, not from the fills, so there is exactly one
+         line weight and it is never doubled. The accent weight is for the ONE edge that marks a selection. -->
+    <Thickness x:Key="StrokeThin">1</Thickness>
+    <!-- ONE line weight: where Fluent gives a button a heavier edge as part of its affordance, this theme does not -
+    	 depth here comes from the lines being consistent, not from some of them being thicker. -->
+    <Thickness x:Key="StrokeControl">1</Thickness>
+    <sys:Double x:Key="StrokeThinValue">1</sys:Double>
+    <sys:Double x:Key="StrokeAccentValue">2</sys:Double>
+
+    <!-- ── Insets ─────────────────────────────────────────────────────────────────────────────────────────────────
+         Horizontal padding is generous where a row is tight: the text needs air on the axis that has room, not on the
+         one that does not. -->
+    <!-- The same roles Fluent names, answered for a dense skin. Flatter than its: at this row height a pixel of
+         optical centring is a twelfth of the row, so the insets are symmetric and the air is horizontal. -->
+    <Thickness x:Key="PaddingControl">8 2 8 2</Thickness>
+    <Thickness x:Key="PaddingDropDown">8 2 6 2</Thickness>
+    <Thickness x:Key="PaddingControlCompact">6 1 6 1</Thickness>
+    <Thickness x:Key="PaddingField">8 2 8 2</Thickness>
+    <Thickness x:Key="PaddingFieldFlat">6 0 6 0</Thickness>
+    <Thickness x:Key="PaddingRow">8 0 8 0</Thickness>
+    <!-- All four sides stated: Thickness(a b) means (leftTop, rightBottom) here, not (horizontal, vertical).
+         The vertical pair is not slack - on a tab folded against a side the label is TURNED, so top and bottom become
+         the gap BETWEEN one label and the next down the column. At zero they ran together into one word. It costs a
+         docked strip nothing: MinHeight already sets the row's height, and this sits inside it. -->
+    <Thickness x:Key="PaddingTab">8 4 8 4</Thickness>
+    <Thickness x:Key="PaddingTight">4 1 4 1</Thickness>
+
+    <!-- Surfaces, answered tightly: an editor's panels are working space, and every pixel of decorative air is a pixel
+         of the project the user cannot see. The tab body gets NONE - the content owns its own margins. -->
+    <!-- ── Ribbon ─────────────────────────────────────────────────────────────────────────────────────────────────
+         Answered because this theme includes Fluent's ribbon, not because an editor leads with one - it is a toolbar
+         here, not the main way anything is done, so every part of it is a step tighter and the large button loses the
+         height it spent on standing out. -->
+    <Thickness x:Key="RibbonRule">0 0 0 1</Thickness>
+    <Thickness x:Key="RibbonTabPadding">10 4</Thickness>
+    <Thickness x:Key="RibbonLedgePadding">6 0</Thickness>
+    <Thickness x:Key="RibbonGroupPadding">4 4 4 2</Thickness>
+    <sys:Double x:Key="RibbonChipWidth">22</sys:Double>
+    <sys:Double x:Key="RibbonChipHeight">20</sys:Double>
+    <sys:Double x:Key="RibbonButtonLargeHeight">44</sys:Double>
+    <sys:Double x:Key="RibbonButtonMinWidth">44</sys:Double>
+    <Thickness x:Key="RibbonButtonPadding">6 4</Thickness>
+    <Thickness x:Key="RibbonButtonPaddingSmall">4 1</Thickness>
+    <sys:Double x:Key="RibbonMenuItemHeight">34</sys:Double>
+    <Thickness x:Key="RibbonBackstagePadding">14 0</Thickness>
+    <CornerRadius x:Key="RibbonSplitLeadingRadius">3 0 0 3</CornerRadius>
+    <CornerRadius x:Key="RibbonSplitTrailingRadius">0 3 3 0</CornerRadius>
+    <Thickness x:Key="RibbonSplitDropDownPadding">2 1</Thickness>
+    <Thickness x:Key="RibbonSplitDropDownPaddingSmall">1 1</Thickness>
+    <CornerRadius x:Key="RibbonGalleryItemRadius">2</CornerRadius>
+    <Thickness x:Key="RibbonGalleryItemPadding">2</Thickness>
+
+    <!-- ── Busy indicator ─────────────────────────────────────────────────────────────────────────────────────────
+         A quarter smaller across the board. A spinner in an editor appears beside a status line or inside a panel
+         header, not in the middle of an empty page, so it has to be the size of a control rather than of a dialog. -->
+    <sys:Double x:Key="BusySize">28</sys:Double>
+    <sys:Double x:Key="BusyDotSize">7</sys:Double>
+    <Thickness x:Key="BusyDotGap">2,0</Thickness>
+    <sys:Double x:Key="BusyBarWidth">120</sys:Double>
+    <sys:Double x:Key="BusyBarHeight">3</sys:Double>
+    <sys:Double x:Key="BusyBarSegmentWidth">40</sys:Double>
+    <sys:Double x:Key="BusyEqualizerBarWidth">4</sys:Double>
+    <sys:Double x:Key="BusyEqualizerBarHeight">20</sys:Double>
+    <Thickness x:Key="BusyEqualizerGap">2,0</Thickness>
+    <sys:Double x:Key="BusyFlipWidth">13</sys:Double>
+    <sys:Double x:Key="BusyFlipHeight">18</sys:Double>
+    <Thickness x:Key="BusyFlipGap">3,0</Thickness>
+    <sys:Double x:Key="BusyHeartSize">14</sys:Double>
+    <sys:Double x:Key="BusyShimmerWidth">140</sys:Double>
+    <sys:Double x:Key="BusyShimmerHeight">40</sys:Double>
+    <sys:Double x:Key="BusyArcThickness">3</sys:Double>
+    <sys:Double x:Key="BusyRippleThickness">2</sys:Double>
+    <CornerRadius x:Key="BusyPieceRadius">2</CornerRadius>
+    <CornerRadius x:Key="BusyPieceRadiusLarge">2</CornerRadius>
+    <CornerRadius x:Key="BusyShimmerRadius">3</CornerRadius>
+
+    <Thickness x:Key="PaddingSurface">10</Thickness>
+    <Thickness x:Key="PaddingPanel">8</Thickness>
+    <Thickness x:Key="PaddingContent">0</Thickness>
+    <sys:Double x:Key="GapSmall">4</sys:Double>
+    <sys:Double x:Key="GapMedium">8</sys:Double>
+
+    <!-- ── Indicators ─────────────────────────────────────────────────────────────────────────────────────────────
+         The chevron every list-opener shares (drop-down, overflow, tree expander, submenu), the box a checkbox draws,
+         and the ring a radio draws. Named for what they are, not "icon size" - they are not one size. -->
+    <sys:Double x:Key="DropDownIconSize">8</sys:Double>
+    <!-- The square an expander arrow is centred in. Smaller than Fluent's 16 because it has to sit inside a 22-pixel
+         row without crowding the label beside it. -->
+    <sys:Double x:Key="ExpanderBoxSize">12</sys:Double>
+    <!-- A command glyph, two pixels down from Fluent's: at this row height a 16-pixel icon crowds the label. -->
+    <sys:Double x:Key="IconSize">14</sys:Double>
+    <!-- The bar down the left edge of a selected row. An editor selects rows constantly - a solid accent fill per
+         selection turns a file tree into a stripe pattern - so the mark is an edge and a faint wash. -->
+    <sys:Double x:Key="SelectionBarWidth">2</sys:Double>
+
+    <!-- ── Designer adorners ──────────────────────────────────────────────────────────────────────────────────────
+         The frame drawn around a selected or hovered element on the design surface, and the square handle at each of
+         a selection's corners. -->
+    <sys:Double x:Key="AdornerHandleSize">5</sys:Double>
+    <sys:Double x:Key="AdornerSelectionThickness">1</sys:Double>
+    <sys:Double x:Key="AdornerHoverThickness">1</sys:Double>
+
+    <!-- ── Menus ──────────────────────────────────────────────────────────────────────────────────────────────────
+         The gutter every menu row reserves for an icon or a checkmark, so labels line up whether or not a row has one.
+         Narrower than Fluent's 28 because the glyph inside it is smaller too. -->
+    <sys:Double x:Key="MenuIconGutter">20</sys:Double>
+    <sys:Double x:Key="MenuMinWidth">140</sys:Double>
+    <Thickness x:Key="MenuCardPadding">2</Thickness>
+    <Thickness x:Key="MenuGestureInset">16 0 0 0</Thickness>
+    <Thickness x:Key="MenuChevronInset">8 0 0 0</Thickness>
+    <sys:Double x:Key="CheckBoxSize">14</sys:Double>
+    <!-- The "partly" bar across a three-state box, and the air between a box and the label it belongs to. -->
+    <sys:Double x:Key="CheckMarkWidth">7</sys:Double>
+    <Thickness x:Key="CheckLabelInset">6 0 0 0</Thickness>
+    <!-- The switch: a shorter, flatter pill than Fluent's, sized so it stands no taller than a checkbox beside it in
+         the same settings column. -->
+    <sys:Double x:Key="SwitchWidth">28</sys:Double>
+    <sys:Double x:Key="SwitchHeight">14</sys:Double>
+    <!-- The pill's radius as a CornerRadius, not as the height reused: a metric has to be declared in the type the
+         property takes, or the value simply does not arrive - and a control whose template did not finish building
+         cannot complete a layout pass, which stalls the whole swap rather than looking wrong. -->
+    <CornerRadius x:Key="SwitchRadius">7</CornerRadius>
+    <sys:Double x:Key="SwitchThumbSize">8</sys:Double>
+    <Thickness x:Key="SwitchThumbInsetOff">3 0 0 0</Thickness>
+    <Thickness x:Key="SwitchThumbInsetOn">0 0 3 0</Thickness>
+    <sys:Double x:Key="RadioSize">14</sys:Double>
+    <sys:Double x:Key="RadioDotSize">6</sys:Double>
+
+    <!-- ── Scrolling ──────────────────────────────────────────────────────────────────────────────────────────────
+         A thin bar: in an editor the scrollbar is a position readout far more often than a grab target. -->
+    <sys:Double x:Key="ScrollBarThickness">10</sys:Double>
+    <sys:Double x:Key="ScrollThumbMinLength">24</sys:Double>
+
+    <!-- ── Window chrome ──────────────────────────────────────────────────────────────────────────────────────────
+         The title bar is the one place the theme spends vertical space, because it is also the tab strip's ground. -->
+    <sys:Double x:Key="TitleBarHeight">30</sys:Double>
+    <sys:Double x:Key="TitleBarButtonWidth">40</sys:Double>
+
+    <!-- Control extents. Narrower than Fluent's: an editor puts settings in a side panel, not on a page, and 120 is
+         most of that panel. -->
+    <sys:Double x:Key="ControlMinWidth">96</sys:Double>
+    <sys:Double x:Key="ControlMinLength">96</sys:Double>
+
+    <!-- Tracks and rules, all a notch thinner - the same reason the scrollbar is. -->
+    <sys:Double x:Key="SliderTrackThickness">3</sys:Double>
+    <!-- The handle: a narrow upright bar, not a disc. Its WIDTH is what a hand grabs and its HEIGHT is what makes it
+         readable against a three-pixel rail. -->
+    <sys:Double x:Key="SliderThumbWidth">6</sys:Double>
+    <sys:Double x:Key="SliderThumbLength">14</sys:Double>
+    <sys:Double x:Key="ProgressBarThickness">4</sys:Double>
+    <sys:Double x:Key="TabIndicatorThickness">2</sys:Double>
+    <sys:Double x:Key="RingSize">32</sys:Double>
+    <sys:Double x:Key="RingThickness">3</sys:Double>
+    <sys:Double x:Key="FocusRingOutset">1</sys:Double>
+    <sys:Double x:Key="DragHandleWidth">12</sys:Double>
+    <sys:Double x:Key="DragHandleHeight">16</sys:Double>
+    <sys:Double x:Key="TabStripHeight">26</sys:Double>
+
+    <!-- The drop caret: a hairline with END CAPS. A 1px line alone is ambiguous about where the insertion SPAN starts
+         and stops; the caps close it off, which is what lets the line stay this thin. -->
+    <sys:Double x:Key="DropCaretThickness">1</sys:Double>
+    <sys:Double x:Key="DropCaretCapLength">5</sys:Double>
+    <Thickness x:Key="DropFrameThickness">1</Thickness>
+
+    <!-- The tooltip is a LABEL, not a card: room to the sides of one line of text, almost none above and below. -->
+    <Thickness x:Key="ToolTipPadding">6 2 6 2</Thickness>
+
+    <!-- Caption strip: how far the icon stands off the drag area's edge, and the hairline gutter that separates the
+         application's own commands from the window's buttons. -->
+    <Thickness x:Key="TitleBarTitleInset">8 0 0 0</Thickness>
+    <Thickness x:Key="TitleBarIconGap">0 0 6 0</Thickness>
+    <Thickness x:Key="TitleBarUnderline">0 0 0 1</Thickness>
+    <Thickness x:Key="TitleBarGutterMargin">4 6 4 6</Thickness>
+
+    <!-- The window's own frame, its corner grip, and the theme-swap spinner. -->
+    <Thickness x:Key="WindowBorderThickness">1</Thickness>
+    <sys:Double x:Key="ResizeGripSize">22</sys:Double>
+    <Thickness x:Key="ResizeGripInset">0 0 3 3</Thickness>
+    <sys:Double x:Key="ThemeSpinnerSize">40</sys:Double>
+    <sys:Double x:Key="ThemeSpinnerThickness">3</sys:Double>
+    <Thickness x:Key="ThemeSpinnerLabelGap">0 14 0 0</Thickness>
+
+    <!-- Docking. The header button is sized for a MOUSE - this skin's whole premise - where Fluent sizes the same
+         button for a finger; at six open tool panels that difference is a row of the workspace. -->
+    <Thickness x:Key="DockHeaderPadding">6 1 2 1</Thickness>
+    <Thickness x:Key="DockHeaderUnderline">0 0 0 1</Thickness>
+    <!-- Air between the tab strip and the panel's own frame. Without it the strip's accent indicator ends where the
+         frame begins, and at a glance the two are one thick line - two different statements ("this tab" and "this
+         panel") sharing a single mark. -->
+    <Thickness x:Key="DockStripInset">3 0 3 3</Thickness>
+    <sys:Double x:Key="DockHeaderButtonSize">18</sys:Double>
+    <Thickness x:Key="DockAreaMargin">1</Thickness>
+
+</ResourceDictionary>

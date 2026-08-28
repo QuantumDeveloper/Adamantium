@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- A list in an editor is PART OF THE PANEL, not a card floating on it. Fluent gives it the card ground, which is
+         right when a list is a thing on a page; here a list IS the panel's contents - a file list, a problem list, a
+         search result - and a second surface behind it only draws a box around something that already has edges.
+
+         A ground, not a shape: the template is Fluent's, and nothing about the list's structure differs. -->
+
+    <Style Selector="ListBox">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+</StyleSet>

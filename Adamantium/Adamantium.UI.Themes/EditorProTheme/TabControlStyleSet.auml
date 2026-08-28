@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The body under a LINE tab. Fluent's is a card: rounded, outlined, joined to the tab that sits on top of it -
+         which is what makes a card tab read as the front sheet of a stack. This theme's tab is a line, so there is no
+         sheet to draw: the body is the page itself, square and unoutlined, and the accent rule under the current tab
+         is the only thing marking where it belongs.
+
+         Properties, not a template: the shared template already reads all three off the control. -->
+
+    <Style Selector="TabControl">
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+
+</StyleSet>

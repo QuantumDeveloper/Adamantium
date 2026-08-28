@@ -13,12 +13,12 @@
         <Setter Property="ForegroundSelected" Value="{ResourceReference TextFillColorPrimary}"/>
         <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="CornerRadius" Value="4 4 0 0"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusTabTop}"/>
         <!-- All four sides stated: Thickness(a b) here means (leftTop, rightBottom), NOT (horizontal, vertical), so the
              two-value form padded a tab 12 on the left AND top against 6 on the right and bottom. Invisible in a wide
              strip; on a turned label in a narrow column it read as text pushed off-centre. -->
-        <Setter Property="Padding" Value="12 6 12 6"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingTab}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeChrome}"/>
         <!-- LEFT, not centre: a tab is a label, and it reads from the left of whatever room it has. No difference at all
              for an ordinary content-sized tab (its slot IS the header); it decides where the name of a lone stretched
              document sits, and centred it drifted away from the tab's own edge. -->

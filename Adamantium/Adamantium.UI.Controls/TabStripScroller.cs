@@ -267,7 +267,7 @@ public class TabStripScroller : InputUIComponent, IContainer
             UpdateScrollState();
             // The panned child is a render MOTION NODE: its subtree bakes in ITS space and rides its transform-table
             // slot, so a pan rewrites one matrix and replays the recorded frame instead of re-walking the window.
-            if (child is UIComponent panned) 
+            if (child is UIComponent panned)
                 panned.IsRenderMotionNode = true;
 
             var rect = IsHorizontal

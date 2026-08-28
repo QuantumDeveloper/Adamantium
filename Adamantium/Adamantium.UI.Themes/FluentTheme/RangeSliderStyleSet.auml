@@ -7,8 +7,8 @@
          plus the parts it positions. Split per the small-styles convention: sizing, template, vertical. -->
 
     <Style Selector="RangeSlider">
-        <Setter Property="MinHeight" Value="24"/>
-        <Setter Property="MinWidth" Value="120"/>
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeightCompact}"/>
+        <Setter Property="MinWidth" Value="{ResourceReference ControlMinWidth}"/>
     </Style>
 
     <Style Selector="RangeSlider">
@@ -74,8 +74,8 @@
             <!-- MinWidth is a horizontal min-LENGTH; on a vertical control it would force a 120px-wide dead hit area
                  beside a 4px rail (the same trap the Slider style documents). Move the minimum onto the other axis. -->
             <Setter Property="MinWidth" Value="0"/>
-            <Setter Property="MinHeight" Value="120"/>
-            <Setter TargetName="Rail" Property="Width" Value="4"/>
+            <Setter Property="MinHeight" Value="{ResourceReference ControlMinLength}"/>
+            <Setter TargetName="Rail" Property="Width" Value="{ResourceReference SliderTrackThickness}"/>
             <Setter TargetName="Rail" Property="Height" Value="Auto"/>
             <Setter TargetName="Rail" Property="HorizontalAlignment" Value="Center"/>
             <Setter TargetName="Rail" Property="VerticalAlignment" Value="Stretch"/>

@@ -58,9 +58,16 @@ public class Pane : TabItem
     /// <para>A property with three states rather than an angle, because the theme has to select a TEMPLATE from it - a
     /// Transform is not a component and so cannot be a binding target, which leaves a literal angle per state as the
     /// only way to say it.</para></summary>
+    // AffectsParentMeasure as well as AffectsMeasure: turning the label swaps what the pane asks for - it stops being as
+    // wide as its text and starts being as TALL as it - and how much room a child needs is the PARENT's business. On its
+    // own, AffectsMeasure re-measures the pane and leaves the strip around it reporting the size it worked out for text
+    // lying flat. Measured on the stand with a panel folded against the right edge: the strip needed 179 and its group
+    // was laid out at 78, which is three tabs at the 26 of an unturned row. It corrected itself as soon as anything
+    // forced another layout pass, so clicking a tab looked like a fix.
     public static readonly AdamantiumProperty LabelRotationProperty = AdamantiumProperty.Register(nameof(LabelRotation),
         typeof(PaneLabelRotation), typeof(Pane),
-        new PropertyMetadata(PaneLabelRotation.None, PropertyMetadataOptions.AffectsMeasure));
+        new PropertyMetadata(PaneLabelRotation.None,
+            PropertyMetadataOptions.AffectsMeasure | PropertyMetadataOptions.AffectsParentMeasure));
 
     public PaneLabelRotation LabelRotation
     {

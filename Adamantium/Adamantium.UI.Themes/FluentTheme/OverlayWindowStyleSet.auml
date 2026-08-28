@@ -12,9 +12,9 @@
         <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="8"/>
-        <Setter Property="Padding" Value="20"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeThin}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusSurface}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingSurface}"/>
         <Setter Property="OverlayBrush" Value="{ResourceReference SmokeFillColorDefault}"/>
         <Setter Property="TitleBarBackground" Value="{ThemeResource AccentFillColorDefault}"/>
         <Setter Property="TitleForeground" Value="{ThemeResource AccentForegroundColor}"/>
@@ -46,7 +46,7 @@
                                                 Foreground="{TemplateBinding TitleForeground}"
                                                 VerticalAlignment="Center" Margin="0,0,8,0"/>
                                         <ContentPresenter x:Name="PART_Title" Content="{TemplateBinding Title}"
-                                                Foreground="{TemplateBinding TitleForeground}" FontSize="15"
+                                                Foreground="{TemplateBinding TitleForeground}" FontSize="{ResourceReference FontSizeSubtitle}"
                                                 VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Grid>
