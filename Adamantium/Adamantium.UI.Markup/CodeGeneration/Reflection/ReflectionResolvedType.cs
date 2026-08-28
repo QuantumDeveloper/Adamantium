@@ -133,6 +133,7 @@ public class ReflectionResolvedType : IResolvedType
             if (ImplementsInterface("ITheme")) return EntityType.Theme;
             if (ImplementsInterface("IResourceDictionary")) return EntityType.ResourceDictionary;
             if (ImplementsInterface("IStyleSet")) return EntityType.StyleSet;
+            if (ImplementsInterface("IThemeVariant")) return EntityType.ThemeVariant;
             return EntityType.Unknown;
         }
     }

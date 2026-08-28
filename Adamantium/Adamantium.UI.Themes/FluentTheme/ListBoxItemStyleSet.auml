@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- ListBoxItem: ONE template; the rest/hover/pressed/selected brushes live as properties on the control and the
+         triggers project them onto the chrome via {TemplateBinding}. Per the small-styles convention each concern is its
+         own <Style Selector="ListBoxItem">: simple properties, then the template, then the triggers. -->
+
+    <!-- Simple properties: rest transparent (the list background shows through); hover/pressed are subtle control fills;
+         selected uses the accent (so it survives a runtime accent swap via {ThemeResource}). -->
+    <Style Selector="ListBoxItem">
+        <!-- No rest Background: a transparent fill would still build a fill unit + AA fringe per item (costly in a long
+             list). The hover/pressed/selected triggers paint one when needed; hit-testing is bounds-based. -->
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference ControlFillColorSecondary}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference ControlFillColorTertiary}"/>
+        <Setter Property="BackgroundSelected" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="ForegroundSelected" Value="{ThemeResource AccentForegroundColor}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="10 6"/>
+        <!-- Stretch on BOTH axes so item content fills the row (Fluent/WinUI default): a templated View/card spans the
+             full width, and plain text still reads left (a TextBlock left-aligns its text inside the stretched
+             presenter).
+             Vertically too, and that is the recoverable choice: content that wants to be centred says so about ITSELF
+             (VerticalAlignment="Center"), whereas content that wants the whole slot cannot get back height the
+             container never handed down. With Center here, a tile in a fixed-size slot (a WrapPanel with ItemHeight)
+             collapsed to its own desired height no matter what it asked for. -->
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+    </Style>
+
+    <!-- Template (its own style). -->
+    <Style Selector="ListBoxItem">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="ItemBorder"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter
+                                x:Name="PART_ContentPresenter"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                Foreground="{TemplateBinding Foreground}"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Triggers (its own style). Hover, then pressed, then selected. The trigger value stack is ACTIVATION-ordered (the
+         most recently activated live trigger wins the shared Background token), so a plain hover/press over an ALREADY
+         selected row would otherwise pop the accent for the gray hover/pressed fill (the row looks deselected while the
+         cursor is on it). The two MultiTriggers below re-assert a DIMMED accent for selected+hover / selected+pressed -
+         declared LAST so they land on top while both are active, and pop cleanly back to the flat accent on release
+         (Fluent's accent PointerOver/Pressed, same tokens the accent Button uses). -->
+    <Style Selector="ListBoxItem">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsPressed" Value="true">
+            <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsSelected" Value="true">
+            <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundSelected}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundSelected}"/>
+        </PropertyTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="IsSelected" Value="true"/>
+                <Condition Property="IsMouseOver" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="ItemBorder" Property="Background" Value="{ThemeResource AccentFillColorSecondary}"/>
+        </MultiTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="IsSelected" Value="true"/>
+                <Condition Property="IsPressed" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="ItemBorder" Property="Background" Value="{ThemeResource AccentFillColorTertiary}"/>
+        </MultiTrigger>
+    </Style>
+
+</StyleSet>

@@ -11,14 +11,14 @@ internal class UIContext : IUIContext
     {
         Resolver = resolver;
         ResourceManager = uiApplication.ResourceManager;
-        ThemeContext = uiApplication.ThemeManager;
+        ThemeEngine = uiApplication.ThemeManager;
         UIApplication = uiApplication;
     }
     public IDependencyResolver Resolver { get; }
     
     public IResourceManager ResourceManager { get; }
     
-    public IThemeContext ThemeContext { get; }
+    public IThemeEngine ThemeEngine { get; }
     
     public IUIApplication UIApplication { get; }
 

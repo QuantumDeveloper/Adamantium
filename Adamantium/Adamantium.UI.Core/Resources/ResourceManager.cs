@@ -78,6 +78,16 @@ public class ResourceManager : IResourceManager
         if (resource != null)
             return resource;
 
+        // The APPLICATION theme's palette - the right answer when there is no requester, since with nobody to scope
+        // from the application's theme is the only theme in force. Without this, a theme that keeps its palette in
+        // variants rather than in a resource dictionary would answer every requester-aware lookup and none of the
+        // eager ones, which is a difference no theme author could see coming.
+        if (UIAppContext.Current?.ThemeManager?.CurrentTheme is Theme current
+            && current.PaletteValue(name) is { } fromPalette)
+        {
+            return fromPalette;
+        }
+
         return FindResourceInScope(name, ResourceScope.Global);
     }
 
@@ -98,6 +108,16 @@ public class ResourceManager : IResourceManager
             if (local != null)
                 return Materialize(local);
         }
+
+        // The PALETTE of the theme in force AT THIS ELEMENT, before the global theme scope. This is the step that makes
+        // a theme scope reach markup at all: {ResourceReference} resolves here, not through ITheme.GetResource, so a
+        // palette consulted only there would answer for code and never for the files themes are actually written in.
+        // Below the Local dictionaries, deliberately - a dictionary on the requester's own subtree still shadows the
+        // theme, or a theme key could not be overridden locally.
+        // Per-requester rather than from a global scope, because two subtrees may be showing two variants of the same
+        // theme at once, and a single Theme scope in this manager could only hold one of them.
+        if (ThemeContext.For(requester) is Theme scoped && scoped.PaletteValue(name) is { } fromPalette)
+            return fromPalette;
 
         var themeResource = FindResourceInScope(name, ResourceScope.Theme);
         if (themeResource != null)

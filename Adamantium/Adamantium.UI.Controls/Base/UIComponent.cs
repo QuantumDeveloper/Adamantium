@@ -983,6 +983,7 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         Core.Media.Animation.AnimationManager.StartDeferred(this);
 
         OnAttachedToVisualTree(e);
+
         AttachedToVisualTreeEvent?.Invoke(this, e);
 
         // TODO: check if we need to call AttachedToVisualTree in chain
@@ -990,7 +991,8 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         {
             foreach (var uiComponent in VisualChildren)
             {
-                var visual = (UIComponent)uiComponent;
+                // An EMPTY slot is skipped: a handler above may have restructured the tree under this walk.
+                if (uiComponent is not UIComponent visual) continue;
                 visual.AttachedToVisualTree(e);
             }
         }
@@ -1023,12 +1025,11 @@ public class UIComponent : FundamentalUIComponent, IUIComponent
         OnDetachedFromVisualTree(e);
         DetachedFromVisualTreeEvent?.Invoke(this, e);
 
-        if (VisualChildren.Count > 0)
+        // Backwards, by index, skipping empties: a handler above may have restructured the tree under this walk.
+        for (var i = (_visualChildren?.Count ?? 0) - 1; i >= 0; i--)
         {
-            foreach (UIComponent visual in VisualChildren)
-            {
-                visual.DetachedFromVisualTree(e, false);
-            }
+            if (i >= _visualChildren.Count) continue;
+            if (_visualChildren[i] is UIComponent visual) visual.DetachedFromVisualTree(e, false);
         }
     }
 

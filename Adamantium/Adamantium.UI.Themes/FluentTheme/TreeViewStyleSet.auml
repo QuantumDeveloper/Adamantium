@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- TreeView: the tree is FLATTENED into one virtualized list of rows (one per visible node, indented by depth), so a
+         branch of thousands of siblings realizes only the viewport. The ItemsPanel is a VIRTUALIZING StackPanel; the
+         ScrollViewer gives it its bounded viewport. -->
+    <Style Selector="TreeView" BasedOn="ItemsControl">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Vertical"/>
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="TreeView">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TreeView">
+                    <Border Background="{TemplateBinding Background}">
+                        <!-- CanContentScroll=true so the ScrollViewer measures the items host at the VIEWPORT (not unbounded)
+                             and delegates scrolling to the virtualizing panel - without it the panel sees infinite height and
+                             realizes a fixed ~screenful, so items past it never appear. Horizontal scroll DISABLED so rows
+                             stretch full-width (the whole row is clickable + the selection highlight spans it). -->
+                        <ScrollViewer x:Name="PART_ScrollViewer" CanContentScroll="True"
+                                               HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </ScrollViewer>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- TreeViewItem: a single FLAT row - [indent][expander] header. It hosts no nested nodes (the tree is flattened, so a
+         node's children are sibling rows in the same virtualized list); depth is expressed by the Indent inset, not nesting. -->
+    <Style Selector="TreeViewItem" BasedOn="ItemsControl">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="14"/>
+    </Style>
+
+    <!-- The expander glyph, its own swappable template (TreeViewItem.ExpanderTemplate). Checked = expanded, so the ▶ swaps
+         to ▼. Restyle the arrow by overriding ExpanderTemplate alone - the row template just hosts PART_Expander. -->
+    <Style Selector="TreeViewItem">
+        <Setter Property="ExpanderTemplate">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Grid Width="16" Height="16" Background="Transparent">
+                        <Image x:Name="ChevronRight"
+                                Source="{ResourceReference ChevronRightIcon}"
+                                Width="{ResourceReference DropDownIconSize}"
+                                Height="{ResourceReference DropDownIconSize}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"/>
+                        <Image x:Name="ChevronDown"
+                                Source="{ResourceReference ChevronDownIcon}"
+                                Width="{ResourceReference DropDownIconSize}"
+                                Height="{ResourceReference DropDownIconSize}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Visibility="Collapsed"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <PropertyTrigger Property="IsChecked" Value="true">
+                            <Setter TargetName="ChevronRight" Property="Visibility" Value="Collapsed"/>
+                            <Setter TargetName="ChevronDown" Property="Visibility" Value="Visible"/>
+                        </PropertyTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="TreeViewItem">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TreeViewItem">
+                    <!-- Root spans the full row width (Border stretches by default), so the selection fill + hover overlay run
+                         edge-to-edge and the whole row is clickable at any depth. -->
+                    <Border x:Name="Root" Background="Transparent" CornerRadius="4" MinHeight="26">
+                        <Grid>
+                            <Border x:Name="HoverOverlay" Background="Transparent" CornerRadius="4"/>
+                            <Grid ColumnDefinitions="Auto,16,*" Margin="4 3 6 3">
+                                <!-- Depth indent: a zero-width spacer at depth 0, Depth × step further in at each level. -->
+                                <Border Grid.Column="0" Width="{TemplateBinding Indent}"/>
+                                <!-- Pin the expander to its 16x16 glyph: the base ToggleButton style leaks MinHeight=32 +
+                                     Padding via the IS-A selector, which inflated the button and pushed the arrow off its
+                                     row centre. Un-inherit them here so the chevron sits dead-centre. -->
+                                <ToggleButton x:Name="PART_Expander" Grid.Column="1"
+                                        Template="{TemplateBinding ExpanderTemplate}"
+                                        Width="16" Height="16" MinWidth="0" MinHeight="0" Padding="0"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <ContentPresenter x:Name="PART_ContentPresenter" Grid.Column="2"
+                                        Content="{TemplateBinding Header}"
+                                        ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                        Foreground="{TemplateBinding Foreground}"
+                                        FontSize="{TemplateBinding FontSize}"
+                                        VerticalAlignment="Center" Margin="4 0 0 0"/>
+                            </Grid>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="TreeViewItem">
+        <!-- Hover uses IsPointerOverHeader (this row only), layered ABOVE the selection fill so a selected+hovered row stays
+             accent (just a touch lighter) instead of reverting to the hover grey. -->
+        <PropertyTrigger Property="IsPointerOverHeader" Value="true">
+            <Setter TargetName="HoverOverlay" Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        </PropertyTrigger>
+        <!-- A leaf hides the expander entirely (no children to open). -->
+        <PropertyTrigger Property="HasItems" Value="false">
+            <Setter TargetName="PART_Expander" Property="Visibility" Value="Hidden"/>
+        </PropertyTrigger>
+        <!-- Selection last so it wins the Root background over hover. -->
+        <PropertyTrigger Property="IsSelected" Value="true">
+            <Setter TargetName="Root" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ThemeResource AccentForegroundColor}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

@@ -259,11 +259,12 @@ public class Popup : MeasurableUIComponent, IContainer
         // walking visual ancestors; a popup opened inside an overlay (a submenu) has no such path, so also consult the host
         // recorded on each overlay root when it was hosted (below). The target is always the anchor we position against.
         IUIComponent anchor = EffectiveTarget ?? this;
-        _host = FindPopupHost(anchor);
+        _host = FindPopupHost(anchor) ?? FindPopupHost(this);
         if (_host == null) return;   // not in a window yet; OnAttachedToVisualTree retries
         if (Child is UIComponent child) child.DataContext = DataContext;
         _focusReturn.Capture();   // where the keyboard was, so closing can put it back
         _host.PopupLayer.Add(this);
+        _isShowing = true;
         if (!KeepOpen) HookLightDismiss();   // click-outside-to-close, hosted centrally here (see OnGlobalPreviewDown)
         if (DismissOnEscape) HookEscape();   // ...and Escape, which a KeepOpen drawer wants just as much
     }
@@ -277,13 +278,20 @@ public class Popup : MeasurableUIComponent, IContainer
 
     private readonly FocusReturn _focusReturn = new();
 
+    // Showing, which is neither IsOpen (already written by the time Close runs) nor having a host (a detach drops it).
+    private bool _isShowing;
+
     private void Close()
     {
-        var wasOpen = _host != null;
-        UnhookLightDismiss();                    // while _host is still set
-        UnhookEscape();
-        _host?.PopupLayer.Remove(this);   // the layer un-records the overlay root - see PopupLayer.Remove
+        // State settled FIRST: everything below runs input and layout, and a click landing there re-enters through IsOpen.
+        var wasOpen = _isShowing;
+        var host = _host;
+        _isShowing = false;
         _host = null;
+
+        UnhookLightDismiss(host);
+        UnhookEscape(host);
+        host?.PopupLayer.Remove(this);   // the layer un-records the overlay root - see PopupLayer.Remove
         // The focus goes back to whatever opened this - but only if it is still in here, where it is about to be
         // stranded. See FocusReturn.
         if (wasOpen) _focusReturn.Restore(Child);
@@ -300,9 +308,9 @@ public class Popup : MeasurableUIComponent, IContainer
         root.AddHandler(Mouse.PreviewMouseDownEvent, _lightDismiss, handledEventsToo: true);
     }
 
-    private void UnhookLightDismiss()
+    private void UnhookLightDismiss(IPopupHost host = null)
     {
-        if (_lightDismiss != null && _host is IInputComponent root)
+        if (_lightDismiss != null && (host ?? _host) is IInputComponent root)
             root.RemoveHandler(Mouse.PreviewMouseDownEvent, _lightDismiss);
     }
 
@@ -326,11 +334,11 @@ public class Popup : MeasurableUIComponent, IContainer
         OpenDismissable.Add(this);
     }
 
-    private void UnhookEscape()
+    private void UnhookEscape(IPopupHost host = null)
     {
         OpenDismissable.Remove(this);
         if (_escapeDismiss == null) return;
-        if (_host is IInputComponent root) root.RemoveHandler(Keyboard.PreviewKeyDownEvent, _escapeDismiss);
+        if ((host ?? _host) is IInputComponent root) root.RemoveHandler(Keyboard.PreviewKeyDownEvent, _escapeDismiss);
         // Remove from the SAME object it was added to: Child can be swapped while the popup is open.
         _escapeContentRoot?.RemoveHandler(Keyboard.PreviewKeyDownEvent, _escapeDismiss);
         _escapeContentRoot = null;

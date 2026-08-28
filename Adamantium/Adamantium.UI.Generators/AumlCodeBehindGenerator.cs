@@ -154,7 +154,10 @@ namespace Adamantium.UI.Generators
             {
                 "ResourceDictionary" => 0,
                 "StyleSet" => 1,
-                "Theme" => 2,
+                // Before the theme that names them: a theme lists its variants as elements, so their classes have to
+                // exist by the time it is generated.
+                "ThemeVariantDefinition" => 2,
+                "Theme" => 3,
                 _ => 99
             };
         }

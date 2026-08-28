@@ -800,8 +800,12 @@ public class DefaultAumlTransformer : IAumlTransformer
     /// another - e.g. <c>&lt;local:ControlsView/&gt;</c> - can resolve it during its own transform, regardless of file
     /// processing order (and so a view-inside-a-view works too). Resolves only the ROOT type (a real framework type,
     /// always present in the compilation), computes the generated class name + namespace exactly as the source generator
-    /// will, and registers a <see cref="MetadataResolvedType"/>. Non-control roots (resources/styles/themes are never
-    /// embedded) are a no-op. Must run for ALL documents before any body is transformed.
+    /// will, and registers a <see cref="MetadataResolvedType"/>. Must run for ALL documents before any body is transformed.
+    /// <para>A THEME VARIANT counts as embedded too: a theme names its variants as elements, so the class has to resolve
+    /// while the THEME is being transformed. Registering it only when it is generated would make that file order, and
+    /// "Fluent" sorts before "FluentDark".</para>
+    /// <para>A no-op for a resource dictionary, a style set or a theme (pulled in by TYPE through ResourceLink /
+    /// StyleInclude, which resolves by a different route), and for a FRAGMENT root, which generates no class at all.</para>
     /// </summary>
     public IResolvedType PreRegisterDocument(AumlDocument document, ITypeResolver typeResolver)
     {
@@ -822,7 +826,8 @@ public class DefaultAumlTransformer : IAumlTransformer
         if (resolvedRoot == null) return null;
 
         var rootType = typeResolver.Resolve(resolvedRoot.GetFullTypeName());
-        if (rootType is not { EntityType: EntityType.Window or EntityType.View or EntityType.Page or EntityType.UIApplication })
+        if (rootType is not { EntityType: EntityType.Window or EntityType.View or EntityType.Page
+                              or EntityType.UIApplication or EntityType.ThemeVariant })
             return null;
 
         // Reuse the resolved root reference in the full Transform (which short-circuits on IsResolved) and as the

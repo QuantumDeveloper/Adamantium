@@ -9,7 +9,7 @@ public interface IUIContext
     
     object Resolve(Type type, string name = "");
     
-    public IThemeContext ThemeContext { get; }
+    public IThemeEngine ThemeEngine { get; }
     
     public IUIApplication UIApplication { get; }
 }

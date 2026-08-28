@@ -11,6 +11,14 @@ public class Theme : AdamantiumComponent, ITheme
     {
         StyleSets = new StyleSetCollection();
         StyleIncludes = new StyleIncludeCollection();
+        Variants = new ThemeVariantCollection();
+        // Declared through ONE path whether it came from markup or from code: the collection is what markup fills, and
+        // adding to it is what creates the palette brushes. A theme file and a hand-built theme must not differ here.
+        Variants.CollectionChanged += (_, e) =>
+        {
+            if (e.NewItems == null) return;
+            foreach (ThemeVariantDefinition definition in e.NewItems) AddVariant(definition);
+        };
         ResourceManager = UIAppContext.Current.ResourceManager;
         MergedStyles = new StyleSet();
         // Any change to the merged style set invalidates the per-type match cache below (init, AddStyleSet, hot-reload).
@@ -290,25 +298,231 @@ public class Theme : AdamantiumComponent, ITheme
             s.Selector.Id == null && s.Selector.Classes.Count == 0 && s.Selector.ClassGroups.Count == 0
             && s.Selector.Types.Any(t => t == type));
 
+    // ── Variants ──────────────────────────────────────────────────────────────────────────────────────────────────
+    //
+    // The PALETTE belongs to the theme: one brush per key, shared by every variant. A variant supplies that brush's
+    // COLOUR, not a brush of its own. That inversion is the entire point - two dictionaries of separate brush objects
+    // under the same keys would mean every element's Background receives a DIFFERENT OBJECT when the variant changes,
+    // which is a property write per element (measured at ~18000 on a swap) plus a re-subscribe on every brush. Writing
+    // a colour into a brush that is already there is O(palette keys) and touches no element at all.
+
+    private readonly Dictionary<string, SolidColorBrush> _palette = new();
+    private readonly Dictionary<ThemeVariant, ThemeVariantDefinition> _variants = new();
+
+    /// <summary>What markup writes: <c>&lt;Theme.Variants&gt;…&lt;/Theme.Variants&gt;</c>. Adding to it declares the
+    /// variant, so a theme file and a theme built in code go through exactly the same path.</summary>
+    public ThemeVariantCollection Variants { get; }
+
+    /// <summary>The theme's palette brushes by key - created once from the variants' colour tables and never replaced.
+    /// Their IDENTITY is what makes a variant switch cheap.</summary>
+    public IReadOnlyDictionary<string, SolidColorBrush> Palette => _palette;
+
+    public IReadOnlyDictionary<ThemeVariant, ThemeVariantDefinition> VariantsByKey => _variants;
+
+    public ThemeVariant CurrentVariant { get; private set; }
+
+    /// <summary>The variant used when nothing else is said - the first one declared.</summary>
+    public ThemeVariant DefaultVariant { get; private set; }
+
+    public ThemeVariant SystemLightVariant { get; set; }
+
+    public ThemeVariant SystemDarkVariant { get; set; }
+
+    /// <summary>Declare a variant. The palette gains a brush for any colour key it has not seen yet, so the brushes
+    /// exist before anything asks for them and never have to be swapped later.</summary>
+    public void AddVariant(ThemeVariantDefinition variant)
+    {
+        if (variant == null || variant.Key.IsUnspecified) return;
+
+        _variants[variant.Key] = variant;
+        if (DefaultVariant.IsUnspecified) DefaultVariant = variant.Key;
+
+        RegisterPaletteKeys(variant);
+
+        // ...and keep registering. Markup adds the variant to the theme BEFORE filling in its colours - the loader
+        // parents a child and then populates it - so a palette built once, here, would come out empty for every theme
+        // read from a file while looking perfectly correct for every theme built in a test. The keys arrive when they
+        // arrive; this listens rather than assuming an order.
+        variant.Colors.CollectionChanged += (_, _) => RegisterPaletteKeys(variant);
+    }
+
+    // Keys served as a raw Color rather than as a brush - a gradient STOP takes a colour. Kept beside the brushes
+    // rather than in a second collection on the variant: one palette, two ways of being asked for.
+    private readonly Dictionary<string, Color> _rawColors = new();
+
+    /// <summary>Palette entries a variant declares as colours rather than brushes.</summary>
+    public IReadOnlyDictionary<string, Color> RawColors => _rawColors;
+
+    private void RegisterPaletteKeys(ThemeVariantDefinition variant)
+    {
+        foreach (var entry in variant.Colors)
+        {
+            if (entry.Key == null) continue;
+
+            if (entry.As == PaletteEntryKind.Color)
+            {
+                if (!_rawColors.ContainsKey(entry.Key)) _rawColors[entry.Key] = entry.Color;
+                continue;
+            }
+
+            if (_palette.ContainsKey(entry.Key)) continue;
+
+            // The brush is created with the colour of whichever variant is CURRENT, when that variant declares the key
+            // - so a palette entry is never briefly the wrong colour on its way to being right.
+            var colour = entry.Color;
+            if (!CurrentVariant.IsUnspecified && _variants.TryGetValue(CurrentVariant, out var current)
+                && current.Colors.TryGet(entry.Key, out var currentColour))
+            {
+                colour = currentColour;
+            }
+
+            _palette[entry.Key] = new SolidColorBrush(colour);
+        }
+    }
+
+    /// <summary>Every variant of a theme must answer the SAME set of keys. A key one variant declares and another does
+    /// not would leave the palette holding whatever the previous variant put there - so the subtree's appearance would
+    /// depend on which variant it was switched FROM, which is not a thing anyone can reason about. Returns the keys
+    /// that are missing somewhere, by variant; empty means the theme is consistent.</summary>
+    public IReadOnlyList<string> ValidateVariants()
+    {
+        var problems = new List<string>();
+        if (_variants.Count < 2) return problems;
+
+        foreach (var variant in _variants.Values)
+        {
+            foreach (var key in _palette.Keys)
+            {
+                if (!variant.Colors.ContainsKey(key)) problems.Add($"{variant.Key}: no colour for '{key}'");
+            }
+        }
+
+        return problems;
+    }
+
+    public bool ApplyVariant(ThemeVariant variant)
+    {
+        if (variant.FollowsSystem) return false;   // the caller resolves this one first - see ResolveSystemVariant
+        if (variant.IsUnspecified) variant = DefaultVariant;
+        if (variant.IsUnspecified || !_variants.TryGetValue(variant, out var definition)) return false;
+
+        CurrentVariant = variant;
+
+        // Colours first: writing into the brushes that already exist, so every element drawing with one keeps drawing
+        // with the same object and simply repaints.
+        foreach (var entry in definition.Colors)
+        {
+            if (entry.Key == null) continue;
+
+            if (entry.As == PaletteEntryKind.Color)
+            {
+                _rawColors[entry.Key] = entry.Color;
+                continue;
+            }
+
+            if (_palette.TryGetValue(entry.Key, out var brush)) brush.Color = entry.Color;
+            else _palette[entry.Key] = new SolidColorBrush(entry.Color);
+        }
+
+        // ...then the theme's own properties, which is where {ThemeResource} looks. AccentColor derives the whole ramp
+        // on assignment, so setting the seed is enough.
+        foreach (var entry in definition.Values)
+        {
+            if (entry.Property == null) continue;
+            var property = AdamantiumPropertyMap.FindRegistered(GetType(), entry.Property);
+            if (property != null) SetValue(property, entry.Value);
+        }
+
+        return true;
+    }
+
+    // ── One theme, several variants AT ONCE ───────────────────────────────────────────────────────────────────────
+    //
+    // Applying a variant re-colours the palette IN PLACE, and that is what makes an application-wide switch cheap. But
+    // the palette is ONE set of brushes, so a single theme object cannot show light in one subtree and dark in another
+    // at the same time - and a preview pane beside the thing it previews is exactly that.
+    //
+    // So a variant that differs from the one this theme is currently showing resolves to a SIBLING: same styles, same
+    // templates (literally the same Style objects), its own palette. Which keeps both properties, each where it
+    // belongs - the common case (the whole application on one variant) stays a colour write per palette key and costs
+    // no element anything, and the rare case (a subtree that wants a different variant) pays a re-style ONCE, when it
+    // opts in, instead of making everyone else pay for the possibility.
+
+    private readonly Dictionary<ThemeVariant, Theme> _siblings = new();
+    private Theme _variantRoot;   // the theme this one was made from; null on the original
+
+    /// <summary>The theme object that shows <paramref name="variant"/> - this one when it already does, otherwise a
+    /// sibling sharing every style with it. Returns this theme unchanged when the variant is not one it declares:
+    /// giving back something else would be the silent substitution <see cref="ApplyVariant"/> refuses to make.</summary>
+    public Theme SiblingForVariant(ThemeVariant variant)
+    {
+        if (variant.IsUnspecified || variant.FollowsSystem) return this;
+        if (!_variants.ContainsKey(variant)) return this;
+
+        // A named variant ALWAYS gets its own sibling, even when this theme happens to be showing that variant right
+        // now. Handing back the theme itself looked like a free optimisation and was a bug: the subtree then held the
+        // APPLICATION's brushes, so the moment the application switched variant the pinned subtree switched with it -
+        // a pane labelled "Dark" going light because something elsewhere changed. Naming a variant has to mean it
+        // cannot be changed by anyone else, and that is only true of brushes nobody else is holding.
+
+        var root = _variantRoot ?? this;
+        lock (root._siblings)
+        {
+            if (root._siblings.TryGetValue(variant, out var existing)) return existing;
+
+            var sibling = new Theme(Name) { _variantRoot = root, FontFamily = FontFamily };
+            foreach (var styleSet in StyleSets) sibling.StyleSets.Add(styleSet);
+            sibling.MergedStyles.AddStyles(MergedStyles.Styles);
+
+            // The definitions are DATA and are shared: a variant's colour table is read, never written, and having two
+            // copies drift apart would be a bug nobody could see.
+            foreach (var definition in _variants.Values) sibling.AddVariant(definition);
+
+            sibling.ApplyVariant(variant);
+            root._siblings[variant] = sibling;
+            return sibling;
+        }
+    }
+
+    /// <summary>The theme this one is a variant sibling of - itself when it is the original.</summary>
+    public Theme VariantRoot => _variantRoot ?? this;
+
+    public ThemeVariant ResolveSystemVariant(bool osPrefersDark)
+    {
+        var wanted = osPrefersDark ? SystemDarkVariant : SystemLightVariant;
+        return wanted.IsUnspecified || !_variants.ContainsKey(wanted) ? default : wanted;
+    }
+
+    /// <summary>The palette's answer for <paramref name="key"/>, or null. Brushes first, then the few keys a variant
+    /// declares as raw colours.</summary>
+    internal object PaletteValue(string key)
+    {
+        if (_palette.TryGetValue(key, out var brush)) return brush;
+        return _rawColors.TryGetValue(key, out var colour) ? colour : null;
+    }
+
     public object GetResource(string key)
     {
-        return ResourceManager.FindResource(key);
+        return PaletteValue(key) ?? ResourceManager.FindResource(key);
     }
 
     public bool TryGetResource(string key, out object value)
     {
-        value = ResourceManager.FindResource(key);
+        value = PaletteValue(key) ?? ResourceManager.FindResource(key);
         return value != null;
     }
 
+    // The requester-aware pair asks the tree-scoped chain FIRST and the palette last: a Local dictionary on the
+    // requester's own subtree is meant to override the theme, and answering from the palette before looking would make
+    // a theme key impossible to shadow locally.
     public object GetResource(IFundamentalUIComponent requester, string key)
     {
-        return ResourceManager.FindResource(requester, key);
+        return ResourceManager.FindResource(requester, key) ?? PaletteValue(key);
     }
 
     public bool TryGetResource(IFundamentalUIComponent requester, string key, out object value)
     {
-        value = ResourceManager.FindResource(requester, key);
+        value = GetResource(requester, key);
         return value != null;
     }
 
@@ -326,6 +540,14 @@ public class Theme : AdamantiumComponent, ITheme
     {
         if (Initialized || Initializing) return;
         Initializing = true;
+
+        // A theme with variants must HAVE one from the moment it is usable. Declaring a variant only creates the
+        // palette brushes; the accent, the on-accent text colour and the focus strokes are theme PROPERTIES and are set
+        // by nothing but ApplyVariant. A theme left on no variant therefore comes up with those properties null - and
+        // {ThemeResource AccentForegroundColor} (31 uses) and {ThemeResource AccentFillColorDefault} (72) then resolve
+        // to nothing, so the window's title text has no Foreground at all and the render walk throws on it. The screen
+        // shows a blank tab and empty fills, which says nothing about the cause.
+        if (CurrentVariant.IsUnspecified && !DefaultVariant.IsUnspecified) ApplyVariant(DefaultVariant);
 
         foreach (var styleInclude in StyleIncludes)
         {

@@ -67,7 +67,8 @@ public static class ParkedVisuals
 
         // What the world looked like when it left, so the return can ask ONE question instead of revalidating six
         // thousand nodes: same window, same theme?
-        var world = new World(root.RootVisual, Core.Resources.ThemeManager.Version);
+        var world = new World(root.RootVisual, Core.Resources.ThemeManager.Version,
+            Core.Resources.ThemeManager.PaletteVersion);
 
         var slot = new Slot(owner, key);
         ParkedSubtree.Park(root);
@@ -107,7 +108,8 @@ public static class ParkedVisuals
         // holds the right value - the return may skip it. A different window or a theme swap in between means it may not.
         // Against the HOST's window, not the parked root's: a parked root is out of the tree, so its own RootVisual is
         // null and comparing it always answered "changed" - the cheap path could never be taken at all.
-        var now = new World(host?.RootVisual, Core.Resources.ThemeManager.Version);
+        var now = new World(host?.RootVisual, Core.Resources.ThemeManager.Version,
+            Core.Resources.ThemeManager.PaletteVersion);
         IsUnchanged = entry.World == now;
 
         // Asked SEPARATELY from the above, because the two answers cost different things. A theme swap invalidates what
@@ -154,5 +156,10 @@ public static class ParkedVisuals
         NavigationCacheMode Mode, Mathematics.Size HostSize, World World);
 
     // The two things a parked subtree's per-node state depends on. Compared as a whole so adding a third is one edit.
-    private readonly record struct World(IRootVisualComponent RootVisual, int ThemeVersion);
+    // PaletteVersion is part of the world on purpose: a variant switch leaves styles, templates and property values
+    // exactly as they were - so ThemeVersion does not move - but it writes new colours into every brush the palette
+    // owns. A subtree that is parked at that moment has given up its render attachments, so no brush can reach it and
+    // nothing marks it; without this it came home reporting "same world" and took the cheap return, still baked in the
+    // colours of the variant it left under, and only a scroll (which forces a walk) put it right.
+    private readonly record struct World(IRootVisualComponent RootVisual, int ThemeVersion, int PaletteVersion);
 }

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- A ring with a centre dot, then the content label. The ring fills with the accent + the dot fades in when
+         checked. Per the small-styles convention each concern is its own <Style Selector="RadioButton">. -->
+
+    <!-- Base brushes on the control, bound onto the ring with {TemplateBinding} so the IsChecked trigger can repaint it
+         (a {ResourceReference} straight on the part would bake at Local priority and block the trigger). -->
+    <Style Selector="RadioButton" BasedOn="ToggleButton">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="RadioButton">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Grid Width="20" 
+                                       Height="20" 
+                                       VerticalAlignment="Center">
+                            <Ellipse x:Name="OuterRing"
+                                              Fill="{TemplateBinding Background}"
+                                              Stroke="{TemplateBinding BorderBrush}"
+                                              StrokeThickness="1"/>
+                            <Ellipse x:Name="Dot"
+                                              Width="10"
+                                              Height="10"
+                                              Fill="{ThemeResource AccentForegroundColor}"
+                                              Opacity="0"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Grid>
+                        <ContentPresenter x:Name="PART_ContentPresenter"
+                                                   Content="{TemplateBinding Content}"
+                                                   ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                   Foreground="{TemplateBinding Foreground}"
+                                                   FontSize="{TemplateBinding FontSize}"
+                                                   VerticalAlignment="Center"
+                                                   Margin="8 0 0 0"/>
+                    </StackPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="RadioButton">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="OuterRing" Property="Fill" Value="{ResourceReference ControlFillColorSecondary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsChecked" Value="true">
+            <Setter TargetName="OuterRing" Property="Fill" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="OuterRing" Property="Stroke" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="Dot" Property="Opacity" Value="1"/>
+            <!-- Un-inherit the ToggleButton accent-label; a radio label sits on the normal background. -->
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{ResourceReference TextFillColorPrimary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="OuterRing" Property="Fill" Value="{ResourceReference ControlFillColorDisabled}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground"
+                    Value="{ResourceReference TextFillColorDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

@@ -29,6 +29,28 @@ public interface ITheme: IInitializable, IAdamantiumComponent
     /// UIComponent.FontFamily.</summary>
     FontFamily FontFamily { get; }
     
+    /// <summary>The variants this theme declares, by key. A theme with none has exactly one appearance.</summary>
+    IReadOnlyDictionary<ThemeVariant, ThemeVariantDefinition> VariantsByKey { get; }
+
+    /// <summary>The variant in force. Setting it re-colours the palette IN PLACE - the brushes keep their identity, so
+    /// nothing that draws with them has to be told anything beyond "you changed".</summary>
+    ThemeVariant CurrentVariant { get; }
+
+    /// <summary>Make <paramref name="variant"/> current. Returns false if this theme does not declare it - the caller
+    /// then knows to fall back rather than being silently given something else.</summary>
+    bool ApplyVariant(ThemeVariant variant);
+
+    /// <summary>Which of this theme's variants answers to the operating system saying "light" / "dark". Unspecified
+    /// when the theme has no such notion - a HUD theme is dark by nature and its variants run along another axis
+    /// entirely - and then following the system means staying on the default variant.</summary>
+    ThemeVariant SystemLightVariant { get; }
+
+    ThemeVariant SystemDarkVariant { get; }
+
+    /// <summary>Resolve <see cref="ThemeVariant.System"/> against what the OS currently says. Returns unspecified when
+    /// this theme has no light/dark mapping.</summary>
+    ThemeVariant ResolveSystemVariant(bool osPrefersDark);
+
     StyleSetCollection StyleSets { get; }
     
     StyleIncludeCollection StyleIncludes { get; }

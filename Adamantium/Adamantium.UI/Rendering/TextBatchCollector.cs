@@ -156,6 +156,36 @@ internal sealed class TextBatchCollector : BatchCollector<GlyphItem>
     /// re-walked: a counter whose glyph count holds steady costs one range upload, not a walk of the scene. The caller
     /// checks the count and atlas still match (RenderCache.IsSlotPatchable); false here means the block no longer packs
     /// at all (a rotated relative transform) and the walk must take it.</summary>
+    /// <summary>Rewrite ONLY the colour of a retained run - which is all a recolour is. Geometry, atlas UVs and the
+    /// transform/opacity slots are left exactly as they were, so this needs no bake world, no transform slot and no
+    /// re-record: the same bytes in a different colour, uploaded in place.
+    /// <para>Exists because delivering a recolour through a RE-PACK ties it to a walk, and the content cache almost
+    /// never walks - it replays. A variant switch therefore only recoloured text when something unrelated forced a walk
+    /// in the same frame, which is why scrolling appeared to "fix" it.</para></summary>
+    public bool RecolourRun(IGraphicsDevice device, int first, int count, TextRenderComponent tc)
+    {
+        if (count <= 0 || tc?.Foreground is not SolidColorBrush solid) return false;
+        if (first < 0 || first + count > Count) return false;
+
+        var color = solid.Color.ToVector4();
+        color.W *= (float)tc.RenderData.Opacity;   // the same fold PackInto does - one colour, computed one way
+
+        var span = Items.AsSpan(first, count);
+        var changed = false;
+        for (var i = 0; i < span.Length; i++)
+        {
+            if (span[i].Color == color) continue;
+            span[i].Color = color;
+            changed = true;
+        }
+
+        if (!changed) return false;
+
+        PrepareRetainedWrite(device);
+        UploadRange(first, count);
+        return true;
+    }
+
     public bool UpdateRun(IGraphicsDevice device, int first, TextRenderComponent tc, Matrix4x4F relWorld, int transformSlot, int fadeSlot)
     {
         PrepareRetainedWrite(device);

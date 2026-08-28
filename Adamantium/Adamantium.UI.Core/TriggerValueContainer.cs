@@ -13,13 +13,13 @@ namespace Adamantium.UI.Core;
 /// </summary>
 internal class TriggerValueContainer
 {
-    private readonly List<(object Token, object Value, int Order)> _values = [];
+    private readonly List<(object Token, object Value, long Order)> _values = [];
 
     /// <summary>Records a trigger setter's contribution. Re-applying an existing token updates its value IN PLACE, so an
     /// idempotent re-apply or a {ThemeResource} refresh changes nothing about who wins.</summary>
     public void Set(object token, object value)
     {
-        var order = (token as ISetter)?.DeclarationOrder ?? 0;
+        var order = token is ISetter s ? (long)s.StyleBand * 1_000_000 + s.DeclarationOrder : 0L;
 
         for (var i = 0; i < _values.Count; i++)
         {

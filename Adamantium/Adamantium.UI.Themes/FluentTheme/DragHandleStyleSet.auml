@@ -1,0 +1,31 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- DragHandle: the grip that makes a row draggable by it alone. The classic 2x3 dot cluster, subtle until the
+         pointer is on it. The Transparent background is load-bearing - it makes the WHOLE box the grab area, so a press
+         in the gaps between dots still counts (the drag engine tests the control's bounds, not the dot geometry). -->
+    <Style Selector="DragHandle">
+        <Setter Property="Width" Value="16"/>
+        <Setter Property="Height" Value="20"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorSecondary}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DragHandle">
+                    <Border Background="Transparent">
+                        <Path HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       Fill="{TemplateBinding Foreground}"
+                                       Data="M0,0 L3,0 L3,3 L0,3 Z M5,0 L8,0 L8,3 L5,3 Z M0,5 L3,5 L3,8 L0,8 Z M5,5 L8,5 L8,8 L5,8 Z M0,10 L3,10 L3,13 L0,13 Z M5,10 L8,10 L8,13 L5,13 Z"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="DragHandle">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

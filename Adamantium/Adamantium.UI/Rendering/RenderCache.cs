@@ -181,12 +181,22 @@ public partial class RenderCache
     // hundreds of elements (the skeleton pulse) - the reason paint fans out where transform does not.
     private readonly Dictionary<Core.Media.Brush, List<IRenderUnit>> _unitsByBrush = new();
 
+    // What each indexed brush looked like when the walk baked it. A recolour is then one comparison per brush in the
+    // scene - see Brush.PaintVersion and ApplyBrushRepaints.
+    private readonly Dictionary<Core.Media.Brush, int> _brushPaintBaked = new();
+
+    // The brushes found stale this frame. Collected first and patched after, so the map above is not written while it
+    // is being read; reused between frames so the check allocates nothing.
+    private readonly List<Core.Media.Brush> _repaintedBrushes = new();
+
     private void IndexUnitBrush(IUIComponent _, IRenderUnit unit, Core.Media.Brush liveBrush)
     {
         if (liveBrush == null) return;
         if (!_unitsByBrush.TryGetValue(liveBrush, out var list))
             _unitsByBrush[liveBrush] = list = new List<IRenderUnit>();
         list.Add(unit);
+        // The walk that indexes it also BAKES it, so this is the version now on screen.
+        _brushPaintBaked[liveBrush] = liveBrush.PaintVersion;
     }
     private bool _partialSpliced;                                            // last partial mutated the paint-order list -> ops/slots stale
 

@@ -33,7 +33,7 @@ using Adamantium.UI.Platforms.MacOS;
 using Adamantium.UI.Platforms.Windows;
 using Adamantium.UI.Rendering;
 using Adamantium.UI.Services;
-using Adamantium.UI.Themes.FluentDarkTheme;
+using Adamantium.UI.Themes.FluentTheme;
 using Adamantium.Vulkan.Loader;
 using Serilog;
 using Serilog.Sinks.SystemConsole.Themes;
@@ -389,11 +389,14 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
 
     private void LoadThemes()
     {
-        var theme = new FluentDark();
-        ThemeManager.AddTheme(theme.Name, theme);
-        var lightTheme = new FluentLight();
-        ThemeManager.AddTheme(lightTheme.Name, lightTheme);
-        ThemeManager.SetTheme(theme);
+        // ONE theme, carrying light and dark as VARIANTS - not two themes that happen to look alike. The pair it
+        // replaces declared the same 49 style includes, the same icons and the same metrics, and differed by a palette
+        // and four accent values: switching between them therefore rebuilt every template in the application and wrote
+        // to every element, to change a hundred colours. Keeping both around would also have left two sources of truth
+        // for the same palette. See docs/THEME_VARIANTS_PLAN.md.
+        var fluent = new Fluent();
+        ThemeManager.AddTheme(fluent.Name, fluent);
+        ThemeManager.SetTheme(fluent);
     }
 
     private void SubscribeToEvents()

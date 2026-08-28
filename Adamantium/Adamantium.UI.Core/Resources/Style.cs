@@ -168,8 +168,52 @@ public class Style : AdamantiumComponent
             var seen = new HashSet<Style> { this };   // guard against a self/cyclic BasedOn
             theme.CollectBasedOn(BasedOn, result, seen);
         }
+        // Band every style in the chain, and this one, by what its selector SELECTS - see StyleBandOfSelector.
+        foreach (var baseStyle in result) baseStyle.StampBand(baseStyle.StyleBandOfSelector());
+        StampBand(StyleBandOfSelector());
+
         return _resolvedBases = result;
     }
+
+    /// <summary>How LOCAL this style's rules are: the inheritance depth of the type its selector names. A style on the
+    /// control's own type outranks one on a type it derives from, so the deriving control always has the last word.
+    /// <para>It is the SELECTOR that says this, not the BasedOn chain, because a control's rules are spread over
+    /// SEVERAL style blocks (one concern each, per the small-styles convention) while the base arrives through the one
+    /// block that says <c>BasedOn</c>. Banding by position in the collected chain therefore ranked a BASE style above a
+    /// derived one whose block simply declared no BasedOn of its own - and every trigger a derived control writes to
+    /// un-inherit a base rule lives in exactly such a block. Measured: ToggleButton pulls in three style blocks, so its
+    /// checked-label rule landed on band 2 while the ToggleSwitch rule meant to overrule it sat on band 0. The label of
+    /// a checked switch, checkbox and radio button came out white on a light panel.</para>
+    /// <para>A selector with no type facet bands at 0. Selecting several types takes the SHALLOWEST: the style speaks
+    /// for all of them, so it can only claim the specificity of the least specific.</para></summary>
+    private int StyleBandOfSelector()
+    {
+        var shallowest = int.MaxValue;
+        foreach (var type in Selector.Types)
+        {
+            var depth = 0;
+            for (var t = type.BaseType; t != null; t = t.BaseType) depth++;
+            if (depth < shallowest) shallowest = depth;
+        }
+
+        return shallowest == int.MaxValue ? 0 : shallowest;
+    }
+
+    /// <summary>Mark every trigger setter of THIS style with its band (see <see cref="StyleBandOfSelector"/>), so the
+    /// trigger value stack can prefer the more local rule. Idempotent: the band is a property of the style alone.</summary>
+    private void StampBand(int band)
+    {
+        if (_band == band) return;
+        _band = band;
+
+        foreach (var trigger in Triggers)
+        {
+            if (trigger?.Setters is not { } setters) continue;
+            foreach (var setter in setters) setter.StyleBand = band;
+        }
+    }
+
+    private int _band = -1;
 
     // Add an activator to both the component's shared list (so a template-change reevaluation sees it) and this style's
     // own per-component record (so Detach/re-Attach can remove exactly the ones it added).

@@ -608,7 +608,8 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
         var fillCorners = payload.HasFrame ? payload.FrameInnerCorners : payload.CornerRadius;
         var g = new RectangleGeometry(fillRect, fillCorners);
         g.ProcessGeometry(GeometryType.Both);
-        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, payload.Brush, BufferManager, ResourceFactory);
+        // The LIVE brush, not its snapshot - see GeometryRenderComponent.Render, which dereferences it on every draw.
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, payload.LiveBrush, BufferManager, ResourceFactory);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
         GeometryRenderer.Owner = DrawCommand.Component;
         ProcessFillFringe(g, payload.Brush);
@@ -802,7 +803,8 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
     {
         var g = EllipseShape(payload);
         g.ProcessGeometry(GeometryType.Both);
-        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, payload.Brush, BufferManager, ResourceFactory);
+        // The LIVE brush, not its snapshot - see GeometryRenderComponent.Render, which dereferences it on every draw.
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, payload.LiveBrush, BufferManager, ResourceFactory);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
         GeometryRenderer.Owner = DrawCommand.Component;
         ProcessFillFringe(g, payload.Brush);
@@ -1048,6 +1050,28 @@ public class TextRenderUnit : RenderUnit<TextPayload>
         return true;
     }
 
+    /// <summary>Re-dereference the block's brushes before a PAINT patch bakes it.
+    /// <para>A recolour that reaches a block by INHERITANCE never re-records it: the block does not own the brush, so
+    /// nothing hands it a new payload, and <see cref="UpdateWithDrawCommand"/> - the only caller of UpdateColors - never
+    /// runs. The component would then still hold the snapshot it dereferenced when the block was RECORDED, and the patch
+    /// would faithfully re-bake the glyphs in the previous variant's colour. The payload holds the LIVE brush and
+    /// dereferences its current snapshot on every read (see <see cref="Brush.Snapshot"/>), so reading it here is what the
+    /// recolour actually is. Same mechanism as the record path, so the private text target is re-rastered too - not only
+    /// the batched glyphs.</para></summary>
+    internal void RefreshColors()
+    {
+        if (TextComponent is not { } tc) return;
+
+        var background = Payload.Background;
+        var foreground = Payload.Foreground;
+        var stroke = Payload.Stroke;
+        // Between changes a brush hands out the SAME snapshot instance, so an unchanged block costs three reference
+        // compares - and never a needless re-rasterization of its render target.
+        if (Equals(tc.Background, background) && Equals(tc.Foreground, foreground) && Equals(tc.Stroke, stroke)) return;
+
+        tc.UpdateColors(background, foreground, stroke);
+    }
+
     public TextRenderUnit(IDrawCommand command, RenderUnitContext context) : base(command, context)
     {
         Payload.TextLayout.Update(GraphicsDevice);
@@ -1181,7 +1205,8 @@ public class RegularPolygonRenderUnit : RenderUnit<RegularPolygonPayload>
     {
         var g = PolygonShape(payload);
         g.ProcessGeometry(GeometryType.Both);
-        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, payload.Brush, BufferManager, ResourceFactory);
+        // The LIVE brush, not its snapshot - see GeometryRenderComponent.Render, which dereferences it on every draw.
+        GeometryRenderer = new GeometryRenderComponent(GraphicsDevice, UIBasicEffect, g.Mesh, payload.LiveBrush, BufferManager, ResourceFactory);
         GeometryRenderer.RenderData = DrawCommand.RenderData;
         GeometryRenderer.Owner = DrawCommand.Component;
         ProcessFillFringe(g, payload.Brush);

@@ -117,4 +117,48 @@ public class TabControlDeferredOverflowTests
         Assert.That(second, Is.SameAs(list), "the card is built once - a re-open must reuse it");
         Assert.That(second.Items.Count, Is.EqualTo(5), "the rows are rebuilt per open, so a new tab must be listed");
     }
+
+    /// <summary>The flyout says which tab is current, and it has to say it EVERY time it is opened - not only the first.
+    /// <para>The rows are rebuilt per open, so the container carrying the selection is a new object each time, while the
+    /// index is a number: re-assigning the number it already holds changes nothing and notifies nobody, and the new row
+    /// never learns it is the selected one.</para></summary>
+    [Test]
+    public void EveryOpen_MarksTheCurrentTabAsSelected_NotOnlyTheFirst()
+    {
+        var (tabs, window) = Hosted();
+        tabs.SelectedIndex = 2;
+        for (var i = 0; i < 3; i++) WindowExtension.UpdateTree(window);
+
+        var first = OpenOverflow(tabs, window);
+        Assume.That(first.SelectedIndex, Is.EqualTo(2), "precondition: the first open marks it - this half always worked");
+
+        (tabs.GetTemplateChild("PART_TabOverflow") as ToggleButton).IsChecked = false;
+        for (var i = 0; i < 3; i++) WindowExtension.UpdateTree(window);
+
+        var second = OpenOverflow(tabs, window);
+        Assert.That(second.SelectedIndex, Is.EqualTo(2),
+            "re-opened on the same tab, the flyout still has to show which one that is");
+    }
+
+    /// <summary>A flyout dismissed from OUTSIDE (a click elsewhere closes the popup on its own) has to be re-openable by
+    /// the very next press of the arrow. The arrow's checked state and the popup's open state are two facts kept in step
+    /// by three handlers, and if the dismissal leaves them disagreeing the next press only puts them back in step -
+    /// which from outside looks like a button that sometimes works and sometimes does nothing.</summary>
+    [Test]
+    public void AFlyoutDismissedFromOutside_OpensAgainOnTheNextPress()
+    {
+        var (tabs, window) = Hosted();
+        var toggle = tabs.GetTemplateChild("PART_TabOverflow") as ToggleButton;
+
+        OpenOverflow(tabs, window);
+        Assume.That(PopupOf(tabs).IsOpen, Is.True, "precondition: it opened at all");
+
+        PopupOf(tabs).IsOpen = false;                       // dismissed by something other than the arrow
+        for (var i = 0; i < 3; i++) WindowExtension.UpdateTree(window);
+        Assert.That(toggle.IsChecked, Is.False, "the arrow must come back UP, or its next press only un-presses it");
+
+        toggle.IsChecked = true;                            // the next press
+        for (var i = 0; i < 3; i++) WindowExtension.UpdateTree(window);
+        Assert.That(PopupOf(tabs).IsOpen, Is.True, "and that press has to open the flyout again");
+    }
 }

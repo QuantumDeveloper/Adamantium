@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- TabItem: ONE template; rest/hover/selected brushes live as properties and the triggers project them onto the
+         chrome via {TemplateBinding}. Colors come from the palette/theme via {ResourceReference}/{ThemeResource} so a
+         theme or accent swap restyles them live. Per the small-styles convention: simple properties, template, triggers. -->
+
+    <Style Selector="TabItem">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorSecondary}"/>
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference ControlFillColorSecondary}"/>
+        <Setter Property="BackgroundSelected" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+        <Setter Property="ForegroundSelected" Value="{ResourceReference TextFillColorPrimary}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="4 4 0 0"/>
+        <!-- All four sides stated: Thickness(a b) here means (leftTop, rightBottom), NOT (horizontal, vertical), so the
+             two-value form padded a tab 12 on the left AND top against 6 on the right and bottom. Invisible in a wide
+             strip; on a turned label in a narrow column it read as text pushed off-centre. -->
+        <Setter Property="Padding" Value="12 6 12 6"/>
+        <Setter Property="FontSize" Value="13"/>
+        <!-- LEFT, not centre: a tab is a label, and it reads from the left of whatever room it has. No difference at all
+             for an ordinary content-sized tab (its slot IS the header); it decides where the name of a lone stretched
+             document sits, and centred it drifted away from the tab's own edge. -->
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="TabItem">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabItem">
+                    <Border x:Name="TabBorder"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <!-- A GRID, not a stack: the middle track is starred, so when a tab is given MORE room than its
+                             content needs - a lone document filling its strip (TabControl.StretchSingleTab) - the extra
+                             goes to the header and the close button stays against the right edge. Stacked, the button
+                             sat glued to the end of the text with the whole rest of the strip empty after it. A
+                             content-sized tab is unchanged: the starred track is then exactly the header's width. -->
+                        <Grid ColumnDefinitions="Auto,*,Auto,Auto" VerticalAlignment="Center">
+                            <!-- What marks the tab, drawn from DATA by IconTemplate. Collapsed by default and revealed by
+                                 the HasIcon trigger below: an empty presenter measures to nothing, but its MARGIN is
+                                 reserved regardless, and that gap is what pushed a turned label off-centre. -->
+                            <ContentPresenter x:Name="PART_Icon" Grid.Column="0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed"
+                                    Margin="0 0 6 0"
+                                    Content="{TemplateBinding Icon}"
+                                    ContentTemplate="{TemplateBinding IconTemplate}"/>
+                            <ContentPresenter
+                                    x:Name="PART_ContentPresenter" Grid.Column="1"
+                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                    Foreground="{TemplateBinding Foreground}"
+                                    FontSize="{TemplateBinding FontSize}"
+                                    Content="{TemplateBinding Header}"
+                                    ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                    ContentTemplateSelector="{TemplateBinding HeaderTemplateSelector}"/>
+                            <!-- The pin button, BEFORE the close one: pinning is about keeping the tab, closing about
+                                 losing it, and the more destructive of the two belongs at the very edge. Its LOOK is
+                                 PinButtonTemplate, so a host restyles it without touching this template. -->
+                            <ToggleButton x:Name="PART_PinButton" Grid.Column="2"
+                                    Template="{TemplateBinding PinButtonTemplate}"
+                                    Margin="6 0 0 0"
+                                    MinWidth="0" MinHeight="0" Padding="0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed"/>
+                            <!-- The close button; its LOOK is CloseButtonTemplate (a themed 'x' from TabControlStyleSet).
+                                 Collapsed unless the owner turns close buttons on (see the ShowCloseButton trigger). -->
+                            <Button x:Name="PART_CloseButton" Grid.Column="3"
+                                    Template="{TemplateBinding CloseButtonTemplate}"
+                                    Margin="8 0 0 0"
+                                    MinWidth="0" MinHeight="0" Padding="0"
+                                    VerticalAlignment="Center"
+                                    Visibility="Collapsed"/>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The ONLY tab, filling its strip: it is the title of what is open, so it carries the accent itself. The sliding
+         indicator is hidden by the strip's own template (TabControl.HasStretchedTab) - a bar that says WHICH of several
+         is current has nothing to point out when there is one. -->
+    <Style Selector="TabItem[IsStretched=true]">
+        <Setter Property="BackgroundSelected" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="ForegroundSelected" Value="{ThemeResource AccentForegroundColor}"/>
+        <Setter Property="BackgroundPointerOver" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="CornerRadius" Value="0"/>
+    </Style>
+
+    <Style Selector="TabItem">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="TabBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+        </PropertyTrigger>
+        <!-- The icon slot exists only when there is an icon to put in it (see PART_Icon above). -->
+        <PropertyTrigger Property="HasIcon" Value="true">
+            <Setter TargetName="PART_Icon" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsSelected" Value="true">
+            <Setter TargetName="TabBorder" Property="Background" Value="{TemplateBinding BackgroundSelected}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundSelected}"/>
+        </PropertyTrigger>
+        <!-- Close button reveals on hover (and stays on the selected tab, like a browser/WinUI tab), but only when the
+             owner enabled it and this tab is closable (TabItem folds both into ShowCloseButton). Off = Collapsed (no
+             space); on-but-idle = Hidden (RESERVES space so the tab width doesn't jump when it reveals); on+hover/selected
+             = Visible. Later triggers win on the value stack, so hover/selected override the reserved Hidden. -->
+        <PropertyTrigger Property="ShowCloseButton" Value="true">
+            <Setter TargetName="PART_CloseButton" Property="Visibility" Value="Hidden"/>
+        </PropertyTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ShowCloseButton" Value="true"/>
+                <Condition Property="IsMouseOver" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_CloseButton" Property="Visibility" Value="Visible"/>
+        </MultiTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ShowCloseButton" Value="true"/>
+                <Condition Property="IsSelected" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_CloseButton" Property="Visibility" Value="Visible"/>
+        </MultiTrigger>
+        <!-- The pin button follows the same rule as the close one - reserved while idle, revealed on hover or on the
+             selected tab - with one addition: on a PINNED tab it is always visible, because it is the only way back and
+             a button you have to hunt for is not one. -->
+        <PropertyTrigger Property="ShowPinButton" Value="true">
+            <Setter TargetName="PART_PinButton" Property="Visibility" Value="Hidden"/>
+        </PropertyTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ShowPinButton" Value="true"/>
+                <Condition Property="IsMouseOver" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_PinButton" Property="Visibility" Value="Visible"/>
+        </MultiTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ShowPinButton" Value="true"/>
+                <Condition Property="IsSelected" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_PinButton" Property="Visibility" Value="Visible"/>
+        </MultiTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ShowPinButton" Value="true"/>
+                <Condition Property="IsPinned" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_PinButton" Property="Visibility" Value="Visible"/>
+        </MultiTrigger>
+    </Style>
+
+</StyleSet>

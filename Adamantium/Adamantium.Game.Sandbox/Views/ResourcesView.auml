@@ -103,6 +103,67 @@
             </StackPanel>
         </StackPanel>
 
+        <!-- ═══ Theme SCOPE stand ═══════════════════════════════════════════════════════════════════════════════
+             Four panes, each showing a different VARIANT of the theme at the same time. What to look for:
+
+               1. the panes differ from each other - one palette cannot hold two variants at once, so a variant that is
+                  not the one the theme is currently showing resolves to a sibling with its own brushes;
+               2. toggling the APPLICATION's light/dark above re-colours the rest of this tab and leaves the first two
+                  panes alone - they name their variant, so nothing else decides it for them;
+               3. the third pane follows the OPERATING SYSTEM (change light/dark in the OS settings);
+               4. the fourth changes only when its OWN checkbox does. -->
+        <TextBlock Text="Theme scope — a subtree with a variant of its own" FontSize="18" Margin="0,28,0,4"/>
+        <TextBlock Text="Each pane names its own variant, so toggling the application's light/dark above leaves them where they are."
+                   Margin="0,0,0,10"/>
+
+        <StackPanel Orientation="Horizontal" ThemeContext.Theme="{Binding LocalTheme}">
+
+            <Border Width="200" Height="120" CornerRadius="8" Margin="0,0,16,0" Padding="14"
+                    ThemeContext.Variant="Light"
+                    Background="{ObservableResource SolidBackgroundFillColorBase}">
+                <StackPanel Orientation="Vertical">
+                    <TextBlock Text="Variant: Light" Foreground="{ObservableResource TextFillColorPrimary}"/>
+                    <Rectangle Height="10" CornerRadius="5" Margin="0,10,0,0"
+                               Fill="{ThemeResource AccentFillColorDefault}"/>
+                </StackPanel>
+            </Border>
+
+            <Border Width="200" Height="120" CornerRadius="8" Margin="0,0,16,0" Padding="14"
+                    ThemeContext.Variant="Dark"
+                    Background="{ObservableResource SolidBackgroundFillColorBase}">
+                <StackPanel Orientation="Vertical">
+                    <TextBlock Text="Variant: Dark" Foreground="{ObservableResource TextFillColorPrimary}"/>
+                    <Rectangle Height="10" CornerRadius="5" Margin="0,10,0,0"
+                               Fill="{ThemeResource AccentFillColorDefault}"/>
+                </StackPanel>
+            </Border>
+
+            <Border Width="200" Height="120" CornerRadius="8" Margin="0,0,16,0" Padding="14"
+                    ThemeContext.Variant="System"
+                    Background="{ObservableResource SolidBackgroundFillColorBase}">
+                <StackPanel Orientation="Vertical">
+                    <TextBlock Text="Variant: System" Foreground="{ObservableResource TextFillColorPrimary}"/>
+                    <Rectangle Height="10" CornerRadius="5" Margin="0,10,0,0"
+                               Fill="{ThemeResource AccentFillColorDefault}"/>
+                </StackPanel>
+            </Border>
+
+            <!-- The pane that switches ITSELF: its variant is bound to its own checkbox, so it changes when nobody
+                 else does. The application theme buttons above leave it alone, and so does the OS. -->
+            <Border Width="200" Height="120" CornerRadius="8" Padding="14"
+                    ThemeContext.Variant="{Binding StandVariant}"
+                    Background="{ObservableResource SolidBackgroundFillColorBase}">
+                <StackPanel Orientation="Vertical">
+                    <TextBlock Text="Variant: its own" Foreground="{ObservableResource TextFillColorPrimary}"/>
+                    <CheckBox Content="Dark" IsChecked="{Binding StandIsDark, Mode=TwoWay}" Margin="0,6,0,0"
+                             />
+                    <Rectangle Height="10" CornerRadius="5" Margin="0,8,0,0"
+                               Fill="{ThemeResource AccentFillColorDefault}"/>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+
     </StackPanel>
     </ScrollViewer>
 </View>

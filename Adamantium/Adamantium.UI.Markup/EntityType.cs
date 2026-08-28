@@ -9,6 +9,7 @@
         Theme,
         UIApplication,
         ResourceDictionary,
-        StyleSet
+        StyleSet,
+        ThemeVariant
     }
 }

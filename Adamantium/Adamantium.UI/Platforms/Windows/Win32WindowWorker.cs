@@ -53,7 +53,12 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     public Win32WindowWorker(IUIContext uiContext)
     {
         UIContext = uiContext;
-        
+
+        // What the OS is asking for RIGHT NOW, before any window is up: a theme set to follow the system must open in
+        // the right appearance, not correct itself after the first change notification arrives.
+        Core.Resources.SystemAppearance.PrefersDark = Win32Interop.SystemPrefersDarkAppearance();
+
+
         messageTable = new Dictionary<uint, HandleMessage>();
         messageTable[(uint)WindowMessages.Activate] = HandleActivate;
         messageTable[(uint)WindowMessages.Syscommand] = HandleSysCommand;
@@ -65,6 +70,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         messageTable[(uint)WindowMessages.Moving] = HandleMoving;
         messageTable[(uint)WindowMessages.Exitsizemove] = HandleExitSizeMove;
         messageTable[(uint)WindowMessages.Dpichanged] = HandleDpiChanged;
+        messageTable[(uint)WindowMessages.Settingchange] = HandleSettingChange;
         messageTable[(uint)WindowMessages.Keydown] = HandleKeyDown;
         messageTable[(uint)WindowMessages.Syskeydown] = HandleKeyDown;
         messageTable[(uint)WindowMessages.Keyup] = HandleKeyUp;
@@ -218,7 +224,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         // the HWND (OLE requires that), never per drag. Silently does nothing when the OS bridge is unavailable.
         Input.DragDrop.RegisterNativeDropTarget(this.window);
 
-        UIContext.ThemeContext.ApplyCurrentTheme(this.window);
+        UIContext.ThemeEngine.ApplyCurrentTheme(this.window);
         UIContext.UIApplication.AddWindow(this.window);
                 
         this.window.OnSourceInitialized();
@@ -809,6 +815,23 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     // HIWORD Y); lParam is the RECT the OS wants the window at, already sized for the new DPI. Apply that rect
     // synchronously here (a Win32 op that must run on the owning thread), but marshal the managed DpiScale update onto
     // the loop thread - it fires DpiChanged, which re-scales the renderer + re-lays-out, and must not race the loop.
+    // Windows announces a personalisation change - the user flipping light/dark, or the scheduled switch at sunset -
+    // by broadcasting WM_SETTINGCHANGE with "ImmersiveColorSet" in lParam. Announced, not polled: nothing here asks
+    // the OS repeatedly, it is told.
+    private IntPtr HandleSettingChange(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
+    {
+        handled = false;   // a broadcast: other windows and the default handler still want it
+
+        var area = lParam == IntPtr.Zero ? null : System.Runtime.InteropServices.Marshal.PtrToStringUni(lParam);
+        if (!string.Equals(area, "ImmersiveColorSet", StringComparison.Ordinal)) return IntPtr.Zero;
+
+        // Setting this is the whole reaction: SystemAppearance raises its own change, the theme manager re-resolves the
+        // application's variant if it is following the system, and the subtrees that asked to follow it are re-styled.
+        // A variant switch, so no template is rebuilt - the OS turning night is a colour write per palette key.
+        Core.Resources.SystemAppearance.PrefersDark = Win32Interop.SystemPrefersDarkAppearance();
+        return IntPtr.Zero;
+    }
+
     private IntPtr HandleDpiChanged(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
         handled = true;

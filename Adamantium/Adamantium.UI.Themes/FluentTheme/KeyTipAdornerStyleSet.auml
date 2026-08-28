@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The badge that says which key reaches a command while the ribbon is in key-tip mode. Deliberately loud - it has
+         to be legible over an icon, a label, or the accent of an active tab - and small enough not to hide what it
+         marks. The adorner stage measures it to its content and puts it where the command asked (see
+         KeyTipService.Placement). -->
+    <Style Selector="KeyTipAdorner">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="KeyTipAdorner">
+                    <!-- The three colours are the palette's (KeyTipPlateFill / KeyTipPlateStroke / KeyTipForeground) and
+                         are their OWN tokens: a badge is read over whatever it lands on - the band, an icon, the accent
+                         of an active tab - so no fill or text colour of the ordinary ramp suits it. Each palette states
+                         a plate that CONTRASTS with its own surface (light on the dark theme, dark on the light one),
+                         which is the only way a badge does not go missing against the background it happens to cover.
+                         Opaque throughout: a see-through badge over a glyph is unreadable at 12px. -->
+                    <!-- One SIZE for every badge, not one per glyph: a plate that hugs its letter comes out a different
+                         width for F, H and M, and a row of them reads as noise. A minimum square holds a single
+                         character; two characters widen it and no more. -->
+                    <Border Background="{ResourceReference KeyTipPlateFill}"
+                            BorderBrush="{ResourceReference KeyTipPlateStroke}"
+                            BorderThickness="1"
+                            CornerRadius="2"
+                            MinWidth="18"
+                            MinHeight="18"
+                            Padding="3 0 3 0">
+                        <!-- Both text alignments stated: VerticalTextAlignment defaults to Bottom, which is what sat
+                             the letter on the floor of the plate instead of in the middle of it. -->
+                        <TextBlock Text="{TemplateBinding Keys}"
+                                   FontSize="12"
+                                   Foreground="{ObservableResource KeyTipForeground}"
+                                   HorizontalTextAlignment="Center"
+                                   VerticalTextAlignment="Center"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>
