@@ -62,15 +62,26 @@ public sealed class DockingAreaRegionAdapter : IRegionAdapter
             }
 
             // New in the region -> a pane in the document well.
+            var opened = false;
             foreach (var viewModel in region.ActiveViewModels)
             {
                 if (panesByViewModel.ContainsKey(viewModel)) continue;
 
                 var placement = viewModel as IDockablePane;
                 panesByViewModel[viewModel] = area.AddPane(PaneFor(viewModel), placement?.PaneZone ?? DockZone.Center);
+                opened = true;
             }
 
-            if (region.CurrentViewModel != null && panesByViewModel.TryGetValue(region.CurrentViewModel, out var current))
+            // Putting the region's current view on top is for a sync that OPENED NOTHING - a re-entry, a restore, a
+            // region rebuilt around panes that already exist. When this sync has just opened one, the opening already
+            // decided what is on top, and the region's "current" is still the view it was on a moment ago: the list of
+            // active views changes BEFORE CurrentViewModel does, so activating it here reaches into whatever panel that
+            // older view lives in and turns it to that tab. Measured: opening a document in one zone moved a zone
+            // nobody had touched, and the change of CurrentViewModel then arrived and put the new document on top
+            // anyway - so the line achieved nothing except disturbing the other panel.
+            if (!opened
+                && region.CurrentViewModel != null
+                && panesByViewModel.TryGetValue(region.CurrentViewModel, out var current))
             {
                 area.Activate(current);
             }
@@ -78,9 +89,14 @@ public sealed class DockingAreaRegionAdapter : IRegionAdapter
             syncing = false;
         }
 
-        region.ActiveViewsChanged += (_, _) => Sync();
+        // NAMED handlers, every one of them, so that all of this can be taken off again. It used to be five lambdas and
+        // no way to remove any: a view rebuilt on re-entry hands the region a NEW area while the old one - detached from
+        // the tree, but still subscribed - goes on syncing into its own layout. Measured on the stand: two areas alive,
+        // and every document opened after that arrived in BOTH, so a zone nobody touched moved to the tab it had just
+        // been given.
+        void OnActiveViewsChanged(object s, EventArgs e) => Sync();
 
-        region.PropertyChanged += (_, e) =>
+        void OnRegionPropertyChanged(object s, System.ComponentModel.PropertyChangedEventArgs e)
         {
             if (e.PropertyName != nameof(IRegion.CurrentViewModel) || syncing) return;
             if (region.CurrentViewModel == null || !panesByViewModel.TryGetValue(region.CurrentViewModel, out var id)) return;
@@ -88,12 +104,12 @@ public sealed class DockingAreaRegionAdapter : IRegionAdapter
             syncing = true;
             area.Activate(id);
             syncing = false;
-        };
+        }
 
         // A saved layout names panes this region opened, and at start-up none of them exist yet. The key written with
         // them is the view model's TYPE, so the region can make the very same thing again, put it back in itself, and
         // hand the area the pane - which the layout then finds by id like any other.
-        area.PaneRestoring += (_, e) =>
+        void OnPaneRestoring(object s, PaneRestoringEventArgs e)
         {
             if (e.Pane != null || string.IsNullOrEmpty(e.RestoreKey)) return;
 
@@ -108,12 +124,12 @@ public sealed class DockingAreaRegionAdapter : IRegionAdapter
             pane.Id = e.PaneId;
             panesByViewModel[viewModel] = e.PaneId;
             e.Pane = pane;
-        };
+        }
 
         // Closing a pane is the user saying that view is done with, so the region must forget it too. Otherwise the
         // region still holds the view model, the next navigation to it REUSES that instance, sees it already "open"
         // and opens nothing at all - a name that can never be reached again once it has been closed.
-        area.PaneClosed += (_, e) =>
+        void OnPaneClosed(object s, PaneClosedEventArgs e)
         {
             foreach (var pair in panesByViewModel)
             {
@@ -125,11 +141,11 @@ public sealed class DockingAreaRegionAdapter : IRegionAdapter
                 syncing = false;
                 break;
             }
-        };
+        }
 
         // ...and the other way: the user clicking a tab IS navigation, so the region has to hear about it or the two
         // answers - what is on screen and what the journal thinks - drift apart.
-        area.ActivePaneChanged += (_, _) =>
+        void OnActivePaneChanged(object s, EventArgs e)
         {
             if (syncing) return;
 
@@ -139,7 +155,39 @@ public sealed class DockingAreaRegionAdapter : IRegionAdapter
             syncing = true;
             region.Activate(active);
             syncing = false;
-        };
+        }
+
+        region.ActiveViewsChanged += OnActiveViewsChanged;
+        region.PropertyChanged += OnRegionPropertyChanged;
+        area.PaneRestoring += OnPaneRestoring;
+        area.PaneClosed += OnPaneClosed;
+        area.ActivePaneChanged += OnActivePaneChanged;
+
+        // ...and taken off again the moment this area is gone for good. Without it the adapter outlives its control: the
+        // region goes on calling into an area nobody can see, which keeps its own layout, its own panes and its own idea
+        // of what is open - and every document opened afterwards is added to that one as well as to the live one.
+        void Release(ReadOnlySpan<IFundamentalUIComponent> gone)
+        {
+            // The batch is everything discarded together - our area is at most one of them, so this only asks whether it
+            // is in there at all.
+            var ours = false;
+            foreach (var component in gone)
+            {
+                if (!ReferenceEquals(component, area)) continue;
+                ours = true;
+                break;
+            }
+            if (!ours) return;
+
+            region.ActiveViewsChanged -= OnActiveViewsChanged;
+            region.PropertyChanged -= OnRegionPropertyChanged;
+            area.PaneRestoring -= OnPaneRestoring;
+            area.PaneClosed -= OnPaneClosed;
+            area.ActivePaneChanged -= OnActivePaneChanged;
+            DiscardedVisuals.Discarded -= Release;
+        }
+
+        DiscardedVisuals.Discarded += Release;
 
         Sync();
     }
