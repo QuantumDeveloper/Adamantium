@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- SlidePanel: a panel that slides in from a window edge and overlays everything (hosted in the popup/overlay layer
+         via an edge-docked Popup). The template = Popup(PART_Popup) > Border(PART_Drawer) chrome > header row (title +
+         PART_CloseButton) + content. The slide + open/close are driven in code (SlidePanel). Per the small-styles
+         convention: properties, template, triggers. -->
+
+    <Style Selector="SlidePanel">
+        <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Padding" Value="16"/>
+    </Style>
+
+    <Style Selector="SlidePanel">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="SlidePanel">
+                    <Popup x:Name="PART_Popup"
+                                    DockEdge="{TemplateBinding Placement}"
+                                    DockFill="{TemplateBinding FullWindow}">
+                        <Border x:Name="PART_Drawer"
+                                Width="{TemplateBinding Width}"
+                                Height="{TemplateBinding Height}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Padding="{TemplateBinding Padding}"
+                                ClipToBounds="True">
+                            <Grid RowDefinitions="Auto,*">
+                                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+                                    <ContentPresenter Grid.Column="0"
+                                            Content="{TemplateBinding Header}"
+                                            Foreground="{TemplateBinding Foreground}"
+                                            FontSize="18"
+                                            VerticalAlignment="Center"/>
+                                    <Button x:Name="PART_CloseButton" Grid.Column="1"
+                                            Width="28" Height="28"
+                                            Background="Transparent" BorderThickness="0" Padding="0"
+                                            VerticalAlignment="Top">
+                                        <Image Source="{ResourceReference CloseIcon}" Width="10" Height="10"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Button>
+                                </Grid>
+                                <ContentPresenter Grid.Row="1"
+                                        Content="{TemplateBinding Content}"
+                                        ContentTemplate="{TemplateBinding ContentTemplate}"
+                                        ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                            </Grid>
+                        </Border>
+                    </Popup>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="SlidePanel">
+        <PropertyTrigger Property="ShowCloseButton" Value="false">
+            <Setter TargetName="PART_CloseButton" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

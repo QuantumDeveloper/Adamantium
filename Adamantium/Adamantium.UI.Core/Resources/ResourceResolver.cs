@@ -56,6 +56,12 @@ public static class ResourceResolver
 
         if (target is IUIComponent visual)
         {
+            // Remembered as well as re-resolved on attach. Attaching is not the only thing that changes the answer:
+            // an element inside a theme SCOPE resolves against that scope's theme, and the scope can be switched while
+            // the element sits still - a preview pane changing its variant. Without the record there would be nothing
+            // to ask again with, and the pane would keep the colours it happened to attach with.
+            _pending.GetValue(target, static _ => []).Add((property, key));
+
             visual.AttachedToVisualTreeEvent += (_, _) =>
             {
                 var scoped = resourceManager.FindResource(visual, key);
@@ -73,6 +79,21 @@ public static class ResourceResolver
 
     /// <summary>Whether this target is still waiting on a resource that only a tree can answer.</summary>
     public static bool HasPending(IAdamantiumComponent target) => _pending.TryGetValue(target, out _);
+
+    /// <summary>Ask every <c>{ResourceReference}</c> in this subtree again, because the theme that answers them has
+    /// changed - a scope was given a different theme or variant while the elements stood still.
+    /// <para>Styles are re-applied by the ordinary re-theme, but a reference written straight onto an attribute is not
+    /// a style: it was resolved once, when the element attached, and nothing would ever ask again. That is the
+    /// difference between a scope that can be SWITCHED and one that can only be set before anything is shown.</para>
+    /// <para>Walks the subtree, which is fine for what triggers it: a scope changing is an explicit, rare act, unlike
+    /// the per-frame paths where a walk of this shape would be indefensible.</para></summary>
+    public static void ReResolveSubtree(IUIComponent root)
+    {
+        if (root == null) return;
+
+        ResolveThrough(root, root);
+        foreach (var child in root.VisualChildren) ReResolveSubtree(child);
+    }
 
     /// <summary>Answer a non-visual target's deferred resources from <paramref name="anchor"/>'s position in the tree.
     /// Called when the target finally has one. Entries are kept, not consumed: a theme swap re-resolves through the same

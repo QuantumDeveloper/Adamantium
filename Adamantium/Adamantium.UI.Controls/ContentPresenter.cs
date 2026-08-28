@@ -309,7 +309,12 @@ public class ContentPresenter : InputUIComponent
                     HorizontalTextAlignment = ToTextAlignment(HorizontalAlignment),
                     VerticalTextAlignment = ToTextAlignment(VerticalAlignment)
                 };
-                if (Foreground != null) textBlock.Foreground = Foreground;
+                // BOUND, not copied: a copy is only as current as the change notification that refreshes it, and an
+                // INHERITED change does not always reach a descendant - the inheritance walk has a cheap path that steps
+                // over an element without notifying it. The label then kept the colour the presenter held when the
+                // content was built, so a generated label inside a theme scope stayed in the application's colour.
+                textBlock.SetBinding(nameof(TextBlock.Foreground),
+                    new Core.Data.Binding(nameof(Foreground)) { Source = this });
                 _currentRoot = textBlock;
             }
         }
@@ -684,7 +689,9 @@ public class ContentPresenter : InputUIComponent
 
     private static void OnTextStyleChanged(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
-        if (a is ContentPresenter presenter) presenter.ApplyTextStyle();
+        if (a is not ContentPresenter presenter) return;
+
+        presenter.ApplyTextStyle();
     }
 
     private void ApplyTextStyle()

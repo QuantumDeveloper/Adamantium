@@ -14,8 +14,17 @@ public class ThemeManager : IThemeManager
 
     public IReadOnlyList<ITheme> Themes => _themes;
 
+    // Set when the application asked for ThemeVariant.System, so a later change of the OS appearance is followed
+    // rather than being a one-off resolution that goes stale at sunset.
+    private bool _followingSystem;
+
     public ThemeManager(IDependencyResolver dependencyResolver)
     {
+        SystemAppearance.Changed += (_, _) =>
+        {
+            if (_followingSystem) SetVariant(ThemeVariant.System);
+        };
+
         this.dependencyResolver = dependencyResolver;
         _themes = new TrackingCollection<ITheme>();
         _themesMap = new Dictionary<string, ITheme>();
@@ -47,11 +56,58 @@ public class ThemeManager : IThemeManager
     /// that comes back at the same version needs none of the revalidation a returning view otherwise does.</summary>
     public static int Version { get; private set; }
 
+    /// <summary>Bumped whenever the PALETTE is repainted - a variant switch, and a swap (which repaints it by replacing
+    /// it). A variant deliberately leaves styles, templates and property values alone, so <see cref="Version"/> does not
+    /// move for one; but the colours in every brush DID change, and anything that was out of the tree at the time was
+    /// told nothing. That is the question a returning parked subtree has to ask, and it is not the same question as
+    /// "must I be re-styled".</summary>
+    public static int PaletteVersion { get; private set; }
+
+    /// <summary>Switch the current theme's variant. See <see cref="IThemeManager.SetVariant"/> for why this is not a
+    /// theme swap: everything a swap is expensive FOR - rebuilt templates, re-applied styles, a property write per
+    /// element - is exactly what a variant does not touch.</summary>
+    public bool SetVariant(ThemeVariant variant)
+    {
+        if (CurrentTheme is not Theme theme) return false;
+
+        if (variant.FollowsSystem)
+        {
+            var resolved = theme.ResolveSystemVariant(SystemAppearance.PrefersDark);
+            if (resolved.IsUnspecified) return false;   // this theme has no light/dark notion to follow
+
+            // Remembered, so the application KEEPS following: the OS changes its mind at sunset, and an application
+            // that resolved "system" once and forgot would be right only until then.
+            _followingSystem = true;
+            if (!theme.ApplyVariant(resolved)) return false;
+            PaletteVersion++;
+            UIAppContext.Current?.ResourceManager?.NotifyResourcesChanged();
+            return true;
+        }
+
+        _followingSystem = false;
+        if (!theme.ApplyVariant(variant)) return false;
+        PaletteVersion++;
+
+        // A variant rewrites the palette, so everything holding a LIVE reference to a keyed resource has to re-resolve.
+        // Solid fills came through without this because the brush OBJECT survives a variant and tells its owners itself;
+        // a raw COLOUR has no such thread - a gradient stop is handed a value, and only this tells it there is a new one.
+        UIAppContext.Current?.ResourceManager?.NotifyResourcesChanged();
+
+        // Nothing else to do here. A variant writes new colours into the brushes the palette already owns, and a brush
+        // tells its owners - which INCLUDES the elements that took the value by inheritance, because an inherited value
+        // is materialised on the inheritor and attaches from there. There was a window-wide paint walk in this spot,
+        // added on the theory that a TextBlock inheriting Foreground is not an owner and would never be told; the pixel
+        // test in InheritedBrushRepaintTests disproves it - the text follows the brush with no walk anywhere in sight.
+        // The text that really did stay in the old colour was a STALE SNAPSHOT one layer down (TextRenderUnit.RefreshColors).
+        return true;
+    }
+
     public void SetTheme(ITheme theme)
     {
         if (CurrentTheme == theme) return;
 
         Version++;
+        PaletteVersion++;   // a swap replaces the palette, which is a repaint by any other name
         var oldTheme = CurrentTheme;
         CurrentTheme = theme;
 
@@ -261,9 +317,10 @@ public class ThemeManager : IThemeManager
     public ITheme this[int index] => _themes[index];
     
     /// <summary>Applies the theme that is in force AT <paramref name="control"/> - which is the application's only when
-    /// no ancestor declares a scope of its own. See <see cref="ThemeScope"/>.</summary>
+    /// no ancestor declares a scope of its own. See <see cref="ThemeContext"/>.</summary>
     public void ApplyCurrentTheme(IFundamentalUIComponent control)
     {
-        ApplyTheme(ThemeScope.For(control) ?? CurrentTheme, control);
+        ApplyTheme(ThemeContext.For(control) ?? CurrentTheme, control);
     }
+
 }

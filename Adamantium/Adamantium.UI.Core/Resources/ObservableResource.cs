@@ -16,7 +16,7 @@ public class ObservableResource : MarkupExtension
     // Live expressions created by Apply, per target, keyed by "property@priority" + token - so a setter/trigger disposes
     // the exact expression it established without disturbing a same-property expression at another priority/token (a
     // template base under a hover-trigger override). Weak keys: never pins a control. Mirrors ThemeResource.
-    private static readonly ConditionalWeakTable<IFundamentalUIComponent, Dictionary<(string Slot, object Token), ObservableResourceExpression>> _applied = new();
+    private static readonly ConditionalWeakTable<IAdamantiumComponent, Dictionary<(string Slot, object Token), ObservableResourceExpression>> _applied = new();
 
     public ObservableResource()
     {
@@ -33,7 +33,12 @@ public class ObservableResource : MarkupExtension
 
     /// <summary>Connects a live <see cref="ObservableResourceExpression"/> from the keyed resource to
     /// <paramref name="propertyName"/> on <paramref name="target"/>. Used by codegen, setters and triggers.</summary>
-    public ObservableResourceExpression Apply(IFundamentalUIComponent target, string propertyName,
+    /// <remarks>Any component, not only one that lives in a tree. A GRADIENT STOP is the case that forced this: a
+    /// theme's fade is a brush, a brush is not in the visual tree, and its stops could therefore only take the STATIC
+    /// <c>{ResourceReference}</c> - resolved once, so every gradient in the application kept the colours of the variant
+    /// it was built under while the solid fills around it followed. Resolution copes: a target with no tree resolves
+    /// against Theme and Global, which is exactly where a palette colour lives.</remarks>
+    public ObservableResourceExpression Apply(IAdamantiumComponent target, string propertyName,
         ValuePriority priority = ValuePriority.Template, object token = null)
     {
         var expression = new ObservableResourceExpression(target, target.GetProperty(propertyName), Key, priority, token);
@@ -48,7 +53,7 @@ public class ObservableResource : MarkupExtension
 
     /// <summary>Disposes the expression a setter/trigger established (closing its resource subscription) and clears the
     /// value it pushed - so leaving a trigger or detaching a style fully undoes an <c>{ObservableResource}</c>.</summary>
-    public static void Remove(IFundamentalUIComponent target, string propertyName, ValuePriority priority, object token = null)
+    public static void Remove(IAdamantiumComponent target, string propertyName, ValuePriority priority, object token = null)
     {
         if (!_applied.TryGetValue(target, out var map)) return;
         if (map.Remove((propertyName + "@" + priority, token), out var expression))
@@ -63,7 +68,7 @@ public class ObservableResource : MarkupExtension
 
     public override object ProvideObject(MarkupContext context)
     {
-        if (context?.TargetObject is IFundamentalUIComponent target && !string.IsNullOrEmpty(context.TargetPropertyName))
+        if (context?.TargetObject is IAdamantiumComponent target && !string.IsNullOrEmpty(context.TargetPropertyName))
             Apply(target, context.TargetPropertyName);
         return this;
     }

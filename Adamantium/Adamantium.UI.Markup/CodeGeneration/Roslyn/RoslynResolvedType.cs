@@ -260,6 +260,10 @@ public class RoslynResolvedType : IResolvedType
             {
                 return EntityType.StyleSet;
             }
+            else if (ImplementsInterface("IThemeVariant"))
+            {
+                return EntityType.ThemeVariant;
+            }
 
             return EntityType.Unknown;
         }

@@ -188,8 +188,14 @@ public abstract class ButtonBase : ContentControl
             ReleaseMouseCapture();
         }
 
-        // A click only counts if the press was never cancelled and the pointer is still over the button on release.
-        if (wasPressed && IsEnabled && IsMouseOver && ClickMode == ClickMode.Release)
+        // Containment, NOT IsMouseOver: capture deliberately pins that flag to the captured element so a drag does not
+        // lose hover (see MouseDevice.MouseMove), and this button captures on press - so it read "over" wherever the
+        // pointer was, and press-drag-away-release still clicked.
+        var position = e.GetPosition(this);
+        var over = position.X >= 0 && position.Y >= 0
+                   && position.X <= RenderSize.Width && position.Y <= RenderSize.Height;
+
+        if (wasPressed && IsEnabled && over && ClickMode == ClickMode.Release)
         {
             OnClick();
         }

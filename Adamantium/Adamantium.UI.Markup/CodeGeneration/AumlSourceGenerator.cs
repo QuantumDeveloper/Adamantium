@@ -65,6 +65,7 @@ public class AumlSourceGenerator : IAumlSourceGenerator
         {
             EntityType.ResourceDictionary or EntityType.StyleSet => GenerateResourceFile(container, container.RootEntityType, diagnostics),
             EntityType.Theme => GenerateThemeFile(container, diagnostics),
+            EntityType.ThemeVariant => GenerateThemeVariantFile(container, diagnostics),
             _ => GenerateControlFile(container, container.RootEntityType, diagnostics),
         };
     }
@@ -121,8 +122,53 @@ public class AumlSourceGenerator : IAumlSourceGenerator
         return textGenerator;
     }
 
+    /// <summary>One theme VARIANT in its own file. A variant is four hundred lines of palette against a theme's dozen
+    /// lines of includes, so keeping both in one file buried the part anyone opens the file to read. The class derives
+    /// from <c>ThemeVariantDefinition</c> and fills itself in its constructor, exactly as a theme does; the theme then
+    /// names it as an element in <c>&lt;Theme.Variants&gt;</c>.</summary>
+    private string GenerateThemeVariantFile(AumlMetadataContainer container, IDiagnosticSink diagnostics)
+    {
+        var rootNode = container.RootNode as AumlAstObjectNode;
+        var typeContainer = container.TypeResolver.GetResolvedAssembly(rootNode.TypeReference.Assembly);
+        var rootBaseType = typeContainer.Types.FirstOrDefault(x => x.Name == rootNode.TypeReference.Name);
+        var className = container.FileName;
+        var additionalPath = Path.GetDirectoryName(container.RelativeFilePath);
+        var @namespace = $"{container.AssemblyName}";
+        if (!string.IsNullOrEmpty(additionalPath))
+        {
+            additionalPath = additionalPath.ToNamespace();
+            @namespace = $"{@namespace}.{additionalPath}";
+        }
+        container.Namespace = @namespace;
+        container.ClassName = className;
+
+        var textGenerator = new TextGenerator();
+        textGenerator.WriteLine(_sourceGeneratorNotice);
+
+        foreach (var ns in container.Usings)
+        {
+            textGenerator.WriteLine($"using {ns};");
+        }
+
+        textGenerator.NewLine();
+        textGenerator.WriteLine($"namespace {@namespace};");
+        textGenerator.NewLine();
+        textGenerator.WriteLine($"public sealed class {className} : {rootBaseType.FullName}");
+        textGenerator.WriteOpenBraceAndIndent();
+        textGenerator.WriteLine($"public {className}()");
+        textGenerator.WriteOpenBraceAndIndent();
+
+        var codeGenerationContext = new CodeGenerationContext(textGenerator, container, EntityType.ThemeVariant);
+        codeGenerationContext.ProcessControlElements((AumlAstObjectNode)container.RootNode, diagnostics, true);
+
+        textGenerator.UnindentAndWriteCloseBrace();
+        textGenerator.UnindentAndWriteCloseBrace();
+
+        return textGenerator;
+    }
+
     private string GenerateResourceFile(
-        AumlMetadataContainer container, 
+        AumlMetadataContainer container,
         EntityType entityType,
         IDiagnosticSink diagnostics)
     {

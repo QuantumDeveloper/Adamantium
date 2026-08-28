@@ -70,10 +70,23 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
    /// (see <see cref="ForRendering"/>), so a brush that can be drawn always has one.</summary>
    public Brush Snapshot => _isFrozen ? this : _snapshot;
 
+   /// <summary>How many times this brush's appearance has been REWRITTEN IN PLACE (see <see cref="RaiseChanged"/>). The
+   /// render side keeps, per brush, the version it last baked into its retained slots; the two differing is the whole
+   /// question "does anything on screen still show the old colour", asked in O(brushes in the scene) rather than by
+   /// walking anything. Needed because an in-place recolour changes no property, adds no unit and moves no slot, so a
+   /// frame that replays or patches has nothing else to notice it by - which is how a palette repaint reached the
+   /// elements that happened to be re-recorded that frame and no others.</summary>
+   public int PaintVersion { get; private set; }
+
    /// <summary>How many handlers are listening to <see cref="Changed"/>. This is what the owner counting exists to keep
    /// at one per owner, so it is what the test has to read - the hold count alone is satisfied by a broken attach that
    /// subscribes every time.</summary>
    internal int SubscriberCount => (Changed?.GetInvocationList().Length ?? 0) + (_owners?.Count ?? 0);
+
+   /// <summary>Is this element in the owner map - the only thing this brush can tell when its colour changes. An
+   /// element that PAINTS with a brush and is not in it hears nothing, which is what left every inherited Foreground
+   /// in the previous variant's colour.</summary>
+   internal bool IsOwnedBy(AdamantiumComponent component) => _owners?.ContainsKey(component) == true;
 
    protected void RaiseChanged()
    {
@@ -82,6 +95,7 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
       // reaches the screen. Only for a brush that already has one: a clone being built inside CreateFrozenCore raises
       // this from its own initializer, and snapshotting THAT would recurse forever.
       if (_snapshot != null) _snapshot = CreateFrozenCore();
+      PaintVersion++;
       _baseChanged = true;   // a real change to the brush's own values - the compositor re-captures its paint base on it
 
       // A wholesale discard happened since this brush last looked (see SweepGeneration). This is the moment it is worth

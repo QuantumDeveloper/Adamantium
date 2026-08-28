@@ -577,8 +577,11 @@ public partial class RenderCache
     // SCRATCH (§5a phase 1 verification): force every frame through the WALK. ADAM_NO_PATCH=1 kills the partial/spliced
     // patch paths, ADAM_NO_REPLAY=1 kills the clean-frame op replay. A visual defect that survives both is not in the
     // retained machinery at all - which is the one question a single run can answer.
-    private static readonly bool PatchDisabled = Environment.GetEnvironmentVariable("ADAM_NO_PATCH") == "1";
-    private static readonly bool ReplayDisabled = Environment.GetEnvironmentVariable("ADAM_NO_REPLAY") == "1";
+    // Settable, not readonly: a test that has to prove something about the WALK cannot get there any other way - a
+    // synthetic scene is small enough that the patch always succeeds, which is exactly how a defect that only ever
+    // showed up on walking frames survived a green suite.
+    internal static bool PatchDisabled = Environment.GetEnvironmentVariable("ADAM_NO_PATCH") == "1";
+    internal static bool ReplayDisabled = Environment.GetEnvironmentVariable("ADAM_NO_REPLAY") == "1";
 
     private void RenderCore(IGraphicsDevice device, Rect2D fullScissor)
     {
@@ -593,6 +596,16 @@ public partial class RenderCache
         if (_transformTable != null) _transformTable.CompositedWrite = true;
         ApplyCompositedAnimations(device);
         if (_transformTable != null) _transformTable.CompositedWrite = false;
+
+        // A recolour reaches the arena HERE, before this frame decides between replaying, patching and walking - because
+        // it must reach it on ALL THREE. Every other family bakes from a payload that holds the live brush, so a re-bake
+        // picks the new colour up wherever it happens; text bakes from a frozen component, so it only followed when
+        // something re-packed it, and re-packing means a walk. The content cache almost never walks - it replays - so a
+        // variant switch recoloured the text only when an unrelated change happened to force a walk in the same frame.
+        // From outside: the first switch worked, the next one did not, and scrolling put it right.
+        // No slot moves and no op changes, so a replay of the recorded stream now draws it in the new colour.
+        ApplyPaintToArenas(device);
+        ApplyBrushRepaints(device);
 
         // Clean-frame replay: re-issue the last recorded walk's op stream and skip the per-unit loop (the retained buffers
         // still hold its bytes). Only a fully-Clean build qualifies; a Partial/Full re-walks and re-records.
@@ -651,7 +664,8 @@ public partial class RenderCache
             _fillSlotByUnit.Clear();
             _haloRunsByUnit.Clear();
             _slotBlindUnits.Clear();
-            _unitsByBrush.Clear(); 
+            _unitsByBrush.Clear();
+            _brushPaintBaked.Clear();
             _walkGroup = null; 
             _walkVersion++;
             _nodeAllAware.Clear();
@@ -766,6 +780,14 @@ public partial class RenderCache
                 group.NotBatchableBecause = null;   // a fresh walk describes this group from scratch
                 group.WalkVersion = _walkVersion;
             }
+
+            // A block's brushes, re-dereferenced before it is baked. The other families bake from their payload, which
+            // holds the LIVE brush and hands out its current snapshot - which is why every background followed a theme
+            // variant while the text did not: a text unit bakes from its COMPONENT, and the component dereferenced the
+            // snapshot once, when the block was recorded. Refreshed here rather than at each bake site because the walk
+            // reaches a block through several of them (batched glyphs, the private render target, the direct draw), and
+            // one that forgot would put that block back in the previous variant's colour.
+            if (unit is TextRenderUnit walkText) walkText.RefreshColors();
 
             // World transform read ONCE (frame-memoized): the bounds-cull below and the GPU re-bake use the SAME value, so
             // the cull can't approve "inside" while the GPU draws the element elsewhere (the spill).
@@ -1245,7 +1267,10 @@ public partial class RenderCache
                     // (PrepareOverlay) on any frame that moved it. So the node keeps its slot-write fast path either way.
                     // Its run is noted like any other family's: the KEY is an arena and this instance is a slot in it.
                     if (_recording && _instancedFill.LastArena is { } fillArena)
+                    {
                         NoteBatched(group, fillArena, _instancedFill.LastSlot);
+                        IndexUnitBrush(unit.Component, unit, gru.Payload.LiveBrush);
+                    }
                     _batchScissor = scissor;
                     _batchClip = unit.Component;
                     _batchOpen = true;
@@ -1613,6 +1638,98 @@ public partial class RenderCache
     // Draw a fast-path partial by patching only the dirty tiles' batch slots, then replaying last frame's op stream. False
     // (-> full walk) if ANY dirty unit isn't a still-batchable rect we recorded a slot for (its bytes live elsewhere - a
     // per-unit / text / instanced unit, or a tile that just switched to a gradient). Validate fully BEFORE patching.
+    /// <summary>Carry a PAINT change into the retained arenas for every paint-dirty component. O(paint-dirty), it
+    /// changes no op and moves no slot, and it is FAMILY-AGNOSTIC: the re-bake is <see cref="PatchSlot"/>, which
+    /// dispatches per family and bakes from each unit's payload, so a brush kind added later is carried by it without a
+    /// line of its own.
+    /// <para>Two things bound it, both learned the hard way. Only units <see cref="IsSlotPatchable"/> accepts - reaching
+    /// past that writes slots the frame's own path has not settled yet. And not during a SPLICE, whose whole business is
+    /// moving the slots this would be writing. Without either guard every splice test fails (11 of them).</para></summary>
+    /// <summary>How many brush repaints this cache has served through <see cref="ApplyBrushRepaints"/> - the counter a
+    /// test reads to prove the recolour travelled by the brush index and not by something else re-recording the element.</summary>
+    internal int BrushRepaintTotal => _brushRepaintTotal;
+    private int _brushRepaintTotal;
+
+    /// <summary>Re-bake every retained slot painted by a brush that has been REWRITTEN IN PLACE since the walk baked it
+    /// (a palette repaint, a brush edited from code). Asked of the brush, not of a dirty set: an in-place recolour adds
+    /// no unit, moves no slot and writes no property, so the element painting with it is not necessarily re-recorded -
+    /// and whether it happens to be decides, today, whether it follows the theme. Driven from the brush index it costs
+    /// one comparison per brush in the scene and repaints exactly the units that wear the new colour, on every frame
+    /// path - replay, patch and walk alike.</summary>
+    private void ApplyBrushRepaints(IGraphicsDevice device)
+    {
+        // Not during a SPLICE, for the same reason the paint patch stands aside: its whole business is moving the very
+        // slots this would be writing. The splice re-issues those records from the payload anyway, so the colour is not
+        // lost - only this pass is.
+        if (device == null || _partialSpliced || _brushPaintBaked.Count == 0) return;
+
+        _repaintedBrushes.Clear();
+        foreach (var pair in _brushPaintBaked)
+            if (pair.Key.PaintVersion != pair.Value)
+                _repaintedBrushes.Add(pair.Key);
+
+        if (_repaintedBrushes.Count == 0) return;
+        _brushRepaintTotal += _repaintedBrushes.Count;
+
+        foreach (var brush in _repaintedBrushes)
+        {
+            _brushPaintBaked[brush] = brush.PaintVersion;
+            if (!_unitsByBrush.TryGetValue(brush, out var units)) continue;
+
+            foreach (var u in units)
+            {
+                // A unit the patch cannot reach is repainted by the next walk, exactly as the composited paint path
+                // treats one - refusing here would cost every OTHER unit of this brush its repaint.
+                if (!IsSlotPatchable(u)) continue;
+
+                u.SetFadeSlot(OpacitySlotOf(device, u.Component));
+                u.SetEffectiveOpacity(EffectiveOpacity(u.Component));
+
+                var bakeWorld = ResolveBake(device, u.Component, World(u.Component), out var slot);
+                PatchSlot(device, u, bakeWorld, slot);
+            }
+        }
+    }
+
+    private void ApplyPaintToArenas(IGraphicsDevice device)
+    {
+        if (device == null || _partialDirty.Count == 0 || !_built) return;
+
+        foreach (var comp in _partialDirty)
+        {
+            if (comp == null || !_groupById.TryGetValue(comp.RenderId, out var g)) continue;
+
+            foreach (var u in g.Units)
+            {
+                // TEXT first, and UNCONDITIONALLY. Its colour is a straight rewrite of the run's colour bytes: it moves
+                // no slot, changes no count and needs no bake, so nothing about it can be refused. That matters because
+                // the patch below refuses text for reasons that have nothing to do with colour - a block with no
+                // recorded run, a splice in flight - and every such refusal used to leave that block in the previous
+                // variant's colour until an unrelated re-record.
+                if (u is TextRenderUnit tru)
+                {
+                    tru.RefreshColors();
+                    if (_textRunByUnit.TryGetValue(u, out var run))
+                        _textBatch?.RecolourRun(device, run.First, run.Count, tru.TextComponent);
+                    continue;
+                }
+
+                // Everything else re-bakes through the patch - family-agnostic, and only for units it accepts: reaching
+                // past that writes slots the frame's own path has not settled. Not during a SPLICE, whose whole business
+                // is moving the very slots this would write. A refusal here is NOT fatal to the frame any more: one unit
+                // the patch cannot reach used to cost every other unit its repaint, because the refusal handed the whole
+                // frame to the walk - and the walk reuses the units of everything that is not geometry-dirty.
+                if (_partialSpliced || !IsSlotPatchable(u)) continue;
+
+                u.SetFadeSlot(OpacitySlotOf(device, u.Component));
+                u.SetEffectiveOpacity(EffectiveOpacity(u.Component));
+
+                var bakeWorld = ResolveBake(device, u.Component, World(u.Component), out var slot);
+                PatchSlot(device, u, bakeWorld, slot);
+            }
+        }
+    }
+
     private bool TryPartialReplay(IGraphicsDevice device, Rect2D fullScissor)
     {
         // Moved motion nodes first: rewrite their table matrices (64B each) so the replayed segments draw the scrolled
@@ -1831,7 +1948,10 @@ public partial class RenderCache
         // drawing - so the bar the window outgrew comes back at the size and place it had, once per animation tick.
         // Answering "done" rather than "cannot": the frame is correct, and refusing would cost it a full walk.
         if (u.Component != null
-            && (!_groupById.TryGetValue(u.Component.RenderId, out var owner) || !owner.InOrder)) return true;
+            && (!_groupById.TryGetValue(u.Component.RenderId, out var owner) || !owner.InOrder))
+        {
+            return true;
+        }
 
         // The soft bands first: they are a SEPARATE record from the fill, so a repaint that touches only the fill left
         // a shape recoloured and its aura on the old colour until an unrelated frame walked the scene.
@@ -1857,6 +1977,9 @@ public partial class RenderCache
 
         if (u is TextRenderUnit tru)
         {
+            // A paint patch is where an INHERITED recolour arrives: the block was never re-recorded, so its component
+            // still holds the brushes it dereferenced at record time. Re-read them before baking.
+            tru.RefreshColors();
             // The block's own placement rides on top of the bake, exactly as the recording walk composed it.
             return _textBatch.UpdateRun(device, _textRunByUnit[u].First, tru.TextComponent, tru.Place(bakeWorld), transformSlot, tru.FadeSlot);
         }

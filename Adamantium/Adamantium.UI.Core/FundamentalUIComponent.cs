@@ -650,8 +650,8 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
             DetachStyles(style);
         }
 
-        UIAppContext.Current.UIContext.ThemeContext.ApplyCurrentTheme(this);
-        UIAppContext.Current.UIContext.ThemeContext.ApplyExternalStyles(this, own == null ? default : own.AsSpan());
+        UIAppContext.Current.UIContext.ThemeEngine.ApplyCurrentTheme(this);
+        UIAppContext.Current.UIContext.ThemeEngine.ApplyExternalStyles(this, own == null ? default : own.AsSpan());
 
         IsStyleApplied = true;
     }
@@ -749,7 +749,9 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
         if (_triggerActivators != null || triggers == null || triggers.Count == 0)
             return;
 
-        var theme = UIAppContext.Current?.ThemeManager?.CurrentTheme;
+        // The theme in force HERE, not the application's: a trigger inside a themed scope resolves its {ThemeResource}
+        // values against that scope, like everything else in the subtree.
+        var theme = Resources.ThemeContext.For(this);
         _triggerActivators = new List<ITriggerActivator>();
         foreach (var trigger in triggers)
         {

@@ -1531,6 +1531,8 @@ public class TabControl : Selector
 
         _fillingOverflow = true;   // our own write must not read back as the user picking a row (which closes the flyout)
         _overflowList.ItemsSource = BuildOverflowRows();
+        // The rows are rebuilt per open, so the same index must be re-applied to a NEW container.
+        _overflowList.SelectedIndex = -1;
         _overflowList.SelectedIndex = SelectedIndex;
         _fillingOverflow = false;
     }

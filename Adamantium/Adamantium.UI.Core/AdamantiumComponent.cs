@@ -574,9 +574,34 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
             break;
         }
 
+        // A value that DRAWS this element has to keep the element in its owner map, and the link is normally taken by
+        // the property system's Changed hook (see AdamantiumProperty.WireOwnerAttachment). This fill raises nothing by
+        // design - it is a cache fill, the property already READ as this value - so nothing took the link here, and an
+        // element that inherits its Foreground was left out of the brush's owner map entirely. Measured on the stand:
+        // of 1028 elements painting with a palette brush, 724 were not owners of it (268 Border, 98 Grid, 80 TextBlock,
+        // 76 Path), so a variant recolour had nobody to tell and the text stayed in the old colour until something
+        // unrelated re-recorded it - a hover, or switching tabs.
+        //
+        // Taken HERE rather than on the inheritance walk on purpose: the walk's cheap path deliberately steps over
+        // elements without resolving anything (it exists so a list rebinding its DataContext does not re-resolve
+        // 125 534 times), and resolving there to take a link would undo exactly that. This costs a reference compare,
+        // and only for the handful of properties that can carry an attachable value at all.
+        var attachable = property.CanAttachToOwner;
+        var before = attachable ? container.Effective : null;
+
         container.SetInheritedCache(raw,
             raw == AdamantiumProperty.UnsetValue ? container.Effective : Coerce(property, metadata, raw),
             AdamantiumProperty.InheritanceEpoch);
+
+        if (!attachable) return;
+
+        var after = container.Effective;
+        if (ReferenceEquals(before, after)) return;
+
+        (before as IRenderAttachable)?.DetachFrom(this);
+        // Not while this element is OUT of the tree: leaving gave every link up, and taking one here would leave the
+        // value holding an element that the next leave can no longer release. Same rule as the Changed hook.
+        if (!_renderAttachmentsReleased) (after as IRenderAttachable)?.AttachTo(this);
     }
 
     // "Explicit" = a value set from a real source (Animation..Style); the seeded Default and the computed Effective/
@@ -679,6 +704,7 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         if (!triggerValues.TryGetValue(property.Name, out var container))
             triggerValues[property.Name] = container = new TriggerValueContainer();
         container.Set(token, value);
+
         SetValue(property, container.EffectiveValue, ValuePriority.Trigger);
     }
 

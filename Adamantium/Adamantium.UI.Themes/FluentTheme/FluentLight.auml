@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8" ?>
+
+<!-- The LIGHT variant of the Fluent theme. See FluentDark.auml for why a variant lives in its own file.
+
+     Every key here must also be declared by every other variant: a key one variant answers and another does not makes
+     the appearance depend on which variant it was switched FROM. Theme.ValidateVariants is what catches that. -->
+
+<ThemeVariantDefinition xmlns="http://adamantium/ui"
+                        Key="Light">
+
+  <ThemeVariantDefinition.Values>
+    <ThemeValue Property="AccentColor" Value="#005FB8"/>
+    <ThemeValue Property="AccentFillColorDisabled" Value="#E0E0E0"/>
+    <ThemeValue Property="FocusStrokeColorOuter" Value="#000000"/>
+    <ThemeValue Property="FocusStrokeColorInner" Value="#FFFFFF"/>
+  </ThemeVariantDefinition.Values>
+
+  <ThemeVariantDefinition.Colors>
+    <PaletteColor Key="SolidBackgroundFillColorBase" Color="#F3F3F3"/>
+    <PaletteColor Key="SolidBackgroundFillColorSecondary" Color="#EEEEEE"/>
+    <PaletteColor Key="SmokeFillColorDefault" Color="#99000000"/>
+    <PaletteColor Key="SolidBackgroundFillColorTertiary" Color="#F9F9F9"/>
+    <PaletteColor Key="CardBackgroundFillColorDefault" Color="#FFFFFF"/>
+    <PaletteColor Key="LayerFillColorDefault" Color="#80FFFFFF"/>
+    <PaletteColor Key="TileFillColorDefault" Color="#0F000000"/>
+    <PaletteColor Key="ControlFillColorDefault" Color="#B3FFFFFF"/>
+    <PaletteColor Key="ControlFillColorSecondary" Color="#0F000000"/>
+    <PaletteColor Key="ControlFillColorTertiary" Color="#1A000000"/>
+    <PaletteColor Key="ControlFillColorDisabled" Color="#4DF9F9F9"/>
+    <PaletteColor Key="SubtleFillColorSecondary" Color="#09000000"/>
+    <PaletteColor Key="SubtleFillColorTertiary" Color="#06000000"/>
+    <PaletteColor Key="OnAccentShadePointerOver" Color="#33000000"/>
+    <PaletteColor Key="OnAccentShadePressed" Color="#59000000"/>
+    <PaletteColor Key="OnAccentOverlayPointerOver" Color="#40FFFFFF"/>
+    <PaletteColor Key="OnAccentOverlayPressed" Color="#73FFFFFF"/>
+    <PaletteColor Key="DockFoldedStripFill" Color="#14000000"/>
+    <PaletteColor Key="DockCompassFillColor" Color="#F2E0E0E0"/>
+    <PaletteColor Key="DockCompassStrokeColor" Color="#73000000"/>
+    <PaletteColor Key="DockCompassPreviewColor" Color="#4D005FB8"/>
+    <PaletteColor Key="ControlStrokeColorDefault" Color="#33000000"/>
+    <PaletteColor Key="ControlStrokeColorSecondary" Color="#52000000"/>
+    <PaletteColor Key="TextFillColorPrimary" Color="#E4000000"/>
+    <PaletteColor Key="TextFillColorSecondary" Color="#9E000000"/>
+    <PaletteColor Key="TextFillColorTertiary" Color="#72000000"/>
+    <PaletteColor Key="TextFillColorDisabled" Color="#5C000000"/>
+    <PaletteColor Key="SystemFillColorSuccess" Color="#0F7B0F"/>
+    <PaletteColor Key="SystemFillColorCaution" Color="#9D5D00"/>
+    <PaletteColor Key="SystemFillColorCritical" Color="#C42B1C"/>
+    <PaletteColor Key="SkeletonPulseFill" Color="#000000"/>
+    <PaletteColor Key="ShimmerTrackFill" Color="#14000000"/>
+    <PaletteColor Key="KeyTipPlateFill" Color="#2B2B2B"/>
+    <PaletteColor Key="KeyTipPlateStroke" Color="#0D0D0D"/>
+    <PaletteColor Key="KeyTipForeground" Color="#F5F5F5"/>
+    <PaletteColor Key="ShimmerPeakColor" Color="#59000000" As="Color"/>
+    <PaletteColor Key="ShimmerTrackColor" Color="#14000000" As="Color"/>
+    <PaletteColor Key="EdgeFadeColor" Color="#E6DFDFDF" As="Color"/>
+    <PaletteColor Key="EdgeFadeColorTransparent" Color="#00DFDFDF" As="Color"/>
+  </ThemeVariantDefinition.Colors>
+
+</ThemeVariantDefinition>

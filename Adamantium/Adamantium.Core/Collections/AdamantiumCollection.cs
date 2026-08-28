@@ -444,6 +444,10 @@ namespace Adamantium.Core.Collections
         protected virtual void InsertItem(int index, T item)
         {
             CheckCapacity(currentIndex);
+
+            // Past the end APPENDS: storing at the raw index left every slot between the old end and it empty.
+            if (index > currentIndex) index = currentIndex;
+
             if (index < currentIndex)
             {
                 // Shift [index, currentIndex) right by one to open a slot AT index, then store there. (Storing at

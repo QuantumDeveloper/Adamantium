@@ -309,7 +309,10 @@ public class Image : InputUIComponent, IDesignTimeAnimatedMedia
       base.OnAttachedToVisualTree(e);
       // Resume playback after a re-attach (tab switch, virtualization recycle): the ticker self-removed on detach. Post
       // runs inline when already on the loop thread (attach normally runs during the loop's layout pass).
-      UIAppContext.Current.Dispatcher.Post(StartRuntimePlayback);
+      // There is not always a loop to post to - an off-screen bake, a RenderTargetBitmap, the designer host all attach
+      // a tree with no application behind it, and an unguarded read threw NRE out of the middle of the ATTACH WALK,
+      // taking the rest of the subtree with it. Nothing to resume there either: playback rides the loop's heartbeat.
+      UIAppContext.Current?.Dispatcher?.Post(StartRuntimePlayback);
 
       // ...and watch the drawing again. See OnDetachedFromVisualTree for why the watch does not simply stay.
       WatchDrawing(null, Source);

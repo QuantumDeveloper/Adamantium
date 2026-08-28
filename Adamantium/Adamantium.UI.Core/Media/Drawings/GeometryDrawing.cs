@@ -45,7 +45,7 @@ public class GeometryDrawing : Drawing
     /// checkmark, an arrow are strokes.
     /// <para>Setting <see cref="Pen"/> directly still wins: it is the explicit, full form.</para></summary>
     public static readonly AdamantiumProperty StrokeProperty = AdamantiumProperty.Register(nameof(Stroke),
-        typeof(Brush), typeof(GeometryDrawing), new PropertyMetadata(null, StrokeChangedCallback));
+        typeof(Brush), typeof(GeometryDrawing), new PropertyMetadata(null, StrokeBrushChangedCallback));
 
     public static readonly AdamantiumProperty StrokeThicknessProperty = AdamantiumProperty.Register(nameof(StrokeThickness),
         typeof(double), typeof(GeometryDrawing), new PropertyMetadata(1.0, StrokeChangedCallback));
@@ -71,6 +71,27 @@ public class GeometryDrawing : Drawing
         drawing.Pen = drawing.Stroke == null ? null : new Pen(drawing.Stroke, drawing.StrokeThickness);
     }
 
+    // The stroke brush is watched exactly as the fill brush is below, and for the same reason: half an icon set IS a
+    // stroke - a cross, a checkmark, an arrow - and recolouring one changes the picture just as much. Only Brush was
+    // hooked, so a recoloured stroke told nobody, and whoever holds PIXELS of the drawing (a baked tile brush, a
+    // nine-slice) kept the old ones for good - a bake is only ever thrown away on this event.
+    private static void StrokeBrushChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (a is not GeometryDrawing drawing) return;
+
+        if (e.OldValue is Brush oldBrush)
+        {
+            oldBrush.Changed -= drawing.OnChildChanged;
+        }
+
+        if (e.NewValue is Brush newBrush)
+        {
+            newBrush.Changed += drawing.OnChildChanged;
+        }
+
+        StrokeChangedCallback(a, e);
+    }
+
     // A brush mutating INTERNALLY (a recoloured fill, an animated gradient stop) changes the picture just as much as
     // swapping the brush does, and the drawing is not an element, so nothing else is listening on its behalf.
     private static void BrushChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
@@ -93,6 +114,7 @@ public class GeometryDrawing : Drawing
     protected override void AttachChildren()
     {
         AttachOwned(Brush);
+        AttachOwned(Stroke);
         AttachOwned(Geometry);
         AttachOwned(Geometry?.Transform);
     }

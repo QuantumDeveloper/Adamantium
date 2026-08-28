@@ -32,14 +32,46 @@ internal static class DrawingImageRaster
 
     private static readonly HashSet<DrawingImage> _watched = [];
 
+    // Who asked for a bake - the elements to re-record when the palette is repainted. Concurrent: Get runs on the
+    // render thread.
+    private static readonly ConcurrentDictionary<IUIComponent, byte> _owners = new();
+
+    // The palette the current bakes were drawn under.
+    private static int _bakedPalette = -1;
+
     private static IVisualRenderer _renderer;
 
     private static IVisualRenderer Renderer => _renderer ??= UIApplication.Current?.Container.Resolve<IVisualRenderer>();
+
+    /// <summary>Throw the bakes away when the PALETTE has been repainted. A drawing is baked to pixels, and the key is
+    /// the drawing and the size - not the colours, which live in brushes the palette owns and rewrites in place. So an
+    /// icon baked under one variant kept its pixels under the next, and the chevrons stayed in the colour they were
+    /// first drawn in while every vector around them followed.</summary>
+    private static void DropStaleBakes()
+    {
+        var palette = Core.Resources.ThemeManager.PaletteVersion;
+        if (palette == _bakedPalette) return;
+
+        _bakedPalette = palette;
+        _baked.Clear();
+        _pending.Clear();
+
+        // Dropping the pixels is not enough: whoever DREW them holds the texture, and its Source is the same drawing
+        // object it always was - no property changed, so nothing would ask again. Tell the elements that asked for a
+        // bake to re-record; they are the few that draw icons, not the scene.
+        foreach (var owner in _owners.Keys)
+        {
+            owner.InvalidateRender(false);
+        }
+    }
 
     /// <summary>The bake for this drawing at this size, or null while there is none. Render-thread safe: it only reads.
     /// A miss queues the bake (see <see cref="Request"/>) - it never blocks the frame waiting for one.</summary>
     public static BitmapSource Get(DrawingImage image, Size size, IUIComponent owner)
     {
+        DropStaleBakes();
+        if (owner != null) _owners[owner] = 0;
+
         var key = KeyOf(image, size, DeviceScaleOf(owner));
         if (key.Width <= 0 || key.Height <= 0)
         {
@@ -109,7 +141,8 @@ internal static class DrawingImageRaster
 
         // At the KEY's size, not the asked-for one: the key is snapped, and a bitmap that does not match the key it is
         // filed under is handed to every later ask for that key.
-        dispatcher.Post(() => Bake(key, new Size(key.Width, key.Height), owner));
+        var palette = _bakedPalette;
+        dispatcher.Post(() => Bake(key, new Size(key.Width, key.Height), owner, palette));
     }
 
     /// <summary>Throw away everything baked from this drawing - its picture changed, so every size of it is now wrong.</summary>
@@ -205,7 +238,7 @@ internal static class DrawingImageRaster
     // LOOP thread. Baked THROUGH the vector path - an Image showing the drawing draws exactly what the on-screen one
     // does - and QUEUED, never rendered here: the GPU half shares one device with the render thread, so submitting it
     // from this thread interleaved with a live frame and the bake came back with one shape wearing another's colour.
-    private static void Bake((DrawingImage Image, int Width, int Height, int Scale) key, Size size, IUIComponent owner)
+    private static void Bake((DrawingImage Image, int Width, int Height, int Scale) key, Size size, IUIComponent owner, int palette)
     {
         var renderer = Renderer;
         if (renderer == null)
@@ -228,13 +261,22 @@ internal static class DrawingImageRaster
         // The LOGICAL size lays the host out; the device scale decides how many PIXELS come back. Baking at 1.0 on a
         // 150% display handed the fill a texture two thirds of the resolution it is drawn at - the whole reason a vector
         // source exists is that it does not have to blur.
-        renderer.RequestRender(host, size, key.Scale / 100.0, Colors.Transparent, image => Store(key, image, owner));
+        renderer.RequestRender(host, size, key.Scale / 100.0, Colors.Transparent, image => Store(key, image, owner, palette));
     }
 
     // UI thread, once the render thread has drawn and read the bake back.
-    private static void Store((DrawingImage Image, int Width, int Height, int Scale) key, ImageSource rendered, IUIComponent owner)
+    private static void Store((DrawingImage Image, int Width, int Height, int Scale) key, ImageSource rendered, IUIComponent owner, int palette)
     {
         _pending.TryRemove(key, out _);
+
+        // Drawn BEFORE the palette was repainted: these are last variant's pixels, and filing them would pin the icon
+        // to the colour it had when the bake was asked for. Ask again instead.
+        if (palette != _bakedPalette)
+        {
+            owner?.InvalidateRender(false);
+            return;
+        }
+
         if (rendered is not BitmapSource baked)
         {
             return;

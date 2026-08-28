@@ -9,7 +9,7 @@ import com.intellij.psi.xml.XmlAttribute
 
 /**
  * Suppresses XML's "URI is not registered" problem on AUML xmlns declarations that point at a CLR
- * namespace, e.g. `xmlns:fluentDark="clr-namespace:Adamantium.UI.Themes.FluentDarkTheme"`. These
+ * namespace, e.g. `xmlns:fluent="clr-namespace:Adamantium.UI.Themes.FluentTheme"`. These
  * URIs are dynamic (a different CLR namespace per file), so unlike the static `http://adamantium/ui`
  * namespaces (handled by AumlResourceProvider) they can't be pre-registered as ignored resources.
  * The AUML language server is the real validator here, so the built-in XML schema check is just noise.

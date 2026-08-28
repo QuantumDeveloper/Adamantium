@@ -6,10 +6,16 @@ using Adamantium.UI.Core.RoutedEvents;
 namespace Adamantium.Game.Sandbox.Behaviors;
 
 /// <summary>
-/// View-layer behavior: on click, toggles the application theme between FluentDark and FluentLight via the ThemeManager.
-/// Kept out of the view-model (theme switching is app-level UI, wired declaratively in markup):
+/// View-layer behavior: on click, toggles the application's appearance between light and dark. Kept out of the
+/// view-model (this is app-level UI, wired declaratively in markup):
 /// <code>&lt;Button&gt;&lt;Button.Behaviors&gt;&lt;local:ToggleThemeBehavior/&gt;&lt;/Button.Behaviors&gt;&lt;/Button&gt;</code>
 /// </summary>
+/// <remarks>
+/// It switches a VARIANT, not a theme, and that is the whole point: light and dark are two variants of one Fluent
+/// theme, so the styles and templates on either side of this click are the same objects. Nothing is re-templated,
+/// nothing is re-styled, and no element is written to - what changes is the colour inside about a hundred brushes the
+/// elements are already holding. As two separate themes the same click rebuilt every template in the application.
+/// </remarks>
 public class ToggleThemeBehavior : Behavior<Button>
 {
     private Button _button;
@@ -28,14 +34,12 @@ public class ToggleThemeBehavior : Behavior<Button>
     private void OnClick(object sender, RoutedEventArgs e)
     {
         var themeManager = UIAppContext.Current?.ThemeManager;
-        if (themeManager == null) return;
+        if (themeManager?.CurrentTheme is not Adamantium.UI.Core.Resources.Theme theme) return;
 
-        // Hold the busy overlay up for a moment so the swap loader is visibly spinning (the demo). Real apps leave this 0 -
-        // the overlay then shows only for a genuinely slow swap.
-        themeManager.MinSwapSeconds = 1.5;
+        var next = theme.CurrentVariant == Adamantium.UI.Core.Resources.ThemeVariant.Dark
+            ? Adamantium.UI.Core.Resources.ThemeVariant.Light
+            : Adamantium.UI.Core.Resources.ThemeVariant.Dark;
 
-        var nextName = themeManager.CurrentTheme?.Name == "FluentLight" ? "FluentDark" : "FluentLight";
-        var next = themeManager[nextName];
-        if (next != null) themeManager.SetTheme(next);
+        themeManager.SetVariant(next);
     }
 }

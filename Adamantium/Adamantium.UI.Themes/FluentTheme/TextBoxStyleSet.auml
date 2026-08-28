@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- TextBox: a templated single-line editor. The template is a themed Border (chrome) wrapping PART_TextPresenter -
+         the surface that renders text/caret/selection and hosts the caret-following horizontal scroll (the Border clips,
+         so long text scrolls under it). Focus shows an accent border; hover a subtler stroke. Per the small-styles
+         convention: properties, template, triggers. -->
+
+    <Style Selector="TextBox">
+        <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <!-- Dimmer than the text (Tertiary, not Secondary) so the watermark reads as a hint, not real entered text. -->
+        <Setter Property="PlaceholderForeground" Value="{ResourceReference TextFillColorTertiary}"/>
+        <Setter Property="FloatingPlaceholderForeground" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="CaretBrush" Value="{ResourceReference TextFillColorPrimary}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Padding" Value="10 6 10 6"/>
+        <Setter Property="MinWidth" Value="120"/>
+        <Setter Property="MinHeight" Value="32"/>
+        <Setter Property="FontSize" Value="14"/>
+    </Style>
+
+    <Style Selector="TextBox">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <Border x:Name="PART_Border"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Padding="{TemplateBinding Padding}"
+                            ClipToBounds="True">
+                        <ScrollViewer x:Name="PART_ContentHost"
+                                HorizontalScrollBarVisibility="{TemplateBinding HorizontalScrollBarVisibility}"
+                                VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}">
+                            <TextPresenter x:Name="PART_TextPresenter"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Stretch"/>
+                        </ScrollViewer>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="TextBox">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="PART_Border" Property="BorderBrush" Value="{ResourceReference ControlStrokeColorSecondary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsFocused" Value="true">
+            <Setter TargetName="PART_Border" Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="PART_Border" Property="Background" Value="{ResourceReference ControlFillColorSecondary}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

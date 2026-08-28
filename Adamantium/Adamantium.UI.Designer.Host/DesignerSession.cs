@@ -99,7 +99,7 @@ public sealed class DesignerSession : IDisposable
 
         // Same as UIApplication.LoadThemes() (skipped because we never call Run()): without a theme the controls
         // have no templates/brushes and render nothing.
-        var theme = new Adamantium.UI.Themes.FluentDarkTheme.FluentDark();
+        var theme = new Adamantium.UI.Themes.FluentTheme.Fluent();
         _app.ThemeManager.AddTheme(theme.Name, theme);
         _app.ThemeManager.SetTheme(theme);
 

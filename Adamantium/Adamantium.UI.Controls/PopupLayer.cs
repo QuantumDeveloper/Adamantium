@@ -208,6 +208,7 @@ public class PopupLayer
 
     private static bool NeedsArrange(IUIComponent node)
     {
+        if (node == null) return false;
         if (node is IMeasurableComponent { IsArrangeValid: false }) return true;
         foreach (var child in node.VisualChildren)
             if (NeedsArrange(child)) return true;
@@ -216,6 +217,7 @@ public class PopupLayer
 
     private static void InvalidateArrangeSubtree(IUIComponent node)
     {
+        if (node == null) return;
         (node as IMeasurableComponent)?.InvalidateArrange();
         foreach (var child in node.VisualChildren) InvalidateArrangeSubtree(child);
     }
@@ -224,18 +226,22 @@ public class PopupLayer
     // or by the open invalidation). Cheap - flag reads only, early-out on the first dirty node.
     private static bool NeedsLayout(IUIComponent node)
     {
+        if (node == null) return false;
         if (node is IMeasurableComponent { IsMeasureValid: false }) return true;
         foreach (var child in node.VisualChildren)
             if (NeedsLayout(child)) return true;
         return false;
     }
 
+    // All four walks below tolerate an empty child: they run while content is attached or taken down.
     private static void InvalidateSubtree(IUIComponent node)
     {
+        if (node == null) return;
         (node as IMeasurableComponent)?.InvalidateMeasure();
         foreach (var child in node.VisualChildren)
             InvalidateSubtree(child);
     }
+
 
     private static bool IsFinitePositive(double v) => !double.IsNaN(v) && !double.IsInfinity(v) && v > 0;
 

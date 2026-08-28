@@ -125,7 +125,8 @@ public class CodeGenerationContext
             var hasBackingField = isNamed
                 && CurrentTemplate == null
                 && !isHeldBack
-                && EntityType is not (EntityType.ResourceDictionary or EntityType.StyleSet or EntityType.Theme);
+                && EntityType is not (EntityType.ResourceDictionary or EntityType.StyleSet or EntityType.Theme
+                                      or EntityType.ThemeVariant);
             var declaration = hasBackingField ? elementName : $"var {elementName}";
 
             // A VALUE-TYPE element that carries its value as text content (<Color x:Key="X">#33FFFFFF</Color>): a struct/enum

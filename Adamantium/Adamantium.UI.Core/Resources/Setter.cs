@@ -22,6 +22,8 @@ public class Setter : ISetter, IEquatable<Setter>
 
     public int DeclarationOrder { get; set; }
 
+    public int StyleBand { get; set; }
+
     public void Apply(IFundamentalUIComponent component, Style style, ITheme theme)
     {
         switch (Value)

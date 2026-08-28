@@ -208,9 +208,39 @@ public class Program
 
                         for (var i = 0; i < flips && themes != null; i++)
                         {
-                            var nextName = themes.CurrentTheme?.Name == "FluentLight" ? "FluentDark" : "FluentLight";
-                            var next = themes[nextName];
-                            if (next == null) break;
+                            // TEMP: reproduce the merged-theme swap under the probe instead of by hand. First step goes
+                            // to the merged theme; every step after it toggles its VARIANT, which is the cheap path.
+                            if (Environment.GetEnvironmentVariable("ADAM_MERGED_THEME") == "1")
+                            {
+                                if (themes.CurrentTheme?.Name != "Fluent")
+                                {
+                                    var merged = themes["Fluent"];
+                                    if (merged == null) break;
+                                    System.IO.File.AppendAllText(report, $"-- switching to merged theme\n");
+                                    themes.SetTheme(merged);
+                                }
+                                else
+                                {
+                                    var current = (themes.CurrentTheme as Adamantium.UI.Core.Resources.Theme)?.CurrentVariant;
+                                    var wanted = current == Adamantium.UI.Core.Resources.ThemeVariant.Dark
+                                        ? Adamantium.UI.Core.Resources.ThemeVariant.Light
+                                        : Adamantium.UI.Core.Resources.ThemeVariant.Dark;
+                                    System.IO.File.AppendAllText(report, $"-- variant -> {wanted}\n");
+                                    Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => themes.SetVariant(wanted));
+                                }
+
+                                System.Threading.Thread.Sleep(4000);
+                                Sample($"swap{i + 1}");
+                                continue;
+                            }
+
+                            // Light and dark are VARIANTS of the one Fluent theme now, so this drives a variant switch.
+                            // The counters below then read what a variant costs: near zero templates, where the old
+                            // two-theme swap rebuilt every one of them.
+                            var currentVariant = (themes.CurrentTheme as Adamantium.UI.Core.Resources.Theme)?.CurrentVariant;
+                            var wantedVariant = currentVariant == Adamantium.UI.Core.Resources.ThemeVariant.Dark
+                                ? Adamantium.UI.Core.Resources.ThemeVariant.Light
+                                : Adamantium.UI.Core.Resources.ThemeVariant.Dark;
 
                             // Count WHAT gets rebuilt, for this swap alone: reset immediately before it, dump once it
                             // has settled. A swap builds 2.5x more templates than the whole tree contains, and only a
@@ -218,7 +248,7 @@ public class Program
                             Adamantium.UI.Controls.Base.TemplatedUIComponent.BuildsByType.Clear();
                             Adamantium.UI.Controls.Base.TemplatedUIComponent.RemovesByType.Clear();
 
-                            Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => themes.SetTheme(next));
+                            Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => themes.SetVariant(wantedVariant));
                             // Long enough for the swap to settle before it is read, so every step is a settled state
                             // rather than a mid-cascade one.
                             System.Threading.Thread.Sleep(9000);
@@ -764,9 +794,11 @@ public class Program
                         stripReport = string.Empty;
                         for (var lap = 0; lap < 2; lap++)
                         {
-                            var wanted = themes.CurrentTheme?.Name == "FluentLight" ? "FluentDark" : "FluentLight";
-                            var next = themes[wanted];
-                            Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => themes.SetTheme(next));
+                            var currentVariant = (themes.CurrentTheme as Adamantium.UI.Core.Resources.Theme)?.CurrentVariant;
+                            var wanted = currentVariant == Adamantium.UI.Core.Resources.ThemeVariant.Dark
+                                ? Adamantium.UI.Core.Resources.ThemeVariant.Light
+                                : Adamantium.UI.Core.Resources.ThemeVariant.Dark;
+                            Adamantium.UI.Threading.Dispatcher.CurrentDispatcher?.Post(() => themes.SetVariant(wanted));
                             System.Threading.Thread.Sleep(6000);
                             stripReport += $"after {wanted}: strip {StripHeight(win):0} px; ";
                         }

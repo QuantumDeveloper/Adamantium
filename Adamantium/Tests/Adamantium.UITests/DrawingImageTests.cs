@@ -192,6 +192,32 @@ public class DrawingImageTests
         Assert.That(raised, Is.GreaterThan(0));
     }
 
+    /// <summary>The same, for a STROKED shape. Half an icon set is strokes - a cross, a checkmark, an arrow - and the
+    /// stroke brush was the one half of the pair nothing watched: only <c>Brush</c> was hooked, so recolouring a stroke
+    /// changed the picture and told nobody. Whoever holds PIXELS of the drawing (a baked tile brush, a nine-slice) then
+    /// keeps the old ones for good, because the bake is only ever thrown away on this event.</summary>
+    [Test]
+    public void RecolouringASTROKE_ReachesTheImage()
+    {
+        var brush = new SolidColorBrush(Colors.Red);
+        var image = new DrawingImage
+        {
+            Drawing = new GeometryDrawing
+            {
+                Geometry = new RectangleGeometry { Rect = new Rect(0, 0, 10, 10) },
+                Stroke = brush,
+                StrokeThickness = 2
+            }
+        };
+
+        var raised = 0;
+        image.Changed += (_, _) => raised++;
+
+        brush.Color = Colors.Blue;
+
+        Assert.That(raised, Is.GreaterThan(0));
+    }
+
     /// <summary>A drawing lives in a RESOURCE, outside the tree. Attaching it to the element that shows it is the ONLY
     /// route a binding inside it has to a DataContext - without it every such binding yields null, which for a brush
     /// means the shape draws nothing at all and says nothing about why.</summary>

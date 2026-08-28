@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Theme xmlns="http://adamantium/ui"
+       xmlns:x="http://adamantium/ui/xaml/extensions"
+       xmlns:fluent="clr-namespace:Adamantium.UI.Themes.FluentTheme"
+       Name="Fluent"
+       SystemLightVariant="Light"
+       SystemDarkVariant="Dark"
+       ResourceContext.Scope="Theme">
+
+  <!-- ONE theme with two VARIANTS, replacing the FluentDark / FluentLight pair.
+
+       Those two files declared the SAME 49 style includes, the same icons and the same metrics; they differed by a
+       palette and four accent values. So the engine was doing a full theme swap - rebuilding every template in the
+       application, re-applying every style, ~18000 property writes - to change a hundred colours. Measured cost of
+       that mistake: a four-second stall leaving a heavy tab, and 200 MB retained per swap.
+
+       Here light and dark are variants of one theme: the styles below are shared, the brushes belong to the theme,
+       and a variant supplies their COLOURS. Switching is a colour write per palette key - about a hundred - and not a
+       single template is rebuilt. See docs/THEME_VARIANTS_PLAN.md. -->
+
+  <ResourceContext.Resources>
+    <ResourceLink Source="{x:Type fluent:Icons}"/>
+    <ResourceLink Source="{x:Type fluent:Metrics}"/>
+  </ResourceContext.Resources>
+
+  <!-- Dark first: it is the variant the application opens on, and order is what says so. A variant is four hundred
+       lines of palette, so each lives in its OWN file and naming the class here is the whole declaration. -->
+  <Theme.Variants>
+    <fluent:FluentDark/>
+    <fluent:FluentLight/>
+  </Theme.Variants>
+
+  <!-- Shared by every variant. This list is why variants are worth having: it is what a theme swap rebuilt and a
+       variant switch does not touch. -->
+  <Theme.StyleIncludes>
+        <StyleInclude Source="{x:Type fluent:TextBlockStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:BorderStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ContentControlStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:RepeatButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ThumbStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ScrollBarStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ScrollViewerStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ZoomBoxStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ToggleButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:CheckBoxStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:RadioButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ToggleSwitchStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:SliderStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:RangeSliderStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:NumericUpDownStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ProgressBarStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:RingProgressBarStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:BusyIndicatorStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ItemsControlStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ListBoxStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ListBoxItemStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:DropInsertionIndicatorStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:DragHandleStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:SelectionAdornerStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:HoverAdornerStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:FocusAdornerStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:KeyTipAdornerStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:TilesHostStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:FlipTileStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:DropDownStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:DropDownItemStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:TextBoxStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ToolTipStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:TabControlStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:TabItemStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:RibbonStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:SlidePanelStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:OverlayWindowStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:TitleBarStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ResizeGripperStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:WindowStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:MenuStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:TreeViewStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:GridSplitterStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:DockingStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ColorPickerStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ColorPickerButtonStyleSet}"/>
+        <StyleInclude Source="{x:Type fluent:ColorWheelStyleSet}"/>
+  </Theme.StyleIncludes>
+</Theme>

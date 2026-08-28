@@ -29,10 +29,10 @@ public class ThemeResourceExpression : BindingExpressionBase
     public override void EstablishConnection()
     {
         CloseConnection();
-        // The theme in force AT THE TARGET, not the application's: an element inside a ThemeScope resolves its
+        // The theme in force AT THE TARGET, not the application's: an element inside a ThemeContext scope resolves its
         // {ThemeResource} against that scope's theme, or the whole point of a scope would stop at the styles.
         _theme = (Target is IFundamentalUIComponent element
-            ? Resources.ThemeScope.For(element)
+            ? Resources.ThemeContext.For(element)
             : UIAppContext.Current?.ThemeManager?.CurrentTheme) as AdamantiumComponent;
         if (_theme == null || TargetProperty == null || string.IsNullOrEmpty(_key)) return;
 
