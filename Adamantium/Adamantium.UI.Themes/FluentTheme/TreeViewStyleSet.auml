@@ -39,7 +39,7 @@
          node's children are sibling rows in the same virtualized list); depth is expressed by the Indent inset, not nesting. -->
     <Style Selector="TreeViewItem" BasedOn="ItemsControl">
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
-        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
     </Style>
 
     <!-- The expander glyph, its own swappable template (TreeViewItem.ExpanderTemplate). Checked = expanded, so the ▶ swaps

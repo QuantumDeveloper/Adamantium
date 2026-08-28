@@ -14,11 +14,11 @@
         <Setter Property="BackgroundDisabled" Value="{ResourceReference ControlFillColorDisabled}"/>
         <Setter Property="ForegroundPressed" Value="{ResourceReference TextFillColorSecondary}"/>
         <Setter Property="ForegroundDisabled" Value="{ResourceReference TextFillColorDisabled}"/>
-        <Setter Property="BorderThickness" Value="2"/>
-        <Setter Property="CornerRadius" Value="4"/>
-        <Setter Property="Padding" Value="11 5 11 6"/>
-        <Setter Property="MinHeight" Value="32"/>
-        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeControl}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingControl}"/>
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeight}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>

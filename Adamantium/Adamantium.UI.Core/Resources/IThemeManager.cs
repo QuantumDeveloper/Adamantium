@@ -6,6 +6,11 @@ public interface IThemeManager : IThemeEngine
 {
     ITheme CurrentTheme { get; }
 
+    /// <summary>Every theme registered with <see cref="AddTheme"/>, in registration order. Part of the contract because
+    /// offering the user a CHOICE of theme is the ordinary reason to have more than one, and a chooser cannot be
+    /// written against "the current one" alone.</summary>
+    System.Collections.Generic.IReadOnlyList<ITheme> Themes { get; }
+
     /// <summary>Raised SYNCHRONOUSLY at the start of <see cref="SetTheme"/>, before anything is re-styled - the moment to
     /// put a busy overlay up. <see cref="IsThemeChanging"/> is already true here.</summary>
     event EventHandler<ThemeChangedEventArgs> ThemeChanging;

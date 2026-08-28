@@ -7,7 +7,7 @@
          (they track the picked colour); the SV overlays and the hue rainbow are static, authored here. -->
     <Style Selector="ColorPicker">
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeChrome}"/>
     </Style>
 
     <Style Selector="ColorPicker">

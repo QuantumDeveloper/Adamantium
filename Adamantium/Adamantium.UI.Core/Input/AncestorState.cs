@@ -7,8 +7,9 @@ namespace Adamantium.UI.Core.Input;
 /// <summary>
 /// Drives "self-or-descendant" aggregate input states up the visual tree - states that are true for an element while a
 /// focal leaf (the element under the pointer, the captured element, the focused element, ...) is that element or one of
-/// its visual descendants. <see cref="IInputComponent.IsMouseOver"/> is the first such state; the same machinery fits
-/// IsMouseCaptureWithin / IsKeyboardFocusWithin / IsStylusOver when they are added.
+/// its visual descendants. <see cref="IInputComponent.IsMouseOver"/> was the first such state; <c>IsKeyboardFocusWithin</c>
+/// runs on the same machinery (see FocusManager.AnnounceFocusMove), and IsMouseCaptureWithin / IsStylusOver would fit it
+/// too when they are added.
 ///
 /// The backing enter/leave events are Direct (they must not bubble), so when the leaf moves the dispatcher raises them
 /// individually: <paramref name="leaveEvent"/> on every element that left the leaf's ancestor chain and

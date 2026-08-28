@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Adamantium.MVVM;
 using Adamantium.UI.Core;
 using Adamantium.UI.Core.Resources;
@@ -29,6 +30,51 @@ public partial class ResourcesViewModel : TabPageViewModel
     /// coming up, and the theme manager has its themes only afterwards.</para>
     /// </remarks>
     public ITheme LocalTheme => UIAppContext.Current?.ThemeManager?["Fluent"];
+
+    /// <summary>Every theme the application has registered, by name - what the stand's theme chooser lists.
+    /// <para>Read from the manager each time rather than captured: themes are registered while the application comes
+    /// up, and a list captured in the constructor would be the empty one.</para></summary>
+    public System.Collections.Generic.IReadOnlyList<string> AvailableThemes
+    {
+        get
+        {
+            var themes = UIAppContext.Current?.ThemeManager?.Themes;
+            if (themes == null) return [];
+
+            var names = new List<string>(themes.Count);
+            foreach (var theme in themes) names.Add(theme.Name);
+            return names;
+        }
+    }
+
+    /// <summary>Which theme the chooser shows. Defaults to the one the application is ON, resolved on FIRST READ rather
+    /// than in the constructor: a view-model is built while the application is still coming up, when the theme manager
+    /// has no themes yet, so a value taken there would be null for good and the chooser would open on nothing.</summary>
+    public string SelectedThemeName
+    {
+        get => _selectedThemeName ??= UIAppContext.Current?.ThemeManager?.CurrentTheme?.Name;
+        set
+        {
+            if (_selectedThemeName == value) return;
+            _selectedThemeName = value;
+            RaisePropertyChanged(nameof(SelectedThemeName));
+        }
+    }
+
+    private string _selectedThemeName;
+
+    /// <summary>Move the whole application onto the chosen theme. A SWAP, not a variant switch: different style sets and
+    /// different metrics, so every template is rebuilt - which is exactly what the stand exists to make visible next to
+    /// the variant button, whose cost is a colour write per palette key.</summary>
+    [Command]
+    private void SwitchTheme()
+    {
+        var manager = UIAppContext.Current?.ThemeManager;
+        if (manager == null || string.IsNullOrEmpty(SelectedThemeName)) return;
+
+        var theme = manager[SelectedThemeName];
+        if (theme != null && !ReferenceEquals(theme, manager.CurrentTheme)) manager.SetTheme(theme);
+    }
 
     /// <summary>The switchable pane's own light/dark, changed by its own checkbox and by nothing else - not by the
     /// application's theme buttons, and not by the OS.</summary>

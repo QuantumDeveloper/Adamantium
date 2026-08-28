@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's switch. Same idea as everywhere else in this theme: the OFF state carries no fill, so a settings
+         column at rest is a column of text with a few outlines in it rather than a column of grey pills.
+
+         Off, it is an empty stadium with a muted thumb; on, the track takes the accent and the thumb goes to the
+         on-accent colour. Fluent fills the track in both states and relies on the fill CHANGING - which at this size
+         reads as "grey pill" versus "blue pill" and makes an untouched settings page look busy.
+
+         No BasedOn. Fluent's switch derives from ToggleButton to inherit its brushes, and then has to spend a trigger
+         undoing the accent-label that comes with them. A switch is not a button that stays pressed - it is a track and
+         a thumb - so this theme states its own three brushes and inherits nothing it then has to cancel. -->
+
+    <Style Selector="ToggleSwitch">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorSecondary}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="ToggleSwitch">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleSwitch">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Border x:Name="SwitchTrack"
+                                Width="{ResourceReference SwitchWidth}"
+                                Height="{ResourceReference SwitchHeight}"
+                                CornerRadius="{ResourceReference SwitchRadius}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{ResourceReference StrokeThin}"
+                                VerticalAlignment="Center">
+                            <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                                <Ellipse x:Name="SwitchThumb"
+                                        Width="{ResourceReference SwitchThumbSize}"
+                                        Height="{ResourceReference SwitchThumbSize}"
+                                        Fill="{ObservableResource TextFillColorTertiary}"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Center"
+                                        Margin="{ResourceReference SwitchThumbInsetOff}"/>
+                            </Grid>
+                        </Border>
+                        <ContentPresenter x:Name="PART_ContentPresenter"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                VerticalAlignment="Center"
+                                Margin="{ResourceReference CheckLabelInset}"/>
+                    </StackPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="ToggleSwitch">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="{ObservableResource TextFillColorTertiary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsChecked" Value="true">
+            <Setter TargetName="SwitchTrack" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="SwitchThumb" Property="Fill" Value="{ThemeResource AccentForegroundColor}"/>
+            <Setter TargetName="SwitchThumb" Property="HorizontalAlignment" Value="Right"/>
+            <Setter TargetName="SwitchThumb" Property="Margin" Value="{ResourceReference SwitchThumbInsetOn}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="SwitchTrack" Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground"
+                    Value="{ObservableResource TextFillColorDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

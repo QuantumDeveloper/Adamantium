@@ -46,13 +46,20 @@ public static class ResourceResolver
     // construction, so a Local resource can't be tree-scoped at that moment. Resolve the Theme/Global value immediately,
     // then - ONLY for a target that lives in the VISUAL tree - re-resolve tree-scoped once it attaches (the cascade brings
     // the full ancestor chain, incl. a Local resource's owner, and a nearer Local hit wins).
-    public static void SetDeferred(IAdamantiumComponent target, string property, string key)
+    /// <param name="priority">Where the reference was WRITTEN, expressed as a priority - the same one a literal in that
+    /// position gets. Inside a ControlTemplate a part's value must be Template, so a trigger targeting that part can
+    /// still change it; written directly on an element it is that element's own value, which is Local.
+    /// <para>It has to be told, because this method cannot see where it was called from - and getting it wrong is
+    /// silent: with Local, every trigger that has to change a metric-driven part simply stops working, which is how a
+    /// vertical slider lost its handle, its fill and its direction all at once.</para></param>
+    public static void SetDeferred(IAdamantiumComponent target, string property, string key,
+        ValuePriority priority = ValuePriority.Local)
     {
         var resourceManager = UIAppContext.Current?.ResourceManager;
 
         var baseline = resourceManager?.FindResource(key);
         if (baseline != null)
-            target.SetValue(property, baseline);
+            target.SetValue(property, baseline, priority);
 
         if (target is IUIComponent visual)
         {
@@ -66,7 +73,7 @@ public static class ResourceResolver
             {
                 var scoped = resourceManager.FindResource(visual, key);
                 if (scoped != null)
-                    visual.SetValue(property, scoped);
+                    visual.SetValue(property, scoped, priority);
             };
             return;
         }

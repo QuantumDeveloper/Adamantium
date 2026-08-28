@@ -7,8 +7,8 @@
          Per the small-styles convention each concern is its own <Style Selector="Slider">. -->
 
     <Style Selector="Slider">
-        <Setter Property="MinHeight" Value="24"/>
-        <Setter Property="MinWidth" Value="120"/>
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeightCompact}"/>
+        <Setter Property="MinWidth" Value="{ResourceReference ControlMinWidth}"/>
     </Style>
 
     <Style Selector="Slider">
@@ -69,12 +69,12 @@
                  control 120px WIDE - a huge dead hit area beside the ~4-20px rail (it swallowed clicks left/right of,
                  and above, the thin vertical track). Clear it and move the min length onto the vertical axis. -->
             <Setter Property="MinWidth" Value="0"/>
-            <Setter Property="MinHeight" Value="120"/>
-            <Setter TargetName="Rail" Property="Width" Value="4"/>
+            <Setter Property="MinHeight" Value="{ResourceReference ControlMinLength}"/>
+            <Setter TargetName="Rail" Property="Width" Value="{ResourceReference SliderTrackThickness}"/>
             <Setter TargetName="Rail" Property="Height" Value="Auto"/>
             <Setter TargetName="Rail" Property="HorizontalAlignment" Value="Center"/>
             <Setter TargetName="Rail" Property="VerticalAlignment" Value="Stretch"/>
-            <Setter TargetName="PART_SelectionRange" Property="Width" Value="4"/>
+            <Setter TargetName="PART_SelectionRange" Property="Width" Value="{ResourceReference SliderTrackThickness}"/>
             <Setter TargetName="PART_SelectionRange" Property="Height" Value="0"/>
             <Setter TargetName="PART_SelectionRange" Property="HorizontalAlignment" Value="Center"/>
             <!-- Bottom-anchored: with the Track reversed (Minimum at the bottom) the accent fills UPWARD from the bottom to

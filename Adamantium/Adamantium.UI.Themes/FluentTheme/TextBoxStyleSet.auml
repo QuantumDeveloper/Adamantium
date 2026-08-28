@@ -15,12 +15,12 @@
         <Setter Property="FloatingPlaceholderForeground" Value="{ThemeResource AccentFillColorDefault}"/>
         <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
         <Setter Property="CaretBrush" Value="{ResourceReference TextFillColorPrimary}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="4"/>
-        <Setter Property="Padding" Value="10 6 10 6"/>
-        <Setter Property="MinWidth" Value="120"/>
-        <Setter Property="MinHeight" Value="32"/>
-        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeThin}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingField}"/>
+        <Setter Property="MinWidth" Value="{ResourceReference ControlMinWidth}"/>
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeight}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
     </Style>
 
     <Style Selector="TextBox">

@@ -29,7 +29,7 @@
                         <!-- Both text alignments stated: VerticalTextAlignment defaults to Bottom, which is what sat
                              the letter on the floor of the plate instead of in the middle of it. -->
                         <TextBlock Text="{TemplateBinding Keys}"
-                                   FontSize="12"
+                                   FontSize="{ResourceReference FontSizeCaption}"
                                    Foreground="{ObservableResource KeyTipForeground}"
                                    HorizontalTextAlignment="Center"
                                    VerticalTextAlignment="Center"

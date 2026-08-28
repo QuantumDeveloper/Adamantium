@@ -255,6 +255,8 @@ public abstract class TextBoxBase : Control
     private double _lineHeight;
     private double _glyphLineHeight;           // real single-line ink extent (ascent+descent+gap) - reserves the LAST
                                                // line's descent so hanging tails (g y p q j) aren't clipped by the control
+    private double _inkTopInLine;              // ascent line, measured from the line's top: where the glyphs of that line
+    private double _inkHeight;                 // actually start, and how tall they are (ascent+descent)
 
     // Caret model, rebuilt on every (re)shape. For each of the TextLength+1 caret slots (slot i = caret BEFORE character
     // i; slot TextLength = the end) its text-local X and visual line index. Built from the shaped glyphs (one per
@@ -323,6 +325,12 @@ public abstract class TextBoxBase : Control
         // field's tails overflow _lineHeight and the control's clip cuts them. Reserve the TRUE bottom of the last line's
         // ink - its baseline (Baseline*scale) plus the descent below it - never less than the line advance.
         _glyphLineHeight = Math.Max(_lineHeight, (iFont.Baseline + Math.Abs(iFont.Descender)) * lgScale);
+        // Where that line's GLYPHS are, which is not where the line BOX is: ProcessText puts the baseline
+        // Baseline*scale below the line top and the ink spans ascent..descent around it. For Segoe UI at 12 the line box
+        // is 0..13.6 while the ink is 4.5..15.8 - so anything drawn on the box (the caret, the selection) sits a couple
+        // of pixels ABOVE the text it is supposed to mark. Both are derived from here instead.
+        _inkTopInLine = (iFont.Baseline - iFont.Ascender) * lgScale;
+        _inkHeight = (iFont.Ascender + Math.Abs(iFont.Descender)) * lgScale;
 
         var text = Text ?? string.Empty;
         var wrapping = TextWrapping;
@@ -401,13 +409,13 @@ public abstract class TextBoxBase : Control
     // aren't clipped by the control's bottom edge (the em-based advance can be shorter than ascent+descent).
     private double ContentHeight => (_lineCount - 1) * _lineHeight + _glyphLineHeight;
 
-    // Text-local caret rect (before the scroll offset) sitting BEFORE character index: X from the caret model, Y from
-    // the line index (uniform line height), height = one line.
-    private Rect CaretRect(int index)
+    // Text-local caret rect (before the scroll offset) sitting BEFORE character index: X from the caret model, Y from the
+    // line index. It spans the line's INK (ascent to descent), not its line box - a caret marks where the letters are.
+    internal Rect CaretRect(int index)
     {
         EnsureLayout();
         index = Math.Clamp(index, 0, _caretX.Length - 1);
-        return new Rect(_caretX[index], _caretLine[index] * _lineHeight, CaretWidth, _lineHeight);
+        return new Rect(_caretX[index], _caretLine[index] * _lineHeight + _inkTopInLine, CaretWidth, _inkHeight);
     }
 
     private int CaretLineOf(int index)

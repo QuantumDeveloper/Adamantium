@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's radio. A RING with an accent dot in it, not a filled accent disc.
+
+         Fluent floods the whole circle with the accent and punches the dot out of it in the on-accent colour. At 14
+         pixels that is a solid coin, and a column of choices becomes a column of coins with one lit. Keeping the ring
+         empty and putting the accent only in the dot means the eye finds the chosen row by a small bright point rather
+         than by the largest blob - which is what a list of alternatives should read like.
+
+         It also keeps the radio and the checkbox honestly different: one fills, one dots. Fluent fills both, so at a
+         glance the only difference between them is the corner radius. -->
+
+    <Style Selector="RadioButton">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorSecondary}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+    </Style>
+
+    <Style Selector="RadioButton">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <Grid Width="{ResourceReference RadioSize}"
+                              Height="{ResourceReference RadioSize}"
+                              VerticalAlignment="Center">
+                            <Ellipse x:Name="OuterRing"
+                                    Fill="{TemplateBinding Background}"
+                                    Stroke="{TemplateBinding BorderBrush}"
+                                    StrokeThickness="{ResourceReference StrokeThinValue}"/>
+                            <!-- The dot carries the ACCENT itself - there is no accent ground under it to contrast
+                                 against, which is exactly the difference from Fluent's. -->
+                            <Ellipse x:Name="Dot"
+                                    Width="{ResourceReference RadioDotSize}"
+                                    Height="{ResourceReference RadioDotSize}"
+                                    Fill="{ThemeResource AccentFillColorDefault}"
+                                    Opacity="0"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"/>
+                        </Grid>
+                        <ContentPresenter x:Name="PART_ContentPresenter"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                VerticalAlignment="Center"
+                                Margin="{ResourceReference CheckLabelInset}"/>
+                    </StackPanel>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="RadioButton">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="OuterRing" Property="Stroke" Value="{ObservableResource TextFillColorTertiary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsChecked" Value="true">
+            <!-- The ring takes the accent too, so the chosen one reads at a glance - but it stays a RING. -->
+            <Setter TargetName="OuterRing" Property="Stroke" Value="{ThemeResource AccentFillColorDefault}"/>
+            <Setter TargetName="Dot" Property="Opacity" Value="1"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground"
+                    Value="{ObservableResource TextFillColorPrimary}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="OuterRing" Property="Stroke" Value="{ResourceReference ControlStrokeColorDefault}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground"
+                    Value="{ObservableResource TextFillColorDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

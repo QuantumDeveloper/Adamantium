@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's scrollbar: thin, square, and a RECESSED CHANNEL rather than Fluent's rounded pill.
+
+         It first shipped with no trough at all, on the theory that in an editor the bar is a position readout and the
+         wheel does the scrolling, so a channel down every panel is noise. On the stand that was plainly wrong: a 320px
+         bar showing a 29px thumb is a stub floating in nothing - the thumb says where you are only if something says
+         what it is a position WITHIN. The channel is the scale the thumb is read against, so the extent has to be
+         drawn even when the fill is nearly invisible.
+
+         The thickness is a control PROPERTY (ScrollBar.BarThickness), not a size on the template: the control fixes its
+         own cross axis and writes it at Local priority, so a Width setter here would simply be overwritten. It used to
+         be a constant in the control, which is why no theme could change it. -->
+
+    <Style Selector="ScrollBar">
+        <Setter Property="BarThickness" Value="{ResourceReference ScrollBarThickness}"/>
+        <!-- This theme's own rule, stated in its palette: the fill sits nearly on the ground and the STROKE is what
+             says where the control is. A 4%-white channel alone would not read on a #14181D panel. -->
+        <Setter Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeThin}"/>
+    </Style>
+
+    <Style Selector="ScrollBar">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollBar">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="0">
+                        <Track x:Name="PART_Track"
+                                Orientation="{TemplateBinding Orientation}"
+                                Minimum="{TemplateBinding Minimum}"
+                                Maximum="{TemplateBinding Maximum}"
+                                Value="{TemplateBinding Value}"
+                                ViewportSize="{TemplateBinding ViewportSize}">
+                            <!-- The paging areas stay: they are invisible but hit-testable, and clicking the empty
+                                 channel to page is expected even when the channel is not drawn. -->
+                            <Track.DecreaseRepeatButton>
+                                <ScrollBarPageButton Focusable="false"/>
+                            </Track.DecreaseRepeatButton>
+                            <Track.Thumb>
+                                <Thumb/>
+                            </Track.Thumb>
+                            <Track.IncreaseRepeatButton>
+                                <ScrollBarPageButton Focusable="false"/>
+                            </Track.IncreaseRepeatButton>
+                        </Track>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

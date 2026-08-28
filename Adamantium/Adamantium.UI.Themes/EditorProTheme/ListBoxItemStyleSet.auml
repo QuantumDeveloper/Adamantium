@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's ROW - the unit the whole theme is built around, and the one thing the shared template cannot give
+         it. Fluent's list row has no minimum height at all: it stands as tall as its content plus its padding, which
+         in a theme with generous padding is tall enough. This theme's padding is nearly nothing, so without a floor
+         the rows would be as tall as the text and a list would read as a wall.
+
+         Everything else - the inset, the radius, the type size - comes from the shared template reading this theme's
+         Metrics, which is why there is nothing else here. -->
+
+    <Style Selector="ListBoxItem">
+        <Setter Property="MinHeight" Value="{ResourceReference RowHeight}"/>
+    </Style>
+
+</StyleSet>

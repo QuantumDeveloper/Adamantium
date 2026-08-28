@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Where a dragged item will land. The drag engine only creates this control, sets Orientation/IsFrame and sizes
+         it to the insertion span - everything it looks like is here.
+
+         A CAPPED HAIRLINE, not Fluent's capsule. A three-pixel rounded bar is easy to see, and in an editor that is the
+         problem: rows are dense, so the bar is thick enough to sit over the rows either side of the gap and the eye has
+         to work out which gap it means. A hairline is unambiguous about the gap but says nothing about how FAR the
+         insertion reaches - so the ends get caps, and the caps are what let the line stay this thin. It is the same
+         reasoning a text caret uses, and a drop point between rows is the same kind of statement.
+
+         FRAME MODE (drop INTO a node, the hybrid tree-drop) drops the translucent wash as well: over a tree node that
+         wash sits on the node's own label, and in an editor the label is how you know which node you are about to drop
+         into. An outline says the same thing and leaves it readable. -->
+
+    <Style Selector="DropInsertionIndicator">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DropInsertionIndicator">
+                    <Grid>
+                        <!-- Grouped per orientation so one Visibility setter moves a whole caret, caps included. -->
+                        <Grid x:Name="CaretH">
+                            <Border Height="{ResourceReference DropCaretThickness}"
+                                    Background="{ThemeResource AccentFillColorDefault}"
+                                    VerticalAlignment="Center" HorizontalAlignment="Stretch"/>
+                            <Border Width="{ResourceReference DropCaretThickness}"
+                                    Height="{ResourceReference DropCaretCapLength}"
+                                    Background="{ThemeResource AccentFillColorDefault}"
+                                    VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                            <Border Width="{ResourceReference DropCaretThickness}"
+                                    Height="{ResourceReference DropCaretCapLength}"
+                                    Background="{ThemeResource AccentFillColorDefault}"
+                                    VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                        </Grid>
+
+                        <Grid x:Name="CaretV" Visibility="Collapsed">
+                            <Border Width="{ResourceReference DropCaretThickness}"
+                                    Background="{ThemeResource AccentFillColorDefault}"
+                                    HorizontalAlignment="Center" VerticalAlignment="Stretch"/>
+                            <Border Height="{ResourceReference DropCaretThickness}"
+                                    Width="{ResourceReference DropCaretCapLength}"
+                                    Background="{ThemeResource AccentFillColorDefault}"
+                                    HorizontalAlignment="Center" VerticalAlignment="Top"/>
+                            <Border Height="{ResourceReference DropCaretThickness}"
+                                    Width="{ResourceReference DropCaretCapLength}"
+                                    Background="{ThemeResource AccentFillColorDefault}"
+                                    HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
+                        </Grid>
+
+                        <Border x:Name="Frame"
+                                BorderThickness="{ResourceReference DropFrameThickness}"
+                                CornerRadius="0"
+                                BorderBrush="{ThemeResource AccentFillColorDefault}"
+                                Visibility="Collapsed"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="DropInsertionIndicator">
+        <PropertyTrigger Property="Orientation" Value="Vertical">
+            <Setter TargetName="CaretH" Property="Visibility" Value="Collapsed"/>
+            <Setter TargetName="CaretV" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+    </Style>
+
+    <Style Selector="DropInsertionIndicator">
+        <PropertyTrigger Property="IsFrame" Value="True">
+            <Setter TargetName="CaretH" Property="Visibility" Value="Collapsed"/>
+            <Setter TargetName="CaretV" Property="Visibility" Value="Collapsed"/>
+            <Setter TargetName="Frame" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

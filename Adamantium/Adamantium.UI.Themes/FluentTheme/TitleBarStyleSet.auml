@@ -12,8 +12,8 @@
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <!-- A standalone TitleBar's own height. Inside a Window the template binds it to Window.TitleBarHeight, which
              wins over this - the window is the one that has to know how tall its caption is. -->
-        <Setter Property="Height" Value="36"/>
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Height" Value="{ResourceReference TitleBarHeight}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeChrome}"/>
     </Style>
 
     <Style Selector="TitleBar">
@@ -190,9 +190,9 @@
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="CornerRadius" Value="0"/>
         <Setter Property="MinHeight" Value="0"/>
-        <Setter Property="MinWidth" Value="46"/>
+        <Setter Property="MinWidth" Value="{ResourceReference TitleBarButtonWidth}"/>
         <Setter Property="Padding" Value="0"/>
-        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
         <Setter Property="Focusable" Value="False"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>

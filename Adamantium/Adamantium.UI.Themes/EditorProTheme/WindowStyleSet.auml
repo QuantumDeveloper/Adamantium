@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The window frame.
+
+         THE CAPTION DOES NOT GO ACCENT WHEN ACTIVE. This is the one real decision here, and it is the opposite of
+         Fluent's. Fluent paints the caption and the outline with the accent while the window is focused, which is the
+         native title-bar convention and reads well on a document window you switch away from. An editor is the window
+         you have focused all day - so that convention puts the loudest colour on screen, full width, permanently, and
+         says nothing while it is there. Worse, it spends the accent: this theme uses the accent for the field you are
+         typing in, the node you selected, the tab you are on, and a caption wearing the same colour competes with every
+         one of them.
+
+         So active/inactive moves to a channel that costs nothing: the caption's TEXT dims when the window loses focus,
+         and the frame's hairline steps down with it. Same information, none of the shouting.
+
+         The window still exposes TitleBarBackground and the rest, so an application that WANTS an accent caption sets
+         it on its own window and that local value wins. What no longer follows the caption colour is the frame outline:
+         in this theme the outline is chrome and stays chrome. -->
+
+    <Style Selector="Window">
+        <!-- Default window background so any window (incl. a code-created custom shell) is themed, not the black clear
+             colour. An explicit Background on the window instance overrides this. -->
+        <Setter Property="Background" Value="{ResourceReference SolidBackgroundFillColorBase}"/>
+        <!-- Default TEXT colour for the whole window: content inherits it, so plain text is theme-correct without a
+             per-TextBlock style (which would sit at Style priority and MASK a control's selection/state Foreground from
+             reaching its content). -->
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <!-- Both grounds the same on purpose - see the note above; the state is carried by the foregrounds. -->
+        <Setter Property="TitleBarBackground" Value="{ResourceReference SolidBackgroundFillColorSecondary}"/>
+        <Setter Property="InactiveTitleBarBackground" Value="{ResourceReference SolidBackgroundFillColorSecondary}"/>
+        <Setter Property="TitleBarForeground" Value="{ResourceReference TextFillColorPrimary}"/>
+        <Setter Property="InactiveTitleBarForeground" Value="{ResourceReference TextFillColorDisabled}"/>
+        <Setter Property="LoadingIndicatorText" Value="Switching theme…"/>
+    </Style>
+
+    <Style Selector="Window">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Window">
+                    <Border x:Name="PART_WindowBorder" Background="{TemplateBinding Background}"
+                            BorderThickness="{ResourceReference WindowBorderThickness}"
+                            BorderBrush="{ResourceReference ControlStrokeColorDefault}">
+                        <Grid RowDefinitions="Auto,*">
+                            <!-- The caption's height comes from the WINDOW (Window.TitleBarHeight), so code that needs
+                                 it reads one property instead of measuring a template part. -->
+                            <TitleBar x:Name="PART_TitleBar" Grid.Row="0"
+                                    Height="{TemplateBinding TitleBarHeight}"
+                                    Background="{TemplateBinding InactiveTitleBarBackground}"
+                                    Foreground="{TemplateBinding InactiveTitleBarForeground}"
+                                    Title="{TemplateBinding Title}"
+                                    Icon="{TemplateBinding Icon}"
+                                    LeadingContent="{TemplateBinding TitleBarLeadingContent}"
+                                    LeftWindowCommands="{TemplateBinding LeftWindowCommands}"
+                                    RightWindowCommands="{TemplateBinding RightWindowCommands}"/>
+                            <!-- The SELECTOR travels too, not just the single template: a window given only a selector
+                                 (one template per content type - the usual shape for a view-model host) had nothing to
+                                 build with and fell back to showing Content.ToString(). -->
+                            <ContentPresenter x:Name="PART_ContentPresenter" Grid.Row="1"
+                                    Content="{TemplateBinding Content}"
+                                    ContentTemplate="{TemplateBinding ContentTemplate}"
+                                    ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                            <ResizeGripper x:Name="PART_ResizeGripper" Grid.Row="1"
+                                    HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                    Width="{ResourceReference ResizeGripSize}"
+                                    Height="{ResourceReference ResizeGripSize}"
+                                    Visibility="Collapsed"/>
+                            <!-- Theme-swap busy overlay. The ENGINE owns the state (Window.IsThemeChanging, mirrored
+                                 from the ThemeManager); the THEME decides what to show. A translucent SCRIM (not
+                                 opaque) - the tree re-styling underneath shows through dimmed, so the swap reads as
+                                 "working" rather than a frozen blank; the spinner keeps its own full alpha (the scrim is
+                                 a translucent BACKGROUND, not element Opacity, so it does not fade the child). The Ring
+                                 animates a RenderTransform, which the compositor plays on the RENDER thread - so it
+                                 keeps turning even while the loop thread is in the cascade. -->
+                            <Border x:Name="PART_ThemeOverlay" Grid.Row="1"
+                                    Background="{ResourceReference SmokeFillColorDefault}"
+                                    Visibility="Collapsed">
+                                <StackPanel Orientation="Vertical"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <!-- Template set INLINE (Local), so the theme's BusyIndicator Template setter can't
+                                         re-template it during the swap it covers. A re-templated spinner gets a
+                                         brand-new RingSpin owner the busy loop can't re-record while the cascade runs,
+                                         so the compositor has nothing to drive and it freezes. Fixed template = a
+                                         stable, recorded owner the render thread keeps spinning. -->
+                                    <BusyIndicator x:Name="PART_ThemeSpinner" IsActive="False"
+                                            Width="{ResourceReference ThemeSpinnerSize}"
+                                            Height="{ResourceReference ThemeSpinnerSize}"
+                                            HorizontalAlignment="Center">
+                                        <BusyIndicator.Template>
+                                            <ControlTemplate TargetType="BusyIndicator">
+                                                <Grid>
+                                                    <Ellipse Stroke="{ResourceReference ControlFillColorTertiary}"
+                                                             StrokeThickness="{ResourceReference ThemeSpinnerThickness}"
+                                                             Fill="Transparent" EllipseType="EdgeToEdge"/>
+                                                    <Ellipse Stroke="{ThemeResource AccentFillColorDefault}"
+                                                             StrokeThickness="{ResourceReference ThemeSpinnerThickness}"
+                                                             Fill="Transparent" EllipseType="EdgeToEdge"
+                                                             StartAngle="0" StopAngle="90" RenderTransformOrigin="0.5,0.5">
+                                                        <Ellipse.RenderTransform>
+                                                            <Transform x:Name="RingSpin"/>
+                                                        </Ellipse.RenderTransform>
+                                                    </Ellipse>
+                                                </Grid>
+                                            </ControlTemplate>
+                                        </BusyIndicator.Template>
+                                    </BusyIndicator>
+                                    <TextBlock Text="{TemplateBinding LoadingIndicatorText}" HorizontalAlignment="Center"
+                                            Margin="{ResourceReference ThemeSpinnerLabelGap}"
+                                            Foreground="{ObservableResource TextFillColorSecondary}"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="Window">
+        <!-- Native frame (custom chrome off): hide the custom caption; the OS draws its own title bar. -->
+        <PropertyTrigger Property="UseCustomChrome" Value="false">
+            <Setter TargetName="PART_TitleBar" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+        <!-- Grip-only resize mode: show the corner grip (the only sizing affordance; edge borders are off there). -->
+        <PropertyTrigger Property="ResizeMode" Value="CanResizeWithGrip">
+            <Setter TargetName="PART_ResizeGripper" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+        <!-- Active: the caption's text comes up to full strength and the frame's hairline steps up one. The GROUND does
+             not move - see the note at the top of this file. -->
+        <PropertyTrigger Property="IsActive" Value="true">
+            <Setter TargetName="PART_TitleBar" Property="Background" Value="{TemplateBinding TitleBarBackground}"/>
+            <Setter TargetName="PART_TitleBar" Property="Foreground" Value="{TemplateBinding TitleBarForeground}"/>
+            <Setter TargetName="PART_WindowBorder" Property="BorderBrush"
+                    Value="{ResourceReference ControlStrokeColorSecondary}"/>
+        </PropertyTrigger>
+        <!-- A theme swap is in flight: raise the busy overlay and start its spinner (see the template). -->
+        <PropertyTrigger Property="IsThemeChanging" Value="true">
+            <Setter TargetName="PART_ThemeOverlay" Property="Visibility" Value="Visible"/>
+            <Setter TargetName="PART_ThemeSpinner" Property="IsActive" Value="true"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

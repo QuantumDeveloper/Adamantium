@@ -704,13 +704,17 @@ public class Grid: Panel
       }
 
       // Spare room is the star tracks' to share; Auto keeps what the measure gave it, and a shortfall overflows.
+      // EVERY star track is written, including to ZERO. The assignment used to happen only while there was room left to
+      // share, so a star that lost ALL of its room kept the width it had at the previous, larger arrange - and every
+      // track after it stayed pushed along by exactly that much. Measured: a docking panel folded against a side left a
+      // 32-wide group laying its tab strip out at x=38 - the share the star still held from when the group was 70 wide -
+      // so the strip drew outside its own panel, at the window's edge.
+      // A plain loop, not Where(): this runs on every arrange of every grid.
       var availableSize = Math.Max(finalSize - totalTakenSize, 0);
-      if (availableSize > 0 && stars > 0)   // a "0*" track alone makes stars 0, and the division NaN
+      var share = stars > 0 ? availableSize / stars : 0;   // a "0*" track alone makes stars 0, and the division NaN
+      for (int i = 0; i < segments.Length; ++i)
       {
-         foreach (var starSegment in segments.Where(x => x.IsStar))
-         {
-            starSegment.Min = Math.Max(availableSize / stars * starSegment.Stars, 0);
-         }
+         if (segments[i].IsStar) segments[i].Min = Math.Max(share * segments[i].Stars, 0);
       }
 
       Double offset = 0.0;

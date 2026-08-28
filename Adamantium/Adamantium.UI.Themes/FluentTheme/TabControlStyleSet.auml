@@ -12,14 +12,14 @@
     <Style Selector="TabControl" BasedOn="ItemsControl">
         <Setter Property="Background" Value="{ResourceReference CardBackgroundFillColorDefault}"/>
         <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="4"/>
-        <Setter Property="Padding" Value="12"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeThin}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingContent}"/>
         <Setter Property="ReorderAnimationDuration" Value="0:0:0.18"/>
         <!-- Selection indicator: accent bar that slides under the selected tab. {ThemeResource} so it follows an accent
              or theme swap live (the template paints PART_SelectionIndicator via TemplateBinding). -->
         <Setter Property="SelectionIndicatorBrush" Value="{ThemeResource AccentFillColorDefault}"/>
-        <Setter Property="SelectionIndicatorThickness" Value="3"/>
+        <Setter Property="SelectionIndicatorThickness" Value="{ResourceReference TabIndicatorThickness}"/>
         <Setter Property="SelectionAnimationDuration" Value="0:0:0.25"/>
         <!-- Default look of the per-tab close button (enable via TabControl.ShowCloseButton). A standalone ControlTemplate
              so a host swaps ONLY this to restyle the button; a click raises TabControl.TabCloseRequested. -->

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The SAME row height as a list's - an open drop-down is a list, and two row heights in one theme is exactly the
+         drift the Metrics exist to prevent. Here for the same reason as ListBoxItem: the shared template gives a row
+         no minimum, which only works for a theme whose padding is generous. -->
+
+    <Style Selector="DropDownItem">
+        <Setter Property="MinHeight" Value="{ResourceReference RowHeight}"/>
+    </Style>
+
+</StyleSet>

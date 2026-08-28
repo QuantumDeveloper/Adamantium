@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's splitter is INVISIBLE until you reach for it.
+
+         An editor window is divided four or five ways - explorer, editor, output, properties - and Fluent's answer
+         draws a visible rule at every division. Five permanent lines across the window is a grid drawn over the work.
+         The panels already have their own grounds, and the step between two grounds is enough to say where one ends;
+         the splitter only needs to exist when the pointer is on it, and then it says so with the accent.
+
+         The hit area is unchanged - it is the control's own size, and nothing here touches it. What changes is only
+         whether anything is painted in it. -->
+
+    <Style Selector="GridSplitter">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="GridSplitter">
+                    <Border Background="{TemplateBinding Background}"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="GridSplitter">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

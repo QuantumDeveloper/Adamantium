@@ -17,8 +17,8 @@
         <Setter Property="BackgroundSelected" Value="{ThemeResource AccentFillColorDefault}"/>
         <Setter Property="ForegroundSelected" Value="{ThemeResource AccentForegroundColor}"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="CornerRadius" Value="4"/>
-        <Setter Property="Padding" Value="10 6"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingRow}"/>
         <!-- Stretch on BOTH axes so item content fills the row (Fluent/WinUI default): a templated View/card spans the
              full width, and plain text still reads left (a TextBlock left-aligns its text inside the stretched
              presenter).

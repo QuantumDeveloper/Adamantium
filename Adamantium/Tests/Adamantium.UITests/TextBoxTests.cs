@@ -166,4 +166,25 @@ public class TextBoxTests
         Type(tb, "\t");
         Assert.That(tb.Text, Is.EqualTo(string.Empty));
     }
+
+    /// <summary>The caret has to stand where the LETTERS are. The layout places a line's baseline Baseline*scale below
+    /// the line top and the ink spans ascent..descent around it, so the line BOX and the ink are two different boxes
+    /// (Segoe UI at 12: box 0..13.6, ink 4.5..15.8). A caret built from the box sat a couple of pixels above the text.
+    /// Measured against a quantity computed by different code - the surface height, which reserves the last line's true
+    /// ink bottom - so it stays a check rather than a restatement of the formula.</summary>
+    [Test]
+    public void Caret_StandsOnTheLinesInk_NotOnItsLineBox()
+    {
+        var tb = new TextBox { Text = "Agy" };   // a cap, an ascender and a descender: the full ink extent
+        var surface = tb.MeasureSurface(double.PositiveInfinity);
+        var caret = tb.CaretRect(0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(caret.Bottom, Is.EqualTo(surface.Height).Within(0.01),
+                "caret must reach the bottom of the line's ink, descenders included");
+            Assert.That(caret.Y, Is.GreaterThan(0),
+                "caret must start at the ascent line, which sits below the top of the line box");
+        });
+    }
 }

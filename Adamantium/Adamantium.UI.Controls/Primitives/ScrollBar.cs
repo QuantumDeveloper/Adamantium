@@ -1,6 +1,7 @@
 using System;
 using Adamantium.UI.Controls.Panels;
 using Adamantium.UI.Core;
+using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Controls.Primitives;
@@ -13,9 +14,23 @@ namespace Adamantium.UI.Controls.Primitives;
 /// </summary>
 public class ScrollBar : RangeBase
 {
-    // Conventional fixed cross-axis thickness applied in code so a standalone scrollbar has an intrinsic width/height
-    // regardless of theme (the long axis stretches to its container).
+    // The cross-axis thickness a bar has when no theme says otherwise. A DEFAULT, not the answer: see BarThickness.
     private const double DefaultThickness = 12.0;
+
+    /// <summary>How thick the bar is across its short axis - its Width when vertical, its Height when horizontal.
+    /// <para>A PROPERTY rather than a constant because it is a THEME's number: a dense editor skin wants a thinner bar
+    /// than a touch-friendly one. The control still writes the cross axis itself (that is what fixes one axis and lets
+    /// the other stretch), and it writes it at Local priority - so while this was a const, a style setter for Width was
+    /// simply overwritten and no theme could change it at all. Setting THIS is what a theme does now.</para></summary>
+    public static readonly AdamantiumProperty BarThicknessProperty = AdamantiumProperty.Register(nameof(BarThickness),
+        typeof(double), typeof(ScrollBar),
+        new PropertyMetadata(DefaultThickness, PropertyMetadataOptions.AffectsMeasure, OnBarThicknessChanged));
+
+    public double BarThickness
+    {
+        get => GetValue<double>(BarThicknessProperty);
+        set => SetValue(BarThicknessProperty, value);
+    }
 
     public static readonly AdamantiumProperty OrientationProperty = AdamantiumProperty.Register(nameof(Orientation),
         typeof(Orientation), typeof(ScrollBar),
@@ -63,19 +78,29 @@ public class ScrollBar : RangeBase
     private static void OnOrientationChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
         => ((ScrollBar)d).ApplyOrientation();
 
+    // Either the axis or the number changing re-applies it, so the two can arrive in any order - a theme's setter lands
+    // when the style attaches, which is not necessarily before the orientation is set.
+    private static void OnBarThicknessChanged(AdamantiumComponent d, AdamantiumPropertyChangedEventArgs e)
+        => ((ScrollBar)d).ApplyOrientation();
+
+    /// <summary>Which axis currently carries the thickness WE stamped. The only size this control may release: the long
+    /// axis belongs to whoever placed the bar.</summary>
+    private Orientation? _stampedAxis;
+
     private void ApplyOrientation()
     {
-        // Fix the cross axis, let the long axis stretch (clear it to Auto).
-        if (Orientation == Orientation.Vertical)
-        {
-            Width = DefaultThickness;
-            Height = double.NaN;
-        }
-        else
-        {
-            Height = DefaultThickness;
-            Width = double.NaN;
-        }
+        // Fix the CROSS axis and leave the long one alone. It used to clear the long axis to NaN as well, which was
+        // harmless only while this ran once from the constructor - before any markup. As soon as a theme's BarThickness
+        // setter could re-run it, it landed AFTER the markup and wiped an author's Width="320": the bar took its length
+        // from whatever the parent panel happened to be, and a sibling label that changed width during a drag resized
+        // the thumb on every frame.
+        if (_stampedAxis is { } stamped && stamped != Orientation)
+            ClearValue(stamped == Orientation.Vertical ? WidthProperty : HeightProperty);
+
+        if (Orientation == Orientation.Vertical) Width = BarThickness;
+        else Height = BarThickness;
+
+        _stampedAxis = Orientation;
     }
 
     public override void OnApplyTemplate()
@@ -139,11 +164,26 @@ public class ScrollBar : RangeBase
     private void OnThumbDragCompleted(object sender, DragCompletedEventArgs e)
         => Scroll?.Invoke(this, new ScrollEventArgs(ScrollEventType.EndScroll, Value));
 
+    // Paging stops AT THE CURSOR, as everywhere else: the repeat runs until the thumb reaches the pointer and no
+    // further. See Track.PageLimitFromPoint for why the page button cannot notice that on its own.
     private void OnPageIncrease(object sender, RoutedEventArgs e)
-        => SetValueAndNotify(Value + LargeChange, ScrollEventType.LargeIncrement);
+        => Page(Value + LargeChange, increasing: true, ScrollEventType.LargeIncrement);
 
     private void OnPageDecrease(object sender, RoutedEventArgs e)
-        => SetValueAndNotify(Value - LargeChange, ScrollEventType.LargeDecrement);
+        => Page(Value - LargeChange, increasing: false, ScrollEventType.LargeDecrement);
+
+    private void Page(double stepped, bool increasing, ScrollEventType type)
+    {
+        if (_track != null)
+        {
+            var limit = _track.PageLimitFromPoint(MouseDevice.CurrentDevice.GetPosition(_track), increasing);
+            stepped = increasing ? Math.Min(stepped, limit) : Math.Max(stepped, limit);
+        }
+
+        // Already there: keep quiet rather than raise a Scroll every repeat tick for a value that does not move.
+        if (stepped == Value) return;
+        SetValueAndNotify(stepped, type);
+    }
 
     private void OnLineIncrease(object sender, RoutedEventArgs e)
         => SetValueAndNotify(Value + SmallChange, ScrollEventType.SmallIncrement);

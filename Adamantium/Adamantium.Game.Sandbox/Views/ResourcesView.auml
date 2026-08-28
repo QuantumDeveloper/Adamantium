@@ -31,11 +31,24 @@
             </Button>
         </StackPanel>
 
-        <Button Content="Toggle theme (Dark / Light)" Width="220" Height="36" Margin="0,12,0,0">
-            <Button.Behaviors>
-                <behaviors:ToggleThemeBehavior/>
-            </Button.Behaviors>
-        </Button>
+        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <Button Content="Toggle theme (Dark / Light)" Width="220" Height="36">
+                <Button.Behaviors>
+                    <behaviors:ToggleThemeBehavior/>
+                </Button.Behaviors>
+            </Button>
+
+            <!-- The other half of the pair: a variant switch rewrites colours in place, a theme SWAP re-templates the
+                 whole application with different style sets and different metrics. Side by side, what each costs is
+                 visible instead of argued about. The list is every REGISTERED theme, so a theme added later shows up
+                 here without this markup changing. -->
+            <DropDown ItemsSource="{Binding AvailableThemes}"
+                      SelectedItem="{Binding SelectedThemeName, Mode=TwoWay}"
+                      Width="200" Height="36" Margin="16,0,0,0"/>
+
+            <Button Content="Switch" Command="{Binding SwitchThemeCommand}"
+                    Width="110" Height="36" Margin="8,0,0,0"/>
+        </StackPanel>
 
         <!-- ACCENT: the theme's accent brushes are observable theme properties consumed via {ThemeResource}. Cycling them
              at runtime re-colours the live swatch and every accented control (checked toggle / checkbox / radio) at once. -->

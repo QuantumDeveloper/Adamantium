@@ -13,7 +13,7 @@
              SIZE but not into its POSITION, so an offset ring came out shifted by the outset and read as lopsided.
              Both are worth fixing in the layout/render seam - see docs/TECH_DEBT.md - and until they are, zero is the
              honest value: the ring traces the control's outline and matches its corners exactly. -->
-        <Setter Property="Outset" Value="2"/>
+        <Setter Property="Outset" Value="{ResourceReference FocusRingOutset}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="FocusAdorner">

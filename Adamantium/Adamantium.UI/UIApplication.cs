@@ -396,7 +396,20 @@ public abstract class UIApplication : FundamentalUIComponent, IService, IUIAppli
         // for the same palette. See docs/THEME_VARIANTS_PLAN.md.
         var fluent = new Fluent();
         ThemeManager.AddTheme(fluent.Name, fluent);
-        ThemeManager.SetTheme(fluent);
+
+        // The editor skin. A SECOND theme is what proves the first one is a theme and not the framework's own look:
+        // it changes the metrics of every control, so anything a control bakes into its own code shows up as the one
+        // thing that did not get denser. Registered, not current - the application still opens on Fluent.
+        var editorPro = new Themes.EditorProTheme.EditorPro();
+        ThemeManager.AddTheme(editorPro.Name, editorPro);
+
+        // Which theme the application OPENS on. Fluent unless told otherwise; ADAM_THEME names another registered one.
+        // A theme is only really exercised by being the current one from the first frame - a swap into it is a
+        // different path, and a theme that stalls the swap cannot be told apart from one that stalls at startup
+        // without being able to start ON it.
+        var requested = Environment.GetEnvironmentVariable("ADAM_THEME");
+        var startOn = string.IsNullOrEmpty(requested) ? fluent : ThemeManager[requested] ?? fluent;
+        ThemeManager.SetTheme(startOn);
     }
 
     private void SubscribeToEvents()

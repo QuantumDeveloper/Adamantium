@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's toggle button - the thing a toolbar is made of: wrap, whitespace, word-wrap, each one a button
+         that STAYS DOWN.
+
+         Checked is a held FILL, not an accent flood. Fluent paints a checked toggle in the full accent and flips its
+         label to the on-accent colour, which is right for a button that is also a statement; in a toolbar of eight it
+         turns half the strip blue. Here a checked toggle keeps its own text colour and takes the subtle fill plus an
+         accent RULE along its bottom edge - the same mark the tab strip uses, so "this one is active" reads the same
+         way everywhere in the theme.
+
+         Same resting behaviour as the plain button: no chrome until the pointer arrives. -->
+
+    <Style Selector="ToggleButton">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference SubtleFillColorTertiary}"/>
+        <Setter Property="BackgroundDisabled" Value="Transparent"/>
+        <Setter Property="ForegroundPressed" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="ForegroundDisabled" Value="{ObservableResource TextFillColorDisabled}"/>
+
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeight}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingControl}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeControl}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="ToggleButton">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <!-- Two rows, as the tab: the mark lives under the content and never moves it. -->
+                    <Grid RowDefinitions="*,Auto">
+                        <Border x:Name="InnerBorder" Grid.Row="0"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter
+                                    x:Name="PART_ContentPresenter"
+                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                    Foreground="{TemplateBinding Foreground}"
+                                    FontSize="{TemplateBinding FontSize}"
+                                    Content="{TemplateBinding Content}"
+                                    ContentTemplate="{TemplateBinding ContentTemplate}"
+                                    ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                        </Border>
+
+                        <Border x:Name="CheckedRule" Grid.Row="1"
+                                Height="{ResourceReference StrokeAccentValue}"
+                                Background="{ThemeResource AccentFillColorDefault}"
+                                Visibility="Hidden"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="ToggleButton">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+            <Setter TargetName="InnerBorder" Property="BorderBrush"
+                    Value="{ResourceReference ControlStrokeColorDefault}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsPressed" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundPressed}"/>
+        </PropertyTrigger>
+        <!-- Held down: the fill stays and the rule appears. The label keeps its own colour - nothing accent-coloured is
+             behind it. -->
+        <PropertyTrigger Property="IsChecked" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{ResourceReference SubtleFillColorSecondary}"/>
+            <Setter TargetName="CheckedRule" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundDisabled}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's button. Not Fluent's with different numbers: a different thing.
+
+         An editor's toolbar is a row of these, pressed dozens of times an hour, and a filled bordered box repeated
+         twenty times across a strip reads as a fence. So this button has NO chrome at rest - it is a label in a box
+         that exists only when the pointer is on it - and the accent variant is the only one that carries a fill.
+         Fluent's button is the opposite: chrome always, a two-pixel border that is part of its affordance.
+
+         Per the small-styles convention: properties, then the template, then the triggers. -->
+
+    <Style Selector="Button">
+        <!-- Nothing at rest. The hover and pressed grounds are what the button is made of. -->
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference SubtleFillColorTertiary}"/>
+        <Setter Property="BackgroundDisabled" Value="Transparent"/>
+        <Setter Property="ForegroundPressed" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="ForegroundDisabled" Value="{ObservableResource TextFillColorDisabled}"/>
+
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeight}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingControl}"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeControl}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
+    <Style Selector="Button">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <!-- ONE border, no outer grid. Fluent wraps its chrome in a Grid to stack a focus layer over it;
+                         this theme draws no ring of its own - the window's focus adorner is the single answer to that
+                         question - so the extra element would hold nothing. -->
+                    <Border x:Name="InnerBorder"
+                            CornerRadius="{TemplateBinding CornerRadius}"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter
+                                x:Name="PART_ContentPresenter"
+                                HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                Foreground="{TemplateBinding Foreground}"
+                                FontSize="{TemplateBinding FontSize}"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="Button">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+            <!-- The edge appears WITH the hover, not before it: that is what makes the resting row quiet. -->
+            <Setter TargetName="InnerBorder" Property="BorderBrush"
+                    Value="{ResourceReference ControlStrokeColorDefault}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsPressed" Value="true">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundPressed}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundDisabled}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- The accent button is the one that KEEPS its fill: it is the commit action of a dialog, and the only button in
+         this theme allowed to shout. -->
+    <Style Selector="Button.Accent">
+        <Setter Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="BorderBrush" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="Foreground" Value="{ThemeResource AccentForegroundColor}"/>
+        <Setter Property="BackgroundPointerOver" Value="{ThemeResource AccentFillColorSecondary}"/>
+        <Setter Property="BackgroundPressed" Value="{ThemeResource AccentFillColorTertiary}"/>
+        <Setter Property="BackgroundDisabled" Value="{ThemeResource AccentFillColorDisabled}"/>
+        <Setter Property="ForegroundPressed" Value="{ThemeResource AccentForegroundColor}"/>
+    </Style>
+
+</StyleSet>

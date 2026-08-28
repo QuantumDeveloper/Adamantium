@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Editor Pro's range slider - the same bar handles as the plain slider, for the same reason, and with one thing
+         the round version could not have: the handles now BUTT AGAINST the selected band instead of overlapping it.
+
+         Fluent's round handles sit on top of the band's square ends, which is why that template says the ends must be
+         square - a rounded end beside a circle reads as a gap. With bar handles there is nothing to hide: the span is
+         a rectangle with a slightly taller rectangle at each end, and the whole thing reads as one object with two
+         grips rather than as two circles with a line between them. -->
+
+    <Style Selector="RangeSlider">
+        <Setter Property="MinHeight" Value="{ResourceReference ControlHeightCompact}"/>
+        <Setter Property="MinWidth" Value="{ResourceReference ControlMinWidth}"/>
+    </Style>
+
+    <Style Selector="RangeSlider">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RangeSlider">
+                    <Grid>
+                        <Border x:Name="Rail"
+                                Height="{ResourceReference SliderTrackThickness}" CornerRadius="0"
+                                Background="{ResourceReference ControlFillColorTertiary}"
+                                VerticalAlignment="Center"/>
+                        <RangeTrack x:Name="PART_Track"
+                                Orientation="{TemplateBinding Orientation}"
+                                Minimum="{TemplateBinding Minimum}"
+                                Maximum="{TemplateBinding Maximum}"
+                                LowerValue="{TemplateBinding LowerValue}"
+                                UpperValue="{TemplateBinding UpperValue}"
+                                MinimumBandLength="{TemplateBinding MinimumRangeWidth}">
+                            <!-- The band is a THUMB: it shows the span AND drags it whole. Unlike a plain slider's fill
+                                 it is anchored to neither end, so the track arranges it between the two handles rather
+                                 than the control sizing it. -->
+                            <RangeTrack.CenterThumb>
+                                <Thumb x:Name="SelectedBand" Height="{TemplateBinding BandThickness}">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Border Background="{ThemeResource AccentFillColorDefault}"/>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </RangeTrack.CenterThumb>
+                            <RangeTrack.LowerThumb>
+                                <!-- Named so it can be turned with the control - see the vertical trigger below. -->
+                                <Thumb x:Name="LowerGrip"
+                                       Width="{ResourceReference SliderThumbWidth}"
+                                       Height="{ResourceReference SliderThumbLength}">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Border CornerRadius="{ResourceReference CornerRadiusSmall}"
+                                                    Background="{ThemeResource AccentFillColorDefault}"/>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </RangeTrack.LowerThumb>
+                            <RangeTrack.UpperThumb>
+                                <Thumb x:Name="UpperGrip"
+                                       Width="{ResourceReference SliderThumbWidth}"
+                                       Height="{ResourceReference SliderThumbLength}">
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Border CornerRadius="{ResourceReference CornerRadiusSmall}"
+                                                    Background="{ThemeResource AccentFillColorDefault}"/>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </RangeTrack.UpperThumb>
+                        </RangeTrack>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="RangeSlider">
+        <PropertyTrigger Property="Orientation" Value="Vertical">
+            <!-- The horizontal minimum is a min-LENGTH; left in place it would force a wide dead hit area beside a
+                 three-pixel rail. Move it onto the other axis. -->
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="{ResourceReference ControlMinLength}"/>
+            <Setter TargetName="Rail" Property="Width" Value="{ResourceReference SliderTrackThickness}"/>
+            <Setter TargetName="Rail" Property="Height" Value="Auto"/>
+            <Setter TargetName="Rail" Property="HorizontalAlignment" Value="Center"/>
+            <Setter TargetName="Rail" Property="VerticalAlignment" Value="Stretch"/>
+            <Setter TargetName="SelectedBand" Property="Width" Value="{TemplateBinding BandThickness}"/>
+            <Setter TargetName="SelectedBand" Property="Height" Value="Auto"/>
+            <!-- Both grips turn with the control: WIDE across the rail, SHORT along it. An asymmetric handle that is
+                 not turned lies along the rail and stops reading as something to grab. -->
+            <Setter TargetName="LowerGrip" Property="Width" Value="{ResourceReference SliderThumbLength}"/>
+            <Setter TargetName="LowerGrip" Property="Height" Value="{ResourceReference SliderThumbWidth}"/>
+            <Setter TargetName="UpperGrip" Property="Width" Value="{ResourceReference SliderThumbLength}"/>
+            <Setter TargetName="UpperGrip" Property="Height" Value="{ResourceReference SliderThumbWidth}"/>
+            <!-- Minimum at the BOTTOM, the span grows up. The track defaults to top=min (the scrollbar convention). -->
+            <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="true"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

@@ -11,4 +11,146 @@
          not all one size, and a name that claims they are would be wrong the first time one is not. -->
     <sys:Double x:Key="DropDownIconSize">8</sys:Double>
 
+    <!-- The standard icon square - a command's glyph in a toolbar, a ribbon button, a menu row. Distinct from the
+         chevron above on purpose: icons in this theme are not all one size, and a name that claimed they were would be
+         wrong the first time one is not. -->
+    <sys:Double x:Key="IconSize">16</sys:Double>
+
+    <!-- ── Type scale ─────────────────────────────────────────────────────────────────────────────────────────────
+         Named by ROLE, not by size: what a template asks for is "chrome text" or "a caption", and a theme decides how
+         big that is. The names are a CONTRACT between themes - a template that asks for a key is included by other
+         themes too, and each of them has to answer it, exactly as they all have to answer the palette's keys.
+
+         Six roles, which is what the theme actually uses; the sizes were repeated inline in nineteen files, where
+         "make the chrome one point smaller" meant finding all six of the places that meant chrome among the thirty
+         that mentioned a size. -->
+    <sys:Double x:Key="FontSizeTitle">18</sys:Double>
+    <sys:Double x:Key="FontSizeSubtitle">15</sys:Double>
+    <sys:Double x:Key="FontSizeBody">14</sys:Double>
+    <sys:Double x:Key="FontSizeChrome">13</sys:Double>
+    <sys:Double x:Key="FontSizeCaption">12</sys:Double>
+    <sys:Double x:Key="FontSizeMicro">11</sys:Double>
+
+    <!-- ── Heights ────────────────────────────────────────────────────────────────────────────────────────────────
+         What a control STANDS at. Only the shared ones are named: a busy indicator's 40 and a ring's 48 are the
+         geometry of that one widget, not a size any other control or theme would ever want to agree with, and putting
+         them here would grow the vocabulary every theme has to answer with names none of them mean. -->
+    <sys:Double x:Key="ControlHeight">32</sys:Double>
+    <!-- A track rather than a box - a slider has no chrome to stand up, so it needs less room than a field. -->
+    <sys:Double x:Key="ControlHeightCompact">24</sys:Double>
+    <sys:Double x:Key="TitleBarHeight">36</sys:Double>
+    <!-- A caption button is WIDER than it is tall - the target is the strip's full height, and the width is what keeps
+         three of them from reading as one block. -->
+    <sys:Double x:Key="TitleBarButtonWidth">46</sys:Double>
+
+    <!-- ── Control extents ────────────────────────────────────────────────────────────────────────────────────────
+         How wide a control is before anything is put in it. One number, written out six times - a drop-down, a spin
+         box, a progress bar, both sliders and a text field all start at the same width, and that is what makes a
+         column of settings line up. -->
+    <sys:Double x:Key="ControlMinWidth">120</sys:Double>
+    <!-- ...and the same, along a control turned on its side. -->
+    <sys:Double x:Key="ControlMinLength">120</sys:Double>
+
+    <!-- ── Tracks and rules ───────────────────────────────────────────────────────────────────────────────────────
+         The thin things: what a value SLIDES along, what it FILLS, and the bar that marks a current tab. -->
+    <sys:Double x:Key="SliderTrackThickness">4</sys:Double>
+    <sys:Double x:Key="ProgressBarThickness">6</sys:Double>
+    <sys:Double x:Key="TabIndicatorThickness">3</sys:Double>
+    <sys:Double x:Key="RingSize">48</sys:Double>
+    <sys:Double x:Key="RingThickness">5</sys:Double>
+    <!-- How far the focus ring stands OFF the control it marks: a ring drawn on the edge reads as a border. -->
+    <sys:Double x:Key="FocusRingOutset">2</sys:Double>
+    <sys:Double x:Key="DragHandleWidth">16</sys:Double>
+    <sys:Double x:Key="DragHandleHeight">20</sys:Double>
+    <sys:Double x:Key="TabStripHeight">26</sys:Double>
+
+    <!-- ── Insets ─────────────────────────────────────────────────────────────────────────────────────────────────
+         ASYMMETRIC on purpose, and that is why each role keeps its own key instead of being folded into one: a pixel
+         more below than above is optical centring - a line of text sits high in its box - and collapsing the four
+         values into one would change how every control looks, which is not what a refactor does. -->
+    <Thickness x:Key="PaddingControl">11 5 11 6</Thickness>
+    <!-- A drop-down is tighter on the right: the chevron sits there and brings its own air. -->
+    <Thickness x:Key="PaddingDropDown">11 5 8 6</Thickness>
+    <Thickness x:Key="PaddingControlCompact">8 4 8 5</Thickness>
+    <Thickness x:Key="PaddingField">10 6 10 6</Thickness>
+    <Thickness x:Key="PaddingFieldFlat">8 0 8 0</Thickness>
+    <Thickness x:Key="PaddingRow">10 6</Thickness>
+    <Thickness x:Key="PaddingTab">12 6 12 6</Thickness>
+    <Thickness x:Key="PaddingTight">8 4</Thickness>
+
+    <!-- ── Shape ──────────────────────────────────────────────────────────────────────────────────────────────────
+         One radius for everything a hand touches, a larger one for a SURFACE that floats above the window, and the
+         tab's top-only pair - a tab is joined to the strip below it, so rounding its bottom would cut it loose. -->
+    <CornerRadius x:Key="CornerRadiusDefault">4</CornerRadius>
+    <CornerRadius x:Key="CornerRadiusSurface">8</CornerRadius>
+    <CornerRadius x:Key="CornerRadiusTabTop">4 4 0 0</CornerRadius>
+
+    <!-- ── Strokes ────────────────────────────────────────────────────────────────────────────────────────────────
+         A hairline for everything that is merely bounded, and a heavier edge for what is PRESSED: a button's border is
+         part of its affordance in this theme, not a container's outline. -->
+    <Thickness x:Key="StrokeThin">1</Thickness>
+    <Thickness x:Key="StrokeControl">2</Thickness>
+    <!-- The same hairline as a NUMBER, for a rule drawn as a Border's own height rather than as somebody's border. -->
+    <sys:Double x:Key="StrokeThinValue">1</sys:Double>
+
+    <!-- ── Surfaces ───────────────────────────────────────────────────────────────────────────────────────────────
+         How much air a surface gives its content. Three, because they are three different distances from the user: a
+         floating dialog is furthest and gets the most, a panel attached to an edge less, and the tab body least - it
+         is the page itself, and padding there is margin the content did not ask for. -->
+    <!-- ── Ribbon ─────────────────────────────────────────────────────────────────────────────────────────────────
+         The ribbon's own layout. It is a whole miniature interface - tabs, groups, three button sizes, a gallery, a
+         backstage - so it brings the largest vocabulary of any control here, and every one of these was written inline
+         in the same file, several of them more than once. -->
+    <Thickness x:Key="RibbonRule">0 0 0 1</Thickness>
+    <Thickness x:Key="RibbonTabPadding">16 7</Thickness>
+    <Thickness x:Key="RibbonLedgePadding">8 0</Thickness>
+    <Thickness x:Key="RibbonGroupPadding">6 6 6 3</Thickness>
+    <!-- The small square button that collapses the ribbon, and the gallery's scroll buttons: the same chip. -->
+    <sys:Double x:Key="RibbonChipWidth">28</sys:Double>
+    <sys:Double x:Key="RibbonChipHeight">26</sys:Double>
+    <!-- A LARGE button - icon over label - and a small one, side by side in a row of three. -->
+    <sys:Double x:Key="RibbonButtonLargeHeight">56</sys:Double>
+    <sys:Double x:Key="RibbonButtonMinWidth">56</sys:Double>
+    <Thickness x:Key="RibbonButtonPadding">8 6</Thickness>
+    <Thickness x:Key="RibbonButtonPaddingSmall">4 2</Thickness>
+    <sys:Double x:Key="RibbonMenuItemHeight">48</sys:Double>
+    <Thickness x:Key="RibbonBackstagePadding">20 0</Thickness>
+    <!-- A split button's two halves: the radius is the theme's, cut in half down the seam. -->
+    <CornerRadius x:Key="RibbonSplitLeadingRadius">4 0 0 4</CornerRadius>
+    <CornerRadius x:Key="RibbonSplitTrailingRadius">0 4 4 0</CornerRadius>
+    <Thickness x:Key="RibbonSplitDropDownPadding">3 2</Thickness>
+    <Thickness x:Key="RibbonSplitDropDownPaddingSmall">1 2</Thickness>
+    <CornerRadius x:Key="RibbonGalleryItemRadius">3</CornerRadius>
+    <Thickness x:Key="RibbonGalleryItemPadding">2</Thickness>
+
+    <!-- ── Busy indicator ─────────────────────────────────────────────────────────────────────────────────────────
+         The spinner's SQUARE, and the pieces each variant is built from. Sizes, not animation: how long a dot takes to
+         travel and how it eases are the animation, and they stay in the templates. These are the same repeated numbers
+         as everywhere else - the 40x40 box was written out six times, once per variant, and the dot's diameter three
+         times, once per dot - which is exactly how a set of indicators drifts into six slightly different sizes. -->
+    <sys:Double x:Key="BusySize">40</sys:Double>
+    <sys:Double x:Key="BusyDotSize">10</sys:Double>
+    <Thickness x:Key="BusyDotGap">3,0</Thickness>
+    <sys:Double x:Key="BusyBarWidth">160</sys:Double>
+    <sys:Double x:Key="BusyBarHeight">4</sys:Double>
+    <sys:Double x:Key="BusyBarSegmentWidth">56</sys:Double>
+    <sys:Double x:Key="BusyEqualizerBarWidth">5</sys:Double>
+    <sys:Double x:Key="BusyEqualizerBarHeight">28</sys:Double>
+    <Thickness x:Key="BusyEqualizerGap">2,0</Thickness>
+    <sys:Double x:Key="BusyFlipWidth">18</sys:Double>
+    <sys:Double x:Key="BusyFlipHeight">26</sys:Double>
+    <Thickness x:Key="BusyFlipGap">4,0</Thickness>
+    <sys:Double x:Key="BusyHeartSize">20</sys:Double>
+    <sys:Double x:Key="BusyShimmerWidth">180</sys:Double>
+    <sys:Double x:Key="BusyShimmerHeight">56</sys:Double>
+    <sys:Double x:Key="BusyArcThickness">4</sys:Double>
+    <sys:Double x:Key="BusyRippleThickness">3</sys:Double>
+    <CornerRadius x:Key="BusyPieceRadius">2</CornerRadius>
+    <CornerRadius x:Key="BusyPieceRadiusLarge">3</CornerRadius>
+    <CornerRadius x:Key="BusyShimmerRadius">6</CornerRadius>
+
+    <Thickness x:Key="PaddingSurface">20</Thickness>
+    <Thickness x:Key="PaddingPanel">16</Thickness>
+    <Thickness x:Key="PaddingContent">12</Thickness>
+
 </ResourceDictionary>

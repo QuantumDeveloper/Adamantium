@@ -12,8 +12,8 @@
         <Setter Property="BackgroundSelected" Value="{ThemeResource AccentFillColorDefault}"/>
         <Setter Property="ForegroundSelected" Value="{ThemeResource AccentForegroundColor}"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="CornerRadius" Value="4"/>
-        <Setter Property="Padding" Value="10 6"/>
+        <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingRow}"/>
         <Setter Property="HorizontalContentAlignment" Value="Left"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
