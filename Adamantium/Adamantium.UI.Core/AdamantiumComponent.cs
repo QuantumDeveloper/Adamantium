@@ -370,7 +370,16 @@ public abstract class AdamantiumComponent : IAdamantiumComponent
         // that needs it most: a list rebinding its containers re-resolved the bindings of every element under each of
         // them, and three quarters of those elements have no binding at all. Measured on the Layout tab: 125 534 refreshes
         // over 22 822 elements - 5.5 apiece, of which only 31 259 had anything to re-resolve.
-        if ((metadata.PropertyChangedCallback != null && NeedsInheritedCallback(e.Property)) || PropertyChanged != null)
+        // ...and an element whose LOOK depends on the value has to be told too, callback or not. Stepping over is safe for
+        // the value - the next read resolves it from the ancestors - but the invalidation that a write performs is not a
+        // read: skip the write and the element keeps the value it is no longer painting with. That is what froze a tab's
+        // label at the resting colour while every probe reported the selected one: the presenter got the trigger's brush
+        // and the TextBlock under it - AffectsRender, no callback - was stepped over, so nothing ever asked for the
+        // repaint. It only looked intermittent because an element with any PropertyChanged subscriber takes the branch
+        // below anyway. DataContext, the property this step-over exists for, carries none of these flags and still skips.
+        if ((metadata.PropertyChangedCallback != null && NeedsInheritedCallback(e.Property)) || PropertyChanged != null
+            || metadata.AffectsRender || metadata.AffectsPaint || metadata.AffectsMeasure || metadata.AffectsArrange
+            || metadata.AffectsParentMeasure || metadata.AffectsParentArrange)
         {
             // The old push, for the few that need telling: it writes, notifies, and cascades to ITS children itself.
             SetValue(e.Property, e.NewValue, ValuePriority.Inherited);

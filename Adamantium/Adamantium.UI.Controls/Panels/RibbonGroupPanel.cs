@@ -106,7 +106,10 @@ public class RibbonGroupPanel : Panel
             var y = top;
             foreach (var child in _columns[i])
             {
-                var childHeight = child.DesiredSize.Height;
+                // Never taller than the room LEFT: arranged at its wish, a command taller than the band hangs out of
+                // the bottom and is clipped there - which for a gallery took its chevron off. (Measured: 75 available,
+                // 90 handed out.) A control given less shows less; the gallery scrolls.
+                var childHeight = Math.Min(child.DesiredSize.Height, Math.Max(0, finalSize.Height - y));
                 child.Arrange(new Rect(x, y, _columnWidths[i], childHeight));
                 y += childHeight;
             }

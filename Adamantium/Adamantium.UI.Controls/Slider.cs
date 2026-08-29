@@ -174,13 +174,44 @@ public class Slider : RangeBase
     private void OnIncrease(object sender, RoutedEventArgs e)
     {
         if (IsMoveToPointEnabled) MoveToMousePoint();
-        else SetValueFromInput(SnapToTick(Value + LargeChange));
+        else Page(Value + LargeChange, increasing: true);
     }
 
     private void OnDecrease(object sender, RoutedEventArgs e)
     {
         if (IsMoveToPointEnabled) MoveToMousePoint();
-        else SetValueFromInput(SnapToTick(Value - LargeChange));
+        else Page(Value - LargeChange, increasing: false);
+    }
+
+    /// <summary>A page step stops AT THE CURSOR, the way the scrollbar's does: the repeat runs until the thumb reaches
+    /// the pointer and no further.
+    /// <para>The page button cannot notice that on its own - the pointer does not move, the AREA moves out from under
+    /// it, and enter/leave are raised from pointer movement, so the button never hears that it was left and repeats all
+    /// the way to the end. See Track.PageLimitFromPoint.</para></summary>
+    private void Page(double stepped, bool increasing)
+    {
+        if (_track == null)
+        {
+            SetValueFromInput(SnapToTick(stepped));
+            return;
+        }
+
+        var limit = _track.PageLimitFromPoint(MouseDevice.CurrentDevice.GetPosition(_track), increasing);
+        SetValueFromInput(PageTarget(stepped, limit, increasing));
+    }
+
+    /// <summary>Where a page step actually lands: the stepped value, cut short at <paramref name="limit"/> if it would
+    /// pass the cursor, then snapped.
+    /// <para>Separate from <see cref="Page"/> and internal because the decision is worth testing and the reading of the
+    /// pointer is not - the mouse is the one part of this that cannot be handed a value.</para></summary>
+    internal double PageTarget(double stepped, double limit, bool increasing)
+    {
+        if (increasing ? limit >= stepped : limit <= stepped) return SnapToTick(stepped);
+
+        // Landing ON the cursor is the one case where snapping must not round to the NEAREST tick: half the time the
+        // nearest one lies past the cursor, which is the very overshoot the limit is here to stop. Take the tick on the
+        // near side instead - and only here, so an ordinary page step keeps rounding normally.
+        return SnapToTick(limit, increasing ? TickSnap.Down : TickSnap.Up);
     }
 
     // The page button that fired the Click captured the press, so the mouse is still at the click point: read it relative
@@ -368,12 +399,24 @@ public class Slider : RangeBase
         _valueToolTip.HorizontalOffset = horizontal ? 0 : 6;
     }
 
-    // Lands a value on the nearest tick when snapping is on; otherwise returns it unchanged (RangeBase clamps to range).
-    private double SnapToTick(double value)
+    /// <summary>Which tick to take when the value falls between two. Nearest everywhere except a page step that was cut
+    /// short at the cursor, where rounding outward would step back over the point it stopped at.</summary>
+    private enum TickSnap { Nearest, Down, Up }
+
+    // Lands a value on a tick when snapping is on; otherwise returns it unchanged (RangeBase clamps to range).
+    private double SnapToTick(double value) => SnapToTick(value, TickSnap.Nearest);
+
+    private double SnapToTick(double value, TickSnap mode)
     {
         if (!IsSnapToTickEnabled || TickFrequency <= 0) return value;
 
-        var snapped = Minimum + Math.Round((value - Minimum) / TickFrequency) * TickFrequency;
+        var steps = (value - Minimum) / TickFrequency;
+        var snapped = Minimum + mode switch
+        {
+            TickSnap.Down => Math.Floor(steps),
+            TickSnap.Up => Math.Ceiling(steps),
+            _ => Math.Round(steps)
+        } * TickFrequency;
 
         // ...and then land it on the tick EXACTLY. Minimum + n x 0.1 is a sum of binary fractions, so the arithmetic
         // above lands a hair beside the tick (1.9000000000000001), and a snapped value is precisely the one people read,

@@ -314,13 +314,21 @@ public class TextBlock : InputUIComponent
         return size;
     }
 
+    /// <summary>Lays the text out and then takes the WHOLE SLOT, as WPF's TextBlock does - it does not shrink back to
+    /// the ink.
+    /// <para>This used to return the text's own size, and that quietly disabled both text alignments: a block arranged
+    /// at its ink is pinned to the top-left of the slot, so "centre the text" centred it inside a box that was itself
+    /// against the edge. In a list row it put every label several pixels high - visible enough that it was reported by
+    /// eye - and no alignment setting anywhere could correct it, because alignment can only place text within the box
+    /// the block was given.</para>
+    /// <para>The layout call stays: it is what produces the text, and it is not free to skip. Only the answer changes.</para></summary>
     protected override Size ArrangeOverride(Size finalSize)
     {
         var b0 = System.GC.GetAllocatedBytesForCurrentThread();
-        var size = HasInlines ? EnsureInlineLayout() : EnsureLayout();
+        _ = HasInlines ? EnsureInlineLayout() : EnsureLayout();
         OverrideBytes += System.GC.GetAllocatedBytesForCurrentThread() - b0;
         OverrideCount++;
-        return size;
+        return finalSize;
     }
 
     TextRenderingParameters GetTextRenderingParameters()

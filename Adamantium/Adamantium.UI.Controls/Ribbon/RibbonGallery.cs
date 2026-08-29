@@ -168,7 +168,11 @@ public class RibbonGallery : Selector
         _clamping = true;
         try
         {
-            var last = Math.Max(0, RowCount - Math.Max(1, Rows));
+            // Rows that FIT, not rows asked for: a viewport a little shorter than two cells shows one whole row and
+            // part of another, and clamping to the asked-for two left the last row permanently half cut with nowhere
+            // further to scroll.
+            var shown = (ItemsHostPanel as Panels.RibbonGalleryPanel)?.VisibleRows ?? Math.Max(1, Rows);
+            var last = Math.Max(0, RowCount - shown);
             var clamped = Math.Min(Math.Max(0, FirstRow), last);
             if (clamped != FirstRow) FirstRow = clamped;
 
@@ -236,6 +240,14 @@ public class RibbonGallery : Selector
         if (GetTemplateChild("PART_More") is Primitives.ButtonBase more) more.Click += (_, _) => IsDropDownOpen = !IsDropDownOpen;
 
         RefreshDropDown();
+    }
+
+    // How many rows FIT is only known once the panel has been given its height, so the clamp is re-asked here.
+    protected override Size ArrangeOverride(Size finalSize)
+    {
+        var size = base.ArrangeOverride(finalSize);
+        Clamp();
+        return size;
     }
 
     /// <summary>Let the template's parts go when the template does - see ScrollBar.OnRemoveTemplate.</summary>
