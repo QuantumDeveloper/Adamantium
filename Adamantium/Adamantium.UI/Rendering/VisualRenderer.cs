@@ -73,7 +73,7 @@ public sealed class VisualRenderer : IVisualRenderer
         lock (_cacheLock)
         {
             var built = BuildDetachedCache(visual, size, scale);
-            return DrawToBitmap(built.Cache, built.Width, built.Height, clearColor ?? Colors.Transparent);
+            return DrawToBitmap(built.Cache, built.Width, built.Height, clearColor ?? Colors.Transparent, scale);
         }
     }
 
@@ -150,7 +150,7 @@ public sealed class VisualRenderer : IVisualRenderer
     // ------------------------------------------------------------------------------------------------------------------
     private readonly ConcurrentQueue<(IUIComponent visual, Action<ImageSource> onReady)> _recordQueue = new();
     private readonly ConcurrentQueue<(IUIComponent visual, Size size, double scale, Color clear, Action<ImageSource> onReady)> _detachedQueue = new();
-    private readonly ConcurrentQueue<(RenderCache cache, uint width, uint height, Color clear, Action<ImageSource> onReady)> _drawQueue = new();
+    private readonly ConcurrentQueue<(RenderCache cache, uint width, uint height, Color clear, double scale, Action<ImageSource> onReady)> _drawQueue = new();
 
     /// <summary>UI-thread API: request a snapshot of a LIVE on-screen element. It is recorded on the loop thread and drawn on
     /// the render thread (never racing or hanging the window's render); <paramref name="onReady"/> is invoked back on the UI
@@ -196,7 +196,7 @@ public sealed class VisualRenderer : IVisualRenderer
                 Record(detached.onReady, () =>
                 {
                     var built = BuildDetachedCache(detached.visual, detached.size, detached.scale);
-                    return (built.Cache, built.Width, built.Height, detached.clear);
+                    return (built.Cache, built.Width, built.Height, detached.clear, detached.scale);
                 });
                 return;
             }
@@ -207,8 +207,8 @@ public sealed class VisualRenderer : IVisualRenderer
                 {
                     var built = BuildLiveCache(request.visual);
                     return built == null
-                        ? default((RenderCache, uint, uint, Color)?)
-                        : (built.Value.cache, built.Value.width, built.Value.height, Colors.Transparent);
+                        ? default((RenderCache, uint, uint, Color, double)?)
+                        : (built.Value.cache, built.Value.width, built.Value.height, Colors.Transparent, built.Value.scale);
                 });
             }
         }
@@ -217,7 +217,7 @@ public sealed class VisualRenderer : IVisualRenderer
     // Builds one queued request and hands it to the draw queue. Whatever happens, the caller gets an ANSWER: a request
     // that never comes back is not one lost picture - the caller counts it as still in flight and refuses every later
     // one, so a live brush freezes at its last good picture for good.
-    private void Record(Action<ImageSource> onReady, Func<(RenderCache Cache, uint Width, uint Height, Color Clear)?> build)
+    private void Record(Action<ImageSource> onReady, Func<(RenderCache Cache, uint Width, uint Height, Color Clear, double Scale)?> build)
     {
         try
         {
@@ -229,7 +229,8 @@ public sealed class VisualRenderer : IVisualRenderer
                 return;
             }
 
-            _drawQueue.Enqueue((built.Value.Cache, built.Value.Width, built.Value.Height, built.Value.Clear, onReady));
+            _drawQueue.Enqueue((built.Value.Cache, built.Value.Width, built.Value.Height, built.Value.Clear,
+                built.Value.Scale, onReady));
             LoopSignal.Request();   // ensure a frame runs so the render thread drains the draw queue
         }
         catch (Exception ex)
@@ -251,7 +252,7 @@ public sealed class VisualRenderer : IVisualRenderer
             {
                 try
                 {
-                    image = DrawToBitmap(request.cache, request.width, request.height, request.clear);
+                    image = DrawToBitmap(request.cache, request.width, request.height, request.clear, request.scale);
                 }
                 catch (Exception ex)
                 {
@@ -272,7 +273,7 @@ public sealed class VisualRenderer : IVisualRenderer
     /// real <c>RenderParent</c> chain), and the projection is offset by the element's world origin so the subtree lands at
     /// the render-target origin. DEVICE-FREE (no GPU work) - safe on the loop thread. Null if the element has no visible size.
     /// </summary>
-    private (RenderCache cache, uint width, uint height)? BuildLiveCache(IUIComponent element)
+    private (RenderCache cache, uint width, uint height, double scale)? BuildLiveCache(IUIComponent element)
     {
         if (element == null) return null;
         var size = element.Bounds.Size;
@@ -315,7 +316,7 @@ public sealed class VisualRenderer : IVisualRenderer
 
         var width = (uint)Math.Max(1, size.Width * scale);
         var height = (uint)Math.Max(1, size.Height * scale);
-        return (cache, width, height);
+        return (cache, width, height, scale);
     }
 
     private static void FlattenSubtree(IUIComponent component, List<IUIComponent> list)
@@ -327,7 +328,12 @@ public sealed class VisualRenderer : IVisualRenderer
 
     // Draws an already-built cache into a fresh off-screen RT and reads it back to a CPU bitmap (device-INDEPENDENT: the
     // dedicated render device's GPU texture can't be sampled by a window's device). One-shot - frees the GPU resources here.
-    private ImageSource DrawToBitmap(RenderCache cache, uint width, uint height, Color clear)
+    // scale = the device-pixel density the cache was RECORDED at. The bitmap is that many physical pixels across, and it
+    // has to say so: a BitmapSource's logical size is PixelWidth * DpiXScale, so a snapshot taken at 1.5x and handed over
+    // as 1:1 measures 1.5x the element it copied - on a 4K monitor the "1:1" snapshot stood half again as large as the
+    // live tree beside it. The density belongs on the picture, not in the size: dropping the 1.5 from the RASTER instead
+    // would match the size by throwing away exactly the pixels the monitor has.
+    private ImageSource DrawToBitmap(RenderCache cache, uint width, uint height, Color clear, double scale)
     {
         EnsureDevice();
         var presenter = TargetFor(width, height);
@@ -366,7 +372,8 @@ public sealed class VisualRenderer : IVisualRenderer
         // itself is kept: what leaked was never the units, it was the batch rings it owns.
         cache.DisposeUnits();
 
-        return new BitmapSource(width, height, 1, 1, format, pixels);
+        var density = scale > 0 ? 1.0 / scale : 1.0;
+        return new BitmapSource(width, height, density, density, format, pixels);
     }
 
     /// <summary>The off-screen target, KEPT between bakes and re-made only when the size changes. A fresh render target
