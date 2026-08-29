@@ -282,9 +282,9 @@ public class RibbonTabPanel : Panel
 
     /// <summary>Out-of-band theming means out-of-band RE-theming too: a theme swap reaches this panel, and the ledges
     /// hang off it rather than under it.</summary>
-    public override void ApplyCurrentTheme()
+    protected override void ApplyCurrentThemeCore()
     {
-        base.ApplyCurrentTheme();
+        base.ApplyCurrentThemeCore();
 
         foreach (var ledge in _ledges) Theme(ledge);
     }

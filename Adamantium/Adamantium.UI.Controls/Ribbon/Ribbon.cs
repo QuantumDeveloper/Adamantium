@@ -397,7 +397,9 @@ public class Ribbon : Selector
         ribbon.HostSelectedContent();
         if (!ribbon.IsMinimized)
         {
-            ribbon.CloseFlyout();
+            // NOT animated: the band has just gone back into the ribbon, so there is nothing left in the flyout to
+            // slide away - only an empty plate its own height, under the band that is already showing.
+            ribbon.CloseFlyout(animate: false);
         }
     }
 
@@ -438,7 +440,10 @@ public class Ribbon : Selector
         UpdateSelectedContent();
     }
 
-    private void UpdateSelectedContent() => SelectedContent = SelectedItem;
+    private void UpdateSelectedContent()
+    {
+        SelectedContent = SelectedItem;
+    }
 
     /// <summary>Selects the tab whose header was clicked.</summary>
     internal void SelectTab(RibbonTabHeader header)
@@ -577,12 +582,26 @@ public class Ribbon : Selector
     {
         if (_flyout == null) return;
 
+
         _flyoutClosing = false;
 
         var slide = FlyoutSlide;
         if (slide == null)
         {
             _flyout.IsOpen = true;
+            return;
+        }
+
+        // ALREADY SHOWING - this is a tab being switched, not a band being opened. Parking it off-screen here would be
+        // fatal: the motion back is started by the popup's FIRST LAYER PASS, and a popup that is already open gets no
+        // such pass (IsOpen = true over true is not a change, so it never re-opens). Nothing would ever bring it back,
+        // and the flyout would stay up with its commands a band's height above the clip - commands vanishing from a
+        // panel that is plainly still there, after nothing more than clicking between tabs.
+        // Animate instead: from 0 it is a no-op, and it is also the thing that catches a band caught mid-close.
+        if (_flyout.IsOpen)
+        {
+            _flyout.LayerPass -= OnFlyoutFirstPass;
+            Animate(0);
             return;
         }
 
@@ -599,13 +618,21 @@ public class Ribbon : Selector
         Animate(0);
     }
 
-    private void CloseFlyout()
+    /// <summary>Puts the minimized band away. <paramref name="animate"/> is false when the band is not going anywhere -
+    /// it is going HOME, back into the ribbon, which the restore has already done.
+    /// <para>Sliding it out then animates a plate that is empty: the content moved back to the band first, so what
+    /// travels down is a ghost of the band the same height as the band now showing above it. On screen that is a
+    /// ribbon twice as tall for the length of the transition, settling back when the ghost finally leaves - measured:
+    /// band 106 visible AND popup still open with a 106-tall child.</para></summary>
+    private void CloseFlyout(bool animate = true)
     {
         if (_flyout is not { IsOpen: true }) return;
 
         var slide = FlyoutSlide;
-        if (slide == null)
+        if (slide == null || !animate)
         {
+            _flyoutClosing = false;
+            _flyout.LayerPass -= OnFlyoutFirstPass;
             _flyout.IsOpen = false;
             return;
         }

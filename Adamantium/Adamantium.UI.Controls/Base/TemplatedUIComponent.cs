@@ -40,11 +40,11 @@ public class TemplatedUIComponent : InputUIComponent, ITemplatedUIComponent, ITe
     private bool _suspendTemplateBuild;
     private bool _pendingTemplateBuild;
 
-    public override void ApplyCurrentTheme()
+    protected override void ApplyCurrentThemeCore()
     {
         var wasSuspended = _suspendTemplateBuild;   // save/restore so a nested re-theme doesn't build early - only the outermost does
         _suspendTemplateBuild = true;
-        base.ApplyCurrentTheme();
+        base.ApplyCurrentThemeCore();
         _suspendTemplateBuild = wasSuspended;
         if (!wasSuspended && _pendingTemplateBuild)
         {

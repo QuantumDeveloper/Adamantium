@@ -91,10 +91,22 @@ public class RibbonGalleryPanel : Panel
         return new Size(columns * _cellWidth, rows * _cellHeight);
     }
 
+    private double _arrangedHeight;
+
+    /// <summary>How many rows fit WHOLE in the height this panel was GIVEN - which is not always the <see cref="Rows"/>
+    /// asked for, and is what "scrolled to the end" has to be measured against.</summary>
+    public int VisibleRows => _cellHeight <= 0 || _arrangedHeight <= 0
+        ? Math.Max(1, Rows)
+        : Math.Max(1, (int)(_arrangedHeight / _cellHeight));
+
     protected override Size ArrangeOverride(Size finalSize)
     {
+        _arrangedHeight = finalSize.Height;
+
         var columns = Math.Max(1, Columns);
-        var top = FirstRow * _cellHeight;
+        // Never past the end: the last row lands flush with the bottom rather than scrolling into empty space.
+        var maxTop = Math.Max(0, RowCount * _cellHeight - finalSize.Height);
+        var top = Math.Min(FirstRow * _cellHeight, maxTop);
 
         var at = 0;
         foreach (var child in Children)

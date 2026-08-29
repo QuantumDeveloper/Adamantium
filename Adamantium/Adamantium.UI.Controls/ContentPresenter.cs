@@ -307,7 +307,18 @@ public class ContentPresenter : InputUIComponent
                     Text = newContent.ToString(),
                     FontSize = FontSize,
                     HorizontalTextAlignment = ToTextAlignment(HorizontalAlignment),
-                    VerticalTextAlignment = ToTextAlignment(VerticalAlignment)
+                    VerticalTextAlignment = ToTextAlignment(VerticalAlignment),
+                    // The BLOCK is placed by layout; the text alignments above only place text inside it. Which matters
+                    // because a stretched block does NOT hand its height to the text layout - that is fed the explicit
+                    // Height, which a label leaves NaN, i.e. unbounded - so "centre the text" centres it inside its own
+                    // line and the block still sits against the top of the slot. In a row with
+                    // VerticalContentAlignment=Stretch that put every label several pixels high, in both themes.
+                    // So a stretched presenter CENTRES its generated label rather than stretching it - the same reading
+                    // of Stretch that ToTextAlignment already takes just below.
+                    HorizontalAlignment = HorizontalAlignment,
+                    VerticalAlignment = VerticalAlignment == VerticalAlignment.Stretch
+                        ? VerticalAlignment.Center
+                        : VerticalAlignment
                 };
                 // BOUND, not copied: a copy is only as current as the change notification that refreshes it, and an
                 // INHERITED change does not always reach a descendant - the inheritance walk has a cheap path that steps
@@ -325,7 +336,6 @@ public class ContentPresenter : InputUIComponent
             AddLogicalChild(_currentRoot);
             SetContentContext(newContent);
         }
-
     }
 
     /// <summary>Builds the visual from its template right here, on the calling thread - the ordinary path, and the one a
@@ -519,6 +529,12 @@ public class ContentPresenter : InputUIComponent
     /// again, leaving the tab blank with its content parented nowhere.</para>
     /// <para>A visual built from a TEMPLATE is ours by construction and is always destroyed with it.</para>
     /// </summary>
+    /// <summary>Is this visual an ITEM of the control this presenter serves - something the owner holds and will hand
+    /// back - rather than content the presenter was given to keep? Asked of the templated parent, because that is the
+    /// control a selected-content host belongs to.</summary>
+    private bool IsOwnersOwnItem(IUIComponent visual) =>
+        visual != null && TemplatedParent is ItemsControl owner && owner.Items.Contains(visual);
+
     private void Release(IUIComponent visual, TemplateResult built)
     {
         // Ask our OWN children, not the visual's parent pointer. Adoption sets the child's VisualParent and does not
@@ -535,10 +551,19 @@ public class ContentPresenter : InputUIComponent
         // CONTENT, not a template part, so nothing marked it and every sweep that asks "was this discarded" answered no
         // for an entire discarded view. Measured: a discarded ListBox left subscribed to a view model's collection,
         // which outlives the application's whole UI. See DiscardedVisuals.
-        if (_discardBuf.Count > 0) _discardBuf.Clear();
-        CollectForDiscard(visual);
-        Core.DiscardedVisuals.Publish(System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_discardBuf));
-        _discardBuf.Clear();
+        //
+        // ...but NOT an item of the control this presenter was templated into. A selected-content host shows one of its
+        // owner's OWN items - a ribbon tab, and the owner still holds it in Items and hands it back the next time it is
+        // picked. A discard is ONE WAY (Revive refuses a discarded element, and the render cache skips one), so saying
+        // it here killed every ribbon tab the moment it was switched away from: it came back parented, measured,
+        // arranged, correctly sized - and invisible, for the rest of the session. Showing something is not owning it.
+        if (!IsOwnersOwnItem(visual))
+        {
+            if (_discardBuf.Count > 0) _discardBuf.Clear();
+            CollectForDiscard(visual);
+            Core.DiscardedVisuals.Publish(System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_discardBuf));
+            _discardBuf.Clear();
+        }
 
         RemoveVisualChild(visual);
         RemoveLogicalChild(visual);

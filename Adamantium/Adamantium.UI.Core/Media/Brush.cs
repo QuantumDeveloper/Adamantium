@@ -24,6 +24,14 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
    // subscribers. Allocated lazily - most brushes have exactly one owner.
    private Dictionary<AdamantiumComponent, int> _owners;
 
+   // The map is written from BOTH THREADS. Attaching happens wherever a visual joins the tree, and the popup layer does
+   // that on the RENDER thread while the loop thread is attaching everything else - and a theme brush is shared by the
+   // whole window, so it is the same map. Two writers tore a Dictionary mid-resize and it came out as
+   // IndexOutOfRangeException from set_Item, on the render processor, taking the application with it.
+   // A lock rather than a ConcurrentDictionary: the read-modify-write of the per-owner count is the operation that has
+   // to be atomic, and the sweeps walk and mutate the map together.
+   private readonly object _ownersLock = new();
+
    // The immutable appearance the render path reads - see Snapshot.
    private volatile Brush _snapshot;
 
@@ -81,12 +89,23 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
    /// <summary>How many handlers are listening to <see cref="Changed"/>. This is what the owner counting exists to keep
    /// at one per owner, so it is what the test has to read - the hold count alone is satisfied by a broken attach that
    /// subscribes every time.</summary>
-   internal int SubscriberCount => (Changed?.GetInvocationList().Length ?? 0) + (_owners?.Count ?? 0);
+   internal int SubscriberCount
+   {
+      get
+      {
+         int owners;
+         lock (_ownersLock) owners = _owners?.Count ?? 0;
+         return (Changed?.GetInvocationList().Length ?? 0) + owners;
+      }
+   }
 
    /// <summary>Is this element in the owner map - the only thing this brush can tell when its colour changes. An
    /// element that PAINTS with a brush and is not in it hears nothing, which is what left every inherited Foreground
    /// in the previous variant's colour.</summary>
-   internal bool IsOwnedBy(AdamantiumComponent component) => _owners?.ContainsKey(component) == true;
+   internal bool IsOwnedBy(AdamantiumComponent component)
+   {
+      lock (_ownersLock) return _owners?.ContainsKey(component) == true;
+   }
 
    protected void RaiseChanged()
    {
@@ -126,9 +145,14 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
       var owners = _ownersSnapshot;
       if (owners == null)
       {
-         owners = new AdamantiumComponent[_owners.Count];
-         _owners.Keys.CopyTo(owners, 0);
-         _ownersSnapshot = owners;
+         // Built under the lock, walked outside it: copying the keys is the one moment this must not race a writer,
+         // while the walk itself is over an array nobody else can touch.
+         lock (_ownersLock)
+         {
+            owners = new AdamantiumComponent[_owners.Count];
+            _owners.Keys.CopyTo(owners, 0);
+            _ownersSnapshot = owners;
+         }
       }
 
       foreach (var owner in owners) owner.OnRenderValueChanged(this, EventArgs.Empty);
@@ -167,9 +191,12 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
       foreach (var brush in live)
       {
          var here = 0;
-         if (brush._owners != null)
-            foreach (var owner in brush._owners.Keys)
-               if (owner is FundamentalUIComponent { IsDiscarded: true }) here++;
+         lock (brush._ownersLock)
+         {
+            if (brush._owners != null)
+               foreach (var owner in brush._owners.Keys)
+                  if (owner is FundamentalUIComponent { IsDiscarded: true }) here++;
+         }
 
          // ...and the SUBSCRIBER LIST, which is a different thing from the owner map and can disagree with it. The map
          // came back clean while the graph showed this very event holding a destroyed part, so the map is not the
@@ -205,22 +232,32 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
 
    void IRenderAttachable.AttachTo(AdamantiumComponent owner)
    {
-      if (_owners == null)
+      var firstOwner = false;
+
+      lock (_ownersLock)
       {
-         _owners = new Dictionary<AdamantiumComponent, int>();
-         lock (BrushesWithOwners) BrushesWithOwners.Add(new WeakReference<Brush>(this));
+         if (_owners == null)
+         {
+            _owners = new Dictionary<AdamantiumComponent, int>();
+            firstOwner = true;
+         }
+
+         if (_owners.TryGetValue(owner, out var held))
+         {
+            _owners[owner] = held + 1;   // already subscribed for this owner; another of its properties took the brush
+         }
+         else
+         {
+            _owners[owner] = 1;
+            System.Threading.Interlocked.Increment(ref LinksTaken);
+            _ownersSnapshot = null;   // the map is what notifies them now - see RaiseChanged
+         }
       }
 
-      if (_owners.TryGetValue(owner, out var held))
-      {
-         _owners[owner] = held + 1;   // already subscribed for this owner; another of its properties took the brush
-      }
-      else
-      {
-         _owners[owner] = 1;
-         System.Threading.Interlocked.Increment(ref LinksTaken);
-         _ownersSnapshot = null;   // the map is what notifies them now - see RaiseChanged
-      }
+      // OUTSIDE the map lock, and that ordering is the point: the diagnostics take BrushesWithOwners and then read a
+      // brush's map, so a path that held the map while reaching for the global list would be the other half of a
+      // deadlock. Nobody holds both at once.
+      if (firstOwner) lock (BrushesWithOwners) BrushesWithOwners.Add(new WeakReference<Brush>(this));
 
       Anchor(owner);
 
@@ -229,25 +266,30 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
       // sweep reads it as gone - and the subscribe below then went ahead anyway. That leaves a SUBSCRIBER WITH NO MAP
       // ENTRY: invisible to every later sweep, and holding a whole discarded subtree through this brush. Measured at
       // +20 such a swap, with the owner map reading perfectly clean.
-      if (_owners.Count > _sweepAt) SweepOwnersOutOfTheTree();
+      bool overdue;
+      lock (_ownersLock) overdue = _owners.Count > _sweepAt;
+      if (overdue) SweepOwnersOutOfTheTree();
    }
 
    void IRenderAttachable.DetachFrom(AdamantiumComponent owner)
    {
-      if (_owners == null || !_owners.TryGetValue(owner, out var held))
+      lock (_ownersLock)
       {
-         return;
-      }
+         if (_owners == null || !_owners.TryGetValue(owner, out var held))
+         {
+            return;
+         }
 
-      if (held > 1)
-      {
-         _owners[owner] = held - 1;   // its other properties still draw with this brush
-         return;
-      }
+         if (held > 1)
+         {
+            _owners[owner] = held - 1;   // its other properties still draw with this brush
+            return;
+         }
 
-      _owners.Remove(owner);
-      System.Threading.Interlocked.Increment(ref LinksGivenUp);
-      _ownersSnapshot = null;
+         _owners.Remove(owner);
+         System.Threading.Interlocked.Increment(ref LinksGivenUp);
+         _ownersSnapshot = null;
+      }
    }
 
    // A brush outlives its owners - a THEME brush outlives the application - and it can only be TOLD an owner is gone by
@@ -279,6 +321,12 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
    {
       _sweptGeneration = SweepGeneration;
       List<AdamantiumComponent> gone = null;
+
+      // Under the lock: this walks the map while the other thread may be attaching into it. The RELEASING below stays
+      // outside - it calls back into the owners, and holding a brush's lock across foreign code is how a deadlock is
+      // built.
+      lock (_ownersLock)
+      {
       foreach (var owner in _owners.Keys)
       {
          // Only an ELEMENT can be judged: a non-visual owner (a drawing, a stop, another brush) has no tree to be out
@@ -296,6 +344,8 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
 
       // Collected first: releasing mutates the very map being walked.
       _sweepAt = Math.Max(16, _owners.Count * 2);
+      }
+
       if (gone == null) return;
 
       foreach (var owner in gone)
@@ -305,22 +355,26 @@ public abstract class Brush: AdamantiumComponent, IRenderAttachable
          // swap has settled they hold the NEW theme's brushes - so the detach landed on the wrong brush, and this one
          // kept both its map entry and its Changed subscription. The link counter said nothing, because a stale entry
          // here was balanced by a released one there.
-         if (_owners.Remove(owner))
+         bool removed;
+         lock (_ownersLock)
          {
-            System.Threading.Interlocked.Increment(ref LinksGivenUp);
-            _ownersSnapshot = null;
+            removed = _owners.Remove(owner);
+            if (removed) _ownersSnapshot = null;
          }
+         if (removed) System.Threading.Interlocked.Increment(ref LinksGivenUp);
 
          // ...and the owner still gives up the rest of what it holds, which also arms its re-take on attach.
          owner.ReleaseRenderAttachments();
       }
 
-      _sweepAt = Math.Max(16, _owners.Count * 2);
+      lock (_ownersLock) _sweepAt = Math.Max(16, _owners.Count * 2);
    }
 
    /// <summary>How many of <paramref name="owner"/>'s render properties currently hold this brush.</summary>
-   internal int OwnerHoldCount(AdamantiumComponent owner) =>
-      _owners != null && _owners.TryGetValue(owner, out var held) ? held : 0;
+   internal int OwnerHoldCount(AdamantiumComponent owner)
+   {
+      lock (_ownersLock) return _owners != null && _owners.TryGetValue(owner, out var held) ? held : 0;
+   }
 
    /// <summary>Hang this brush on the element that draws with it, so expressions written ON THE BRUSH -
    /// <c>{Binding Colour}</c>, <c>{ResourceReference Key}</c> - have a tree to resolve against. On its own a brush is

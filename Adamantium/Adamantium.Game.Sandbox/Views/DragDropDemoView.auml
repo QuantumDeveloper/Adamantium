@@ -59,11 +59,19 @@
                              ItemsSource="{Binding Left}"
                              SelectedItems="{Binding LeftSelection}"
                              DragDrop.UseDropGap="{Binding IsChecked, ElementName=LeftGapToggle}"
-                             SelectionMode="Extended" 
+                             SelectionMode="Extended"
                              Background="Transparent">
+                        <!-- The gap between rows belongs to the CONTAINER, not to the tile inside it: on the tile it is
+                             wrapped by the row's selection plate, so the plate stands six pixels taller than what it is
+                             highlighting and the tile hugs its top. -->
+                        <ListBox.Styles>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Margin" Value="0 3 0 3"/>
+                            </Style>
+                        </ListBox.Styles>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="{ResourceReference TileFillColorDefault}" CornerRadius="6" Padding="10" MarginBottom="6">
+                                <Border Background="{ResourceReference TileFillColorDefault}" CornerRadius="6" Padding="10">
                                     <!-- DragSourceBehavior: Data={Binding} = the item (behavior inherits the item's DataContext);
                                          the source-lifecycle commands reach the VM via the default VISUAL ancestor walk from
                                          the behavior's host, which crosses the item's template boundary to the ItemsControl. -->
@@ -118,9 +126,15 @@
                     <CheckBox Grid.Row="1" Content="Accept drop" IsChecked="{Binding AnimalsAcceptDrop, Mode=TwoWay}" MarginBottom="8"/>
                     <ListBox Grid.Row="2" ItemsSource="{Binding Right}" SelectedItems="{Binding RightSelection}"
                              SelectionMode="Extended" Background="Transparent">
+                        <!-- On the CONTAINER, not the tile - see the note on the Fruits list. -->
+                        <ListBox.Styles>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Margin" Value="0 3 0 3"/>
+                            </Style>
+                        </ListBox.Styles>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Border Background="{ResourceReference TileFillColorDefault}" CornerRadius="6" Padding="10" MarginBottom="6"
+                                <Border Background="{ResourceReference TileFillColorDefault}" CornerRadius="6" Padding="10"
                                         DragDrop.AllowDrag="True" DragDrop.DragData="{Binding}"
                                         DragDrop.DragStartedCommand="{Ancestor ItemsControl, DataContext.DragStartedCommand}"
                                         DragDrop.DragCompletedCommand="{Ancestor ItemsControl, DataContext.DragCompletedCommand}">
