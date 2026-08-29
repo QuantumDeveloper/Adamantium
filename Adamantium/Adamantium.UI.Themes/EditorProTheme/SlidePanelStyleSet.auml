@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- A panel that slides in from a window edge and lies over everything. The slide itself is the control's; what is
+         here is the drawer it slides.
+
+         A DRAWER, not a card. Fluent floats it on the card ground with a rounded frame, which reads as an object
+         arriving on top of the work. Here it takes the panel ground and is closed by a hairline on the edge it slid
+         from - it reads as part of the window that was folded away, which is what it is. Square, so it lines up with
+         the panels it slides over instead of announcing itself as a different kind of surface. -->
+
+    <Style Selector="SlidePanel">
+        <Setter Property="Background" Value="{ResourceReference SolidBackgroundFillColorBase}"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeThin}"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingPanel}"/>
+    </Style>
+
+    <Style Selector="SlidePanel">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="SlidePanel">
+                    <Popup x:Name="PART_Popup"
+                            DockEdge="{TemplateBinding Placement}"
+                            DockFill="{TemplateBinding FullWindow}">
+                        <Border x:Name="PART_Drawer"
+                                Width="{TemplateBinding Width}"
+                                Height="{TemplateBinding Height}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Padding="{TemplateBinding Padding}"
+                                ClipToBounds="True">
+                            <Grid RowDefinitions="Auto,*">
+                                <Grid Grid.Row="0" ColumnDefinitions="*,Auto"
+                                        Margin="{ResourceReference SlidePanelHeaderGap}">
+                                    <!-- The caption is SUBTITLE weight, not title: a drawer is a place inside the
+                                         window, and a title-sized heading makes it read as a separate document. -->
+                                    <ContentPresenter Grid.Column="0"
+                                            Content="{TemplateBinding Header}"
+                                            FontSize="{ResourceReference FontSizeSubtitle}"
+                                            VerticalAlignment="Center"/>
+                                    <Button x:Name="PART_CloseButton" Grid.Column="1"
+                                            Width="{ResourceReference SlidePanelCloseSize}"
+                                            Height="{ResourceReference SlidePanelCloseSize}"
+                                            MinWidth="0" MinHeight="0"
+                                            Background="Transparent" BorderThickness="0" Padding="0"
+                                            VerticalAlignment="Top">
+                                        <Image Source="{ResourceReference CloseIcon}"
+                                                Width="{ResourceReference SlidePanelCloseGlyph}"
+                                                Height="{ResourceReference SlidePanelCloseGlyph}"
+                                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Button>
+                                </Grid>
+                                <ContentPresenter Grid.Row="1"
+                                        Content="{TemplateBinding Content}"
+                                        ContentTemplate="{TemplateBinding ContentTemplate}"
+                                        ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                            </Grid>
+                        </Border>
+                    </Popup>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="SlidePanel">
+        <PropertyTrigger Property="ShowCloseButton" Value="false">
+            <Setter TargetName="PART_CloseButton" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

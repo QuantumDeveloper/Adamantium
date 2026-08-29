@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The swatch that opens a picker. In an editor this sits in a properties row next to a label, so it is a SQUARE
+         chip with a hairline frame and almost no padding: the point of it is the colour, and every pixel spent on
+         chrome is a pixel not spent showing the colour being judged.
+         The popup's content is bound {Ancestor}-two-way, which walks the LOGICAL tree - the one that stays intact for
+         popup content, where the visual tree does not reach. -->
+
+    <Style Selector="ColorPickerButton">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ColorPickerButton">
+                    <Grid>
+                        <Border x:Name="PART_Header"
+                                CornerRadius="0"
+                                Background="{ResourceReference ControlFillColorDefault}"
+                                BorderBrush="{ResourceReference ControlStrokeColorDefault}"
+                                BorderThickness="{ResourceReference StrokeThin}"
+                                Padding="{ResourceReference ColorSwatchPadding}">
+                            <Border Background="{TemplateBinding SelectedBrush}" CornerRadius="0"/>
+                        </Border>
+                        <Popup x:Name="PART_Popup"
+                                Placement="Bottom" FlipToFit="True" VerticalOffset="4">
+                            <Popup.ChildTemplate>
+                                <ControlTemplate TargetType="Popup">
+                                    <ColorPicker SelectedColor="{Binding SelectedColor, Mode=TwoWay}"/>
+                                </ControlTemplate>
+                            </Popup.ChildTemplate>
+                        </Popup>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="ColorPickerButton">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="PART_Header" Property="BorderBrush" Value="{ResourceReference ControlStrokeColorSecondary}"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

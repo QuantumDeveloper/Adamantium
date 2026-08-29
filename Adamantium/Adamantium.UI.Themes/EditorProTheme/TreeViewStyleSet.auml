@@ -109,4 +109,35 @@
         </PropertyTrigger>
     </Style>
 
+    <!-- The tree itself. CanContentScroll so the viewer measures the items host at the VIEWPORT rather than unbounded
+         and hands scrolling to the virtualizing panel - without it the panel sees infinite height, realizes about a
+         screenful and everything past that never appears. Horizontal scroll DISABLED so rows stretch full width: the
+         whole row is the click target and the selection spans it, which is what makes a dense tree usable.
+         Transparent ground: a tree fills a docked panel, and the panel already stated what colour that panel is. -->
+    <Style Selector="TreeView" BasedOn="ItemsControl">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="ItemsPanel">
+            <Setter.Value>
+                <ItemsPanelTemplate>
+                    <StackPanel Orientation="Vertical"/>
+                </ItemsPanelTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="TreeView">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TreeView">
+                    <Border Background="{TemplateBinding Background}">
+                        <ScrollViewer x:Name="PART_ScrollViewer" CanContentScroll="True"
+                                HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </ScrollViewer>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
 </StyleSet>

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The badge naming the key that reaches a command while key-tip mode is on. Deliberately the ONE loud thing in
+         this theme, and squarely against its own hairline habit: a badge has to be legible over an icon, a label, or an
+         active tab's accent, and a hairline plate over a glyph is unreadable. The rule this theme spends elsewhere -
+         quiet chrome - does not apply to something that exists only while the user is asking "which key".
+
+         Square, like everything here. Opaque throughout: a see-through badge over a glyph cannot be read at this size.
+         Its three colours are the palette's own tokens rather than the ordinary ramp, because a badge is read over
+         whatever it lands on - each variant states a plate that contrasts with its OWN surface, which is the only way
+         it does not go missing against the thing it covers.
+
+         One SIZE for every badge, not one per glyph: a plate that hugs its letter comes out a different width for F, H
+         and M, and a row of them reads as noise. -->
+
+    <Style Selector="KeyTipAdorner">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="KeyTipAdorner">
+                    <Border Background="{ResourceReference KeyTipPlateFill}"
+                            BorderBrush="{ResourceReference KeyTipPlateStroke}"
+                            BorderThickness="{ResourceReference StrokeThin}"
+                            CornerRadius="0"
+                            MinWidth="{ResourceReference KeyTipSize}"
+                            MinHeight="{ResourceReference KeyTipSize}"
+                            Padding="{ResourceReference KeyTipPadding}">
+                        <!-- Both text alignments stated: the vertical one defaults to Bottom, which sits the letter on
+                             the floor of the plate instead of in the middle of it. -->
+                        <TextBlock Text="{TemplateBinding Keys}"
+                                FontSize="{ResourceReference FontSizeMicro}"
+                                Foreground="{ObservableResource KeyTipForeground}"
+                                HorizontalTextAlignment="Center"
+                                VerticalTextAlignment="Center"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

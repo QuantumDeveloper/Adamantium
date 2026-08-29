@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- The face a tile shows before it turns. TileFillColorDefault rather than ControlFillColorDefault: the latter is
+         the fill of a control standing on the window's ground, and a tile stands on a BOARD - the two grounds are not
+         the same, so a control fill on a tile comes out either invisible or a shade too light. -->
+
+    <Style Selector="FlipTile">
+        <Setter Property="FrontBrush" Value="{ResourceReference TileFillColorDefault}"/>
+    </Style>
+
+</StyleSet>

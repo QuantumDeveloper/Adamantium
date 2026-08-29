@@ -19,9 +19,15 @@
                                      BorderBrush="{ResourceReference ControlStrokeColorDefault}"
                                      BorderThickness="1"
                                      CornerRadius="4">
-                        <ScrollViewer CanContentScroll="True"
-                                               HorizontalScrollBarVisibility="{TemplateBinding HorizontalScrollBarVisibility}"
-                                               VerticalScrollBarVisibility="{TemplateBinding VerticalScrollBarVisibility}">
+                        <!-- OWNER-QUALIFIED, so it reaches ScrollViewer's ATTACHED properties: a bare
+                             {TemplateBinding HorizontalScrollBarVisibility} is looked up as a property of the LIST,
+                             which has none, so it resolved to null and threw while the template was being BUILT -
+                             leaving every list with no template of its own. In this form an author writes
+                             ScrollViewer.VerticalScrollBarVisibility="Hidden" on the list and it lands here, which is
+                             how WPF has always let a control's scroll policy be set from outside. -->
+                        <ScrollViewer x:Name="PART_ScrollHost" CanContentScroll="True"
+                                               HorizontalScrollBarVisibility="{TemplateBinding (ScrollViewer.HorizontalScrollBarVisibility)}"
+                                               VerticalScrollBarVisibility="{TemplateBinding (ScrollViewer.VerticalScrollBarVisibility)}">
                             <ItemsPresenter x:Name="PART_ItemsPresenter"/>
                         </ScrollViewer>
                     </Border>

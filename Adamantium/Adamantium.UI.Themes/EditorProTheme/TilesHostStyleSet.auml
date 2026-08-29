@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- A board of tiles. It IS an items control, so it takes that look whole and states only what differs: the ground
+         it lays tiles on, and a viewer that scrolls both ways (tiles wrap, so a board can outgrow either axis where an
+         ordinary list only outgrows one).
+         BasedOn is stated outright because matching here is by EXACT type - without it a derived control inherits
+         nothing at all. -->
+
+    <Style Selector="TilesHost" BasedOn="ItemsControl">
+        <!-- The PANEL ground, not a card: a board of tiles is a place in the window, and the tiles are the objects on
+             it. Giving the board a card ground of its own puts a second surface between the window and the tiles. -->
+        <Setter Property="Background" Value="{ResourceReference SolidBackgroundFillColorSecondary}"/>
+    </Style>
+
+    <Style Selector="TilesHost">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TilesHost">
+                    <Border Background="{TemplateBinding Background}">
+                        <ScrollViewer CanContentScroll="True"
+                                HorizontalScrollBarVisibility="Auto"
+                                VerticalScrollBarVisibility="Auto">
+                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </ScrollViewer>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

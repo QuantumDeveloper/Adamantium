@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- A content host with two overlay scrollbars - and here they are ALWAYS THERE.
+         Fluent fades them in on hover, and says in its own note that another theme is free to choose otherwise. An
+         editor is that other theme: a scrollbar is read far more often than it is grabbed. Its length says how much
+         file there is and its position says where in it you are, and both answers have to be available at a GLANCE -
+         while looking somewhere else entirely. A bar that only exists once the pointer is over the panel cannot answer
+         a question the pointer is not asking.
+         It costs nothing here because this theme's bar is a thin channel rather than Fluent's pill (see
+         ScrollBarStyleSet), so leaving it on does not put a heavy rail down the side of every panel. -->
+
+    <Style Selector="ScrollViewer">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollViewer">
+                    <Grid>
+                        <ScrollContentPresenter
+                                x:Name="PART_ScrollContentPresenter"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                        <!-- The vertical bar runs the FULL height so it fills the bottom-right corner; the horizontal
+                             one stops one bar-thickness short of the right and meets its edge - no pile-up in the
+                             corner, and no transparent gap either. -->
+                        <ScrollBar
+                                x:Name="PART_VerticalScrollBar"
+                                Orientation="Vertical"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Stretch"/>
+                        <ScrollBar
+                                x:Name="PART_HorizontalScrollBar"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Bottom"
+                                HorizontalAlignment="Stretch"
+                                MarginRight="{ResourceReference ScrollBarThickness}"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

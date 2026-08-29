@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- Hue around, saturation out from the middle, value dimmed over the top. The three layers are the same as anyone
+         would build them - a conic ramp, a white radial, and a black veil the control fades to (1 - Value).
+
+         What differs is the SIZE and the MARKER, and both come from where this lives: a properties column, not a
+         dialog. A 220-wide wheel does not fit one, and Fluent's marker - a three-unit white ring - covers a disc of
+         hues around the very point being chosen, which on a wheel is precisely the region you are comparing. This one
+         is a small square outlined a hairline in white over black: the two together stay visible on any hue, and it
+         hides almost nothing. It is the eyedropper's mark rather than a handle, because that is the job. -->
+
+    <Style Selector="ColorWheel">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ColorWheel">
+                    <Border x:Name="PART_Wheel"
+                            Width="{ResourceReference ColorWheelSize}"
+                            Height="{ResourceReference ColorWheelSize}">
+                        <Grid>
+                            <Ellipse>
+                                <Ellipse.Fill>
+                                    <ConicGradientBrush Center="0.5,0.5">
+                                        <GradientStop Color="#FFFF0000" Offset="0"/>
+                                        <GradientStop Color="#FFFFFF00" Offset="0.1667"/>
+                                        <GradientStop Color="#FF00FF00" Offset="0.3333"/>
+                                        <GradientStop Color="#FF00FFFF" Offset="0.5"/>
+                                        <GradientStop Color="#FF0000FF" Offset="0.6667"/>
+                                        <GradientStop Color="#FFFF00FF" Offset="0.8333"/>
+                                        <GradientStop Color="#FFFF0000" Offset="1"/>
+                                    </ConicGradientBrush>
+                                </Ellipse.Fill>
+                            </Ellipse>
+                            <Ellipse>
+                                <Ellipse.Fill>
+                                    <RadialGradientBrush Center="0.5,0.5" GradientOrigin="0.5,0.5" RadiusX="0.5" RadiusY="0.5">
+                                        <GradientStop Color="#FFFFFFFF" Offset="0"/>
+                                        <GradientStop Color="#00FFFFFF" Offset="1"/>
+                                    </RadialGradientBrush>
+                                </Ellipse.Fill>
+                            </Ellipse>
+                            <!-- Value dimming: a black disc whose Opacity the control sets to (1 - Value). -->
+                            <Ellipse x:Name="PART_ValueOverlay" Fill="Black" Opacity="0"/>
+                            <!-- The marker, positioned by the control via Margin. Two hairlines, not one: white alone
+                                 vanishes on a pale hue and black alone on a dark one. -->
+                            <Border x:Name="PART_Thumb"
+                                    Width="{ResourceReference ColorThumbSize}"
+                                    Height="{ResourceReference ColorThumbSize}"
+                                    CornerRadius="0"
+                                    BorderThickness="{ResourceReference StrokeThin}"
+                                    BorderBrush="Black"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Top">
+                                <Border BorderThickness="{ResourceReference StrokeThin}" BorderBrush="White"/>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

@@ -4,11 +4,10 @@
 
     <!-- Editor Pro's drop-down, built to match this theme's FIELD: a rule under the value, not a box around it. A
          settings column mixes fields and drop-downs, and two different shapes for "a value you can change" is what
-         makes such a column look assembled rather than designed. Fluent draws it as a bordered box, which is right
-         there, because its text field is a bordered box too.
+         makes such a column look assembled rather than designed. Whatever the field is, this follows it.
 
-         The list card keeps its border - it FLOATS, and a floating surface with no edge has nothing to separate it
-         from what it covers. That is the one place this theme still draws a full outline. -->
+         The list card keeps its own border for a different reason: it FLOATS, and a floating surface with no edge has
+         nothing to separate it from what it covers. -->
 
     <Style Selector="DropDown" BasedOn="ItemsControl">
         <Setter Property="Background" Value="Transparent"/>

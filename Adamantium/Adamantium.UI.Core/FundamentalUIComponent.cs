@@ -609,7 +609,37 @@ public abstract class FundamentalUIComponent : AnimatableUIComponent, IFundament
     /// rebuilt exactly TWICE, so the question is whether the theme is applied to each element twice.</summary>
     public static long ThemeApplications;
 
-    public virtual void ApplyCurrentTheme()
+    /// <summary>Theming ONE control, and the boundary that keeps it one control's business.
+    /// <para>A theme is applied per element, over and over, as the tree is built and walked - so a failure here decides
+    /// how far the walk gets. Applying a theme runs markup: it resolves resources, writes setters, attaches triggers and
+    /// builds the control's template, and any of that can throw on a single bad attribute (an unresolvable
+    /// <c>{TemplateBinding}</c> resolves to a null property and throws while the template is BUILT). That throw used to
+    /// travel up through SetParent and the logical-children walk and abandon the rest of the pass, leaving the
+    /// application HALF THEMED - some controls in the new theme, the rest still wearing the old one, and nothing on
+    /// screen saying why. It reads as "the new theme was never written", which is the most misleading symptom there is.</para>
+    /// <para>This is a boundary, not a silence: the control is left as it is - visibly wrong - and the failure is
+    /// reported at Error with its type. The defect still has to be fixed; it just no longer decides how far the theme
+    /// got. The work itself stays overridable through <see cref="ApplyCurrentThemeCore"/>, so every derived kind of
+    /// component is inside the same boundary rather than each having to remember one.</para></summary>
+    public void ApplyCurrentTheme()
+    {
+        try
+        {
+            ApplyCurrentThemeCore();
+        }
+        catch (Exception e)
+        {
+            // Marked applied even though it failed: the cause is a fixed defect in markup, so a retry would fail
+            // identically - and LayoutManager re-themes anything still unapplied on EVERY pass, which would turn one
+            // bad attribute into an exception per frame and a log nobody can read.
+            IsStyleApplied = true;
+            Serilog.Log.Logger.Error(e,
+                "Applying the theme to {ControlType} failed; this control keeps its previous look. The rest of the theme is unaffected.",
+                GetType().FullName);
+        }
+    }
+
+    protected virtual void ApplyCurrentThemeCore()
     {
         if (UIAppContext.Current == null)
             return;

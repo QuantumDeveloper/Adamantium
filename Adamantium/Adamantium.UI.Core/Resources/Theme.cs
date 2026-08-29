@@ -75,6 +75,19 @@ public class Theme : AdamantiumComponent, ITheme
     public static readonly AdamantiumProperty AccentPressedDarkenProperty = AdamantiumProperty.Register(
         nameof(AccentPressedDarken), typeof(double), typeof(Theme), new PropertyMetadata(0.24, OnAccentRampChanged));
 
+    /// <summary>How opaque the SELECTION wash is (0..1). Theme-settable, like the darken factors above.</summary>
+    public static readonly AdamantiumProperty AccentSelectionOpacityProperty = AdamantiumProperty.Register(
+        nameof(AccentSelectionOpacity), typeof(double), typeof(Theme), new PropertyMetadata(0.4, OnAccentRampChanged));
+
+    public double AccentSelectionOpacity
+    {
+        get => GetValue<double>(AccentSelectionOpacityProperty);
+        set => SetValue(AccentSelectionOpacityProperty, value);
+    }
+
+    private static Color WithAlpha(Color colour, double opacity) =>
+        new(colour.R, colour.G, colour.B, (byte)Math.Clamp(opacity * 255.0, 0, 255));
+
     /// <summary>Fraction (0..1, toward black) the hover accent (<see cref="AccentFillColorSecondary"/>) is darkened from
     /// the seed. Default 0.12.</summary>
     public double AccentHoverDarken
@@ -106,6 +119,10 @@ public class Theme : AdamantiumComponent, ITheme
         Recolour(AccentFillColorDefaultProperty, seed);
         Recolour(AccentFillColorSecondaryProperty, Color.Lerp(seed, Black, (float)AccentHoverDarken));   // hover
         Recolour(AccentFillColorTertiaryProperty, Color.Lerp(seed, Black, (float)AccentPressedDarken));  // pressed
+        // Derived, not authored in a palette: they have to follow the seed like the rest of the ramp, or a runtime
+        // accent change would leave every selected row in the previous colour.
+        Recolour(AccentFillColorSelectionProperty, WithAlpha(seed, AccentSelectionOpacity));
+        Recolour(AccentFillColorSelectionStrongProperty, WithAlpha(seed, AccentSelectionOpacity + 0.15));
         Recolour(AccentForegroundColorProperty, OnAccent(seed));
     }
 
@@ -170,6 +187,12 @@ public class Theme : AdamantiumComponent, ITheme
     public static readonly AdamantiumProperty AccentFillColorTertiaryProperty = AdamantiumProperty.Register(
         nameof(AccentFillColorTertiary), typeof(Brush), typeof(Theme), new PropertyMetadata(null));
 
+    public static readonly AdamantiumProperty AccentFillColorSelectionProperty = AdamantiumProperty.Register(
+        nameof(AccentFillColorSelection), typeof(Brush), typeof(Theme), new PropertyMetadata(null));
+
+    public static readonly AdamantiumProperty AccentFillColorSelectionStrongProperty = AdamantiumProperty.Register(
+        nameof(AccentFillColorSelectionStrong), typeof(Brush), typeof(Theme), new PropertyMetadata(null));
+
     public static readonly AdamantiumProperty AccentFillColorDisabledProperty = AdamantiumProperty.Register(
         nameof(AccentFillColorDisabled), typeof(Brush), typeof(Theme), new PropertyMetadata(null));
 
@@ -198,6 +221,18 @@ public class Theme : AdamantiumComponent, ITheme
     {
         get => GetValue<Brush>(AccentFillColorTertiaryProperty);
         set => SetValue(AccentFillColorTertiaryProperty, value);
+    }
+
+    public Brush AccentFillColorSelection
+    {
+        get => GetValue<Brush>(AccentFillColorSelectionProperty);
+        set => SetValue(AccentFillColorSelectionProperty, value);
+    }
+
+    public Brush AccentFillColorSelectionStrong
+    {
+        get => GetValue<Brush>(AccentFillColorSelectionStrongProperty);
+        set => SetValue(AccentFillColorSelectionStrongProperty, value);
     }
 
     public Brush AccentFillColorDisabled

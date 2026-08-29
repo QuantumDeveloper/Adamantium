@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- A border around a scroll viewer that hosts the items. CanContentScroll delegates scrolling to the virtualizing
+         panel (item scrolling, not pixel translation), which is behaviour rather than looks and is kept as it is. -->
+    <Style Selector="ItemsControl">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ItemsControl">
+                    <Border Background="{TemplateBinding Background}">
+                        <ScrollViewer CanContentScroll="True"
+                                HorizontalScrollBarVisibility="Disabled"
+                                VerticalScrollBarVisibility="Auto">
+                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </ScrollViewer>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Where a dragged item will land, inside a list. The same statement this theme's drop caret makes between rows,
+         made around a whole slot: a HAIRLINE outline, square, no wash. Fluent uses a two-unit dashed frame; at this
+         theme's row height a dashed two-unit frame is thicker than the gap between rows and reads as a filled band. -->
+    <Style Selector="ItemsControl">
+        <Setter Property="DropPlaceholderTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <!-- A Shape, not a Border: the dashes live on Shape.StrokeDashArray. -->
+                    <Rectangle IsHitTestVisible="False" Fill="Transparent"
+                            StrokeThickness="{ResourceReference StrokeThinValue}"
+                            StrokeDashArray="3,2"
+                            Stroke="{ThemeResource AccentFillColorDefault}"/>
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The card shown per slot while a cold fill outruns the per-frame bind budget. Square and hairline like every
+         other surface here; what it says is "content is on its way", and it must not be mistaken for the drop outline
+         above when both are on screen - dropping into a list that is still filling. They differ in KIND: this one is
+         filled and breathes, that one is an empty dashed frame.
+         The card paints with the SHARED SkeletonPulseFill brush - one instance for every card of every list - so the
+         breathe is ONE animation on ONE brush rather than one per card (a screenful can be four thousand cards).
+         {ObservableResource}, so a live theme swap re-points the pooled cards at the new palette's brush. -->
+    <Style Selector="ItemsControl">
+        <Setter Property="ItemSkeletonTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <!-- No margin: the PANEL insets the card by the real item's margin, read from a realized row, so the
+                         cards line up with the real ones for any list. -->
+                    <Border CornerRadius="0"
+                            BorderThickness="{ResourceReference StrokeThin}"
+                            IsHitTestVisible="False"
+                            Background="{ObservableResource SkeletonPulseFill}"
+                            BorderBrush="{ResourceReference ControlStrokeColorDefault}"/>
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- The breathe belongs to the LIST, not to a card: IsLoadingItems is true exactly while the panel is showing
+         skeletons, so one action starts the pulse on the shared brush and one stops it when the last card is recycled.
+         Every card re-renders from its brush-change subscription, so they breathe in step. TargetName resolves a keyed
+         RESOURCE here - which is how a trigger reaches a deliberately shared brush. Two lists loading at once retain
+         the same brush, so whichever finishes first does not stop the other's pulse.
+         Shallower and slower than Fluent's: this theme's ground is darker, so the same swing reads as a flash. -->
+    <Style Selector="ItemsControl">
+        <PropertyTrigger Property="IsLoadingItems" Value="True">
+            <PropertyTrigger.EnterActions>
+                <RunAnimationAction TargetName="SkeletonPulseFill">
+                    <PulseAnimation Property="Opacity" Min="0.04" Max="0.11" Duration="0:0:1.4" Easing="CubicInOut"/>
+                </RunAnimationAction>
+            </PropertyTrigger.EnterActions>
+            <PropertyTrigger.ExitActions>
+                <StopAnimationAction TargetName="SkeletonPulseFill"/>
+            </PropertyTrigger.ExitActions>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

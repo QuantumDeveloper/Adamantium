@@ -4,7 +4,8 @@
 
     <!-- Editor Pro's spin box, built to match this theme's FIELD: a rule under the value, not a box around it. A
          properties panel puts a spin box directly under a text field, and two different frames for the same job -
-         "type a value here" - is what makes a panel look assembled rather than designed.
+         "type a value here" - is what makes a panel look assembled rather than designed. Whatever the field is, this
+         follows it.
 
          The PART NAMES and the five-seat grid are Fluent's on purpose. Its six placement multi-triggers decide which
          seat each button takes for every combination of ButtonsPlacement and AreButtonsSwapped - pure behaviour with
@@ -90,16 +91,93 @@
         </Setter>
     </Style>
 
+    <!-- WHERE the two buttons sit, for every combination of ButtonsPlacement and AreButtonsSwapped. Pure behaviour -
+         nothing here is about how anything looks - and the seats are the five columns the template above lays out:
+         0 and 1 are the left pair, 3 and 4 the right one. The DEFAULT (Split, not swapped) is stated by the template
+         itself, so only the other five combinations need saying.
+         These live in this theme now rather than being borrowed: a theme that owns a control's template owns the rules
+         that address ITS parts, and leaving them in another theme's file meant this one only worked while that file
+         was also loaded. -->
+    <Style Selector="NumericUpDown">
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ButtonsPlacement" Value="Split"/>
+                <Condition Property="AreButtonsSwapped" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_Increase" Property="Grid.Column" Value="0"/>
+            <Setter TargetName="PART_Decrease" Property="Grid.Column" Value="4"/>
+        </MultiTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ButtonsPlacement" Value="Left"/>
+                <Condition Property="AreButtonsSwapped" Value="false"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_Decrease" Property="Grid.Column" Value="0"/>
+            <Setter TargetName="PART_Increase" Property="Grid.Column" Value="1"/>
+        </MultiTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ButtonsPlacement" Value="Left"/>
+                <Condition Property="AreButtonsSwapped" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_Increase" Property="Grid.Column" Value="0"/>
+            <Setter TargetName="PART_Decrease" Property="Grid.Column" Value="1"/>
+        </MultiTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ButtonsPlacement" Value="Right"/>
+                <Condition Property="AreButtonsSwapped" Value="false"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_Decrease" Property="Grid.Column" Value="3"/>
+            <Setter TargetName="PART_Increase" Property="Grid.Column" Value="4"/>
+        </MultiTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="ButtonsPlacement" Value="Right"/>
+                <Condition Property="AreButtonsSwapped" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="PART_Increase" Property="Grid.Column" Value="3"/>
+            <Setter TargetName="PART_Decrease" Property="Grid.Column" Value="4"/>
+        </MultiTrigger>
+    </Style>
+
     <Style Selector="NumericUpDown">
         <PropertyTrigger Property="IsMouseOver" Value="true">
             <Setter TargetName="Rule" Property="Background" Value="{ResourceReference ControlStrokeColorSecondary}"/>
         </PropertyTrigger>
-        <!-- Focus WITHIN, not IsFocused: clicking a spin box puts the caret in its embedded editor, so the control
+        <!-- Focus WITHIN, not IsFocused: clicking a spin box puts the caret in its EMBEDDED editor, so the control
              itself never becomes the focused element and a rule watching its own IsFocused would never light. -->
         <PropertyTrigger Property="IsKeyboardFocusWithin" Value="true">
             <Setter TargetName="Rule" Property="Background" Value="{ThemeResource AccentFillColorDefault}"/>
             <Setter TargetName="Rule" Property="Height" Value="{ResourceReference StrokeAccentValue}"/>
             <Setter TargetName="PART_Border" Property="Background" Value="{ResourceReference ControlFillColorDefault}"/>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- The states that are not about the pointer. These are the control ANSWERING FOR ITSELF - whether it has its
+         buttons, whether it can be typed into, whether it is enabled at all - and they were being borrowed from
+         Fluent's set along with the part names. When that include was dropped they left with it, silently: the spin
+         box kept its shape and stopped reacting, so AreButtonsVisible="false" did nothing and a disabled one looked
+         exactly like a live one. -->
+    <Style Selector="NumericUpDown">
+        <PropertyTrigger Property="AreButtonsVisible" Value="false">
+            <Setter TargetName="PART_Decrease" Property="Visibility" Value="Collapsed"/>
+            <Setter TargetName="PART_Increase" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+        <!-- Both roads to "you may not type here" end at the embedded editor: the control being read-only, and manual
+             entry being turned off while the buttons still work. -->
+        <PropertyTrigger Property="IsReadOnly" Value="true">
+            <Setter TargetName="PART_TextBox" Property="IsReadOnly" Value="true"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsManualEntryEnabled" Value="false">
+            <Setter TargetName="PART_TextBox" Property="IsReadOnly" Value="true"/>
+        </PropertyTrigger>
+        <!-- Disabled dims the VALUE and greys the rule. In this theme the rule is the whole frame, so it is the rule
+             that has to say it - there is no box to grey out. -->
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="PART_Border" Property="Background" Value="{ResourceReference ControlFillColorDisabled}"/>
+            <Setter TargetName="PART_TextBox" Property="Foreground" Value="{ResourceReference TextFillColorDisabled}"/>
+            <Setter TargetName="Rule" Property="Background" Value="{ResourceReference ControlStrokeColorDefault}"/>
         </PropertyTrigger>
     </Style>
 

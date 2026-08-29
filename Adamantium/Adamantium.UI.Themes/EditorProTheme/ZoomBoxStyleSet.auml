@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- A zoom-and-pan viewport: a scroll viewer hosting a surface. The control puts a LAYOUT transform (the scale) on
+         the surface from code, so zooming grows the scrollable EXTENT and the bars follow it - a render-only scale
+         would leave them describing the unzoomed size.
+         There is no editor-specific way to hold a zoomed surface, so the shape is the obvious one. What this theme does
+         say is the scrollbars: they are ALWAYS ON here (see ScrollViewerStyleSet), and on a design surface that matters
+         more than anywhere else - at any zoom above fit, the bars are the only thing saying which part of the drawing
+         you are looking at. -->
+
+    <Style Selector="ZoomBox">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ZoomBox">
+                    <ScrollViewer x:Name="PART_Scroll"
+                            HorizontalScrollBarVisibility="Auto"
+                            VerticalScrollBarVisibility="Auto">
+                        <ContentPresenter x:Name="PART_Surface"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Top"
+                                Content="{TemplateBinding Content}"
+                                ContentTemplate="{TemplateBinding ContentTemplate}"/>
+                    </ScrollViewer>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</StyleSet>

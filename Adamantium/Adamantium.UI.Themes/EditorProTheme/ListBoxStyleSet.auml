@@ -2,14 +2,52 @@
 <StyleSet xmlns="http://adamantium/ui"
           xmlns:x="http://adamantium/ui/xaml/extensions">
 
-    <!-- A list in an editor is PART OF THE PANEL, not a card floating on it. Fluent gives it the card ground, which is
-         right when a list is a thing on a page; here a list IS the panel's contents - a file list, a problem list, a
-         search result - and a second surface behind it only draws a box around something that already has edges.
+    <!-- A list is OUTLINED, and squarely: an interactive control says where it begins and ends. It briefly did not -
+         the argument was that a list in an editor is the panel's contents rather than a card on it, so it needed no
+         frame of its own - and what that produced was a column of text with no edge, indistinguishable from a label.
+         The rule for this theme is the plain one: most interactive controls carry a clear border, and a host that
+         genuinely wants an edgeless list sets BorderThickness="0" on that one list.
+         No FILL, though, and no corners: the outline is the whole statement, and the panel's ground shows through.
 
-         A ground, not a shape: the template is Fluent's, and nothing about the list's structure differs. -->
+         This file used to be a single Background setter, RIDING on Fluent's template. When Fluent's set was dropped
+         from the theme the override had no template left under it and every list in the application drew nothing at
+         all. That is what `ItGivesATemplateToEveryControlFluentTemplates` now stands guard over: a theme that owns a
+         control owns its TEMPLATE, not a correction to somebody else's. -->
+
+    <Style Selector="ListBox" BasedOn="ItemsControl">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
+        <Setter Property="BorderThickness" Value="{ResourceReference StrokeThin}"/>
+        <Setter Property="CornerRadius" Value="0"/>
+    </Style>
 
     <Style Selector="ListBox">
-        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBox">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="{TemplateBinding CornerRadius}">
+                        <!-- The bar policy is reached from OUTSIDE through ScrollViewer's ATTACHED properties, the way
+                             WPF does it: an author writes ScrollViewer.VerticalScrollBarVisibility="Hidden" on the
+                             LIST and it lands on the viewer inside this template. The parenthesised, owner-qualified
+                             path is what makes that work - a bare {TemplateBinding HorizontalScrollBarVisibility} is
+                             looked up as a property OF THE LIST, which has none, so it resolves to null and throws
+                             while the template is being BUILT (leaving the list with no template at all).
+                             The defaults live on the attached properties themselves - Disabled across, Auto down - so
+                             a list that says nothing behaves the way a list should.
+                             CanContentScroll delegates to the virtualizing items panel: a long list must scroll by
+                             ITEM, or every scrolled pixel realizes rows nobody asked for. -->
+                        <ScrollViewer x:Name="PART_ScrollHost" CanContentScroll="True"
+                                      HorizontalScrollBarVisibility="{TemplateBinding (ScrollViewer.HorizontalScrollBarVisibility)}"
+                                      VerticalScrollBarVisibility="{TemplateBinding (ScrollViewer.VerticalScrollBarVisibility)}">
+                            <ItemsPresenter x:Name="PART_ItemsPresenter"/>
+                        </ScrollViewer>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
 </StyleSet>
