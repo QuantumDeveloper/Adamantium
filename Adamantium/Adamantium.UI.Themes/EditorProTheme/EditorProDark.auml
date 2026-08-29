@@ -76,6 +76,11 @@
     <PaletteColor Key="ShimmerTrackColor" Color="#12FFFFFF" As="Color"/>
     <PaletteColor Key="EdgeFadeColor" Color="#E614181D" As="Color"/>
     <PaletteColor Key="EdgeFadeColorTransparent" Color="#0014181D" As="Color"/>
+    <!-- The same fade one ground UP, for the ribbon band: a fade dissolves into whatever is behind it, and behind the
+         band is the raised plate, not the base one. Using the base pair there left a visible step where the fade
+         ended. Both stops are the SAME rgb - a gradient that also changes hue as it fades reads as a smear. -->
+    <PaletteColor Key="BandFadeColor" Color="#E61A1F26" As="Color"/>
+    <PaletteColor Key="BandFadeColorTransparent" Color="#001A1F26" As="Color"/>
   </ThemeVariantDefinition.Colors>
 
 </ThemeVariantDefinition>

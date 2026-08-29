@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<StyleSet xmlns="http://adamantium/ui"
+          xmlns:x="http://adamantium/ui/xaml/extensions">
+
+    <!-- A circular gauge: a dim full ring under an accent arc swept to the value. Smaller and thinner than Fluent's,
+         because of where it appears - an editor shows progress beside a row in a panel, not in the middle of a dialog,
+         and at that size a thick band is a blob rather than a gauge. Both numbers come from this theme's Metrics.
+         The control is always square (it says so in its own measure), so centring lets arrange settle onto that square. -->
+
+    <Style Selector="RingProgressBar">
+        <Setter Property="MinWidth" Value="{ResourceReference RingSize}"/>
+        <Setter Property="MinHeight" Value="{ResourceReference RingSize}"/>
+        <Setter Property="RingThickness" Value="{ResourceReference RingThickness}"/>
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+    </Style>
+
+    <Style Selector="RingProgressBar">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RingProgressBar">
+                    <Grid>
+                        <!-- The ring is a SHAPE, not a stroke: RingThickness leaves a band that thick inward from the
+                             outline, and a swept band is an annular sector - which is what a gauge actually is. A thick
+                             stroke would spend the pen on the shape, leaving the band unable to carry an outline of its
+                             own and its thickness tied to a stroke width. -->
+                        <Ellipse Fill="{ResourceReference ControlFillColorTertiary}"
+                                RingThickness="{TemplateBinding RingThickness}"
+                                EllipseType="Sector"/>
+                        <Ellipse x:Name="PART_Indicator"
+                                Fill="{ThemeResource AccentFillColorDefault}"
+                                RingThickness="{TemplateBinding RingThickness}"
+                                EllipseType="Sector"
+                                StartAngle="0"
+                                StopAngle="0"
+                                RenderTransformOrigin="0.5,0.5"/>
+                        <!-- The number inside is BODY size, not a subtitle: at this ring's diameter a subtitle does not
+                             fit, and a gauge whose label is clipped says less than one with no label at all. -->
+                        <TextBlock x:Name="PART_ValueText"
+                                Text="{TemplateBinding ValueText}"
+                                Visibility="Collapsed"
+                                FontSize="{ResourceReference FontSizeCaption}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                VerticalTextAlignment="Center"
+                                Foreground="{TemplateBinding Foreground}"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Centre percentage label, opt-in via ShowValueText. -->
+    <Style Selector="RingProgressBar">
+        <PropertyTrigger Property="ShowValueText" Value="true">
+            <Setter TargetName="PART_ValueText" Property="Visibility" Value="Visible"/>
+        </PropertyTrigger>
+    </Style>
+
+</StyleSet>

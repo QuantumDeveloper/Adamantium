@@ -14,8 +14,11 @@
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="BackgroundPointerOver" Value="{ResourceReference ControlFillColorSecondary}"/>
         <Setter Property="BackgroundPressed" Value="{ResourceReference ControlFillColorTertiary}"/>
-        <Setter Property="BackgroundSelected" Value="{ThemeResource AccentFillColorDefault}"/>
-        <Setter Property="ForegroundSelected" Value="{ThemeResource AccentForegroundColor}"/>
+        <!-- The accent as a WASH: a row draws its own tile, and in a layered interface that tile is translucent - under
+             a solid accent it has nothing to survive with, so every selected row read as a plain slab. The label keeps
+             its ordinary colour for the same reason: the ground under it is now tinted, not replaced. -->
+        <Setter Property="BackgroundSelected" Value="{ThemeResource AccentFillColorSelection}"/>
+        <Setter Property="ForegroundSelected" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="CornerRadius" Value="{ResourceReference CornerRadiusDefault}"/>
         <Setter Property="Padding" Value="{ResourceReference PaddingRow}"/>
@@ -56,11 +59,9 @@
     </Style>
 
     <!-- Triggers (its own style). Hover, then pressed, then selected. The trigger value stack is ACTIVATION-ordered (the
-         most recently activated live trigger wins the shared Background token), so a plain hover/press over an ALREADY
-         selected row would otherwise pop the accent for the gray hover/pressed fill (the row looks deselected while the
-         cursor is on it). The two MultiTriggers below re-assert a DIMMED accent for selected+hover / selected+pressed -
-         declared LAST so they land on top while both are active, and pop cleanly back to the flat accent on release
-         (Fluent's accent PointerOver/Pressed, same tokens the accent Button uses). -->
+         most recently activated live trigger wins the shared Background token), so a plain hover over an ALREADY
+         selected row would otherwise drop it back to the unselected wash. The two MultiTriggers re-assert a brighter
+         plate for selected+hover / selected+pressed - declared LAST so they land on top while both hold. -->
     <Style Selector="ListBoxItem">
         <PropertyTrigger Property="IsMouseOver" Value="true">
             <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
@@ -77,14 +78,14 @@
                 <Condition Property="IsSelected" Value="true"/>
                 <Condition Property="IsMouseOver" Value="true"/>
             </MultiTrigger.Conditions>
-            <Setter TargetName="ItemBorder" Property="Background" Value="{ThemeResource AccentFillColorSecondary}"/>
+            <Setter TargetName="ItemBorder" Property="Background" Value="{ThemeResource AccentFillColorSelectionStrong}"/>
         </MultiTrigger>
         <MultiTrigger>
             <MultiTrigger.Conditions>
                 <Condition Property="IsSelected" Value="true"/>
                 <Condition Property="IsPressed" Value="true"/>
             </MultiTrigger.Conditions>
-            <Setter TargetName="ItemBorder" Property="Background" Value="{ThemeResource AccentFillColorTertiary}"/>
+            <Setter TargetName="ItemBorder" Property="Background" Value="{ThemeResource AccentFillColorSelectionStrong}"/>
         </MultiTrigger>
     </Style>
 

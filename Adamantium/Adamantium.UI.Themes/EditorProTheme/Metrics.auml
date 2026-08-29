@@ -65,7 +65,9 @@
     <Thickness x:Key="PaddingDropDown">8 2 6 2</Thickness>
     <Thickness x:Key="PaddingControlCompact">6 1 6 1</Thickness>
     <Thickness x:Key="PaddingField">8 2 8 2</Thickness>
-    <Thickness x:Key="PaddingFieldFlat">6 0 6 0</Thickness>
+    <!-- FLAT means no box, not no room: the two vertical pixels keep the descenders and the caret off the rule that
+         runs under the value. At zero the caret sat exactly ON it. -->
+    <Thickness x:Key="PaddingFieldFlat">6 2 6 2</Thickness>
     <Thickness x:Key="PaddingRow">8 0 8 0</Thickness>
     <!-- All four sides stated: Thickness(a b) means (leftTop, rightBottom) here, not (horizontal, vertical).
          The vertical pair is not slack - on a tab folded against a side the label is TURNED, so top and bottom become
@@ -77,9 +79,9 @@
     <!-- Surfaces, answered tightly: an editor's panels are working space, and every pixel of decorative air is a pixel
          of the project the user cannot see. The tab body gets NONE - the content owns its own margins. -->
     <!-- ── Ribbon ─────────────────────────────────────────────────────────────────────────────────────────────────
-         Answered because this theme includes Fluent's ribbon, not because an editor leads with one - it is a toolbar
-         here, not the main way anything is done, so every part of it is a step tighter and the large button loses the
-         height it spent on standing out. -->
+         Answered because an application may put one there, not because an editor leads with one - it is a toolbar here,
+         not the main way anything is done, so every part of it is a step tighter and the large button loses the height
+         it spent on standing out. -->
     <Thickness x:Key="RibbonRule">0 0 0 1</Thickness>
     <Thickness x:Key="RibbonTabPadding">10 4</Thickness>
     <Thickness x:Key="RibbonLedgePadding">6 0</Thickness>
@@ -92,12 +94,41 @@
     <Thickness x:Key="RibbonButtonPaddingSmall">4 1</Thickness>
     <sys:Double x:Key="RibbonMenuItemHeight">34</sys:Double>
     <Thickness x:Key="RibbonBackstagePadding">14 0</Thickness>
-    <CornerRadius x:Key="RibbonSplitLeadingRadius">3 0 0 3</CornerRadius>
-    <CornerRadius x:Key="RibbonSplitTrailingRadius">0 3 3 0</CornerRadius>
+    <!-- SQUARE, like every other plate in this theme. They are still two keys rather than one zero, because they are
+         the two HALVES of a split button and a theme that does round its commands rounds only the outer corners. -->
+    <CornerRadius x:Key="RibbonSplitLeadingRadius">0</CornerRadius>
+    <CornerRadius x:Key="RibbonSplitTrailingRadius">0</CornerRadius>
     <Thickness x:Key="RibbonSplitDropDownPadding">2 1</Thickness>
     <Thickness x:Key="RibbonSplitDropDownPaddingSmall">1 1</Thickness>
     <CornerRadius x:Key="RibbonGalleryItemRadius">2</CornerRadius>
     <Thickness x:Key="RibbonGalleryItemPadding">2</Thickness>
+
+    <!-- The inset inside a ribbon's own cards. A THICKNESS: the Double gap put here by mistake is a wrong TYPE, and
+         it took both cards down - a collapsed group opened onto nothing. -->
+    <Thickness x:Key="RibbonCardPadding">4</Thickness>
+
+    <!-- Whichever is TALLER: three rows of small commands, or a two-row GALLERY, plus the caption and padding. It was
+         derived from the command rows alone (88) and a gallery cell is about twice a command row, so the caption ended
+         up underneath the overflow. -->
+    <sys:Double x:Key="RibbonBandHeight">100</sys:Double>
+    <sys:Double x:Key="RibbonLedgeHeight">14</sys:Double>
+    <sys:Double x:Key="RibbonIconBoxLarge">24</sys:Double>
+    <sys:Double x:Key="RibbonScrollPlateWidth">16</sys:Double>
+    <sys:Double x:Key="RibbonScrollFadeWidth">24</sys:Double>
+    <sys:Double x:Key="RibbonGalleryArrowWidth">16</sys:Double>
+    <sys:Double x:Key="RibbonRailWidth">180</sys:Double>
+    <sys:Double x:Key="RibbonBackstagePaneMinWidth">280</sys:Double>
+    <sys:Double x:Key="RibbonBackstagePaneMinHeight">240</sys:Double>
+    <Thickness x:Key="RibbonBackstageContentMargin">28 20</Thickness>
+    <Thickness x:Key="RibbonMenuPaneMargin">20 16</Thickness>
+    <sys:Double x:Key="RibbonBackButtonSize">22</sys:Double>
+    <sys:Double x:Key="RibbonQuickAccessMaxWidth">320</sys:Double>
+    <sys:Double x:Key="RibbonQuickAccessItemHeight">22</sys:Double>
+    <Thickness x:Key="RibbonQuickAccessItemPadding">5 0</Thickness>
+    <Thickness x:Key="RibbonGroupRuleMargin">1 4 1 4</Thickness>
+    <Thickness x:Key="RibbonCaptionMargin">0 3 0 0</Thickness>
+    <Thickness x:Key="RibbonIconLabelGap">5 0 0 0</Thickness>
+    <Thickness x:Key="RibbonMenuIconGap">0 0 10 0</Thickness>
 
     <!-- ── Busy indicator ─────────────────────────────────────────────────────────────────────────────────────────
          A quarter smaller across the board. A spinner in an editor appears beside a status line or inside a panel
@@ -146,8 +177,9 @@
          The frame drawn around a selected or hovered element on the design surface, and the square handle at each of
          a selection's corners. -->
     <sys:Double x:Key="AdornerHandleSize">5</sys:Double>
-    <sys:Double x:Key="AdornerSelectionThickness">1</sys:Double>
-    <sys:Double x:Key="AdornerHoverThickness">1</sys:Double>
+    <!-- THICKNESSES, because that is what BorderThickness is: as Doubles they were a wrong TYPE, and drew nothing. -->
+    <Thickness x:Key="AdornerSelectionThickness">1</Thickness>
+    <Thickness x:Key="AdornerHoverThickness">1</Thickness>
 
     <!-- ── Menus ──────────────────────────────────────────────────────────────────────────────────────────────────
          The gutter every menu row reserves for an icon or a checkmark, so labels line up whether or not a row has one.
@@ -205,6 +237,17 @@
     <sys:Double x:Key="DragHandleHeight">16</sys:Double>
     <sys:Double x:Key="TabStripHeight">26</sys:Double>
 
+    <!-- The tab strip's own furniture. The close and pin buttons are SQUARE and sized to this theme's row rather than
+         to a finger: this is a mouse-and-keyboard editor, and a 24 square next to a 26 strip leaves the label almost no
+         room. The fade over a scrolled-off edge is a HINT that there is more, so it is about a tab's width, not a third
+         of the strip. -->
+    <sys:Double x:Key="TabButtonSize">16</sys:Double>
+    <sys:Double x:Key="TabGlyphSize">7</sys:Double>
+    <sys:Double x:Key="TabEdgeFadeExtent">24</sys:Double>
+    <sys:Double x:Key="TabOverflowButtonExtent">20</sys:Double>
+    <sys:Double x:Key="TabOverflowListMaxHeight">360</sys:Double>
+    <sys:Double x:Key="TabOverflowRowMinWidth">160</sys:Double>
+
     <!-- The drop caret: a hairline with END CAPS. A 1px line alone is ambiguous about where the insertion SPAN starts
          and stops; the caps close it off, which is what lets the line stay this thin. -->
     <sys:Double x:Key="DropCaretThickness">1</sys:Double>
@@ -239,5 +282,39 @@
     <Thickness x:Key="DockStripInset">3 0 3 3</Thickness>
     <sys:Double x:Key="DockHeaderButtonSize">18</sys:Double>
     <Thickness x:Key="DockAreaMargin">1</Thickness>
+
+    <!-- The key-tip badge: one size for every letter, so a row of them reads as a row. -->
+    <sys:Double x:Key="KeyTipSize">16</sys:Double>
+    <Thickness x:Key="KeyTipPadding">3 0 3 0</Thickness>
+
+    <!-- The slide-in panel: its caption row and the button that closes it. -->
+    <Thickness x:Key="SlidePanelHeaderGap">0 0 0 8</Thickness>
+    <sys:Double x:Key="SlidePanelCloseSize">20</sys:Double>
+    <sys:Double x:Key="SlidePanelCloseGlyph">9</sys:Double>
+
+    <!-- The in-window dialog: how narrow it may get, and its corner grip. -->
+    <sys:Double x:Key="OverlayMinWidth">260</sys:Double>
+    <sys:Double x:Key="OverlayGripSize">14</sys:Double>
+
+    <!-- Colour: the wheel and square live in a PROPERTIES COLUMN, not in a dialog, so they are sized to a column. The
+         marker is small and hairline - a fat ring hides the very pixels you are choosing between. -->
+    <sys:Double x:Key="ColorWheelSize">150</sys:Double>
+    <sys:Double x:Key="ColorAreaSize">150</sys:Double>
+    <sys:Double x:Key="ColorBarWidth">14</sys:Double>
+    <sys:Double x:Key="ColorThumbSize">9</sys:Double>
+    <sys:Double x:Key="ColorBarThumbHeight">5</sys:Double>
+    <sys:Double x:Key="ColorPreviewHeight">28</sys:Double>
+    <sys:Double x:Key="ColorFieldWidth">54</sys:Double>
+    <!-- The R/G/B/A and Hex captions: wide enough that the fields after them line up in a column. -->
+    <sys:Double x:Key="ColorLabelWidth">22</sys:Double>
+    <Thickness x:Key="ColorSwatchPadding">3</Thickness>
+    <Thickness x:Key="ColorStackGap">0 8 0 0</Thickness>
+    <sys:Double x:Key="ColorCheckerCell">5</sys:Double>
+
+    <!-- Menu: the rule between groups of commands, and the arrows a too-tall menu grows. -->
+    <Thickness x:Key="MenuSeparatorMargin">6 3 6 3</Thickness>
+    <sys:Double x:Key="MenuScrollArrowHeight">14</sys:Double>
+    <sys:Double x:Key="MenuArrowWidth">8</sys:Double>
+    <sys:Double x:Key="MenuArrowHeight">4</sys:Double>
 
 </ResourceDictionary>

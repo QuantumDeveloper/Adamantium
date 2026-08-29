@@ -10,7 +10,11 @@
          ground stays the panel's until focus, when it lifts by one step - enough to say "typing happens here" without
          the field becoming an object. The structure differs too: the rule is its own element under the text rather
          than the border of the box, because a border cannot be one-sided AND change weight without moving the text
-         inside it. -->
+         inside it.
+
+         The rule holds for FIELDS only. A button, a toggle and a list carry a real outline at rest - they are things
+         you press or pick from, and they have to say so before the pointer arrives. A field is already a column of
+         values under labels, and its line is enough to say where the value goes. -->
 
     <Style Selector="TextBox">
         <Setter Property="Background" Value="Transparent"/>
@@ -18,6 +22,7 @@
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="MinHeight" Value="{ResourceReference ControlHeight}"/>
         <Setter Property="MinWidth" Value="{ResourceReference ControlMinWidth}"/>
+        <!-- Carries the two vertical pixels that keep the descenders and the caret off the rule below. -->
         <Setter Property="Padding" Value="{ResourceReference PaddingFieldFlat}"/>
         <Setter Property="CornerRadius" Value="0"/>
         <Setter Property="BorderThickness" Value="0"/>

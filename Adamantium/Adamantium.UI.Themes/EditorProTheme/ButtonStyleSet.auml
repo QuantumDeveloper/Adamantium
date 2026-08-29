@@ -2,19 +2,21 @@
 <StyleSet xmlns="http://adamantium/ui"
           xmlns:x="http://adamantium/ui/xaml/extensions">
 
-    <!-- Editor Pro's button. Not Fluent's with different numbers: a different thing.
+    <!-- Editor Pro's button. Not Fluent's with different numbers: a different thing - a HAIRLINE OUTLINE and no fill,
+         where Fluent's is a filled plate with a two-pixel border.
 
-         An editor's toolbar is a row of these, pressed dozens of times an hour, and a filled bordered box repeated
-         twenty times across a strip reads as a fence. So this button has NO chrome at rest - it is a label in a box
-         that exists only when the pointer is on it - and the accent variant is the only one that carries a fill.
-         Fluent's button is the opposite: chrome always, a two-pixel border that is part of its affordance.
+         This started out with no chrome at all at rest, on the argument that a toolbar is a row of these and twenty
+         filled boxes across a strip read as a fence. That argument is right about a row of ICONS and wrong about a
+         button: a lone "Add" under a list came out as bare text, and an affordance that appears only once you have
+         already found it is not one. The flat form moved to Button.Toolbar, which is where it was actually true.
+         So: an outline at rest says "this is pressable", and the FILL is still reserved for the pointer being on it.
 
          Per the small-styles convention: properties, then the template, then the triggers. -->
 
     <Style Selector="Button">
-        <!-- Nothing at rest. The hover and pressed grounds are what the button is made of. -->
+        <!-- No fill at rest - the outline carries it. The hover and pressed grounds are what the button fills with. -->
         <Setter Property="Background" Value="Transparent"/>
-        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="BorderBrush" Value="{ResourceReference ControlStrokeColorDefault}"/>
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
 
         <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
@@ -63,9 +65,9 @@
     <Style Selector="Button">
         <PropertyTrigger Property="IsMouseOver" Value="true">
             <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
-            <!-- The edge appears WITH the hover, not before it: that is what makes the resting row quiet. -->
+            <!-- The outline BRIGHTENS rather than appearing: it is already there, so hover has only to strengthen it. -->
             <Setter TargetName="InnerBorder" Property="BorderBrush"
-                    Value="{ResourceReference ControlStrokeColorDefault}"/>
+                    Value="{ResourceReference ControlStrokeColorSecondary}"/>
         </PropertyTrigger>
         <PropertyTrigger Property="IsPressed" Value="true">
             <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
@@ -74,6 +76,33 @@
         <PropertyTrigger Property="IsEnabled" Value="false">
             <Setter TargetName="InnerBorder" Property="Background" Value="{TemplateBinding BackgroundDisabled}"/>
             <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundDisabled}"/>
+            <!-- The outline dims WITH the label. Left crisp, it would keep promising a press the button cannot take -
+                 and on this theme the outline IS the button, so it is the part that has to go quiet.
+                 A direct resource, not a {TemplateBinding}: there is no BorderBrushDisabled on Button, and binding a
+                 name the control does not have resolves to a null property and throws while the template is BUILT. -->
+            <Setter TargetName="InnerBorder" Property="BorderBrush"
+                    Value="{ResourceReference ControlFillColorDisabled}"/>
+        </PropertyTrigger>
+    </Style>
+
+    <!-- The flat form, for the case the outline was originally written for: a ROW of them. A toolbar of icon buttons
+         outlined one after another is a fence, and there the neighbours plus the strip's own edge already say what
+         these are. Opt in with Classes="Toolbar" - which is the difference from before, when every button in the
+         application was quietly assumed to be in a toolbar. -->
+    <Style Selector="Button.Toolbar">
+        <Setter Property="BorderBrush" Value="Transparent"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingRow}"/>
+    </Style>
+
+    <Style Selector="Button.Toolbar">
+        <!-- The edge appears WITH the hover here, since there is none at rest to brighten - and goes away again when
+             the button cannot be pressed, rather than dimming to the grey the outlined form fades to. -->
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="InnerBorder" Property="BorderBrush"
+                    Value="{ResourceReference ControlStrokeColorDefault}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsEnabled" Value="false">
+            <Setter TargetName="InnerBorder" Property="BorderBrush" Value="Transparent"/>
         </PropertyTrigger>
     </Style>
 

@@ -17,6 +17,15 @@ public interface ITheme: IInitializable, IAdamantiumComponent
 
     Brush AccentFillColorTertiary { get; set; }
 
+    /// <summary>The accent as a WASH - what marks a selected row. Translucent on purpose: an interface built in layers
+    /// (and, before long, over a blurred backdrop) has nothing else that is a flat slab, and a solid accent under a
+    /// row's own translucent tile simply replaces it - the tile has no weight of its own to survive with.</summary>
+    Brush AccentFillColorSelection { get; set; }
+
+    /// <summary>The same wash, denser - a selected row under the pointer. A wash strengthens by becoming more opaque;
+    /// darkening it, the way the solid ramp does, barely reads at this alpha.</summary>
+    Brush AccentFillColorSelectionStrong { get; set; }
+
     Brush AccentFillColorDisabled { get; set; }
 
     Brush AccentForegroundColor { get; set; }

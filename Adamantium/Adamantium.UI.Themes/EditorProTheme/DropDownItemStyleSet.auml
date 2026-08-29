@@ -2,12 +2,83 @@
 <StyleSet xmlns="http://adamantium/ui"
           xmlns:x="http://adamantium/ui/xaml/extensions">
 
-    <!-- The SAME row height as a list's - an open drop-down is a list, and two row heights in one theme is exactly the
-         drift the Metrics exist to prevent. Here for the same reason as ListBoxItem: the shared template gives a row
-         no minimum, which only works for a theme whose padding is generous. -->
+    <!-- A row in an open drop-down. It is a LIST row - the same height, the same inset, the same plate - because an
+         open drop-down is a list, and two row heights in one theme is exactly the drift the Metrics exist to prevent.
+
+         One thing differs from a list row and it is not cosmetic: here the accent MARKS THE CURRENT VALUE. A drop-down
+         has exactly one selected row and it is the answer the control is holding, so the loud mark is affordable and is
+         the whole point; a file list may have twenty selected rows, which is why that one stays a plate.
+
+         This file used to be a MinHeight setter alone, riding on Fluent's template; when Fluent's set left the theme
+         the rows had no template at all. -->
+
+    <Style Selector="DropDownItem" BasedOn="ListBoxItem">
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference SubtleFillColorTertiary}"/>
+        <Setter Property="BackgroundSelected" Value="{ResourceReference ControlFillColorSecondary}"/>
+        <Setter Property="ForegroundSelected" Value="{ThemeResource AccentFillColorDefault}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingRow}"/>
+        <Setter Property="MinHeight" Value="{ResourceReference RowHeight}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <!-- Left and centred, unlike a list row: a drop-down row is a LABEL, never a card, so there is nothing here
+             that would want the whole slot. -->
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
 
     <Style Selector="DropDownItem">
-        <Setter Property="MinHeight" Value="{ResourceReference RowHeight}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="DropDownItem">
+                    <Grid>
+                        <Border x:Name="ItemBorder"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter
+                                    x:Name="PART_ContentPresenter"
+                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                    Foreground="{TemplateBinding Foreground}"
+                                    FontSize="{TemplateBinding FontSize}"
+                                    Content="{TemplateBinding Content}"
+                                    ContentTemplate="{TemplateBinding ContentTemplate}"
+                                    ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                        </Border>
+                        <Rectangle x:Name="Marker" Opacity="0"
+                                Width="{ResourceReference TabIndicatorThickness}"
+                                HorizontalAlignment="Left" VerticalAlignment="Stretch"
+                                Fill="{ThemeResource AccentFillColorDefault}"
+                                IsHitTestVisible="False"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="DropDownItem">
+        <!-- The row the ARROWS are on, which is not the same as the chosen one: it says where Enter would go, while the
+             accent keeps saying what the control holds right now. It reads like hover because it is the keyboard's
+             equivalent of it - and stays BELOW the selected trigger, so the current value still wins. -->
+        <PropertyTrigger Property="IsHighlighted" Value="true">
+            <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsPressed" Value="true">
+            <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsSelected" Value="true">
+            <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundSelected}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundSelected}"/>
+            <Setter TargetName="Marker" Property="Opacity" Value="1"/>
+        </PropertyTrigger>
     </Style>
 
 </StyleSet>

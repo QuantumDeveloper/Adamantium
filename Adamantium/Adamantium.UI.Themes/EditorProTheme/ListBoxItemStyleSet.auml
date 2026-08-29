@@ -2,16 +2,112 @@
 <StyleSet xmlns="http://adamantium/ui"
           xmlns:x="http://adamantium/ui/xaml/extensions">
 
-    <!-- Editor Pro's ROW - the unit the whole theme is built around, and the one thing the shared template cannot give
-         it. Fluent's list row has no minimum height at all: it stands as tall as its content plus its padding, which
-         in a theme with generous padding is tall enough. This theme's padding is nearly nothing, so without a floor
-         the rows would be as tall as the text and a list would read as a wall.
+    <!-- Editor Pro's ROW - the unit the whole theme is built around.
 
-         Everything else - the inset, the radius, the type size - comes from the shared template reading this theme's
-         Metrics, which is why there is nothing else here. -->
+         Two things differ from Fluent, and both are about a list that holds hundreds of rows rather than a dozen:
+
+         1. A MINIMUM HEIGHT. Fluent's row has none: it stands as tall as its content plus its padding, which works in a
+            theme with generous padding. This theme's padding is nearly nothing, so without a floor the rows would be as
+            tall as the text and a list would read as a wall of words.
+         2. SELECTION IS A FLAT PLATE, not the accent. A file list with twenty selected rows in the loudest colour the
+            palette owns is unreadable, and in an editor multi-selection is ordinary. The plate says "these", and the
+            accent is spent on the one thing that is CURRENT.
+
+         This file used to be the MinHeight setter alone, riding on Fluent's template; when Fluent's set left the theme
+         the rows had no template at all. Now it states the whole row.
+
+         Per the small-styles convention: properties, then the template, then the triggers. -->
 
     <Style Selector="ListBoxItem">
+        <!-- No rest Background: a transparent fill would still build a fill unit and an AA fringe per row, which in a
+             long list is paid hundreds of times for nothing. The triggers paint one when there is something to say;
+             hit-testing is bounds-based and needs no fill. -->
+        <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="BackgroundPointerOver" Value="{ResourceReference SubtleFillColorSecondary}"/>
+        <Setter Property="BackgroundPressed" Value="{ResourceReference SubtleFillColorTertiary}"/>
+        <!-- The accent as a WASH, so a row's own tile survives being selected - see the note in Fluent's set. The
+             accent LINE on the leading edge stays: at this alpha the tint alone is easy to miss in a dense list. -->
+        <Setter Property="BackgroundSelected" Value="{ThemeResource AccentFillColorSelection}"/>
+        <Setter Property="ForegroundSelected" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="Padding" Value="{ResourceReference PaddingRow}"/>
         <Setter Property="MinHeight" Value="{ResourceReference RowHeight}"/>
+        <Setter Property="FontSize" Value="{ResourceReference FontSizeBody}"/>
+        <!-- Stretch on BOTH axes so the row's content fills it: a templated card spans the full width, and plain text
+             still reads left inside the stretched presenter. Vertically too, and that is the recoverable choice -
+             content that wants to be centred says so about ITSELF, whereas content that wants the whole slot cannot get
+             back height the container never handed down. -->
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+    </Style>
+
+    <Style Selector="ListBoxItem">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Grid>
+                        <Border x:Name="ItemBorder"
+                                CornerRadius="{TemplateBinding CornerRadius}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter
+                                    x:Name="PART_ContentPresenter"
+                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                    Foreground="{TemplateBinding Foreground}"
+                                    FontSize="{TemplateBinding FontSize}"
+                                    Content="{TemplateBinding Content}"
+                                    ContentTemplate="{TemplateBinding ContentTemplate}"
+                                    ContentTemplateSelector="{TemplateBinding ContentTemplateSelector}"/>
+                        </Border>
+                        <!-- The accent rule on the leading edge, the same mark the tabs and the backstage rows wear.
+                             This is what carries the accent once the fill stopped doing it: two selected rows are two
+                             plates, and the line is affordable a hundred times over where a wash is not. -->
+                        <Rectangle x:Name="Marker" Opacity="0"
+                                Width="{ResourceReference TabIndicatorThickness}"
+                                HorizontalAlignment="Left" VerticalAlignment="Stretch"
+                                Fill="{ThemeResource AccentFillColorDefault}"
+                                IsHitTestVisible="False"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Hover, then pressed, then selected. The trigger value stack is ACTIVATION-ordered - the most recently activated
+         live trigger wins the shared Background token - so hovering an ALREADY selected row would otherwise swap its
+         plate for the hover wash and the row would look deselected while the pointer is on it. The MultiTriggers below
+         re-assert a brighter plate for selected+hover and selected+pressed, declared LAST so they land on top while
+         both hold, and pop cleanly back on release. -->
+    <Style Selector="ListBoxItem">
+        <PropertyTrigger Property="IsMouseOver" Value="true">
+            <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundPointerOver}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsPressed" Value="true">
+            <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundPressed}"/>
+        </PropertyTrigger>
+        <PropertyTrigger Property="IsSelected" Value="true">
+            <Setter TargetName="ItemBorder" Property="Background" Value="{TemplateBinding BackgroundSelected}"/>
+            <Setter TargetName="PART_ContentPresenter" Property="Foreground" Value="{TemplateBinding ForegroundSelected}"/>
+            <Setter TargetName="Marker" Property="Opacity" Value="1"/>
+        </PropertyTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="IsSelected" Value="true"/>
+                <Condition Property="IsMouseOver" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="ItemBorder" Property="Background" Value="{ThemeResource AccentFillColorSelectionStrong}"/>
+        </MultiTrigger>
+        <MultiTrigger>
+            <MultiTrigger.Conditions>
+                <Condition Property="IsSelected" Value="true"/>
+                <Condition Property="IsPressed" Value="true"/>
+            </MultiTrigger.Conditions>
+            <Setter TargetName="ItemBorder" Property="Background" Value="{ThemeResource AccentFillColorSelectionStrong}"/>
+        </MultiTrigger>
     </Style>
 
 </StyleSet>
