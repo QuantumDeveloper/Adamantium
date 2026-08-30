@@ -16,11 +16,15 @@ public enum PatternType
     /// <summary>Thin Color2 grid lines at each cell boundary over a Color1 background.</summary>
     Grid = 3,
 
-    // value 4 is reserved for NoiseBrush (shader PatternMix type 4 = FBM noise), so the new patterns start at 5.
-
     /// <summary>Thin Color2 honeycomb (hexagonal) grid lines over a Color1 background.</summary>
-    Hexagon = 5,
+    Hexagon = 4,
 
     /// <summary>Thin Color2 diagonal (45 deg) hatch lines over a Color1 background.</summary>
-    Hatch = 6
+    Hatch = 5,
+
+    /// <summary>Over-under WEAVE - the carbon-fibre look: two ribbons crossing in each cell, which one lies on top
+    /// alternating like a checkerboard, with the shading across each ribbon that makes the crossing read as depth.
+    /// A MATERIAL by eye, a PATTERN by nature: it draws itself and needs nothing of what is behind it, which is what
+    /// keeps it here instead of in MaterialBrush.</summary>
+    Weave = 6
 }

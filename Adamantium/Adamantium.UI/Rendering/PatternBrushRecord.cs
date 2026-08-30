@@ -13,7 +13,8 @@ namespace Adamantium.UI.Rendering;
 /// </summary>
 internal readonly struct PatternBrushRecord
 {
-    /// <summary>The shader's pattern/noise type: PatternType as-is, 4 = simplex FBM, 7/8/9 = perlin/value/worley.</summary>
+    /// <summary>The kind code the shader keys its pass on: a <see cref="PatternType"/> as-is, or a
+    /// <see cref="NoiseType"/> offset by <see cref="NoiseBase"/>. Produced ONLY here - see the note there.</summary>
     public readonly int Type;
 
     public readonly Color Color1;
@@ -54,6 +55,20 @@ internal readonly struct PatternBrushRecord
         Noise = noise;
     }
 
+
+    // BOTH families ride ONE field of the record (Params.y) through ONE collector, so their codes must not collide -
+    // and THIS is the only place that knows it. The public enums stay naturally numbered from zero: PatternType has no
+    // holes punched in it for noise, NoiseType none for patterns, and adding a kind to either never renumbers the other.
+    //
+    // Noise sits in its own hundred. Not a clever bit-packing: a reader who sees 103 in a capture can tell instantly
+    // which family it belongs to, and the shader's pass table splits into two obvious ranges instead of one interleaved
+    // list where 4 was noise and 5 was a pattern.
+    public const int NoiseBase = 100;
+
+    private static int PatternCode(PatternType pattern) => (int)pattern;
+
+    private static int NoiseCode(NoiseType noise) => NoiseBase + (int)noise;
+
     public static bool TryDescribe(Brush brush, out PatternBrushRecord record)
     {
         record = default;
@@ -62,7 +77,7 @@ internal readonly struct PatternBrushRecord
         {
             // Bake the hatch line normal (cos/sin) here so the shader needs NO trig (its pattern PS is at the NVVM limit).
             var ha = pat.HatchAngle * Math.PI / 180.0;
-            record = new PatternBrushRecord((int)pat.Pattern, pat.Color1, pat.Color2, new Color(0, 0, 0, 0),
+            record = new PatternBrushRecord(PatternCode(pat.Pattern), pat.Color1, pat.Color2, new Color(0, 0, 0, 0),
                 pat.CellSize, pat.Opacity, new Vector4F((float)Math.Cos(ha), (float)Math.Sin(ha), 0, 0), 0.0, 0.0);
             return true;
         }
@@ -78,7 +93,7 @@ internal readonly struct PatternBrushRecord
                 noise.W = n.UseFirePalette ? 1f : 0f;
             }
 
-            record = new PatternBrushRecord(n.NoiseType == NoiseType.Simplex ? 4 : 6 + (int)n.NoiseType,
+            record = new PatternBrushRecord(NoiseCode(n.NoiseType),
                 n.Color1, n.Color2, n.MidColor, n.Scale, n.Opacity, noise, n.FrozenPhase, n.PhaseOffset);
             return true;
         }

@@ -701,35 +701,38 @@ float PatternMix(int type, float2 p, float cell, float4 noise, float2 anim)
         return 1.0 - smoothstep(0.5, 0.5 + aa + 1.0, dmin);   // ~1px line
     }
 
-    if (type == 4 || type == 7 || type == 8 || type == 9)   // FBM noise: 4 simplex / 7 perlin / 8 value / 9 WorleyNoise
+    // NOISE lives in its own hundred (PatternBrushRecord.NoiseBase): 100 simplex, 101 perlin, 102 value, 103 worley,
+    // 104 ridged, 105 turbulence, 106 voronoi borders, 107 combustible. Patterns keep 0..N. The two families share this
+    // one field because they share one record and one collector, and separating them by RANGE is what keeps either
+    // enum free to grow without renumbering the other.
+    if (type >= 100 && type <= 103)   // FBM noise: simplex / perlin / value / worley
     {
-        int basis = type - 6;                                            // 7->1 perlin, 8->2 value, 9->3 WorleyNoise
-        if (type == 4) basis = 0;                                        // 4 -> simplex
+        int basis = type - 100;                                          // 100->0 simplex, 101->1 perlin, ...
         int oct = int(abs(noise.x));                                     // octaves is sign-encoded: negative = animate
         float phase = NoisePhase(noise.x, anim);
         float2 np = g + noise.y;                                         // base noise domain + seed offset
         float n = Fbm(np, oct, max(noise.z, 1.0), noise.w, basis, phase);   // Color1 (low) -> Color2 (high); phase drives flow
         return saturate(n * 0.5 + 0.5);
     }
-    if (type == 10 || type == 11)   // ridged (10) / turbulence (11): FBM folds over simplex, already ~[0,1]
+    if (type == 104 || type == 105)   // ridged (104) / turbulence (105): FBM folds over simplex, already ~[0,1]
     {
         int mode = 0;                              // turbulence
-        if (type == 10) mode = 1;                  // ridged
+        if (type == 104) mode = 1;                 // ridged
         int oct = int(abs(noise.x));
         float phase = NoisePhase(noise.x, anim);
         float2 np = g + noise.y;
         float n = FbmFold(np, oct, max(noise.z, 1.0), noise.w, mode, phase);
-        if (type == 11) n = n * 1.6;               // turbulence is dimmer (averaged |noise|) - lift it for contrast
+        if (type == 105) n = n * 1.6;               // turbulence is dimmer (averaged |noise|) - lift it for contrast
         return saturate(n);
     }
-    if (type == 12)   // Voronoi BORDER network (iq Xd23Dh): thin bright cell walls, morphing under Animate
+    if (type == 106)   // Voronoi BORDER network (iq Xd23Dh): thin bright cell walls, morphing under Animate
     {
         float ph = NoisePhase(noise.x, anim);
         float dd = VoronoiEdge(g + noise.y, ph);
         float aa = fwidth(dd) + 1e-4;
         return 1.0 - smoothstep(0.0, 0.06 + aa, dd);   // Color2 on the borders, Color1 inside the cells
     }
-    if (type == 5)   // hexagonal grid (honeycomb) lines
+    if (type == 4)   // hexagonal grid (honeycomb) lines
     {
         float2 grid = float2(1.0, 1.7320508);
         float2 hh = grid * 0.5;
@@ -742,12 +745,32 @@ float PatternMix(int type, float2 p, float cell, float4 noise, float2 anim)
         float aa = fwidth(dpx) + 1e-4;
         return 1.0 - smoothstep(0.5, 0.5 + aa + 1.0, dpx);     // ~1px hex lines
     }
-    if (type == 6)   // hatch lines; noise.xy = the unit line normal (cos/sin baked on the CPU - NO trig here, so the
+    if (type == 5)   // hatch lines; noise.xy = the unit line normal (cos/sin baked on the CPU - NO trig here, so the
     {                //                 already-maxed pattern PS doesn't grow: dot replaces the old p.x+p.y)
         float t = dot(p, float2(noise.x, noise.y)) / cell;
         float dpx = (0.5 - abs(frac(t) - 0.5)) * cell;       // px to the nearest line (cell = perpendicular spacing)
         float aa = fwidth(dpx) + 1e-4;
         return 1.0 - smoothstep(0.5, 0.5 + aa + 1.0, dpx);
+    }
+    if (type == 6)   // WEAVE (carbon fibre): two ribbons cross in every cell, and which one lies ON TOP alternates
+    {                 // like a checkerboard - that alternation IS the weave; without it this is just a grid.
+        float2 f = frac(g);
+        float2 id = floor(g);
+        float over = fmod(id.x + id.y, 2.0);                 // 0 = the horizontal ribbon is on top here
+        float dh = abs(f.y - 0.5);                           // distance across the horizontal ribbon
+        float dv = abs(f.x - 0.5);
+        float halfW = 0.30;                                  // ribbon half-width, in cells (leaves a gap between tows)
+        float mh = 1.0 - smoothstep(halfW - fwidth(dh) - 1e-4, halfW + fwidth(dh) + 1e-4, dh);
+        float mv = 1.0 - smoothstep(halfW - fwidth(dv) - 1e-4, halfW + fwidth(dv) + 1e-4, dv);
+        // Shading ACROSS each ribbon: bright along its middle, falling off to the edges. This is what makes the
+        // crossing read as depth rather than as a flat plaid.
+        float bh = mh * (0.55 + 0.45 * saturate(1.0 - dh / halfW));
+        float bv = mv * (0.55 + 0.45 * saturate(1.0 - dv / halfW));
+        // step(), not a ternary: the whole family is written branch-free here (NVVM has device-lost on one).
+        float onTop = step(over, 0.5);
+        float top = lerp(bv, bh, onTop);
+        float under = lerp(bh, bv, onTop);
+        return saturate(max(top, under * 0.45));             // the one underneath reads darker where it passes below
     }
 
     // checkerboard (type 0): iq's analytically-filtered checker (period 2 in g -> cell-sized squares)
@@ -830,7 +853,7 @@ float4 PatternFillColor(PatternRectData it, int ptype, float2 pTopLeft, float2 c
     // optimiser drop every branch but one and leave each pass with a small pixel shader instead of the fourteen-way
     // monster this used to be (which the driver kept refusing to create).
     float4 fill;
-    if (ptype == 13)   // Combustible Voronoi: its own 3D-ray + fire-palette colour path (ignores Color1/Color2 as a lerp)
+    if (ptype == 107)   // Combustible Voronoi: its own 3D-ray + fire-palette colour path (ignores Color1/Color2 as a lerp)
     {
         float time = NoisePhase(it.Noise.x, it.Anim.xy);
         float2 uv = centerRel / max(halfY, 1.0);   // centred, normalised by half height
@@ -983,33 +1006,35 @@ float4 PatternMeshShade(PatFillPSInput input, int kind)
 [shader("fragment")] float4 PatternStripesSdfPS(PatternPSInput i)      : SV_Target { return PatternSdfShade(i, 1); }
 [shader("fragment")] float4 PatternDotsSdfPS(PatternPSInput i)         : SV_Target { return PatternSdfShade(i, 2); }
 [shader("fragment")] float4 PatternGridSdfPS(PatternPSInput i)         : SV_Target { return PatternSdfShade(i, 3); }
-[shader("fragment")] float4 PatternHexagonSdfPS(PatternPSInput i)      : SV_Target { return PatternSdfShade(i, 5); }
-[shader("fragment")] float4 PatternHatchSdfPS(PatternPSInput i)        : SV_Target { return PatternSdfShade(i, 6); }
+[shader("fragment")] float4 PatternHexagonSdfPS(PatternPSInput i)      : SV_Target { return PatternSdfShade(i, 4); }
+[shader("fragment")] float4 PatternHatchSdfPS(PatternPSInput i)        : SV_Target { return PatternSdfShade(i, 5); }
+[shader("fragment")] float4 PatternWeaveSdfPS(PatternPSInput i)        : SV_Target { return PatternSdfShade(i, 6); }
 
 [shader("fragment")] float4 PatternCheckerboardMeshPS(PatFillPSInput i) : SV_Target { return PatternMeshShade(i, 0); }
 [shader("fragment")] float4 PatternStripesMeshPS(PatFillPSInput i)      : SV_Target { return PatternMeshShade(i, 1); }
 [shader("fragment")] float4 PatternDotsMeshPS(PatFillPSInput i)         : SV_Target { return PatternMeshShade(i, 2); }
 [shader("fragment")] float4 PatternGridMeshPS(PatFillPSInput i)         : SV_Target { return PatternMeshShade(i, 3); }
-[shader("fragment")] float4 PatternHexagonMeshPS(PatFillPSInput i)      : SV_Target { return PatternMeshShade(i, 5); }
-[shader("fragment")] float4 PatternHatchMeshPS(PatFillPSInput i)        : SV_Target { return PatternMeshShade(i, 6); }
+[shader("fragment")] float4 PatternHexagonMeshPS(PatFillPSInput i)      : SV_Target { return PatternMeshShade(i, 4); }
+[shader("fragment")] float4 PatternHatchMeshPS(PatFillPSInput i)        : SV_Target { return PatternMeshShade(i, 5); }
+[shader("fragment")] float4 PatternWeaveMeshPS(PatFillPSInput i)        : SV_Target { return PatternMeshShade(i, 6); }
 
-[shader("fragment")] float4 NoiseSimplexSdfPS(PatternPSInput i)     : SV_Target { return PatternSdfShade(i, 4); }
-[shader("fragment")] float4 NoisePerlinSdfPS(PatternPSInput i)      : SV_Target { return PatternSdfShade(i, 7); }
-[shader("fragment")] float4 NoiseValueSdfPS(PatternPSInput i)       : SV_Target { return PatternSdfShade(i, 8); }
-[shader("fragment")] float4 NoiseWorleySdfPS(PatternPSInput i)      : SV_Target { return PatternSdfShade(i, 9); }
-[shader("fragment")] float4 NoiseRidgedSdfPS(PatternPSInput i)      : SV_Target { return PatternSdfShade(i, 10); }
-[shader("fragment")] float4 NoiseTurbulenceSdfPS(PatternPSInput i)  : SV_Target { return PatternSdfShade(i, 11); }
-[shader("fragment")] float4 NoiseVoronoiSdfPS(PatternPSInput i)     : SV_Target { return PatternSdfShade(i, 12); }
-[shader("fragment")] float4 NoiseCombustibleSdfPS(PatternPSInput i) : SV_Target { return PatternSdfShade(i, 13); }
+[shader("fragment")] float4 NoiseSimplexSdfPS(PatternPSInput i)     : SV_Target { return PatternSdfShade(i, 100); }
+[shader("fragment")] float4 NoisePerlinSdfPS(PatternPSInput i)      : SV_Target { return PatternSdfShade(i, 101); }
+[shader("fragment")] float4 NoiseValueSdfPS(PatternPSInput i)       : SV_Target { return PatternSdfShade(i, 102); }
+[shader("fragment")] float4 NoiseWorleySdfPS(PatternPSInput i)      : SV_Target { return PatternSdfShade(i, 103); }
+[shader("fragment")] float4 NoiseRidgedSdfPS(PatternPSInput i)      : SV_Target { return PatternSdfShade(i, 104); }
+[shader("fragment")] float4 NoiseTurbulenceSdfPS(PatternPSInput i)  : SV_Target { return PatternSdfShade(i, 105); }
+[shader("fragment")] float4 NoiseVoronoiSdfPS(PatternPSInput i)     : SV_Target { return PatternSdfShade(i, 106); }
+[shader("fragment")] float4 NoiseCombustibleSdfPS(PatternPSInput i) : SV_Target { return PatternSdfShade(i, 107); }
 
-[shader("fragment")] float4 NoiseSimplexMeshPS(PatFillPSInput i)     : SV_Target { return PatternMeshShade(i, 4); }
-[shader("fragment")] float4 NoisePerlinMeshPS(PatFillPSInput i)      : SV_Target { return PatternMeshShade(i, 7); }
-[shader("fragment")] float4 NoiseValueMeshPS(PatFillPSInput i)       : SV_Target { return PatternMeshShade(i, 8); }
-[shader("fragment")] float4 NoiseWorleyMeshPS(PatFillPSInput i)      : SV_Target { return PatternMeshShade(i, 9); }
-[shader("fragment")] float4 NoiseRidgedMeshPS(PatFillPSInput i)      : SV_Target { return PatternMeshShade(i, 10); }
-[shader("fragment")] float4 NoiseTurbulenceMeshPS(PatFillPSInput i)  : SV_Target { return PatternMeshShade(i, 11); }
-[shader("fragment")] float4 NoiseVoronoiMeshPS(PatFillPSInput i)     : SV_Target { return PatternMeshShade(i, 12); }
-[shader("fragment")] float4 NoiseCombustibleMeshPS(PatFillPSInput i) : SV_Target { return PatternMeshShade(i, 13); }
+[shader("fragment")] float4 NoiseSimplexMeshPS(PatFillPSInput i)     : SV_Target { return PatternMeshShade(i, 100); }
+[shader("fragment")] float4 NoisePerlinMeshPS(PatFillPSInput i)      : SV_Target { return PatternMeshShade(i, 101); }
+[shader("fragment")] float4 NoiseValueMeshPS(PatFillPSInput i)       : SV_Target { return PatternMeshShade(i, 102); }
+[shader("fragment")] float4 NoiseWorleyMeshPS(PatFillPSInput i)      : SV_Target { return PatternMeshShade(i, 103); }
+[shader("fragment")] float4 NoiseRidgedMeshPS(PatFillPSInput i)      : SV_Target { return PatternMeshShade(i, 104); }
+[shader("fragment")] float4 NoiseTurbulenceMeshPS(PatFillPSInput i)  : SV_Target { return PatternMeshShade(i, 105); }
+[shader("fragment")] float4 NoiseVoronoiMeshPS(PatFillPSInput i)     : SV_Target { return PatternMeshShade(i, 106); }
+[shader("fragment")] float4 NoiseCombustibleMeshPS(PatFillPSInput i) : SV_Target { return PatternMeshShade(i, 107); }
 
 
 // ---- TEXTURED rounded rect: the first fill of this batch whose colour is SAMPLED rather than computed. Deliberately the
@@ -1581,6 +1606,7 @@ technique Pattern
     pass GridSdf         { Profile = 6.6; VertexShader = PatternRectInstancedVS; PixelShader = PatternGridSdfPS; }
     pass HexagonSdf      { Profile = 6.6; VertexShader = PatternRectInstancedVS; PixelShader = PatternHexagonSdfPS; }
     pass HatchSdf        { Profile = 6.6; VertexShader = PatternRectInstancedVS; PixelShader = PatternHatchSdfPS; }
+    pass WeaveSdf        { Profile = 6.6; VertexShader = PatternRectInstancedVS; PixelShader = PatternWeaveSdfPS; }
 
     pass CheckerboardMesh { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = PatternCheckerboardMeshPS; }
     pass StripesMesh      { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = PatternStripesMeshPS; }
@@ -1588,6 +1614,7 @@ technique Pattern
     pass GridMesh         { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = PatternGridMeshPS; }
     pass HexagonMesh      { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = PatternHexagonMeshPS; }
     pass HatchMesh        { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = PatternHatchMeshPS; }
+    pass WeaveMesh        { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = PatternWeaveMeshPS; }
 }
 
 // NOISE FIELDS. Same shape as Pattern above - these are a separate technique because they are a separate FAMILY of

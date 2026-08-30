@@ -568,12 +568,13 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         return LogicalDevice.GetDescriptorSetLayoutOffset(layout, bindingSlot);
     }
 
-    // SERIALISED, and static rather than per-instance: every render device shares one VkDevice, and the binary cache
-    // below is one folder on disk, so two threads creating shaders at once means two writers for one cache file and two
-    // concurrent vkCreateShadersEXT calls into a compiler this driver is already documented to flake in. It cost a
-    // NATIVE crash of the test host partway through a parallel run - and only once the brushes split into a pass per
-    // kind, i.e. once there were enough shaders for the two to overlap. Creation is lazy and once per pass, so the lock
-    // is never on a hot path.
+    // SERIALISED for CALLERS THAT ARE PARALLEL - which the application is not: it renders on one thread
+    // (AdamantiumRenderThread), and every shader here is created from a draw on it. The parallel caller is the TEST
+    // RUNNER, which runs fixtures concurrently; there two threads meant two writers for one on-disk cache file and two
+    // concurrent vkCreateShadersEXT calls, and the host died natively partway through a run once the brushes split into
+    // a pass per kind and there were finally enough shaders to overlap.
+    // Static rather than per-instance because every render device shares one VkDevice and one cache folder. Creation is
+    // lazy and once per pass, so this is never on a hot path - and if rendering ever does go parallel, it already holds.
     private static readonly object ShaderCreateLock = new();
 
     public ShaderEXT CreateShader(ShaderCreateInfoEXT shaderCreateInfo, string name = null)
@@ -1059,6 +1060,29 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         // the beforeRenderPass record, BeginRendering - has run WITHOUT touching the swapchain image, so a failure there
         // aborts the frame with no dangling acquired image. Only now, committed to Submit + Present, do we take one.
         return true;
+    }
+
+    /// <summary>Break the render pass OPEN in the middle of a frame, so work that may not run inside one - copying out of
+    /// the colour target, a blit - can be recorded into the SAME command buffer. Pair it with
+    /// <see cref="ResumeRendering"/>; everything already drawn is kept, because the resume loads the attachment instead
+    /// of clearing it.
+    /// <para>This exists for the backdrop materials: acrylic and its family read what is already composited BEHIND the
+    /// element, and that read is a transfer, not a draw. Doing it through a one-off command buffer (BeginSingleTimeCommand)
+    /// would stall the pipeline mid-frame, which is the whole reason this pair is here.</para></summary>
+    public void SuspendRendering()
+    {
+        if (!EnableDynamicRendering) return;
+
+        CurrentCommandBuffer.EndRendering();
+    }
+
+    /// <summary>Re-open the pass suspended by <see cref="SuspendRendering"/>. LoadOp is Load, so the colour and depth
+    /// already in the target survive - a Clear here would wipe the frame drawn so far.</summary>
+    public void ResumeRendering()
+    {
+        if (!EnableDynamicRendering) return;
+
+        BeginRendering(CurrentCommandBuffer, continueRendering: true);
     }
 
     public void BeginRendering(CommandBuffer commandBuffer, bool continueRendering = false, float depth = 1.0f, uint stencil = 0)

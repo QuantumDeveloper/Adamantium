@@ -505,8 +505,9 @@ public partial class BrushesViewModel : TabPageViewModel
         return new PointsCollection(points);
     }
 
-    /// <summary>All procedural pattern types (Checkerboard..Hatch; the reserved noise slot has no name so GetValues skips
-    /// it) - the source for the "Pattern type" dropdown.</summary>
+    /// <summary>Every pattern kind, straight from the enum - the source for the "Pattern type" dropdown. It has no holes
+    /// to skip any more: noise codes used to be punched into this enum's numbering and now live in their own range,
+    /// so a kind added there shows up here by itself.</summary>
     public PatternType[] PatternTypes { get; } = Enum.GetValues<PatternType>();
 
     [Bindable] private PatternType _patternKind = PatternType.Dots;

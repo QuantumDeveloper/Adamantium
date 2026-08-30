@@ -1037,16 +1037,18 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         1 => brush.PatternStripesMeshPass,
         2 => brush.PatternDotsMeshPass,
         3 => brush.PatternGridMeshPass,
-        4 => brush.NoiseSimplexMeshPass,
-        5 => brush.PatternHexagonMeshPass,
-        6 => brush.PatternHatchMeshPass,
-        7 => brush.NoisePerlinMeshPass,
-        8 => brush.NoiseValueMeshPass,
-        9 => brush.NoiseWorleyMeshPass,
-        10 => brush.NoiseRidgedMeshPass,
-        11 => brush.NoiseTurbulenceMeshPass,
-        12 => brush.NoiseVoronoiMeshPass,
-        13 => brush.NoiseCombustibleMeshPass,
+        4 => brush.PatternHexagonMeshPass,
+        5 => brush.PatternHatchMeshPass,
+        6 => brush.PatternWeaveMeshPass,
+
+        100 => brush.NoiseSimplexMeshPass,
+        101 => brush.NoisePerlinMeshPass,
+        102 => brush.NoiseValueMeshPass,
+        103 => brush.NoiseWorleyMeshPass,
+        104 => brush.NoiseRidgedMeshPass,
+        105 => brush.NoiseTurbulenceMeshPass,
+        106 => brush.NoiseVoronoiMeshPass,
+        107 => brush.NoiseCombustibleMeshPass,
         _ => brush.PatternCheckerboardMeshPass
     };
 
