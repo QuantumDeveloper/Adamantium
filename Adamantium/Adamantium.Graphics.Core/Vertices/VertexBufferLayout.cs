@@ -6,10 +6,10 @@ namespace Adamantium.Graphics.Core.Vertices
 {
    /// <summary>	
    /// A description of a vertex elements for particular slot for the input-assembler stage. 
-   /// This structure is related to <see cref="SharpDX.Direct3D11.InputElement"/>.
+   /// This structure is related to <see cref="VertexInputElement"/>.
    /// </summary>	
    /// <remarks>	
-   /// Because <see cref="SharpDX.Direct3D11.InputElement"/> requires to have the same <see cref="SlotIndex"/>, <see cref="InstanceCount"/>,
+   /// Because <see cref="VertexInputElement"/> requires to have the same <see cref="SlotIndex"/>, <see cref="InstanceCount"/>,
    /// this <see cref="VertexBufferLayout"/> structure encapsulates a set of <see cref="VertexInputElement"/> for a particular slot, instance count.
    /// </remarks>	
    /// <seealso cref="VertexInputElement"/>
@@ -24,7 +24,7 @@ namespace Adamantium.Graphics.Core.Vertices
       public readonly int SlotIndex;
 
       /// <summary>	
-      /// The number of instances to draw using the same per-instance data before advancing in the buffer by one element. This value must be 0 for an  element that contains per-vertex data (the slot class is set to <see cref="SharpDX.Direct3D11.InputClassification.PerVertexData"/>).
+      /// The number of instances to draw using the same per-instance data before advancing in the buffer by one element. This value must be 0 for an  element that contains per-vertex data (the slot class is set to <see cref="per-vertex data"/>).
       /// </summary>	
       /// <msdn-id>ff476180</msdn-id>	
       /// <unmanaged>unsigned int InstanceDataStepRate</unmanaged>	

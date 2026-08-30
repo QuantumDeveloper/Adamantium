@@ -1072,7 +1072,7 @@ namespace Adamantium.Mathematics
 
       /* This implementation is wrong
       /// <summary>
-      /// Determines whether there is an intersection between a <see cref="SharpDX.BoundingBox"/> and a triangle.
+      /// Determines whether there is an intersection between a <see cref="BoundingBox"/> and a triangle.
       /// </summary>
       /// <param name="box">The box to test.</param>
       /// <param name="vertex1">The first vertex of the triangle to test.</param>
@@ -1205,7 +1205,7 @@ namespace Adamantium.Mathematics
 
       /* This implementation is wrong
       /// <summary>
-      /// Determines whether a <see cref="SharpDX.BoundingBox"/> contains a triangle.
+      /// Determines whether a <see cref="BoundingBox"/> contains a triangle.
       /// </summary>
       /// <param name="box">The box to test.</param>
       /// <param name="vertex1">The first vertex of the triangle to test.</param>

@@ -523,10 +523,10 @@
         //
         // Сводка:
         //     Most common YUV 4:4:4 video resource format. Valid view formats for this video
-        //     resource format are SharpDX.DXGI.Format.R8G8B8A8_UNorm and SharpDX.DXGI.Format.R8G8B8A8_UInt.
-        //     For UAVs, an additional valid view format is SharpDX.DXGI.Format.R32_UInt. By
-        //     using SharpDX.DXGI.Format.R32_UInt for UAVs, you can both read and write as opposed
-        //     to just write for SharpDX.DXGI.Format.R8G8B8A8_UNorm and SharpDX.DXGI.Format.R8G8B8A8_UInt.
+        //     resource format are Format.R8G8B8A8_UNorm and Format.R8G8B8A8_UInt.
+        //     For UAVs, an additional valid view format is Format.R32_UInt. By
+        //     using Format.R32_UInt for UAVs, you can both read and write as opposed
+        //     to just write for Format.R8G8B8A8_UNorm and Format.R8G8B8A8_UInt.
         //     Supported view types are SRV, RTV, and UAV. One view provides a straightforward
         //     mapping of the entire surface. The mapping to the view channel is V->R8, U->G8,
         //     Y->B8, and A->A8. For more info about YUV formats for video rendering, see Recommended
@@ -536,11 +536,11 @@
         //
         // Сводка:
         //     10-bit per channel packed YUV 4:4:4 video resource format. Valid view formats
-        //     for this video resource format are SharpDX.DXGI.Format.R10G10B10A2_UNorm and
-        //     SharpDX.DXGI.Format.R10G10B10A2_UInt. For UAVs, an additional valid view format
-        //     is SharpDX.DXGI.Format.R32_UInt. By using SharpDX.DXGI.Format.R32_UInt for UAVs,
-        //     you can both read and write as opposed to just write for SharpDX.DXGI.Format.R10G10B10A2_UNorm
-        //     and SharpDX.DXGI.Format.R10G10B10A2_UInt. Supported view types are SRV and UAV.
+        //     for this video resource format are Format.R10G10B10A2_UNorm and
+        //     Format.R10G10B10A2_UInt. For UAVs, an additional valid view format
+        //     is Format.R32_UInt. By using Format.R32_UInt for UAVs,
+        //     you can both read and write as opposed to just write for Format.R10G10B10A2_UNorm
+        //     and Format.R10G10B10A2_UInt. Supported view types are SRV and UAV.
         //     One view provides a straightforward mapping of the entire surface. The mapping
         //     to the view channel is U->R10, Y->G10, V->B10, and A->A2. For more info about
         //     YUV formats for video rendering, see Recommended 8-Bit YUV Formats for Video
@@ -549,8 +549,8 @@
         //
         // Сводка:
         //     16-bit per channel packed YUV 4:4:4 video resource format. Valid view formats
-        //     for this video resource format are SharpDX.DXGI.Format.R16G16B16A16_UNorm and
-        //     SharpDX.DXGI.Format.R16G16B16A16_UInt. Supported view types are SRV and UAV.
+        //     for this video resource format are Format.R16G16B16A16_UNorm and
+        //     Format.R16G16B16A16_UInt. Supported view types are SRV and UAV.
         //     One view provides a straightforward mapping of the entire surface. The mapping
         //     to the view channel is U->R16, Y->G16, V->B16, and A->A16. For more info about
         //     YUV formats for video rendering, see Recommended 8-Bit YUV Formats for Video
@@ -559,9 +559,9 @@
         //
         // Сводка:
         //     Most common YUV 4:2:0 video resource format. Valid luminance data view formats
-        //     for this video resource format are SharpDX.DXGI.Format.R8_UNorm and SharpDX.DXGI.Format.R8_UInt.
+        //     for this video resource format are Format.R8_UNorm and Format.R8_UInt.
         //     Valid chrominance data view formats (width and height are each 1/2 of luminance
-        //     view) for this video resource format are SharpDX.DXGI.Format.R8G8_UNorm and SharpDX.DXGI.Format.R8G8_UInt.
+        //     view) for this video resource format are Format.R8G8_UNorm and Format.R8G8_UInt.
         //     Supported view types are SRV, RTV, and UAV. For luminance data view, the mapping
         //     to the view channel is Y->R8. For chrominance data view, the mapping to the view
         //     channel is U->R8 and V->G8. For more info about YUV formats for video rendering,
@@ -570,7 +570,7 @@
         //     use (rowPitch * (height + (height / 2))) bytes. The first (SysMemPitch * height)
         //     bytes are the Y plane, the remaining (SysMemPitch * (height / 2)) bytes are the
         //     UV plane. An app using the YUY 4:2:0 formats must map the luma (Y) plane separately
-        //     from the chroma (UV) planes. Developers do this by calling SharpDX.Direct3D12.Device.CreateShaderResourceView
+        //     from the chroma (UV) planes. Developers do this by calling CreateShaderResourceView
         //     twice for the same texture and passing in 1-channel and 2-channel formats. Passing
         //     in a 1-channel format compatible with the Y plane maps only the Y plane. Passing
         //     in a 2-channel format compatible with the UV planes (together) maps only the
@@ -580,17 +580,17 @@
         //
         // Сводка:
         //     10-bit per channel planar YUV 4:2:0 video resource format. Valid luminance data
-        //     view formats for this video resource format are SharpDX.DXGI.Format.R16_UNorm
-        //     and SharpDX.DXGI.Format.R16_UInt. The runtime does not enforce whether the lowest
+        //     view formats for this video resource format are Format.R16_UNorm
+        //     and Format.R16_UInt. The runtime does not enforce whether the lowest
         //     6 bits are 0 (given that this video resource format is a 10-bit format that uses
         //     16 bits). If required, application shader code would have to enforce this manually.
-        //     From the runtime's point of view, SharpDX.DXGI.Format.P010 is no different than
-        //     SharpDX.DXGI.Format.P016. Valid chrominance data view formats (width and height
-        //     are each 1/2 of luminance view) for this video resource format are SharpDX.DXGI.Format.R16G16_UNorm
-        //     and SharpDX.DXGI.Format.R16G16_UInt. For UAVs, an additional valid chrominance
-        //     data view format is SharpDX.DXGI.Format.R32_UInt. By using SharpDX.DXGI.Format.R32_UInt
-        //     for UAVs, you can both read and write as opposed to just write for SharpDX.DXGI.Format.R16G16_UNorm
-        //     and SharpDX.DXGI.Format.R16G16_UInt. Supported view types are SRV, RTV, and UAV.
+        //     From the runtime's point of view, Format.P010 is no different than
+        //     Format.P016. Valid chrominance data view formats (width and height
+        //     are each 1/2 of luminance view) for this video resource format are Format.R16G16_UNorm
+        //     and Format.R16G16_UInt. For UAVs, an additional valid chrominance
+        //     data view format is Format.R32_UInt. By using Format.R32_UInt
+        //     for UAVs, you can both read and write as opposed to just write for Format.R16G16_UNorm
+        //     and Format.R16G16_UInt. Supported view types are SRV, RTV, and UAV.
         //     For luminance data view, the mapping to the view channel is Y->R16. For chrominance
         //     data view, the mapping to the view channel is U->R16 and V->G16. For more info
         //     about YUV formats for video rendering, see Recommended 8-Bit YUV Formats for
@@ -599,7 +599,7 @@
         //     bytes. The first (SysMemPitch * height) bytes are the Y plane, the remaining
         //     (SysMemPitch * (height / 2)) bytes are the UV plane. An app using the YUY 4:2:0
         //     formats must map the luma (Y) plane separately from the chroma (UV) planes. Developers
-        //     do this by calling SharpDX.Direct3D12.Device.CreateShaderResourceView twice for
+        //     do this by calling CreateShaderResourceView twice for
         //     the same texture and passing in 1-channel and 2-channel formats. Passing in a
         //     1-channel format compatible with the Y plane maps only the Y plane. Passing in
         //     a 2-channel format compatible with the UV planes (together) maps only the U and
@@ -609,13 +609,13 @@
         //
         // Сводка:
         //     16-bit per channel planar YUV 4:2:0 video resource format. Valid luminance data
-        //     view formats for this video resource format are SharpDX.DXGI.Format.R16_UNorm
-        //     and SharpDX.DXGI.Format.R16_UInt. Valid chrominance data view formats (width
+        //     view formats for this video resource format are Format.R16_UNorm
+        //     and Format.R16_UInt. Valid chrominance data view formats (width
         //     and height are each 1/2 of luminance view) for this video resource format are
-        //     SharpDX.DXGI.Format.R16G16_UNorm and SharpDX.DXGI.Format.R16G16_UInt. For UAVs,
-        //     an additional valid chrominance data view format is SharpDX.DXGI.Format.R32_UInt.
-        //     By using SharpDX.DXGI.Format.R32_UInt for UAVs, you can both read and write as
-        //     opposed to just write for SharpDX.DXGI.Format.R16G16_UNorm and SharpDX.DXGI.Format.R16G16_UInt.
+        //     Format.R16G16_UNorm and Format.R16G16_UInt. For UAVs,
+        //     an additional valid chrominance data view format is Format.R32_UInt.
+        //     By using Format.R32_UInt for UAVs, you can both read and write as
+        //     opposed to just write for Format.R16G16_UNorm and Format.R16G16_UInt.
         //     Supported view types are SRV, RTV, and UAV. For luminance data view, the mapping
         //     to the view channel is Y->R16. For chrominance data view, the mapping to the
         //     view channel is U->R16 and V->G16. For more info about YUV formats for video
@@ -624,7 +624,7 @@
         //     format use (rowPitch * (height + (height / 2))) bytes. The first (SysMemPitch
         //     * height) bytes are the Y plane, the remaining (SysMemPitch * (height / 2)) bytes
         //     are the UV plane. An app using the YUY 4:2:0 formats must map the luma (Y) plane
-        //     separately from the chroma (UV) planes. Developers do this by calling SharpDX.Direct3D12.Device.CreateShaderResourceView
+        //     separately from the chroma (UV) planes. Developers do this by calling CreateShaderResourceView
         //     twice for the same texture and passing in 1-channel and 2-channel formats. Passing
         //     in a 1-channel format compatible with the Y plane maps only the Y plane. Passing
         //     in a 2-channel format compatible with the UV planes (together) maps only the
@@ -637,8 +637,8 @@
         //     where each pixel has its own Y value, but each 2x2 pixel block shares a single
         //     U and V value. The runtime requires that the width and height of all resources
         //     that are created with this format are multiples of 2. The runtime also requires
-        //     that the left, right, top, and bottom members of any SharpDX.Mathematics.Interop.RawRectangle
-        //     that are used for this format are multiples of 2. This format differs from SharpDX.DXGI.Format.NV12
+        //     that the left, right, top, and bottom members of any rectangle
+        //     that are used for this format are multiples of 2. This format differs from Format.NV12
         //     in that the layout of the data within the resource is completely opaque to applications.
         //     Applications cannot use the CPU to map the resource and then access the data
         //     within the resource. You cannot use shaders with this format. Because of this
@@ -650,7 +650,7 @@
         //     Direct3D 11 staging resources and initData parameters for this format use (rowPitch
         //     * (height + (height / 2))) bytes. An app using the YUY 4:2:0 formats must map
         //     the luma (Y) plane separately from the chroma (UV) planes. Developers do this
-        //     by calling SharpDX.Direct3D12.Device.CreateShaderResourceView twice for the same
+        //     by calling CreateShaderResourceView twice for the same
         //     texture and passing in 1-channel and 2-channel formats. Passing in a 1-channel
         //     format compatible with the Y plane maps only the Y plane. Passing in a 2-channel
         //     format compatible with the UV planes (together) maps only the U and V planes
@@ -660,15 +660,15 @@
         //
         // Сводка:
         //     Most common YUV 4:2:2 video resource format. Valid view formats for this video
-        //     resource format are SharpDX.DXGI.Format.R8G8B8A8_UNorm and SharpDX.DXGI.Format.R8G8B8A8_UInt.
-        //     For UAVs, an additional valid view format is SharpDX.DXGI.Format.R32_UInt. By
-        //     using SharpDX.DXGI.Format.R32_UInt for UAVs, you can both read and write as opposed
-        //     to just write for SharpDX.DXGI.Format.R8G8B8A8_UNorm and SharpDX.DXGI.Format.R8G8B8A8_UInt.
+        //     resource format are Format.R8G8B8A8_UNorm and Format.R8G8B8A8_UInt.
+        //     For UAVs, an additional valid view format is Format.R32_UInt. By
+        //     using Format.R32_UInt for UAVs, you can both read and write as opposed
+        //     to just write for Format.R8G8B8A8_UNorm and Format.R8G8B8A8_UInt.
         //     Supported view types are SRV and UAV. One view provides a straightforward mapping
         //     of the entire surface. The mapping to the view channel is Y0->R8, U0->G8, Y1->B8,
-        //     and V0->A8. A unique valid view format for this video resource format is SharpDX.DXGI.Format.R8G8_B8G8_UNorm.
-        //     With this view format, the width of the view appears to be twice what the SharpDX.DXGI.Format.R8G8B8A8_UNorm
-        //     or SharpDX.DXGI.Format.R8G8B8A8_UInt view would be when hardware reconstructs
+        //     and V0->A8. A unique valid view format for this video resource format is Format.R8G8_B8G8_UNorm.
+        //     With this view format, the width of the view appears to be twice what the Format.R8G8B8A8_UNorm
+        //     or Format.R8G8B8A8_UInt view would be when hardware reconstructs
         //     RGBA automatically on read and before filtering. This Direct3D hardware behavior
         //     is legacy and is likely not useful any more. With this view format, the mapping
         //     to the view channel is Y0->R8, U0-> G8[0], Y1->B8, and V0-> G8[1]. For more info
@@ -679,12 +679,12 @@
         //
         // Сводка:
         //     10-bit per channel packed YUV 4:2:2 video resource format. Valid view formats
-        //     for this video resource format are SharpDX.DXGI.Format.R16G16B16A16_UNorm and
-        //     SharpDX.DXGI.Format.R16G16B16A16_UInt. The runtime does not enforce whether the
+        //     for this video resource format are Format.R16G16B16A16_UNorm and
+        //     Format.R16G16B16A16_UInt. The runtime does not enforce whether the
         //     lowest 6 bits are 0 (given that this video resource format is a 10-bit format
         //     that uses 16 bits). If required, application shader code would have to enforce
-        //     this manually. From the runtime's point of view, SharpDX.DXGI.Format.Y210 is
-        //     no different than SharpDX.DXGI.Format.Y216. Supported view types are SRV and
+        //     this manually. From the runtime's point of view, Format.Y210 is
+        //     no different than Format.Y216. Supported view types are SRV and
         //     UAV. One view provides a straightforward mapping of the entire surface. The mapping
         //     to the view channel is Y0->R16, U->G16, Y1->B16, and V->A16. For more info about
         //     YUV formats for video rendering, see Recommended 8-Bit YUV Formats for Video
@@ -694,8 +694,8 @@
         //
         // Сводка:
         //     16-bit per channel packed YUV 4:2:2 video resource format. Valid view formats
-        //     for this video resource format are SharpDX.DXGI.Format.R16G16B16A16_UNorm and
-        //     SharpDX.DXGI.Format.R16G16B16A16_UInt. Supported view types are SRV and UAV.
+        //     for this video resource format are Format.R16G16B16A16_UNorm and
+        //     Format.R16G16B16A16_UInt. Supported view types are SRV and UAV.
         //     One view provides a straightforward mapping of the entire surface. The mapping
         //     to the view channel is Y0->R16, U->G16, Y1->B16, and V->A16. For more info about
         //     YUV formats for video rendering, see Recommended 8-Bit YUV Formats for Video
@@ -705,9 +705,9 @@
         //
         // Сводка:
         //     Most common planar YUV 4:1:1 video resource format. Valid luminance data view
-        //     formats for this video resource format are SharpDX.DXGI.Format.R8_UNorm and SharpDX.DXGI.Format.R8_UInt.
+        //     formats for this video resource format are Format.R8_UNorm and Format.R8_UInt.
         //     Valid chrominance data view formats (width and height are each 1/4 of luminance
-        //     view) for this video resource format are SharpDX.DXGI.Format.R8G8_UNorm and SharpDX.DXGI.Format.R8G8_UInt.
+        //     view) for this video resource format are Format.R8G8_UNorm and Format.R8G8_UInt.
         //     Supported view types are SRV, RTV, and UAV. For luminance data view, the mapping
         //     to the view channel is Y->R8. For chrominance data view, the mapping to the view
         //     channel is U->R8 and V->G8. For more info about YUV formats for video rendering,

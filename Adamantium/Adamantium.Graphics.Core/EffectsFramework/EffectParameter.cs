@@ -37,7 +37,7 @@ public sealed class EffectParameter : NamedObject
         Offset = (int) parameterDescription.Offset;
         Size = parameterDescription.Size;
 
-        // If the expecting Matrix4x4F is column_major or the expected size is != from Matrix4x4F, than we need to remap SharpDX.Matrix4x4F to it.
+        // If the expected matrix is column_major, or its size differs from Matrix4x4F, ours has to be remapped into it.
         if (ParameterClass is EffectParameterClass.MatrixRows or EffectParameterClass.MatrixColumns)
         {
             var isMatrixToMap = RowCount != 4 || ColumnCount != 4 ||
