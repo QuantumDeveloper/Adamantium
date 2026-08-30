@@ -1,6 +1,7 @@
 using System;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
+using Adamantium.Graphics.Core.Extensions;
 using Adamantium.Mathematics;
 using Adamantium.Imaging;
 using Adamantium.Vulkan.Core;
@@ -30,11 +31,16 @@ internal sealed class BackdropCapture : IDisposable
     // as glass rather than as fog.
     public const int Downscale = 4;
 
-    private Texture _texture;
+    // ONE TEXTURE PER FRAME IN FLIGHT, not one texture. The capture is written by a blit and read by a shader in the
+    // SAME frame, so a single image is written by frame N while frame N-1 is still sampling it - a write-after-read the
+    // barriers inside one command buffer say nothing about, and the way this shows up is the GPU dying with the
+    // validation layer silent. Indexed by the device's current frame, exactly as ReusableBuffer's ring is.
+    private Texture[] _ring;
+    private Texture _current;
     private uint _width, _height;
 
     /// <summary>The last captured image, or null if nothing has been captured yet. Bound by the material pass.</summary>
-    public ITexture Image => _texture;
+    public ITexture Image => _current;
 
     /// <summary>Where the capture came from, in DEVICE pixels - the material's pixel shader needs it to map a fragment
     /// back into the copy.</summary>
@@ -61,7 +67,8 @@ internal sealed class BackdropCapture : IDisposable
         var w = (uint)Math.Max(1, (right - x) / Downscale);
         var h = (uint)Math.Max(1, (bottom - y) / Downscale);
         EnsureTexture(gd, w, h);
-        if (_texture == null) return false;
+        _current = _ring[gd.CurrentFrame % (uint)_ring.Length];
+        if (_current == null) return false;
 
         Region = new Rect2D
         {
@@ -72,12 +79,21 @@ internal sealed class BackdropCapture : IDisposable
         var commandBuffer = gd.CurrentCommandBuffer;
         gd.SuspendRendering();
 
+        // The barriers below move the images on the GPU; these two lines move what the texture OBJECTS believe about
+        // themselves, so the next thing to transition either of them starts from the state it is actually in.
+        //
+        // ASSIGNED, not transitioned: TransitionImageLayout opens a SINGLE-TIME command buffer of its own, and doing
+        // that in the middle of recording the frame's buffer crashes the process outright - which is exactly what it
+        // did here. The existing CopyImage path can call it because it runs on its own buffer to begin with.
+        source.ImageLayout = ImageLayout.TransferSrcOptimal;
+        _current.ImageLayout = ImageLayout.TransferDstOptimal;
+
         gd.InsertImageMemoryBarrier(commandBuffer, source,
             AccessFlagBits.ColorAttachmentWriteBit, AccessFlagBits.TransferReadBit,
             ImageLayout.ColorAttachmentOptimal, ImageLayout.TransferSrcOptimal,
             PipelineStageFlagBits.ColorAttachmentOutputBit, PipelineStageFlagBits.TransferBit);
 
-        gd.InsertImageMemoryBarrier(commandBuffer, _texture,
+        gd.InsertImageMemoryBarrier(commandBuffer, _current,
             AccessFlagBits.ShaderReadBit, AccessFlagBits.TransferWriteBit,
             ImageLayout.ShaderReadOnlyOptimal, ImageLayout.TransferDstOptimal,
             PipelineStageFlagBits.FragmentShaderBit, PipelineStageFlagBits.TransferBit);
@@ -100,9 +116,9 @@ internal sealed class BackdropCapture : IDisposable
 
         // Linear, not Nearest: the filtering IS the first blur pass (see the note above).
         commandBuffer.BlitImage(source.GetImage(), ImageLayout.TransferSrcOptimal,
-            _texture.GetImage(), ImageLayout.TransferDstOptimal, 1, blit, Filter.Linear);
+            _current.GetImage(), ImageLayout.TransferDstOptimal, 1, blit, Filter.Linear);
 
-        gd.InsertImageMemoryBarrier(commandBuffer, _texture,
+        gd.InsertImageMemoryBarrier(commandBuffer, _current,
             AccessFlagBits.TransferWriteBit, AccessFlagBits.ShaderReadBit,
             ImageLayout.TransferDstOptimal, ImageLayout.ShaderReadOnlyOptimal,
             PipelineStageFlagBits.TransferBit, PipelineStageFlagBits.FragmentShaderBit);
@@ -112,6 +128,9 @@ internal sealed class BackdropCapture : IDisposable
             ImageLayout.TransferSrcOptimal, ImageLayout.ColorAttachmentOptimal,
             PipelineStageFlagBits.TransferBit, PipelineStageFlagBits.ColorAttachmentOutputBit);
 
+        source.ImageLayout = ImageLayout.ColorAttachmentOptimal;
+        _current.ImageLayout = ImageLayout.ShaderReadOnlyOptimal;
+
         gd.ResumeRendering();
         return true;
     }
@@ -119,35 +138,56 @@ internal sealed class BackdropCapture : IDisposable
     // Kept between captures and re-made only when the size changes - the same rule the off-screen renderer's target
     // follows, and for the same reason: a fresh image per capture exhausts device memory in seconds when something
     // behind the material moves every frame.
+    //
+    // The old images go to the DEFERRED queue, never to Dispose: the element only has to change size by a pixel - a
+    // scroll, a resize - for this to run while earlier frames are still sampling what it is about to free, and freeing
+    // a texture out from under an in-flight frame kills the device with nothing in the validation log.
     private void EnsureTexture(GraphicsDevice device, uint width, uint height)
     {
-        if (_texture != null && _width == width && _height == height) return;
+        _ring ??= new Texture[Math.Max(1, (int)device.MaxFramesInFlight)];
+        if (_ring[0] != null && _width == width && _height == height) return;
 
-        _texture?.Dispose();
+        for (var i = 0; i < _ring.Length; i++)
+        {
+            if (_ring[i] != null) device.AddToDeferDisposeQueue(_ring[i]);
+            _ring[i] = null;
+        }
+
+        _current = null;
         _width = width;
         _height = height;
-        _texture = Graphics.Texture.New(device, new TextureDescription
+        for (var i = 0; i < _ring.Length; i++)
         {
-            Width = width,
-            Height = height,
-            Depth = 1,
-            ArrayLayers = 1,
-            MipLevels = 1,
-            Samples = MSAALevel.None,
-            Format = Format.R8G8B8A8_UNORM,
-            InitialLayout = ImageLayout.Undefined,
-            DesiredImageLayout = ImageLayout.ShaderReadOnlyOptimal,
-            ImageType = ImageType._2d,
-            ImageAspect = ImageAspectFlagBits.ColorBit,
-            ImageTiling = Vulkan.Core.ImageTiling.Optimal,
-            Usage = ImageUsageFlagBits.SampledBit | ImageUsageFlagBits.TransferDstBit,
-            Dimension = TextureDimension.Texture2D
-        }, "BackdropCapture");
+            _ring[i] = Graphics.Texture.New(device, new TextureDescription
+            {
+                Width = width,
+                Height = height,
+                Depth = 1,
+                ArrayLayers = 1,
+                MipLevels = 1,
+                Samples = MSAALevel.None,
+                Format = Format.R8G8B8A8_UNORM,
+                InitialLayout = ImageLayout.Undefined,
+                DesiredImageLayout = ImageLayout.ShaderReadOnlyOptimal,
+                ImageType = ImageType._2d,
+                ImageAspect = ImageAspectFlagBits.ColorBit,
+                ImageTiling = Vulkan.Core.ImageTiling.Optimal,
+                Usage = ImageUsageFlagBits.SampledBit | ImageUsageFlagBits.TransferDstBit,
+                Dimension = TextureDimension.Texture2D
+            }, $"BackdropCapture:{i}");
+        }
     }
 
     public void Dispose()
     {
-        _texture?.Dispose();
-        _texture = null;
+        if (_ring == null) return;
+
+        for (var i = 0; i < _ring.Length; i++)
+        {
+            _ring[i]?.Dispose();
+            _ring[i] = null;
+        }
+
+        _current = null;
     }
 }

@@ -176,6 +176,7 @@ public partial class RenderCache
         _patternBatch?.DisposeGpuResources(device);
         _fractalBatch?.DisposeGpuResources(device);
         _texRectBatch?.DisposeGpuResources(device);
+        _materialBatch?.DisposeGpuResources(device);
         _haloUnder?.DisposeGpuResources(device);
         _haloOver?.DisposeGpuResources(device);
         _haloLivingUnder?.DisposeGpuResources(device);
@@ -192,6 +193,7 @@ public partial class RenderCache
         _patternBatch = null;
         _fractalBatch = null;
         _texRectBatch = null;
+        _materialBatch = null;
         _haloUnder = null;
         _haloOver = null;
         _haloLivingUnder = null;

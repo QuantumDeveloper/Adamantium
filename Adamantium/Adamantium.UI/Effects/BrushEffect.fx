@@ -481,12 +481,8 @@ PatternPSInput PatternRectInstancedVS(uint vertexId : SV_VertexID, uint instance
 // large lattice coords, no sin), mixes every component into every other via the dot, and finishes with an ADDITION
 // (p3.x+p3.y)*p3.z - so it never collapses to ~0 along an axis the way frac(p.x*p.y*(p.x+p.y)) did (that zero-column was
 // the vertical seam in value/perlin). Returns [0,1).
-float Hash21(float2 p)
-{
-    float3 p3 = frac(float3(p.x, p.y, p.x) * 0.1031);
-    p3 += dot(p3, p3.yzx + 33.33);
-    return frac((p3.x + p3.y) * p3.z);
-}
+// Hash21 moved to NoiseMath.fxh - it is a primitive, and the backdrop materials need it for grain without needing any
+// of the fields built on it.
 
 float2 Hash22(float2 p)
 {
@@ -1600,44 +1596,220 @@ technique Gradient
 // merges by BYTECODE and refuses two owners for one shader.
 technique Pattern
 {
-    pass CheckerboardSdf { Profile = 6.6; VertexShader = PatternRectInstancedVS; PixelShader = PatternCheckerboardSdfPS; }
-    pass StripesSdf      { Profile = 6.6; VertexShader = PatternRectInstancedVS; PixelShader = PatternStripesSdfPS; }
-    pass DotsSdf         { Profile = 6.6; VertexShader = PatternRectInstancedVS; PixelShader = PatternDotsSdfPS; }
-    pass GridSdf         { Profile = 6.6; VertexShader = PatternRectInstancedVS; PixelShader = PatternGridSdfPS; }
-    pass HexagonSdf      { Profile = 6.6; VertexShader = PatternRectInstancedVS; PixelShader = PatternHexagonSdfPS; }
-    pass HatchSdf        { Profile = 6.6; VertexShader = PatternRectInstancedVS; PixelShader = PatternHatchSdfPS; }
-    pass WeaveSdf        { Profile = 6.6; VertexShader = PatternRectInstancedVS; PixelShader = PatternWeaveSdfPS; }
+    pass CheckerboardSdf
+    {
+        Profile = 6.6;
+        VertexShader = PatternRectInstancedVS;
+        PixelShader = PatternCheckerboardSdfPS;
+    }
 
-    pass CheckerboardMesh { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = PatternCheckerboardMeshPS; }
-    pass StripesMesh      { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = PatternStripesMeshPS; }
-    pass DotsMesh         { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = PatternDotsMeshPS; }
-    pass GridMesh         { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = PatternGridMeshPS; }
-    pass HexagonMesh      { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = PatternHexagonMeshPS; }
-    pass HatchMesh        { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = PatternHatchMeshPS; }
-    pass WeaveMesh        { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = PatternWeaveMeshPS; }
+    pass StripesSdf
+    {
+        Profile = 6.6;
+        VertexShader = PatternRectInstancedVS;
+        PixelShader = PatternStripesSdfPS;
+    }
+
+    pass DotsSdf
+    {
+        Profile = 6.6;
+        VertexShader = PatternRectInstancedVS;
+        PixelShader = PatternDotsSdfPS;
+    }
+
+    pass GridSdf
+    {
+        Profile = 6.6;
+        VertexShader = PatternRectInstancedVS;
+        PixelShader = PatternGridSdfPS;
+    }
+
+    pass HexagonSdf
+    {
+        Profile = 6.6;
+        VertexShader = PatternRectInstancedVS;
+        PixelShader = PatternHexagonSdfPS;
+    }
+
+    pass HatchSdf
+    {
+        Profile = 6.6;
+        VertexShader = PatternRectInstancedVS;
+        PixelShader = PatternHatchSdfPS;
+    }
+
+    pass WeaveSdf
+    {
+        Profile = 6.6;
+        VertexShader = PatternRectInstancedVS;
+        PixelShader = PatternWeaveSdfPS;
+    }
+
+    pass CheckerboardMesh
+    {
+        Profile = 6.6;
+        VertexShader = PatternFillVS;
+        PixelShader = PatternCheckerboardMeshPS;
+    }
+
+    pass StripesMesh
+    {
+        Profile = 6.6;
+        VertexShader = PatternFillVS;
+        PixelShader = PatternStripesMeshPS;
+    }
+
+    pass DotsMesh
+    {
+        Profile = 6.6;
+        VertexShader = PatternFillVS;
+        PixelShader = PatternDotsMeshPS;
+    }
+
+    pass GridMesh
+    {
+        Profile = 6.6;
+        VertexShader = PatternFillVS;
+        PixelShader = PatternGridMeshPS;
+    }
+
+    pass HexagonMesh
+    {
+        Profile = 6.6;
+        VertexShader = PatternFillVS;
+        PixelShader = PatternHexagonMeshPS;
+    }
+
+    pass HatchMesh
+    {
+        Profile = 6.6;
+        VertexShader = PatternFillVS;
+        PixelShader = PatternHatchMeshPS;
+    }
+
+    pass WeaveMesh
+    {
+        Profile = 6.6;
+        VertexShader = PatternFillVS;
+        PixelShader = PatternWeaveMeshPS;
+    }
 }
 
 // NOISE FIELDS. Same shape as Pattern above - these are a separate technique because they are a separate FAMILY of
 // brush (NoiseBrush, not PatternBrush), even though both bake into the same record and the same vertex stage.
 technique Noise
 {
-    pass SimplexSdf     { Profile = 6.6; VertexShader = PatternRectInstancedVS; PixelShader = NoiseSimplexSdfPS; }
-    pass PerlinSdf      { Profile = 6.6; VertexShader = PatternRectInstancedVS; PixelShader = NoisePerlinSdfPS; }
-    pass ValueSdf       { Profile = 6.6; VertexShader = PatternRectInstancedVS; PixelShader = NoiseValueSdfPS; }
-    pass WorleySdf      { Profile = 6.6; VertexShader = PatternRectInstancedVS; PixelShader = NoiseWorleySdfPS; }
-    pass RidgedSdf      { Profile = 6.6; VertexShader = PatternRectInstancedVS; PixelShader = NoiseRidgedSdfPS; }
-    pass TurbulenceSdf  { Profile = 6.6; VertexShader = PatternRectInstancedVS; PixelShader = NoiseTurbulenceSdfPS; }
-    pass VoronoiSdf     { Profile = 6.6; VertexShader = PatternRectInstancedVS; PixelShader = NoiseVoronoiSdfPS; }
-    pass CombustibleSdf { Profile = 6.6; VertexShader = PatternRectInstancedVS; PixelShader = NoiseCombustibleSdfPS; }
+    pass SimplexSdf
+    {
+        Profile = 6.6;
+        VertexShader = PatternRectInstancedVS;
+        PixelShader = NoiseSimplexSdfPS;
+    }
 
-    pass SimplexMesh     { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = NoiseSimplexMeshPS; }
-    pass PerlinMesh      { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = NoisePerlinMeshPS; }
-    pass ValueMesh       { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = NoiseValueMeshPS; }
-    pass WorleyMesh      { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = NoiseWorleyMeshPS; }
-    pass RidgedMesh      { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = NoiseRidgedMeshPS; }
-    pass TurbulenceMesh  { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = NoiseTurbulenceMeshPS; }
-    pass VoronoiMesh     { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = NoiseVoronoiMeshPS; }
-    pass CombustibleMesh { Profile = 6.6; VertexShader = PatternFillVS; PixelShader = NoiseCombustibleMeshPS; }
+    pass PerlinSdf
+    {
+        Profile = 6.6;
+        VertexShader = PatternRectInstancedVS;
+        PixelShader = NoisePerlinSdfPS;
+    }
+
+    pass ValueSdf
+    {
+        Profile = 6.6;
+        VertexShader = PatternRectInstancedVS;
+        PixelShader = NoiseValueSdfPS;
+    }
+
+    pass WorleySdf
+    {
+        Profile = 6.6;
+        VertexShader = PatternRectInstancedVS;
+        PixelShader = NoiseWorleySdfPS;
+    }
+
+    pass RidgedSdf
+    {
+        Profile = 6.6;
+        VertexShader = PatternRectInstancedVS;
+        PixelShader = NoiseRidgedSdfPS;
+    }
+
+    pass TurbulenceSdf
+    {
+        Profile = 6.6;
+        VertexShader = PatternRectInstancedVS;
+        PixelShader = NoiseTurbulenceSdfPS;
+    }
+
+    pass VoronoiSdf
+    {
+        Profile = 6.6;
+        VertexShader = PatternRectInstancedVS;
+        PixelShader = NoiseVoronoiSdfPS;
+    }
+
+    pass CombustibleSdf
+    {
+        Profile = 6.6;
+        VertexShader = PatternRectInstancedVS;
+        PixelShader = NoiseCombustibleSdfPS;
+    }
+
+    pass SimplexMesh
+    {
+        Profile = 6.6;
+        VertexShader = PatternFillVS;
+        PixelShader = NoiseSimplexMeshPS;
+    }
+
+    pass PerlinMesh
+    {
+        Profile = 6.6;
+        VertexShader = PatternFillVS;
+        PixelShader = NoisePerlinMeshPS;
+    }
+
+    pass ValueMesh
+    {
+        Profile = 6.6;
+        VertexShader = PatternFillVS;
+        PixelShader = NoiseValueMeshPS;
+    }
+
+    pass WorleyMesh
+    {
+        Profile = 6.6;
+        VertexShader = PatternFillVS;
+        PixelShader = NoiseWorleyMeshPS;
+    }
+
+    pass RidgedMesh
+    {
+        Profile = 6.6;
+        VertexShader = PatternFillVS;
+        PixelShader = NoiseRidgedMeshPS;
+    }
+
+    pass TurbulenceMesh
+    {
+        Profile = 6.6;
+        VertexShader = PatternFillVS;
+        PixelShader = NoiseTurbulenceMeshPS;
+    }
+
+    pass VoronoiMesh
+    {
+        Profile = 6.6;
+        VertexShader = PatternFillVS;
+        PixelShader = NoiseVoronoiMeshPS;
+    }
+
+    pass CombustibleMesh
+    {
+        Profile = 6.6;
+        VertexShader = PatternFillVS;
+        PixelShader = NoiseCombustibleMeshPS;
+    }
 }
 
 // SAMPLED fills - an ImageBrush is one instance, a NineSliceBrush is nine, so a whole skinned frame is still one draw.
@@ -1665,6 +1837,11 @@ technique Texture
         PixelShader = TexFringePS;
     }
 }
+
+// The BACKDROP MATERIALS are NOT here - they are in MaterialEffect.fx. They were, briefly, and adding them made
+// vkCreateShadersEXT die with an access violation on the GRADIENT pass, which had worked for months: one effect can
+// only carry so many shader objects before this driver's compiler gives out, and the brushes were already at that
+// line. Anything added here from now on should be weighed against that, not against the file's length.
 
 // Escape-time fractals: z = z^2 + c per fragment, coloured by the smooth escape count, with a perturbation path for
 // deep zoom (see OrbitAddress). No Fill/Fringe - a fractal fills a rect, and its edge is the rect's own SDF.
