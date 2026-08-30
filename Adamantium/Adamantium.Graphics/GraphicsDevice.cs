@@ -568,7 +568,23 @@ public class GraphicsDevice : DisposableObject, IGraphicsDevice
         return LogicalDevice.GetDescriptorSetLayoutOffset(layout, bindingSlot);
     }
 
+    // SERIALISED, and static rather than per-instance: every render device shares one VkDevice, and the binary cache
+    // below is one folder on disk, so two threads creating shaders at once means two writers for one cache file and two
+    // concurrent vkCreateShadersEXT calls into a compiler this driver is already documented to flake in. It cost a
+    // NATIVE crash of the test host partway through a parallel run - and only once the brushes split into a pass per
+    // kind, i.e. once there were enough shaders for the two to overlap. Creation is lazy and once per pass, so the lock
+    // is never on a hot path.
+    private static readonly object ShaderCreateLock = new();
+
     public ShaderEXT CreateShader(ShaderCreateInfoEXT shaderCreateInfo, string name = null)
+    {
+        lock (ShaderCreateLock)
+        {
+            return CreateShaderCore(shaderCreateInfo, name);
+        }
+    }
+
+    private ShaderEXT CreateShaderCore(ShaderCreateInfoEXT shaderCreateInfo, string name)
     {
         // Shader-object binary cache (dodges the Turing vkCreateShadersEXT NVVM flake). On a cache hit, create from the
         // driver-compiled BINARY - no NVVM, no flake. On a miss (or an incompatible binary after a driver/device change),

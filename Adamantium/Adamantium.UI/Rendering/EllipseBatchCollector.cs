@@ -17,7 +17,7 @@ namespace Adamantium.UI.Rendering;
 // - each baked to WORLD space on the CPU - into ONE instanced draw. The shader evaluates the ellipse implicit and
 // self-anti-aliases via fwidth, so N circles/ellipses cost ~1 draw AND are resolution-independent (no tessellation, crisp
 // at any DPI/zoom, no AA fringe). Sibling of RectBatchCollector; drawn in the SAME fill layer (below the text batch).
-internal sealed class EllipseBatchCollector : SdfBatchCollector<EllipseItem>
+internal sealed class EllipseBatchCollector : ShapeSdfCollector<EllipseItem>
 {
     // A/B / safety-valve toggle: off routes every ellipse back to its per-unit tessellated fill + AA-fringe draw.
     public static bool Enabled = true;

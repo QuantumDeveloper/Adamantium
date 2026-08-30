@@ -17,7 +17,7 @@ namespace Adamantium.UI.Rendering;
 //
 // It knows nothing about "an aura and a shadow": it draws N bands. That is what leaves room for an elevation preset -
 // one number expanding into the several bands a real penumbra needs - without the public API growing a list.
-internal sealed class HaloRectCollector : SdfBatchCollector<HaloRectItem>
+internal sealed class HaloRectCollector : ShapeSdfCollector<HaloRectItem>
 {
     public static bool Enabled = true;
 
@@ -58,6 +58,8 @@ internal sealed class HaloRectCollector : SdfBatchCollector<HaloRectItem>
 
     protected override void DrawSegment(IGraphicsDevice device, Buffer<HaloRectItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
     {
+        EnsureEffectForDraw(device);
+
         // A segment with no field holds only analytic bands, and those never sample - so unlike the textured batch there
         // is nothing to refuse here. When there IS one, bind it; the shader reaches it only for shape 2.
         if (_field != null)

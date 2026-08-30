@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System;
 using Adamantium.Graphics;
 using Adamantium.Graphics.Core;
@@ -15,19 +16,75 @@ namespace Adamantium.UI.Rendering;
 // rounded rect from an SDF AND evaluates the pattern per fragment). A sibling of the solid/gradient SDF collectors - a
 // PatternBrush fill routes here. Segment/buffer/overlap/retain machinery comes from SdfBatchCollector; this adds the
 // pattern bake + the Pattern draw pass. Up to PatternType's four patterns; the second colour + cell size ride the record.
-internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
+internal sealed class PatternRectCollector : BrushSdfCollector<PatternRectItem>
 {
     public static bool Enabled = true;
 
     public PatternRectCollector() : base(512) { }
 
-    protected override IEffectPass DrawPass => Effect.BatchPatternPass;
+    // ONE KIND PER SEGMENT. Each kind is its own pass now (BrushEffect.fx: technique Pattern / technique Noise), because
+    // one pixel shader branching over fourteen fields was what kept the driver on the edge of refusing to create it. So
+    // a segment must be uniform in kind, exactly as the textured batch's segment is uniform in texture - same three
+    // hooks, same question asked by the caller before adding. Cost: two kinds in one clip group are two draws instead of
+    // one, and a screen holds a handful of kinds at a time.
+    private int _kind;
+    private readonly List<int> _segKinds = new();
+
+    protected override void OnBeginFrame(IGraphicsDevice device)
+    {
+        base.OnBeginFrame(device);
+        _segKinds.Clear();
+    }
+
+    protected override void OnSegmentRecorded(int index)
+    {
+        while (_segKinds.Count <= index) _segKinds.Add(0);
+        _segKinds[index] = _kind;
+    }
+
+    protected override void OnSegmentInserted(int index)
+    {
+        while (_segKinds.Count < index) _segKinds.Add(0);
+        _segKinds.Insert(index, index > 0 ? _segKinds[index - 1] : 0);
+    }
+
+    protected override void BindSegment(int index) => _kind = _segKinds[index];
+
+    /// <summary>Still the pending segment's kind? A change flushes the batch - the caller asks this before adding,
+    /// mirroring TextureBatchCollector.SameTexture.</summary>
+    public bool SameKind(int kind) => !Active || _kind == kind;
+
+    /// <summary>The kind this brush bakes as, for the caller's SameKind check. -1 = not a procedural brush at all.</summary>
+    public static int KindOf(Brush brush) =>
+        PatternBrushRecord.TryDescribe(brush, out var record) ? record.Type : -1;
+
+    // Pattern kinds and noise kinds share one record and one vertex stage, so they differ only in which pass runs.
+    // Anything unrecognised falls back to the checkerboard pass rather than drawing nothing: a new PatternType that
+    // nobody wired up should look wrong, not vanish.
+    protected override IEffectPass DrawPass => _kind switch
+    {
+        1 => Effect.PatternStripesSdfPass,
+        2 => Effect.PatternDotsSdfPass,
+        3 => Effect.PatternGridSdfPass,
+        4 => Effect.NoiseSimplexSdfPass,
+        5 => Effect.PatternHexagonSdfPass,
+        6 => Effect.PatternHatchSdfPass,
+        7 => Effect.NoisePerlinSdfPass,
+        8 => Effect.NoiseValueSdfPass,
+        9 => Effect.NoiseWorleySdfPass,
+        10 => Effect.NoiseRidgedSdfPass,
+        11 => Effect.NoiseTurbulenceSdfPass,
+        12 => Effect.NoiseVoronoiSdfPass,
+        13 => Effect.NoiseCombustibleSdfPass,
+        _ => Effect.PatternCheckerboardSdfPass
+    };
 
     // Feed the shared noise-flow clock to the shader before drawing (an animated NoiseBrush reads Time to orbit its Worley
     // feature points; a static pattern/noise ignores it). NoiseClock advances only while an animating noise brush is live,
     // so Time is 0 otherwise. Same hook the fractal pass uses.
     protected override void DrawSegment(IGraphicsDevice device, Buffer<PatternRectItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
     {
+        EnsureEffectForDraw(device);
         Effect.Time.SetValue((float)NoiseClock.Time);
         base.DrawSegment(device, buffer, count, firstInstance, projection);
     }
@@ -67,6 +124,7 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
         {
             return false;
         }
+        _kind = (int)item.Params.Y;   // the pass this segment draws with; the caller has already flushed on a change
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
         return true;
@@ -94,6 +152,7 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
         {
             return false;
         }
+        _kind = (int)item.Params.Y;   // the pass this segment draws with; the caller has already flushed on a change
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
         return true;
@@ -128,6 +187,7 @@ internal sealed class PatternRectCollector : SdfBatchCollector<PatternRectItem>
         {
             return false;
         }
+        _kind = (int)item.Params.Y;   // the pass this segment draws with; the caller has already flushed on a change
         Items[Count++] = item;
         MarkPending(scissor, logicalBounds);
         return true;

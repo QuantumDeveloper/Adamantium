@@ -14,7 +14,7 @@ namespace Adamantium.UI.Rendering;
 // instanced draw (each fill = one per-instance FractalRectItem; the pixel shader reconstructs the rounded rect from an SDF
 // AND iterates the fractal per fragment). A sibling of the pattern/gradient SDF collectors - a FractalBrush fill routes
 // here. Segment/buffer/overlap/retain machinery comes from SdfBatchCollector; this adds the fractal bake + the Fractal pass.
-internal sealed class FractalRectCollector : SdfBatchCollector<FractalRectItem>
+internal sealed class FractalRectCollector : BrushSdfCollector<FractalRectItem>
 {
     public static bool Enabled = true;
 
@@ -32,7 +32,7 @@ internal sealed class FractalRectCollector : SdfBatchCollector<FractalRectItem>
 
     public FractalRectCollector() : base(256) { }
 
-    protected override IEffectPass DrawPass => Effect.BatchFractalPass;
+    protected override IEffectPass DrawPass => Effect.FractalSdfPass;
 
     protected override void OnBeginFrame(IGraphicsDevice device)
     {
@@ -45,6 +45,7 @@ internal sealed class FractalRectCollector : SdfBatchCollector<FractalRectItem>
     // it; an Animate one drifts C by it. FractalClock advances only while an animating fractal is live, so this is 0 otherwise.
     protected override void DrawSegment(IGraphicsDevice device, Buffer<FractalRectItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
     {
+        EnsureEffectForDraw(device);
         Effect.Time.SetValue((float)FractalClock.Time);
 
         // Publish the reference-orbit buffer (perturbation deep path). Uploaded ONCE per frame on the first segment; the

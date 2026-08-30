@@ -1,3 +1,4 @@
+using Adamantium.Graphics.Core.EffectsFramework;
 ﻿using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -110,7 +111,12 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
 
     private readonly GraphicsDevice _device;
     private readonly GpuBufferManager _bufferManager;
+    // BOTH effects, because this collector draws both families: a solid instanced fill and its fringe come from
+    // BatchEffect, while the gradient/pattern/texture fills of the SAME shared mesh come from BrushEffect. The shared
+    // per-frame parameters (projection, transforms, viewport, fringe width) are therefore written into BOTH - the price
+    // of the split, paid once per state setup rather than per draw.
     private readonly BatchEffect _effect;
+    private BrushEffect _brush;
     private readonly Dictionary<GeometryKey, KeySegment> _keys = new();
 
     // Pending (not-yet-flushed) clip group: the keys with unflushed instances + the units whose fringe/stroke draw AFTER
@@ -130,7 +136,9 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     {
         public readonly List<(KeySegment Seg, uint First, uint Count)> Keys = new();
         public readonly List<(KeySegment Seg, uint First, uint Count)> GradKeys = new();
-        public readonly List<(KeySegment Seg, uint First, uint Count)> PatKeys = new();
+        // The pattern/noise runs, each UNIFORM IN KIND: every kind is its own pass now, so a run is cut wherever the kind
+        // changes (see RecordGroup). Without that a single draw would paint two different fields with one shader.
+        public readonly List<(KeySegment Seg, uint First, uint Count, int Kind)> PatKeys = new();
         // Textured runs carry their TEXTURE: one is bound per draw, so a run ends where the texture changes.
         public readonly List<(KeySegment Seg, uint First, uint Count, ITexture Texture)> TexKeys = new();
         public readonly List<IRenderUnit> Units = new();
@@ -164,6 +172,23 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         _device = (GraphicsDevice)device;
         _bufferManager = bufferManager;
         _effect = new BatchEffect(device);
+    }
+
+    // The brush effect is built on FIRST BRUSH DRAW, not in the constructor: a tree of solid fills never needs it, and an
+    // effect costs a set of shader objects per device. Building it unconditionally was enough extra device pressure to
+    // crash the off-screen test host natively partway through a run. Returns it ready to use, with the per-frame state
+    // this collector last set up already applied.
+    private BrushEffect Brush(Matrix4x4F projection)
+    {
+        if (_brush != null) return _brush;
+
+        _brush = new BrushEffect(_device);
+        _brush.Projection.SetValue(projection);
+        _brush.TransformsAddress.SetValue(TransformsAddress);
+        var vp = _device.CurrentViewports;
+        if (vp is { Length: > 0 }) _brush.ViewportSize.SetValue(new Vector2F(vp[0].Width, vp[0].Height));
+        _brush.FringePixels.SetValue(DeviceFringePx);
+        return _brush;
     }
 
     /// <summary>A pending (not-yet-flushed) clip group exists.</summary>
@@ -665,7 +690,19 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             {
                 if (!SceneClean || seg.PatRecreated)
                     seg.PatGpu.SetData(seg.PatItems.AsSpan(seg.PatFlushed, pcount), (uint)(seg.PatFlushed * PatInstanceStride));
-                rec.PatKeys.Add((seg, (uint)seg.PatFlushed, (uint)pcount));
+                // Cut the run wherever the KIND changes: one pass evaluates one field, so a draw may not span two.
+                // Params.Y is the kind the CPU baked (PatternType / NoiseType), the same number the SDF path keys on.
+                var runStart = seg.PatFlushed;
+                var runKind = (int)seg.PatItems[runStart].Params.Y;
+                for (var k = seg.PatFlushed + 1; k < seg.PatCount; k++)
+                {
+                    var kk = (int)seg.PatItems[k].Params.Y;
+                    if (kk == runKind) continue;
+                    rec.PatKeys.Add((seg, (uint)runStart, (uint)(k - runStart), runKind));
+                    runStart = k;
+                    runKind = kk;
+                }
+                rec.PatKeys.Add((seg, (uint)runStart, (uint)(seg.PatCount - runStart), runKind));
                 seg.PatFlushed = seg.PatCount;
             }
             var tcount = seg.TexCount - seg.TexFlushed;
@@ -713,6 +750,14 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
     // sets went in ahead of a loop that then skipped every single entry - a mesh with no closed boundary has no fringe,
     // and a textured run with no texture is not drawn at all. Checking a handful of list entries is the cheap half.
     private static bool AnyRing(List<(KeySegment Seg, uint First, uint Count)> keys)
+    {
+        foreach (var k in keys)
+            if (k.Seg.RingBuffer != null) return true;
+        return false;
+    }
+
+    // Same question for the kind-tagged pattern runs.
+    private static bool AnyRing(List<(KeySegment Seg, uint First, uint Count, int Kind)> keys)
     {
         foreach (var k in keys)
             if (k.Seg.RingBuffer != null) return true;
@@ -813,13 +858,14 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         if (rec.GradKeys.Count > 0)
         {
             SetupInstancedState(projection);
+            var brush = Brush(projection);
             _device.SetScissors(rec.Scissor);
             foreach (var (seg, first, count) in rec.GradKeys)
             {
-                _effect.InstancesAddress.SetValue(seg.GradGpu.GetDeviceAddress() + (ulong)(first * GradInstanceStride));
+                brush.InstancesAddress.SetValue(seg.GradGpu.GetDeviceAddress() + (ulong)(first * GradInstanceStride));
                 _device.SetVertexBuffer(seg.VtxBuffer);
                 _device.PrimitiveTopology = seg.Topology;
-                _effect.BatchGradientFillPass.Apply();
+                brush.GradientMeshPass.Apply();
                 if (seg.Indexed)
                     _device.DrawIndexed(seg.VtxBuffer, seg.IdxBuffer, instanceCount: count, indexCount: seg.IndexCount);
                 else
@@ -832,14 +878,15 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         if (rec.PatKeys.Count > 0)
         {
             SetupInstancedState(projection);
-            _effect.Time.SetValue((float)NoiseClock.Time);   // animated noise reads the shared flow clock
+            var brush = Brush(projection);
+            brush.Time.SetValue((float)NoiseClock.Time);   // animated noise reads the shared flow clock
             _device.SetScissors(rec.Scissor);
-            foreach (var (seg, first, count) in rec.PatKeys)
+            foreach (var (seg, first, count, kind) in rec.PatKeys)
             {
-                _effect.InstancesAddress.SetValue(seg.PatGpu.GetDeviceAddress() + (ulong)(first * PatInstanceStride));
+                brush.InstancesAddress.SetValue(seg.PatGpu.GetDeviceAddress() + (ulong)(first * PatInstanceStride));
                 _device.SetVertexBuffer(seg.VtxBuffer);
                 _device.PrimitiveTopology = seg.Topology;
-                _effect.BatchPatternFillPass.Apply();
+                MeshPassFor(brush, kind).Apply();
                 if (seg.Indexed)
                     _device.DrawIndexed(seg.VtxBuffer, seg.IdxBuffer, instanceCount: count, indexCount: seg.IndexCount);
                 else
@@ -853,6 +900,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         if (rec.TexKeys.Count > 0 && AnyTexture(rec.TexKeys))
         {
             SetupInstancedState(projection);
+            var brush = Brush(projection);
             _device.SetScissors(rec.Scissor);
             foreach (var (seg, first, count, texture) in rec.TexKeys)
             {
@@ -860,12 +908,12 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
                 // one last, so drawing without binding samples whatever descriptor sits there - in practice the glyph
                 // atlas, smeared across the frame. See TextureBatchCollector.DrawSegment.
                 if (texture == null) continue;
-                _effect.InstancesAddress.SetValue(seg.TexGpu.GetDeviceAddress() + (ulong)(first * TexInstanceStride));
-                _effect.SourceTexture.SetResource(texture);
-                _effect.SourceSampler.SetResource(_device.SamplerStates.LinearClampToEdge);
+                brush.InstancesAddress.SetValue(seg.TexGpu.GetDeviceAddress() + (ulong)(first * TexInstanceStride));
+                brush.SourceTexture.SetResource(texture);
+                brush.SourceSampler.SetResource(_device.SamplerStates.LinearClampToEdge);
                 _device.SetVertexBuffer(seg.VtxBuffer);
                 _device.PrimitiveTopology = seg.Topology;
-                _effect.BatchTexFillPass.Apply();
+                brush.TextureMeshPass.Apply();
                 if (seg.Indexed)
                     _device.DrawIndexed(seg.VtxBuffer, seg.IdxBuffer, instanceCount: count, indexCount: seg.IndexCount);
                 else
@@ -878,13 +926,14 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         if (rec.GradKeys.Count > 0 && AnalyticAa.Enabled && AnyRing(rec.GradKeys))
         {
             SetupFringeState(projection);
+            var brush = Brush(projection);
             _device.SetScissors(rec.Scissor);
             foreach (var (seg, first, count) in rec.GradKeys)
             {
                 if (seg.RingBuffer == null) continue;
-                _effect.InstancesAddress.SetValue(seg.GradGpu.GetDeviceAddress() + (ulong)(first * GradInstanceStride));
+                brush.InstancesAddress.SetValue(seg.GradGpu.GetDeviceAddress() + (ulong)(first * GradInstanceStride));
                 _device.SetVertexBuffer(seg.RingBuffer);
-                _effect.BatchGradientFringePass.Apply();
+                brush.GradientFringePass.Apply();
                 _device.Draw(seg.RingVertexCount, count);
             }
             _device.SetScissors(fullScissor);
@@ -893,9 +942,11 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         // The pattern/noise instances' fringe, same shape as the solid one above: shared ring, same instance buffer.
         if (rec.PatKeys.Count > 0 && AnalyticAa.Enabled && AnyRing(rec.PatKeys))
         {
+            // Drawn through the SHAPE effect, not the brush one: a flat ring is the solid fringe with the brush's low
+            // colour, so the address goes where the pass does.
             SetupFringeState(projection);
             _device.SetScissors(rec.Scissor);
-            foreach (var (seg, first, count) in rec.PatKeys)
+            foreach (var (seg, first, count, _) in rec.PatKeys)   // the ring is flat-coloured: kind does not change the pass
             {
                 if (seg.RingBuffer == null) continue;
                 _effect.InstancesAddress.SetValue(seg.PatGpu.GetDeviceAddress() + (ulong)(first * PatInstanceStride));
@@ -911,15 +962,16 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         if (rec.TexKeys.Count > 0 && AnalyticAa.Enabled && AnyDrawableRing(rec.TexKeys))
         {
             SetupFringeState(projection);
+            var brush = Brush(projection);
             _device.SetScissors(rec.Scissor);
             foreach (var (seg, first, count, texture) in rec.TexKeys)
             {
                 if (seg.RingBuffer == null || texture == null) continue;
-                _effect.InstancesAddress.SetValue(seg.TexGpu.GetDeviceAddress() + (ulong)(first * TexInstanceStride));
-                _effect.SourceTexture.SetResource(texture);
-                _effect.SourceSampler.SetResource(_device.SamplerStates.LinearClampToEdge);
+                brush.InstancesAddress.SetValue(seg.TexGpu.GetDeviceAddress() + (ulong)(first * TexInstanceStride));
+                brush.SourceTexture.SetResource(texture);
+                brush.SourceSampler.SetResource(_device.SamplerStates.LinearClampToEdge);
                 _device.SetVertexBuffer(seg.RingBuffer);
-                _effect.BatchTexFringePass.Apply();
+                brush.TextureFringePass.Apply();
                 _device.Draw(seg.RingVertexCount, count);
             }
             _device.SetScissors(fullScissor);
@@ -963,6 +1015,8 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         // collector's to keep: an off-screen bake draws through the same effect with its own projection in between.
         _effect.Projection.SetValue(projection);
         _effect.TransformsAddress.SetValue(TransformsAddress);
+        if (_brush != null) _brush.Projection.SetValue(projection);
+        if (_brush != null) _brush.TransformsAddress.SetValue(TransformsAddress);
 
         _device.VertexType = typeof(UIVertex);
         _device.PolygonMode = PolygonMode.Fill;
@@ -975,6 +1029,27 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         _device.DepthCompareFunction = CompareOp.Always;
     }
 
+    // The mesh pass for one procedural kind. Mirrors PatternRectCollector.DrawPass, which does the same for the analytic
+    // shapes - the numbers are PatternType / NoiseType as baked into Params.Y, and an unknown one draws as checkerboard
+    // rather than not at all.
+    private static IEffectPass MeshPassFor(BrushEffect brush, int kind) => kind switch
+    {
+        1 => brush.PatternStripesMeshPass,
+        2 => brush.PatternDotsMeshPass,
+        3 => brush.PatternGridMeshPass,
+        4 => brush.NoiseSimplexMeshPass,
+        5 => brush.PatternHexagonMeshPass,
+        6 => brush.PatternHatchMeshPass,
+        7 => brush.NoisePerlinMeshPass,
+        8 => brush.NoiseValueMeshPass,
+        9 => brush.NoiseWorleyMeshPass,
+        10 => brush.NoiseRidgedMeshPass,
+        11 => brush.NoiseTurbulenceMeshPass,
+        12 => brush.NoiseVoronoiMeshPass,
+        13 => brush.NoiseCombustibleMeshPass,
+        _ => brush.PatternCheckerboardMeshPass
+    };
+
     // Fringe device state: as the fill, but the ring's own vertex layout and the pixel basis its VS offsets in.
     private void SetupFringeState(Matrix4x4F projection)
     {
@@ -982,8 +1057,13 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         _device.VertexType = typeof(FringeVertex);
         _device.PrimitiveTopology = PrimitiveTopology.TriangleList;
         var vp = _device.CurrentViewports;
-        if (vp is { Length: > 0 }) _effect.ViewportSize.SetValue(new Vector2F(vp[0].Width, vp[0].Height));
+        if (vp is { Length: > 0 })
+        {
+            _effect.ViewportSize.SetValue(new Vector2F(vp[0].Width, vp[0].Height));
+            if (_brush != null) _brush.ViewportSize.SetValue(new Vector2F(vp[0].Width, vp[0].Height));
+        }
         _effect.FringePixels.SetValue(DeviceFringePx);
+        if (_brush != null) _brush.FringePixels.SetValue(DeviceFringePx);
     }
 
     // Fringe width in DEVICE pixels - the same constant the per-unit fringe uses (GpuFillRenderComponent).

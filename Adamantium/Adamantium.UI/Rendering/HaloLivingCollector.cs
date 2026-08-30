@@ -16,7 +16,7 @@ namespace Adamantium.UI.Rendering;
 //
 // Like the plain one it can draw three kinds of shape: a rounded rect and an ellipse compute their distance, arbitrary
 // geometry reads a field bound per SEGMENT.
-internal sealed class HaloLivingCollector : SdfBatchCollector<HaloLivingItem>
+internal sealed class HaloLivingCollector : ShapeSdfCollector<HaloLivingItem>
 {
     public static bool Enabled = true;
 
@@ -54,6 +54,7 @@ internal sealed class HaloLivingCollector : SdfBatchCollector<HaloLivingItem>
     {
         // The shared flow clock, the same one the animated noise brushes advance on - so a breathing aura and a flowing
         // noise fill drift together rather than each on its own timebase.
+        EnsureEffectForDraw(device);
         Effect.Time.SetValue((float)NoiseClock.Time);
 
         if (_field != null)

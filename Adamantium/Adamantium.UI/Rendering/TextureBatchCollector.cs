@@ -20,7 +20,7 @@ namespace Adamantium.UI.Rendering;
 // segment. Bindless would let a segment mix textures, but the engine has no bindless path (textures bind as effect
 // parameters) and this driver is documented to fall over on richer texture use - see docs/NINE_SLICE_PLAN.md. Cost: a
 // texture change breaks the batch, which for UI is a handful of times per frame.
-internal sealed class TextureBatchCollector : SdfBatchCollector<TextureItem>
+internal sealed class TextureBatchCollector : BrushSdfCollector<TextureItem>
 {
     public static bool Enabled = true;
 
@@ -29,7 +29,7 @@ internal sealed class TextureBatchCollector : SdfBatchCollector<TextureItem>
 
     public TextureBatchCollector() : base(256) { }
 
-    protected override IEffectPass DrawPass => Effect.BatchTexRectPass;
+    protected override IEffectPass DrawPass => Effect.TextureSdfPass;
 
     protected override void OnBeginFrame(IGraphicsDevice device)
     {
@@ -66,6 +66,7 @@ internal sealed class TextureBatchCollector : SdfBatchCollector<TextureItem>
             return;
         }
 
+        EnsureEffectForDraw(device);
         Effect.SourceTexture.SetResource(_texture);
         Effect.SourceSampler.SetResource(((GraphicsDevice)device).SamplerStates.LinearClampToEdge);
         base.DrawSegment(device, buffer, count, firstInstance, projection);

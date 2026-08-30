@@ -11,13 +11,13 @@ namespace Adamantium.UI.Rendering;
 // Gradient ellipse batch: draws MANY full-ellipse fills with a LINEAR/RADIAL gradient in ONE instanced draw. Sibling of
 // the solid EllipseBatchCollector - a gradient ellipse fill routes here. Reuses the gradient RECT instance record + bake
 // (GradientRectItem / GradientRectCollector.BakeGradientItem) - only the pixel-shader SDF differs (pass GradientEllipse).
-internal sealed class GradientEllipseCollector : SdfBatchCollector<GradientRectItem>
+internal sealed class GradientEllipseCollector : BrushSdfCollector<GradientRectItem>
 {
     public static bool Enabled = true;
 
     public GradientEllipseCollector() : base(1024) { }
 
-    protected override IEffectPass DrawPass => Effect.BatchGradientPass;
+    protected override IEffectPass DrawPass => Effect.GradientSdfPass;
 
     // Batchable = a gradient (linear/radial) fill, a batchable pen, a FULL ellipse. Mirrors EllipseRenderUnit.IsGradientBatchable.
     /// <summary>THE one statement of what this batch draws - the render unit asks THIS, never its own copy.</summary>

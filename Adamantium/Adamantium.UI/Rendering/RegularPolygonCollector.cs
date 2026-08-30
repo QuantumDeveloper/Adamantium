@@ -13,7 +13,7 @@ namespace Adamantium.UI.Rendering;
 // Regular-polygon SDF batch: N same-clip triangles/pentagons/hexagons in ONE instanced draw, each a per-instance
 // PolygonItem the pixel shader reconstructs from its distance field (pass Polygon). Sibling of the rect and ellipse
 // collectors, and deliberately its own: a polygon and an ellipse share a shape of record, not a shape.
-internal sealed class RegularPolygonCollector : SdfBatchCollector<PolygonItem>
+internal sealed class RegularPolygonCollector : ShapeSdfCollector<PolygonItem>
 {
     // A/B / safety-valve toggle: off routes every polygon back to its per-unit tessellated draw.
     public static bool Enabled = true;
