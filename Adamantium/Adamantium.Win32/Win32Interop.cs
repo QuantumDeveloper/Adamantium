@@ -475,8 +475,17 @@ namespace Adamantium.Win32
         /// <summary>CLSCTX_INPROC_SERVER - the shell's drag-image helper lives in-process.</summary>
         public const uint ClsCtxInprocServer = 1;
 
+        /// <summary>CLSCTX_ALL - let COM pick the server it is actually registered as. The wallpaper service is NOT
+        /// in-process: its CLSID carries an AppId and no InProcServer32, so asking for in-process only comes back
+        /// REGDB_E_CLASSNOTREG - the class is there, the context is not.</summary>
+        public const uint ClsCtxAll = 23;
+
         /// <summary>CLSID_DragDropHelper: implements both IDragSourceHelper and IDropTargetHelper.</summary>
         public static readonly Guid ClsidDragDropHelper = new("4657278A-411B-11D2-839A-00C04FD918D0");
+
+        /// <summary>CLSID_DesktopWallpaper: the shell's wallpaper service, which backdrop materials read (Mica shows
+        /// the desktop picture behind the window, not the frame behind the element).</summary>
+        public static readonly Guid ClsidDesktopWallpaper = new("C2CF3110-460E-4FC1-B9D0-8A1C0C9CC4BD");
 
         /// <summary>Register (or look up) a private clipboard format by name - how a non-standard payload crosses
         /// processes.</summary>
