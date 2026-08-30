@@ -20,9 +20,17 @@
 // blit - so it is already blurred once, for free, and a handful of taps here widen that into a proper frosting instead
 // of paying for a full convolution.
 //
-// CaptureRect maps a fragment back into that copy. It is in DEVICE pixels of the frame, not of the element, because the
-// capture is grown by a margin: a blur reaches outside what it covers, and sampling right up to the element's edge
-// darkens the border towards whatever the clamp returns.
+// THE SOURCE MAPPING, as texture coordinates rather than as a rectangle: .xy scales a frame pixel into the image, .zw
+// shifts it. So a fragment's place in the source is one multiply-add - the divide (and the guard against a zero-sized
+// rectangle) happens once on the CPU instead of per fragment, and the blur below reuses the same scale for its taps.
+//
+// One per SEGMENT rather than per instance, which is why it is a parameter and not a field - a draw binds one image, so
+// every instance in it maps the same way. Set at DRAW time, which is what keeps it honest across replays: for a capture
+// it describes the copied region, and for mica where the desktop put the wallpaper, in this window's pixels. The window
+// moving changes the second one without changing anything the frame recorded - so baking it into the instances made the
+// wallpaper travel WITH the window instead of staying on the desktop.
+float4 SourceUv;
+
 struct MaterialRectData
 {
     float4 Bounds;       // NODE-local x, y, w, h
@@ -30,7 +38,6 @@ struct MaterialRectData
     float4 Radii;        // corner radii: TL, TR, BR, BL
     float4 Tint;         // straight RGBA laid over the capture; .a is the tint's strength
     float4 Knobs;        // .x blur (device px), .y grain, .z refraction (device px), .w reserved
-    float4 CaptureRect;  // where the capture came from, in DEVICE pixels: x, y, w, h
 };
 
 struct MaterialPSInput
@@ -65,11 +72,11 @@ MaterialPSInput MaterialRectInstancedVS(uint vertexId : SV_VertexID, uint instan
     return o;
 }
 
-// A fragment's position in the CAPTURE, 0..1. Position.xy is already the frame's device pixel, which is exactly the
-// space CaptureRect is stated in - so this is a subtraction and a divide, with no matrices involved.
-float2 CaptureUv(float2 fragment, float4 captureRect)
+// A fragment's position in the source, 0..1. Position.xy is already the frame's device pixel, which is the space
+// SourceUv was built for - so this is one multiply-add, with no matrices and no divide.
+float2 CaptureUv(float2 fragment, float4 sourceUv)
 {
-    return (fragment - captureRect.xy) / max(captureRect.zw, float2(1.0, 1.0));
+    return fragment * sourceUv.xy + sourceUv.zw;
 }
 
 // Widening blur: a small ring of taps around the fragment. The capture is already downscaled, so each tap here reaches
@@ -83,9 +90,10 @@ float2 CaptureUv(float2 fragment, float4 captureRect)
 // this driver has a documented ceiling on what one pixel shader can carry before vkCreateShadersEXT or the GPU itself
 // gives out - the pattern shader hit it, and it is the reason materials are a separate effect at all. Widen only with a
 // measurement in hand.
-float4 BlurCapture(float2 uv, float4 captureRect, float radiusPx)
+float4 BlurCapture(float2 uv, float4 sourceUv, float radiusPx)
 {
-    float2 texel = radiusPx / max(captureRect.zw, float2(1.0, 1.0));
+    // The tap spacing is the radius in FRAME pixels put through the same scale - the mapping is already stated that way.
+    float2 texel = radiusPx * sourceUv.xy;
     float4 sum = SourceTexture.Sample(SourceSampler, uv);
     sum += SourceTexture.Sample(SourceSampler, uv + float2( texel.x,  0.0));
     sum += SourceTexture.Sample(SourceSampler, uv + float2(-texel.x,  0.0));
@@ -106,8 +114,8 @@ float4 MaterialFrostedPS(MaterialPSInput input) : SV_Target
     float4 r4 = lerp(min(input.Radii, float4(lim, lim, lim, lim)), input.Radii, isPolygon);
     float d = BrushShapeDistance(input.Local, input.Half, r4, 2, isEllipse + isPolygon * 2.0);
 
-    float2 uv = saturate(CaptureUv(input.Position.xy, it.CaptureRect));
-    float4 behind = BlurCapture(uv, it.CaptureRect, it.Knobs.x);
+    float2 uv = saturate(CaptureUv(input.Position.xy, SourceUv));
+    float4 behind = BlurCapture(uv, SourceUv, it.Knobs.x);
 
     // Tint over the capture, then grain. The grain is what keeps a large pane from banding - the capture came from an
     // 8-bit target and was smoothed twice, so its gradients are flatter than the eye tolerates at this size.

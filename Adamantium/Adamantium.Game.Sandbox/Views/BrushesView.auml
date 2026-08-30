@@ -32,6 +32,21 @@
                            Foreground="#F2F5F9"/>
             </Grid>
 
+            <!-- MICA, next to the acrylic on purpose: the two differ by SOURCE, and the difference is only visible side
+                 by side. This one shows the DESKTOP WALLPAPER behind the window - so scrolling this page leaves it
+                 completely still, while moving the window across the desktop changes it. -->
+            <TextBlock Text="Mica — the same treatment, fed the desktop instead of the frame" FontSize="18" Margin="0,0,0,10"/>
+            <Grid Width="470" Height="120" Margin="0,0,0,24">
+                <Rectangle CornerRadius="12">
+                    <Rectangle.Fill>
+                        <MaterialBrush Material="Mica" TintColor="#20242E" TintOpacity="0.6" NoiseAmount="0.03"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+
+                <TextBlock Text="Move the window across the desktop — this follows the wallpaper, not the page"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#F2F5F9"/>
+            </Grid>
+
             <!-- Aura and Shadow: the soft band around a shape. Two properties rather than one with the offset zeroed -
                  a shadow has a DIRECTION and an aura does not. Both are the shape's own signed distance read further out,
                  so they batch with everything else: no offscreen target, no blur pass.

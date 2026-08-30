@@ -399,6 +399,21 @@ public partial class RenderCache
         return ToFramebufferScissor(logical, fullScissor);
     }
 
+    /// <summary>Where this window sits on the DESKTOP, in physical pixels. What mica needs, and the one number a
+    /// material reading the wallpaper cannot get from the frame: the frame knows where things are inside the window,
+    /// and the wallpaper is placed outside it.</summary>
+    private Rect WindowOnDesktop()
+    {
+        if (_lastVisualRoot == null) return default;
+
+        // LivePosition, not Position: the bindable one is updated through the loop thread's queue, so during a drag it
+        // trails the window by a frame or more - and a backdrop drawn from a stale position slides about instead of
+        // standing still on the desktop.
+        var origin = _lastVisualRoot.LivePosition;
+        return new Rect(origin.X, origin.Y,
+            _lastVisualRoot.ClientWidth * _renderScale, _lastVisualRoot.ClientHeight * _renderScale);
+    }
+
     /// <summary>The overlap of two device-pixel rects, empty when they do not meet.</summary>
     private static Rect2D Intersect(Rect2D a, Rect2D b)
     {

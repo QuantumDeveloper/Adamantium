@@ -180,6 +180,44 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     public static readonly AdamantiumProperty TopProperty = AdamantiumProperty.Register(nameof(Top),
         typeof(Double), typeof(WindowBase), new PropertyMetadata(0d, PositionChangedCallback));
 
+    // The window's place on the desktop as two plain ints, written by the platform the moment it hears about a move and
+    // read by the render thread without a lock. Two independent reads can in principle catch one axis of an older
+    // position, and that is deliberate: a half-updated position is one pixel wrong for one frame, where taking a lock on
+    // a path the renderer walks every frame would cost far more than it saves.
+    private volatile int _liveX;
+    private volatile int _liveY;
+    private volatile bool _liveKnown;
+
+    /// <inheritdoc/>
+    /// <remarks>Falls back to <see cref="Position"/> until the platform has reported a position at least once -
+    /// otherwise a window placed by the application, and never moved by the user, would report the origin.</remarks>
+    public PixelPoint LivePosition
+    {
+        get
+        {
+            // ASKED, not remembered. Move notifications arrive with the mouse - measured at about 220 a second - while
+            // frames are built two to three times as often, so a remembered position is already stale for most frames.
+            // The platform answers this straight from the OS; the remembered value is the fallback where it cannot.
+            var asked = LivePositionProvider?.Invoke();
+            if (asked.HasValue) return asked.Value;
+
+            return _liveKnown ? new PixelPoint(_liveX, _liveY) : Position;
+        }
+    }
+
+    /// <summary>Set by the platform to report where the OS has this window RIGHT NOW, callable from any thread. Null
+    /// where a platform has no cheap way to ask, and the position reported by its last move message is used instead.</summary>
+    public Func<PixelPoint?> LivePositionProvider { get; set; }
+
+    /// <summary>Record where the OS just put this window, from whatever thread it said so on. Called by the platform
+    /// ahead of the queued property update - see <see cref="LivePosition"/> for why the two are separate.</summary>
+    public void UpdateLivePosition(double left, double top)
+    {
+        _liveX = (int)left;
+        _liveY = (int)top;
+        _liveKnown = true;
+    }
+
     private static void PositionChangedCallback(AdamantiumComponent a, AdamantiumPropertyChangedEventArgs e)
     {
         // Before the OS window exists the value is simply remembered - it is read when the window is created.
@@ -199,6 +237,10 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     /// mid-drag fights the move loop.</para></summary>
     public void UpdatePositionFromPlatform(double left, double top)
     {
+        // Recorded FIRST, and without going near the property system: this is the copy the render thread reads, and it
+        // has to be current now rather than whenever the loop thread gets to the queued update below. See LivePosition.
+        UpdateLivePosition(left, top);
+
         if (Left.Equals(left) && Top.Equals(top)) return;
 
         _positionFromPlatform = true;

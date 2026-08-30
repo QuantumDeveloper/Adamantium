@@ -196,6 +196,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
             // frozen at creation for every ordinary window, which is exactly what "the border does not update" was.
             ApplyBorder();
             WatchAccent();
+            ProvideLivePosition();
         }
 
         this.window.DpiScale = ReadDpiScale(source.Handle);   // initial per-monitor DPI (PMv2)
@@ -247,6 +248,29 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         if (window == null) return;
 
         Win32Interop.SetWindowText(window.Handle, title);
+    }
+
+    // Where the OS has this window at the instant of asking. GetWindowRect is thread-safe and cheap - one call into
+    // user32 - which is what makes this usable from the render thread once a frame.
+    //
+    // Asking beats remembering here because move notifications arrive with the MOUSE (about 220 a second) while frames
+    // are built two to three times as often: a remembered position is stale for most frames, and a backdrop drawn from
+    // it shudders while the window is dragged.
+    private void ProvideLivePosition()
+    {
+        if (window is not Controls.WindowBase target) return;
+
+        var handle = window.Handle;
+        target.LivePositionProvider = () =>
+        {
+            // The CLIENT area's corner, not the window's. What the renderer draws is the client area, and the two differ
+            // by whatever non-client frame the window carries - so answering with the window rect puts everything drawn
+            // from this position off by that margin. ClientToScreen(0,0) asks the question actually being asked.
+            var origin = new NativePoint { X = 0, Y = 0 };
+            return Win32Interop.ClientToScreen(handle, ref origin)
+                ? new Core.PixelPoint(origin.X, origin.Y)
+                : null;
+        };
     }
 
     public void SetPosition(double left, double top)
@@ -551,7 +575,22 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     // input we cannot see. Marshalled to the loop thread like every other handler here: they reach the visual tree.
     private IntPtr HandleMoving(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
-        DispatchInput(() => window.RaiseWindowMoving());
+        // lParam is the rectangle the OS is about to put the window at, so the position can be kept CURRENT through the
+        // whole gesture instead of only at its end. Anything that draws from where the window is on the desktop needs
+        // that: a mica backdrop maps the wallpaper through the window's position, and updated only on release it sat
+        // frozen for the whole drag and then jumped - the one thing that gives away that it is not really the desktop.
+        var rect = Marshal.PtrToStructure<RECT>(lParam);
+
+        // The live copy is written HERE, on the thread the message arrived on, because anything drawn from the window's
+        // position needs it now. The property update and the event still go through the loop thread, where the property
+        // system and the visual tree live - so the fast copy and the correct copy each go the way they must.
+        window.UpdateLivePosition(rect.Left, rect.Top);
+        DispatchInput(() =>
+        {
+            window.UpdatePositionFromPlatform(rect.Left, rect.Top);
+            window.RaiseWindowMoving();
+        });
+
         handled = false;   // let DefWindowProc go on moving the window
         return IntPtr.Zero;
     }
