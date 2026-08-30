@@ -38,16 +38,20 @@
                     <Border Background="{TemplateBinding Background}"
                             BorderBrush="{TemplateBinding BorderBrush}"
                             BorderThickness="{ResourceReference TitleBarUnderline}">
-                        <Grid ColumnDefinitions="Auto,Auto,*,Auto">
+                        <!-- Column 0 is EMPTY until the buttons move into it (CaptionButtonPlacement=Left, the macOS
+                             and Ubuntu convention). An Auto column costs nothing while nothing is in it, and this is
+                             cheaper than carrying a second copy of the button panel: the parts are found by NAME, so
+                             two panels would mean two PART_CloseButton and the control would wire up only one. -->
+                        <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto">
 
                             <!-- A neutral slot before everything else: a quick-access bar, a search box, whatever the
                                  application puts there. -->
-                            <ContentPresenter x:Name="PART_LeadingContent" Grid.Column="0"
+                            <ContentPresenter x:Name="PART_LeadingContent" Grid.Column="1"
                                     Content="{TemplateBinding LeadingContent}"
                                     VerticalAlignment="Center"/>
 
                             <!-- LEFT commands: interactive, sit before the drag area (so they stay clickable). -->
-                            <ItemsControl Grid.Column="1" ItemsSource="{TemplateBinding LeftWindowCommands}"
+                            <ItemsControl Grid.Column="2" ItemsSource="{TemplateBinding LeftWindowCommands}"
                                     VerticalAlignment="Stretch">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
@@ -74,7 +78,7 @@
                                  but fully hit-testable (hit-testing is decoupled from Background here), so the whole
                                  strip drags. Clips so a long title doesn't spill onto the commands. The command columns
                                  sit outside this element, so their buttons stay clickable. -->
-                            <Grid x:Name="PART_DragArea" Grid.Column="2" Background="Transparent" ClipToBounds="True">
+                            <Grid x:Name="PART_DragArea" Grid.Column="3" Background="Transparent" ClipToBounds="True">
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
                                         HorizontalAlignment="{TemplateBinding TitleAlignment}"
                                         Margin="{ResourceReference TitleBarTitleInset}">
@@ -90,7 +94,7 @@
                             </Grid>
 
                             <!-- RIGHT zone (interactive): right commands + "..." overflow menu + the window buttons. -->
-                            <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Stretch">
+                            <StackPanel x:Name="PART_RightCluster" Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Stretch">
                                 <ItemsControl ItemsSource="{TemplateBinding RightWindowCommands}" VerticalAlignment="Stretch">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
@@ -139,17 +143,23 @@
                                 </ContextMenu>
 
                                 <!-- The gutter: where the application's buttons end and the window's begin. -->
-                                <Border Width="{ResourceReference StrokeThinValue}"
+                                <Border x:Name="PART_CaptionGutter"
+                                        Width="{ResourceReference StrokeThinValue}"
                                         Margin="{ResourceReference TitleBarGutterMargin}"
                                         Background="{ResourceReference ControlStrokeColorDefault}"/>
+                            </StackPanel>
 
-                                <!-- Window buttons. VECTOR Path icons (Data + Stroke), NOT font glyphs - crisp and
+                            <!-- Window buttons. VECTOR Path icons (Data + Stroke), NOT font glyphs - crisp and
                                      font-independent. Focusable is stated HERE as well as in the class style: a value
                                      set on a template PART wins over a style setter, so this is the one guaranteed to
                                      hold. Without it a click left the button focused and its focus ring sat in the
                                      caption long after the click. -->
-                                <StackPanel x:Name="PART_ButtonsPanel" Orientation="Horizontal" VerticalAlignment="Stretch">
-                                    <Button x:Name="PART_MinButton" Classes="CaptionButton" Focusable="False" Height="{TemplateBinding Height}">
+                            <!-- A GRID, not a stack, and only because the ORDER has to be swappable: a stack lays its
+                                 children out in markup order and nothing can reverse that from a trigger, while a
+                                 column index is an ordinary attached property a setter can write. -->
+                            <Grid x:Name="PART_ButtonsPanel" Grid.Column="5" ColumnDefinitions="Auto,Auto,Auto"
+                                    VerticalAlignment="Stretch">
+                                    <Button x:Name="PART_MinButton" Grid.Column="0" Classes="CaptionButton" Focusable="False" Height="{TemplateBinding Height}">
                                         <Path Data="M0,5 L10,5"
                                                 Stroke="{TemplateBinding Foreground}"
                                                 StrokeThickness="{ResourceReference StrokeThinValue}"
@@ -157,7 +167,7 @@
                                     </Button>
                                     <!-- Maximize <-> restore: two overlaid glyphs, only one shown; the
                                          IsWindowMaximized trigger swaps their Opacity. -->
-                                    <Button x:Name="PART_MaxButton" Classes="CaptionButton" Focusable="False" Height="{TemplateBinding Height}">
+                                    <Button x:Name="PART_MaxButton" Grid.Column="1" Classes="CaptionButton" Focusable="False" Height="{TemplateBinding Height}">
                                         <Grid>
                                             <Path x:Name="MaximizeGlyph" Data="M0,0 L10,0 L10,10 L0,10 Z"
                                                     Stroke="{TemplateBinding Foreground}"
@@ -169,14 +179,13 @@
                                                     HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </Grid>
                                     </Button>
-                                    <Button x:Name="PART_CloseButton" Classes="CaptionButton CloseButton" Focusable="False" Height="{TemplateBinding Height}">
+                                    <Button x:Name="PART_CloseButton" Grid.Column="2" Classes="CaptionButton CloseButton" Focusable="False" Height="{TemplateBinding Height}">
                                         <Path Data="M0,0 L10,10 M10,0 L0,10"
                                                 Stroke="{TemplateBinding Foreground}"
                                                 StrokeThickness="{ResourceReference StrokeThinValue}"
                                                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Button>
-                                </StackPanel>
-                            </StackPanel>
+                            </Grid>
                         </Grid>
                     </Border>
                 </ControlTemplate>
@@ -185,6 +194,18 @@
     </Style>
 
     <Style Selector="TitleBar">
+        <!-- Buttons on the LEFT (macOS, and Ubuntu since Unity). Three things move together, and all three matter:
+             the panel goes to the far-left column; the ORDER reverses, because closing stays OUTERMOST on either side
+             (right: min, max, close - left: close, min, max); and the gutter that separates the application's buttons
+             from the window's is no longer between them, so it goes away. -->
+        <PropertyTrigger Property="CaptionButtonPlacement" Value="Left">
+            <Setter TargetName="PART_ButtonsPanel" Property="Grid.Column" Value="0"/>
+            <Setter TargetName="PART_CloseButton" Property="Grid.Column" Value="0"/>
+            <Setter TargetName="PART_MinButton" Property="Grid.Column" Value="1"/>
+            <Setter TargetName="PART_MaxButton" Property="Grid.Column" Value="2"/>
+            <Setter TargetName="PART_CaptionGutter" Property="Visibility" Value="Collapsed"/>
+        </PropertyTrigger>
+
         <PropertyTrigger Property="ShowMinButton" Value="false">
             <Setter TargetName="PART_MinButton" Property="Visibility" Value="Collapsed"/>
         </PropertyTrigger>

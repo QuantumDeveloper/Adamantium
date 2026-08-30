@@ -83,14 +83,17 @@ public class ProceduralBrushBakeTests
     }
 
     [Test]
-    public void NoiseBrush_Bakes_TypeFourAndFbmParams()
+    public void NoiseBrush_BakesIntoTheNoiseRange_AndCarriesItsFbmParams()
     {
         var brush = new NoiseBrush { Scale = 40, Octaves = 5, Seed = 12, Lacunarity = 2.5, Gain = 0.6 };
         var ok = PatternRectCollector.BakeItem(Payload(brush), Matrix4x4F.Identity, 1.0, 0, -1, out var item);
         Assert.Multiple(() =>
         {
             Assert.That(ok, Is.True);
-            Assert.That(item.Params.Y, Is.EqualTo(4f), "noise is pattern type 4");
+            // Noise codes live in their OWN range now (PatternBrushRecord.NoiseBase), so that a kind added to either
+            // enum never renumbers the other. Simplex is the first of them; it used to be squeezed in at 4, between
+            // Grid and Hexagon, which is what forced holes into the public PatternType.
+            Assert.That(item.Params.Y, Is.EqualTo(100f), "simplex noise is the first code of the noise range");
             Assert.That(item.Params.Z, Is.EqualTo(40f).Within(1e-4f), "cell = Scale * sx");
             Assert.That(item.Noise.X, Is.EqualTo(5f), "octaves -> Noise.x");
             Assert.That(item.Noise.Y, Is.EqualTo(12f).Within(1e-4f), "seed -> Noise.y");

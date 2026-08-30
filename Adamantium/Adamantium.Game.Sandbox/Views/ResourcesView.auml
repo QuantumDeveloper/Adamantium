@@ -48,6 +48,12 @@
 
             <Button Content="Switch" Command="{Binding SwitchThemeCommand}"
                     Width="110" Height="36" Margin="8,0,0,0"/>
+
+            <!-- Which SIDE the window buttons sit on. A platform theme states this once with a setter; here it is a
+                 checkbox so the difference can be seen on a live window. Left also REVERSES the order - closing stays
+                 outermost either way - which is the part that is easy to get wrong and impossible to miss on screen. -->
+            <CheckBox Content="Caption buttons left" IsChecked="{Binding CaptionButtonsOnLeft, Mode=TwoWay}"
+                      VerticalAlignment="Center" Margin="20,0,0,0"/>
         </StackPanel>
 
         <!-- ACCENT: the theme's accent brushes are observable theme properties consumed via {ThemeResource}. Cycling them

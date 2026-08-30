@@ -20,16 +20,19 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TitleBar">
-                    <Grid Background="{TemplateBinding Background}" ColumnDefinitions="Auto,Auto,*,Auto">
+                    <!-- Column 0 stays EMPTY until the caption buttons move into it (CaptionButtonPlacement=Left).
+                         An Auto column costs nothing while nothing is in it, and it is cheaper than a second copy of
+                         the button panel: parts are found by NAME, so two panels would mean two PART_CloseButton. -->
+                    <Grid Background="{TemplateBinding Background}" ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto">
 
                         <!-- A neutral slot before everything else: a quick-access bar, a search box, whatever the
                              application puts there. -->
-                        <ContentPresenter x:Name="PART_LeadingContent" Grid.Column="0"
+                        <ContentPresenter x:Name="PART_LeadingContent" Grid.Column="1"
                                 Content="{TemplateBinding LeadingContent}"
                                 VerticalAlignment="Center"/>
 
                         <!-- LEFT commands: interactive, sit before the drag area (so they stay clickable). -->
-                        <ItemsControl Grid.Column="1" ItemsSource="{TemplateBinding LeftWindowCommands}"
+                        <ItemsControl Grid.Column="2" ItemsSource="{TemplateBinding LeftWindowCommands}"
                                 VerticalAlignment="Stretch">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
@@ -56,7 +59,7 @@
                              Clips so a long title doesn't spill onto the commands. The command columns (0 and 2) sit outside
                              this element, so their buttons stay clickable; the drag is initiated from managed input here
                              (see TitleBar), which respects z-order so overlays on top keep their clicks. -->
-                        <Grid x:Name="PART_DragArea" Grid.Column="2" Background="Transparent" ClipToBounds="True">
+                        <Grid x:Name="PART_DragArea" Grid.Column="3" Background="Transparent" ClipToBounds="True">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
                                     HorizontalAlignment="{TemplateBinding TitleAlignment}" Margin="12,0,0,0">
                                 <ContentPresenter x:Name="PART_Icon" Content="{TemplateBinding Icon}"
@@ -68,7 +71,7 @@
                         </Grid>
 
                         <!-- RIGHT zone (interactive): right commands + "..." overflow menu + the window buttons. -->
-                        <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Stretch">
+                        <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Stretch">
                             <ItemsControl ItemsSource="{TemplateBinding RightWindowCommands}" VerticalAlignment="Stretch">
                                 <ItemsControl.ItemsPanel>
                                     <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
@@ -121,15 +124,22 @@
                                  wins over a style setter, so this is the one that is guaranteed to hold. Without it a
                                  click left the button focused and the button template drew its focus ring around it -
                                  a frame sitting in the caption long after the click. -->
-                            <StackPanel x:Name="PART_ButtonsPanel" Orientation="Horizontal" VerticalAlignment="Stretch">
-                            <Button x:Name="PART_MinButton" Classes="CaptionButton" Focusable="False" Height="{TemplateBinding Height}">
+                            </StackPanel>
+
+                            <!-- A GRID, not a stack, and only because the ORDER has to be swappable when the buttons
+                                 move to the left (CaptionButtonPlacement): a stack lays its children out in markup
+                                 order and no trigger can reverse that, while a column index is an ordinary attached
+                                 property a setter can write. -->
+                            <Grid x:Name="PART_ButtonsPanel" Grid.Column="5" ColumnDefinitions="Auto,Auto,Auto"
+                                    VerticalAlignment="Stretch">
+                            <Button x:Name="PART_MinButton" Grid.Column="0" Classes="CaptionButton" Focusable="False" Height="{TemplateBinding Height}">
                                 <Path Data="M0,5 L10,5"
                                         Stroke="{TemplateBinding Foreground}" StrokeThickness="1"
                                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
                             <!-- Maximize <-> restore: two overlaid glyphs, only one shown; the IsWindowMaximized trigger
                                  swaps their Opacity (the CheckBox pattern). -->
-                            <Button x:Name="PART_MaxButton" Classes="CaptionButton" Focusable="False" Height="{TemplateBinding Height}">
+                            <Button x:Name="PART_MaxButton" Grid.Column="1" Classes="CaptionButton" Focusable="False" Height="{TemplateBinding Height}">
                                 <Grid>
                                     <Path x:Name="MaximizeGlyph" Data="M0,0 L10,0 L10,10 L0,10 Z"
                                             Stroke="{TemplateBinding Foreground}" StrokeThickness="1"
@@ -139,13 +149,12 @@
                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Grid>
                             </Button>
-                            <Button x:Name="PART_CloseButton" Classes="CaptionButton CloseButton" Focusable="False" Height="{TemplateBinding Height}">
+                            <Button x:Name="PART_CloseButton" Grid.Column="2" Classes="CaptionButton CloseButton" Focusable="False" Height="{TemplateBinding Height}">
                                 <Path Data="M0,0 L10,10 M10,0 L0,10"
                                         Stroke="{TemplateBinding Foreground}" StrokeThickness="1"
                                         HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Button>
-                            </StackPanel>
-                        </StackPanel>
+                            </Grid>
                     </Grid>
                 </ControlTemplate>
             </Setter.Value>
@@ -153,6 +162,16 @@
     </Style>
 
     <Style Selector="TitleBar">
+        <!-- Buttons on the LEFT (macOS, Ubuntu since Unity). The panel moves to the far-left column and the order
+             reverses with it, because CLOSING stays outermost on either side: right is min-max-close, left is
+             close-min-max. -->
+        <PropertyTrigger Property="CaptionButtonPlacement" Value="Left">
+            <Setter TargetName="PART_ButtonsPanel" Property="Grid.Column" Value="0"/>
+            <Setter TargetName="PART_CloseButton" Property="Grid.Column" Value="0"/>
+            <Setter TargetName="PART_MinButton" Property="Grid.Column" Value="1"/>
+            <Setter TargetName="PART_MaxButton" Property="Grid.Column" Value="2"/>
+        </PropertyTrigger>
+
         <PropertyTrigger Property="ShowMinButton" Value="false">
             <Setter TargetName="PART_MinButton" Property="Visibility" Value="Collapsed"/>
         </PropertyTrigger>

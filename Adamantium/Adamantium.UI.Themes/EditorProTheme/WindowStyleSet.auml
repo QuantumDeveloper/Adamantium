@@ -22,16 +22,20 @@
     <Style Selector="Window">
         <!-- Default window background so any window (incl. a code-created custom shell) is themed, not the black clear
              colour. An explicit Background on the window instance overrides this. -->
-        <Setter Property="Background" Value="{ResourceReference SolidBackgroundFillColorBase}"/>
+        <!-- COLOURS are live links ({ObservableResource}), metrics are one-shot ({ResourceReference}). The difference is
+             not stylistic: a resource swapped for a NEW brush - which is what a colour picker does - is re-resolved by an
+             observable link and ignored by a one-shot one. The window's frame kept its original hairline for exactly
+             that reason while everything around it recoloured. -->
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorBase}"/>
         <!-- Default TEXT colour for the whole window: content inherits it, so plain text is theme-correct without a
              per-TextBlock style (which would sit at Style priority and MASK a control's selection/state Foreground from
              reaching its content). -->
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <!-- Both grounds the same on purpose - see the note above; the state is carried by the foregrounds. -->
-        <Setter Property="TitleBarBackground" Value="{ResourceReference SolidBackgroundFillColorSecondary}"/>
-        <Setter Property="InactiveTitleBarBackground" Value="{ResourceReference SolidBackgroundFillColorSecondary}"/>
-        <Setter Property="TitleBarForeground" Value="{ResourceReference TextFillColorPrimary}"/>
-        <Setter Property="InactiveTitleBarForeground" Value="{ResourceReference TextFillColorDisabled}"/>
+        <Setter Property="TitleBarBackground" Value="{ObservableResource SolidBackgroundFillColorSecondary}"/>
+        <Setter Property="InactiveTitleBarBackground" Value="{ObservableResource SolidBackgroundFillColorSecondary}"/>
+        <Setter Property="TitleBarForeground" Value="{ObservableResource TextFillColorPrimary}"/>
+        <Setter Property="InactiveTitleBarForeground" Value="{ObservableResource TextFillColorDisabled}"/>
         <Setter Property="LoadingIndicatorText" Value="Switching theme…"/>
     </Style>
 
@@ -41,7 +45,7 @@
                 <ControlTemplate TargetType="Window">
                     <Border x:Name="PART_WindowBorder" Background="{TemplateBinding Background}"
                             BorderThickness="{ResourceReference WindowBorderThickness}"
-                            BorderBrush="{ResourceReference ControlStrokeColorDefault}">
+                            BorderBrush="{ObservableResource ControlStrokeColorDefault}">
                         <Grid RowDefinitions="Auto,*">
                             <!-- The caption's height comes from the WINDOW (Window.TitleBarHeight), so code that needs
                                  it reads one property instead of measuring a template part. -->
@@ -53,7 +57,8 @@
                                     Icon="{TemplateBinding Icon}"
                                     LeadingContent="{TemplateBinding TitleBarLeadingContent}"
                                     LeftWindowCommands="{TemplateBinding LeftWindowCommands}"
-                                    RightWindowCommands="{TemplateBinding RightWindowCommands}"/>
+                                    RightWindowCommands="{TemplateBinding RightWindowCommands}"
+                                    CaptionButtonPlacement="{TemplateBinding CaptionButtonPlacement}"/>
                             <!-- The SELECTOR travels too, not just the single template: a window given only a selector
                                  (one template per content type - the usual shape for a view-model host) had nothing to
                                  build with and fell back to showing Content.ToString(). -->
@@ -74,7 +79,7 @@
                                  animates a RenderTransform, which the compositor plays on the RENDER thread - so it
                                  keeps turning even while the loop thread is in the cascade. -->
                             <Border x:Name="PART_ThemeOverlay" Grid.Row="1"
-                                    Background="{ResourceReference SmokeFillColorDefault}"
+                                    Background="{ObservableResource SmokeFillColorDefault}"
                                     Visibility="Collapsed">
                                 <StackPanel Orientation="Vertical"
                                         HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -132,7 +137,7 @@
             <Setter TargetName="PART_TitleBar" Property="Background" Value="{TemplateBinding TitleBarBackground}"/>
             <Setter TargetName="PART_TitleBar" Property="Foreground" Value="{TemplateBinding TitleBarForeground}"/>
             <Setter TargetName="PART_WindowBorder" Property="BorderBrush"
-                    Value="{ResourceReference ControlStrokeColorSecondary}"/>
+                    Value="{ObservableResource ControlStrokeColorSecondary}"/>
         </PropertyTrigger>
         <!-- A theme swap is in flight: raise the busy overlay and start its spinner (see the template). -->
         <PropertyTrigger Property="IsThemeChanging" Value="true">
