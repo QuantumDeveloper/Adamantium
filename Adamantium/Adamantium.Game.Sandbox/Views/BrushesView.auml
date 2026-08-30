@@ -7,6 +7,30 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Orientation="Vertical" Margin="24">
 
+            <!-- BACKDROP MATERIAL, FIRST on the tab so it is on screen the moment the stand opens. Unlike every other
+                 brush here, this one has nothing of its own to show: it is made of what is BEHIND it. So it is
+                 deliberately laid over a busy, moving noise - a flat swatch would prove nothing, and a still one would
+                 not show that acrylic follows what moves under it. -->
+            <TextBlock Text="Material brush — the fill is what is behind it" FontSize="18" Margin="0,0,0,10"/>
+            <Grid Width="470" Height="150" Margin="0,0,0,24">
+                <Rectangle CornerRadius="12">
+                    <Rectangle.Fill>
+                        <NoiseBrush NoiseType="Worley" Scale="46" Octaves="2" Animate="true" FlowSpeed="0.5"
+                                    Color1="#0B1220" Color2="#F0ABFC"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+
+                <Rectangle Width="300" Height="92" CornerRadius="14"
+                           HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Rectangle.Fill>
+                        <MaterialBrush Material="Acrylic" TintColor="#20242E" TintOpacity="0.55"
+                                       BlurAmount="10" NoiseAmount="0.04"/>
+                    </Rectangle.Fill>
+                </Rectangle>
+
+                <TextBlock Text="Acrylic over living noise" HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Foreground="#F2F5F9"/>
+            </Grid>
 
             <!-- Aura and Shadow: the soft band around a shape. Two properties rather than one with the offset zeroed -
                  a shadow has a DIRECTION and an aura does not. Both are the shape's own signed distance read further out,

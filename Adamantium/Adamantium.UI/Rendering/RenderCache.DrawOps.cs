@@ -69,6 +69,7 @@ public partial class RenderCache
                         case 10: _haloLivingUnder.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
                         case 11: _haloLivingOver.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
                         case 12: _polygonBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                        case 13: _materialBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
                         default: _textBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
                     }
                     break;
@@ -272,6 +273,40 @@ public partial class RenderCache
             }
         }
 
+        // BACKDROP MATERIALS go LAST of the fills, and that ordering is the whole feature: the material copies what is
+        // behind it out of the frame, so everything meant to be behind it has to be in the frame already. Flushed before
+        // the halo's inner band and before text for the same reason those come after fills at all - a pane of glass is
+        // still a fill, and a label on top of it is content.
+        if (_materialBatch != null)
+        {
+            // Captured from what the INSTANCES cover, grown so the blur has neighbours to average at the edges - without
+            // the margin a material darkens along its border towards whatever the clamp returns.
+            //
+            // Their bounds, not the clip group's scissor. The copy is downscaled fourfold, so its resolution is the
+            // material's detail budget: taken from a whole scrolled panel, a 300x92 pane was reading about 75x23 texels
+            // and looked like fog rather than frosting. The scissor is the fallback for a segment with no bounds.
+            //
+            // The grown box is then CUT BACK to the clip group. The margin reaches outside what the material covers, and
+            // outside a scrolling panel is whatever is drawn OVER it - a scrolled pane picked up the tab strip along its
+            // top edge and the blur dragged that darkness inward as a dense band. Cut there, the sampler's clamp extends
+            // the panel's own edge pixels instead, which is what a blur against a clip boundary should do.
+            const int blurMargin = 24;
+            var limit = _batchOpen ? _batchScissor : fullScissor;
+            var box = _materialBatch.HasPending
+                ? ToFramebufferScissor(_materialBatch.PendingBounds, fullScissor)
+                : limit;
+            _materialBatch.SetCaptureRect(Intersect(new Rect2D
+            {
+                Offset = new Offset2D { X = box.Offset.X - blurMargin, Y = box.Offset.Y - blurMargin },
+                Extent = new Extent2D
+                {
+                    Width = box.Extent.Width + blurMargin * 2,
+                    Height = box.Extent.Height + blurMargin * 2
+                }
+            }, limit));
+            RecordSegment(13, _materialBatch.Flush(device, fullScissor, _projectionMatrix));
+        }
+
         // An INNER band lies inside the shape, so it belongs OVER every fill - drawn under, the shape's own fill covers
         // it and nothing is on screen at all. Still below text: a glow is chrome, a label is content.
         if (_haloOver != null)
@@ -362,6 +397,21 @@ public partial class RenderCache
 
         clipped = true;
         return ToFramebufferScissor(logical, fullScissor);
+    }
+
+    /// <summary>The overlap of two device-pixel rects, empty when they do not meet.</summary>
+    private static Rect2D Intersect(Rect2D a, Rect2D b)
+    {
+        var left = Math.Max(a.Offset.X, b.Offset.X);
+        var top = Math.Max(a.Offset.Y, b.Offset.Y);
+        var right = Math.Min(a.Offset.X + (int)a.Extent.Width, b.Offset.X + (int)b.Extent.Width);
+        var bottom = Math.Min(a.Offset.Y + (int)a.Extent.Height, b.Offset.Y + (int)b.Extent.Height);
+
+        return new Rect2D
+        {
+            Offset = new Offset2D { X = left, Y = top },
+            Extent = new Extent2D { Width = (uint)Math.Max(0, right - left), Height = (uint)Math.Max(0, bottom - top) }
+        };
     }
 
     // Window-logical rect -> Vulkan scissor in framebuffer pixels (logical x RenderScale), clamped to the window scissor so

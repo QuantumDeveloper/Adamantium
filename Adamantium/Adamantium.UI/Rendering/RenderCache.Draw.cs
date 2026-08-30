@@ -56,6 +56,10 @@ public partial class RenderCache
     private GradientRectCollector _gradientRectBatch;   // SDF family: rounded rects with a linear/radial GRADIENT fill
     private GradientEllipseCollector _gradientEllipseBatch;   // SDF family: ellipses with a linear/radial GRADIENT fill
     private PatternRectCollector _patternBatch;   // SDF family: rounded rects with a PROCEDURAL pattern fill (checker/stripes/dots/grid)
+
+    // SDF family: shapes whose fill is a BACKDROP MATERIAL - acrylic, mica, liquid glass. Created on the first one, and
+    // flushed LAST of the fills, because it reads the frame that the others have already drawn.
+    private MaterialRectCollector _materialBatch;
     private FractalRectCollector _fractalBatch;   // SDF family: rounded rects with an escape-time FRACTAL fill (Julia/Mandelbrot)
     private TextureBatchCollector _texRectBatch;   // SDF family: rounded rects whose fill is SAMPLED from a texture (ImageBrush / NineSliceBrush)
     // The soft band (aura / shadow) in its TWO paint positions. An OUTER band goes under every fill; an INNER one over
@@ -465,6 +469,7 @@ public partial class RenderCache
         if (_patternBatch != null) _patternBatch.TransformsAddress = address;
         if (_fractalBatch != null) _fractalBatch.TransformsAddress = address;
         if (_texRectBatch != null) _texRectBatch.TransformsAddress = address;
+        if (_materialBatch != null) _materialBatch.TransformsAddress = address;
         if (_haloUnder != null) _haloUnder.TransformsAddress = address;
         if (_haloOver != null) _haloOver.TransformsAddress = address;
         if (_haloLivingUnder != null) _haloLivingUnder.TransformsAddress = address;
@@ -698,6 +703,9 @@ public partial class RenderCache
             _gradientEllipseBatch ??= new GradientEllipseCollector { BatchId = 4 };
             _patternBatch ??= new PatternRectCollector { BatchId = 5 };
             _fractalBatch ??= new FractalRectCollector { BatchId = 6 };
+            // Lazy, like the textured batch: a material owns a capture texture, and a tree without one should not pay
+            // for it.
+            if (_materialBatch != null) _materialBatch.BeginFrame(device);
             _textBatch.BeginFrame(device);
             _rectBatch.BeginFrame(device);
             _ellipseBatch.BeginFrame(device);
@@ -1072,6 +1080,40 @@ public partial class RenderCache
                     continue;
                 }
                 peru.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
+            }
+            else if (device != null && unit is RectangleRenderUnit mru && MaterialRectCollector.WantsBatch(mru.RectPayload))
+            {
+                // A shape filled with a BACKDROP MATERIAL. Its layer is the highest of the fills (7) on purpose: the
+                // material copies the frame behind it, so anything that should show THROUGH it has to have been drawn
+                // already. Overlapping a higher layer flushes, as everywhere else - here that rule is also what keeps
+                // two materials over each other from capturing the same stale frame.
+                // The address is handed over AT CONSTRUCTION, exactly as the textured batch does it: this batch is made
+                // lazily, on the first frame that meets a material, which is after the frame handed the table's address
+                // to everything that existed then. Without it the vertex shader dereferences NULL for a whole frame -
+                // and a bad BDA read is not something any validation layer sees, it is just a device lost.
+                _materialBatch ??= new MaterialRectCollector
+                {
+                    BatchId = 13,
+                    TransformsAddress = _transformTable?.DeviceAddress ?? 0
+                };
+                _materialBatch.BeginFrame(device);
+                var materialBounds = LogicalBounds(unit.Component, wt);
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor))
+                    || OverlapsHigherLayer(7, materialBounds, unit.Component))   // 7 = material layer
+                {
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                }
+                var matBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Mat);
+                if (_materialBatch.TryAdd(mru.RectPayload, matBakeWorld, mru.FillOpacity, scissor, materialBounds, slot4Mat, mru.FadeSlot))
+                {
+                    if (_recording) group.NotBatchable("material");
+                    _batchScissor = scissor;
+                    _batchClip = unit.Component;
+                    _batchOpen = true;
+                    continue;
+                }
+                mru.EnsureMachinery();
                 unit.Update(wt, _projectionMatrix, _renderScale);
             }
             else if (device != null && unit is RectangleRenderUnit pru && _patternBatch.CanBatch(pru.RectPayload))
@@ -2452,6 +2494,7 @@ public partial class RenderCache
         10 => _haloLivingUnder,
         11 => _haloLivingOver,
         12 => _polygonBatch,
+        13 => _materialBatch,
         _ => _textBatch
     };
 

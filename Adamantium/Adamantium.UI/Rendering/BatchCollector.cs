@@ -283,6 +283,11 @@ internal abstract class BatchCollector<TItem> : BatchArena where TItem : struct
     /// that put something in it - and the only moment that is knowable is while the segment is still empty.</summary>
     public bool HasPending => _hasUnion;
 
+    /// <summary>The logical union of what is waiting to be flushed - the same four numbers <see cref="Flush"/> records on
+    /// the segment. Read by the backdrop materials, which need the area their instances actually cover: a capture taken
+    /// from the whole clip group spends most of its resolution on pixels no material fragment ever samples.</summary>
+    public Rect PendingBounds => _hasUnion ? new Rect(_uL, _uT, _uR - _uL, _uB - _uT) : default;
+
     /// <summary>Does a unit's logical bounds overlap the pending segment? A later overlapping unit must draw AFTER a
     /// flush (painter's order); spatially disjoint units (a list's stacked items) don't.</summary>
     public bool OverlapsPending(Rect r)

@@ -1,3 +1,13 @@
+// A 2D hash: the cheapest random there is, and the building block under value/worley noise and under any per-pixel
+// grain. Lives here rather than with the brushes because it is a primitive, not a fill - the backdrop materials use it
+// for their film grain and evaluate no noise field at all.
+float Hash21(float2 p)
+{
+    float3 p3 = frac(float3(p.x, p.y, p.x) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return frac((p3.x + p3.y) * p3.z);
+}
+
 // NOISE - the base field. Shared because it is not only a brush's business: the LIVING halo wanders its reach with the
 // same simplex noise the noise brushes are built on. Everything DERIVED from it - fbm, worley, voronoi, the pattern
 // mixer - belongs to the brushes and lives in BrushData.fxh.
