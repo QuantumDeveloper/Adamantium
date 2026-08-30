@@ -980,7 +980,8 @@ public partial class RenderCache
                 // A polygon with a PROCEDURAL fill (pattern or noise): the pattern pass, same layer as the rect and the
                 // ellipse forms of it.
                 var patPolyBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(4, patPolyBounds, unit.Component))   // 4 = pattern layer
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_patternBatch.SameKind(PatternRectCollector.KindOf(ppru.PolygonPayload.Brush))
+                    || OverlapsHigherLayer(4, patPolyBounds, unit.Component))   // 4 = pattern layer
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 var patPolyBake = ResolveBake(device, unit.Component, wt, out var slot4PatPoly);
                 if (_patternBatch.TryAddPolygon(ppru.PolygonPayload, patPolyBake, ppru.FillOpacity, scissor, patPolyBounds, slot4PatPoly, ppru.FadeSlot))
@@ -1053,7 +1054,8 @@ public partial class RenderCache
                 // jagged tessellated edges), the shader branching to the ellipse SDF on the negative baked corner radius.
                 // Same clip group + layer 4 as the pattern rect.
                 var patElBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(4, patElBounds, unit.Component))   // 4 = pattern layer
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_patternBatch.SameKind(PatternRectCollector.KindOf(peru.EllipsePayload.Brush))
+                    || OverlapsHigherLayer(4, patElBounds, unit.Component))   // 4 = pattern layer
                 {
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }
@@ -1077,7 +1079,8 @@ public partial class RenderCache
                 // A rounded rect with a PROCEDURAL PATTERN fill (checkerboard/stripes/dots/grid): a new SDF-batch sibling,
                 // its own pass evaluates the pattern per fragment. Shares the clip group with the other batches.
                 var patternBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || OverlapsHigherLayer(4, patternBounds, unit.Component))   // 4 = pattern layer
+                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor)) || !_patternBatch.SameKind(PatternRectCollector.KindOf(pru.RectPayload.Brush))
+                    || OverlapsHigherLayer(4, patternBounds, unit.Component))   // 4 = pattern layer
                 {
                     FlushBatches(device, fullScissor, ref scissorNarrowed);
                 }

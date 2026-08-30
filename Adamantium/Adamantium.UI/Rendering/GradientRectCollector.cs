@@ -16,13 +16,13 @@ namespace Adamantium.UI.Rendering;
 // fill stays in the cheaper RectBatch. Segment/buffer/overlap/retain machinery comes from SdfBatchCollector; this adds
 // the gradient bake + the GradientRect draw pass. Up to GradientRectItem.MaxStops colour stops. The bake is shared with
 // the gradient ELLIPSE batch (GradientEllipseCollector) via BakeGradientItem - the two differ only in the pixel SDF.
-internal sealed class GradientRectCollector : SdfBatchCollector<GradientRectItem>
+internal sealed class GradientRectCollector : BrushSdfCollector<GradientRectItem>
 {
     public static bool Enabled = true;
 
     public GradientRectCollector() : base(1024) { }
 
-    protected override IEffectPass DrawPass => Effect.BatchGradientPass;
+    protected override IEffectPass DrawPass => Effect.GradientSdfPass;
 
     // Batchable = a gradient (linear/radial) fill, a batchable pen (none or a solid stroke the SDF shader draws), and
     // uniform corner radius. Mirrors RectangleRenderUnit.IsGradientBatchable.

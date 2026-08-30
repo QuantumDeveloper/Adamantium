@@ -17,7 +17,7 @@ namespace Adamantium.UI.Rendering;
 // space on the CPU - into ONE instanced draw per segment (RectBatchEffect reconstructs the rounded corners from an SDF
 // = self-anti-aliasing, so N item backgrounds cost ~1 draw AND no separate AA fringe). Segment/buffer/overlap
 // machinery is in BatchCollector; this adds rect baking + the SDF draw. Rendered BELOW the text batch (lower layer).
-internal sealed class RectBatchCollector : SdfBatchCollector<RectItem>
+internal sealed class RectBatchCollector : ShapeSdfCollector<RectItem>
 {
     // A/B / safety-valve toggle: off routes every rect back to its per-unit fill + AA-fringe draw (the pre-batch path).
     public static bool Enabled = true;

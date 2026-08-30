@@ -15,7 +15,15 @@ namespace Adamantium.UI.Rendering;
 // shaders); this just unifies the code.
 internal abstract class SdfBatchCollector<TItem> : BatchCollector<TItem> where TItem : struct
 {
-    protected BatchEffect Effect;
+    // WHICH effect feeds this collector is the subclass's business: the shapes draw through BatchEffect and the brushes
+    // through BrushEffect (see BrushEffect.fx - two effects because one parameter block could not hold both). What the
+    // draw needs is the four parameters BOTH declare, held as fields rather than looked up by name: a dictionary hit per
+    // parameter per draw is exactly the cost the batch exists to remove.
+    protected EffectParameter ProjectionParam, ViewportSizeParam, InstancesAddressParam, TransformsAddressParam;
+
+    /// <summary>Create the effect if it is not there yet and point the four parameters above at it. Called at the start
+    /// of every frame, so it must be cheap once the effect exists.</summary>
+    protected abstract void EnsureEffect(IGraphicsDevice device);
 
     /// <summary>Device address of the owning cache's <see cref="TransformTable"/> - the SDF vertex shaders fetch each
     /// instance's world matrix from it by the instance's slot index. Set by RenderCache every frame BEFORE any draw
@@ -27,7 +35,11 @@ internal abstract class SdfBatchCollector<TItem> : BatchCollector<TItem> where T
 
     protected SdfBatchCollector(int initialCapacity) : base(initialCapacity) { }
 
-    protected override void OnBeginFrame(IGraphicsDevice device) => Effect ??= new BatchEffect(device);
+    // NOT at BeginFrame: an effect is a device resource (its own shader objects, its own parameter block), and a frame
+    // touches every collector whether or not it has anything to draw. Building one for a collector that draws nothing
+    // costs a set of shader objects per device for nothing - which, once the brushes became a SECOND effect, was enough
+    // extra pressure to take the off-screen test host down natively partway through a run.
+    protected void EnsureEffectForDraw(IGraphicsDevice device) => EnsureEffect(device);
 
     // The SDF draw pass for this shape (per-instance TItem read from the buffer's device address by SV_InstanceID).
     protected abstract IEffectPass DrawPass { get; }
@@ -39,6 +51,7 @@ internal abstract class SdfBatchCollector<TItem> : BatchCollector<TItem> where T
     protected override void DrawSegment(IGraphicsDevice device, Buffer<TItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
     {
         var dev = (GraphicsDevice)device;
+        EnsureEffectForDraw(device);
 
         // Set what this draw DEPENDS on, don't inherit it. The colour mask is device state like any other, and a pass
         // that borrows it (the strokes' union coverage masks colour off for its depth pass) would otherwise leave these
@@ -56,18 +69,18 @@ internal abstract class SdfBatchCollector<TItem> : BatchCollector<TItem> where T
         // only thing that draws through one: an off-screen bake (a VisualBrush, a bitmap, a snapshot) renders with its
         // own projection in between, and a cache of what THIS collector last sent then skips restoring ours. The result
         // is content drawn through somebody else's projection - which is not a slow frame but a wrong picture.
-        Effect.Projection.SetValue(projection);
+        ProjectionParam.SetValue(projection);
 
         // The SDF shapes measure themselves in DEVICE pixels (SlotPixelScale), which needs the render target's pixel
         // size; without it the shader falls back to the raw slot space, where an anisotropically scaled slot smears the
         // shape's edge along its long axis.
         var vp = ((GraphicsDevice)device).CurrentViewports;
-        if (vp is { Length: > 0 }) Effect.ViewportSize.SetValue(new Vector2F(vp[0].Width, vp[0].Height));
+        if (vp is { Length: > 0 }) ViewportSizeParam.SetValue(new Vector2F(vp[0].Width, vp[0].Height));
         device.PrimitiveTopology = PrimitiveTopology.TriangleStrip;
 
         device.VertexType = null;
-        Effect.InstancesAddress.SetValue(buffer.GetDeviceAddress() + firstInstance * (ulong)Stride);
-        Effect.TransformsAddress.SetValue(TransformsAddress);
+        InstancesAddressParam.SetValue(buffer.GetDeviceAddress() + firstInstance * (ulong)Stride);
+        TransformsAddressParam.SetValue(TransformsAddress);
 
         var applyBytes0 = System.GC.GetAllocatedBytesForCurrentThread();
         DrawPass.Apply();
