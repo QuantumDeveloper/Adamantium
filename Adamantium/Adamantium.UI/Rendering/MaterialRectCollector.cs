@@ -22,10 +22,29 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
 
     private readonly BackdropCapture _capture = new();
 
+    // The OTHER source. Acrylic and glass read the frame under the element; mica reads the desktop wallpaper behind the
+    // WINDOW, which is a file rather than a capture - see WallpaperBackdrop for why that makes it the cheap one.
+    private readonly WallpaperBackdrop _wallpaper = new();
+
+
+
     // Its OWN effect, not the brushes'. Putting these shaders in BrushEffect made vkCreateShadersEXT die with an access
     // violation - on the gradient pass, which had worked for months: this driver's compiler has a ceiling per effect,
     // and the brushes were already at it. See the note at the top of MaterialEffect.fx.
     private Adamantium.UI.Effects.Generated.MaterialEffect Effect;
+
+    // How a frame pixel maps into the bound image. A parameter rather than an instance field because it belongs to the
+    // SEGMENT, and because it must be recomputed at draw time - see the note on SourceUv in MaterialEffect.fx.
+    private EffectParameter SourceUvParam;
+
+    /// <summary>A rectangle in frame pixels as the SCALE and SHIFT the shader wants: multiply-add instead of
+    /// subtract-and-divide per fragment. The guard against a zero-sized rectangle lives here too, once.</summary>
+    private static Vector4F ToUv(Vector4F rect)
+    {
+        var sx = 1f / Math.Max(rect.Z, 1f);
+        var sy = 1f / Math.Max(rect.W, 1f);
+        return new Vector4F(sx, sy, -rect.X * sx, -rect.Y * sy);
+    }
 
     public MaterialRectCollector() : base(64) { }
 
@@ -34,6 +53,7 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
         if (Effect != null) return;
 
         Effect = new Adamantium.UI.Effects.Generated.MaterialEffect(device);
+        SourceUvParam = Effect.SourceUv;
         ProjectionParam = Effect.Projection;
         ViewportSizeParam = Effect.ViewportSize;
         InstancesAddressParam = Effect.InstancesAddress;
@@ -52,36 +72,101 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
     // back through the CaptureRect baked into the instances, which is the other - and the material jumps between the two
     // every time a frame switches between walking and replaying. That is the flicker seen while scrolling.
     private readonly System.Collections.Generic.List<Rect2D> _segRegion = new();
+    private readonly System.Collections.Generic.List<bool> _segWallpaper = new();
+
+    // TWO flags, not one, and the difference is the difference between recording and drawing.
+    //
+    // _pendingWallpaper describes the segment being FILLED - it decides whether the next material may join it. It is
+    // cleared when that segment is flushed, because the next one starts undecided.
+    //
+    // _boundWallpaper describes the segment being DRAWN - restored by BindSegment, since a replayed frame draws
+    // segments recorded long before. Sharing one field made the draw's value survive into the next frame's recording:
+    // after a mica pane the flag stayed set, so the acrylic pane that opened the next frame was taken for a wallpaper
+    // one, joined its segment, and vanished.
+    private bool _pendingWallpaper;
+    private bool _boundWallpaper;
+
+    /// <summary>Whether the segment currently being drawn reads the WALLPAPER rather than a capture of the frame. One
+    /// segment, one source - the same rule the textured batch has for its texture, and for the same reason: a draw
+    /// binds one image.</summary>
+    public bool WallpaperSegment => _boundWallpaper;
+
+    /// <summary>The window on the DESKTOP, in physical pixels. A wallpaper-backed material needs it: the picture is
+    /// placed on the desktop, and a fragment has to be mapped from the frame into that placement.</summary>
+    public Rect WindowBounds { get; set; }
+
+    /// <summary>The point that picks the MONITOR - the window's centre, so a window mostly on the second screen reads
+    /// that screen's wallpaper rather than the one its top-left corner still touches.</summary>
+    private PixelPoint WindowCentre()
+        => new((int)(WindowBounds.X + WindowBounds.Width / 2), (int)(WindowBounds.Y + WindowBounds.Height / 2));
 
     protected override void OnSegmentRecorded(int index)
     {
         while (_segRegion.Count <= index) _segRegion.Add(default);
+        while (_segWallpaper.Count <= index) _segWallpaper.Add(false);
         _segRegion[index] = CaptureRegion;
+        _segWallpaper[index] = _pendingWallpaper;
+        _pendingWallpaper = false;   // the next segment starts undecided, as its instances decide it
     }
 
     protected override void OnSegmentInserted(int index)
     {
         while (_segRegion.Count < index) _segRegion.Add(default);
+        while (_segWallpaper.Count < index) _segWallpaper.Add(false);
         _segRegion.Insert(index, index > 0 ? _segRegion[index - 1] : CaptureRegion);
+        _segWallpaper.Insert(index, index > 0 && _segWallpaper[index - 1]);
     }
 
     protected override void BindSegment(int index)
     {
         if ((uint)index < (uint)_segRegion.Count) CaptureRegion = _segRegion[index];
+        if ((uint)index < (uint)_segWallpaper.Count) _boundWallpaper = _segWallpaper[index];
     }
+
+    /// <summary>Does this material read the same source as what is already pending? Asked before adding - a change of
+    /// source flushes the batch, exactly as a change of texture does in the textured batch.</summary>
+    public bool SameSource(RectanglePayload p)
+        => !HasPending || p.Brush is not MaterialBrush m || IsWallpaper(m.Material) == _pendingWallpaper;
+
+    private static bool IsWallpaper(MaterialType material) => material == MaterialType.Mica;
 
     protected override void DrawSegment(IGraphicsDevice device, Buffer<MaterialRectItem> buffer, uint count, uint firstInstance, Matrix4x4F projection)
     {
         EnsureEffectForDraw(device);
 
-        // Capture FIRST, then draw. Nothing is drawn without one: a material with no backdrop would sample whatever
+        var samplers = ((GraphicsDevice)device).SamplerStates;
+
+        // ONE source per segment, and NOTHING drawn without one: a material with no backdrop would sample whatever
         // descriptor happens to be bound - in practice the glyph atlas - which is the failure the textured batch already
         // learned to refuse rather than to paint.
-        if (!_capture.Capture(device, CaptureRegion) || _capture.Image == null) return;
+        if (WallpaperSegment)
+        {
+            // No capture at all: the picture is prepared once and only re-read when the desktop says it changed. The
+            // texture is asked for HERE rather than at bake time so a wallpaper that changed between recording and
+            // replaying is picked up by the replay too.
+            var texture = _wallpaper.Texture(device, WindowCentre());
+            if (texture == null) return;
 
+            // Computed NOW, every draw: the window may have been dragged since this segment was recorded, and it is the
+            // window moving under a still picture that makes mica read as a window onto the desktop.
+            SourceUvParam.SetValue(ToUv(WallpaperRect()));
+            Effect.SourceTexture.SetResource(texture);
+            // Repeat only for a TILED desktop - every other layout places one copy, and repeating it would wrap the
+            // picture's far edge into a pane sitting near the screen's border.
+            Effect.SourceSampler.SetResource(_wallpaper.Tiles ? samplers.LinearRepeat : samplers.LinearClampToEdge);
+        }
+        else
+        {
+            // Capture FIRST, then draw - see BackdropCapture: the copy is only correct once everything meant to be
+            // BEHIND the material is already in the frame.
+            if (!_capture.Capture(device, CaptureRegion) || _capture.Image == null) return;
 
-        Effect.SourceTexture.SetResource(_capture.Image);
-        Effect.SourceSampler.SetResource(((GraphicsDevice)device).SamplerStates.LinearClampToEdge);
+            SourceUvParam.SetValue(ToUv(new Vector4F(CaptureRegion.Offset.X, CaptureRegion.Offset.Y,
+                CaptureRegion.Extent.Width, CaptureRegion.Extent.Height)));
+            Effect.SourceTexture.SetResource(_capture.Image);
+            Effect.SourceSampler.SetResource(samplers.LinearClampToEdge);
+        }
+
         base.DrawSegment(device, buffer, count, firstInstance, projection);
     }
 
@@ -117,20 +202,41 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
             // opacity rides the coverage, as it does for every other fill.
             Tint = new Vector4F(tint.R / 255f, tint.G / 255f, tint.B / 255f,
                 (float)Math.Clamp(material.TintOpacity * opacity * material.Opacity, 0.0, 1.0)),
-            Knobs = new Vector4F((float)material.BlurAmount, (float)material.NoiseAmount, (float)material.Refraction, 0f),
-            CaptureRect = Vector4F.Zero   // filled in at flush, when the region is known in device pixels
+            Knobs = new Vector4F((float)material.BlurAmount, (float)material.NoiseAmount, (float)material.Refraction, 0f)
         };
+
+        if (IsWallpaper(material.Material)) _pendingWallpaper = true;
 
         MarkPending(scissor, logicalBounds);
         return true;
     }
 
-    /// <summary>Tell every pending instance where the capture will come from. Called by the cache once, when it knows
-    /// the segment's device-pixel footprint - the instances are baked before that footprint exists.</summary>
-    public void SetCaptureRect(Rect2D region)
+    /// <summary>Where the capture will be taken from - the segment's device-pixel footprint, which the cache knows only
+    /// at flush. Nothing is written into the instances: the rectangle reaches the shader as a parameter set at draw
+    /// time, so a replayed frame gets this segment's own value back through <see cref="BindSegment"/>.</summary>
+    public void SetCaptureRect(Rect2D region) => CaptureRegion = region;
+
+    /// <summary>Where the wallpaper lands, in the FRAME's device pixels: the desktop rectangle the picture was placed
+    /// into, moved into the window and scaled. Recomputed per instance because the window moves - and that movement is
+    /// exactly what makes mica look like a window onto the desktop rather than a painted panel.</summary>
+    private Vector4F WallpaperRect()
     {
-        CaptureRegion = region;
-        var rect = new Vector4F(region.Offset.X, region.Offset.Y, region.Extent.Width, region.Extent.Height);
-        for (var i = 0; i < Count; i++) Items[i].CaptureRect = rect;
+        // The desktop has to have been read at least once before there is a rectangle to compute. Cheap to ask - a path
+        // and a timestamp, compared as one record, and only re-read when that comparison differs.
+        _wallpaper.Ensure(WindowCentre());
+
+        var placement = _wallpaper.Placement(PlatformSettings.VirtualScreen);
+        if (placement.Width <= 0 || placement.Height <= 0) return Vector4F.Zero;
+
+
+        // ALREADY PHYSICAL, both of them: the desktop states where it put the picture in physical pixels, and the
+        // window's corner comes from the OS in the same units. Their difference is therefore physical too, which is what
+        // the shader wants - it works in the frame's device pixels. Scaling it again by the render scale was a mistake
+        // invisible at 100% and a picture off by half its width at 150%.
+        return new Vector4F(
+            (float)(placement.X - WindowBounds.X),
+            (float)(placement.Y - WindowBounds.Y),
+            (float)placement.Width,
+            (float)placement.Height);
     }
 }

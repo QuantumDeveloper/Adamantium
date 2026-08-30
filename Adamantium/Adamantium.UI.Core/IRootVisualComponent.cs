@@ -23,6 +23,17 @@ public interface IRootVisualComponent : IUIComponent
    /// COMPUTES a position works with this, and only the property boundary is loose.</summary>
    PixelPoint Position { get; set; }
 
+   /// <summary>Where the surface is RIGHT NOW, as the OS last reported it - readable from any thread.
+   ///
+   /// <para><see cref="Position"/> is a bindable property, so the platform can only assign it on the loop thread, which
+   /// means posting to that thread's queue and waiting for it to be drained. That is fine for a layout that gets saved
+   /// and for bindings, and far too slow for anything DRAWN from the window's place on the desktop: while a window is
+   /// dragged, the frame would keep being built from where the window was one or two frames ago. A mica backdrop maps
+   /// the wallpaper through this, and any lag turns into the backdrop sliding about instead of standing still.</para>
+   ///
+   /// <para>Defaults to <see cref="Position"/> for surfaces the OS does not move.</para></summary>
+   PixelPoint LivePosition => Position;
+
    double Left { get; set; }
 
    double Top { get; set; }

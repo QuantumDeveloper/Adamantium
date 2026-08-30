@@ -23,6 +23,12 @@ public interface IWindow : IRootVisualComponent, IContentControl
     /// without this Left/Top only ever hold what was last assigned to them, and anything that reads a window's
     /// position afterwards (a layout being saved) writes down where it used to be.</summary>
     void UpdatePositionFromPlatform(double left, double top);
+
+    /// <summary>Record where the OS just put this window, callable from ANY thread - see
+    /// <see cref="IRootVisualComponent.LivePosition"/>. Separate from
+    /// <see cref="UpdatePositionFromPlatform"/> because that one writes bindable properties and must be marshalled to
+    /// the loop thread, which is exactly the delay anything drawn from the position cannot afford.</summary>
+    void UpdateLivePosition(double left, double top);
         
     bool IsActive { get; }
 

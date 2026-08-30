@@ -7,10 +7,11 @@ namespace Adamantium.UI.Rendering;
 /// One instance of the BACKDROP MATERIAL batch (BrushEffect.fx, technique Material): a shape whose fill is made from
 /// what was already drawn behind it. Matches the shader's <c>MaterialRectData</c> field for field.
 ///
-/// <para>Like the textured batch, the SOURCE is not in the record: one capture is bound per SEGMENT, because a capture
-/// is a copy of one region of the frame and two elements in different places cannot share it. Unlike the textured
-/// batch, that source is not an asset the application supplied - it is produced during the frame, immediately before
-/// this segment draws (see <see cref="BackdropCapture"/>).</para>
+/// <para>Like the textured batch, the SOURCE is not in the record: one image is bound per SEGMENT, and so is the
+/// rectangle that maps fragments into it (the effect's <c>SourceRect</c>). Neither belongs to an instance - a draw binds
+/// one image - and keeping the rectangle out of the record is what lets it be recomputed at DRAW time, which a mica
+/// pane depends on: its rectangle is where the desktop put the wallpaper, and it changes when the WINDOW moves, without
+/// anything in the recorded frame changing at all.</para>
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
 public struct MaterialRectItem
@@ -32,9 +33,4 @@ public struct MaterialRectItem
     /// <summary>.x = extra blur radius in device px, .y = grain amount, .z = refraction in device px (LiquidGlass only),
     /// .w spare.</summary>
     public Vector4F Knobs;
-
-    /// <summary>Where the capture came from, in DEVICE pixels of the frame: x, y, w, h. The pixel shader maps a fragment
-    /// back into the copy with it, which is a subtraction and a divide - the capture is stated in the same space
-    /// SV_Position already arrives in.</summary>
-    public Vector4F CaptureRect;
 }

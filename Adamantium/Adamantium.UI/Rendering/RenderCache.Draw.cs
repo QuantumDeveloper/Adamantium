@@ -469,7 +469,16 @@ public partial class RenderCache
         if (_patternBatch != null) _patternBatch.TransformsAddress = address;
         if (_fractalBatch != null) _fractalBatch.TransformsAddress = address;
         if (_texRectBatch != null) _texRectBatch.TransformsAddress = address;
-        if (_materialBatch != null) _materialBatch.TransformsAddress = address;
+        if (_materialBatch != null)
+        {
+            _materialBatch.TransformsAddress = address;
+
+            // WHERE THE WINDOW IS, every frame - not only on frames that walk the tree. Mica maps its picture through
+            // the desktop, so dragging the window changes what it shows while changing NOTHING the frame recorded: set
+            // in the walk alone, it only moved when something else forced a re-record, which from outside looked like
+            // "the wallpaper follows scrolling but ignores the window".
+            _materialBatch.WindowBounds = WindowOnDesktop();
+        }
         if (_haloUnder != null) _haloUnder.TransformsAddress = address;
         if (_haloOver != null) _haloOver.TransformsAddress = address;
         if (_haloLivingUnder != null) _haloLivingUnder.TransformsAddress = address;
@@ -1092,14 +1101,24 @@ public partial class RenderCache
                 // lazily, on the first frame that meets a material, which is after the frame handed the table's address
                 // to everything that existed then. Without it the vertex shader dereferences NULL for a whole frame -
                 // and a bad BDA read is not something any validation layer sees, it is just a device lost.
-                _materialBatch ??= new MaterialRectCollector
+                if (_materialBatch == null)
                 {
-                    BatchId = 13,
-                    TransformsAddress = _transformTable?.DeviceAddress ?? 0
-                };
-                _materialBatch.BeginFrame(device);
+                    _materialBatch = new MaterialRectCollector
+                    {
+                        BatchId = 13,
+                        TransformsAddress = _transformTable?.DeviceAddress ?? 0
+                    };
+
+                    // ONLY on the frame it is created, because the frame's own BeginFrame pass has already gone by.
+                    // Calling it per material - which is what this used to do - resets Count and DISCARDS the segments
+                    // recorded so far: an acrylic pane followed by a mica one lost the acrylic entirely, since the
+                    // second material wiped the first before it could be flushed.
+                    _materialBatch.BeginFrame(device);
+                }
+
                 var materialBounds = LogicalBounds(unit.Component, wt);
                 if ((_batchOpen && !ScissorEquals(_batchScissor, scissor))
+                    || !_materialBatch.SameSource(mru.RectPayload)   // one source per segment - a draw binds one image
                     || OverlapsHigherLayer(7, materialBounds, unit.Component))   // 7 = material layer
                 {
                     FlushBatches(device, fullScissor, ref scissorNarrowed);

@@ -58,8 +58,13 @@ public class VirtualWindow : ContentControl, IVirtualWindow, IAdornerHost, IPopu
     }
 
     // Nothing outside moves a virtual window: it is drawn inside a host surface, and its position is whatever the host
-    // gave it. Assigning it here would be the window arguing with its own host.
+    // gave it. Assigning it here would be the window arguing with its own host - which is why both of these do nothing,
+    // and why LivePosition keeps its default of simply reporting Position.
     public void UpdatePositionFromPlatform(double left, double top)
+    {
+    }
+
+    public void UpdateLivePosition(double left, double top)
     {
     }
 
