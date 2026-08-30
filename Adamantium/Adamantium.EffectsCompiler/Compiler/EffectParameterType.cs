@@ -4,7 +4,7 @@
    /// <p>Values that identify various data, texture, and buffer types that can be assigned to a shader variable.</p>	
    /// </summary>	
    /// <remarks>	
-   /// <p>A call to the <strong><see cref="SharpDX.D3DCompiler.ShaderReflectionType.GetDescription"/></strong> method returns a <strong><see cref="SharpDX.D3DCompiler.ShaderVariableType"/></strong> value in the  <strong>Type</strong> member of a  <strong><see cref="SharpDX.D3DCompiler.ShaderTypeDescription"/></strong> structure.</p><p>The types in a structured buffer describe the structure of the elements in the buffer. The layout of these types generally match their C++ struct counterparts. The following examples show structured buffers:</p><pre><code>struct mystruct {float4 val; uint ind;}; RWStructuredBuffer&lt;mystruct&gt; rwbuf;	
+   /// <p>Reflecting over a compiled shader reports one of these for every variable it declares.</p><p>The types in a structured buffer describe the structure of the elements in the buffer. The layout of these types generally match their C++ struct counterparts. The following examples show structured buffers:</p><pre><code>struct mystruct {float4 val; uint ind;}; RWStructuredBuffer&lt;mystruct&gt; rwbuf;	
    /// RWStructuredBuffer&lt;float3&gt; rwbuf2;</code></pre>	
    /// </remarks>	
    /// <msdn-id>ff728735</msdn-id>	

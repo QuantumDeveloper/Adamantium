@@ -509,7 +509,7 @@ namespace Adamantium.Graphics.Core.Vertices
       }
 
       /// <summary>
-      /// Converts a type to a <see cref="SharpDX.DXGI.Format"/>.
+      /// Converts a type to a <see cref="Format"/>.
       /// </summary>
       /// <param name="typeT">The type T.</param>
       /// <returns>The equivalent Format.</returns>

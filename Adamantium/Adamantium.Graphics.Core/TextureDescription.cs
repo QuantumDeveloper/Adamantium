@@ -17,7 +17,7 @@ namespace Adamantium.Graphics.Core
         public TextureDimension Dimension;
 
         /// <summary>	
-        /// <dd> <p>Texture width (in texels). The  range is from 1 to <see cref="SharpDX.Direct3D11.Resource.MaximumTexture1DSize"/> (16384). However, the range is actually constrained by the feature level at which you create the rendering device. For more information about restrictions, see Remarks.</p> </dd>	
+        /// <dd> <p>Texture width (in texels). The  range is from 1 to 16384. However, the range is actually constrained by the feature level at which you create the rendering device. For more information about restrictions, see Remarks.</p> </dd>	
         /// </summary>	
         /// <remarks>
         /// This field is valid for all textures: <see cref="Texture1D"/>, <see cref="Texture2D"/>, <see cref="Texture3D"/> and <see cref="TextureCube"/>.
@@ -28,7 +28,7 @@ namespace Adamantium.Graphics.Core
         public uint Width;
 
         /// <summary>	
-        /// <dd> <p>Texture height (in texels). The  range is from 1 to <see cref="SharpDX.Direct3D11.Resource.MaximumTexture3DSize"/> (2048). However, the range is actually constrained by the feature level at which you create the rendering device. For more information about restrictions, see Remarks.</p> </dd>	
+        /// <dd> <p>Texture height (in texels). The  range is from 1 to 2048. However, the range is actually constrained by the feature level at which you create the rendering device. For more information about restrictions, see Remarks.</p> </dd>	
         /// </summary>	
         /// <remarks>
         /// This field is only valid for <see cref="Texture2D"/>, <see cref="Texture3D"/> and <see cref="TextureCube"/>.
@@ -39,7 +39,7 @@ namespace Adamantium.Graphics.Core
         public uint Height;
 
         /// <summary>	
-        /// <dd> <p>Texture depth (in texels). The  range is from 1 to <see cref="SharpDX.Direct3D11.Resource.MaximumTexture3DSize"/> (2048). However, the range is actually constrained by the feature level at which you create the rendering device. For more information about restrictions, see Remarks.</p> </dd>	
+        /// <dd> <p>Texture depth (in texels). The  range is from 1 to 2048. However, the range is actually constrained by the feature level at which you create the rendering device. For more information about restrictions, see Remarks.</p> </dd>	
         /// </summary>	
         /// <remarks>
         /// This field is only valid for <see cref="Texture3D"/>.
@@ -50,7 +50,7 @@ namespace Adamantium.Graphics.Core
         public uint Depth;
 
         /// <summary>	
-        /// <dd> <p>Number of textures in the array. The  range is from 1 to <see cref="SharpDX.Direct3D11.Resource.MaximumTexture1DArraySize"/> (2048). However, the range is actually constrained by the feature level at which you create the rendering device. For more information about restrictions, see Remarks.</p> </dd>	
+        /// <dd> <p>Number of textures in the array. The  range is from 1 to 2048. However, the range is actually constrained by the feature level at which you create the rendering device. For more information about restrictions, see Remarks.</p> </dd>	
         /// </summary>	
         /// <remarks>
         /// This field is only valid for <see cref="Texture1D"/>, <see cref="Texture2D"/> and <see cref="TextureCube"/>
@@ -95,7 +95,7 @@ namespace Adamantium.Graphics.Core
         public ImageUsageFlagBits Usage;
 
         /// <summary>	
-        /// <dd> <p>Flags (see <strong><see cref="SharingMode"/></strong>) for binding to pipeline stages. The flags can be combined by a logical OR. For a 1D texture, the allowable values are: <see cref="SharpDX.Direct3D11.BindFlags.ShaderResource"/>, <see cref="SharpDX.Direct3D11.BindFlags.RenderTarget"/> and <see cref="SharpDX.Direct3D11.BindFlags.DepthStencil"/>.</p> </dd>	
+        /// <dd> <p>Flags (see <strong><see cref="SharingMode"/></strong>) for binding to pipeline stages. The flags can be combined by a logical OR. For a 1D texture, the allowable values are: <see cref="BindFlags.ShaderResource"/>, <see cref="BindFlags.RenderTarget"/> and <see cref="BindFlags.DepthStencil"/>.</p> </dd>	
         /// </summary>	
         /// <msdn-id>ff476252</msdn-id>	
         /// <unmanaged>D3D11_BIND_FLAG BindFlags</unmanaged>	

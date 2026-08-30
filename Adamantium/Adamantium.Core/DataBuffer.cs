@@ -328,7 +328,7 @@ namespace Adamantium.Core
         public ulong Size => _size;
 
         /// <summary>
-        /// Performs an explicit conversion from <see cref="SharpDX.DataBuffer"/> to <see cref="SharpDX.DataPointer"/>.
+        /// Performs an explicit conversion from <see cref="DataBuffer"/> to <see cref="DataPointer"/>.
         /// </summary>
         /// <param name="from">The from value.</param>
         /// <returns>The result of the conversion.</returns>

@@ -21,8 +21,6 @@ namespace Adamantium.EffectsCompiler
          // Add reference to this assembly
          AddDependencyPath(typeof(FileDependencyList).Assembly.Location);
 
-         // Add reference to SharpDX.Toolkit Assembly
-         //AddDependencyPath(typeof(SpriteFontData).Assembly.Location);
       }
 
       public static FileDependencyList FromReader(TextReader textReader)

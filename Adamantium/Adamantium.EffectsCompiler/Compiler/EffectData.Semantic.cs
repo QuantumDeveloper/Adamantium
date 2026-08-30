@@ -16,7 +16,7 @@ namespace Adamantium.EffectsCompiler
       /// Compatible means that a shader signature is a exact-match subset of the preceding shader stage. 
       /// Exact match means parameter types and semantics must exactly match. 
       /// Subset means that a parameter that is not required by a downstream stage, does not need to include that parameter in its shader signature.</p>
-      /// <p>Get a shader-signature from a shader or an effect by calling APIs such as <strong>SharpDX.D3DCompiler.ShaderReflection.GetInputParameterDescription</strong>.</p>	
+      /// <p>Get a shader-signature from a shader or an effect by reflecting over the compiled shader.</p>	
       /// </remarks>	
       /// <msdn-id>ff476215</msdn-id>	
       /// <unmanaged>D3D11_SIGNATURE_PARAMETER_DESC</unmanaged>	
