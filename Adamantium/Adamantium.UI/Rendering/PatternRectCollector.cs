@@ -63,19 +63,22 @@ internal sealed class PatternRectCollector : BrushSdfCollector<PatternRectItem>
     // nobody wired up should look wrong, not vanish.
     protected override IEffectPass DrawPass => _kind switch
     {
+        // Patterns 0..N, noise in its own hundred (PatternBrushRecord.NoiseBase) - two ranges, not one interleaved list.
         1 => Effect.PatternStripesSdfPass,
         2 => Effect.PatternDotsSdfPass,
         3 => Effect.PatternGridSdfPass,
-        4 => Effect.NoiseSimplexSdfPass,
-        5 => Effect.PatternHexagonSdfPass,
-        6 => Effect.PatternHatchSdfPass,
-        7 => Effect.NoisePerlinSdfPass,
-        8 => Effect.NoiseValueSdfPass,
-        9 => Effect.NoiseWorleySdfPass,
-        10 => Effect.NoiseRidgedSdfPass,
-        11 => Effect.NoiseTurbulenceSdfPass,
-        12 => Effect.NoiseVoronoiSdfPass,
-        13 => Effect.NoiseCombustibleSdfPass,
+        4 => Effect.PatternHexagonSdfPass,
+        5 => Effect.PatternHatchSdfPass,
+        6 => Effect.PatternWeaveSdfPass,
+
+        100 => Effect.NoiseSimplexSdfPass,
+        101 => Effect.NoisePerlinSdfPass,
+        102 => Effect.NoiseValueSdfPass,
+        103 => Effect.NoiseWorleySdfPass,
+        104 => Effect.NoiseRidgedSdfPass,
+        105 => Effect.NoiseTurbulenceSdfPass,
+        106 => Effect.NoiseVoronoiSdfPass,
+        107 => Effect.NoiseCombustibleSdfPass,
         _ => Effect.PatternCheckerboardSdfPass
     };
 

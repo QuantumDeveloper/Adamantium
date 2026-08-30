@@ -42,13 +42,6 @@ float CornerRadiusAt(float2 p, float4 radii)
                      : (p.y < 0.0 ? radii.y : radii.z);
 }
 
-// Signed distance to a rounded box (iq): negative inside, 0 on the edge, positive outside.
-float SdRoundBox(float2 p, float2 b, float r)
-{
-    float2 q = abs(p) - b + r;
-    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
-}
-
 // Signed distance (device px) to a rounded rect with a selectable outer-corner JOIN: 0 = miter (sharp, Chebyshev outer
 // corner), 1 = bevel (45-deg chamfer), 2 = round (Euclidean, the natural offset). Straight edges are identical across all
 // three; only the corner (both q>0) differs. This is what gives stroke-join parity with the pen (PenLineJoin).
