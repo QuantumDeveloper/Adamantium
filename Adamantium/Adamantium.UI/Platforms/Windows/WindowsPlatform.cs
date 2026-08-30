@@ -27,6 +27,7 @@ public class WindowsPlatform : IApplicationPlatform
         Mouse.Platform = input;
         Keyboard.Platform = input;
         PlatformSettings.Platform = input;
+        DesktopWallpaper.Platform = new WindowsDesktopWallpaper();   // what Mica shows: the picture behind the WINDOW
         WindowsOle.Initialize();   // OLE on THIS (the UI) thread - the precondition for OS drag-drop on every window
     }
 

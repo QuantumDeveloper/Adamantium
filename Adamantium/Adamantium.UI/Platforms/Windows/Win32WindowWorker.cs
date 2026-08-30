@@ -864,6 +864,15 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         handled = false;   // a broadcast: other windows and the default handler still want it
 
         var area = lParam == IntPtr.Zero ? null : System.Runtime.InteropServices.Marshal.PtrToStringUni(lParam);
+
+        // The same broadcast carries the WALLPAPER change (wParam SPI_SETDESKWALLPAPER), which is the one moment a
+        // backdrop material has to re-read the picture: it is cached precisely because it never changes on its own.
+        // Told, not polled, exactly like the appearance switch below - and the slideshow's page turn arrives this way too.
+        if (wParam.ToInt64() == (long)SPI.SetDeskWallpaper || string.Equals(area, "WindowsThemeElement", StringComparison.Ordinal))
+        {
+            Core.DesktopWallpaper.RaiseChanged();
+        }
+
         if (!string.Equals(area, "ImmersiveColorSet", StringComparison.Ordinal)) return IntPtr.Zero;
 
         // Setting this is the whole reaction: SystemAppearance raises its own change, the theme manager re-resolves the

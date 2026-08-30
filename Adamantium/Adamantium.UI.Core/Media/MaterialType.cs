@@ -11,9 +11,16 @@ public enum MaterialType
     /// content beneath it - scroll something under an acrylic panel and the panel shows it moving.</summary>
     Acrylic,
 
-    /// <summary>A tinted backdrop taken from the WINDOW's background rather than from the content: blurred nearly flat,
-    /// so scrolling underneath does not disturb it. Cheap for the same reason - there is nothing per-frame to follow.
-    /// </summary>
+    /// <summary>A tinted backdrop taken from the DESKTOP WALLPAPER behind the window, not from our own frame: blurred
+    /// past recognition, so only broad colour survives. It does not react to the content at all - scrolling underneath
+    /// leaves it still - and changes only when the window moves across the desktop or the wallpaper itself does.
+    ///
+    /// <para>Cheap for that same reason: the wallpaper is a FILE, decoded and blurred once (see
+    /// <c>WallpaperBackdrop</c>), where acrylic pays a copy of the frame every time it draws. That is why mica can sit
+    /// behind a whole window and acrylic is kept for panes.</para>
+    ///
+    /// <para>Where no wallpaper can be read - a plain-colour desktop, or a platform that does not expose one - it falls
+    /// back to tinting that colour, which is a visible fallback rather than a silently disabled material.</para></summary>
     Mica,
 
     /// <summary>A LENS, not frosting: the capture is sampled with an offset that grows towards the shape's edge, so what
