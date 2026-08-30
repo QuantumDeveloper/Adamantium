@@ -42,6 +42,18 @@ namespace Adamantium.Imaging.Jpeg.Decoder
 
         private List<byte[,]> scanDecoded = new List<byte[,]>();
 
+        // THE DECODED BLOCKS, all of them, in one array of 64 bytes each.
+        //
+        // They used to be a List of byte[8,8], one object per block - about 400 000 of them per component in a 4K
+        // photograph, every one a separate allocation with its own header, and every read of a pixel a multidimensional
+        // index. One buffer costs a single allocation, indexes by arithmetic the JIT can hoist, and lets the whole set
+        // be walked in memory order.
+        private byte[] decoded;
+        private int decodedCount;
+
+        private const int BlockSide = 8;
+        private const int BlockPixels = BlockSide * BlockSide;
+
         public int spectralStart, spectralEnd;
         public int successiveLow;
 
@@ -181,18 +193,21 @@ namespace Adamantium.Imaging.Jpeg.Decoder
         public void idctData()
         {
             float[] unZZ = new float[64];
-            float[] toDecode = null;
 
+            // Sized up front, from what the scan actually holds - the count is known, so the buffer is allocated once
+            // instead of growing a list a block at a time.
+            decodedCount = scanData.Count * factorV * factorH;
+            decoded = new byte[decodedCount * BlockPixels];
+
+            var offset = 0;
             for (int i = 0; i < scanData.Count; i++)
             {
                 for (int v = 0; v < factorV; v++)
                     for (int h = 0; h < factorH; h++)
                     {
-                        toDecode = scanData[i][h, v];
-                        ZigZag.UnZigZag(toDecode, unZZ);
-                        //FJCore.Profiling.IDCTWatch.Start();
-                        scanDecoded.Add(_dct.FastIDCT(unZZ));
-                        //FJCore.Profiling.IDCTWatch.Stop();
+                        ZigZag.UnZigZag(scanData[i][h, v], unZZ);
+                        _dct.FastIDCT(unZZ, decoded, offset);
+                        offset += BlockPixels;
                     }
             }
         }
@@ -303,6 +318,83 @@ namespace Adamantium.Imaging.Jpeg.Decoder
             }
         }
 
+        /// <summary>
+        /// The preview path: every block becomes ONE pixel, its DC coefficient.
+        ///
+        /// <para>A block's DC term is the average of its 64 samples (scaled by 8, which is why it is divided by that
+        /// after dequantizing). So reading it alone gives the picture at an eighth of its size directly, with no
+        /// inverse transform to run - and the whole point of this method is what it does NOT do.</para>
+        ///
+        /// <para>The traversal mirrors <see cref="writeDataScaled"/> exactly, since the layout of blocks into MCUs is
+        /// the same; only the tile each block covers shrinks from 8x8 to 1x1, subsampling included - a chroma plane at
+        /// 4:2:0 still stretches its pixel over the two-by-two the luma covers.</para>
+        /// </summary>
+        public void writeDcScaled(byte[][,] raster, int componentIndex)
+        {
+            var plane = raster[componentIndex];
+            int w = plane.GetLength(0),
+                h = plane.GetLength(1);
+
+            var upH = factorUpH;
+            var upV = factorUpV;
+            var dcQuant = quantizationTable[0];
+
+            // The SAME walk as writeDataScaled - carried along block by block rather than computed from an index,
+            // because that is what gets the partial blocks at the right and bottom edges right. Only the tile size
+            // differs: one pixel per block instead of eight.
+            int x = 0, y = 0, lastblockheight = 0, incrementblock = 0;
+            int blockIdx = 0;
+            var total = scanData.Count * factorV * factorH;
+
+            while (blockIdx < total)
+            {
+                int blockwidth = 0;
+                int blockheight = 0;
+
+                if (x >= w) { x = 0; y += incrementblock; }
+
+                for (int factorVIndex = 0; factorVIndex < factorV; factorVIndex++)
+                {
+                    blockwidth = 0;
+
+                    for (int factorHIndex = 0; factorHIndex < factorH; factorHIndex++)
+                    {
+                        var mcu = blockIdx / (factorV * factorH);
+                        var within = blockIdx % (factorV * factorH);
+                        var dc = scanData[mcu][within % factorH, within / factorH][0] * dcQuant / 8f + 128f;
+                        var value = dc < 0 ? (byte)0 : dc > 255 ? (byte)255 : (byte)(dc + 0.5f);
+
+                        for (int dx = 0; dx < upH; dx++)
+                        {
+                            var px = x + dx;
+                            if (px >= w) break;
+
+                            for (int dy = 0; dy < upV; dy++)
+                            {
+                                var py = y + dy;
+                                if (py >= h) break;
+                                plane[px, py] = value;
+                            }
+                        }
+
+                        blockIdx++;
+                        blockwidth += upH;
+                        x += upH;
+                        blockheight = upV;
+                    }
+
+                    y += blockheight;
+                    x -= blockwidth;
+                    lastblockheight += blockheight;
+                }
+
+                y -= lastblockheight;
+                incrementblock = lastblockheight;
+                lastblockheight = 0;
+                x += blockwidth;
+            }
+        }
+
         public void writeDataScaled(byte[][,] raster, int componentIndex, BlockUpsamplingMode mode)
         {
             int x = 0, y = 0, lastblockheight = 0, incrementblock = 0;
@@ -313,7 +405,7 @@ namespace Adamantium.Imaging.Jpeg.Decoder
                 h = raster[0].GetLength(1);
 
             // Keep looping through all of the blocks until there are no more.
-            while (blockIdx < scanDecoded.Count)
+            while (blockIdx < decodedCount)
             {
                 int blockwidth = 0;
                 int blockheight = 0;
@@ -329,15 +421,14 @@ namespace Adamantium.Imaging.Jpeg.Decoder
 
                     for (int factorHIndex = 0; factorHIndex < factorH; factorHIndex++)
                     {
-                        // Captures the width of this block so we can increment the X coordinate
-                        byte[,] blockdata = scanDecoded[blockIdx++];
+                        // Writes the data at the specific X and Y coordinate of this component. Blocks are always 8x8,
+                        // so the sizes that used to be read off each array are constants now.
+                        writeBlockScaled(raster, decoded, blockIdx * BlockPixels, componentIndex, x, y, mode);
+                        blockIdx++;
 
-                        // Writes the data at the specific X and Y coordinate of this component
-                        writeBlockScaled(raster, blockdata, componentIndex, x, y, mode);
-
-                        blockwidth += blockdata.GetLength(1) * factorUpH;
-                        x += blockdata.GetLength(1) * factorUpH;
-                        blockheight = blockdata.GetLength(0) * factorUpV;
+                        blockwidth += BlockSide * factorUpH;
+                        x += BlockSide * factorUpH;
+                        blockheight = BlockSide * factorUpV;
                     }
 
                     y += blockheight;
@@ -351,7 +442,7 @@ namespace Adamantium.Imaging.Jpeg.Decoder
             }
         }
 
-        private void writeBlockScaled(byte[][,] raster, byte[,] blockdata, int compIndex, int x, int y, BlockUpsamplingMode mode)
+        private void writeBlockScaled(byte[][,] raster, byte[] blocks, int blockOffset, int compIndex, int x, int y, BlockUpsamplingMode mode)
         {
             int w = raster[0].GetLength(0),
                 h = raster[0].GetLength(1);
@@ -359,8 +450,8 @@ namespace Adamantium.Imaging.Jpeg.Decoder
             int factorUpVertical = factorUpV,
                 factorUpHorizontal = factorUpH;
 
-            int oldV = blockdata.GetLength(0),
-                oldH = blockdata.GetLength(1),
+            int oldV = BlockSide,
+                oldH = BlockSide,
                 newV = oldV * factorUpVertical,
                 newH = oldH * factorUpHorizontal;
 
@@ -381,7 +472,7 @@ namespace Adamantium.Imaging.Jpeg.Decoder
                     {
                         for (int u = 0; u < xMax; u++)
                             for (int v = 0; v < yMax; v++)
-                                comp[u + x, y + v] = blockdata[v, u];
+                                comp[u + x, y + v] = blocks[blockOffset + v * BlockSide + u];
                     }
                     // Special case 2: Perform scale-up 4 pixels at a time
                     else if (factorUpHorizontal == 2 &&
@@ -394,7 +485,7 @@ namespace Adamantium.Imaging.Jpeg.Decoder
 
                             for (int src_v = 0; src_v < oldV; src_v++)
                             {
-                                byte val = blockdata[src_v, src_u];
+                                byte val = blocks[blockOffset + src_v * BlockSide + src_u];
                                 int by = src_v * 2 + y;
 
                                 comp[bx, by] = val;
@@ -413,7 +504,7 @@ namespace Adamantium.Imaging.Jpeg.Decoder
                             for (int v = 0; v < yMax; v++)
                             {
                                 int src_v = v / factorUpVertical;
-                                comp[u + x, y + v] = blockdata[src_v, src_u];
+                                comp[u + x, y + v] = blocks[blockOffset + src_v * BlockSide + src_u];
                             }
                         }
                     }

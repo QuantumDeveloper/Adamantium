@@ -129,6 +129,43 @@ namespace Adamantium.Imaging.Jpeg.Decoder
                     valptr[i] = (short)(valptr[i] - mincode[i]);
                 bitcount += bits[i];
             }
+
+            BuildLookAhead();
+        }
+
+        // ---- LOOK-AHEAD: the whole reason a Huffman decode is not bit-at-a-time ------------------------------------
+        // Every code of LookAheadBits or fewer is resolved by one table read. Huffman codes are short precisely where
+        // they are common, so in a photograph this settles the overwhelming majority of symbols - the bit-by-bit
+        // descent below stays only for the long, rare ones.
+        //
+        // Indexed by the next 8 bits of the stream: a code shorter than that shares an entry with every possible
+        // continuation, which is why one code fills 2^(8 - length) slots.
+        private const int LookAheadBits = 8;
+        private readonly byte[] lookSize = new byte[1 << LookAheadBits];
+        private readonly short[] lookValue = new short[1 << LookAheadBits];
+
+        private void BuildLookAhead()
+        {
+            System.Array.Clear(lookSize, 0, lookSize.Length);
+
+            int code = 0;
+            int index = 0;
+            for (int length = 1; length <= LookAheadBits; length++)
+            {
+                for (int j = 0; j < bits[length - 1]; j++, index++, code++)
+                {
+                    // This code, followed by every possible tail: all of those prefixes decode to the same symbol.
+                    var shift = LookAheadBits - length;
+                    var start = code << shift;
+                    for (int fill = 0; fill < (1 << shift); fill++)
+                    {
+                        lookSize[start + fill] = (byte)length;
+                        lookValue[start + fill] = huffval[index];
+                    }
+                }
+
+                code <<= 1;
+            }
         }
 
         /// <summary>Figure F.12</summary>
@@ -148,22 +185,42 @@ namespace Adamantium.Imaging.Jpeg.Decoder
             return diff;
         }
 
-        /// <summary>Figure F.16 - Reads the huffman code bit-by-bit.</summary>
+        /// <summary>Figure F.16 - one Huffman symbol, by table where possible and bit-by-bit where not.</summary>
         public int Decode(JPEGBinaryReader JPEGStream)
         {
+            // THE FAST PATH: look at the next eight bits without consuming them and, if they begin with a code that
+            // short, take the symbol straight out of the table. Short codes are the frequent ones by construction, so
+            // this is where nearly every symbol in a photograph is decided.
+            if (JPEGStream.BitsBuffered >= LookAheadBits
+                || JPEGStream.FillBits(LookAheadBits) >= LookAheadBits)
+            {
+                var peek = JPEGStream.PeekBits(LookAheadBits);
+                var size = lookSize[peek];
+                if (size != 0)
+                {
+                    JPEGStream.DropBits(size);
+                    int fast = lookValue[peek];
+                    return fast < 0 ? 256 + fast : fast;
+                }
+            }
+
+            // The slow path, unchanged: a code longer than the look-ahead, or the last few bits of a scan where there
+            // is no longer enough left to peek at.
             int i = 0;
-            short code = (short)JPEGStream.ReadBits(1);
+            short code = (short)JPEGStream.ReadBit();
             while (code > maxcode[i])
             {
                 i++;
                 code <<= 1;
-                code |= (short)JPEGStream.ReadBits(1);
+                code |= (short)JPEGStream.ReadBit();
             }
+
             int val = huffval[code + valptr[i]];
             if (val < 0)
                 val = 256 + val;
             return val;
         }
+
 
         /// <summary>
         /// HuffmanBlockEncoder run length encodes and Huffman encodes the quantized data.

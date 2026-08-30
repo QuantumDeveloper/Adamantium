@@ -8,6 +8,50 @@ namespace Adamantium.Imaging.Jpeg
         // Not possible to convert without loss of colors YCbCr->RGB->YCbCr.
         // For details see https://stackoverflow.com/questions/30081784/jpeg-ycrcb-rgb-conversion-precision
 
+        // ---- YCbCr -> RGB by TABLE, the way libjpeg does it ------------------------------------------------------
+        // The conversion is three multiply-adds per pixel, and a photograph has millions of them - so the products are
+        // precomputed for all 256 possible inputs and the per-pixel work becomes four lookups and two adds, with no
+        // floating point at all. The green channel needs two contributions summed at higher precision, so those two
+        // tables hold fixed-point values and are shifted down together.
+        private const int FixedBits = 16;
+        private const int Half = 1 << (FixedBits - 1);
+
+        private static readonly int[] CrToR = new int[256];
+        private static readonly int[] CbToB = new int[256];
+        private static readonly int[] CrToG = new int[256];
+        private static readonly int[] CbToG = new int[256];
+
+        static YCbCr()
+        {
+            for (int i = 0; i < 256; i++)
+            {
+                var shifted = i - 128;
+                CrToR[i] = (int)(1.402 * shifted + 0.5);
+                CbToB[i] = (int)(1.772 * shifted + 0.5);
+                CrToG[i] = (int)(-0.71414 * (1 << FixedBits) * shifted);
+                CbToG[i] = (int)(-0.34414 * (1 << FixedBits) * shifted) + Half;
+            }
+        }
+
+        private static byte Clamp(int value) => value < 0 ? (byte)0 : value > 255 ? (byte)255 : (byte)value;
+
+        /// <summary>One pixel from YCbCr to RGB through the tables above. Same arithmetic as <see cref="toRGB"/>, which
+        /// it replaced in the decode path; results may differ by one where the old code truncated and this rounds.</summary>
+        public static void ToRgbFast(ref byte y, ref byte cb, ref byte cr)
+        {
+            int luma = y;
+            int b = cb;
+            int r = cr;
+
+            var red = luma + CrToR[r];
+            var green = luma + ((CbToG[b] + CrToG[r]) >> FixedBits);
+            var blue = luma + CbToB[b];
+
+            y = Clamp(red);
+            cb = Clamp(green);
+            cr = Clamp(blue);
+        }
+
         public static void toRGB(ref byte c1, ref byte c2, ref byte c3)
         {
             double dY = c1;
