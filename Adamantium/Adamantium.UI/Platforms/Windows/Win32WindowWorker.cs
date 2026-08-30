@@ -7,6 +7,7 @@ using Adamantium.UI.Core;
 using Adamantium.UI.Core.Input;
 using Adamantium.UI.Core.Input.Raw;
 using Adamantium.UI.Core.Media;
+using Adamantium.UI.Core.Resources;
 using Adamantium.UI.Core.RoutedEvents;
 using Adamantium.Win32;
 
@@ -188,20 +189,13 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
             // The shadow and the accent outline are what a WINDOW looks like, and not every window wants to look like
             // one. Asked of the property that MEANS this, not inferred from how the window happens to be composed:
             // see-through and framed, or opaque and frameless, are both things somebody may want.
-            if (window.ShowWindowBorder)
-            {
-                // Real OS drop shadow on the borderless window: extend the DWM frame 1px into the client. With
-                // WM_NCCALCSIZE keeping the window client-only, this is the standard WindowChrome trick - DWM draws the
-                // window's ambient shadow (and Aero Snap preview) around it without a visible frame.
-                var shadowMargins = new Margins { Left = 1, Right = 1, Top = 1, Bottom = 1 };
-                Win32Interop.DwmExtendFrameIntoClientArea(source.Handle, ref shadowMargins);
-
-                // Windows 11 native accent border: DWMWA_BORDER_COLOR (34) = a COLORREF (0x00BBGGRR). DWM draws a crisp
-                // 1px border around the window in that colour - no extra windows, resize-free. A no-op on Windows 10
-                // (the call just returns a failing HRESULT, which we ignore). Colour follows the THEME accent.
-                var accentBorder = AccentColorRef();
-                Win32Interop.DwmSetWindowAttribute(source.Handle, 34, ref accentBorder, sizeof(int));
-            }
+            //
+            // ONE place sets the frame - ApplyBorder - and creation goes through it like everything else. It used to be
+            // stated twice: here for a real window and in ApplyBorder for an overlay, and the copies were not equal.
+            // Only ApplyBorder was ever called again, so the accent-follows-theme part worked for overlays and was
+            // frozen at creation for every ordinary window, which is exactly what "the border does not update" was.
+            ApplyBorder();
+            WatchAccent();
         }
 
         this.window.DpiScale = ReadDpiScale(source.Handle);   // initial per-monitor DPI (PMv2)
@@ -330,6 +324,52 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 
         ApplyTransparency();
         ApplyBorder();
+        WatchAccent();
+    }
+
+    // The native border is DWM's, not ours: it is set once with DwmSetWindowAttribute and then STAYS whatever it was
+    // told, no matter what happens to the theme afterwards. Nothing about a colour changing on our side reaches it -
+    // which is why picking a new accent recoloured the whole application and left the window outlined in the old one.
+    // So the frame has to be told: watch the accent and re-apply on every change, and re-attach when the theme itself
+    // is swapped, because the accent then belongs to a different Theme object.
+    private ITheme watchedTheme;
+
+    private void WatchAccent()
+    {
+        var manager = UIAppContext.Current?.ThemeManager;
+        if (manager == null) return;
+
+        manager.ThemeChanged -= OnThemeChangedForBorder;
+        manager.ThemeChanged += OnThemeChangedForBorder;
+        AttachAccentWatch(manager.CurrentTheme);
+    }
+
+    private void AttachAccentWatch(ITheme theme)
+    {
+        if (ReferenceEquals(watchedTheme, theme)) return;
+
+        if (watchedTheme is AdamantiumComponent previous) previous.PropertyChanged -= OnAccentChanged;
+        watchedTheme = theme;
+        if (watchedTheme is AdamantiumComponent current) current.PropertyChanged += OnAccentChanged;
+    }
+
+    private void OnThemeChangedForBorder(object sender, ThemeChangedEventArgs e)
+    {
+        AttachAccentWatch(UIAppContext.Current?.ThemeManager?.CurrentTheme);
+        ApplyBorder();
+    }
+
+    private void OnAccentChanged(object sender, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (e.Property?.Name == "AccentColor") ApplyBorder();
+    }
+
+    private void StopWatchingAccent()
+    {
+        var manager = UIAppContext.Current?.ThemeManager;
+        if (manager != null) manager.ThemeChanged -= OnThemeChangedForBorder;
+        if (watchedTheme is AdamantiumComponent watched) watched.PropertyChanged -= OnAccentChanged;
+        watchedTheme = null;
     }
 
     /// <summary>Extends the DWM frame into the client (shadow + accent outline) or retracts it. Live, so the border can
@@ -440,6 +480,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
 
     private void OnWindowClosed(object sender, EventArgs e)
     {
+        StopWatchingAccent();
         source.RemoveHook(CustomWndProc);
         UIContext.UIApplication.RemoveWindow(window);
         // Actually destroy the OS window. The custom-caption close raises Closed on the LOOP thread, but DestroyWindow must

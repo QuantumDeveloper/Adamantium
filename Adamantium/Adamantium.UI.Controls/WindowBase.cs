@@ -449,6 +449,19 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
         set => SetValue(TitleBarHeightProperty, value);
     }
 
+    /// <summary>Which side the caption buttons sit on. Stated on the WINDOW for the same reason the caption's height is:
+    /// it is a property of the window's chrome, a theme sets it with an ordinary setter, and the template hands it down
+    /// to the title bar. A platform theme therefore says "left" once instead of every window saying it.</summary>
+    public static readonly AdamantiumProperty CaptionButtonPlacementProperty = AdamantiumProperty.Register(
+        nameof(CaptionButtonPlacement), typeof(CaptionButtonPlacement), typeof(WindowBase),
+        new PropertyMetadata(CaptionButtonPlacement.Right, PropertyMetadataOptions.AffectsMeasure));
+
+    public CaptionButtonPlacement CaptionButtonPlacement
+    {
+        get => GetValue<CaptionButtonPlacement>(CaptionButtonPlacementProperty);
+        set => SetValue(CaptionButtonPlacementProperty, value);
+    }
+
     public static readonly AdamantiumProperty TitleBarBackgroundProperty = AdamantiumProperty.Register(nameof(TitleBarBackground),
         typeof(Brush), typeof(WindowBase), new PropertyMetadata(null, PropertyMetadataOptions.AffectsRender));
 

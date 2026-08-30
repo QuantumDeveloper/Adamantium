@@ -52,6 +52,19 @@ public class TitleBar : Control
     public static readonly AdamantiumProperty ShowCloseButtonProperty = AdamantiumProperty.Register(nameof(ShowCloseButton),
         typeof(bool), typeof(TitleBar), new PropertyMetadata(true));
 
+    /// <summary>Which side the window buttons sit on. The TEMPLATE moves them - it puts the button panel in the far
+    /// column and reverses the order inside it - so a theme can follow its platform's convention without any of this
+    /// control's code knowing which platform that is.</summary>
+    public static readonly AdamantiumProperty CaptionButtonPlacementProperty = AdamantiumProperty.Register(
+        nameof(CaptionButtonPlacement), typeof(CaptionButtonPlacement), typeof(TitleBar),
+        new PropertyMetadata(CaptionButtonPlacement.Right, PropertyMetadataOptions.AffectsMeasure));
+
+    public CaptionButtonPlacement CaptionButtonPlacement
+    {
+        get => GetValue<CaptionButtonPlacement>(CaptionButtonPlacementProperty);
+        set => SetValue(CaptionButtonPlacementProperty, value);
+    }
+
     static TitleBar()
     {
         FontSizeProperty.OverrideMetadata(typeof(TitleBar),

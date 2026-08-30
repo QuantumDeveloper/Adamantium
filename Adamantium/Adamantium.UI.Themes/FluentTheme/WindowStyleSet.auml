@@ -6,18 +6,20 @@
     <Style Selector="Window">
         <!-- Default window background so any window (incl. a code-created custom shell) is themed, not the black clear
              colour. An explicit Background on the window instance (e.g. MainWindow) overrides this. -->
-        <Setter Property="Background" Value="{ResourceReference SolidBackgroundFillColorBase}"/>
+        <!-- COLOURS live, metrics one-shot: a resource swapped for a NEW brush (what a colour picker does) is re-resolved
+             by {ObservableResource} and ignored by {ResourceReference}. -->
+        <Setter Property="Background" Value="{ObservableResource SolidBackgroundFillColorBase}"/>
         <!-- Default TEXT colour for the whole window: content inherits it, so plain text is theme-correct without a
              per-TextBlock style (which would sit at Style priority and MASK a control's selection/state Foreground from
              reaching its content). A control that recolours its content on a state - e.g. a selected ListBoxItem pushing
              AccentForegroundColor onto its ContentPresenter - now overrides this inherited default for its subtree. -->
         <Setter Property="Foreground" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="TitleBarBackground" Value="{ThemeResource AccentFillColorDefault}"/>
-        <Setter Property="InactiveTitleBarBackground" Value="{ResourceReference SolidBackgroundFillColorBase}"/>
+        <Setter Property="InactiveTitleBarBackground" Value="{ObservableResource SolidBackgroundFillColorBase}"/>
         <!-- Caption foreground: active = the theme's on-accent contrast colour (so title text + button glyphs read on the
              accent-painted bar), inactive = neutral primary text. Both overridable on the window. -->
         <Setter Property="TitleBarForeground" Value="{ThemeResource AccentForegroundColor}"/>
-        <Setter Property="InactiveTitleBarForeground" Value="{ResourceReference TextFillColorPrimary}"/>
+        <Setter Property="InactiveTitleBarForeground" Value="{ObservableResource TextFillColorPrimary}"/>
         <Setter Property="LoadingIndicatorText" Value="Switching theme…"/>
     </Style>
 
@@ -26,7 +28,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Window">
                     <Border x:Name="PART_WindowBorder" Background="{TemplateBinding Background}"
-                            BorderThickness="1" BorderBrush="{ResourceReference ControlStrokeColorDefault}">
+                            BorderThickness="1" BorderBrush="{ObservableResource ControlStrokeColorDefault}">
                         <Grid RowDefinitions="Auto,*">
                             <!-- The caption's height comes from the WINDOW (Window.TitleBarHeight), so code that needs
                                  it reads one property instead of measuring a template part. -->
@@ -38,7 +40,8 @@
                                     Icon="{TemplateBinding Icon}"
                                     LeadingContent="{TemplateBinding TitleBarLeadingContent}"
                                     LeftWindowCommands="{TemplateBinding LeftWindowCommands}"
-                                    RightWindowCommands="{TemplateBinding RightWindowCommands}"/>
+                                    RightWindowCommands="{TemplateBinding RightWindowCommands}"
+                                    CaptionButtonPlacement="{TemplateBinding CaptionButtonPlacement}"/>
                             <!-- The SELECTOR travels too, not just the single template: a window given only a selector
                                  (one template per content type - the usual shape for a view-model host) had nothing to
                                  build with and fell back to showing Content.ToString(). -->
@@ -57,7 +60,7 @@
                                  animates a RenderTransform, which the compositor plays on the RENDER thread - so it keeps
                                  turning even while the loop thread is in the cascade. Collapsed by default; the trigger raises it. -->
                             <Border x:Name="PART_ThemeOverlay" Grid.Row="1"
-                                    Background="{ResourceReference SmokeFillColorDefault}"
+                                    Background="{ObservableResource SmokeFillColorDefault}"
                                     Visibility="Collapsed">
                                 <StackPanel Orientation="Vertical"
                                         HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -71,7 +74,7 @@
                                         <BusyIndicator.Template>
                                             <ControlTemplate TargetType="BusyIndicator">
                                                 <Grid>
-                                                    <Ellipse Stroke="{ResourceReference ControlFillColorTertiary}"
+                                                    <Ellipse Stroke="{ObservableResource ControlFillColorTertiary}"
                                                                       StrokeThickness="4" Fill="Transparent" EllipseType="EdgeToEdge"/>
                                                     <Ellipse Stroke="{ThemeResource AccentFillColorDefault}"
                                                                       StrokeThickness="4" Fill="Transparent" EllipseType="EdgeToEdge"
