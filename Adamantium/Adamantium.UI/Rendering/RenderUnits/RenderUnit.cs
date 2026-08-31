@@ -431,6 +431,28 @@ public class GeometryRenderUnit : RenderUnit<GeometryPayload>
         return true;
     }
 
+    /// <summary>The picture this geometry's brush names, if it names one. Baked at the MESH's box rather than at a
+    /// destination rect: a tessellated shape has no rectangle of its own.</summary>
+    internal ITexture BrushTexture() => TextureBatchCollector.BrushTexture(Payload.Brush, ResourceFactory,
+        _frozenMesh?.Bounds.Size ?? default, DrawCommand?.Component);
+
+    /// <summary>This geometry's fill as one BACKDROP MATERIAL instance. The material carries no picture of its own - it
+    /// is bound at draw time - so only the shared mesh and the brush are reported here.</summary>
+    public bool TryGetInstancedMaterialFill(out GeometryKey key, out object mesh, out MaterialBrush brush,
+        out Rect localBounds, out double opacity)
+    {
+        key = default; mesh = null; brush = null; localBounds = default; opacity = 1.0;
+        if (Payload.Brush is not MaterialBrush material) return false;
+        if (_frozenMesh is not { HasPoints: true } fm) return false;
+
+        key = fm.Key;
+        mesh = fm;
+        brush = material;
+        localBounds = fm.Bounds;
+        opacity = DrawCommand?.RenderData?.Opacity ?? 1.0;
+        return true;
+    }
+
     public bool TryGetInstancedPatternFill(out GeometryKey key, out object mesh, out Brush brush,
         out Rect localBounds, out double opacity)
     {

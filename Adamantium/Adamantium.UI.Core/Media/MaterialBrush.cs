@@ -1,4 +1,5 @@
 using Adamantium.Mathematics;
+using Adamantium.UI.Core.RoutedEvents;
 
 namespace Adamantium.UI.Core.Media;
 
@@ -52,6 +53,19 @@ public sealed class MaterialBrush : Brush
     public static readonly AdamantiumProperty RefractionProperty = AdamantiumProperty.Register(nameof(Refraction),
         typeof(double), typeof(MaterialBrush), new PropertyMetadata(12.0, PropertyMetadataOptions.AffectsPaint));
 
+    /// <summary>A picture for MICA to use instead of the desktop wallpaper; null leaves it reading the real one.
+    ///
+    /// <para>MICA ONLY, ignored by the other two: acrylic and liquid glass ARE what is directly beneath them, so a
+    /// picture from elsewhere would not make them a variant of themselves. Needs no platform support - the picture is
+    /// yours, so nothing is asked of the desktop.</para></summary>
+    public static readonly AdamantiumProperty SourceProperty = AdamantiumProperty.Register(nameof(Source),
+        typeof(Imaging.ImageSource), typeof(MaterialBrush), new PropertyMetadata(null, PropertyMetadataOptions.AffectsPaint, OnSourceChanged));
+
+    /// <summary>What <see cref="Source"/> is pinned to. Ignored without one - the real wallpaper is pinned to the
+    /// desktop by nature.</summary>
+    public static readonly AdamantiumProperty AnchorProperty = AdamantiumProperty.Register(nameof(Anchor),
+        typeof(MaterialAnchor), typeof(MaterialBrush), new PropertyMetadata(MaterialAnchor.Desktop, PropertyMetadataOptions.AffectsPaint));
+
     public MaterialType Material
     {
         get => GetValue<MaterialType>(MaterialProperty);
@@ -88,6 +102,36 @@ public sealed class MaterialBrush : Brush
         set => SetValue(RefractionProperty, value);
     }
 
+    public Imaging.ImageSource Source
+    {
+        get => GetValue<Imaging.ImageSource>(SourceProperty);
+        set
+        {
+            if (IsFrozen)
+            {
+                return;
+            }
+
+            SetValue(SourceProperty, value);
+        }
+    }
+
+    public MaterialAnchor Anchor
+    {
+        get => GetValue<MaterialAnchor>(AnchorProperty);
+        set => SetValue(AnchorProperty, value);
+    }
+
+    // A picture that is still decoding has nothing to sample yet, so the material draws its built-in source this frame
+    // and repaints when the file arrives - the same answer ImageBrush gives.
+    private static void OnSourceChanged(AdamantiumComponent sender, AdamantiumPropertyChangedEventArgs e)
+    {
+        if (sender is MaterialBrush brush)
+        {
+            TexturedBrushSource.RepaintWhenLoaded(e.NewValue as Imaging.ImageSource, brush.RaiseChanged);
+        }
+    }
+
     protected override Brush CreateClone()
     {
         var clone = new MaterialBrush
@@ -98,6 +142,8 @@ public sealed class MaterialBrush : Brush
             BlurAmount = BlurAmount,
             NoiseAmount = NoiseAmount,
             Refraction = Refraction,
+            Source = Source,
+            Anchor = Anchor,
             Opacity = Opacity   // the frozen snapshot paints at the same strength the live brush did
         };
         return clone;

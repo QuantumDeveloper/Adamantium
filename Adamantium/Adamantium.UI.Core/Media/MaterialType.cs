@@ -20,7 +20,14 @@ public enum MaterialType
     /// behind a whole window and acrylic is kept for panes.</para>
     ///
     /// <para>Where no wallpaper can be read - a plain-colour desktop, or a platform that does not expose one - it falls
-    /// back to tinting that colour, which is a visible fallback rather than a silently disabled material.</para></summary>
+    /// back to tinting that colour, which is a visible fallback rather than a silently disabled material.</para>
+    ///
+    /// <para>FROZEN WHILE THE WINDOW IS DRAGGED, and it rides along instead. Alone among the fills this one is anchored
+    /// to the DESKTOP, so it needs the position the window will have when the frame is SHOWN - which the compositor
+    /// decides afterwards. Measured: 7-24% of frames during a drag reach the screen already 8px out of date, peaks past
+    /// 30, and that was the shaking. VSync does not fix it (it makes the frame wait, so the position in it is older
+    /// still - a smooth slide instead of a shake); nothing inside the frame does, because 0.35ms is the whole path from
+    /// reading the position to presenting. See RenderCache.WindowOnDesktop.</para></summary>
     Mica,
 
     /// <summary>A LENS, not frosting: the capture is sampled with an offset that grows towards the shape's edge, so what

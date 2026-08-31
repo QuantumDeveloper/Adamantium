@@ -68,6 +68,7 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         messageTable[(uint)WindowMessages.Nccalcsize] = HandleNcCalcSize;
         messageTable[(uint)WindowMessages.Getminmaxinfo] = HandleGetMinMaxInfo;
         messageTable[(uint)WindowMessages.Size] = HandleResize;
+        messageTable[(uint)WindowMessages.Entersizemove] = HandleEnterSizeMove;
         messageTable[(uint)WindowMessages.Moving] = HandleMoving;
         messageTable[(uint)WindowMessages.Exitsizemove] = HandleExitSizeMove;
         messageTable[(uint)WindowMessages.Dpichanged] = HandleDpiChanged;
@@ -256,13 +257,56 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
     // Asking beats remembering here because move notifications arrive with the MOUSE (about 220 a second) while frames
     // are built two to three times as often: a remembered position is stale for most frames, and a backdrop drawn from
     // it shudders while the window is dragged.
+    // Where the window is HEADED while a move is under way, as the client area's corner. ONE 64-bit word, not a nullable
+    // pair of ints: written by the message thread, read by the render thread, and three separate fields let a reader see
+    // the new X beside the old Y.
+    private long _pendingMovePacked = NoPendingMove;
+
+    private const long NoPendingMove = long.MinValue;   // no real client corner can be this
+
+    private static long PackPoint(Core.PixelPoint p) => ((long)(uint)p.X << 32) | (uint)p.Y;
+
+    private static Core.PixelPoint UnpackPoint(long packed) => new((int)(packed >> 32), (int)(uint)packed);
+
+    /// <summary>The client area's corner for a window rectangle, keeping the offset between the two - the frame reports
+    /// its outer rectangle, while everything drawn works from the client origin.</summary>
+    private Core.PixelPoint ClientOffsetFrom(RECT windowRect)
+    {
+        var origin = new NativePoint { X = 0, Y = 0 };
+        Win32Interop.ClientToScreen(window.Handle, ref origin);
+        Win32Interop.GetWindowRect(window.Handle, out var current);
+
+        // The gap between the window rectangle and the client corner does not change while the window is dragged, so it
+        // is measured from where the window is now and applied to where it is going.
+        return new Core.PixelPoint(
+            windowRect.Left + (origin.X - current.Left),
+            windowRect.Top + (origin.Y - current.Top));
+    }
+
     private void ProvideLivePosition()
     {
         if (window is not Controls.WindowBase target) return;
 
         var handle = window.Handle;
+
+        // Measured against DWMWA_EXTENDED_FRAME_BOUNDS while chasing the mica wobble: this answer, GetWindowRect and
+        // what the COMPOSITOR reports agree exactly, step for step, through a whole drag. There is no second source of
+        // truth about where the window is - which is why the remaining wobble is not something a better position fixes.
         target.LivePositionProvider = () =>
         {
+            // WHILE A MOVE IS IN PROGRESS, answer with where the window is GOING, not where it is.
+            //
+            // WM_MOVING arrives BEFORE the window has moved and carries the rectangle the OS is about to put it at. So
+            // during a drag there are two answers available, and ClientToScreen gives the older one: it reports the
+            // position the window still has. A frame built from it is behind by exactly one step before it is even
+            // drawn - and then shown later still.
+            //
+            // The pending rectangle is not a guess about the future; it is a number the system has already decided on.
+            // Seeded on WM_ENTERSIZEMOVE so a gesture never alternates between this and ClientToScreen below - the two
+            // describe different instants, and switching between them is a step of movement appearing and vanishing.
+            var pending = System.Threading.Volatile.Read(ref _pendingMovePacked);
+            if (pending != NoPendingMove) return UnpackPoint(pending);
+
             // The CLIENT area's corner, not the window's. What the renderer draws is the client area, and the two differ
             // by whatever non-client frame the window carries - so answering with the window rect puts everything drawn
             // from this position off by that margin. ClientToScreen(0,0) asks the question actually being asked.
@@ -585,6 +629,12 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         // position needs it now. The property update and the event still go through the loop thread, where the property
         // system and the visual tree live - so the fast copy and the correct copy each go the way they must.
         window.UpdateLivePosition(rect.Left, rect.Top);
+
+        // ...and remembered as the PENDING position, which is what anything drawn from the window's place should use
+        // until the move completes: this rectangle is where the window is about to be, and asking the OS meanwhile only
+        // returns where it still is. Cleared on WM_EXITSIZEMOVE.
+        var client = ClientOffsetFrom(rect);
+        System.Threading.Volatile.Write(ref _pendingMovePacked, PackPoint(client));
         DispatchInput(() =>
         {
             window.UpdatePositionFromPlatform(rect.Left, rect.Top);
@@ -595,11 +645,31 @@ internal class Win32WindowWorker : AdamantiumComponent, IWindowWorkerService
         return IntPtr.Zero;
     }
 
+    /// <summary>The gesture has begun: mark it, and seed the pending position so the drag never falls through to
+    /// ClientToScreen (see ProvideLivePosition).</summary>
+    private IntPtr HandleEnterSizeMove(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
+    {
+        if (window is Controls.WindowBase moving) moving.IsBeingMoved = true;
+
+        var origin = new NativePoint { X = 0, Y = 0 };
+        if (Win32Interop.ClientToScreen(window.Handle, ref origin))
+        {
+            System.Threading.Volatile.Write(ref _pendingMovePacked,
+                PackPoint(new Core.PixelPoint(origin.X, origin.Y)));
+        }
+
+        handled = false;   // the OS still runs the move loop
+        return IntPtr.Zero;
+    }
+
     private IntPtr HandleExitSizeMove(WindowMessages windowMessage, IntPtr wParam, IntPtr lParam, out bool handled)
     {
         // Where the OS actually left it. Left/Top otherwise still hold whatever WE last assigned - the move loop is
         // invisible to managed code - so anything that reads a window's position afterwards (a saved layout, say)
         // wrote down where it USED to be.
+        System.Threading.Volatile.Write(ref _pendingMovePacked, NoPendingMove);   // the gesture is over; ask the OS again from here on
+        if (window is Controls.WindowBase moved) moved.IsBeingMoved = false;
+
         Win32Interop.GetWindowRect(window.Handle, out var rect);
         DispatchInput(() =>
         {

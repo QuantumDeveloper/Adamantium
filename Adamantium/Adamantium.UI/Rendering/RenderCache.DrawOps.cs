@@ -23,63 +23,63 @@ public partial class RenderCache
         // contiguous range of the stream - and saying it this way is what makes the structure of a recorded frame legible:
         // the stream is a flat list, the layers are what it MEANS.
         foreach (var layer in _layers)
-        for (var i = layer.OpFirst; i < layer.OpFirst + layer.OpCount; i++)
-        {
-            var op = _ops[i];
-            executed++;
-            var kind = (int)op.Kind;
-            if (kind >= 0 && kind < 4) Core.Diagnostics.RuntimeStats.OpCountByKind[kind]++;
-            var opBytes0 = System.GC.GetAllocatedBytesForCurrentThread();
-            switch (op.Kind)
+            for (var i = layer.OpFirst; i < layer.OpFirst + layer.OpCount; i++)
             {
-                case RenderOpKind.Scissor:
-                    device.SetScissors(op.Scissor);
-                    break;
-                case RenderOpKind.Unit:
-                    // A per-unit draw bakes its full world into RenderData at RECORD time and never reads the transform
-                    // slot - while every batched draw follows its slot matrix LIVE. So on any replay where something has
-                    // moved, the two disagree: measured on a scrolling tab strip, the batched fill had followed but this
-                    // Border was still drawn 48 px back, one scroll step behind. That gap is the flicker.
-                    //
-                    // Only the compositor-driven ones. Re-pointing EVERY per-unit draw looks like it fixes the opposite
-                    // problem (a per-unit outline lagging its batched fill), but it introduces the mirror of it: the
-                    // batched half still follows its slot matrix, which a replay does not recompute, so the two halves
-                    // end up a fraction of a step apart and the element jitters. Coherence on a replay comes from
-                    // refusing to replay once the layout moved (see _layoutChangedSinceRecord), not from updating one
-                    // half of the frame.
-                    //
-                    // ...and the same holds for a unit under a node that MOVED this frame: RefreshMovedNodes has just
-                    // written that node's matrix, so both halves are being taken from one position in one frame - which
-                    // is the condition the paragraph above is really about.
-                    RepointIfItMoved(op.Unit);
-                    op.Unit.Render();
-                    break;
-                case RenderOpKind.Segment:
-                    switch (op.Batch)
-                    {
-                        case 0: _rectBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
-                        case 1: _ellipseBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
-                        case 3: _gradientRectBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
-                        case 4: _gradientEllipseBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
-                        case 5: _patternBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
-                        case 6: _fractalBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
-                        case 7: _texRectBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
-                        case 8: _haloUnder.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
-                        case 9: _haloOver.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
-                        case 10: _haloLivingUnder.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
-                        case 11: _haloLivingOver.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
-                        case 12: _polygonBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
-                        case 13: _materialBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
-                        default: _textBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
-                    }
-                    break;
-                case RenderOpKind.InstancedFlush:
-                    _instancedFill.ReplayFlush(op.SegId, fullScissor, _projectionMatrix);
-                    break;
+                var op = _ops[i];
+                executed++;
+                var kind = (int)op.Kind;
+                if (kind >= 0 && kind < 4) Core.Diagnostics.RuntimeStats.OpCountByKind[kind]++;
+                var opBytes0 = System.GC.GetAllocatedBytesForCurrentThread();
+                switch (op.Kind)
+                {
+                    case RenderOpKind.Scissor:
+                        device.SetScissors(op.Scissor);
+                        break;
+                    case RenderOpKind.Unit:
+                        // A per-unit draw bakes its full world into RenderData at RECORD time and never reads the transform
+                        // slot - while every batched draw follows its slot matrix LIVE. So on any replay where something has
+                        // moved, the two disagree: measured on a scrolling tab strip, the batched fill had followed but this
+                        // Border was still drawn 48 px back, one scroll step behind. That gap is the flicker.
+                        //
+                        // Only the compositor-driven ones. Re-pointing EVERY per-unit draw looks like it fixes the opposite
+                        // problem (a per-unit outline lagging its batched fill), but it introduces the mirror of it: the
+                        // batched half still follows its slot matrix, which a replay does not recompute, so the two halves
+                        // end up a fraction of a step apart and the element jitters. Coherence on a replay comes from
+                        // refusing to replay once the layout moved (see _layoutChangedSinceRecord), not from updating one
+                        // half of the frame.
+                        //
+                        // ...and the same holds for a unit under a node that MOVED this frame: RefreshMovedNodes has just
+                        // written that node's matrix, so both halves are being taken from one position in one frame - which
+                        // is the condition the paragraph above is really about.
+                        RepointIfItMoved(op.Unit);
+                        op.Unit.Render();
+                        break;
+                    case RenderOpKind.Segment:
+                        switch (op.Batch)
+                        {
+                            case 0: _rectBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                            case 1: _ellipseBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                            case 3: _gradientRectBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                            case 4: _gradientEllipseBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                            case 5: _patternBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                            case 6: _fractalBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                            case 7: _texRectBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                            case 8: _haloUnder.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                            case 9: _haloOver.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                            case 10: _haloLivingUnder.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                            case 11: _haloLivingOver.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                            case 12: _polygonBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                            case 13: _materialBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                            default: _textBatch.DrawRecordedSegment(device, op.SegId, fullScissor, _projectionMatrix); break;
+                        }
+                        break;
+                    case RenderOpKind.InstancedFlush:
+                        _instancedFill.ReplayFlush(op.SegId, fullScissor, _projectionMatrix);
+                        break;
+                }
+                if (kind >= 0 && kind < 4)
+                    Core.Diagnostics.RuntimeStats.OpBytesByKind[kind] += System.GC.GetAllocatedBytesForCurrentThread() - opBytes0;
             }
-            if (kind >= 0 && kind < 4)
-                Core.Diagnostics.RuntimeStats.OpBytesByKind[kind] += System.GC.GetAllocatedBytesForCurrentThread() - opBytes0;
-        }
 
         Core.Diagnostics.RuntimeStats.ExecuteOpsBytes += System.GC.GetAllocatedBytesForCurrentThread() - opsBytes0;
         Core.Diagnostics.RuntimeStats.LastOpsExecuted = executed;
@@ -409,10 +409,28 @@ public partial class RenderCache
         // LivePosition, not Position: the bindable one is updated through the loop thread's queue, so during a drag it
         // trails the window by a frame or more - and a backdrop drawn from a stale position slides about instead of
         // standing still on the desktop.
+        // FROZEN while the window is dragged, so a desktop-anchored backdrop rides along instead of chasing. During a
+        // drag the correct answer does not exist: the frame would need the position the window will have when it is
+        // SHOWN, which the compositor decides afterwards - measured, 7-24% of frames arrive 8px out of date (peaks past
+        // 30), and that was the shaking.
+        if (_lastVisualRoot is Controls.WindowBase { IsBeingMoved: true })
+        {
+            if (!_frozenWhileMoving) { _frozenPosition = _lastVisualRoot.LivePosition; _frozenWhileMoving = true; }
+            return new Rect(_frozenPosition.X, _frozenPosition.Y,
+                _lastVisualRoot.ClientWidth * _renderScale, _lastVisualRoot.ClientHeight * _renderScale);
+        }
+
+        _frozenWhileMoving = false;
+
         var origin = _lastVisualRoot.LivePosition;
+
         return new Rect(origin.X, origin.Y,
             _lastVisualRoot.ClientWidth * _renderScale, _lastVisualRoot.ClientHeight * _renderScale);
     }
+
+    // The position the desktop-anchored backdrop holds for the duration of a drag, taken on the drag's first frame.
+    private PixelPoint _frozenPosition;
+    private bool _frozenWhileMoving;
 
     /// <summary>The overlap of two device-pixel rects, empty when they do not meet.</summary>
     private static Rect2D Intersect(Rect2D a, Rect2D b)

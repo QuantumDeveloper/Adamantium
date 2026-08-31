@@ -28,7 +28,7 @@ internal sealed class WallpaperBackdrop : IDisposable
     // window moves over it. It cannot, quite: the frame is built for where the window is at that instant and reaches the
     // screen after the OS has already moved it on, and no amount of asking the OS more often closes that gap - the
     // system's own mica does not have it only because the compositor moves the window and paints its backdrop in one
-    // step. What is left is a sub-pixel wobble.
+    // step. Which is why the backdrop is FROZEN for the duration of a drag - see MaterialType.Mica.
     //
     // Raising this to 480 was tried and made the wobble THREE TIMES more visible - not worse, just no longer hidden:
     // a sharper picture shows the same displacement better. At 160 the copy is soft enough that the eye has nothing to

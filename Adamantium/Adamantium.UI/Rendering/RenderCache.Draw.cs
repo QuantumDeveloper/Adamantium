@@ -473,11 +473,16 @@ public partial class RenderCache
         {
             _materialBatch.TransformsAddress = address;
 
-            // WHERE THE WINDOW IS, every frame - not only on frames that walk the tree. Mica maps its picture through
-            // the desktop, so dragging the window changes what it shows while changing NOTHING the frame recorded: set
-            // in the walk alone, it only moved when something else forced a re-record, which from outside looked like
-            // "the wallpaper follows scrolling but ignores the window".
-            _materialBatch.WindowBounds = WindowOnDesktop();
+            _materialBatch.WindowBoundsProvider = WindowOnDesktop;
+
+            // THE FRAME'S OWN ORIGIN, taken here and nowhere else. Here, because this runs on EVERY frame - a drag
+            // changes what mica shows while changing nothing the frame recorded, so a latch anywhere in the walk simply
+            // stops moving the moment the scene goes quiet, which is exactly what a drag is.
+            //
+            // Once, because a frame has to describe ONE instant: read per draw, as it used to be, two panes could be
+            // placed against two different positions, and each against a value written by the message thread at some
+            // arbitrary point in the recording.
+            _materialBatch.LatchWindow();
         }
         if (_haloUnder != null) _haloUnder.TransformsAddress = address;
         if (_haloOver != null) _haloOver.TransformsAddress = address;
@@ -741,6 +746,7 @@ public partial class RenderCache
                 _instanceBuffers ??= new GpuBufferManager(device);
                 _instancedFill ??= new InstancedFillCollector(device, _instanceBuffers) { PrepareOverlay = RepointIfItMoved };
                 _instancedFill.TransformsAddress = _transformTable.DeviceAddress;   // instance VS fetches its slot matrix
+                _instancedFill.Backdrop = _materialBatch;   // may be null: the material batch is made on first sight of one
                 _instancedFill.BeginFrame();
                 _instancedFill.SceneClean = sceneClean;
             }
@@ -1093,46 +1099,64 @@ public partial class RenderCache
             }
             else if (device != null && unit is RectangleRenderUnit mru && MaterialRectCollector.WantsBatch(mru.RectPayload))
             {
-                // A shape filled with a BACKDROP MATERIAL. Its layer is the highest of the fills (7) on purpose: the
-                // material copies the frame behind it, so anything that should show THROUGH it has to have been drawn
-                // already. Overlapping a higher layer flushes, as everywhere else - here that rule is also what keeps
-                // two materials over each other from capturing the same stale frame.
-                // The address is handed over AT CONSTRUCTION, exactly as the textured batch does it: this batch is made
-                // lazily, on the first frame that meets a material, which is after the frame handed the table's address
-                // to everything that existed then. Without it the vertex shader dereferences NULL for a whole frame -
-                // and a bad BDA read is not something any validation layer sees, it is just a device lost.
-                if (_materialBatch == null)
-                {
-                    _materialBatch = new MaterialRectCollector
-                    {
-                        BatchId = 13,
-                        TransformsAddress = _transformTable?.DeviceAddress ?? 0
-                    };
-
-                    // ONLY on the frame it is created, because the frame's own BeginFrame pass has already gone by.
-                    // Calling it per material - which is what this used to do - resets Count and DISCARDS the segments
-                    // recorded so far: an acrylic pane followed by a mica one lost the acrylic entirely, since the
-                    // second material wiped the first before it could be flushed.
-                    _materialBatch.BeginFrame(device);
-                }
-
                 var materialBounds = LogicalBounds(unit.Component, wt);
-                if ((_batchOpen && !ScissorEquals(_batchScissor, scissor))
-                    || !_materialBatch.SameSource(mru.RectPayload)   // one source per segment - a draw binds one image
-                    || OverlapsHigherLayer(7, materialBounds, unit.Component))   // 7 = material layer
+                var matSource = mru.BrushTexture();   // null unless the brush names a picture of its own
+                if (OpenMaterialSegment(device, mru.RectPayload.Brush, matSource, materialBounds, unit.Component, scissor,
+                        fullScissor, ref scissorNarrowed))
                 {
-                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                    var matBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Mat);
+                    if (_materialBatch.TryAdd(mru.RectPayload, matBakeWorld, mru.FillOpacity, scissor, materialBounds,
+                            slot4Mat, mru.FadeSlot, matSource))
+                    {
+                        CloseMaterialSegment(group, unit.Component, scissor);
+                        continue;
+                    }
                 }
-                var matBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Mat);
-                if (_materialBatch.TryAdd(mru.RectPayload, matBakeWorld, mru.FillOpacity, scissor, materialBounds, slot4Mat, mru.FadeSlot))
-                {
-                    if (_recording) group.NotBatchable("material");
-                    _batchScissor = scissor;
-                    _batchClip = unit.Component;
-                    _batchOpen = true;
-                    continue;
-                }
+
                 mru.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
+            }
+            // An ELLIPSE or a regular POLYGON filled with a material. Same batch, same pass: the figure rides as a flag
+            // in the record and the shader branches on it, exactly as the pattern fills do - so all three shapes get
+            // the material rather than only the rectangle.
+            else if (device != null && unit is EllipseRenderUnit meru
+                     && MaterialRectCollector.WantsBatch(meru.EllipsePayload.Brush, meru.EllipsePayload.Pen))
+            {
+                var bounds = LogicalBounds(unit.Component, wt);
+                var elSource = meru.BrushTexture();
+                if (OpenMaterialSegment(device, meru.EllipsePayload.Brush, elSource, bounds, unit.Component, scissor,
+                        fullScissor, ref scissorNarrowed))
+                {
+                    var bake = ResolveBake(device, unit.Component, wt, out var slot);
+                    if (_materialBatch.TryAddEllipse(meru.EllipsePayload, bake, meru.FillOpacity, scissor, bounds,
+                            slot, meru.FadeSlot, elSource))
+                    {
+                        CloseMaterialSegment(group, unit.Component, scissor);
+                        continue;
+                    }
+                }
+
+                meru.EnsureMachinery();
+                unit.Update(wt, _projectionMatrix, _renderScale);
+            }
+            else if (device != null && unit is RegularPolygonRenderUnit mpru
+                     && MaterialRectCollector.WantsBatch(mpru.PolygonPayload.Brush, mpru.PolygonPayload.Pen))
+            {
+                var bounds = LogicalBounds(unit.Component, wt);
+                var polySource = mpru.BrushTexture();
+                if (OpenMaterialSegment(device, mpru.PolygonPayload.Brush, polySource, bounds, unit.Component, scissor,
+                        fullScissor, ref scissorNarrowed))
+                {
+                    var bake = ResolveBake(device, unit.Component, wt, out var slot);
+                    if (_materialBatch.TryAddPolygon(mpru.PolygonPayload, bake, mpru.FillOpacity, scissor, bounds,
+                            slot, mpru.FadeSlot, polySource))
+                    {
+                        CloseMaterialSegment(group, unit.Component, scissor);
+                        continue;
+                    }
+                }
+
+                mpru.EnsureMachinery();
                 unit.Update(wt, _projectionMatrix, _renderScale);
             }
             else if (device != null && unit is RectangleRenderUnit pru && _patternBatch.CanBatch(pru.RectPayload))
@@ -1364,6 +1388,31 @@ public partial class RenderCache
                     continue;
                 }
                 ggru.FillInstanced = false;
+            }
+            else if (device != null && InstancedFillCollector.Enabled && MaterialRectCollector.Enabled
+                     && unit is GeometryRenderUnit mgru && _instancedFill.CanBatchMaterial(mgru))
+            {
+                // A BACKDROP MATERIAL on authored geometry - an outline that arrives as triangles rather than as a
+                // formula. Same instanced path as the pattern and textured fills, plus the region it will copy: only the
+                // cache knows how a logical box lands in device pixels.
+                if (_batchOpen && !ScissorEquals(_batchScissor, scissor))
+                    FlushBatches(device, fullScissor, ref scissorNarrowed);
+                EnsureMaterialBatch(device);
+                var matBounds = LogicalBounds(unit.Component, wt);
+                var matMeshBake = ResolveBake(device, unit.Component, wt, out var slot4MatMesh);
+                FadeBySlot(unit);
+                if (_instancedFill.TryAddMaterial(mgru, matMeshBake, scissor, matBounds, slot4MatMesh,
+                        MaterialCaptureRegion(matBounds, scissor, fullScissor)))
+                {
+                    mgru.FillInstanced = true;
+                    if (!RidesFadeSlot(unit)) _slotBlindUnits.Add(unit);
+                    if (_recording) group.NotBatchable("instancedMaterialFill");
+                    _batchScissor = scissor;
+                    _batchClip = unit.Component;
+                    _batchOpen = true;
+                    continue;
+                }
+                mgru.FillInstanced = false;
             }
             else if (device != null && InstancedFillCollector.Enabled && unit is GeometryRenderUnit pgru && _instancedFill.CanBatchPattern(pgru))
             {
@@ -2498,6 +2547,88 @@ public partial class RenderCache
     /// <summary>The arena a recorded Segment op draws from - the way back from what the stream SAYS to the thing that
     /// holds the bytes. The same table ExecuteOps switches on; a family whose collector this cache never created has no
     /// arena and its ops are simply left alone.</summary>
+    /// <summary>
+    /// Make the material batch ready to take one more instance, flushing first if this one cannot join what is pending.
+    ///
+    /// <para>Shared by all three shapes, because none of this depends on the shape: a rectangle, an ellipse and a
+    /// polygon differ only in the record they bake, not in when a segment has to end.</para>
+    ///
+    /// <para>The batch is made LAZILY, on the first frame that meets a material, and the transform table's address is
+    /// handed over AT CONSTRUCTION - by then the frame has already given it to everything that existed. Without it the
+    /// vertex shader dereferences NULL for a whole frame, and a bad address is not something any validation layer sees:
+    /// it is simply a lost device.</para>
+    /// </summary>
+    private bool OpenMaterialSegment(IGraphicsDevice device, Core.Media.Brush brush, ITexture source, Rect bounds,
+        IUIComponent component, Rect2D scissor, Rect2D fullScissor, ref bool scissorNarrowed)
+    {
+        if (device == null) return false;
+
+        EnsureMaterialBatch(device);
+
+        // Layer 7, the highest of the fills, on purpose: a material copies the frame behind it, so anything meant to
+        // show THROUGH it has to have been drawn already. Overlapping a higher layer flushes, as everywhere else - and
+        // here that rule is also what keeps two materials over each other from capturing the same stale frame.
+        if ((_batchOpen && !ScissorEquals(_batchScissor, scissor))
+            || !_materialBatch.SameKind(brush, source)   // one source AND one pass per segment
+            || OverlapsHigherLayer(7, bounds, component))
+        {
+            FlushBatches(device, fullScissor, ref scissorNarrowed);
+        }
+
+        return true;
+    }
+
+    /// <summary>Make the material batch exist, lazily, on the first material of EITHER carrier (the meshes need it for
+    /// its backdrop alone). The transform address is handed over AT CONSTRUCTION: without it the vertex shader
+    /// dereferences NULL for a whole frame, and a bad address is not something validation sees - just a lost device.
+    /// </summary>
+    private void EnsureMaterialBatch(IGraphicsDevice device)
+    {
+        if (_materialBatch != null) return;
+
+        _materialBatch = new MaterialRectCollector
+        {
+            BatchId = 13,
+            TransformsAddress = _transformTable?.DeviceAddress ?? 0,
+            WindowBoundsProvider = WindowOnDesktop
+        };
+
+        // ONLY on the frame it is created, because the frame's own BeginFrame pass has already gone by. Calling it
+        // per material - which is what this used to do - resets Count and DISCARDS the segments recorded so far: an
+        // acrylic pane followed by a mica one lost the acrylic entirely, since the second wiped the first before it
+        // could be flushed.
+        _materialBatch.BeginFrame(device);
+        if (_instancedFill != null) _instancedFill.Backdrop = _materialBatch;
+    }
+
+    /// <summary>The frame region a material must copy to draw over: what it covers, grown so the blur has neighbours to
+    /// average at its edges, then cut back to the clip it lives in - outside that clip is whatever is drawn OVER the
+    /// element, and the blur would drag it inward as a dense band along the border.</summary>
+    private Rect2D MaterialCaptureRegion(Rect bounds, Rect2D scissor, Rect2D fullScissor)
+    {
+        const int blurMargin = 24;
+        var box = ToFramebufferScissor(bounds, fullScissor);
+        return Intersect(new Rect2D
+        {
+            Offset = new Offset2D { X = box.Offset.X - blurMargin, Y = box.Offset.Y - blurMargin },
+            Extent = new Extent2D
+            {
+                Width = box.Extent.Width + blurMargin * 2,
+                Height = box.Extent.Height + blurMargin * 2
+            }
+        }, scissor);
+    }
+
+    /// <summary>Record that the pending segment now holds this instance - the clip it belongs to, and the fact that the
+    /// group can no longer be patched as a plain batch.</summary>
+    private void CloseMaterialSegment(ControlGroup group, IUIComponent component, Rect2D scissor)
+    {
+        if (_recording) group.NotBatchable("material");
+        _batchScissor = scissor;
+        _batchClip = component;
+        _batchOpen = true;
+    }
+
     private BatchArena ArenaOf(byte batch) => batch switch
     {
         0 => _rectBatch,
