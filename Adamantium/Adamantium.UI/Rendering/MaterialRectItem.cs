@@ -20,7 +20,10 @@ public struct MaterialRectItem
     public Vector4F Bounds;
 
     /// <summary>.x = corner radius (device px; NEGATIVE flags ellipse / regular polygon, as in the other SDF batches);
-    /// .y = transform-table slot; .z = material kind; .w = opacity slot.</summary>
+    /// .y = transform-table slot; .z = the element's own alpha; .w = opacity slot.
+    ///
+    /// <para>.z used to carry the material KIND, which nothing read: both the pass and the source are chosen on the CPU,
+    /// so by the time a fragment runs there is nothing left to branch on.</para></summary>
     public Vector4F Params;
 
     /// <summary>The four corner radii: x = TL, y = TR, z = BR, w = BL.</summary>
@@ -31,6 +34,13 @@ public struct MaterialRectItem
     public Vector4F Tint;
 
     /// <summary>.x = extra blur radius in device px, .y = grain amount, .z = refraction in device px (LiquidGlass only),
-    /// .w spare.</summary>
+    /// .w = 1 when Source is pinned to the ELEMENT (the shader then takes its coordinates from the shape).</summary>
     public Vector4F Knobs;
+
+    /// <summary>The pen, in the same three slots every other SDF batch bakes it into (see RectBatchCollector.BakeStroke),
+    /// so the shared CompositeFillStroke draws it: colour, then .x width / .y alignment / .zw dash run, then dash offset,
+    /// trim and flags. Zero width = no pen.</summary>
+    public Vector4F StrokeColor;
+    public Vector4F Stroke0;
+    public Vector4F Stroke1;
 }

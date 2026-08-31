@@ -37,7 +37,10 @@ struct MaterialRectData
     float4 Params;       // .x corner radius (negative = ellipse/polygon flag), .y transform slot, .z material, .w opacity slot
     float4 Radii;        // corner radii: TL, TR, BR, BL
     float4 Tint;         // straight RGBA laid over the capture; .a is the tint's strength
-    float4 Knobs;        // .x blur (device px), .y grain, .z refraction (device px), .w reserved
+    float4 Knobs;        // .x blur (device px), .y grain, .z refraction (device px), .w Source pinned to the element
+    float4 StrokeColor;  // the pen, in the slots CompositeFillStroke expects
+    float4 Stroke0;      // .x width (LOGICAL units - scaled by Scale below), .y alignment
+    float4 Stroke1;      // dash offset / trim / flags: this batch bakes only whole solid pens, so they stay at default
 };
 
 struct MaterialPSInput
@@ -47,6 +50,8 @@ struct MaterialPSInput
     float2 Half     : TEXCOORD1;
     float4 Radii    : TEXCOORD2;
     nointerpolation uint InstId : TEXCOORD3;
+    nointerpolation float Scale : TEXCOORD4;   // device pixels per logical unit, for the pen's width
+    nointerpolation float Fade  : TEXCOORD5;   // the opacity slot's chain, as every other batched fill reads it
 };
 
 [shader("vertex")]
@@ -62,13 +67,21 @@ MaterialPSInput MaterialRectInstancedVS(uint vertexId : SV_VertexID, uint instan
     float2 px = SlotPixelScale(nodeWorld);
     float iso = min(px.x, px.y);
 
-    float2 localPos = it.Bounds.xy + corner * it.Bounds.zw + (corner * 2.0 - 1.0) * (1.0 / px);
+    // The quad has to hold the PEN as well as the fill: a stroke aligned outward leaves the bounds by half its width,
+    // and a quad grown by one pixel simply cuts it off - most visibly at the corners, where the stroke stands furthest
+    // from the rectangular border. Same expansion the gradient and pattern passes use.
+    float widthPx = it.Stroke0.x * iso;
+    float outsetPx = max(widthPx * (0.5 * (1.0 + it.Stroke0.y) + 0.5), 0.0) + 1.0;
+    float2 localPos = it.Bounds.xy + corner * it.Bounds.zw + (corner * 2.0 - 1.0) * (outsetPx / px);
     float4 worldPos = mul(float4(localPos, 0.0, 1.0), nodeWorld);
     o.Position = mul(worldPos, Projection);
     o.Half   = it.Bounds.zw * 0.5 * px;
-    o.Local  = (corner - 0.5) * it.Bounds.zw * px + (corner * 2.0 - 1.0);
+    o.Local  = (corner - 0.5) * it.Bounds.zw * px + (corner * 2.0 - 1.0) * outsetPx;
     o.Radii  = ScaleShapeNumbers(it.Radii, iso, step(it.Params.x, -1.5));
     o.InstId = instanceId;
+    o.Scale  = iso;
+    int fadeSlot = int(it.Params.w);
+    o.Fade = lerp(1.0, nodes[max(fadeSlot, 0)].Params.x, step(0.0, float(fadeSlot)));
     return o;
 }
 
@@ -130,10 +143,13 @@ float4 MaterialFrostedPS(MaterialPSInput input) : SV_Target
     float grain = (Hash21(input.Position.xy) - 0.5) * it.Knobs.y;
     colour = saturate(colour + grain);
 
-    // Self-anti-aliased edge, the same one every other SDF fill here uses.
-    float aa = fwidth(d) + 1e-4;
-    float coverage = 1.0 - smoothstep(-aa, aa, d);
-    return float4(colour, coverage);
+    // Fill and pen composited by the shared helper, exactly as the gradient and pattern passes do it - which is also
+    // where the self-anti-aliased edge comes from. A pen of zero width degrades to the fill alone.
+    // Params.z is the element's own alpha, Fade the slot chain above it. The pen already carries the element's alpha
+    // from the bake, so only the chain is applied to the composited result.
+    float4 painted = CompositeFillStroke(d, float4(colour, it.Params.z), it.StrokeColor,
+                                         it.Stroke0.x * input.Scale, it.Stroke0.y, 1.0, 0.0);
+    return float4(painted.rgb, painted.a * input.Fade);
 }
 
 
@@ -211,9 +227,11 @@ float4 MaterialGlassPS(MaterialPSInput input) : SV_Target
     float grain = (Hash21(input.Position.xy) - 0.5) * it.Knobs.y;
     colour = saturate(colour + grain);
 
-    float aa = fwidth(d) + 1e-4;
-    float coverage = 1.0 - smoothstep(-aa, aa, d);
-    return float4(colour, coverage);
+    // Params.z is the element's own alpha, Fade the slot chain above it. The pen already carries the element's alpha
+    // from the bake, so only the chain is applied to the composited result.
+    float4 painted = CompositeFillStroke(d, float4(colour, it.Params.z), it.StrokeColor,
+                                         it.Stroke0.x * input.Scale, it.Stroke0.y, 1.0, 0.0);
+    return float4(painted.rgb, painted.a * input.Fade);
 }
 
 

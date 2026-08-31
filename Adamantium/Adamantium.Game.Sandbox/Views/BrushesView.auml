@@ -54,18 +54,24 @@
                                Visibility="{Binding MaterialUnderlay, Converter={conv:MaterialUnderlayVisibilityConverter}, ConverterParameter=Picture}"/>
 
                     <!-- THE MATERIAL, on whichever figure is selected. One live brush drives all of them. -->
+                    <!-- The pen rides the same pass as the fill (CompositeFillStroke), so a framed material is still
+                         one draw. Solid and whole only - dashes and trims go to the per-unit path. -->
                     <Rectangle Width="500" Height="280" Fill="{Binding LiveMaterial}"
+                               Stroke="#66FFFFFF" StrokeThickness="{Binding MaterialStroke}" Opacity="{Binding MaterialOpacity}"
                                CornerRadius="{Binding MaterialRadius, Converter={conv:DoubleToCornerRadiusConverter}}"
                                HorizontalAlignment="Center" VerticalAlignment="Center"
                                Visibility="{Binding MaterialShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Rectangle}"/>
                     <Ellipse Width="500" Height="280" Fill="{Binding LiveMaterial}"
+                             Stroke="#66FFFFFF" StrokeThickness="{Binding MaterialStroke}" Opacity="{Binding MaterialOpacity}"
                              HorizontalAlignment="Center" VerticalAlignment="Center"
                              Visibility="{Binding MaterialShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Ellipse}"/>
                     <RegularPolygon Width="320" Height="320" Corners="{Binding ShapeCornerCount}"
                                     StartAngle="{Binding ShapeStartAngle}" Fill="{Binding LiveMaterial}"
+                                    Stroke="#66FFFFFF" StrokeThickness="{Binding MaterialStroke}" Opacity="{Binding MaterialOpacity}"
                                     HorizontalAlignment="Center" VerticalAlignment="Center"
                                     Visibility="{Binding MaterialShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Polygon}"/>
                     <Polygon Points="{Binding FixedStar}" Fill="{Binding LiveMaterial}"
+                             Stroke="#66FFFFFF" StrokeThickness="{Binding MaterialStroke}" Opacity="{Binding MaterialOpacity}"
                              HorizontalAlignment="Center" VerticalAlignment="Center"
                              Visibility="{Binding MaterialShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Star}"/>
                 </Grid>
@@ -137,6 +143,20 @@
                                            IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
                                            Value="{Binding ShapeStartAngle, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
                         </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock Text="Element opacity — the whole thing fades, tint and pen together"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Minimum="0" Maximum="1" Value="{Binding MaterialOpacity, Mode=TwoWay}" Width="240"/>
+                        <TextBlock Text="{Binding MaterialOpacity}" MarginLeft="8" Width="48"/>
+                    </StackPanel>
+
+                    <TextBlock Text="Stroke — the pen rides the SAME pass as the fill, so a framed material is one draw"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Minimum="0" Maximum="20" Value="{Binding MaterialStroke, Mode=TwoWay}" Width="240"/>
+                        <TextBlock Text="{Binding MaterialStroke}" MarginLeft="8" Width="48"/>
                     </StackPanel>
 
                     <TextBlock Text="Tint strength — glass takes its colour from behind, so keep it low there"
