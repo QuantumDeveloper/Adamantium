@@ -8,7 +8,6 @@ using Adamantium.EffectsCompiler;
 using Adamantium.Graphics.Core;
 using Adamantium.Graphics.Core.EffectsFramework;
 using Adamantium.Vulkan.Core;
-using Adamantium.Vulkan.Core.Interop;
 using Serilog;
 using EffectTechnique = Adamantium.Graphics.Core.EffectsFramework.EffectTechnique;
 
@@ -20,13 +19,6 @@ namespace Adamantium.Graphics.Effects;
 public sealed class EffectPass : DisposableObject, IEffectPass
 {
     private const uint MaxItemsPerBuffer = 4096;
-
-    /// <summary>
-    /// Resource-binding mechanism switch (engine-wide, set at startup).
-    /// <c>false</c> = VK_EXT_descriptor_buffer (the working path on current hardware);
-    /// <c>true</c>  = VK_EXT_descriptor_heap (implementation is correct, but on Turing the screen is black due to an NVIDIA driver bug).
-    /// </summary>
-    public static bool UseDescriptorHeap = true;
 
     /// <summary>
     ///   Gets the attributes associated with this pass.
@@ -49,16 +41,6 @@ public sealed class EffectPass : DisposableObject, IEffectPass
     private List<PipelineShaderStageCreateInfo> shaderStages;
 
     private List<DescriptorSetLayoutBinding> layoutBindings;
-
-    private DescriptorSetLayout descriptorSetLayout;
-
-    private DescriptorSetLayout[] descriptorSetLayouts;
-
-    // Reused across draws so BindDescriptors doesn't allocate a fresh array (+ per-element objects) each draw.
-    private DescriptorBufferBindingInfoEXT[] bindingInfos;
-
-    private readonly VkDeviceSize[] offsets = new VkDeviceSize[1];
-    private readonly uint[] _bufferIndices = new uint[1];
 
     private readonly List<StageBlock> stages = new List<StageBlock>();
 
@@ -115,8 +97,6 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         layoutBindings.Clear();
     }
 
-    public PipelineLayout PipelineLayout { get; private set; }
-
     /// <summary>
     ///   Applies this pass to the device pipeline.
     /// </summary>
@@ -133,13 +113,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
        ApplyInternal();
     }
 
-    private void ApplyInternal()
-    {
-        if (UseDescriptorHeap)
-            ApplyHeap();
-        else
-            ApplyBuffer();
-    }
+    private void ApplyInternal() => ApplyHeap();
 
     // === VK_EXT_descriptor_heap: CB via push-address; textures/samplers — indices into heaps ===
     // Which linker resource collection a heap-offset write pulls from - a plain kind so ApplyHeap's inner loop needs no
@@ -242,12 +216,17 @@ public sealed class EffectPass : DisposableObject, IEffectPass
                 for (int resIdx = 0; resIdx < resources.Length; resIdx++)
                 {
                     var slot = resources[resIdx]?.GlobalHeapOffset ?? uint.MaxValue;
-                    // Nothing bound. The index is out of the heap, so the draw would sample whatever the driver finds
-                    // there - in practice another effect's live descriptor. Mark the pass and let the device refuse.
+                    // Nothing bound. An out-of-heap index would sample whatever the driver finds there - in practice
+                    // another effect's live descriptor - so hand over the stand-in instead: the worst case becomes a
+                    // red square (DEBUG) or a transparent one, both of which are honest, rather than someone else's
+                    // texture. The pass is still marked, because a missing binding is a bug either way.
                     if (slot == uint.MaxValue)
                     {
                         ResourcesBound = false;
                         UnboundResource.ReportOnce(Effect.Name, link.Parameter?.Name);
+                        var heap = ((GraphicsDevice)graphicsDevice).DescriptorHeapManager;
+                        if (heap != null)
+                            slot = kind == HeapResourceKind.Sampler ? heap.FallbackSamplerOffset : heap.FallbackTextureOffset;
                     }
                     *(uint*)(push + basePushOffset + (uint)(resIdx * 4)) = slot;
                 }
@@ -255,7 +234,6 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         }
     }
 
-    // === VK_EXT_descriptor_buffer: CB/texture/sampler descriptors are written into descriptor buffers ===
     // The stage list of a pass does not change once its shaders exist, so the arrays vkCmdBindShadersEXT wants are built
     // ONCE and re-used. A pass that also has to say "no geometry shader" carries that entry in the same arrays: one call
     // instead of one per stage plus one for the null.
@@ -284,106 +262,6 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         }
 
         graphicsDevice.BindShaders(graphicsDevice.CurrentCommandBuffer, _bindStages, _bindShaders);
-    }
-
-    private void ApplyBuffer()
-    {
-        Effect.CurrentTechnique = Technique;
-        graphicsDevice.CurrentEffectPass = this;
-        stages.Clear();
-
-        var resourceLinker = (EffectResourceLinker)Effect.ResourceLinker;
-        var dynamicPool = CurrentBufferPool;
-        ulong uboAlignment = graphicsDevice.Adapter.AdapterProperties.Limits.MinUniformBufferOffsetAlignment;
-
-        for (int stageIndex = 0; stageIndex < pipelineStages.Count; stageIndex++)
-        {
-            var stageBlock = pipelineStages[stageIndex];
-            if (stageBlock == null || stageBlock.Index < 0) continue;
-
-            // Constant buffers: sub-allocate data from the shared pool and write a uniform descriptor.
-            foreach (var link in stageBlock.ConstantBufferLinks)
-            {
-                var (page, offset) = dynamicPool.Allocate(link.ConstantBuffer.BackingBuffer.Size, uboAlignment);
-                page.CopyFrom(link.ConstantBuffer.BackingBuffer, offset);
-
-                CreateUniformBufferDescriptor(
-                    page, offset, link.ConstantBuffer.BackingBuffer.Size,
-                    link.ConstantBuffer.Description.Slot,
-                    link.ConstantBuffer.Description.DescriptorSet);
-            }
-
-            // Samplers
-            foreach (var links in stageBlock.SamplerStateSlotLinks)
-            {
-                var resources = resourceLinker.GetSamplers(links.ResourceParamDescription);
-                CreateSamplerDescriptor(resources, links.SlotIndex, links.DescriptorSet);
-            }
-
-            // ShaderResourceView: a texture -> an image-view descriptor; a read-only StructuredBuffer -> a storage-buffer
-            // descriptor (same as a UAV - read-only is a shader-side decoration, not a descriptor difference).
-            foreach (var links in stageBlock.ShaderResourceViewSlotLinks)
-            {
-                if (links.IsStorageBuffer)
-                    CreateUAVWriteDescriptor(resourceLinker.GetShaderResourceBuffers(links.ResourceParamDescription),
-                        links.SlotIndex, links.DescriptorSet);
-                else
-                    CreateImageViewDescriptor(resourceLinker.GetShaderResources(links.ResourceParamDescription),
-                        links.SlotIndex, links.DescriptorSet);
-            }
-
-            // UAV
-            foreach (var links in stageBlock.UnorderedAccessViewSlotLinks)
-            {
-                var resources = resourceLinker.GetUAVs(links.ResourceParamDescription);
-                CreateUAVWriteDescriptor(resources, links.SlotIndex, links.DescriptorSet);
-            }
-
-            stages.Add(stageBlock);
-        }
-
-        BindDescriptors();
-
-        foreach (var stage in stages)
-            graphicsDevice.BindShader(graphicsDevice.CurrentCommandBuffer, stage.Stage, stage.ShaderObject);
-
-        if (!geometryStagePresent)
-            graphicsDevice.BindShader(graphicsDevice.CurrentCommandBuffer, ShaderStageFlagBits.GeometryBit, null);
-
-        appliesCounter++;
-    }
-
-    
-
-    private void BindDescriptors()
-    {
-        if (bindingInfos == null || bindingInfos.Length != DescriptorDataSets.Length)
-        {
-            bindingInfos = new DescriptorBufferBindingInfoEXT[DescriptorDataSets.Length];
-            for (int i = 0; i < bindingInfos.Length; i++)
-                bindingInfos[i] = new DescriptorBufferBindingInfoEXT();
-        }
-
-        for (int i = 0; i < DescriptorDataSets.Length; i++)
-        {
-            var info = bindingInfos[i];
-            info.Address = DescriptorDataSets[i].Buffer.GetDeviceAddress();
-            info.Usage = (BufferUsageFlagBits)DescriptorDataSets[i].UsageFlags;
-        }
-
-        graphicsDevice.CurrentCommandBuffer.BindDescriptorBuffersEXT((uint)bindingInfos.Length, bindingInfos);
-
-        for (int i = 0; i < DescriptorDataSets.Length; ++i)
-        {
-            offsets[0] = appliesCounter * DescriptorDataSets[0].Size;
-            graphicsDevice.CurrentCommandBuffer.SetDescriptorBufferOffsetsEXT(
-                PipelineBindPoint.Graphics,
-                PipelineLayout,
-                (uint)i,
-                1,
-                _bufferIndices,
-                offsets);
-        }
     }
 
     /// <summary>
@@ -429,10 +307,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
     public void PrepareData()
     {
         ComputeSlotLinks();
-        if (UseDescriptorHeap)
-            ComputePushDataLayout();   // creates shaders with heap mappings
-        else
-            PrepareDescriptorSets();   // creates set layouts + descriptor buffers + shaders
+        ComputePushDataLayout();   // creates shaders with heap mappings
     }
 
     private readonly Dictionary<EffectParameter, uint> parameterPushOffsets = new();
@@ -488,38 +363,11 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         CreateShaderObjects();
     }
 
-    private void PrepareDescriptorSets()
-    {
-        var descriptorSets = new List<uint>();
-        for (var index = 0; index < pipelineStages.Count; index++)
-        {
-            var stage = pipelineStages[index];
-
-            if (stage?.Parameters != null)
-            {
-                descriptorSets.AddRange(stage.Parameters.Select(x => x.DescriptorSet));
-            }
-        }
-
-        descriptorSets = descriptorSets.Distinct().Order().ToList();
-
-        DescriptorDataSets = new DescriptorData[descriptorSets.Count];
-        for (int i = 0; i < descriptorSets.Count; i++)
-        {
-            DescriptorDataSets[i] = new DescriptorData(descriptorSets[i]);
-        }
-
-        CreateDescriptorSetLayout(0, layoutBindings);
-        CreatePipelineLayout();
-        CreateShaderObjects();
-    }
-
     private void CreateShaderObjects()
     {
         for (int i = 0; i < pipelineStages.Count; ++i)
         {
             var stage = pipelineStages[i];
-            stage.Layouts = descriptorSetLayouts;
             if (i > 0)
             {
                 pipelineStages[i - 1].NextStage = stage.Stage;
@@ -528,8 +376,6 @@ public sealed class EffectPass : DisposableObject, IEffectPass
 
         pipelineStages.ForEach(stage => stage.CreateShader(parameterPushOffsets));
     }
-
-    private DescriptorData[] DescriptorDataSets;
 
     /// <summary>
     /// Initializes the stage block.
@@ -707,171 +553,6 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         }
 
         return binding;
-    }
-
-    private void CreateDescriptorSetLayout(uint descriptorSet, List<DescriptorSetLayoutBinding> bindings)
-    {
-        InitDescriptorBuffer(descriptorSet, bindings);
-
-        var layoutInfo = new DescriptorSetLayoutCreateInfo();
-        layoutInfo.BindingCount = (uint)bindings.Count;
-        layoutInfo.PBindings = bindings.ToArray();
-        layoutInfo.Flags = DescriptorSetLayoutCreateFlagBits.DescriptorBufferBitExt;
-
-        descriptorSetLayout = graphicsDevice.CreateDescriptorSetLayout(layoutInfo);
-        descriptorSetLayouts = DescriptorDataSets.Select(x => x.Layout).ToArray();
-    }
-
-    private void InitDescriptorBuffer(uint descriptorSetIndex, List<DescriptorSetLayoutBinding> bindings)
-    {
-        if (bindings == null || bindings.Count == 0) return;
-
-        var layoutInfo = new DescriptorSetLayoutCreateInfo();
-        layoutInfo.BindingCount = (uint)bindings.Count;
-        layoutInfo.PBindings = bindings.ToArray();
-        layoutInfo.Flags = DescriptorSetLayoutCreateFlagBits.DescriptorBufferBitExt;
-
-        var descriptorTypes = bindings.Select(x => x.DescriptorType).ToList();
-        var descriptorData = DescriptorDataSets[descriptorSetIndex];
-        descriptorData.DescriptorType = bindings[0].DescriptorType;
-        descriptorData.Layout = graphicsDevice.CreateDescriptorSetLayout(layoutInfo);
-        var size = graphicsDevice.GetDescriptorSetLayoutSize(descriptorData.Layout);
-        descriptorData.UniformBufferDescriptorSize = (uint)graphicsDevice.UniformBufferDescriptorSize;
-        descriptorData.SamplerDescriptorSize = (uint)graphicsDevice.SamplerDescriptorSize;
-        descriptorData.ImageDescriptorSize = (uint)graphicsDevice.SampledImageDescriptorSize;
-
-        descriptorData.Size = (uint)Utilities.AlignSize(size, graphicsDevice.DescriptorBufferOffsetAlignment);
-
-        var bufferFlags = BufferUsageFlags.ResourceDescriptorBufferExt | BufferUsageFlags.ShaderDeviceAddress;
-        if (descriptorTypes.Contains(DescriptorType.Sampler) || descriptorTypes.Contains(DescriptorType.SampledImage))
-        {
-            bufferFlags |= BufferUsageFlags.SamplerDescriptorBufferExt;
-        }
-
-        descriptorData.UsageFlags = bufferFlags;
-
-        descriptorData.Buffer = ToDispose(
-            Buffer.New((GraphicsDevice)graphicsDevice,
-            descriptorData.Size * MaxItemsPerBuffer,
-            bufferFlags,
-            MemoryPropertyFlags.HostVisible | MemoryPropertyFlags.DeviceLocal));
-    }
-
-    private void CreatePipelineLayout()
-    {
-        var pipelineLayoutInfo = new PipelineLayoutCreateInfo();
-        pipelineLayoutInfo.SetLayoutCount = (uint)descriptorSetLayouts.Length;
-        pipelineLayoutInfo.PSetLayouts = descriptorSetLayouts;
-
-        PipelineLayout = graphicsDevice.CreatePipelineLayout(pipelineLayoutInfo);
-    }
-
-    private unsafe void CreateUniformBufferDescriptor(Buffer buffer, ulong bufferOffset, ulong range, uint bindingIndex, uint descriptorSet)
-    {
-        var addrInfo = new DescriptorAddressInfoEXT();
-        addrInfo.Address = buffer.GetDeviceAddress() + bufferOffset;
-        addrInfo.Range = range;
-        addrInfo.Format = Format.UNDEFINED;
-
-        var bufferDescriptorInfo = new DescriptorGetInfoEXT();
-        bufferDescriptorInfo.Type = DescriptorType.UniformBuffer;
-        bufferDescriptorInfo.Data = new DescriptorDataEXT();
-        bufferDescriptorInfo.Data.PUniformBuffer = addrInfo;
-
-        var descriptorData = DescriptorDataSets[descriptorSet];
-        var dataPtr = descriptorData.Buffer.MapMemory();
-        var offset = graphicsDevice.GetDescriptorSetLayoutOffset(descriptorData.Layout,
-            bindingIndex);
-
-        graphicsDevice.GetDescriptor(bufferDescriptorInfo, descriptorData.UniformBufferDescriptorSize,
-            (nuint)((IntPtr)dataPtr + (appliesCounter * descriptorData.Size) + offset));
-
-        descriptorData.Buffer.UnmapMemory();
-    }
-
-    private void CreateImageViewDescriptor(ResourceInfo<Texture>[] images, uint bindingIndex, uint descriptorSet)
-    {
-        var descriptorData = DescriptorDataSets[descriptorSet];
-        var dataPtr = descriptorData.Buffer.MapMemory();
-        for (uint i = 0; i < images.Length; i++)
-        {
-            var imageInfo = new DescriptorImageInfo
-            {
-                ImageView = images[i].Resource,
-                ImageLayout = images[i].Resource.ImageLayout
-            };
-
-            var bufferDescriptorInfo = new DescriptorGetInfoEXT();
-            bufferDescriptorInfo.Type = DescriptorType.SampledImage;
-            bufferDescriptorInfo.Data = new DescriptorDataEXT();
-            bufferDescriptorInfo.Data.PSampledImage = imageInfo;
-
-            var offset =
-                graphicsDevice.GetDescriptorSetLayoutOffset(descriptorData.Layout,
-                    bindingIndex + i);
-
-            graphicsDevice.GetDescriptor(bufferDescriptorInfo, descriptorData.ImageDescriptorSize,
-                (nuint)((IntPtr)dataPtr + (appliesCounter * descriptorData.Size) + offset));
-        }
-
-        descriptorData.Buffer.UnmapMemory();
-    }
-
-    private unsafe void CreateSamplerDescriptor(ResourceInfo<SamplerState>[] samplers, uint bindingIndex, uint descriptorSet)
-    {
-        var descriptorData = DescriptorDataSets[descriptorSet];
-        var dataPtr = descriptorData.Buffer.MapMemory();
-        for (uint i = 0; i < samplers.Length; i++)
-        {
-            var sampleInfo = new DescriptorImageInfo();
-            sampleInfo.Sampler = samplers[i].Resource;
-
-            var bufferDescriptorInfo = new DescriptorGetInfoEXT();
-            bufferDescriptorInfo.Type = DescriptorType.Sampler;
-            bufferDescriptorInfo.Data = new DescriptorDataEXT();
-            bufferDescriptorInfo.Data.PSampledImage = sampleInfo;
-
-            var offset =
-                graphicsDevice.GetDescriptorSetLayoutOffset(descriptorData.Layout,
-                    bindingIndex + i);
-            graphicsDevice.GetDescriptor(bufferDescriptorInfo, descriptorData.SamplerDescriptorSize,
-                (nuint)((IntPtr)dataPtr + (appliesCounter * descriptorData.Size) + offset));
-        }
-
-        descriptorData.Buffer.UnmapMemory();
-    }
-
-    private unsafe void CreateUAVWriteDescriptor(ResourceInfo<Buffer>[] buffers, uint bindingIndex,
-        uint descriptorSet)
-    {
-        var descriptorData = DescriptorDataSets[descriptorSet];
-        uint storageBufferDescriptorSize = (uint)graphicsDevice.Adapter.DeviceBufferProperties.StorageBufferDescriptorSize;
-        var dataPtr = descriptorData.Buffer.MapMemory();
-        for (uint i = 0; i < buffers.Length; i++)
-        {
-            // Address/size — for EACH buffer separately (previously buffers[0] was mistakenly taken outside the loop).
-            var addrInfo = new DescriptorAddressInfoEXT
-            {
-                Address = buffers[i].Resource.GetDeviceAddress(),
-                Range = buffers[i].Resource.TotalSize,
-                Format = Format.UNDEFINED
-            };
-
-            // UAV buffer = storage buffer (as in the heap branch); PStorageBuffer field, storage-descriptor size.
-            var bufferDescriptorInfo = new DescriptorGetInfoEXT();
-            bufferDescriptorInfo.Type = DescriptorType.StorageBuffer;
-            bufferDescriptorInfo.Data = new DescriptorDataEXT();
-            bufferDescriptorInfo.Data.PStorageBuffer = addrInfo;
-
-            var offset =
-                graphicsDevice.GetDescriptorSetLayoutOffset(descriptorData.Layout,
-                    bindingIndex + i);
-
-            graphicsDevice.GetDescriptor(bufferDescriptorInfo, storageBufferDescriptorSize,
-                (nuint)((IntPtr)dataPtr + (appliesCounter * descriptorData.Size) + offset));
-        }
-
-        descriptorData.Buffer.UnmapMemory();
     }
 
     public static ShaderStageFlagBits EffectShaderTypeToShaderStage(EffectShaderType type)
@@ -1068,9 +749,6 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         Log.Logger.Debug("Disposing EffectPass resources");
         graphicsDevice.MainDevice.FrameFinished -= GraphicsDeviceOnFrameFinished;
         ClearLayoutBindings();
-        graphicsDevice.Destroy(descriptorSetLayout);
-        graphicsDevice.Destroy(PipelineLayout);
-        PipelineLayout = null;
         pipelineStages.Clear();
         base.Dispose(disposeManagedResources);
     }
@@ -1126,7 +804,6 @@ public sealed class EffectPass : DisposableObject, IEffectPass
         public ShaderEXT ShaderObject;
 
         public byte[] ByteCode;
-        public DescriptorSetLayout[] Layouts;
         public string EntryPoint;
         /// <summary>effect.technique.pass.stage - names this shader's binary-cache file so the cache folder is readable.</summary>
         public string CacheName;
@@ -1155,16 +832,7 @@ public sealed class EffectPass : DisposableObject, IEffectPass
             shaderCreateInfo.PCode = ByteCode;
             shaderCreateInfo.PName = EntryPoint;
 
-            if (!UseDescriptorHeap)
-            {
-                // VK_EXT_descriptor_buffer: classic descriptor set layouts, without the heap flag or mappings.
-                shaderCreateInfo.PSetLayouts = Layouts;
-                shaderCreateInfo.SetLayoutCount = Layouts != null ? (uint)Layouts.Length : 0;
-                ShaderObject = GraphicsDevice.CreateShader(shaderCreateInfo, CacheName);
-                return;
-            }
-
-            // VK_EXT_descriptor_heap: no set layouts; classic (set,binding) are remapped to heap/push-address.
+            // No set layouts; classic (set,binding) are remapped to heap/push-address.
             shaderCreateInfo.Flags = ShaderCreateFlagBitsEXT.DescriptorHeapBitExt;
             shaderCreateInfo.PSetLayouts = null;
             shaderCreateInfo.SetLayoutCount = 0;
@@ -1330,25 +998,6 @@ public sealed class EffectPass : DisposableObject, IEffectPass
     #endregion
 
     #region Nested Types
-
-    public class DescriptorData
-    {
-        public DescriptorData(uint set)
-        {
-            DescriptorSet = set;
-        }
-
-        public DescriptorSetLayout Layout;
-        public Buffer Buffer;
-        public uint Size;
-        public DescriptorType DescriptorType;
-        public readonly uint DescriptorSet;
-        public BufferUsageFlags UsageFlags;
-
-        public uint SamplerDescriptorSize;
-        public uint ImageDescriptorSize;
-        public uint UniformBufferDescriptorSize;
-    }
 
     public class DynamicBufferPool : IDisposable
     {

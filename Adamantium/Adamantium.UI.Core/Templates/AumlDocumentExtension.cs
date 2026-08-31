@@ -12,10 +12,7 @@ public static class AumlDocumentExtension
         var metaContainer = new AumlTemplateContainer();
         var stack = new Stack<IAumlAstNode>();
         stack.Push(document.Root);
-        var allTypes = AppDomain.CurrentDomain
-            .GetAssemblies()
-            .SelectMany(x => x.GetTypes())
-            .ToList();
+        var allTypes = Adamantium.Core.Reflection.LoadableTypes.FromLoadedAssemblies().ToList();
 
         while (stack.Count > 0)
         {

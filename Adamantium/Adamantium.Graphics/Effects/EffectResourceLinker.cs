@@ -232,12 +232,9 @@ internal class EffectResourceLinker : IEffectResourceLinker
 
                 states[index].Resource = state;
 
-                // Descriptor-heap path only: in descriptor_buffer mode the GPU samples via per-pass descriptor
-                // buffers (EffectPass.Create*Descriptor reads .Resource directly), so writing into the global heap
-                // here is wasted work and the heap isn't even allocated. Skip it.
-                // Same bindless fix as textures: each sampler gets its OWN stable heap slot instead of sharing one
-                // per-parameter slot (which made the last-bound sampler apply to every draw).
-                if (state != null && EffectPass.UseDescriptorHeap)
+                // Each sampler gets its OWN stable heap slot instead of sharing one per-parameter slot, which made the
+                // last-bound sampler apply to every draw.
+                if (state != null)
                 {
                     states[index].GlobalHeapOffset = DescriptorHeapManager.GetOrAllocateSamplerOffset(state);
                 }
@@ -259,11 +256,8 @@ internal class EffectResourceLinker : IEffectResourceLinker
 
                     srvBufs[index] ??= new ResourceInfo<Buffer>();
                     srvBufs[index].Resource = srvBuffer;
-                    if (EffectPass.UseDescriptorHeap)
-                    {
-                        srvBufs[index].GlobalHeapOffset =
-                            DescriptorHeapManager.GetOrAllocateBufferOffset(srvBuffer, DescriptorType.StorageBuffer);
-                    }
+                    srvBufs[index].GlobalHeapOffset =
+                        DescriptorHeapManager.GetOrAllocateBufferOffset(srvBuffer, DescriptorType.StorageBuffer);
                     break;
                 }
 
@@ -283,14 +277,11 @@ internal class EffectResourceLinker : IEffectResourceLinker
                 {
                     views[index].Resource = texture;
 
-                    // Descriptor-heap path: bind this texture's OWN stable heap slot (bindless). Previously the offset
-                    // was allocated per parameter, so every texture bound to ShaderTexture shared ONE slot and the
-                    // last-written one showed up on every draw. Now the slot belongs to the texture itself.
-                    if (EffectPass.UseDescriptorHeap)
-                    {
-                        views[index].GlobalHeapOffset =
-                            DescriptorHeapManager.GetOrAllocateTextureOffset(texture, DescriptorType.SampledImage);
-                    }
+                    // This texture's OWN stable heap slot (bindless). The offset used to be allocated per parameter, so
+                    // every texture bound to ShaderTexture shared ONE slot and the last-written one showed up on every
+                    // draw. The slot belongs to the texture itself.
+                    views[index].GlobalHeapOffset =
+                        DescriptorHeapManager.GetOrAllocateTextureOffset(texture, DescriptorType.SampledImage);
                 }
             }
                 break;
@@ -312,14 +303,9 @@ internal class EffectResourceLinker : IEffectResourceLinker
                     
                     uavs[index].Resource = buffer;
 
-                    // Descriptor-heap path: bind this buffer's OWN stable heap slot (bindless) — same per-resource fix
-                    // as textures/samplers. The old per-parameter slot would make the last-bound UAV apply to every
-                    // draw once compute/UAV is actually used.
-                    if (EffectPass.UseDescriptorHeap)
-                    {
-                        uavs[index].GlobalHeapOffset =
-                            DescriptorHeapManager.GetOrAllocateBufferOffset(buffer, DescriptorType.StorageBuffer);
-                    }
+                    // This buffer's OWN stable heap slot - same per-resource rule as textures and samplers.
+                    uavs[index].GlobalHeapOffset =
+                        DescriptorHeapManager.GetOrAllocateBufferOffset(buffer, DescriptorType.StorageBuffer);
                 }
             }
                 break;

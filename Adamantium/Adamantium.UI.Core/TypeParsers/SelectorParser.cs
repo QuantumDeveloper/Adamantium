@@ -39,7 +39,7 @@ public class SelectorParser : ITypeParser<StyleSelector>
             else // Control type, optionally with chained .classes: "Button" or "Button.Accent" or "Button.Accent.Big"
             {
                 var parts = splitItem.Split('.', StringSplitOptions.RemoveEmptyEntries);
-                var type = AppDomain.CurrentDomain.GetAssemblies().SelectMany(x => x.GetTypes()).FirstOrDefault(x => x.Name == parts[0]);
+                var type = Adamantium.Core.Reflection.LoadableTypes.FromLoadedAssemblies().FirstOrDefault(x => x.Name == parts[0]);
                 if (type != null)
                 {
                     selector.Types.Add(type);
