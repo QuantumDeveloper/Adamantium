@@ -34,6 +34,8 @@ public class DescriptorHeapManager : DisposableObject, IDescriptorHeapManager
     // Binds the shared heap onto the CALLING render device's command buffer (not the heap's construction device).
     public void BindDescriptorHeaps(IGraphicsDevice device)
     {
+        ReclaimRetiredSlots();   // once a frame, where a frame demonstrably begins
+
         IBuffer resourceBuffer = ResourceHeapBuffer;
         IBuffer samplerBuffer = SamplerHeapBuffer;
 
@@ -66,17 +68,10 @@ public class DescriptorHeapManager : DisposableObject, IDescriptorHeapManager
     
     private void InitializeHeaps()
     {
-        // VK_EXT_descriptor_buffer (the default/working path, EffectPass.UseDescriptorHeap == false) never reads
-        // this heap: EffectResourceLinker's heap writes are gated off (see ProcessReferenceResources) and the GPU
-        // samples via per-pass descriptor buffers. So don't allocate it there at all — it would otherwise burn
-        // ~10 MB of the small BAR window (~256 MB on NVIDIA Turing) per render device and scale with window/panel
-        // count -> OutOfMemory. Only the heap path needs it (and is then bound via BindDescriptorHeaps).
-        if (!EffectPass.UseDescriptorHeap) return;
-
         var props = graphicsDevice.Adapter.DeviceHeapProperties;
 
-        // IMPORTANT: do not allocate a heap as large as the device maximum. host-visible + device-local memory
-        // lives in the small BAR window, so keep it modest even in the heap path.
+        // IMPORTANT: do not allocate a heap as large as the device maximum. host-visible + device-local memory lives in
+        // the small BAR window (~256 MB on NVIDIA Turing) and this is paid per render device, so keep it modest.
         ulong resourceHeapSize = Math.Min((ulong)props.MaxResourceHeapSize, 8UL * 1024 * 1024);
         ulong samplerHeapSize = Math.Min((ulong)props.MaxSamplerHeapSize, 2UL * 1024 * 1024);
 
@@ -159,6 +154,52 @@ public class DescriptorHeapManager : DisposableObject, IDescriptorHeapManager
     private readonly System.Collections.Generic.Dictionary<SamplerState, uint> _samplerHeapOffsets = new();
     private readonly System.Collections.Generic.Dictionary<IBuffer, uint> _bufferHeapOffsets = new();
 
+    // ---- RETURNING SLOTS ----------------------------------------------------------------------------------------
+    // A slot used to be handed out and never taken back: allocation was a bump pointer and nothing was ever removed from
+    // the caches above. Two costs, both real. The dictionaries key on the RESOURCE OBJECT, so a dead texture stayed
+    // reachable and never reached the collector; and the 8 MB resource heap drained monotonically until it threw.
+    //
+    // A freed slot goes to a per-KIND free list, because a slot fits only a descriptor of the size and alignment it was
+    // cut for. And it is not reusable immediately: frames still in flight may be sampling through it, so it waits out
+    // the pipeline depth first - the same rule every GPU buffer here follows.
+    private readonly System.Collections.Generic.Queue<uint> _freeImageSlots = new();
+    private readonly System.Collections.Generic.Queue<uint> _freeBufferSlots = new();
+    private readonly System.Collections.Generic.Queue<uint> _freeSamplerSlots = new();
+    private readonly System.Collections.Generic.List<(uint Slot, DescriptorKind Kind, uint Frame)> _retiring = new();
+
+    private enum DescriptorKind { Image, Buffer, Sampler }
+
+    private void Retire(uint slot, DescriptorKind kind)
+    {
+        lock (_heapSync) _retiring.Add((slot, kind, graphicsDevice.CurrentFrame));
+    }
+
+    /// <summary>Move slots whose frames have gone by into the free lists. Called once per frame, where the heap is bound.
+    /// </summary>
+    private void ReclaimRetiredSlots()
+    {
+        var depth = Math.Max(1u, graphicsDevice.MaxFramesInFlight);
+        var now = graphicsDevice.CurrentFrame;
+
+        lock (_heapSync)
+        {
+            for (var i = _retiring.Count - 1; i >= 0; i--)
+            {
+                var (slot, kind, frame) = _retiring[i];
+                // Unsigned wrap is fine: what matters is that a full pipeline's worth of frames has passed.
+                if (now - frame < depth) continue;
+
+                (kind switch
+                {
+                    DescriptorKind.Image => _freeImageSlots,
+                    DescriptorKind.Buffer => _freeBufferSlots,
+                    _ => _freeSamplerSlots
+                }).Enqueue(slot);
+                _retiring.RemoveAt(i);
+            }
+        }
+    }
+
     public uint GetOrAllocateBufferOffset(IBuffer buffer, DescriptorType type)
     {
         lock (_heapSync)
@@ -167,9 +208,12 @@ public class DescriptorHeapManager : DisposableObject, IDescriptorHeapManager
 
             uint descSize = (uint)DeviceHeapProperties.BufferDescriptorSize;
             uint descAlignment = (uint)(ulong)DeviceHeapProperties.BufferDescriptorAlignment;
-            uint offset = AllocateResourceOffset(descSize, descAlignment); // _heapSync is re-entrant
+            uint offset = _freeBufferSlots.Count > 0
+                ? _freeBufferSlots.Dequeue()
+                : AllocateResourceOffset(descSize, descAlignment); // _heapSync is re-entrant
             WriteBuffer(offset, buffer, 0, buffer.TotalSize, type);        // whole-buffer binding
             _bufferHeapOffsets[buffer] = offset;
+            Track(buffer as DisposableObject, () => ReleaseBuffer(buffer));
             return offset;
         }
     }
@@ -182,11 +226,125 @@ public class DescriptorHeapManager : DisposableObject, IDescriptorHeapManager
 
             uint descSize = (uint)DeviceHeapProperties.ImageDescriptorSize;
             uint descAlignment = (uint)DeviceHeapProperties.ImageDescriptorAlignment;
-            uint offset = AllocateResourceOffset(descSize, descAlignment); // _heapSync is re-entrant
+            uint offset = _freeImageSlots.Count > 0
+                ? _freeImageSlots.Dequeue()
+                : AllocateResourceOffset(descSize, descAlignment); // _heapSync is re-entrant
             WriteTexture(offset, texture, type);
             _textureHeapOffsets[texture] = offset;
+            Track(texture as DisposableObject, () => ReleaseTexture(texture));
             return offset;
         }
+    }
+
+    // The resource tells us when it dies. Subscribed once, at the moment it takes a slot - which is also the only moment
+    // we know it has one.
+    private static void Track(DisposableObject resource, Action release)
+    {
+        if (resource == null) return;
+        resource.Disposing += (_, _) => release();
+    }
+
+    private void ReleaseTexture(ITexture texture)
+    {
+        lock (_heapSync)
+        {
+            if (!_textureHeapOffsets.Remove(texture, out var slot)) return;
+            Retire(slot, DescriptorKind.Image);
+        }
+    }
+
+    private void ReleaseBuffer(IBuffer buffer)
+    {
+        lock (_heapSync)
+        {
+            if (!_bufferHeapOffsets.Remove(buffer, out var slot)) return;
+            Retire(slot, DescriptorKind.Buffer);
+        }
+    }
+
+    private void ReleaseSampler(SamplerState sampler)
+    {
+        lock (_heapSync)
+        {
+            if (!_samplerHeapOffsets.Remove(sampler, out var slot)) return;
+            Retire(slot, DescriptorKind.Sampler);
+        }
+    }
+
+    // ---- THE FALLBACK DESCRIPTOR --------------------------------------------------------------------------------
+    // What a shader samples when a parameter was never bound. Before this it received uint.MaxValue - an index OUTSIDE
+    // the heap - and the draw had to be refused outright, because sampling there returns whatever descriptor the driver
+    // finds: in practice another effect's live texture, smeared across the frame.
+    //
+    // RED AND 4x4 IN DEBUG, transparent and 1x1 in release. A transparent square is the right answer for a shipped
+    // build - the worst case is that something is missing rather than wrong - but it is also invisible, and a bug that
+    // shows nothing is a bug nobody finds. Red says "this draw asked for a texture and nobody gave it one", and 4x4
+    // because a single texel stretched over a shape can pass for a solid colour someone chose on purpose.
+    private uint _fallbackTextureOffset = uint.MaxValue;
+    private uint _fallbackSamplerOffset = uint.MaxValue;
+    private ITexture _fallbackTexture;
+
+    public uint FallbackTextureOffset
+    {
+        get
+        {
+            lock (_heapSync)
+            {
+                if (_fallbackTextureOffset != uint.MaxValue) return _fallbackTextureOffset;
+
+                _fallbackTexture = CreateFallbackTexture();
+                _fallbackTextureOffset = GetOrAllocateTextureOffset(_fallbackTexture, DescriptorType.SampledImage);
+                return _fallbackTextureOffset;
+            }
+        }
+    }
+
+    public uint FallbackSamplerOffset
+    {
+        get
+        {
+            lock (_heapSync)
+            {
+                if (_fallbackSamplerOffset != uint.MaxValue) return _fallbackSamplerOffset;
+
+                _fallbackSamplerOffset = GetOrAllocateSamplerOffset(
+                    ((GraphicsDevice)graphicsDevice).SamplerStates.LinearClampToEdge);
+                return _fallbackSamplerOffset;
+            }
+        }
+    }
+
+    private ITexture CreateFallbackTexture()
+    {
+#if DEBUG
+        const uint size = 4;
+        var pixels = new byte[size * size * 4];
+        for (var i = 0; i < pixels.Length; i += 4)
+        {
+            pixels[i] = 255;        // R
+            pixels[i + 3] = 255;    // A
+        }
+#else
+        const uint size = 1;
+        var pixels = new byte[4];   // transparent black
+#endif
+        return graphicsDevice.CreateTexture(new TextureDescription
+        {
+            Width = size,
+            Height = size,
+            Depth = 1,
+            ArrayLayers = 1,
+            MipLevels = 1,
+            Samples = MSAALevel.None,
+            Format = Format.R8G8B8A8_UNORM,
+            InitialLayout = ImageLayout.Undefined,
+            DesiredImageLayout = ImageLayout.ShaderReadOnlyOptimal,
+            ImageType = ImageType._2d,
+            ImageAspect = ImageAspectFlagBits.ColorBit,
+            ImageTiling = ImageTiling.Optimal,
+            Usage = ImageUsageFlagBits.SampledBit | ImageUsageFlagBits.TransferDstBit,
+            Dimension = Imaging.TextureDimension.Texture2D
+        }, pixels);
     }
 
     public uint GetOrAllocateSamplerOffset(SamplerState samplerState)
@@ -196,9 +354,10 @@ public class DescriptorHeapManager : DisposableObject, IDescriptorHeapManager
             if (_samplerHeapOffsets.TryGetValue(samplerState, out var existing)) return existing;
 
             uint descSize = (uint)DeviceHeapProperties.SamplerDescriptorSize;
-            uint offset = AllocateSamplerOffset(descSize);
+            uint offset = _freeSamplerSlots.Count > 0 ? _freeSamplerSlots.Dequeue() : AllocateSamplerOffset(descSize);
             WriteSampler(offset, samplerState);
             _samplerHeapOffsets[samplerState] = offset;
+            Track(samplerState as DisposableObject, () => ReleaseSampler(samplerState));
             return offset;
         }
     }

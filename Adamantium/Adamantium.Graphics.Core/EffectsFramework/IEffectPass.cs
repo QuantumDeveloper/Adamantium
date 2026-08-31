@@ -11,9 +11,10 @@ public interface IEffectPass : INamedObject, IDisposable
     
     void Apply();
 
-    /// <summary>Whether every resource this pass declares was actually BOUND on the last <see cref="Apply"/>. False means
-    /// its push data carries an out-of-range heap index, and drawing would sample whoever else owns that slot - so the
-    /// device refuses the draw instead of putting someone else's texture on screen.</summary>
+    /// <summary>Whether every resource this pass declares was actually BOUND on the last <see cref="Apply"/>. False
+    /// means at least one was not, and the pass handed the shader the heap's FALLBACK slot for it - a red square in
+    /// DEBUG, a transparent one otherwise. The draw still goes ahead: a stand-in is a better answer than a hole in the
+    /// frame, and either way the parameter has already been reported by name.</summary>
     bool ResourcesBound { get; }
     
     void UnApply(bool fullUnApply = false);

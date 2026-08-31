@@ -517,11 +517,7 @@ public sealed class DesignerSession : IDisposable
         return null;
     }
 
-    private static IEnumerable<Type> SafeGetTypes(Assembly asm)
-    {
-        try { return asm.GetTypes(); }
-        catch (ReflectionTypeLoadException ex) { return ex.Types.Where(t => t != null); }
-    }
+    private static IEnumerable<Type> SafeGetTypes(Assembly asm) => Adamantium.Core.Reflection.LoadableTypes.Of(asm);
 
     /// <summary>Design size for a dimension: the declared value if set, else the request, else the default.</summary>
     private static double ResolveDimension(double? declared, uint? request, double fallback)

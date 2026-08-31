@@ -207,9 +207,7 @@ public static class AdamantiumPropertyMap
    {
       foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
       {
-         Type[] types;
-         try { types = asm.GetTypes(); } catch { continue; }
-         foreach (var t in types)
+         foreach (var t in Adamantium.Core.Reflection.LoadableTypes.Of(asm))
          {
             if (t.Name == n && typeof(AdamantiumComponent).IsAssignableFrom(t)) return t;
          }

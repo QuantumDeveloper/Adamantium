@@ -7,14 +7,6 @@ public static class Program
 {
     public static int Main(string[] args)
     {
-        // The headless designer renders via the VK_EXT_descriptor_buffer path. The descriptor_heap path (the engine
-        // default) makes vkCreateShadersEXT access-violate (0xC0000005) inside the NVIDIA driver's NVVM compiler while
-        // building the FontEffect fragment shader (the first text render) - a deterministic crash that kills the host.
-        // descriptor_buffer compiles the same shader cleanly and renders the preview correctly. Set before any device
-        // or effect is created. (The on-screen runtime still uses descriptor_heap; the buffer path currently renders
-        // black there - a separate, tracked issue.)
-        EffectPass.UseDescriptorHeap = false;   // designer MUST use descriptor_buffer: descriptor_heap = 100% FontEffect vkCreateShadersEXT AV here
-
         if (args.Length >= 1 && args[0] == "serve")
             return DesignerHost.Run();
 

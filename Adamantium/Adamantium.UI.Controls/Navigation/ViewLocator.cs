@@ -72,9 +72,6 @@ public sealed class ViewLocator : IViewLocator
     private static Type FindView(IEnumerable<Type> types, string viewName)
         => types.FirstOrDefault(t => t.Name == viewName && typeof(IUIComponent).IsAssignableFrom(t));
 
-    private static Type[] SafeGetTypes(System.Reflection.Assembly assembly)
-    {
-        try { return assembly.GetTypes(); }
-        catch { return Array.Empty<Type>(); }
-    }
+    private static IEnumerable<Type> SafeGetTypes(System.Reflection.Assembly assembly)
+        => Adamantium.Core.Reflection.LoadableTypes.Of(assembly);
 }

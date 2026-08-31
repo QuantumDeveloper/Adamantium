@@ -40,4 +40,11 @@ public interface IDescriptorHeapManager : System.IDisposable
 
     /// <summary>Binds the shared heap onto the calling render device's command buffer.</summary>
     void BindDescriptorHeaps(IGraphicsDevice device);
+
+    /// <summary>Slots holding a stand-in for a parameter nobody bound. Sampling an out-of-heap index returns whatever
+    /// descriptor the driver finds there - another effect's live texture - so a shader is handed these instead. Red and
+    /// 4x4 in DEBUG so a missing binding is visible; transparent and 1x1 in release.</summary>
+    uint FallbackTextureOffset { get; }
+
+    uint FallbackSamplerOffset { get; }
 }

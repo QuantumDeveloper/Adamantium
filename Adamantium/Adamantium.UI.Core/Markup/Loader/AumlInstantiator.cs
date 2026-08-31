@@ -107,7 +107,12 @@ internal sealed class AumlInstantiator
         foreach (var value in prop.Values)
         {
             // A Binding/MultiBinding (markup-extension OR element syntax) sets up a live binding, not a plain value.
-            if (instance is IFundamentalUIComponent bindable && TryBuildBindingBase(value, out var binding))
+            //
+            // Asked of AdamantiumComponent, not of IFundamentalUIComponent: SetBinding lives on the former, and so do
+            // BRUSHES. Bound to the narrower interface, a binding written inside a brush - <VisualBrush
+            // Visual="{Binding ElementName=...}"/> - fell through to the plain-value branch and threw "Binding cannot be
+            // converted to IUIComponent", taking the whole document with it.
+            if (instance is AdamantiumComponent bindable && TryBuildBindingBase(value, out var binding))
             {
                 bindable.SetBinding(pref.Name, binding);
                 continue;
