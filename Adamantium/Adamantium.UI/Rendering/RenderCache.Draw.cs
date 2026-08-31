@@ -1105,6 +1105,7 @@ public partial class RenderCache
                         fullScissor, ref scissorNarrowed))
                 {
                     var matBakeWorld = ResolveBake(device, unit.Component, wt, out var slot4Mat);
+                    FadeBySlot(unit);   // the material pass reads the chain from the slot; keep it out of the colour
                     if (_materialBatch.TryAdd(mru.RectPayload, matBakeWorld, mru.FillOpacity, scissor, materialBounds,
                             slot4Mat, mru.FadeSlot, matSource))
                     {
@@ -1128,6 +1129,7 @@ public partial class RenderCache
                         fullScissor, ref scissorNarrowed))
                 {
                     var bake = ResolveBake(device, unit.Component, wt, out var slot);
+                    FadeBySlot(unit);
                     if (_materialBatch.TryAddEllipse(meru.EllipsePayload, bake, meru.FillOpacity, scissor, bounds,
                             slot, meru.FadeSlot, elSource))
                     {
@@ -1148,6 +1150,7 @@ public partial class RenderCache
                         fullScissor, ref scissorNarrowed))
                 {
                     var bake = ResolveBake(device, unit.Component, wt, out var slot);
+                    FadeBySlot(unit);
                     if (_materialBatch.TryAddPolygon(mpru.PolygonPayload, bake, mpru.FillOpacity, scissor, bounds,
                             slot, mpru.FadeSlot, polySource))
                     {

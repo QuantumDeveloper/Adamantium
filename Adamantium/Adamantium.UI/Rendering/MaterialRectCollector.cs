@@ -252,12 +252,21 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
     {
         if (!Enabled) return false;
         if (brush is not MaterialBrush) return false;
-        // A pen would have to be composited over a fill that is itself a capture; not supported yet, so a framed
-        // material falls to the per-unit path rather than silently losing its border.
-        return pen == null;
+        if (pen == null) return true;
+
+        // A SOLID, WHOLE pen only. The stroke is composited by the shared CompositeFillStroke, exactly as in the other
+        // SDF batches, but dashes and trims need the arc-length machinery those passes carry and this one does not - so
+        // they go to the per-unit path rather than being drawn as a solid ring nobody asked for.
+        if (!RectBatchCollector.IsPenBatchable(pen)) return false;
+        if (pen.DashStrokeArray is { Count: > 0 }) return false;
+        return pen.TrimStart <= 0 && pen.TrimEnd >= 1;
     }
 
     public static bool WantsBatch(RectanglePayload p) => WantsBatch(p.Brush, p.Pen);
+
+    public static bool WantsBatchEllipse(EllipsePayload p) => WantsBatch(p.Brush, p.Pen);
+
+    public static bool WantsBatchPolygon(RegularPolygonPayload p) => WantsBatch(p.Brush, p.Pen);
 
     public bool CanBatch(RectanglePayload p) => WantsBatch(p.Brush, p.Pen);
 
@@ -302,6 +311,10 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
         if (brush is not MaterialBrush material) return false;
 
         var tint = material.TintColor;
+        // Baked in LOGICAL units (scale 1), like the bounds and the radii beside them: this batch has no world matrix on
+        // the CPU at all - the vertex shader takes the device scale from the transform slot and hands it to the pixel
+        // shader, which is where the width becomes pixels.
+        RectBatchCollector.BakeStroke(pen, opacity * material.Opacity, 1f, out var strokeColor, out var stroke0, out var stroke1);
         var radii = shape == ShapePolygon
             ? new Vector4F(polygonCorners, polygonStart, 0f, 0f)
             : new Vector4F((float)corners.TopLeft, (float)corners.TopRight,
@@ -312,17 +325,21 @@ internal sealed class MaterialRectCollector : SdfBatchCollector<MaterialRectItem
             Bounds = new Vector4F((float)destination.X, (float)destination.Y,
                 (float)destination.Width, (float)destination.Height),
             Params = new Vector4F(shape == ShapeRect ? (float)corners.TopLeft : shape,
-                transformSlot, (float)material.Material, fadeSlot),
+                transformSlot, (float)Math.Clamp(opacity * material.Opacity, 0.0, 1.0), fadeSlot),
             Radii = radii,
-            // The tint's ALPHA carries TintOpacity - how much the tint covers the capture - while the element's own
-            // opacity rides the coverage, as it does for every other fill.
+            // TintOpacity alone: how much the tint covers the capture. The element's own opacity is the fill's ALPHA
+            // (Params.z), not a weakening of the tint - folding it in here left a half-transparent material fully
+            // opaque, just less tinted.
             Tint = new Vector4F(tint.R / 255f, tint.G / 255f, tint.B / 255f,
-                (float)Math.Clamp(material.TintOpacity * opacity * material.Opacity, 0.0, 1.0)),
+                (float)Math.Clamp(material.TintOpacity, 0.0, 1.0)),
             // .w says the picture is pinned to the ELEMENT, and the shader then takes its coordinates from the fragment's
             // place in the shape instead of from its place in the frame. It cannot be a rectangle in SourceUv like the
             // other anchors: each instance in the segment has its own, and a rotated shape has none at all.
             Knobs = new Vector4F((float)material.BlurAmount, (float)material.NoiseAmount, (float)material.Refraction,
-                source != null && material.Anchor == MaterialAnchor.Element ? 1f : 0f)
+                source != null && material.Anchor == MaterialAnchor.Element ? 1f : 0f),
+            StrokeColor = strokeColor,
+            Stroke0 = stroke0,
+            Stroke1 = stroke1
         };
 
         if (IsWallpaper(material.Material)) _pendingWallpaper = true;

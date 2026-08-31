@@ -389,6 +389,8 @@ public partial class BrushesViewModel : TabPageViewModel
     [Bindable] private double _materialBlur = 10;
     [Bindable] private double _materialGrain = 0.04;
     [Bindable] private double _materialRefraction = 18;
+    [Bindable] private double _materialStroke = 0;
+    [Bindable] private double _materialOpacity = 1.0;
 
     /// <summary>What mica may read, as ONE list - "built-in or mine" and "which of mine" are the same question asked
     /// twice. Chosen to differ in DETAIL: tile-sample is 64x64 across the whole desktop, texture.jpg is 1920x1200.

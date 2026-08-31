@@ -568,7 +568,8 @@ public class RectangleRenderUnit : RenderUnit<RectanglePayload>
     // unit builds ZERO machinery: no tessellation, no geometry/fringe/stroke, no GPU buffers, which is what makes a big
     // virtualized tile grid cheap. Re-stating the rules here is exactly how they drifted: the ellipse collector learned
     // about a stopless mesh brush and its twin here did not, and the mismatch drew garbage.
-    private static bool IsSdfBatchable(RectanglePayload p) => RectBatchCollector.WantsBatch(p);
+    private static bool IsSdfBatchable(RectanglePayload p) =>
+        RectBatchCollector.WantsBatch(p) || MaterialRectCollector.WantsBatch(p);
 
     // A rect the GRADIENT SDF batch (GradientRectCollector) will draw: a linear/radial gradient fill, a batchable pen,
     // uniform corners. Like IsSdfBatchable it means "build ZERO per-unit machinery" - the batch's pixel shader draws the
@@ -796,7 +797,8 @@ public class EllipseRenderUnit : RenderUnit<EllipsePayload>
     // implicit field and self-anti-aliases, so this unit needs NO tessellated body and NO AA fringe. Building them per
     // ellipse is pure waste (and their per-unit GPU buffers are exactly what strained device memory). Mirrors
     // EllipseBatchCollector.CanBatch so "no machinery built" == "the batch will draw it".
-    private static bool IsSdfBatchable(EllipsePayload p) => EllipseBatchCollector.WantsBatch(p);
+    private static bool IsSdfBatchable(EllipsePayload p) =>
+        EllipseBatchCollector.WantsBatch(p) || MaterialRectCollector.WantsBatchEllipse(p);
 
     // A full ellipse the GRADIENT ellipse SDF batch will draw (linear/radial gradient fill). Like IsSdfBatchable it means
     // "build ZERO per-unit machinery". Mirrors GradientEllipseCollector.CanBatch.
@@ -1189,7 +1191,8 @@ public class RegularPolygonRenderUnit : RenderUnit<RegularPolygonPayload>
 
     private static bool IsSdfBatchable(RegularPolygonPayload p) =>
         RegularPolygonCollector.WantsBatch(p) || GradientRectCollector.WantsBatchPolygon(p) ||
-        PatternRectCollector.WantsBatchPolygon(p) || TextureBatchCollector.WantsBatchPolygon(p);
+        PatternRectCollector.WantsBatchPolygon(p) || TextureBatchCollector.WantsBatchPolygon(p) ||
+        MaterialRectCollector.WantsBatchPolygon(p);
 
     internal ITexture BrushTexture() => TextureBatchCollector.BrushTexture(Payload.Brush, ResourceFactory,
         Payload.DestinationRect.Size, DrawCommand.Component);
