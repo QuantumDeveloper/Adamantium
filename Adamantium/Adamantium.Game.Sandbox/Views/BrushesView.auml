@@ -7,45 +7,175 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
         <StackPanel Orientation="Vertical" Margin="24">
 
-            <!-- BACKDROP MATERIAL, FIRST on the tab so it is on screen the moment the stand opens. Unlike every other
-                 brush here, this one has nothing of its own to show: it is made of what is BEHIND it. So it is
-                 deliberately laid over a busy, moving noise - a flat swatch would prove nothing, and a still one would
-                 not show that acrylic follows what moves under it. -->
+            <!-- BACKDROP MATERIALS, live. Unlike every other brush here, these have nothing of their own to show: they
+                 are made of what is BEHIND them. So the stand is built the other way round from the rest - the controls
+                 change not only the material but WHAT IT SITS OVER, because a backdrop over a flat colour proves
+                 nothing at all.
+                 The three kinds are one dropdown apart on purpose. Acrylic and liquid glass take exactly the same
+                 capture and differ only in the treatment - one scatters it, the other bends it - and switching between
+                 them in place, over the same field, is the only way to see that. Mica differs in the third way: same
+                 treatment, different SOURCE - the desktop wallpaper rather than this frame, so scrolling the page
+                 leaves it still while moving the window changes it. -->
             <TextBlock Text="Material brush — the fill is what is behind it" FontSize="18" Margin="0,0,0,10"/>
-            <Grid Width="470" Height="150" Margin="0,0,0,24">
-                <Rectangle CornerRadius="12">
-                    <Rectangle.Fill>
-                        <NoiseBrush NoiseType="Worley" Scale="46" Octaves="2" Animate="true" FlowSpeed="0.5"
-                                    Color1="#0B1220" Color2="#F0ABFC"/>
-                    </Rectangle.Fill>
-                </Rectangle>
+            <StackPanel Orientation="Horizontal" MarginBottom="24">
+                <!-- BIG on purpose. The drag wobble is a shift of a pixel or two, and on a small pane there is not
+                     enough backdrop on screen to see it against - the whole point of this stand is that the fault is
+                     visible in it. -->
+                <Grid Width="660" Height="440">
+                    <!-- WHAT IT SITS OVER. All four are here and one is revealed, the same way every other stand on
+                         this tab reveals the selected figure. -->
+                    <Rectangle CornerRadius="12"
+                               Visibility="{Binding MaterialUnderlay, Converter={conv:MaterialUnderlayVisibilityConverter}, ConverterParameter=LivingNoise}">
+                        <Rectangle.Fill>
+                            <NoiseBrush NoiseType="Worley" Scale="46" Octaves="2" Animate="true" FlowSpeed="0.5"
+                                        Color1="#0B1220" Color2="#F0ABFC"/>
+                        </Rectangle.Fill>
+                    </Rectangle>
 
-                <Rectangle Width="300" Height="92" CornerRadius="14"
-                           HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Rectangle.Fill>
-                        <MaterialBrush Material="Acrylic" TintColor="#20242E" TintOpacity="0.55"
-                                       BlurAmount="10" NoiseAmount="0.04"/>
-                    </Rectangle.Fill>
-                </Rectangle>
+                    <Rectangle CornerRadius="12"
+                               Visibility="{Binding MaterialUnderlay, Converter={conv:MaterialUnderlayVisibilityConverter}, ConverterParameter=Checkerboard}">
+                        <Rectangle.Fill>
+                            <PatternBrush Pattern="Checkerboard" CellSize="26"
+                                          Color1="#0B1220" Color2="#E9D5FF"/>
+                        </Rectangle.Fill>
+                    </Rectangle>
 
-                <TextBlock Text="Acrylic over living noise" HorizontalAlignment="Center" VerticalAlignment="Center"
-                           Foreground="#F2F5F9"/>
-            </Grid>
+                    <Rectangle CornerRadius="12"
+                               Visibility="{Binding MaterialUnderlay, Converter={conv:MaterialUnderlayVisibilityConverter}, ConverterParameter=Gradient}">
+                        <Rectangle.Fill>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Offset="0" Color="#0B1220"/>
+                                <GradientStop Offset="1" Color="#7DD3FC"/>
+                            </LinearGradientBrush>
+                        </Rectangle.Fill>
+                    </Rectangle>
 
-            <!-- MICA, next to the acrylic on purpose: the two differ by SOURCE, and the difference is only visible side
-                 by side. This one shows the DESKTOP WALLPAPER behind the window - so scrolling this page leaves it
-                 completely still, while moving the window across the desktop changes it. -->
-            <TextBlock Text="Mica — the same treatment, fed the desktop instead of the frame" FontSize="18" Margin="0,0,0,10"/>
-            <Grid Width="470" Height="120" Margin="0,0,0,24">
-                <Rectangle CornerRadius="12">
-                    <Rectangle.Fill>
-                        <MaterialBrush Material="Mica" TintColor="#20242E" TintOpacity="0.6" NoiseAmount="0.03"/>
-                    </Rectangle.Fill>
-                </Rectangle>
+                    <Rectangle CornerRadius="12" Fill="{Binding MaterialPicture}"
+                               Visibility="{Binding MaterialUnderlay, Converter={conv:MaterialUnderlayVisibilityConverter}, ConverterParameter=Picture}"/>
 
-                <TextBlock Text="Move the window across the desktop — this follows the wallpaper, not the page"
-                           HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#F2F5F9"/>
-            </Grid>
+                    <!-- THE MATERIAL, on whichever figure is selected. One live brush drives all of them. -->
+                    <Rectangle Width="500" Height="280" Fill="{Binding LiveMaterial}"
+                               CornerRadius="{Binding MaterialRadius, Converter={conv:DoubleToCornerRadiusConverter}}"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Visibility="{Binding MaterialShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Rectangle}"/>
+                    <Ellipse Width="500" Height="280" Fill="{Binding LiveMaterial}"
+                             HorizontalAlignment="Center" VerticalAlignment="Center"
+                             Visibility="{Binding MaterialShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Ellipse}"/>
+                    <RegularPolygon Width="320" Height="320" Corners="{Binding ShapeCornerCount}"
+                                    StartAngle="{Binding ShapeStartAngle}" Fill="{Binding LiveMaterial}"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                                    Visibility="{Binding MaterialShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Polygon}"/>
+                    <Polygon Points="{Binding FixedStar}" Fill="{Binding LiveMaterial}"
+                             HorizontalAlignment="Center" VerticalAlignment="Center"
+                             Visibility="{Binding MaterialShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Star}"/>
+                </Grid>
+
+                <StackPanel Orientation="Vertical" Width="320" MarginLeft="16" VerticalAlignment="Center">
+                    <TextBlock Text="Material — acrylic and glass share a capture and differ in treatment; mica differs in source"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <DropDown ItemsSource="{Binding MaterialTypes}" SelectedItem="{Binding MaterialKind, Mode=TwoWay}"
+                              Width="300" MarginBottom="10"/>
+
+                    <TextBlock Text="Sitting over" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <DropDown ItemsSource="{Binding MaterialUnderlays}" SelectedItem="{Binding MaterialUnderlay, Mode=TwoWay}"
+                              Width="300" MarginBottom="10"/>
+
+                    <!-- MICA ONLY. Acrylic and glass ARE what is directly beneath them - that is the whole of what
+                         they are - so they have no source to choose. Mica is the one reading a picture from elsewhere,
+                         and the choice here is whose picture. -->
+                    <StackPanel Orientation="Vertical"
+                                Visibility="{Binding MaterialKind, Converter={conv:MaterialKnobVisibilityConverter}, ConverterParameter=Source}">
+                        <TextBlock Text="Source — the desktop's own wallpaper, or one of ours. They differ in DETAIL: the tile hides the drag wobble, texture.jpg shows it at its worst"
+                                   Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                        <DropDown ItemsSource="{Binding MaterialSources}" SelectedItem="{Binding MaterialSource, Mode=TwoWay}"
+                                  Width="300" MarginBottom="10"/>
+                    </StackPanel>
+
+                    <!-- Only with a picture of one's own - the real wallpaper is pinned to the desktop by nature. Drag
+                         the window to tell them apart: Desktop stays put while the window moves over it, Window travels
+                         with it, Element travels AND turns with the shape. -->
+                    <StackPanel Orientation="Vertical" Visibility="{Binding HasOwnSource, Converter={conv:BoolToVisibilityConverter}}">
+                        <TextBlock Text="Anchor — what the picture is pinned to"
+                                   Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <DropDown ItemsSource="{Binding MaterialAnchors}" SelectedItem="{Binding MaterialAnchor, Mode=TwoWay}"
+                                  Width="300" MarginBottom="10"/>
+                    </StackPanel>
+
+                    <TextBlock Text="Shape" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <DropDown ItemsSource="{Binding PreviewShapes}" SelectedItem="{Binding MaterialShape, Mode=TwoWay}"
+                              Width="300" MarginBottom="10"/>
+
+                    <!-- Every knob below appears only where it CHANGES something - the shape decides the first two, the
+                         material the next two. A slider that moves and does nothing is worse than one that is not
+                         there: it teaches the wrong thing about the feature. -->
+                    <StackPanel Orientation="Vertical"
+                                Visibility="{Binding MaterialShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Rectangle}">
+                        <TextBlock Text="Corner radius" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Minimum="0" Maximum="75" Value="{Binding MaterialRadius, Mode=TwoWay}" Width="240"/>
+                            <TextBlock Text="{Binding MaterialRadius}" MarginLeft="8" Width="48"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- The polygon's two numbers, shared by every stand on this tab: change them here and all of them
+                         follow. -->
+                    <StackPanel Orientation="Vertical"
+                                Visibility="{Binding MaterialShape, Converter={conv:PreviewShapeVisibilityConverter}, ConverterParameter=Polygon}">
+                        <TextBlock Text="Corners — 3 is a triangle, enough of them a circle" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="6">
+                            <Slider Value="{Binding ShapeCorners, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="3" Maximum="24"
+                                    TickFrequency="1" IsSnapToTickEnabled="true" Width="200"/>
+                            <NumericUpDown Width="88" Minimum="3" Maximum="24" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding ShapeCorners, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
+                        <TextBlock Text="Start angle — where corner 0 sits" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Value="{Binding ShapeStartAngle, Mode=TwoWay}" IsValueToolTipEnabled="True" Minimum="0" Maximum="360"
+                                    TickFrequency="1" IsSnapToTickEnabled="true" Width="200"/>
+                            <NumericUpDown Width="88" Minimum="0" Maximum="360" SmallChange="1" SnapsToSmallChange="true" StringFormat="N0"
+                                           IsDragScrubEnabled="true" TracksMouseWheelWhenOver="true"
+                                           Value="{Binding ShapeStartAngle, Mode=TwoWay}" VerticalAlignment="Center" MarginLeft="6"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock Text="Tint strength — glass takes its colour from behind, so keep it low there"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Minimum="0" Maximum="1" Value="{Binding MaterialTintOpacity, Mode=TwoWay}" Width="240"/>
+                        <TextBlock Text="{Binding MaterialTintOpacity}" MarginLeft="8" Width="48"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Vertical"
+                                Visibility="{Binding MaterialKind, Converter={conv:MaterialKnobVisibilityConverter}, ConverterParameter=Blur}">
+                        <TextBlock Text="Blur — how wide the frosting scatters" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Minimum="0" Maximum="40" Value="{Binding MaterialBlur, Mode=TwoWay}" Width="240"/>
+                            <TextBlock Text="{Binding MaterialBlur}" MarginLeft="8" Width="48"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Vertical"
+                                Visibility="{Binding MaterialKind, Converter={conv:MaterialKnobVisibilityConverter}, ConverterParameter=Refraction}">
+                        <TextBlock Text="Refraction — how hard the rim bends what is behind"
+                                   Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                        <StackPanel Orientation="Horizontal" MarginBottom="10">
+                            <Slider Minimum="0" Maximum="60" Value="{Binding MaterialRefraction, Mode=TwoWay}" Width="240"/>
+                            <TextBlock Text="{Binding MaterialRefraction}" MarginLeft="8" Width="48"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <TextBlock Text="Grain — hides the banding an 8-bit capture brings"
+                               Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2" TextWrapping="WrapByWords"/>
+                    <StackPanel Orientation="Horizontal" MarginBottom="10">
+                        <Slider Minimum="0" Maximum="0.2" Value="{Binding MaterialGrain, Mode=TwoWay}" Width="240"/>
+                        <TextBlock Text="{Binding MaterialGrain}" MarginLeft="8" Width="48"/>
+                    </StackPanel>
+
+                    <TextBlock Text="Tint colour" Foreground="{ResourceReference TextFillColorSecondary}" MarginBottom="2"/>
+                    <ColorPickerButton Width="48" Height="32" SelectedColor="{Binding MaterialTint, Mode=TwoWay}"/>
+                </StackPanel>
+            </StackPanel>
 
             <!-- Aura and Shadow: the soft band around a shape. Two properties rather than one with the offset zeroed -
                  a shadow has a DIRECTION and an aura does not. Both are the shape's own signed distance read further out,

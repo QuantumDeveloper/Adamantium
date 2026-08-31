@@ -81,6 +81,13 @@ internal sealed class TextureBatchCollector : BrushSdfCollector<TextureItem>
         {
             TileBrush tile => tile.ContentSource,
             NineSliceBrush nine => nine.Source,
+            // A material with a picture of its own. It is not a textured fill and never goes through this batch - it
+            // only wants the SAME answer to "what texture does this brush name", which is the question this method is.
+            //
+            // MICA ONLY, and stated HERE so it is stated once: acrylic and liquid glass ARE "what is directly beneath
+            // this element", and a picture from elsewhere would not make them a variant of themselves - it would make
+            // them something else wearing their name.
+            MaterialBrush material => MaterialRectCollector.IsWallpaper(material.Material) ? material.Source : null,
             _ => null
         };
 

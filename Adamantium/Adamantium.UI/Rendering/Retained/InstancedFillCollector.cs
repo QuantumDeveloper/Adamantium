@@ -107,6 +107,24 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         public int TexGpuCapacity;
         public bool TexRecreated;
         public ITexture PendingTexture;   // what the instances appended since the last run all sample
+
+        // Parallel MATERIAL instance state for this key's shared mesh. The record is the PATTERN one deliberately: both
+        // feed PatGeomData, so a second identical struct would only be a second thing to keep in step.
+        public PatternGeometryInstance[] MatItems = new PatternGeometryInstance[16];
+        public int MatCount;
+        public int MatFlushed;
+        public Buffer[] MatGpuRing;
+        public Buffer MatGpu;
+        public int MatGpuCapacity;
+        public bool MatRecreated;
+        // What the instances appended since the last run agree about: the image bound to them, the pass that reads it,
+        // and the frame region the capture is taken from. A disagreement about either of the first two ends the run.
+        public bool MatPending;
+        public bool MatWallpaper;
+        public bool MatGlass;
+        public Rect2D MatRegion;
+        public ITexture MatSource;          // a picture of the author's own, replacing the built-in source
+        public MaterialAnchor MatAnchor;    // and what it is pinned to, which decides the mapping
     }
 
     private readonly GraphicsDevice _device;
@@ -141,6 +159,10 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         public readonly List<(KeySegment Seg, uint First, uint Count, int Kind)> PatKeys = new();
         // Textured runs carry their TEXTURE: one is bound per draw, so a run ends where the texture changes.
         public readonly List<(KeySegment Seg, uint First, uint Count, ITexture Texture)> TexKeys = new();
+        // Material runs carry the whole description of their source: which image (a capture of the frame, or the
+        // desktop), which pass reads it, and which region the capture is taken from.
+        public readonly List<(KeySegment Seg, uint First, uint Count, bool Wallpaper, bool Glass, Rect2D Region,
+            ITexture Source, MaterialAnchor Anchor)> MatKeys = new();
         public readonly List<IRenderUnit> Units = new();
         public Rect2D Scissor;
 
@@ -149,7 +171,7 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         // recorded value, so a replay marks the buffer exactly as the recording did.
         public uint StencilRef;
 
-        public void Reset() { Keys.Clear(); GradKeys.Clear(); PatKeys.Clear(); TexKeys.Clear(); Units.Clear(); }
+        public void Reset() { Keys.Clear(); GradKeys.Clear(); PatKeys.Clear(); TexKeys.Clear(); MatKeys.Clear(); Units.Clear(); }
     }
     private readonly List<FlushRecord> _flushRecords = new();
     private int _flushCount;   // records used this frame (pooled objects reused up to this count)
@@ -190,6 +212,27 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         _brush.FringePixels.SetValue(DeviceFringePx);
         return _brush;
     }
+
+    // The material passes live in their OWN effect, not the brushes' - putting them in BrushEffect made this driver's
+    // shader compiler die on an unrelated pass. See the note at the top of MaterialEffect.fx.
+    private Adamantium.UI.Effects.Generated.MaterialEffect _material;
+
+    private Adamantium.UI.Effects.Generated.MaterialEffect Material(Matrix4x4F projection)
+    {
+        if (_material != null) return _material;
+
+        _material = new Adamantium.UI.Effects.Generated.MaterialEffect(_device);
+        _material.Projection.SetValue(projection);
+        _material.TransformsAddress.SetValue(TransformsAddress);
+        var vp = _device.CurrentViewports;
+        if (vp is { Length: > 0 }) _material.ViewportSize.SetValue(new Vector2F(vp[0].Width, vp[0].Height));
+        return _material;
+    }
+
+    /// <summary>Where a material instance's backdrop comes from. Handed over by the cache rather than built here,
+    /// because there must be exactly ONE capture of the frame per region per frame - see
+    /// <see cref="MaterialRectCollector.BindSource"/>.</summary>
+    public MaterialRectCollector Backdrop { get; set; }
 
     /// <summary>A pending (not-yet-flushed) clip group exists.</summary>
     public bool Active => _pendingKeys.Count > 0;
@@ -304,6 +347,26 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             else seg.TexRecreated = true;
             seg.TexGpu = seg.TexGpuRing == null ? null : seg.TexGpuRing[slot];
 
+            // Parallel grow/reset for the material instance buffer (only when this key has ever held material instances).
+            if (seg.MatGpuRing != null && (seg.MatGpuRing.Length != copies || seg.MatGpuCapacity < seg.MatItems.Length))
+            {
+                DeferRing(seg.MatGpuRing);
+                seg.MatGpuRing = null;
+            }
+            if (seg.MatGpuRing == null && seg.MeshUploaded && seg.MatCount > 0)
+            {
+                seg.MatGpuRing = new Buffer[copies];
+                for (var i = 0; i < copies; i++)
+                {
+                    seg.MatGpuRing[i] = Buffer.New<PatternGeometryInstance>(_device, (uint)seg.MatItems.Length,
+                        BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+                }
+                seg.MatGpuCapacity = seg.MatItems.Length;
+                seg.MatRecreated = true;
+            }
+            else seg.MatRecreated = true;
+            seg.MatGpu = seg.MatGpuRing == null ? null : seg.MatGpuRing[slot];
+
             seg.Count = 0;
             seg.Flushed = 0;
             seg.GradCount = 0;
@@ -313,6 +376,9 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
             seg.TexCount = 0;
             seg.TexFlushed = 0;
             seg.PendingTexture = null;
+            seg.MatCount = 0;
+            seg.MatFlushed = 0;
+            seg.MatPending = false;
             seg.InPending = false;
         }
         _pendingKeys.Clear();
@@ -609,6 +675,111 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         return inst;
     }
 
+    public bool CanBatchMaterial(GeometryRenderUnit unit) => unit.TryGetInstancedMaterialFill(out _, out _, out _, out _, out _);
+
+    /// <summary>
+    /// Collect one instanceable BACKDROP MATERIAL fill on tessellated geometry - a star, an icon, any authored outline.
+    ///
+    /// <para>A run must agree about the image and the pass that reads it (a disagreement is refused, so the caller
+    /// flushes); the captured region merely GROWS to cover every instance in it.</para></summary>
+    public bool TryAddMaterial(GeometryRenderUnit unit, Matrix4x4F local, Rect2D scissor, Rect logicalBounds,
+        int transformSlot, Rect2D captureRegion)
+    {
+        if (!unit.TryGetInstancedMaterialFill(out var key, out var meshObj, out var brush, out var localBounds, out var opacity)) return false;
+        local = unit.Place(local);
+        if (meshObj is not FrozenMesh mesh) return false;
+        var seg = GetOrCreate(key, mesh);
+        if (seg == null) return false;
+
+        var wallpaper = MaterialRectCollector.IsWallpaper(brush.Material);
+        var glass = MaterialRectCollector.IsGlass(brush.Material);
+        var source = unit.BrushTexture();
+        var anchor = brush.Anchor;
+        if (seg.MatPending && seg.MatCount > seg.MatFlushed
+            && (seg.MatWallpaper != wallpaper || seg.MatGlass != glass || !ReferenceEquals(seg.MatSource, source)
+                || (source != null && seg.MatAnchor != anchor))) return false;
+
+        if (seg.MatCount + 1 > seg.MatItems.Length) Array.Resize(ref seg.MatItems, seg.MatItems.Length * 2);
+        if (seg.MatGpu == null)
+        {
+            var copies = (int)Math.Max(1u, _device.MaxFramesInFlight);
+            if (seg.MatGpuRing != null) DeferRing(seg.MatGpuRing);
+            seg.MatGpuRing = new Buffer[copies];
+            for (var i = 0; i < copies; i++)
+            {
+                seg.MatGpuRing[i] = Buffer.New<PatternGeometryInstance>(_device, (uint)seg.MatItems.Length,
+                    BufferUsageFlags.StorageBuffer | BufferUsageFlags.ShaderDeviceAddress, Mem);
+            }
+            seg.MatGpu = seg.MatGpuRing[_writeCursor % copies];
+            seg.MatGpuCapacity = seg.MatItems.Length;
+            seg.MatRecreated = true;
+        }
+        if (seg.MatCount + 1 > seg.MatGpuCapacity) return false;
+
+        seg.MatItems[seg.MatCount++] = BuildMaterialInstance(brush, local, localBounds, opacity, transformSlot,
+            FadeSlotFor(unit), source != null && anchor == MaterialAnchor.Element);
+        seg.MatRegion = seg.MatPending ? Union(seg.MatRegion, captureRegion) : captureRegion;
+        seg.MatWallpaper = wallpaper;
+        seg.MatGlass = glass;
+        seg.MatSource = source;
+        seg.MatAnchor = anchor;
+        seg.MatPending = true;
+
+        _scissor = scissor;
+        if (!seg.InPending) { seg.InPending = true; _pendingKeys.Add(seg); }
+        AddPendingUnit(unit);
+        NoteFringed(unit, logicalBounds);
+        if (!_hasUnion) { _uL = logicalBounds.X; _uT = logicalBounds.Y; _uR = logicalBounds.Right; _uB = logicalBounds.Bottom; _hasUnion = true; }
+        else
+        {
+            if (logicalBounds.X < _uL) _uL = logicalBounds.X;
+            if (logicalBounds.Y < _uT) _uT = logicalBounds.Y;
+            if (logicalBounds.Right > _uR) _uR = logicalBounds.Right;
+            if (logicalBounds.Bottom > _uB) _uB = logicalBounds.Bottom;
+        }
+        return true;
+    }
+
+    private static Rect2D Union(Rect2D a, Rect2D b)
+    {
+        if (a.Extent.Width == 0 || a.Extent.Height == 0) return b;
+        if (b.Extent.Width == 0 || b.Extent.Height == 0) return a;
+        var x = Math.Min(a.Offset.X, b.Offset.X);
+        var y = Math.Min(a.Offset.Y, b.Offset.Y);
+        var right = Math.Max(a.Offset.X + (int)a.Extent.Width, b.Offset.X + (int)b.Extent.Width);
+        var bottom = Math.Max(a.Offset.Y + (int)a.Extent.Height, b.Offset.Y + (int)b.Extent.Height);
+        return new Rect2D
+        {
+            Offset = new Offset2D { X = x, Y = y },
+            Extent = new Extent2D { Width = (uint)(right - x), Height = (uint)(bottom - y) }
+        };
+    }
+
+    // The same PatGeomData slots the pattern bake fills, carrying the material's numbers: tint in Color1 (alpha = its
+    // strength), blur / grain / refraction in Color3 - as MaterialRectCollector bakes them for the analytic shapes.
+    private static PatternGeometryInstance BuildMaterialInstance(MaterialBrush brush, Matrix4x4F local, Rect localBounds,
+        double opacity, int transformSlot, int fadeSlot, bool pinnedToElement)
+    {
+        var tint = brush.TintColor;
+
+        return new PatternGeometryInstance
+        {
+            Local = local,
+            // .y says the picture is pinned to the ELEMENT, and the shader then takes its coordinates from the mesh's
+            // own local bounds instead of from the frame.
+            Params = new Vector4F(fadeSlot, pinnedToElement ? 1f : 0f, 0, transformSlot),
+            LocalBounds = new Vector4F((float)localBounds.X, (float)localBounds.Y, (float)localBounds.Width, (float)localBounds.Height),
+            // The tint's ALPHA carries TintOpacity - how much the tint covers the capture - while the element's own
+            // opacity rides the fill's alpha in Color3.w, since here the coverage is the geometry rather than a field.
+            Color1 = new Vector4F(tint.R / 255f, tint.G / 255f, tint.B / 255f, (float)Math.Clamp(brush.TintOpacity, 0.0, 1.0)),
+            Color2 = Vector4F.Zero,
+            Color3 = new Vector4F((float)brush.BlurAmount, (float)brush.NoiseAmount, (float)brush.Refraction,
+                (float)Math.Clamp(opacity * brush.Opacity, 0.0, 1.0)),
+            Noise = Vector4F.Zero,
+            Anim = Vector4F.Zero
+        };
+    }
+
     // Register a collected unit for the deferred per-unit draw - but ONLY if it still has something to draw there. A
     // solid fill whose fringe is instanced too has nothing left (its body is skipped via FillInstanced), and that empty
     // Render() per element is exactly the cost this path exists to remove.
@@ -713,6 +884,16 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
                 rec.TexKeys.Add((seg, (uint)seg.TexFlushed, (uint)tcount, seg.PendingTexture));
                 seg.TexFlushed = seg.TexCount;
                 seg.PendingTexture = null;   // the run is closed; the next texture starts a fresh one
+            }
+            var mcount = seg.MatCount - seg.MatFlushed;
+            if (mcount > 0)
+            {
+                if (!SceneClean || seg.MatRecreated)
+                    seg.MatGpu.SetData(seg.MatItems.AsSpan(seg.MatFlushed, mcount), (uint)(seg.MatFlushed * PatInstanceStride));
+                rec.MatKeys.Add((seg, (uint)seg.MatFlushed, (uint)mcount, seg.MatWallpaper, seg.MatGlass, seg.MatRegion,
+                    seg.MatSource, seg.MatAnchor));
+                seg.MatFlushed = seg.MatCount;
+                seg.MatPending = false;   // the run is closed; the next source starts a fresh one
             }
             seg.InPending = false;
         }
@@ -914,6 +1095,34 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
                 _device.SetVertexBuffer(seg.VtxBuffer);
                 _device.PrimitiveTopology = seg.Topology;
                 brush.TextureMeshPass.Apply();
+                if (seg.Indexed)
+                    _device.DrawIndexed(seg.VtxBuffer, seg.IdxBuffer, instanceCount: count, indexCount: seg.IndexCount);
+                else
+                    _device.Draw(seg.VertexCount, count);
+            }
+            _device.SetScissors(fullScissor);
+        }
+
+        // BACKDROP MATERIALS on tessellated geometry, LAST of this group's fills: each run copies the frame behind it
+        // before drawing, so everything meant to show through must already be in the frame. The copy is taken between
+        // two draws, hence a source bound per run rather than once for the group.
+        if (rec.MatKeys.Count > 0 && Backdrop != null)
+        {
+            SetupInstancedState(projection);
+            var material = Material(projection);
+            material.Projection.SetValue(projection);
+            material.TransformsAddress.SetValue(TransformsAddress);
+            _device.SetScissors(rec.Scissor);
+            foreach (var (seg, first, count, wallpaper, glass, region, source, anchor) in rec.MatKeys)
+            {
+                // NO backdrop, NO draw - the same refusal the textured runs make, and for the same reason: a pass that
+                // samples an unbound descriptor paints whatever was left there.
+                if (!Backdrop.BindSource(_device, wallpaper, region, source, anchor,
+                        material.SourceTexture, material.SourceSampler, material.SourceUv)) continue;
+                material.InstancesAddress.SetValue(seg.MatGpu.GetDeviceAddress() + (ulong)(first * PatInstanceStride));
+                _device.SetVertexBuffer(seg.VtxBuffer);
+                _device.PrimitiveTopology = seg.Topology;
+                (glass ? material.MaterialGlassMeshPass : material.MaterialFrostedMeshPass).Apply();
                 if (seg.Indexed)
                     _device.DrawIndexed(seg.VtxBuffer, seg.IdxBuffer, instanceCount: count, indexCount: seg.IndexCount);
                 else

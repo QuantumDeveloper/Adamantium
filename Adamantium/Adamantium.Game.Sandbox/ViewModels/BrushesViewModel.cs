@@ -361,6 +361,96 @@ public partial class BrushesViewModel : TabPageViewModel
     [Bindable] private PreviewShape _meshShape = PreviewShape.Rectangle;
     [Bindable] private PreviewShape _imageShape = PreviewShape.Rectangle;
 
+    // --- Backdrop material stand ---------------------------------------------------------------------------------
+    // ONE live brush the controls drive in place, exactly as the aura below: the element holds this object and each
+    // property change raises its own Changed, so the pane re-records without the stand rebuilding anything.
+    //
+    // The point of the stand is that acrylic and liquid glass are the SAME material with a different treatment - the
+    // dropdown turns one into the other while everything else stays put, which is far more convincing than two static
+    // swatches side by side. Mica is in the same list because it differs in the third way: not the treatment but the
+    // source, the desktop instead of the frame.
+    public MaterialBrush LiveMaterial { get; } = new MaterialBrush
+    {
+        Material = MaterialType.Acrylic,
+        TintColor = new Color(32, 36, 46, 255),
+        TintOpacity = 0.55,
+        BlurAmount = 10,
+        NoiseAmount = 0.04,
+        Refraction = 18
+    };
+
+    public MaterialType[] MaterialTypes { get; } = Enum.GetValues<MaterialType>();
+
+    [Bindable] private MaterialType _materialKind = MaterialType.Acrylic;
+    [Bindable] private PreviewShape _materialShape = PreviewShape.Rectangle;
+    [Bindable] private double _materialRadius = 24;
+    [Bindable] private Color _materialTint = new Color(32, 36, 46, 255);
+    [Bindable] private double _materialTintOpacity = 0.55;
+    [Bindable] private double _materialBlur = 10;
+    [Bindable] private double _materialGrain = 0.04;
+    [Bindable] private double _materialRefraction = 18;
+
+    /// <summary>What mica may read, as ONE list - "built-in or mine" and "which of mine" are the same question asked
+    /// twice. Chosen to differ in DETAIL: tile-sample is 64x64 across the whole desktop, texture.jpg is 1920x1200.
+    /// </summary>
+    public string[] MaterialSources { get; } =
+    {
+        DesktopWallpaperSource, "tile-sample.png", "elephant.png", "ColoredImage.jpg", "texture2.jpg", "texture.jpg"
+    };
+
+    private const string DesktopWallpaperSource = "Desktop wallpaper";
+
+    public MaterialAnchor[] MaterialAnchors { get; } = Enum.GetValues<MaterialAnchor>();
+
+    [Bindable] private string _materialSource = DesktopWallpaperSource;
+    [Bindable] private MaterialAnchor _materialAnchor = MaterialAnchor.Desktop;
+
+    /// <summary>Whether the anchor means anything right now: only mica takes a picture, and only a picture has to be
+    /// pinned to anything.</summary>
+    public bool HasOwnSource => _materialSource != DesktopWallpaperSource && _materialKind == MaterialType.Mica;
+
+    partial void OnMaterialKindChanged(MaterialType value)
+    {
+        LiveMaterial.Material = value;
+        RaisePropertyChanged(nameof(HasOwnSource));
+    }
+
+    // Loaded HERE, when it is picked, rather than up front: the whole set would otherwise be decoded on every start of
+    // the tab for the one picture anybody looks at. The cache keeps what has already been asked for.
+    partial void OnMaterialSourceChanged(string value)
+    {
+        LiveMaterial.Source = value == DesktopWallpaperSource
+            ? null
+            : BitmapImageCache.GetOrCreate(System.IO.Path.Combine(AppContext.BaseDirectory, "Textures", value));
+        RaisePropertyChanged(nameof(HasOwnSource));
+    }
+
+    partial void OnMaterialAnchorChanged(MaterialAnchor value) => LiveMaterial.Anchor = value;
+
+    partial void OnMaterialTintChanged(Color value) => LiveMaterial.TintColor = value;
+    partial void OnMaterialTintOpacityChanged(double value) => LiveMaterial.TintOpacity = value;
+    partial void OnMaterialBlurChanged(double value) => LiveMaterial.BlurAmount = value;
+    partial void OnMaterialGrainChanged(double value) => LiveMaterial.NoiseAmount = value;
+    partial void OnMaterialRefractionChanged(double value) => LiveMaterial.Refraction = value;
+
+    /// <summary>What lies UNDER the material - the whole point of a backdrop is that it has something to show, and a
+    /// flat colour proves nothing. Switchable because different fields expose different faults: a moving noise shows
+    /// whether the capture is fresh, a hard-edged checkerboard shows how far the refraction bends, and a gradient shows
+    /// banding the grain is there to hide.</summary>
+    public MaterialUnderlay[] MaterialUnderlays { get; } = Enum.GetValues<MaterialUnderlay>();
+
+    [Bindable] private MaterialUnderlay _materialUnderlay = MaterialUnderlay.LivingNoise;
+
+    /// <summary>The photograph the material can be put over - the case it is actually used in, and the only one where
+    /// "does this read as glass" can honestly be judged. The same sample the ImageBrush stand uses, through the same
+    /// cache, so the tab loads it once.</summary>
+    public ImageBrush MaterialPicture { get; } = new ImageBrush
+    {
+        Source = BitmapImageCache.GetOrCreate(
+            System.IO.Path.Combine(AppContext.BaseDirectory, "Textures", "tile-sample.png")),
+        Stretch = Stretch.UniformToFill
+    };
+
     // --- Aura / Shadow stand -------------------------------------------------------------------------------------
     // Two live objects the sliders drive in place: the element holds THESE, and each property change raises their
     // Changed, so the band re-records without the stand rebuilding anything.
@@ -468,7 +558,7 @@ public partial class BrushesViewModel : TabPageViewModel
 
     /// <summary>The five-pointed star every stand can wear: the concave one of the four, so a fill has to survive
     /// reflex corners and a tessellation that is nothing like a quad.</summary>
-    public PointsCollection FixedStar { get; } = Star(300, 200);
+    public PointsCollection FixedStar { get; } = Star(440, 300);
 
     /// <summary>The image stand's star, sized by the same Width/Height sliders the other figures follow - a Polygon
     /// holds authored coordinates rather than stretching to a slot, so the points are computed here.</summary>

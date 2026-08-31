@@ -90,10 +90,12 @@ float2 CaptureUv(float2 fragment, float4 sourceUv)
 // this driver has a documented ceiling on what one pixel shader can carry before vkCreateShadersEXT or the GPU itself
 // gives out - the pattern shader hit it, and it is the reason materials are a separate effect at all. Widen only with a
 // measurement in hand.
-float4 BlurCapture(float2 uv, float4 sourceUv, float radiusPx)
+// Takes the SCALE, not the whole mapping: a picture pinned to the element has no rectangle in the frame at all, and
+// only the tap spacing is wanted here.
+float4 BlurCapture(float2 uv, float2 uvScale, float radiusPx)
 {
     // The tap spacing is the radius in FRAME pixels put through the same scale - the mapping is already stated that way.
-    float2 texel = radiusPx * sourceUv.xy;
+    float2 texel = radiusPx * uvScale;
     float4 sum = SourceTexture.Sample(SourceSampler, uv);
     sum += SourceTexture.Sample(SourceSampler, uv + float2( texel.x,  0.0));
     sum += SourceTexture.Sample(SourceSampler, uv + float2(-texel.x,  0.0));
@@ -114,8 +116,13 @@ float4 MaterialFrostedPS(MaterialPSInput input) : SV_Target
     float4 r4 = lerp(min(input.Radii, float4(lim, lim, lim, lim)), input.Radii, isPolygon);
     float d = BrushShapeDistance(input.Local, input.Half, r4, 2, isEllipse + isPolygon * 2.0);
 
-    float2 uv = saturate(CaptureUv(input.Position.xy, SourceUv));
-    float4 behind = BlurCapture(uv, SourceUv, it.Knobs.x);
+    // Knobs.w pins the picture to the ELEMENT: coordinates come from the fragment's place in the SHAPE, not in the
+    // frame - which is what makes such a picture travel and TURN with it.
+    float pin = it.Knobs.w;
+    float2 uvLocal = input.Local / max(2.0 * input.Half, float2(1.0, 1.0)) + 0.5;
+    float2 uvScale = lerp(SourceUv.xy, 1.0 / max(2.0 * input.Half, float2(1.0, 1.0)), pin);
+    float2 uv = saturate(lerp(CaptureUv(input.Position.xy, SourceUv), uvLocal, pin));
+    float4 behind = BlurCapture(uv, uvScale, it.Knobs.x);
 
     // Tint over the capture, then grain. The grain is what keeps a large pane from banding - the capture came from an
     // 8-bit target and was smoothed twice, so its gradients are flatter than the eye tolerates at this size.
@@ -130,10 +137,189 @@ float4 MaterialFrostedPS(MaterialPSInput input) : SV_Target
 }
 
 
+// ---- LIQUID GLASS: the same capture, BENT ---------------------------------------------------------------------
+// Frosting scatters what is behind it; a lens BENDS it, and the bending is what makes a shape read as a solid piece of
+// glass rather than as a hazy panel. Everything below follows from one observation: a thick drop of glass is flat in
+// the middle and steeply curved at its rim, so light passes straight through the centre and is pushed aside near the
+// edge. The signed distance already describes exactly that - it is zero at the rim and grows inward - so the surface's
+// slope comes free, without a normal map or any geometry.
+//
+// Three things arrive together, and none of them reads as glass alone:
+//   - REFRACTION: sampling is displaced along the surface's slope, hardest at the rim.
+//   - DISPERSION: red and blue are displaced by slightly different amounts, so the rim carries a faint colour fringe,
+//     as it does in a real lens.
+//   - THE RIM ITSELF: a bright line where the curvature is steepest, which is what tells the eye the shape has depth.
+
+// How the surface leans, at this fragment. The gradient of a signed distance IS the direction away from the nearest
+// edge, so the derivatives give the slope of a lens whose shape nobody had to model.
+float2 GlassSlope(float d, float2 local)
+{
+    float2 slope = float2(ddx(d), ddy(d));
+    float len = length(slope);
+    return len > 1e-5 ? slope / len : float2(0.0, 0.0);
+}
+
+// Where the curvature is: flat across the middle, rising steeply within `rim` pixels of the edge. Squared so the centre
+// stays honestly flat instead of bulging slightly everywhere.
+float GlassCurve(float d, float rim)
+{
+    float t = saturate(1.0 + d / max(rim, 1.0));   // d is negative inside; 0 at the centre, 1 at the edge
+    return t * t;
+}
+
+[shader("fragment")]
+float4 MaterialGlassPS(MaterialPSInput input) : SV_Target
+{
+    MaterialRectData* items = (MaterialRectData*)InstancesAddress;
+    MaterialRectData it = items[input.InstId];
+
+    float isPolygon = step(it.Params.x, -1.5);
+    float isEllipse = step(it.Params.x, -0.0001) * (1.0 - isPolygon);
+    float lim = min(input.Half.x, input.Half.y);
+    float4 r4 = lerp(min(input.Radii, float4(lim, lim, lim, lim)), input.Radii, isPolygon);
+    float d = BrushShapeDistance(input.Local, input.Half, r4, 2, isEllipse + isPolygon * 2.0);
+
+    // The lens: how far to push the sample, and in which direction.
+    float strength = it.Knobs.z;
+    float rim = max(strength * 2.0, 8.0);
+    float2 slope = GlassSlope(d, input.Local);
+
+    // As in the frosted pass, and the bend's scale comes from the shape too.
+    float pin = it.Knobs.w;
+    float2 uvScale = lerp(SourceUv.xy, 1.0 / max(2.0 * input.Half, float2(1.0, 1.0)), pin);
+    float2 push = slope * (GlassCurve(d, rim) * strength) * uvScale;
+
+    float2 uvLocal = input.Local / max(2.0 * input.Half, float2(1.0, 1.0)) + 0.5;
+    float2 uv = lerp(CaptureUv(input.Position.xy, SourceUv), uvLocal, pin);
+
+    // Dispersion: the three channels take slightly different paths, which is why the fringe appears only where the
+    // bending is strong - along the rim - and not across the flat middle.
+    float3 behind;
+    behind.r = SourceTexture.Sample(SourceSampler, saturate(uv + push * 1.06)).r;
+    behind.g = SourceTexture.Sample(SourceSampler, saturate(uv + push)).g;
+    behind.b = SourceTexture.Sample(SourceSampler, saturate(uv + push * 0.94)).b;
+
+    // A LIGHT tint only: glass takes its colour from what is behind it, and a heavy tint turns it back into a panel.
+    float3 colour = lerp(behind, it.Tint.rgb, saturate(it.Tint.a) * 0.5);
+
+    // The rim highlight, brightest where the surface turns over. Weighted towards the upper-left because that is where
+    // light is assumed to come from throughout this engine's shading.
+    float curve = GlassCurve(d, rim);
+    float facing = saturate(dot(slope, normalize(float2(-0.7, -0.7))));
+    colour += curve * curve * facing * 0.35;
+
+    float grain = (Hash21(input.Position.xy) - 0.5) * it.Knobs.y;
+    colour = saturate(colour + grain);
+
+    float aa = fwidth(d) + 1e-4;
+    float coverage = 1.0 - smoothstep(-aa, aa, d);
+    return float4(colour, coverage);
+}
+
+
+// ---- THE SAME MATERIALS ON ARBITRARY GEOMETRY -----------------------------------------------------------------
+// An authored outline arrives as triangles, so these passes do LESS than the analytic ones above: no distance field, no
+// radii, no edge to anti-alias - coverage IS the geometry. What remains is the material itself: read the capture, tint,
+// grain.
+//
+// The one thing lost is the lens's SHAPE - the slope came from the distance field. It is taken from the fragment's place
+// within the mesh's local bounds instead, so the bend follows the bounding box rather than the true outline.
+
+struct MaterialMeshPSInput
+{
+    float4 Position : SV_Position;
+    float2 Local : TEXCOORD0;                   // fragment's local mesh xy, for the lens falloff
+    nointerpolation uint InstId : TEXCOORD1;
+    nointerpolation float Fade : TEXCOORD2;
+};
+
+[shader("vertex")]
+MaterialMeshPSInput MaterialFillVS(UI_VERTEX v, uint instanceId : SV_InstanceID)
+{
+    PatGeomData* items = (PatGeomData*)InstancesAddress;
+    PatGeomData it = items[instanceId];
+
+    // local -> slot space -> world, as PatternFillVS and the other instanced fills do it.
+    NodeSlot* nodes = (NodeSlot*)TransformsAddress;
+    float4 world = mul(mul(float4(v.position.xyz, 1.0), it.Local), nodes[(uint)it.Params.w].World);
+
+    MaterialMeshPSInput o;
+    o.Position = mul(world, Projection);
+    o.Local = v.position.xy;
+    o.InstId = instanceId;
+    int fadeSlot = int(it.Params.x);
+    o.Fade = lerp(1.0, nodes[max(fadeSlot, 0)].Params.x, step(0.0, float(fadeSlot)));
+    return o;
+}
+
+[shader("fragment")]
+float4 MaterialFrostedMeshPS(MaterialMeshPSInput input) : SV_Target
+{
+    PatGeomData* items = (PatGeomData*)InstancesAddress;
+    PatGeomData it = items[input.InstId];
+
+    // Params.y pins the picture to the ELEMENT - here, the fragment's place within the mesh's own local bounds.
+    float pin = it.Params.y;
+    float2 extent = max(it.LocalBounds.zw, float2(1.0, 1.0));
+    float2 uvLocal = (input.Local - it.LocalBounds.xy) / extent;
+    float2 uvScale = lerp(SourceUv.xy, 1.0 / extent, pin);
+    float2 uv = saturate(lerp(CaptureUv(input.Position.xy, SourceUv), uvLocal, pin));
+    float4 behind = BlurCapture(uv, uvScale, it.Color3.x);
+
+    float3 colour = lerp(behind.rgb, it.Color1.rgb, saturate(it.Color1.a));
+    float grain = (Hash21(input.Position.xy) - 0.5) * it.Color3.y;
+    colour = saturate(colour + grain);
+
+    return float4(colour, input.Fade * it.Color3.w);
+}
+
+[shader("fragment")]
+float4 MaterialGlassMeshPS(MaterialMeshPSInput input) : SV_Target
+{
+    PatGeomData* items = (PatGeomData*)InstancesAddress;
+    PatGeomData it = items[input.InstId];
+
+    float strength = it.Color3.z;
+
+    // Where the lens leans and how hard - from the fragment's place in the mesh's local bounds, since there is no
+    // distance field here. Flat in the middle, steep towards the outside, following the bounding box.
+    float2 halfSize = max(it.LocalBounds.zw * 0.5, float2(1.0, 1.0));
+    float2 outward = (input.Local - (it.LocalBounds.xy + halfSize)) / halfSize;
+    float edge = saturate(max(abs(outward.x), abs(outward.y)));
+    float curve = edge * edge;
+    float len = length(outward);
+    float2 slope = len > 1e-5 ? outward / len : float2(0.0, 0.0);
+
+    // As in the frosted mesh pass, and the bend's scale comes from the shape too.
+    float pin = it.Params.y;
+    float2 extent = max(it.LocalBounds.zw, float2(1.0, 1.0));
+    float2 uvScale = lerp(SourceUv.xy, 1.0 / extent, pin);
+    float2 push = slope * (curve * strength) * uvScale;
+
+    float2 uvLocal = (input.Local - it.LocalBounds.xy) / extent;
+    float2 uv = lerp(CaptureUv(input.Position.xy, SourceUv), uvLocal, pin);
+
+    float3 behind;
+    behind.r = SourceTexture.Sample(SourceSampler, saturate(uv + push * 1.06)).r;
+    behind.g = SourceTexture.Sample(SourceSampler, saturate(uv + push)).g;
+    behind.b = SourceTexture.Sample(SourceSampler, saturate(uv + push * 0.94)).b;
+
+    float3 colour = lerp(behind, it.Color1.rgb, saturate(it.Color1.a) * 0.5);
+
+    float facing = saturate(dot(slope, normalize(float2(-0.7, -0.7))));
+    colour += curve * curve * facing * 0.35;
+
+    float grain = (Hash21(input.Position.xy) - 0.5) * it.Color3.y;
+    colour = saturate(colour + grain);
+
+    return float4(colour, input.Fade * it.Color3.w);
+}
+
+
 // =====================================================================================================================
-// TECHNIQUE - one per MATERIAL FAMILY, one pass per carrier. Frosted serves both Acrylic and Mica: they differ in what
-// is CAPTURED and handed to it, not in what it does with the capture. Glass (the refracting lens) will be a second pass
-// over the same record.
+// TECHNIQUE - one pass per TREATMENT and CARRIER. Frosted serves both Acrylic and Mica: they differ in what is CAPTURED,
+// not in what is done with it. Glass bends the same capture instead of scattering it. Sdf and Mesh are the two carriers:
+// a shape described by a formula, and one that arrives as triangles.
 // =====================================================================================================================
 technique Material
 {
@@ -143,4 +329,26 @@ technique Material
         VertexShader = MaterialRectInstancedVS;
         PixelShader = MaterialFrostedPS;
     }
+
+    pass GlassSdf
+    {
+        Profile = 6.6;
+        VertexShader = MaterialRectInstancedVS;
+        PixelShader = MaterialGlassPS;
+    }
+
+    pass FrostedMesh
+    {
+        Profile = 6.6;
+        VertexShader = MaterialFillVS;
+        PixelShader = MaterialFrostedMeshPS;
+    }
+
+    pass GlassMesh
+    {
+        Profile = 6.6;
+        VertexShader = MaterialFillVS;
+        PixelShader = MaterialGlassMeshPS;
+    }
+
 }

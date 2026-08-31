@@ -209,6 +209,17 @@ public abstract class WindowBase : ContentControl, IWindow, IWindowInternals, IA
     /// where a platform has no cheap way to ask, and the position reported by its last move message is used instead.</summary>
     public Func<PixelPoint?> LivePositionProvider { get; set; }
 
+    /// <summary>Whether the user is dragging this window right now. Written by the message thread, read by the render
+    /// thread. Anything anchored to the DESKTOP cannot be drawn correctly during a drag - see RenderCache.WindowOnDesktop.
+    /// </summary>
+    public bool IsBeingMoved
+    {
+        get => System.Threading.Volatile.Read(ref _isBeingMoved);
+        set => System.Threading.Volatile.Write(ref _isBeingMoved, value);
+    }
+
+    private bool _isBeingMoved;
+
     /// <summary>Record where the OS just put this window, from whatever thread it said so on. Called by the platform
     /// ahead of the queued property update - see <see cref="LivePosition"/> for why the two are separate.</summary>
     public void UpdateLivePosition(double left, double top)
