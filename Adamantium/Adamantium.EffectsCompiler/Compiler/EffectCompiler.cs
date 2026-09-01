@@ -2,7 +2,6 @@
 using System.Collections.Immutable;
 using System.IO;
 using System.Text;
-using Adamantium.DXC;
 using Adamantium.Vulkan.Spirv.Reflection;
 
 namespace Adamantium.EffectsCompiler
@@ -81,15 +80,5 @@ namespace Adamantium.EffectsCompiler
          return compiler.DisassembleShader(shader);
       }
 
-      /// <summary>
-      /// Builds effect data from the provided bytecode.
-      /// </summary>
-      /// <param name="shaderSource">The bytecode list to for the provided effect.</param>
-      /// <returns>Built effect data.</returns>
-      public static EffectData Compile(params DxcCompilationResult[] shaderSource)
-      {
-         var compiler = new EffectCompilerInternal();
-         return compiler.Build(shaderSource);
-      }
    }
 }

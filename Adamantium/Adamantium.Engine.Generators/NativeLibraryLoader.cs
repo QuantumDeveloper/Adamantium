@@ -21,7 +21,6 @@ public class NativeLibraryLoader
     // (slang-c-shared.dll imports slang.dll), so list dependencies first.
     private static readonly string[] NativeLibraries =
     {
-        "dxcompiler.dll",
         "spirv-cross-c-shared.dll",
         "slang.dll",
         "slang-c-shared.dll",
