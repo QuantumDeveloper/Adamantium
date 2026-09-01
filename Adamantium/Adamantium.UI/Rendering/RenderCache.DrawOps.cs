@@ -52,6 +52,7 @@ public partial class RenderCache
                         // written that node's matrix, so both halves are being taken from one position in one frame - which
                         // is the condition the paragraph above is really about.
                         RepointIfItMoved(op.Unit);
+                        RefreshOverlayFade(op.Unit);
                         op.Unit.Render();
                         break;
                     case RenderOpKind.Segment:
@@ -90,6 +91,29 @@ public partial class RenderCache
     // this frame has just rewritten (RefreshMovedNodes); and an element inside a subtree whose slots this frame has just
     // rewritten (RefreshMovedComponents). All three mean the batched half and this half are being taken from one position
     // in one frame; re-pointing anything else is what tears a frame in two.
+    /// <summary>Hand a PER-UNIT draw the alpha its slot carries right now.
+    ///
+    /// <para>These draws (a stroke, a fill fringe, a per-unit body) are re-issued by the CPU on every replayed frame -
+    /// ExecuteOps calls Render() again - so they never needed to read the table from a shader: they only needed someone
+    /// to tell them the current number. Nobody did, which is why a unit wearing one used to keep the whole opacity
+    /// CHAIN in its baked colour and be re-baked by a slot-blind list whenever an ancestor faded. Now the chain comes
+    /// from the table (one lookup, already composed) and multiplies the element's own alpha, so the same unit's
+    /// INSTANCED fill can ride the slot like every other family.</para></summary>
+    private void RefreshOverlayFade(IRenderUnit unit)
+    {
+        if (_transformTable == null || unit?.Component == null) return;
+        unit.SetEffectiveOpacity(ApplySnap(unit.Component).SelfOpacity * _transformTable.AlphaAt(unit.FadeSlot));
+    }
+
+    /// <summary>The two things a deferred overlay needs before it draws: WHERE it is (if something moved) and HOW
+    /// FADED it is. One hook, so the instanced collector's deferred strokes and the recorded per-unit ops cannot drift
+    /// apart on what they were told.</summary>
+    private void PrepareOverlayForDraw(IRenderUnit unit)
+    {
+        RepointIfItMoved(unit);
+        RefreshOverlayFade(unit);
+    }
+
     private void RepointIfItMoved(IRenderUnit unit)
     {
         if (_compositedOwners.Count == 0 && _movedNodeOwners.Count == 0 && _movedOwners.Count == 0) return;

@@ -1432,11 +1432,10 @@ internal sealed class InstancedFillCollector : DeferredDisposableObject
         return true;
     }
 
-    /// <summary>The opacity slot this instance may read - or -1 when it may not. A unit that also draws a per-unit
-    /// overlay (a stroked Path) keeps the opacity CHAIN in its colour, because that overlay reads no table; letting the
-    /// instance read the slot as well would then fade it twice. The chain lives in exactly one place, and which place is
-    /// decided per UNIT (see RenderCache.RidesFadeSlot).</summary>
-    private static int FadeSlotFor(GeometryRenderUnit unit) => unit.HasPerUnitOverlay ? -1 : unit.FadeSlot;
+    /// <summary>The opacity slot this instance reads. Every unit reads one now, per-unit overlay or not: an overlay is
+    /// re-issued by the CPU on each frame and is handed the current alpha before it draws (RenderCache's
+    /// RefreshOverlayFade), so the chain no longer has to sit in the baked colour to reach it.</summary>
+    private static int FadeSlotFor(GeometryRenderUnit unit) => unit.FadeSlot;
 
     /// <summary>Replace [at, at+replaced) of this key's run in that flush with a staged range: the tail of the key's own
     /// array shifts, and every LATER run of the same key moves with it. Nothing else in the collector is touched, and the

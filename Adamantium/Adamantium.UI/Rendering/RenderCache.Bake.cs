@@ -491,18 +491,8 @@ public partial class RenderCache
     {
         if (u.Component == null) return;
 
-        u.SetEffectiveOpacity(RidesFadeSlot(u)
-            ? ApplySnap(u.Component).SelfOpacity
-            : EffectiveOpacity(u.Component));
+        u.SetEffectiveOpacity(ApplySnap(u.Component).SelfOpacity);
     }
-
-    // Does EVERYTHING this unit draws take its alpha from the opacity slot? Asked of the UNIT, not of its family: a
-    // tessellated shape's fill and fringe are instanced and read the slot, but the same unit can also draw a STROKE as a
-    // per-unit overlay, and that one bakes its colour from RenderData and reads no table. A stroked Path whose colour was
-    // stripped of the chain drew its stroke at full alpha - the window's hidden Restore glyph (Opacity=0) appeared on top
-    // of the Maximize one, which is the "square inside a square" the caption button turned into.
-    private static bool RidesFadeSlot(Core.Graphics.IRenderUnit u) =>
-        u is not RenderUnits.GeometryRenderUnit g || !g.HasPerUnitOverlay;
 
     private IUIComponent NodeOf(IUIComponent c)
     {

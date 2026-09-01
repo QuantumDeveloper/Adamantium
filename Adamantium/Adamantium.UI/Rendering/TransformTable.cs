@@ -270,6 +270,12 @@ internal sealed class TransformTable
 
     public bool TryGetOpacitySlot(Guid ownerId, out int slot) => _opacitySlotByOwner.TryGetValue(ownerId, out slot);
 
+    /// <summary>The alpha a slot carries RIGHT NOW, chain already folded in - the same number the shaders read. For the
+    /// draws that cannot read the table themselves: a per-unit overlay (a stroke, a fringe) is re-issued by the CPU on
+    /// every replayed frame, so it can simply ask here instead of being re-baked when an ancestor fades. A slot of -1
+    /// (nothing above this element fades) answers 1.</summary>
+    public float AlphaAt(int slot) => slot >= 0 && slot < _count ? _cpu[slot].Params.X : 1f;
+
     /// <summary>Is this slot inside THIS FRAME's GPU buffer? A slot allocated after <see cref="EnsureResources"/> sized
     /// the buffer is not uploaded until the next frame, and a shader that indexes by it reads past the allocation -
     /// which this device answers with DEVICE LOST, not with a wrong pixel. Callers that hand a slot INDEX to a shader

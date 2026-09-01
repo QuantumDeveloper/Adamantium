@@ -689,7 +689,6 @@ public partial class RenderCache
             _texRunByUnit.Clear();
             _fillSlotByUnit.Clear();
             _haloRunsByUnit.Clear();
-            _slotBlindUnits.Clear();
             _unitsByBrush.Clear();
             _brushPaintBaked.Clear();
             _walkGroup = null; 
@@ -751,7 +750,7 @@ public partial class RenderCache
             if (InstancedFillCollector.Enabled)
             {
                 _instanceBuffers ??= new GpuBufferManager(device);
-                _instancedFill ??= new InstancedFillCollector(device, _instanceBuffers) { PrepareOverlay = RepointIfItMoved };
+                _instancedFill ??= new InstancedFillCollector(device, _instanceBuffers) { PrepareOverlay = PrepareOverlayForDraw };
                 _instancedFill.TransformsAddress = _transformTable.DeviceAddress;   // instance VS fetches its slot matrix
                 _instancedFill.Backdrop = _materialBatch;   // may be null: the material batch is made on first sight of one
                 _instancedFill.BeginFrame();
@@ -1414,9 +1413,6 @@ public partial class RenderCache
                     // scene: measured at 200 refusals in 8 s on a faded subtree, 38 ms a frame against 0.5 patched.
                     if (_instancedFill.LastArena is { } fillArenaSlot)
                         _fillSlotByUnit[unit] = (fillArenaSlot, _instancedFill.LastSlot);
-                    // Only the ones that KEEP the chain in their colour need an ancestor's fade to find them here; the
-                    // ones riding the slot are reached by the slot itself.
-                    if (!RidesFadeSlot(unit)) _slotBlindUnits.Add(unit);
 
                     // The fill AND its analytic-AA fringe both ride the slot (one shared ring per mesh, drawn from the same
                     // instance buffer). A unit that still draws a per-unit overlay - a stroke, or a fringe the instanced
@@ -1448,7 +1444,6 @@ public partial class RenderCache
                         RoundedClipSlot(unit.Component, fullScissor)))
                 {
                     ggru.FillInstanced = true;
-                    if (!RidesFadeSlot(unit)) _slotBlindUnits.Add(unit);
                     // The fill rides the slot now; a per-unit overlay (its fringe, still per-unit here, or a stroke)
                     // bakes its transform at record time and is re-pointed at the flush - see PrepareOverlay.
                     if (_recording) group.NotBatchable("instancedGradientFill");
@@ -1475,7 +1470,6 @@ public partial class RenderCache
                         MaterialCaptureRegion(matBounds, scissor, fullScissor), RoundedClipSlot(unit.Component, fullScissor)))
                 {
                     mgru.FillInstanced = true;
-                    if (!RidesFadeSlot(unit)) _slotBlindUnits.Add(unit);
                     if (_recording) group.NotBatchable("instancedMaterialFill");
                     _batchScissor = scissor;
                     _batchClip = unit.Component;
@@ -1496,7 +1490,6 @@ public partial class RenderCache
                         RoundedClipSlot(unit.Component, fullScissor)))
                 {
                     pgru.FillInstanced = true;
-                    if (!RidesFadeSlot(unit)) _slotBlindUnits.Add(unit);
                     // As the gradient above: the fill rides the slot, the overlay is re-pointed at the flush.
                     if (_recording) group.NotBatchable("instancedPatternFill");
                     _batchScissor = scissor;
@@ -1518,7 +1511,6 @@ public partial class RenderCache
                         RoundedClipSlot(unit.Component, fullScissor)))
                 {
                     tgru.FillInstanced = true;
-                    if (!RidesFadeSlot(unit)) _slotBlindUnits.Add(unit);
                     if (_recording) group.NotBatchable("instancedTexturedFill");
                     _batchScissor = scissor;
                     _batchClip = unit.Component;
@@ -1570,6 +1562,7 @@ public partial class RenderCache
             // A per-unit draw bakes its world into RenderData - but it is recorded as its own op, so a replay can re-point
             // it (see ExecuteOps). It costs the group its rect-only slot patch, not the node its move.
             if (_recording) group.NotBatchable($"perUnitDraw<{unit.GetType().Name}>");
+            RefreshOverlayFade(unit);   // the chain from the table, as the replay does it - see RefreshOverlayFade
             unit.Render();
             if (_recording) RecordOp(new RenderOp { Kind = RenderOpKind.Unit, Unit = unit, Order = _recordOrder });
             }
@@ -1985,8 +1978,6 @@ public partial class RenderCache
                     return SpliceRefused($"notBakeable<{u.Component?.GetType().Name}>");   // rotated; the walk re-bakes anyway
             }
         }
-        if (!RefreshSlotBlindUnder(device)) return false;
-
         // A fade that just STARTED handed out a slot, and the instances under it still carry the index they were baked
         // with. Hand the frame to the walk so they pick it up - once, at the start of the fade; every step after it is
         // one float in the table.
@@ -1994,28 +1985,6 @@ public partial class RenderCache
 
         AcceptPatchedTransforms();
         ExecuteOps(device, fullScissor);
-        return true;
-    }
-
-    // Element Opacity marks only the element it was set on - the slot carries it down to everyone whose shader reads it.
-    // The families that CANNOT read it (text, instanced fills) still hold the chain in their baked colour, so they are
-    // re-baked here: the handful that sit under a dirty element, found by walking the short list of them rather than the
-    // subtree. False = one of them could not be re-baked, and the caller falls back to the walk.
-    private bool RefreshSlotBlindUnder(IGraphicsDevice device)
-    {
-        if (_slotBlindUnits.Count == 0 || _partialDirty.Count == 0) return true;
-
-        foreach (var u in _slotBlindUnits)
-        {
-            if (u.Component == null || !IsUnder(u.Component, _partialDirty)) continue;
-
-            u.SetEffectiveOpacity(EffectiveOpacity(u.Component));
-            u.SetFadeSlot(OpacitySlotOf(device, u.Component));
-            if (!IsSlotPatchable(u)) return false;
-
-            var bakeWorld = ResolveBake(device, u.Component, World(u.Component), out var slot);
-            if (!PatchSlot(device, u, bakeWorld, slot)) return false;
-        }
         return true;
     }
 
